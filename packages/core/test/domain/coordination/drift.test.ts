@@ -14,7 +14,7 @@ import {
   readScope,
   scopeCovers,
 } from "../../../src/domain/coordination/index.ts";
-import { Glob } from "../../../src/domain/kernel/index.ts";
+import { Glob, makeId } from "../../../src/domain/kernel/index.ts";
 import { key } from "../../arbitraries/coordination.ts";
 import {
   changeIdArb,
@@ -215,6 +215,17 @@ describe("drift", () => {
         (f) => f._tag,
       ),
     ).toEqual(["undeclared-effect"]);
+    // A tenet binds like a must premise, with no premise held at all; generated scenarios rarely retract one, so pin it.
+    const tenet = {
+      id: makeId("tnt", "0".repeat(26)),
+      proposition: premiseA.proposition,
+      guards: [],
+    };
+    expect(
+      run({ ...b, premises: [], tenets: [tenet], derived: [cache("per-session", "opinion")] }).map(
+        (f) => f._tag,
+      ),
+    ).toEqual(["silent-retraction"]);
   });
 
   it("[drift.footprint-lists-undeclared-paths] footprint drift names exactly the touched paths outside the declared globs", () => {
