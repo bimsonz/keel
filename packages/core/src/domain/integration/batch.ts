@@ -31,7 +31,7 @@ export function batchSize(failureRate: number): number {
   if (Number.isNaN(failureRate) || failureRate >= 1) return 1;
   if (failureRate <= 0) return MAX_BATCH;
   const n = Math.floor(Math.log(0.8) / Math.log1p(-failureRate));
-  return Number.isFinite(n) ? Math.min(MAX_BATCH, Math.max(1, n)) : MAX_BATCH;
+  return Math.min(MAX_BATCH, Math.max(1, n));
 }
 
 export const PromotionState = Schema.Literals(["idle", "debouncing", "promoting", "frozen"]);
