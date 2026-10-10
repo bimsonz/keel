@@ -2,13 +2,13 @@
 # kills: b1.alarm-multiplex
 # why: arming a deadline replaces every other, so a redelivery retry silently cancels a lease's lapse
 diff --git a/apps/keel/src/adapters/driving/do/alarm.ts b/apps/keel/src/adapters/driving/do/alarm.ts
-index 26b5d16..7ad027d 100644
+index 072c578..038bf52 100644
 --- a/apps/keel/src/adapters/driving/do/alarm.ts
 +++ b/apps/keel/src/adapters/driving/do/alarm.ts
-@@ -38,6 +38,7 @@ async function armEarliest(storage: DurableObjectStorage): Promise<void> {
- }
- 
- export async function scheduleAlarm(storage: DurableObjectStorage, request: AlarmRequest): Promise<void> {
+@@ -45,6 +45,7 @@ export async function scheduleAlarm(
+   storage: DurableObjectStorage,
+   request: AlarmRequest,
+ ): Promise<void> {
 +  storage.sql.exec("DELETE FROM keel_alarms");
    storage.sql.exec(
      "INSERT INTO keel_alarms (reason, kind, at) VALUES (?, ?, ?) ON CONFLICT (reason) DO UPDATE SET kind = excluded.kind, at = excluded.at",

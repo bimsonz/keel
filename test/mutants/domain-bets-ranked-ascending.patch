@@ -2,11 +2,11 @@
 # kills: bets.ranked-by-blast-per-cost
 # why: The cheapest, least-relied-on bets come first
 diff --git a/packages/core/src/domain/coordination/bets.ts b/packages/core/src/domain/coordination/bets.ts
-index 0e6b088..a6b5870 100644
+index f2b06ff..5555395 100644
 --- a/packages/core/src/domain/coordination/bets.ts
 +++ b/packages/core/src/domain/coordination/bets.ts
-@@ -60,7 +60,7 @@ export const rankBets = (
-       return { premise, blast: changes.length + standing.length, cost: costOf(premise), standing: { changes, premises: standing } };
+@@ -81,7 +81,7 @@ export const rankBets = (
+       };
      })
      .toSorted((a, b) => {
 -      const byScore = b.blast / b.cost - a.blast / a.cost;

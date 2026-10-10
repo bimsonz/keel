@@ -2,14 +2,17 @@
 # kills: attribution.leave-one-out-trials
 # why: A leave-one-out trial leaves nothing out
 diff --git a/packages/core/src/domain/integration/attribution.ts b/packages/core/src/domain/integration/attribution.ts
-index b6511e3..3ecfa33 100644
+index 340ba0a..92066aa 100644
 --- a/packages/core/src/domain/integration/attribution.ts
 +++ b/packages/core/src/domain/integration/attribution.ts
-@@ -29,7 +29,7 @@ export const attribute = (failingCheck: string, members: readonly BatchMember[])
+@@ -35,10 +35,7 @@ export const attribute = (failingCheck: string, members: readonly BatchMember[])
          ? { _tag: "culprit", id: only }
          : {
              _tag: "leave-one-out",
--            trials: suspects.map((without) => ({ without, members: members.map((m) => m.id).filter((id) => id !== without) })),
+-            trials: suspects.map((without) => ({
+-              without,
+-              members: members.map((m) => m.id).filter((id) => id !== without),
+-            })),
 +            trials: suspects.map((without) => ({ without, members: members.map((m) => m.id) })),
            };
    return { suspects, graphGap, next };

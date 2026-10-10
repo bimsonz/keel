@@ -2,14 +2,15 @@
 # kills: flow.opinion-only-routes
 # why: An opinion step may clear a change
 diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
-index 378e550..d3cae37 100644
+index 04f37e3..2a0dff9 100644
 --- a/packages/core/src/domain/verification/compile.ts
 +++ b/packages/core/src/domain/verification/compile.ts
-@@ -222,7 +222,6 @@ const typeStep = (spec: StepSpec, effective: EvidenceClass, table: ReadonlyMap<s
-   if (!ceilingFits(spec)) errors.push(new KindCeilingMismatch({ step: spec.id, kind: spec.kind, ceiling: spec.evidenceCeiling }));
+@@ -256,8 +256,6 @@ const typeStep = (
    const decides = canBlock(effective);
-   if (!decides && spec.outcomes.includes("fail")) errors.push(new OnlyProofOrRulingMayFail({ step: spec.id, effectiveClass: effective }));
--  if (!decides && spec.outcomes.includes("pass")) errors.push(new OpinionMayOnlyRoute({ step: spec.id, outcome: "pass" }));
+   if (!decides && spec.outcomes.includes("fail"))
+     errors.push(new OnlyProofOrRulingMayFail({ step: spec.id, effectiveClass: effective }));
+-  if (!decides && spec.outcomes.includes("pass"))
+-    errors.push(new OpinionMayOnlyRoute({ step: spec.id, outcome: "pass" }));
    for (const target of spec.mayskip) {
      const skipped = table.get(target);
      if (skipped === undefined) errors.push(new UnknownStep({ step: target }));

@@ -2,14 +2,15 @@
 # kills: commutation.each-condition-blocks
 # why: Batches in one group commit are never checked against each other
 diff --git a/packages/core/src/domain/integration/commutation.ts b/packages/core/src/domain/integration/commutation.ts
-index f6d64c3..23d8459 100644
+index 808b0fa..8b99df5 100644
 --- a/packages/core/src/domain/integration/commutation.ts
 +++ b/packages/core/src/domain/integration/commutation.ts
-@@ -121,7 +121,6 @@ export const commutation = (input: CommutationInput): Commutation => {
+@@ -141,8 +141,6 @@ export const commutation = (input: CommutationInput): Commutation => {
    if (bd.affected.length > 0) failed.push("C3");
    if (bd.subjects.length > 0) failed.push("C4");
    if (barrierTouched) failed.push("C5");
--  if (pairs.some((p) => p.paths.length > 0 || p.affected.length > 0 || p.subjects.length > 0)) failed.push("C6");
+-  if (pairs.some((p) => p.paths.length > 0 || p.affected.length > 0 || p.subjects.length > 0))
+-    failed.push("C6");
  
    if (failed.length === 0) return { _tag: "commutes", proofId: proofIdOf(input) };
-   if (barrierTouched || !input.mergeTreeClean) return { _tag: "reverify", failed, scope: { _tag: "all" } };
+   if (barrierTouched || !input.mergeTreeClean)

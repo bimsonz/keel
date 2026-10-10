@@ -2,15 +2,15 @@
 # kills: verdict.bounce-only-on-proof-or-ruling
 # why: A bounce cites every result, opinion included, as its evidence
 diff --git a/packages/core/src/domain/verification/verdict.ts b/packages/core/src/domain/verification/verdict.ts
-index 39d8d1b..e00691b 100644
+index bb223f0..3fd16c8 100644
 --- a/packages/core/src/domain/verification/verdict.ts
 +++ b/packages/core/src/domain/verification/verdict.ts
-@@ -193,7 +193,7 @@ const verdict1 = (plan: FlowPlan, run: Run): Verdict => {
-   const root = evaluate(ctx, plan.flow, undefined);
-   const outcome: VerdictOutcome =
-     root.status === "fail" ? "bounce" : root.status === "escalate" ? "park" : root.status === "pending" ? "hold" : "land";
--  return { ...base, outcome, evidence: root.evidence, waitingOn: [...new Set(root.waiting)].toSorted() };
-+  return { ...base, outcome, evidence: run.results, waitingOn: [...new Set(root.waiting)].toSorted() };
+@@ -231,7 +231,7 @@ const verdict1 = (plan: FlowPlan, run: Run): Verdict => {
+   return {
+     ...base,
+     outcome,
+-    evidence: root.evidence,
++    evidence: run.results,
+     waitingOn: [...new Set(root.waiting)].toSorted(),
+   };
  };
- 
- /**

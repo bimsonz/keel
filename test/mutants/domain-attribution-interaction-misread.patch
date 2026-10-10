@@ -2,14 +2,15 @@
 # kills: attribution.reads-leave-one-out
 # why: Two independent culprits are read as an interaction
 diff --git a/packages/core/src/domain/integration/attribution.ts b/packages/core/src/domain/integration/attribution.ts
-index b6511e3..78ca4fa 100644
+index 340ba0a..59d5b3d 100644
 --- a/packages/core/src/domain/integration/attribution.ts
 +++ b/packages/core/src/domain/integration/attribution.ts
-@@ -47,7 +47,7 @@ export type Finding =
+@@ -56,8 +56,7 @@ export type Finding =
  export const interpretLeaveOneOut = (results: readonly LeaveOneOutResult[]): Finding => {
    const fixes = results.filter((r) => r.passed).map((r) => r.without);
    const [one] = fixes;
--  if (results.length >= 2 && fixes.length === results.length) return { _tag: "interaction", parties: [...fixes].toSorted() };
+-  if (results.length >= 2 && fixes.length === results.length)
+-    return { _tag: "interaction", parties: [...fixes].toSorted() };
 +  if (fixes.length >= 2) return { _tag: "interaction", parties: [...fixes].toSorted() };
    if (fixes.length === 1 && one !== undefined) return { _tag: "culprit", id: one };
    return { _tag: "inconclusive" };

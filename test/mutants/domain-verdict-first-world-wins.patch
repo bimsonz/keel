@@ -2,15 +2,18 @@
 # kills: verdict.order-independent
 # why: A condition reads whichever world's result arrived first
 diff --git a/packages/core/src/domain/verification/verdict.ts b/packages/core/src/domain/verification/verdict.ts
-index 39d8d1b..5abf0a7 100644
+index bb223f0..60cd8c9 100644
 --- a/packages/core/src/domain/verification/verdict.ts
 +++ b/packages/core/src/domain/verification/verdict.ts
-@@ -108,7 +108,7 @@ const holds = (ctx: Context, c: Condition, world: World | undefined): boolean |
-   switch (c._tag) {
+@@ -133,10 +133,7 @@ const holds = (ctx: Context, c: Condition, world: World | undefined): boolean |
      case "outcome": {
-       const anyWorld = [...ctx.results.values()].filter((x) => x.stepId === c.step).reduce<StepResult | undefined>(
--        (worst, x) => (worst === undefined ? x : severer(worst, x)),
-+        (worst, x) => (worst === undefined ? x : worst),
-         undefined,
-       );
+       const anyWorld = [...ctx.results.values()]
+         .filter((x) => x.stepId === c.step)
+-        .reduce<StepResult | undefined>(
+-          (worst, x) => (worst === undefined ? x : severer(worst, x)),
+-          undefined,
+-        );
++        .reduce<StepResult | undefined>((worst, x) => (worst === undefined ? x : worst), undefined);
        const r = ctx.results.get(resultKey(c.step, world)) ?? anyWorld;
+       return r === undefined ? "unknown" : c.in.includes(r.outcome);
+     }

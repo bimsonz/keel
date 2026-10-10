@@ -2,11 +2,11 @@
 # kills: fallout.suspect-when-clause-touched
 # why: A refining effect is treated as mere proximity
 diff --git a/packages/core/src/domain/coordination/fallout.ts b/packages/core/src/domain/coordination/fallout.ts
-index 8ab9edb..a7940ff 100644
+index 05b24bd..4deb905 100644
 --- a/packages/core/src/domain/coordination/fallout.ts
 +++ b/packages/core/src/domain/coordination/fallout.ts
-@@ -59,7 +59,6 @@ const classify = (target: FalloutTarget, relied: Proposition, effect: DerivedEff
-         ? { _tag: "conflict", target, kind: "semantic", silentRetraction: !effect.declared, comparison }
+@@ -74,7 +74,6 @@ const classify = (
+           }
          : { _tag: "suspect", target, comparison };
      case "compatible":
 -    case "refines":

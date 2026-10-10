@@ -2,14 +2,15 @@
 # kills: demo.s1-preflight
 # why: Preflight never shows a contradiction before code exists
 diff --git a/packages/core/src/domain/coordination/exposure.ts b/packages/core/src/domain/coordination/exposure.ts
-index 6dfad55..82d55d0 100644
+index 0aef7d3..d128652 100644
 --- a/packages/core/src/domain/coordination/exposure.ts
 +++ b/packages/core/src/domain/coordination/exposure.ts
-@@ -57,7 +57,7 @@ export const exposure = (self: ChangeId, intent: Intent, liveChanges: readonly L
+@@ -71,8 +71,7 @@ export const exposure = (
        ...theirPremises.flatMap((p) => myEffects.map((e) => [p, e, live.id] as const)),
      ];
      for (const [premise, other, holder] of pairs) {
--      if (compare(premise, other).outcome === "contradicts") contradictions.push({ premise, with: other, holder });
+-      if (compare(premise, other).outcome === "contradicts")
+-        contradictions.push({ premise, with: other, holder });
 +      void compare;
      }
    }

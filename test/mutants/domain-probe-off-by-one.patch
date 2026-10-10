@@ -2,13 +2,15 @@
 # kills: probe.discriminating-runs-admitted
 # why: Three discriminating runs are never enough
 diff --git a/packages/core/src/domain/verification/probe.ts b/packages/core/src/domain/verification/probe.ts
-index 1fcbe74..bc53ef8 100644
+index 7359768..9308364 100644
 --- a/packages/core/src/domain/verification/probe.ts
 +++ b/packages/core/src/domain/verification/probe.ts
-@@ -44,5 +44,5 @@ export const admit = (cells: readonly ProbeCell[]): Admission => {
-   const done = [...runs.values()].filter(complete);
+@@ -54,7 +54,7 @@ export const admit = (cells: readonly ProbeCell[]): Admission => {
    const good = done.filter(discriminates).length;
-   if (good < done.length) return { _tag: "rejected", reason: good === 0 ? "non-discriminating" : "unstable" };
--  return done.length >= ADMISSION_RUNS ? { _tag: "admitted", runs: done.length } : { _tag: "pending", complete: done.length };
-+  return done.length > ADMISSION_RUNS ? { _tag: "admitted", runs: done.length } : { _tag: "pending", complete: done.length };
+   if (good < done.length)
+     return { _tag: "rejected", reason: good === 0 ? "non-discriminating" : "unstable" };
+-  return done.length >= ADMISSION_RUNS
++  return done.length > ADMISSION_RUNS
+     ? { _tag: "admitted", runs: done.length }
+     : { _tag: "pending", complete: done.length };
  };

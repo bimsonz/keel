@@ -2,15 +2,16 @@
 # kills: exposure.covers-fallout
 # why: Preflight misses sibling-subject neighbours that fallout will notify
 diff --git a/packages/core/src/domain/coordination/exposure.ts b/packages/core/src/domain/coordination/exposure.ts
-index 6dfad55..067809e 100644
+index 0aef7d3..bd0a840 100644
 --- a/packages/core/src/domain/coordination/exposure.ts
 +++ b/packages/core/src/domain/coordination/exposure.ts
-@@ -25,7 +25,7 @@ export type Exposure = {
+@@ -25,8 +25,7 @@ export type Exposure = {
  const anchorPathsOf = (ps: readonly Proposition[]): ReadonlySet<string> =>
    new Set(ps.flatMap((p) => (p.anchors ?? []).map((a) => a.path)));
  
--const near = (a: SubjectKey, b: SubjectKey): boolean => subjectsRelated(a, b) || subjectsSiblings(a, b);
+-const near = (a: SubjectKey, b: SubjectKey): boolean =>
+-  subjectsRelated(a, b) || subjectsSiblings(a, b);
 +const near = (a: SubjectKey, b: SubjectKey): boolean => subjectsRelated(a, b);
  
- export const exposure = (self: ChangeId, intent: Intent, liveChanges: readonly LiveChange[]): Exposure => {
-   const myPremises = intent.premises;
+ export const exposure = (
+   self: ChangeId,

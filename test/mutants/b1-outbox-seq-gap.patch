@@ -2,10 +2,10 @@
 # kills: b1.seq-gap-free
 # why: the next seq comes from a counter kept outside the transaction, so a rolled-back append still advances it
 diff --git a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
-index 1a59173..9e6e65d 100644
+index d38119f..cf95888 100644
 --- a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
 +++ b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
-@@ -38,6 +38,7 @@ const encodeEnvelope = (envelope: EventEnvelope): string => JSON.stringify(Schem
+@@ -55,6 +55,7 @@ const encodeEnvelope = (envelope: EventEnvelope): string =>
  export function EventOutboxSql(storage: DurableObjectStorage) {
    const sql = storage.sql;
    const nextUlid = monotonicFactory();
@@ -13,17 +13,23 @@ index 1a59173..9e6e65d 100644
  
    const subscribers = (type: string): readonly string[] =>
      sql
-@@ -49,9 +50,11 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
+@@ -70,14 +71,18 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
      EventOutbox,
      EventOutbox.of({
        append: (spec, at, drafts) => {
--        const head = sql
 +        const key = `${spec.entity.kind}:${spec.entity.id}`;
-+        const head = heads.get(key) ?? (sql
-           .exec<{ seq: number | null }>("SELECT MAX(seq) AS seq FROM keel_events WHERE entity_kind = ? AND entity_id = ?", spec.entity.kind, spec.entity.id)
--          .one().seq ?? 0;
-+          .one().seq ?? 0);
+         const head =
++          heads.get(key) ??
+           sql
+             .exec<{ seq: number | null }>(
+               "SELECT MAX(seq) AS seq FROM keel_events WHERE entity_kind = ? AND entity_id = ?",
+               spec.entity.kind,
+               spec.entity.id,
+             )
+-            .one().seq ?? 0;
++            .one().seq ??
++          0;
 +        heads.set(key, head + drafts.length);
-         const envelopes = envelopesFor(spec, at, head, drafts, () => makeId("evt", nextUlid(at)), subscribers);
-         for (const envelope of envelopes) {
-           sql.exec(
+         const envelopes = envelopesFor(
+           spec,
+           at,

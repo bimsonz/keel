@@ -2,11 +2,11 @@
 # kills: probe.needs-three-runs
 # why: Two runs are taken as stable
 diff --git a/packages/core/src/domain/verification/probe.ts b/packages/core/src/domain/verification/probe.ts
-index 1fcbe74..9aabc40 100644
+index 7359768..dd95f8c 100644
 --- a/packages/core/src/domain/verification/probe.ts
 +++ b/packages/core/src/domain/verification/probe.ts
-@@ -7,7 +7,7 @@ export type ProbeOutcome = "pass" | "fail" | "n/a";
- export type ProbeCell = { readonly world: World; readonly run: number; readonly outcome: ProbeOutcome };
+@@ -11,7 +11,7 @@ export type ProbeCell = {
+ };
  
  /** How many consecutive discriminating runs admission needs. */
 -export const ADMISSION_RUNS = 3;

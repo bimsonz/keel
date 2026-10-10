@@ -2,15 +2,15 @@
 # kills: kernel.sha256-matches-reference
 # why: Lone surrogates are not encoded as U+FFFD
 diff --git a/packages/core/src/domain/kernel/hash.ts b/packages/core/src/domain/kernel/hash.ts
-index e13e6a3..2c04ebd 100644
+index ccb4874..a391951 100644
 --- a/packages/core/src/domain/kernel/hash.ts
 +++ b/packages/core/src/domain/kernel/hash.ts
-@@ -47,7 +47,7 @@ const utf8 = (input: string): number[] => {
+@@ -54,7 +54,7 @@ const utf8 = (input: string): number[] => {
    const out: number[] = [];
    for (const ch of input) {
      let cp = ch.codePointAt(0) ?? 0xfffd;
 -    if (cp >= 0xd800 && cp <= 0xdfff) cp = 0xfffd;
-+    
++
      if (cp < 0x80) out.push(cp);
      else if (cp < 0x800) out.push(0xc0 | (cp >> 6), 0x80 | (cp & 0x3f));
-     else if (cp < 0x10000) out.push(0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+     else if (cp < 0x10000)

@@ -2,15 +2,19 @@
 # kills: verdict.only-human-overrides-fail
 # why: Any step's result can override a fail
 diff --git a/packages/core/src/domain/verification/verdict.ts b/packages/core/src/domain/verification/verdict.ts
-index 39d8d1b..a7b5a52 100644
+index bb223f0..3e568e3 100644
 --- a/packages/core/src/domain/verification/verdict.ts
 +++ b/packages/core/src/domain/verification/verdict.ts
-@@ -185,7 +185,7 @@ export type Run = { readonly results: readonly StepResult[]; readonly superseded
+@@ -210,11 +210,7 @@ export type Run = { readonly results: readonly StepResult[]; readonly superseded
+ 
  const verdict1 = (plan: FlowPlan, run: Run): Verdict => {
    const steps = new Map(plan.steps.map((s) => [s.id, s]));
-   const overridden = new Set(
--    run.results.filter((r) => steps.get(r.stepId)?.kind === "human").flatMap((r) => r.overrides ?? []),
-+    run.results.flatMap((r) => r.overrides ?? []),
-   );
+-  const overridden = new Set(
+-    run.results
+-      .filter((r) => steps.get(r.stepId)?.kind === "human")
+-      .flatMap((r) => r.overrides ?? []),
+-  );
++  const overridden = new Set(run.results.flatMap((r) => r.overrides ?? []));
    const ctx: Context = { plan, steps, results: index(run.results), overridden };
    const base = { version: "verdict/1" as const, planHash: plan.planHash };
+   if (run.supersededBy !== undefined)

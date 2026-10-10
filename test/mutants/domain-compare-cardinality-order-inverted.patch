@@ -2,15 +2,15 @@
 # kills: lattice.orders-match-spec, compare.matches-lattice-oracle
 # why: exactly-once becomes the weakest guarantee instead of the strongest
 diff --git a/packages/core/src/domain/coordination/lattice.ts b/packages/core/src/domain/coordination/lattice.ts
-index f14927f..1a7e71c 100644
+index 93f47c7..5073675 100644
 --- a/packages/core/src/domain/coordination/lattice.ts
 +++ b/packages/core/src/domain/coordination/lattice.ts
-@@ -185,7 +185,7 @@ export type Cardinality = "exactly-once" | "at-most-once" | "at-least-once" | "a
- export const cardinalities: readonly Cardinality[] = ["exactly-once", "at-most-once", "at-least-once", "any"];
+@@ -211,7 +211,7 @@ export const cardinalities: readonly Cardinality[] = [
+ ];
  
  export const cardinalityLeq = (a: Cardinality, b: Cardinality): boolean =>
 -  a === b || a === "exactly-once" || b === "any";
 +  a === b || b === "exactly-once" || b === "any";
  
- const finiteRegion = <V>(all: readonly V[], leq: (a: V, b: V) => boolean, relation: ClaimRelation, v: V): readonly V[] =>
-   all.filter((x) =>
+ const finiteRegion = <V>(
+   all: readonly V[],

@@ -2,14 +2,14 @@
 # kills: commutation.sound, commutation.each-condition-blocks
 # why: Shared tests and guards are not re-run
 diff --git a/packages/core/src/domain/integration/commutation.ts b/packages/core/src/domain/integration/commutation.ts
-index f6d64c3..b93057c 100644
+index 808b0fa..f72af0a 100644
 --- a/packages/core/src/domain/integration/commutation.ts
 +++ b/packages/core/src/domain/integration/commutation.ts
-@@ -118,7 +118,6 @@ export const commutation = (input: CommutationInput): Commutation => {
+@@ -138,7 +138,6 @@ export const commutation = (input: CommutationInput): Commutation => {
  
    const failed: CommutationCondition[] = [];
    if (bd.paths.length > 0 || !input.mergeTreeClean) failed.push("C2");
 -  if (bd.affected.length > 0) failed.push("C3");
    if (bd.subjects.length > 0) failed.push("C4");
    if (barrierTouched) failed.push("C5");
-   if (pairs.some((p) => p.paths.length > 0 || p.affected.length > 0 || p.subjects.length > 0)) failed.push("C6");
+   if (pairs.some((p) => p.paths.length > 0 || p.affected.length > 0 || p.subjects.length > 0))

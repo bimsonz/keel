@@ -2,15 +2,15 @@
 # kills: lattice.orders-match-spec, lattice.partial-order-laws
 # why: Every TTL counts as fresher than a session, which the ruling forbids
 diff --git a/packages/core/src/domain/coordination/lattice.ts b/packages/core/src/domain/coordination/lattice.ts
-index f14927f..e927af3 100644
+index 93f47c7..ec2baa9 100644
 --- a/packages/core/src/domain/coordination/lattice.ts
 +++ b/packages/core/src/domain/coordination/lattice.ts
-@@ -37,7 +37,7 @@ const freshnessRank = (v: "per-call" | "per-request" | "per-session" | "static")
+@@ -42,7 +42,7 @@ const freshnessRank = (v: "per-call" | "per-request" | "per-session" | "static")
  
  export const freshnessLeq = (a: Freshness, b: Freshness): Tri => {
    if (isTtl(a) && isTtl(b)) return a.ttl <= b.ttl;
 -  if (isTtl(a)) return b === "static" ? true : b === "per-session" ? "unknown" : false;
 +  if (isTtl(a)) return b === "static" ? true : b === "per-session" ? true : false;
-   if (isTtl(b)) return a === "per-call" || a === "per-request" ? true : a === "per-session" ? "unknown" : false;
+   if (isTtl(b))
+     return a === "per-call" || a === "per-request" ? true : a === "per-session" ? "unknown" : false;
    return freshnessRank(a) <= freshnessRank(b);
- };

@@ -2,14 +2,15 @@
 # kills: verdict.versioned
 # why: A superseded change can still land
 diff --git a/packages/core/src/domain/verification/verdict.ts b/packages/core/src/domain/verification/verdict.ts
-index 39d8d1b..a9abef3 100644
+index bb223f0..f94f2cf 100644
 --- a/packages/core/src/domain/verification/verdict.ts
 +++ b/packages/core/src/domain/verification/verdict.ts
-@@ -189,7 +189,6 @@ const verdict1 = (plan: FlowPlan, run: Run): Verdict => {
+@@ -217,8 +217,6 @@ const verdict1 = (plan: FlowPlan, run: Run): Verdict => {
    );
    const ctx: Context = { plan, steps, results: index(run.results), overridden };
    const base = { version: "verdict/1" as const, planHash: plan.planHash };
--  if (run.supersededBy !== undefined) return { ...base, outcome: "supersede", evidence: [], waitingOn: [] };
+-  if (run.supersededBy !== undefined)
+-    return { ...base, outcome: "supersede", evidence: [], waitingOn: [] };
    const root = evaluate(ctx, plan.flow, undefined);
    const outcome: VerdictOutcome =
-     root.status === "fail" ? "bounce" : root.status === "escalate" ? "park" : root.status === "pending" ? "hold" : "land";
+     root.status === "fail"

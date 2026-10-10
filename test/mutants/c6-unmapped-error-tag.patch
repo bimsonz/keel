@@ -1,14 +1,20 @@
 # expect-red: pnpm --filter @keeltown/keel typecheck
 diff --git a/packages/core/src/application/identity/index.ts b/packages/core/src/application/identity/index.ts
-index a61c97e..5c22701 100644
+index 815fe57..7632ca5 100644
 --- a/packages/core/src/application/identity/index.ts
 +++ b/packages/core/src/application/identity/index.ts
-@@ -29,7 +29,7 @@ function refusal(agent: Agent, principal: Principal | null): AgentNotAdmitted["r
-  * Who the caller is: the agent behind a verified token, if it may still act.
-  * The token's revocation epoch must match the agent's current one.
+@@ -37,9 +37,11 @@ function refusal(agent: Agent, principal: Principal | null): AgentNotAdmitted["r
   */
--export const whoami: (principal: Principal) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted, AgentDirectory> = Effect.fn(
-+export const whoami: (principal: Principal) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted | CredentialRejected, AgentDirectory> = Effect.fn(
-   "identity/whoami",
- )(function* (principal: Principal) {
+ export const whoami: (
+   principal: Principal,
+-) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted, AgentDirectory> = Effect.fn(
+-  "identity/whoami",
+-)(function* (principal: Principal) {
++) => Effect.Effect<
++  Identity,
++  AgentNotKnown | AgentNotAdmitted | CredentialRejected,
++  AgentDirectory
++> = Effect.fn("identity/whoami")(function* (principal: Principal) {
    const directory = yield* AgentDirectory;
+   const agent = yield* directory.findAgent(principal.agentId);
+   if (Option.isNone(agent)) return yield* new AgentNotKnown({ agentId: principal.agentId });

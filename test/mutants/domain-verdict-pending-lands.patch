@@ -2,15 +2,15 @@
 # kills: verdict.land-is-complete
 # why: A change lands before its required steps report
 diff --git a/packages/core/src/domain/verification/verdict.ts b/packages/core/src/domain/verification/verdict.ts
-index 39d8d1b..678833d 100644
+index bb223f0..78e41d8 100644
 --- a/packages/core/src/domain/verification/verdict.ts
 +++ b/packages/core/src/domain/verification/verdict.ts
-@@ -192,7 +192,7 @@ const verdict1 = (plan: FlowPlan, run: Run): Verdict => {
-   if (run.supersededBy !== undefined) return { ...base, outcome: "supersede", evidence: [], waitingOn: [] };
-   const root = evaluate(ctx, plan.flow, undefined);
-   const outcome: VerdictOutcome =
--    root.status === "fail" ? "bounce" : root.status === "escalate" ? "park" : root.status === "pending" ? "hold" : "land";
-+    root.status === "fail" ? "bounce" : root.status === "escalate" ? "park" : root.status === "pending" ? "land" : "land";
-   return { ...base, outcome, evidence: root.evidence, waitingOn: [...new Set(root.waiting)].toSorted() };
- };
- 
+@@ -226,7 +226,7 @@ const verdict1 = (plan: FlowPlan, run: Run): Verdict => {
+       : root.status === "escalate"
+         ? "park"
+         : root.status === "pending"
+-          ? "hold"
++          ? "land"
+           : "land";
+   return {
+     ...base,

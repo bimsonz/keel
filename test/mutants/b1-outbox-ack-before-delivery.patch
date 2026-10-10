@@ -2,17 +2,29 @@
 # kills: b1.ack-after-delivery
 # why: each batch is acknowledged before its delivery is attempted, so a failed delivery is never retried
 diff --git a/packages/core/src/application/ports/flush.ts b/packages/core/src/application/ports/flush.ts
-index ca6c5cd..012fe45 100644
+index 8d0ed92..f5698dc 100644
 --- a/packages/core/src/application/ports/flush.ts
 +++ b/packages/core/src/application/ports/flush.ts
-@@ -30,7 +30,10 @@ export const flushOutbox = (fanOut: FanOut): Effect.Effect<FlushReport, never, C
+@@ -39,11 +39,18 @@ export const flushOutbox = (
      const outbox = yield* EventOutbox;
      const outcomes = yield* Effect.forEach(
        outbox.due(now, FLUSH_BATCH),
--      (batch) => Effect.map(Effect.result(fanOut.deliver(batch.subscriber, batch.events)), (outcome) => ({ batch, outcome })),
+-      (batch) =>
+-        Effect.map(Effect.result(fanOut.deliver(batch.subscriber, batch.events)), (outcome) => ({
+-          batch,
+-          outcome,
+-        })),
 +      (batch) => {
-+        store.transaction(() => outbox.acknowledge(batch.subscriber, batch.events.map((event) => event.eventId)));
-+        return Effect.map(Effect.result(fanOut.deliver(batch.subscriber, batch.events)), (outcome) => ({ batch, outcome }));
++        store.transaction(() =>
++          outbox.acknowledge(
++            batch.subscriber,
++            batch.events.map((event) => event.eventId),
++          ),
++        );
++        return Effect.map(
++          Effect.result(fanOut.deliver(batch.subscriber, batch.events)),
++          (outcome) => ({ batch, outcome }),
++        );
 +      },
        { concurrency: 8 },
      );

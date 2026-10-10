@@ -2,14 +2,15 @@
 # kills: flow.taint-weakest-consumed, flow.well-typed-compiles
 # why: A person who reads a model's summary is reduced to opinion
 diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
-index 378e550..75d6643 100644
+index 04f37e3..7d6960d 100644
 --- a/packages/core/src/domain/verification/compile.ts
 +++ b/packages/core/src/domain/verification/compile.ts
-@@ -193,7 +193,7 @@ const effectiveClasses = (
+@@ -218,8 +218,7 @@ const effectiveClasses = (
        return visit(read.step);
      });
      visiting.pop();
--    const effective = spec.kind === "human" ? "ruling" : consumed.reduce(weakest, spec.evidenceCeiling);
+-    const effective =
+-      spec.kind === "human" ? "ruling" : consumed.reduce(weakest, spec.evidenceCeiling);
 +    const effective = consumed.reduce(weakest, spec.evidenceCeiling);
      classes.set(id, effective);
      return effective;

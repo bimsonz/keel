@@ -2,13 +2,13 @@
 # kills: compare.matches-lattice-oracle
 # why: A second writer never contradicts a single-writer premise
 diff --git a/packages/core/src/domain/coordination/lattice.ts b/packages/core/src/domain/coordination/lattice.ts
-index f14927f..6efb454 100644
+index 93f47c7..9fada38 100644
 --- a/packages/core/src/domain/coordination/lattice.ts
 +++ b/packages/core/src/domain/coordination/lattice.ts
-@@ -241,7 +241,7 @@ export const authorityDecision = (
-   if (eWithinP) return "within";
+@@ -284,7 +284,7 @@ export const authorityDecision = (
    const lo = [...pi.lo, ...ei.lo];
-   const hi = pi.hi === "all" ? ei.hi : ei.hi === "all" ? pi.hi : pi.hi.filter((w) => ei.hi.includes(w));
+   const hi =
+     pi.hi === "all" ? ei.hi : ei.hi === "all" ? pi.hi : pi.hi.filter((w) => ei.hi.includes(w));
 -  return within(lo, hi) ? "overlap" : "disjoint";
 +  return "overlap";
  };

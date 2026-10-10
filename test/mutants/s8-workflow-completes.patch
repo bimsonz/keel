@@ -1,11 +1,11 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/bindings.test.ts -t Workflow
 diff --git a/apps/keel/src/adapters/driving/workflow/precheck.ts b/apps/keel/src/adapters/driving/workflow/precheck.ts
-index 15d0c6f..f2dedec 100644
+index dfc9537..dafc8a2 100644
 --- a/apps/keel/src/adapters/driving/workflow/precheck.ts
 +++ b/apps/keel/src/adapters/driving/workflow/precheck.ts
-@@ -21,7 +21,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
-     await step.do("derive", async () => {
-       const exit = await runtime.runPromiseExit(Effect.die(new NotImplemented(`precheck of ${event.payload.changeId}`)));
+@@ -23,7 +23,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
+         Effect.die(new NotImplemented(`precheck of ${event.payload.changeId}`)),
+       );
        if (Exit.isFailure(exit) && Cause.squash(exit.cause) instanceof NotImplemented) {
 -        throw new NonRetryableError("Precheck is not implemented yet");
 +        return null;

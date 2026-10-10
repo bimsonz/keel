@@ -2,15 +2,15 @@
 # kills: drift.footprint-lists-undeclared-paths
 # why: Touched paths are matched as if they were the globs
 diff --git a/packages/core/src/domain/coordination/drift.ts b/packages/core/src/domain/coordination/drift.ts
-index 53e57be..11ab2ee 100644
+index af2de33..8f0e6cd 100644
 --- a/packages/core/src/domain/coordination/drift.ts
 +++ b/packages/core/src/domain/coordination/drift.ts
-@@ -49,7 +49,7 @@ export const isDeclared = (intent: Intent, effect: Proposition): boolean =>
-   });
- 
+@@ -63,7 +63,7 @@ export const isDeclared = (intent: Intent, effect: Proposition): boolean =>
  const undeclaredPaths = (intent: Intent, touched: readonly FootprintEntry[]): readonly string[] =>
--  touched.map((t) => t.path).filter((path) => !intent.footprint.some((d) => matchesGlob(d.path, path)));
-+  touched.map((t) => t.path).filter((path) => !intent.footprint.some((d) => matchesGlob(path, d.path)));
+   touched
+     .map((t) => t.path)
+-    .filter((path) => !intent.footprint.some((d) => matchesGlob(d.path, path)));
++    .filter((path) => !intent.footprint.some((d) => matchesGlob(path, d.path)));
  
  /**
   * The drift between `intent` and what the diff did: `touched` is the footprint

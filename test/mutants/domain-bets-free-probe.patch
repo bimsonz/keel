@@ -2,15 +2,15 @@
 # kills: bets.probe-cost-positive
 # why: A zero-cost probe makes blast ÷ cost infinite
 diff --git a/packages/core/src/domain/coordination/bets.ts b/packages/core/src/domain/coordination/bets.ts
-index 0e6b088..d475001 100644
+index f2b06ff..c28df64 100644
 --- a/packages/core/src/domain/coordination/bets.ts
 +++ b/packages/core/src/domain/coordination/bets.ts
 @@ -9,7 +9,7 @@ export type ProbeCost = Brand.Branded<number, "ProbeCost">;
  const asProbeCost = Brand.nominal<ProbeCost>();
  
  export const probeCost = (cost: number): Result.Result<ProbeCost, InvalidProbeCost> =>
--  Number.isFinite(cost) && cost > 0 ? Result.succeed(asProbeCost(cost)) : Result.fail(new InvalidProbeCost({ cost }));
-+  Number.isFinite(cost) && cost >= 0 ? Result.succeed(asProbeCost(cost)) : Result.fail(new InvalidProbeCost({ cost }));
+-  Number.isFinite(cost) && cost > 0
++  Number.isFinite(cost) && cost >= 0
+     ? Result.succeed(asProbeCost(cost))
+     : Result.fail(new InvalidProbeCost({ cost }));
  
- /**
-  * A premise no tenet guards: the fleet is betting on it, and its probe is the

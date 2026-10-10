@@ -2,15 +2,15 @@
 # kills: fallout.silent-retraction-iff-undeclared
 # why: Declared effects are labelled silent retractions
 diff --git a/packages/core/src/domain/coordination/fallout.ts b/packages/core/src/domain/coordination/fallout.ts
-index 8ab9edb..7ded2de 100644
+index 05b24bd..3b8e4f1 100644
 --- a/packages/core/src/domain/coordination/fallout.ts
 +++ b/packages/core/src/domain/coordination/fallout.ts
-@@ -56,7 +56,7 @@ const classify = (target: FalloutTarget, relied: Proposition, effect: DerivedEff
-   switch (comparison.outcome) {
-     case "contradicts":
-       return binding
--        ? { _tag: "conflict", target, kind: "semantic", silentRetraction: !effect.declared, comparison }
-+        ? { _tag: "conflict", target, kind: "semantic", silentRetraction: effect.declared, comparison }
+@@ -69,7 +69,7 @@ const classify = (
+             _tag: "conflict",
+             target,
+             kind: "semantic",
+-            silentRetraction: !effect.declared,
++            silentRetraction: effect.declared,
+             comparison,
+           }
          : { _tag: "suspect", target, comparison };
-     case "compatible":
-     case "refines":

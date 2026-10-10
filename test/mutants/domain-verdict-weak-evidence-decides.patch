@@ -2,15 +2,15 @@
 # kills: verdict.infra-failure-never-lands
 # why: A pass or fail from opinion is taken at face value
 diff --git a/packages/core/src/domain/verification/verdict.ts b/packages/core/src/domain/verification/verdict.ts
-index 39d8d1b..710682a 100644
+index bb223f0..f82f53e 100644
 --- a/packages/core/src/domain/verification/verdict.ts
 +++ b/packages/core/src/domain/verification/verdict.ts
-@@ -26,7 +26,7 @@ export const coerce = (plan: FlowPlan, report: StepReport): StepResult => {
+@@ -29,7 +29,7 @@ export const coerce = (plan: FlowPlan, report: StepReport): StepResult => {
    const evidenceClass = weakest(report.evidenceClass, ceiling);
    const declared = step !== undefined && isOutcome(step, report.outcome);
    const decisive = report.outcome === "pass" || report.outcome === "fail";
 -  const usable = report.failure === undefined && declared && (!decisive || canBlock(evidenceClass));
 +  const usable = report.failure === undefined && declared && true;
-   const outcome: StepOutcome = usable && step !== undefined && isOutcome(step, report.outcome) ? report.outcome : "abstain";
+   const outcome: StepOutcome =
+     usable && step !== undefined && isOutcome(step, report.outcome) ? report.outcome : "abstain";
    const allowedSkips = plan.mayskip[report.stepId] ?? [];
-   const allowedOverrides = step?.kind === "human" ? (plan.overrides[report.stepId] ?? []) : [];

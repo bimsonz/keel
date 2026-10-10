@@ -2,14 +2,17 @@
 # kills: commutation.each-condition-blocks
 # why: A parent and child subject do not link B and D
 diff --git a/packages/core/src/domain/integration/commutation.ts b/packages/core/src/domain/integration/commutation.ts
-index f6d64c3..e07c37b 100644
+index 808b0fa..70fd981 100644
 --- a/packages/core/src/domain/integration/commutation.ts
 +++ b/packages/core/src/domain/integration/commutation.ts
-@@ -55,7 +55,7 @@ export type Commutation =
- const sorted = <T extends string>(xs: readonly T[]): readonly T[] => [...new Set(xs)].toSorted();
- const meet = (a: readonly string[], b: readonly string[]): readonly string[] => sorted(a.filter((x) => b.includes(x)));
+@@ -65,10 +65,7 @@ const sorted = <T extends string>(xs: readonly T[]): readonly T[] => [...new Set
+ const meet = (a: readonly string[], b: readonly string[]): readonly string[] =>
+   sorted(a.filter((x) => b.includes(x)));
  const linking = (a: readonly SubjectKey[], b: readonly SubjectKey[]): readonly SubjectKey[] =>
--  sorted([...a.filter((x) => b.some((y) => subjectsRelated(x, y))), ...b.filter((y) => a.some((x) => subjectsRelated(x, y)))]);
+-  sorted([
+-    ...a.filter((x) => b.some((y) => subjectsRelated(x, y))),
+-    ...b.filter((y) => a.some((x) => subjectsRelated(x, y))),
+-  ]);
 +  sorted([...a.filter((x) => b.includes(x)), ...b.filter((y) => a.includes(y))]);
  
  /** C2's path half, C3 and C4 for one pair of footprints. */

@@ -2,15 +2,15 @@
 # kills: verdict.escalation-parks
 # why: An escalation is waved through instead of waiting for a ruling
 diff --git a/packages/core/src/domain/verification/verdict.ts b/packages/core/src/domain/verification/verdict.ts
-index 39d8d1b..95494dd 100644
+index bb223f0..cbb59be 100644
 --- a/packages/core/src/domain/verification/verdict.ts
 +++ b/packages/core/src/domain/verification/verdict.ts
-@@ -192,7 +192,7 @@ const verdict1 = (plan: FlowPlan, run: Run): Verdict => {
-   if (run.supersededBy !== undefined) return { ...base, outcome: "supersede", evidence: [], waitingOn: [] };
-   const root = evaluate(ctx, plan.flow, undefined);
-   const outcome: VerdictOutcome =
--    root.status === "fail" ? "bounce" : root.status === "escalate" ? "park" : root.status === "pending" ? "hold" : "land";
-+    root.status === "fail" ? "bounce" : root.status === "escalate" ? "land" : root.status === "pending" ? "hold" : "land";
-   return { ...base, outcome, evidence: root.evidence, waitingOn: [...new Set(root.waiting)].toSorted() };
- };
- 
+@@ -224,7 +224,7 @@ const verdict1 = (plan: FlowPlan, run: Run): Verdict => {
+     root.status === "fail"
+       ? "bounce"
+       : root.status === "escalate"
+-        ? "park"
++        ? "land"
+         : root.status === "pending"
+           ? "hold"
+           : "land";

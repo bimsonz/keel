@@ -2,14 +2,14 @@
 # kills: exposure.reports-contradictions
 # why: Contradictions against other changes' premises go unreported
 diff --git a/packages/core/src/domain/coordination/exposure.ts b/packages/core/src/domain/coordination/exposure.ts
-index 6dfad55..c502db3 100644
+index 0aef7d3..61c8b50 100644
 --- a/packages/core/src/domain/coordination/exposure.ts
 +++ b/packages/core/src/domain/coordination/exposure.ts
-@@ -54,7 +54,6 @@ export const exposure = (self: ChangeId, intent: Intent, liveChanges: readonly L
+@@ -68,7 +68,6 @@ export const exposure = (
  
      const pairs: readonly (readonly [Proposition, Proposition, ChangeId])[] = [
        ...myPremises.flatMap((p) => theirs.map((t) => [p, t, self] as const)),
 -      ...theirPremises.flatMap((p) => myEffects.map((e) => [p, e, live.id] as const)),
      ];
      for (const [premise, other, holder] of pairs) {
-       if (compare(premise, other).outcome === "contradicts") contradictions.push({ premise, with: other, holder });
+       if (compare(premise, other).outcome === "contradicts")

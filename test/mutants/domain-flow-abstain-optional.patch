@@ -2,14 +2,14 @@
 # kills: flow.abstain-required
 # why: A step need not be able to abstain
 diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
-index 378e550..90205e6 100644
+index 04f37e3..c93721a 100644
 --- a/packages/core/src/domain/verification/compile.ts
 +++ b/packages/core/src/domain/verification/compile.ts
-@@ -218,7 +218,6 @@ const ceilingFits = (spec: StepSpec): boolean => {
- 
- const typeStep = (spec: StepSpec, effective: EvidenceClass, table: ReadonlyMap<string, StepSpec>): readonly CompileError[] => {
+@@ -248,7 +248,6 @@ const typeStep = (
+   table: ReadonlyMap<string, StepSpec>,
+ ): readonly CompileError[] => {
    const errors: CompileError[] = [];
 -  if (!spec.outcomes.includes("abstain")) errors.push(new AbstainMissing({ step: spec.id }));
-   if (!ceilingFits(spec)) errors.push(new KindCeilingMismatch({ step: spec.id, kind: spec.kind, ceiling: spec.evidenceCeiling }));
-   const decides = canBlock(effective);
-   if (!decides && spec.outcomes.includes("fail")) errors.push(new OnlyProofOrRulingMayFail({ step: spec.id, effectiveClass: effective }));
+   if (!ceilingFits(spec))
+     errors.push(
+       new KindCeilingMismatch({ step: spec.id, kind: spec.kind, ceiling: spec.evidenceCeiling }),

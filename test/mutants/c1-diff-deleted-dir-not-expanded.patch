@@ -2,15 +2,15 @@
 # kills: diff.symmetric, diff.apply, diff.differential
 # why: A deleted directory is one row for the tree instead of a deleted row per leaf under it
 diff --git a/packages/gitcore/src/diff.ts b/packages/gitcore/src/diff.ts
-index 87cbbb5..30cdec6 100644
+index 1b457e4..45ad10b 100644
 --- a/packages/gitcore/src/diff.ts
 +++ b/packages/gitcore/src/diff.ts
-@@ -56,7 +56,7 @@ async function children(reader: TreeReader, oid: string | null): Promise<TreeEnt
- /** Every leaf under `entry`, as rows of one kind: the side that has it added it, or deleted it. */
- async function leaves(reader: TreeReader, entry: TreeEntry, prefix: string, change: "added" | "deleted"): Promise<TreeChange[]> {
+@@ -70,7 +70,7 @@ async function leaves(
+   change: "added" | "deleted",
+ ): Promise<TreeChange[]> {
    const path = join(prefix, entry.name);
 -  if (entry.mode !== MODE_TREE) {
 +  if (entry.mode !== MODE_TREE || change === "deleted") {
-     return [change === "added" ? { path, change, newOid: entry.oid, newMode: entry.mode } : { path, change, oldOid: entry.oid, oldMode: entry.mode }];
-   }
-   const below = await children(reader, entry.oid);
+     return [
+       change === "added"
+         ? { path, change, newOid: entry.oid, newMode: entry.mode }

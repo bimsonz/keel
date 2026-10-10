@@ -2,15 +2,18 @@
 # kills: flow.cost-sums-steps-per-world
 # why: A world-matrix step is costed once, not once per world
 diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
-index 378e550..9da52af 100644
+index 04f37e3..b5e87a9 100644
 --- a/packages/core/src/domain/verification/compile.ts
 +++ b/packages/core/src/domain/verification/compile.ts
-@@ -391,7 +391,7 @@ export const compile = (
+@@ -446,10 +446,7 @@ export const compile = (
        },
      ];
    });
--  const costEstimate = planned.reduce((sum, p) => sum + (table.get(p.id)?.budget.usd ?? 0) * Math.max(1, p.worlds?.length ?? 1), 0);
+-  const costEstimate = planned.reduce(
+-    (sum, p) => sum + (table.get(p.id)?.budget.usd ?? 0) * Math.max(1, p.worlds?.length ?? 1),
+-    0,
+-  );
 +  const costEstimate = planned.reduce((sum, p) => sum + (table.get(p.id)?.budget.usd ?? 0), 0);
    const versions = Object.fromEntries(planned.map((p) => [p.id, table.get(p.id)?.version ?? ""]));
-   const overrides = Object.fromEntries(planned.map((p) => [p.id, table.get(p.id)?.overrides ?? []]));
-   const mayskip = Object.fromEntries(planned.map((p) => [p.id, table.get(p.id)?.mayskip ?? []]));
+   const overrides = Object.fromEntries(
+     planned.map((p) => [p.id, table.get(p.id)?.overrides ?? []]),

@@ -2,14 +2,19 @@
 # kills: drift.silent-retraction-iff-contradicting
 # why: Contradicting a should premise counts as a silent retraction
 diff --git a/packages/core/src/domain/coordination/drift.ts b/packages/core/src/domain/coordination/drift.ts
-index 53e57be..e96598e 100644
+index af2de33..2fdb3b3 100644
 --- a/packages/core/src/domain/coordination/drift.ts
 +++ b/packages/core/src/domain/coordination/drift.ts
-@@ -87,7 +87,7 @@ export const drift = (
-     .map((effect): DriftFinding => {
-       const contradicts = (p: Proposition): boolean => compare(p, effect.proposition).outcome === "contradicts";
+@@ -106,12 +106,7 @@ export const drift = (
+       const contradicts = (p: Proposition): boolean =>
+         compare(p, effect.proposition).outcome === "contradicts";
        const against = [
--        ...premises.filter((p) => p.holder !== self && (p.proposition.strength ?? "must") === "must" && contradicts(p.proposition)),
+-        ...premises.filter(
+-          (p) =>
+-            p.holder !== self &&
+-            (p.proposition.strength ?? "must") === "must" &&
+-            contradicts(p.proposition),
+-        ),
 +        ...premises.filter((p) => p.holder !== self && contradicts(p.proposition)),
          ...tenets.filter((t) => contradicts(t.proposition)),
        ];

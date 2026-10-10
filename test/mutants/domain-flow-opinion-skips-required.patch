@@ -2,15 +2,15 @@
 # kills: flow.opinion-skips-only-optional
 # why: Opinion may skip required steps but not optional ones
 diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
-index 378e550..3181189 100644
+index 04f37e3..f9029f3 100644
 --- a/packages/core/src/domain/verification/compile.ts
 +++ b/packages/core/src/domain/verification/compile.ts
-@@ -226,7 +226,7 @@ const typeStep = (spec: StepSpec, effective: EvidenceClass, table: ReadonlyMap<s
+@@ -261,7 +261,7 @@ const typeStep = (
    for (const target of spec.mayskip) {
      const skipped = table.get(target);
      if (skipped === undefined) errors.push(new UnknownStep({ step: target }));
--    else if (!decides && !skipped.optional) errors.push(new OpinionMaySkipOnlyOptional({ step: spec.id, target }));
-+    else if (!decides && skipped.optional) errors.push(new OpinionMaySkipOnlyOptional({ step: spec.id, target }));
+-    else if (!decides && !skipped.optional)
++    else if (!decides && skipped.optional)
+       errors.push(new OpinionMaySkipOnlyOptional({ step: spec.id, target }));
    }
-   if (spec.overrides.length > 0 && spec.kind !== "human") errors.push(new OnlyHumanMayOverride({ step: spec.id, kind: spec.kind }));
-   for (const target of spec.overrides) if (!table.has(target)) errors.push(new UnknownStep({ step: target }));
+   if (spec.overrides.length > 0 && spec.kind !== "human")

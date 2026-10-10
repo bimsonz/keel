@@ -2,15 +2,14 @@
 # kills: bets.narrative-never-counts
 # why: An agent's narrative reorders the bets
 diff --git a/packages/core/src/domain/coordination/bets.ts b/packages/core/src/domain/coordination/bets.ts
-index 0e6b088..7045e7e 100644
+index f2b06ff..6719706 100644
 --- a/packages/core/src/domain/coordination/bets.ts
 +++ b/packages/core/src/domain/coordination/bets.ts
-@@ -39,7 +39,7 @@ const standsOn = (other: HeldPremise, premise: HeldPremise): boolean =>
- /** The order among equal scores: by holder, then by the claim itself. Narrative never counts. */
+@@ -48,6 +48,7 @@ const standsOn = (other: HeldPremise, premise: HeldPremise): boolean =>
  const tieKey = (p: HeldPremise): string => {
    const q = p.proposition;
--  return [p.holder, q.subject, q.predicate, q.relation, String(q.value), q.unit ?? "", q.scope ?? ""].join("\u0000");
-+  return [q.gloss ?? "", p.holder, q.subject, q.predicate, q.relation, String(q.value), q.unit ?? "", q.scope ?? ""].join("\u0000");
- };
- 
- /**
+   return [
++    q.gloss ?? "",
+     p.holder,
+     q.subject,
+     q.predicate,
