@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.fenced
+# why: Results are fenced on the attempt only, so a result from an older chain epoch counts
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index 150f6c9..5c3e64c 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -155,8 +155,7 @@ export const decideCandidate = (
+       : refuse(facts.batchId, undefined, command);
+   const batch = state;
+   const batchId = batch.id;
+-  const fenced = (fence: Fence): boolean =>
+-    fence.attempt !== batch.attempt || fence.chainEpoch !== batch.chainEpoch;
++  const fenced = (fence: Fence): boolean => fence.attempt !== batch.attempt;
+ 
+   switch (command._tag) {
+     case "Form":

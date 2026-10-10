@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.decide-evolvable, candidate.transitions
+# why: decide accepts a verification result before verification started
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index 150f6c9..42c5a13 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -196,7 +196,10 @@ export const decideCandidate = (
+         : refuse(batchId, batch.state, command);
+ 
+     case "Verified":
+-      if (batch.state !== "verifying" || batch.candidateId === undefined)
++      if (
++        (batch.state !== "verifying" && batch.state !== "assembled") ||
++        batch.candidateId === undefined
++      )
+         return refuse(batchId, batch.state, command);
+       if (fenced(command))
+         return Result.fail(

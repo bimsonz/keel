@@ -1,0 +1,20 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.group-resolves-once
+# why: Advancing trunk leaves the group open, so it can advance again
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index b565488..51bdb68 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -399,10 +399,10 @@ export const evolvePromotion = (
+         wal.old === event.from &&
+         wal.composed === event.to
+         ? {
+-            ...without(trunk, "wal"),
++            ...trunk,
+             head: event.to,
+             promoted: [...trunk.promoted, ...event.members],
+-            phase: settled(trunk.queue),
++            phase: "promoting" as const,
+           }
+         : illegal(trunk, event);
+ 

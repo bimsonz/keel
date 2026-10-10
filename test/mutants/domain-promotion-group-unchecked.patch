@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.commutation-gates
+# why: Each batch is checked against trunk alone, not against the rest of its group
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 4658b75..9766ed1 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -115,7 +115,7 @@ const flush = (trunk: Trunk, command: Extract<PromotionCommand, { _tag: "Flush"
+       promoted: [...trunk.promoted, ...group.flatMap((g) => g.batch.members)],
+       mergeTreeClean: facts.mergeTreeClean,
+       barriers: command.barriers,
+-      group: group.map((g) => ({ id: g.batch.batchId, touched: g.touched })),
++      group: [],
+     });
+     if (outcome._tag === "wait") break;
+     if (outcome._tag === "reverify") {

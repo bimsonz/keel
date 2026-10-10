@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.one-terminal
+# why: A batch that ended red is still promoted
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index 150f6c9..36ee6ea 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -260,7 +260,7 @@ export const decideCandidate = (
+         : refuse(batchId, batch.state, command);
+ 
+     case "Promote":
+-      return batch.state === "green" && batch.candidateId !== undefined
++      return (batch.state === "green" || batch.state === "red") && batch.candidateId !== undefined
+         ? Result.succeed([
+             CandidatePromoted.make({
+               candidateId: batch.candidateId,

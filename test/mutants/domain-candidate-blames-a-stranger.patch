@@ -1,0 +1,21 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.attribution-is-member
+# why: A failure is blamed on a change that is not in the batch
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index 150f6c9..fd3eb9c 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -232,12 +232,7 @@ export const decideCandidate = (
+         return Result.fail(
+           new InvalidBatch({ batchId, reason: "a one-change batch's failure is that change's" }),
+         );
+-      if (
+-        blamed !== "interaction" &&
+-        blamed !== "infra" &&
+-        blamed !== "unattributed" &&
+-        !batch.members.includes(blamed)
+-      ) {
++      if (blamed !== "interaction" && blamed !== "infra" && blamed !== "unattributed" && false) {
+         return Result.fail(
+           new InvalidBatch({ batchId, reason: `${blamed} is not a member of the batch` }),
+         );

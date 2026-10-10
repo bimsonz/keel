@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.transitions
+# why: An assembled candidate is assembled again
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index d2f7622..9e29b05 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -128,7 +128,7 @@ export const decideCandidate = (state: Batch | undefined, command: CandidateComm
+       return refuse(batchId, batch.state, command);
+ 
+     case "Assemble":
+-      return batch.state === "forming"
++      return batch.state === "forming" || batch.state === "assembled"
+         ? Result.succeed([
+             CandidateAssembled.make({
+               candidateId: command.candidateId,

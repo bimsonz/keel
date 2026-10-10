@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.transitions, candidate.decide-evolvable
+# why: A green batch is bisected
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index 150f6c9..42a09a3 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -253,7 +253,9 @@ export const decideCandidate = (
+     }
+ 
+     case "Bisect":
+-      return isBisectable(batch) && batch.candidateId !== undefined && command.into.length > 0
++      return (isBisectable(batch) || batch.state === "green") &&
++        batch.candidateId !== undefined &&
++        command.into.length > 0
+         ? Result.succeed([
+             CandidateBisected.make({ candidateId: batch.candidateId, batchId, into: command.into }),
+           ])

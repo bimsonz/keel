@@ -1,0 +1,23 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.initialized-first
+# why: A flush before initialization adopts whatever head it observed
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index b565488..b06801e 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -181,9 +181,13 @@ export const decidePromotion = (
+   facts: PromotionFacts,
+ ): Decision => {
+   if (state === undefined) {
+-    return command._tag === "Initialize"
++    return command._tag === "Initialize" || command._tag === "Flush"
+       ? Result.succeed([
+-          TrunkInitialized.make({ projectId: facts.projectId, head: command.head, by: command.by }),
++          TrunkInitialized.make({
++            projectId: facts.projectId,
++            head: command._tag === "Flush" ? command.observedHead : command.head,
++            by: "flush",
++          }),
+         ])
+       : Result.fail(new TrunkNotInitialized({ projectId: facts.projectId }));
+   }

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.replay
+# why: evolve appends the members to the predecessors array it was handed, rewriting the committed BatchFormed
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index d2f7622..325198e 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -220,7 +220,7 @@ export const evolveCandidate = (state: Batch | undefined, committed: Committed<C
+       attempt: event.attempt,
+       chainEpoch: event.chainEpoch,
+       state: "forming",
+-      predecessors: event.predecessors ?? [],
++      predecessors: ((event.predecessors as ChangeId[] | undefined)?.push(...event.members), event.predecessors ?? []),
+     };
+   }
+   const batch = state;

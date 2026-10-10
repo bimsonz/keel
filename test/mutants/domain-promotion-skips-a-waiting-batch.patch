@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.fifo
+# why: A batch that must wait is passed by the ones behind it
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index b565488..18e918b 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -140,7 +140,7 @@ const flush = (trunk: Trunk, command: Extract<PromotionCommand, { _tag: "Flush"
+       barriers: command.barriers,
+       group: group.map((g) => ({ id: g.batch.batchId, touched: g.touched })),
+     });
+-    if (outcome._tag === "wait") break;
++    if (outcome._tag === "wait") continue;
+     if (outcome._tag === "reverify") {
+       events.push(
+         PromotionDeclined.make({
