@@ -1,0 +1,7 @@
+node_modules/
+.wrangler/
+.dev.vars
+cf.env
+*.log
+.DS_Store
+worker-configuration.d.ts

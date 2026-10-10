@@ -1,0 +1,13 @@
+// Probe only: same code, Worker placed in a fixed cloud region to test whether
+// round-trip latency to the Artifacts backend, not client work, sets wall time.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "keel-spike-12-client-placed",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "placement": { "mode": "targeted", "region": "aws:us-west-2" },
+  "artifacts": [{ "binding": "ARTIFACTS", "namespace": "keel-spike-12" }]
+}

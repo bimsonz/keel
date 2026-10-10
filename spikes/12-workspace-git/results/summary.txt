@@ -1,0 +1,134 @@
+
+== main-tree-r1: n=25 ok=25 verified=25 tail-joined=0 outcomes={"no-tail-event":25} memfs-peak=27716B
+metric                           p50     p95     max   n
+clone                           1081    1306    1614   25
+commit                             0       0       0   25
+push                            1128    1267    1462   25
+cycle (clone+commit+push)       2166    2648    2881   25
+fork/get                         175     204     214   25
+token                            532     627     684   25
+verify                           324     385     396   25
+pass(<2000ms wall p95): false  pass(<500ms CPU p95): untested
+
+== main-tree: n=25 ok=25 verified=25 tail-joined=25 outcomes={"ok":25} memfs-peak=28128B
+metric                           p50     p95     max   n
+clone                           1071    1151    1195   25
+commit                             0       0       0   25
+push                            1103    1171    1172   25
+cycle (clone+commit+push)       2204    2291    2313   25
+fork/get                         177     198     244   25
+token                            367     399     985   25
+verify                           325     373     389   25
+request wall (tail)             3277    3468    3745   25
+request CPU (tail)               102     190     215   25
+  http GET refs?git-upload-pack     363     411     564   25
+  http POST git-upload-pack      709     779     803   25
+  http GET refs?git-receive-pack     369     423     434   25
+  http POST git-receive-pack     735     767     775   25
+pass(<2000ms wall p95): false  pass(<500ms CPU p95): true
+
+== warm-tree: n=5 ok=5 verified=5 tail-joined=5 outcomes={"ok":5} memfs-peak=47614B
+metric                           p50     p95     max   n
+clone                            999    1102    1102   5
+commit                             0       0       0   5
+push                            1119    1263    1263   5
+cycle (clone+commit+push)       2143    2365    2365   5
+fork/get                         161     188     188   5
+token                            358     368     368   5
+verify                           936     984     984   5
+request wall (tail)             8163    8484    8484   5
+request CPU (tail)               215     347     347   5
+  http GET refs?git-upload-pack     356     415     415   5
+  http POST git-upload-pack      645     723     723   5
+  http GET refs?git-receive-pack     373     398     409   25
+  http POST git-receive-pack     739     865     866   25
+warm commit+push (no clone)     1097    1156    1204   20
+CPU per cycle (req CPU / n)       43      69      69   5
+pass(<2000ms wall p95): false  pass(<500ms CPU p95): true
+
+== checkout: n=10 ok=10 verified=10 tail-joined=10 outcomes={"ok":10} memfs-peak=55210B
+metric                           p50     p95     max   n
+clone                            961    1126    1126   10
+commit                             0       0       0   10
+push                            1122    1283    1283   10
+cycle (clone+commit+push)       2068    2384    2384   10
+fork/get                         169     181     181   10
+token                            351     491     491   10
+verify                           320     353     353   10
+request wall (tail)             3119    3507    3507   10
+request CPU (tail)               135     310     310   10
+  http GET refs?git-upload-pack     330     367     367   10
+  http POST git-upload-pack      640     780     780   10
+  http GET refs?git-receive-pack     368     452     452   10
+  http POST git-receive-pack     743     931     931   10
+pass(<2000ms wall p95): false  pass(<500ms CPU p95): true
+
+== fork-per-cycle: n=5 ok=5 verified=5 tail-joined=5 outcomes={"ok":5} memfs-peak=27102B
+metric                           p50     p95     max   n
+clone                           1021    1097    1097   5
+commit                             0       0       0   5
+push                            1162    1752    1752   5
+cycle (clone+commit+push)       2220    2839    2839   5
+fork/get                        3765    4245    4245   5
+token                            348     434     434   5
+verify                           387     412     412   5
+request wall (tail)             6850    8076    8076   5
+request CPU (tail)                80     114     114   5
+  http GET refs?git-upload-pack     338     357     357   5
+  http POST git-upload-pack      683     760     760   5
+  http GET refs?git-receive-pack     369     383     383   5
+  http POST git-receive-pack     793    1378    1378   5
+pass(<2000ms wall p95): false  pass(<500ms CPU p95): true
+
+== branch-basic: n=5 ok=5 verified=5 tail-joined=5 outcomes={"ok":5} memfs-peak=28411B
+metric                           p50     p95     max   n
+clone                           1038    1528    1528   5
+commit                             0       0       0   5
+push                            1150    1483    1483   5
+cycle (clone+commit+push)       2188    2975    2975   5
+fork/get                         182     210     210   5
+token                            374     424     424   5
+verify                           363     383     383   5
+request wall (tail)             3372    4187    4187   5
+request CPU (tail)               207     407     407   5
+  http GET refs?git-upload-pack     379     617     617   5
+  http POST git-upload-pack      652     911     911   5
+  http GET refs?git-receive-pack     403     553     553   5
+  http POST git-receive-pack     747    1035    1035   5
+pass(<2000ms wall p95): false  pass(<500ms CPU p95): true
+
+== placed-sea: n=20 ok=20 verified=20 tail-joined=20 outcomes={"ok":20} memfs-peak=28538B
+metric                           p50     p95     max   n
+clone                            314     486     522   20
+commit                             0       0       0   20
+push                             397     525     640   20
+cycle (clone+commit+push)        706     955     970   20
+fork/get                          33      54     200   20
+token                             81     107     112   20
+verify                            40      53      58   20
+request wall (tail)             1006    1270    1388   20
+request CPU (tail)               111     161     236   20
+  http GET refs?git-upload-pack      76     264     323   20
+  http POST git-upload-pack      213     402     425   20
+  http GET refs?git-receive-pack      76     142     145   20
+  http POST git-receive-pack     294     383     579   20
+pass(<2000ms wall p95): true  pass(<500ms CPU p95): true
+
+== placed-sea-warm: n=4 ok=4 verified=4 tail-joined=4 outcomes={"ok":4} memfs-peak=47886B
+metric                           p50     p95     max   n
+clone                            286     392     392   4
+commit                             0       0       0   4
+push                             350     376     376   4
+cycle (clone+commit+push)        655     687     687   4
+fork/get                          28      62      62   4
+token                             78     101     101   4
+verify                            97     107     107   4
+request wall (tail)             2519    3115    3115   4
+request CPU (tail)               248     321     321   4
+  http GET refs?git-upload-pack      78     126     126   4
+  http POST git-upload-pack      211     266     266   4
+  http GET refs?git-receive-pack      79     177     602   20
+  http POST git-receive-pack     285     343     434   20
+warm commit+push (no clone)      378     924     924   16
+CPU per cycle (req CPU / n)       50      64      64   4
+pass(<2000ms wall p95): true  pass(<500ms CPU p95): true
