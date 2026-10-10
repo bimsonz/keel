@@ -28,8 +28,8 @@ describe("bindings inside workerd", () => {
     await expect(instance.waitForStatus("errored")).resolves.not.toThrow();
   });
 
-  it("Service binding: VERIFY reaches the keel-verify fake", async () => {
-    const response = await env.VERIFY.fetch("https://keel-verify.internal/");
+  it("Service binding: VERIFIER reaches the keel-verify fake", async () => {
+    const response = await env.VERIFIER.fetch("https://keel-verify.internal/");
     expect(await response.json()).toEqual({ fake: "keel-verify" });
   });
 });

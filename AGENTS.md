@@ -90,6 +90,8 @@ Read `node_modules/effect/ai-docs` first, then [docs/effect.md](docs/effect.md) 
 - `keel` requires two secrets: `KEEL_SIGNING_KEY` (the Ed25519 JWK that signs bearer tokens) and `CLOUDFLARE_ACCOUNT_ID` (read by `@cloudflare/ci`; a secret so it is never committed). `scripts/deploy.ts` sets both.
 - `@cloudflare/ci` also mentions `CF_TOKEN` and R2 S3 keys. Keel provides neither: sandbox backups go through the `BACKUP_BUCKET` binding (`localBucket: true`), and no runner step asks for credentials. The `runner-credentials` guard fails if one sets `cloudflareCredentials` or `sourceControlCredentials`.
 - Never put a credential in a container's start environment: it lands on disk and in `/proc/1/environ`. A container reaches git through outbound interception, which injects a short token per request.
+- `KeelSandbox`'s egress: the internet is off and `allowedHosts` is only `*.keel.internal`, which puts the container in intercept-all mode (`interceptAllOutboundHttp` plus HTTPS `*`). `outboundByHost` answers the bundle hosts from `BUNDLES` and refuses `*` at once, rather than leaving a blocked host to hang on DNS. Assign `outboundByHost`; never declare it as a static field, which bypasses the setter.
+- `keel-verify` only reads `BUNDLES`. R2 has no read-only binding, so the `readonly-bundles` guard fails on any use of `BUNDLES` other than `.get`, `.head` or `.list`, including an alias.
 - `@cloudflare/ci` ships unbuilt TypeScript that fails this repo's flags. It is imported through typed boundaries (`apps/keel/src/adapters/driving/workflow/ci.js` + `ci.d.ts`, `apps/keel-verify/src/adapters/driving/do/ci-sandbox.js` + `.d.ts`); grow the declarations as you use more of it.
 
 ## Proving a check

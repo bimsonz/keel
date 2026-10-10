@@ -107,5 +107,6 @@
   ],
   "ai": { "binding": "AI" },
   "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "keel_staging_metrics" }],
-  "services": [{ "binding": "VERIFY", "service": "keel-verify" }]
+  // RPC into keel-verify, for Tier 1 probes, pure checks and Wasm tools.
+  "services": [{ "binding": "VERIFIER", "service": "keel-verify" }]
 }

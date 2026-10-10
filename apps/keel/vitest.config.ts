@@ -20,7 +20,7 @@ export default defineProject({
           KEEL_SIGNING_KEY: await testSigningKey(),
           TEST_MIGRATIONS: await readD1Migrations(`${import.meta.dirname}/migrations`),
         },
-        // keel-verify is another deployable; tests bind VERIFY to a fake of it.
+        // keel-verify is another deployable; tests bind VERIFIER to a fake of it.
         workers: [
           {
             name: "keel-verify",

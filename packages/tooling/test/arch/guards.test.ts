@@ -19,6 +19,7 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
   "event-names": [/PremiseSuspect is not a past-tense verb/, /catalogued twice/, /ChangeTeleported .* missing from the catalogue/],
   "lint-config": [/nested \.oxlintrc\.json/],
   "runner-credentials": [/cloudflareCredentials hands a credential/, /sourceControlCredentials hands a credential/],
+  "readonly-bundles": [/used for something other than get, head or list/, /BUNDLES is destructured/],
   R1: [/outside the domain/, /package hono/, /imports Effect from effect/, /\[archunit\] depends on src\/application/],
   R2: [/imports hono/, /generated\/http\/app\.gen\.ts/],
   R3: [/driving adapter imports the driven adapter/, /\[archunit\] depends on src\/adapters\/driven/],
