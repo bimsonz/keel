@@ -1,0 +1,4 @@
+trial	mode	base	cA	cB	rcA	rcB	sentA	sentB	decided	head	skew_ms	msA	msB	outcome	errA	errB
+1	seqforce	ccce549588eb	d0c60409cb5a	3dfe5913bda2	0	0	ccce549588eb->d0c60409cb5a	d0c60409cb5a->3dfe5913bda2	client	3dfe5913bda2	246	236	261	VIOLATION_BOTH_OK		
+2	seqforce	3dfe5913bda2	4aaa41092cd3	9e70759c8817	0	0	3dfe5913bda2->4aaa41092cd3	4aaa41092cd3->9e70759c8817	client	9e70759c8817	443	433	227	VIOLATION_BOTH_OK		
+3	seqforce	9e70759c8817	275ec68ba028	771b37ad929f	0	0	9e70759c8817->275ec68ba028	275ec68ba028->771b37ad929f	client	771b37ad929f	376	365	365	VIOLATION_BOTH_OK		

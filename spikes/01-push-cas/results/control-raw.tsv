@@ -1,0 +1,4 @@
+trial	mode	base	cA	cB	resA	resB	head	skew_ms	msA	msB	outcome
+1	raw-control	771b37ad929f	ec73541091e9	0c05a5c2067a	ok refs/heads/main	ok refs/heads/main	0c05a5c2067a	111	111	146	VIOLATION_BOTH_OK
+2	raw-control	0c05a5c2067a	69673822e766	959a2448b15a	ok refs/heads/main	ok refs/heads/main	959a2448b15a	91	91	137	VIOLATION_BOTH_OK
+3	raw-control	959a2448b15a	89f672aec642	96926a7700eb	ok refs/heads/main	ok refs/heads/main	96926a7700eb	106	106	236	VIOLATION_BOTH_OK

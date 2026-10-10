@@ -1,0 +1,19 @@
+## 1. git push, second push stale (expected: rejected)
+remote: Processing objects: 100% (1/1)        
+ ! [rejected]        HEAD -> main (fetch first)
+ASSERT OK   [git push] stale second push rejected; head=91a552063e0b is the first push
+
+## 2. raw receive-pack, second update carries the stale old-oid (expected: rejected by the server)
+remote: Processing objects: 100% (1/1)        
+{"sent":["91a552063e0b->eb1fdb5772a1 refs/heads/main"],"atomic":false,"http":200,"ms":161,"unpack":"unpack ok","result":["ng refs/heads/main stale ref"],"after":{"refs/heads/main":"3361bc326437"}}
+ASSERT OK   [raw stale old-oid] stale second push rejected; head=3361bc326437 is the first push
+
+## 3. CONTROL: second push uses --force (it re-reads the head and overwrites)
+remote: Processing objects: 100% (1/1)        
+ + 4878374...69d802f HEAD -> main (forced update)
+ASSERT FAIL [git push --force] second push WON (exit=0); head=69d802f6b096, first=4878374646f0 lost, second=69d802f6b096
+
+## 4. CONTROL: raw update whose old-oid is the new head (a re-read), non-fast-forward
+remote: Processing objects: 100% (1/1)        
+{"sent":["72f815b0b90b->ccce549588eb refs/heads/main"],"atomic":false,"http":200,"ms":133,"unpack":"unpack ok","result":["ok refs/heads/main"],"after":{"refs/heads/main":"ccce549588eb"}}
+ASSERT FAIL [raw re-read old-oid] second push WON (exit=0); head=ccce549588eb, first=72f815b0b90b lost, second=ccce549588eb

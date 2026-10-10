@@ -1,0 +1,49 @@
+$ wrangler artifacts repos list --namespace keel-spike-01   # before
+┌──────┬────────────────┬───────────┬────────┬──────────────────────────┐
+│ name │ default_branch │ read_only │ status │ updated_at               │
+├──────┼────────────────┼───────────┼────────┼──────────────────────────┤
+│ cas  │ main           │ false     │ ready  │ 2026-10-10T18:46:47.317Z │
+└──────┴────────────────┴───────────┴────────┴──────────────────────────┘
+$ wrangler artifacts repos list --namespace keel-spike-03   # before
+┌─────────────┬────────────────┬───────────┬────────┬──────────────────────────┐
+│ name        │ default_branch │ read_only │ status │ updated_at               │
+├─────────────┼────────────────┼───────────┼────────┼──────────────────────────┤
+│ fork1       │ main           │ false     │ ready  │ 2026-10-10T19:11:43.224Z │
+├─────────────┼────────────────┼───────────┼────────┼──────────────────────────┤
+│ shallow-dst │ main           │ false     │ ready  │ 2026-10-10T18:59:21.738Z │
+├─────────────┼────────────────┼───────────┼────────┼──────────────────────────┤
+│ src         │ main           │ false     │ ready  │ 2026-10-10T18:56:55.496Z │
+└─────────────┴────────────────┴───────────┴────────┴──────────────────────────┘
+$ wrangler artifacts repos delete cas --namespace keel-spike-01 --force
+Deleted Artifacts repo "cas" from namespace "keel-spike-01".
+$ wrangler artifacts repos delete fork1 --namespace keel-spike-03 --force
+Deleted Artifacts repo "fork1" from namespace "keel-spike-03".
+$ wrangler artifacts repos delete shallow-dst --namespace keel-spike-03 --force
+Deleted Artifacts repo "shallow-dst" from namespace "keel-spike-03".
+$ wrangler artifacts repos delete src --namespace keel-spike-03 --force
+Deleted Artifacts repo "src" from namespace "keel-spike-03".
+$ wrangler delete --name keel-spike-03-forker --force
+Successfully deleted keel-spike-03-forker
+$ wrangler artifacts repos list --namespace keel-spike-01   # after
+No Artifacts repos found in namespace "keel-spike-01".
+$ wrangler artifacts namespaces get keel-spike-01
+namespace:   keel-spike-01
+repo_count:  0
+created_at:  2026-10-10T18:46:46.546Z
+updated_at:  2026-10-10T19:13:25.809Z
+$ wrangler artifacts repos list --namespace keel-spike-03   # after
+No Artifacts repos found in namespace "keel-spike-03".
+$ wrangler artifacts namespaces get keel-spike-03
+namespace:   keel-spike-03
+repo_count:  0
+created_at:  2026-10-10T18:56:54.243Z
+updated_at:  2026-10-10T19:13:30.139Z
+$ wrangler deployments list --name keel-spike-03-forker
+✘ [ERROR] A request to the Cloudflare API (/accounts/<acct>/workers/scripts/keel-spike-03-forker/deployments) failed.
+  This Worker does not exist on your account. [code: 10007]
+$ curl -s -o /dev/null -w '%{http_code}' https://keel-spike-03-forker.<subdomain>.workers.dev/info
+404
+$ wrangler artifacts namespaces list   # keel-spike-0[13] rows
+│ namespace             │ repo_count │ created_at               │ updated_at               │
+│ keel-spike-01         │ 0          │ 2026-10-10T18:46:46.546Z │ 2026-10-10T19:13:25.809Z │
+│ keel-spike-03         │ 0          │ 2026-10-10T18:56:54.243Z │ 2026-10-10T19:13:30.139Z │

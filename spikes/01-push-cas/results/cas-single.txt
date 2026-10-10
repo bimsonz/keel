@@ -1,0 +1,84 @@
+head=7c18ddec9977 prev(head~1)=dd8b27cf149e bogus=72813a9956cf
+
+## R1 wrong old-oid (never existed), new is a fast-forward of head
+{"sent":["72813a9956cf->4e2f10c3dd39 refs/heads/main"],"atomic":false,"http":200,"ms":146,"unpack":"unpack ok","result":["ng refs/heads/main stale ref"],"after":{"refs/heads/main":"7c18ddec9977"}}
+
+## R2 old-oid zero (create) on an existing ref
+{"sent":["000000000000->5e7e05871075 refs/heads/main"],"atomic":false,"http":200,"ms":146,"unpack":"unpack ok","result":["ng refs/heads/main stale ref"],"after":{"refs/heads/main":"7c18ddec9977"}}
+
+## R3 stale but real old-oid (head~1), new is a fast-forward of head
+{"sent":["dd8b27cf149e->0ee0a64d35d7 refs/heads/main"],"atomic":false,"http":200,"ms":191,"unpack":"unpack ok","result":["ng refs/heads/main stale ref"],"after":{"refs/heads/main":"7c18ddec9977"}}
+
+## R4 wrong old-oid, new is NOT a fast-forward (what a forced update would send)
+{"sent":["72813a9956cf->071a11ed8a7a refs/heads/main"],"atomic":false,"http":200,"ms":142,"unpack":"unpack ok","result":["ng refs/heads/main stale ref"],"after":{"refs/heads/main":"7c18ddec9977"}}
+
+## R5 CONTROL: correct old-oid, fast-forward -> must be ok
+{"sent":["7c18ddec9977->08f15c15aa39 refs/heads/main"],"atomic":false,"http":200,"ms":97,"unpack":"unpack ok","result":["ok refs/heads/main"],"after":{"refs/heads/main":"08f15c15aa39"}}
+
+## R6 correct old-oid, non-fast-forward (server-side non-ff policy?)
+{"sent":["08f15c15aa39->bd162e70a617 refs/heads/main"],"atomic":false,"http":200,"ms":117,"unpack":"unpack ok","result":["ok refs/heads/main"],"after":{"refs/heads/main":"bd162e70a617"}}
+
+## R7 single command: create refs/heads/side with old-oid zero (control: must be ok)
+{"sent":["000000000000->3d20d366f8fa refs/heads/side"],"atomic":false,"http":200,"ms":165,"unpack":"unpack ok","result":["ok refs/heads/side"],"after":{"refs/heads/side":"3d20d366f8fa"}}
+
+## R8 two commands WITHOUT atomic: valid fast-forward of side + stale main
+{"sent":["3d20d366f8fa->fd06c1300979 refs/heads/side","72813a9956cf->1c9d10efaabc refs/heads/main"],"atomic":false,"http":200,"ms":105,"unpack":"unpack ok","result":["ng refs/heads/side stale ref","ng refs/heads/main stale ref"],"after":{"refs/heads/side":"3d20d366f8fa","refs/heads/main":"bd162e70a617"}}
+
+## R9 two commands WITHOUT atomic, stale one first: stale main + valid fast-forward of side
+{"sent":["72813a9956cf->8a7a9a2ba805 refs/heads/main","3d20d366f8fa->fd06c1300979 refs/heads/side"],"atomic":false,"http":200,"ms":103,"unpack":"unpack ok","result":["ng refs/heads/main stale ref","ng refs/heads/side stale ref"],"after":{"refs/heads/main":"bd162e70a617","refs/heads/side":"3d20d366f8fa"}}
+
+## R10 two commands WITH atomic: valid fast-forward of side + stale main
+{"sent":["3d20d366f8fa->fd06c1300979 refs/heads/side","72813a9956cf->fc270ddd4546 refs/heads/main"],"atomic":true,"http":200,"ms":105,"unpack":"unpack ok","result":["ng refs/heads/side stale ref","ng refs/heads/main stale ref"],"after":{"refs/heads/side":"3d20d366f8fa","refs/heads/main":"bd162e70a617"}}
+
+## R11 two valid commands WITHOUT atomic (control: both must be ok)
+{"sent":["3d20d366f8fa->fd06c1300979 refs/heads/side","bd162e70a617->ca68c5a26139 refs/heads/main"],"atomic":false,"http":200,"ms":113,"unpack":"unpack ok","result":["ok refs/heads/side","ok refs/heads/main"],"after":{"refs/heads/side":"fd06c1300979","refs/heads/main":"ca68c5a26139"}}
+
+## R12 delete with wrong old-oid
+{"sent":["72813a9956cf->000000000000 refs/heads/side"],"atomic":false,"http":200,"ms":156,"unpack":"unpack ok","result":["ng refs/heads/side stale ref"],"after":{"refs/heads/side":"fd06c1300979"}}
+
+## R13 delete with correct old-oid (control: must be ok)
+{"sent":["fd06c1300979->000000000000 refs/heads/side"],"atomic":false,"http":200,"ms":111,"unpack":"unpack ok","result":["ok refs/heads/side"],"after":{"refs/heads/side":"absent"}}
+
+## L1 --force-with-lease=main:<wrong sha> (non-fast-forward rewrite)
+To https://<acct>.artifacts.cloudflare.net/git/keel-spike-01/cas.git
+ ! [rejected]        45b8f4193cba7963f11e735b3a7671a940c68d55 -> main (stale info)
+error: failed to push some refs to 'https://<acct>.artifacts.cloudflare.net/git/keel-spike-01/cas.git'
+exit=1 head=ca68c5a26139 commandSent=0
+
+## L2 --force-with-lease=main:<stale real sha head~1>
+To https://<acct>.artifacts.cloudflare.net/git/keel-spike-01/cas.git
+ ! [rejected]        45b8f4193cba7963f11e735b3a7671a940c68d55 -> main (stale info)
+error: failed to push some refs to 'https://<acct>.artifacts.cloudflare.net/git/keel-spike-01/cas.git'
+exit=1 head=ca68c5a26139 commandSent=0
+
+## L3 --force-with-lease=main:<correct sha> with a non-fast-forward rewrite
+remote: Processing objects: 100% (1/1)        
+To https://<acct>.artifacts.cloudflare.net/git/keel-spike-01/cas.git
+ + ca68c5a...5cc87bd 5cc87bda5474fe3201410c43a22811054e3780ac -> main (forced update)
+exit=0 head=5cc87bda5474 expected=5cc87bda5474
+
+## A1 git push --atomic: main stale (non-ff, no force) + new branch atomic-x
+To https://<acct>.artifacts.cloudflare.net/git/keel-spike-01/cas.git
+ ! [rejected]        68720a52c0bb9d8771330d41c4983dc9ae3c98c3 -> main (non-fast-forward)
+ ! [rejected]        5cc87bda5474fe3201410c43a22811054e3780ac -> atomic-x (atomic push failed)
+error: failed to push some refs to 'https://<acct>.artifacts.cloudflare.net/git/keel-spike-01/cas.git'
+hint: Updates were rejected because the tip of your current branch is behind
+hint: its remote counterpart. If you want to integrate the remote changes,
+hint: use 'git pull' before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+exit=1
+5cc87bda5474	refs/heads/main
+7c18ddec9977	refs/heads/nonatomic-x
+
+## A2 same without --atomic
+To https://<acct>.artifacts.cloudflare.net/git/keel-spike-01/cas.git
+   7c18dde..5cc87bd  5cc87bda5474fe3201410c43a22811054e3780ac -> nonatomic-x
+ ! [rejected]        68720a52c0bb9d8771330d41c4983dc9ae3c98c3 -> main (non-fast-forward)
+error: failed to push some refs to 'https://<acct>.artifacts.cloudflare.net/git/keel-spike-01/cas.git'
+hint: Updates were rejected because the tip of your current branch is behind
+hint: its remote counterpart. If you want to integrate the remote changes,
+hint: use 'git pull' before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+exit=1
+5cc87bda5474	refs/heads/main
+5cc87bda5474	refs/heads/nonatomic-x

@@ -1,0 +1,62 @@
+commit=a0d6c2363732 notes-commit=c0e275e79c99
+
+## push the three refs
+remote: Processing objects: 100% (6/6)        
+To https://<acct>.artifacts.cloudflare.net/git/keel-spike-01/cas.git
+ * [new reference]   refs/keel/test -> refs/keel/test
+ * [new reference]   refs/notes/mfp -> refs/notes/mfp
+ * [new branch]      cand/x -> cand/x
+exit=0
+
+## ls-remote (protocol v2, git's default)
+5cc87bda5474	HEAD
+a0d6c2363732	refs/heads/cand/x
+5cc87bda5474	refs/heads/main
+5cc87bda5474	refs/heads/nonatomic-x
+a0d6c2363732	refs/keel/test
+c0e275e79c99	refs/notes/mfp
+
+## ls-remote (protocol v0)
+5cc87bda5474	HEAD
+a0d6c2363732	refs/heads/cand/x
+5cc87bda5474	refs/heads/main
+5cc87bda5474	refs/heads/nonatomic-x
+a0d6c2363732	refs/keel/test
+c0e275e79c99	refs/notes/mfp
+
+## receive-pack advertisement
+5cc87bda5474	HEAD
+a0d6c2363732	refs/heads/cand/x
+5cc87bda5474	refs/heads/main
+5cc87bda5474	refs/heads/nonatomic-x
+a0d6c2363732	refs/keel/test
+c0e275e79c99	refs/notes/mfp
+
+## fetch back into a fresh repo
+fetch exit=0
+a0d6c2363732 refs/keel/test
+c0e275e79c99 refs/notes/mfp
+a0d6c2363732 refs/remotes/o/cand/x
+PASS refs/keel/test round-trips
+PASS refs/notes/mfp round-trips
+PASS refs/heads/cand/x round-trips
+PASS note body readable after fetch
+
+## a plain clone: which refs come along by default
+  refs/heads/main
+  refs/remotes/origin/HEAD
+  refs/remotes/origin/cand/x
+  refs/remotes/origin/main
+  refs/remotes/origin/nonatomic-x
+
+## stale update to refs/keel/test is refused by the server
+{"sent":["72813a9956cf->4812e52d862f refs/keel/test"],"atomic":false,"http":200,"ms":109,"unpack":"unpack ok","result":["ng refs/keel/test stale ref"],"after":{"refs/keel/test":"a0d6c2363732"}}
+
+## and a correct update to refs/keel/test is applied (control)
+{"sent":["a0d6c2363732->4812e52d862f refs/keel/test"],"atomic":false,"http":200,"ms":234,"unpack":"unpack ok","result":["ok refs/keel/test"],"after":{"refs/keel/test":"4812e52d862f"}}
+
+## append a second note and push (notes ref is a fast-forward)
+   c0e275e..928d9fa  refs/notes/mfp -> refs/notes/mfp
+PASS notes ref advanced on the server
+
+ALL CHECKS PASS

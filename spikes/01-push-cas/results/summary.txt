@@ -1,0 +1,73 @@
+## race.tsv  (50 trials)
+outcomes: {"A_WON":22,"B_WON":28}
+CAS violations: 0
+decided: {"server":44,"client":6}
+loser text: {
+ "! [remote rejected] HEAD -> main (stale ref)": 44,
+ "! [rejected] HEAD -> main (fetch first)": 6
+}
+push ms p50/p95/max: 281 / 476 / 793
+start skew ms max: 4
+
+## raw-race.tsv  (50 trials)
+outcomes: {"B_WON":21,"A_WON":29}
+CAS violations: 0
+loser text: {
+ "ng refs/heads/main stale ref": 50
+}
+push ms p50/p95/max: 109 / 267 / 510
+start skew ms max: 0
+
+## force.tsv  (30 trials)
+outcomes: {"A_WON":15,"B_WON":12,"VIOLATION_BOTH_OK":3}
+CAS violations: 3
+decided: {"server":27,"client":3}
+loser text: {
+ "! [remote rejected] HEAD -> main (stale ref)": 27,
+ "(VIOLATION_BOTH_OK)": 3
+}
+push ms p50/p95/max: 285 / 541 / 860
+start skew ms max: 1
+
+## ffchain.tsv  (30 trials)
+outcomes: {"B_WON":18,"A_WON":11,"BOTH_OK_FF":1}
+CAS violations: 0
+decided: {"server":26,"client":4}
+loser text: {
+ "! [remote rejected] HEAD -> main (stale ref)": 26,
+ "(BOTH_OK_FF)": 1,
+ "! [rejected] HEAD -> main (fetch first)": 3
+}
+push ms p50/p95/max: 276 / 489 / 1027
+start skew ms max: 1
+
+## lease.tsv  (20 trials)
+outcomes: {"A_WON":15,"B_WON":5}
+CAS violations: 0
+decided: {"server":19,"client":1}
+loser text: {
+ "! [remote rejected] HEAD -> main (stale ref)": 19,
+ "! [rejected] HEAD -> main (stale info)": 1
+}
+push ms p50/p95/max: 289 / 377 / 403
+start skew ms max: 3
+
+## control-seqforce.tsv  (3 trials)
+outcomes: {"VIOLATION_BOTH_OK":3}
+CAS violations: 3
+decided: {"client":3}
+loser text: {
+ "(VIOLATION_BOTH_OK)": 3
+}
+push ms p50/p95/max: 261 / 433 / 433
+start skew ms max: 443
+
+## control-raw.tsv  (3 trials)
+outcomes: {"VIOLATION_BOTH_OK":3}
+CAS violations: 3
+loser text: {
+ "(VIOLATION_BOTH_OK)": 3
+}
+push ms p50/p95/max: 111 / 236 / 236
+start skew ms max: 111
+
