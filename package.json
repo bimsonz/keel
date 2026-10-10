@@ -1,0 +1,29 @@
+{
+  "name": "keel",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "pnpm@11.18.0",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "gen": "pnpm -r --if-present run gen",
+    "lint": "oxlint",
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r --if-present run typecheck",
+    "test": "vitest run --project unit --project arch",
+    "test:pool": "vitest run --project 'pool:*'",
+    "deploy:dry": "pnpm -r --if-present run deploy:dry",
+    "guards": "node packages/tooling/src/cli/guards.ts",
+    "tooling:controls": "node packages/tooling/src/cli/controls.ts",
+    "check": "pnpm gen && pnpm lint && pnpm typecheck && pnpm guards && pnpm test && pnpm test:pool && pnpm deploy:dry"
+  },
+  "devDependencies": {
+    "@keeltown/tooling": "workspace:*",
+    "@types/node": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

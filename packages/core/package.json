@@ -1,0 +1,17 @@
+{
+  "name": "@keeltown/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The hexagon: pure domain and Effect use-cases behind ports",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate
+        run: pnpm gen
+
+      - name: Generated contract matches the committed one
+        run: git diff --exit-code -- packages/contracts
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Guards
+        run: pnpm guards
+
+      - name: Unit and architecture tests
+        run: pnpm test
+
+      - name: Workers tests (workerd)
+        run: pnpm test:pool
+
+      - name: Deploy dry-run
+        run: pnpm deploy:dry

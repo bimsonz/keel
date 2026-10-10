@@ -1,0 +1,19 @@
+{
+  "name": "@keeltown/console",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Mission Control",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "gen": "wrangler types --include-runtime=true --strict-vars=false",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "deploy:dry": "wrangler deploy --dry-run --outdir .wrangler/dry-run"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

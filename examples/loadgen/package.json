@@ -1,0 +1,17 @@
+{
+  "name": "@keeltown/example-loadgen",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: synthetic load against Keel's public API",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

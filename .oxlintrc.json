@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "import", "vitest", "promise"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "warn"
+  },
+  "options": {
+    "typeAware": true
+  },
+  "rules": {
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/await-thenable": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/consistent-type-imports": "error",
+    "import/no-cycle": "error",
+    "vitest/no-focused-tests": "error",
+    "no-console": "off"
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/src/generated/**",
+    "**/*.gen.ts",
+    "**/worker-configuration.d.ts",
+    "**/.wrangler/**",
+    "test/controls/**",
+    "fixtures/**",
+    "spikes/**"
+  ]
+}

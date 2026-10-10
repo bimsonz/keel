@@ -1,0 +1,17 @@
+{
+  "name": "@keeltown/testing",
+  "version": "0.0.0",
+  "private": true,
+  "description": "In-memory adapters, port contract suites and fake bindings",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

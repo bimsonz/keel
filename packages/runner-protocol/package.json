@@ -1,0 +1,17 @@
+{
+  "name": "@keeltown/runner-protocol",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runner protocol v0: Effect Schema messages between control plane and runners",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@keeltown/gitcore",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Clean-room git algorithms with a small I/O interface; no Effect, no cloudflare:*",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

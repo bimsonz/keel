@@ -1,0 +1,16 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "keel",
+  "main": "src/index.ts",
+  // One compatibility date across every Worker in the repo (rule R13).
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // Never commit account_id: deploys read CLOUDFLARE_ACCOUNT_ID at runtime (rule R13).
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "vars": {
+    // The public host this Worker answers on. scripts/deploy.ts overrides it per environment.
+    "KEEL_HOST": "keel.localhost"
+  }
+}

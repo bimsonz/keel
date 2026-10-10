@@ -1,0 +1,8 @@
+{
+  "name": "@keeltown/spec",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Keel's API, specified in TypeSpec: the single source for REST, MCP and the OpenAPI document",
+  "type": "module",
+  "license": "MIT"
+}
