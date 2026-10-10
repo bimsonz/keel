@@ -54,6 +54,7 @@ const grant = {
   token: "write-token",
   expiresAt: 5_000,
   baseSha: "0".repeat(40),
+  repo: { namespace: "keel-ws-00", name: "wsp-01jz8pt2c4e6g8j0m2n4q6s8v4" },
 };
 const input = {
   goal: "Cache permission lookups",
