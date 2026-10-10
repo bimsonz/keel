@@ -1,5 +1,6 @@
 import type { GuardOptions, GuardResult } from "./guard.ts";
 import { checkEventNames, EVENT_NAMES } from "./guards/event-names.ts";
+import { checkLintConfig, LINT_CONFIG } from "./guards/lint-config.ts";
 import { checkPublicScrub, PUBLIC_SCRUB } from "./guards/public-scrub.ts";
 
 /**
@@ -18,4 +19,5 @@ export const guards: readonly RegisteredGuard[] = [
   { name: REGISTRY_PUBLIC, run: checkRegistryPublic, controlCanary: "pnpm-lock.yaml" },
   { name: PUBLIC_SCRUB, run: checkPublicScrub, controlCanary: "README.md" },
   { name: EVENT_NAMES, run: checkEventNames, controlCanary: "event:ChangeSubmitted" },
+  { name: LINT_CONFIG, run: checkLintConfig, controlCanary: ".oxlintrc.json" },
 ];
