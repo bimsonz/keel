@@ -1,4 +1,6 @@
 {
   "extends": "../tsconfig.base.json",
+  // Scenarios talk to a deployed Keel with the platform's own fetch, as any outside client would.
+  "compilerOptions": { "lib": ["ES2023", "DOM", "DOM.Iterable"] },
   "include": ["src/**/*.ts", "test/**/*.ts"]
 }

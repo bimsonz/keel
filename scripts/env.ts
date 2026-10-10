@@ -7,14 +7,24 @@ export const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { enco
 
 const wranglerBin = join(root, "apps/keel/node_modules/.bin/wrangler");
 
-export function wrangler(args: readonly string[], options: { cwd?: string; input?: string; quiet?: boolean } = {}): string {
-  return execFileSync(wranglerBin, [...args], {
+export interface WranglerOptions {
+  readonly cwd?: string;
+  readonly input?: string;
+  readonly quiet?: boolean;
+  /** Echo wrangler's stdout as it runs, instead of returning it. */
+  readonly stream?: boolean;
+  readonly env?: Readonly<Record<string, string>>;
+}
+
+export function wrangler(args: readonly string[], options: WranglerOptions = {}): string {
+  const output = execFileSync(wranglerBin, [...args], {
     cwd: options.cwd ?? join(root, "apps/keel"),
     encoding: "utf8",
     input: options.input,
-    stdio: [options.input === undefined ? "ignore" : "pipe", "pipe", options.quiet === true ? "pipe" : "inherit"],
-    env: { ...process.env, WRANGLER_SEND_METRICS: "false" },
+    stdio: [options.input === undefined ? "ignore" : "pipe", options.stream === true ? "inherit" : "pipe", options.quiet === true ? "pipe" : "inherit"],
+    env: { ...process.env, ...options.env, WRANGLER_SEND_METRICS: "false" },
   });
+  return output ?? "";
 }
 
 export function accountId(): string {
@@ -25,9 +35,11 @@ export function accountId(): string {
   return id;
 }
 
-/** A short-lived API token from the operator's wrangler login. */
+let token: string | undefined;
+
+/** A short-lived API token from the operator's wrangler login, fetched once per run. */
 export function apiToken(): string {
-  const token = wrangler(["auth", "token"], { quiet: true }).trim().split("\n").pop() ?? "";
+  token ??= wrangler(["auth", "token"], { quiet: true }).trim().split("\n").pop() ?? "";
   if (token.length < 20) throw new Error("No wrangler login: run `pnpm --dir apps/keel exec wrangler login`.");
   return token;
 }

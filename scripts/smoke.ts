@@ -1,0 +1,82 @@
+// The live smoke after a deploy: node scripts/smoke.ts staging
+// Seeds two throwaway agents straight into the environment's D1, asks each
+// "who am I?" over REST and over MCP, and requires the two surfaces to agree
+// for each agent and to disagree across agents (so the comparison can fail).
+// The rows are deleted afterwards, whatever happened. KEEL_URL overrides the
+// workers.dev URL.
+import { isDeepStrictEqual } from "node:util";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { whoamiSmoke, type WhoamiSmokeResult } from "../e2e/src/smoke/whoami.ts";
+import { cloudflare, root, wrangler } from "./env.ts";
+
+const environment = process.argv[2] ?? "staging";
+const appDir = join(root, "apps/keel");
+if (!existsSync(join(appDir, "wrangler.deploy.jsonc"))) throw new Error(`no apps/keel/wrangler.deploy.jsonc: run \`node scripts/deploy.ts ${environment}\` first`);
+
+const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+function ulid(): string {
+  let time = "";
+  for (let t = Date.now(), i = 0; i < 10; i += 1, t = Math.floor(t / 32)) time = CROCKFORD.charAt(t % 32) + time;
+  return time + [...crypto.getRandomValues(new Uint8Array(16))].map((b) => CROCKFORD.charAt(b % 32)).join("");
+}
+
+async function sha256(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return `sha256:${[...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function d1(sql: string): void {
+  wrangler(["d1", "execute", "DB", "--remote", "-c", "wrangler.deploy.jsonc", "--command", sql], { cwd: appDir, quiet: true });
+}
+
+interface Seeded {
+  readonly id: string;
+  readonly clientId: string;
+  readonly clientSecret: string;
+}
+
+async function seed(name: string): Promise<Seeded> {
+  const id = `agt_${ulid()}`;
+  const clientId = `smoke-${crypto.randomUUID()}`;
+  const clientSecret = crypto.randomUUID() + crypto.randomUUID();
+  // Every value is generated here, never taken from input, so inlining is safe.
+  d1(
+    `INSERT INTO agents (id, name, kind, scopes, state, revocation_epoch, created_at) VALUES ('${id}', '${name}', 'interactive', '["agent:read","agent:work"]', 'active', 0, ${Date.now()});` +
+      ` INSERT INTO credentials (client_id, agent_id, secret_hash) VALUES ('${clientId}', '${id}', '${await sha256(clientSecret)}');`,
+  );
+  return { id, clientId, clientSecret };
+}
+
+const subdomain = Reflect.get(Object(await cloudflare("GET", "/workers/subdomain")), "subdomain");
+const keelUrl = process.env["KEEL_URL"] ?? `https://keel.${String(subdomain)}.workers.dev`;
+const seeded: Seeded[] = [];
+let failures = 0;
+const check = (ok: boolean, what: string) => {
+  console.log(`${ok ? "ok  " : "FAIL"} ${what}`);
+  if (!ok) failures += 1;
+};
+
+try {
+  seeded.push(await seed("smoke-a"), await seed("smoke-b"));
+  const results: WhoamiSmokeResult[] = [];
+  for (const agent of seeded) results.push(await whoamiSmoke(keelUrl, agent));
+  console.log(JSON.stringify({ keelUrl, results }, null, 2));
+  for (const [index, result] of results.entries()) {
+    const agent = seeded[index];
+    const named = ["result", "agent", "id"].reduce<unknown>((value, key) => Reflect.get(Object(value), key), result.rest);
+    check(named === agent?.id, `REST names agent ${agent?.id}`);
+    check(isDeepStrictEqual(result.tool, result.rest), `MCP whoami's structuredContent equals the REST body for ${agent?.id}`);
+  }
+  check(!isDeepStrictEqual(results[0]?.rest, results[1]?.tool), "two agents' identities differ across surfaces (the comparison can fail)");
+} catch (error) {
+  failures += 1;
+  console.log(`FAIL ${error instanceof Error ? error.message : String(error)}`);
+} finally {
+  if (seeded.length > 0) {
+    const ids = seeded.map((s) => `'${s.id}'`).join(", ");
+    d1(`DELETE FROM credentials WHERE agent_id IN (${ids}); DELETE FROM agents WHERE id IN (${ids});`);
+    console.log(`cleaned up ${seeded.length} smoke agent(s)`);
+  }
+}
+process.exit(failures === 0 ? 0 : 1);
