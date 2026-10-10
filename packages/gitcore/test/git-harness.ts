@@ -91,6 +91,11 @@ export class CatFileReader implements TreeReader {
     if (o.type !== "commit") throw new Error(`${oid} is a ${o.type}`);
     return decodeCommit(o.body);
   }
+  async readBlob(oid: string): Promise<Uint8Array> {
+    const o = await this.read(oid);
+    if (o.type !== "blob") throw new Error(`${oid} is a ${o.type}`);
+    return o.body;
+  }
   close() {
     this.proc.stdin.end();
     this.proc.kill();
@@ -155,4 +160,25 @@ export function fastImport(dir: string, commits: CommitPlan[]): Map<number, stri
   }
   rmSync(marksFile);
   return marks;
+}
+
+// ------------------------------------------------------------ merge-tree
+
+export interface GitMerge {
+  /** The merged tree git wrote (with conflict markers when `conflicted`). */
+  readonly tree: string;
+  readonly conflicted: boolean;
+  readonly output: string;
+}
+
+/** `git merge-tree --write-tree ours theirs`: exit 0 is clean, 1 is conflicted, anything else fails. */
+export function gitMergeTree(dir: string, ours: string, theirs: string): GitMerge {
+  const r = spawnSync("git", ["merge-tree", "--write-tree", ours, theirs], {
+    cwd: dir,
+    env: GIT_ENV,
+  });
+  if (r.status !== 0 && r.status !== 1)
+    throw new Error(`merge-tree failed (${r.status}): ${r.stderr.toString()}`);
+  const output = r.stdout.toString();
+  return { tree: output.split("\n")[0] ?? "", conflicted: r.status === 1, output };
 }

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/merge.test.ts -t merge.differential
+# kills: merge.differential
+# why: A path both sides changed takes ours silently instead of refusing, so a candidate drops the other change
+diff --git a/packages/gitcore/src/merge.ts b/packages/gitcore/src/merge.ts
+index a573a6c..8ddd8d9 100644
+--- a/packages/gitcore/src/merge.ts
++++ b/packages/gitcore/src/merge.ts
+@@ -356,6 +356,8 @@ async function mergeTree(
+         pick = oid === null ? null : { name, mode: MODE_TREE, oid };
+       } else if (present.some(isTree)) {
+         throw new Refusal("dir-file", path);
++      } else if (o !== null && t !== null) {
++        pick = o;
+       } else if (b === null) {
+         throw new Refusal("add-add", path);
+       } else if (o === null || t === null) {

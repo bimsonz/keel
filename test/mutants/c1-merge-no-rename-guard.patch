@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/merge.test.ts -t merge.differential
+# kills: merge.differential
+# why: Renames are not guarded, so a change git would carry across a rename lands at the old path
+diff --git a/packages/gitcore/src/merge.ts b/packages/gitcore/src/merge.ts
+index a573a6c..dd16df7 100644
+--- a/packages/gitcore/src/merge.ts
++++ b/packages/gitcore/src/merge.ts
+@@ -389,7 +389,6 @@ export async function mergeTrees(
+   await guardChanges(r, changes);
+   const out = new Map<string, GitObject>();
+   const tree = await mergeTree(r, base, ours, theirs, "", out);
+-  await guardRenames(r, changes, options.renameThreshold ?? 0.3);
+   if (tree !== null) return { tree, newObjects: out };
+   const empty = new Uint8Array(0);
+   const oid = await hashObject("tree", empty);
