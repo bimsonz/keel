@@ -3,7 +3,7 @@
 // "who am I?" over REST and over MCP, and requires the two surfaces to agree
 // for each agent and to disagree across agents (so the comparison can fail).
 // The rows are deleted afterwards, whatever happened. KEEL_URL overrides the
-// workers.dev URL.
+// workers.dev URL; `--repeat N` also times N more rounds for the first agent.
 import { isDeepStrictEqual } from "node:util";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -11,6 +11,8 @@ import { whoamiSmoke, type WhoamiSmokeResult } from "../e2e/src/smoke/whoami.ts"
 import { cloudflare, root, wrangler } from "./env.ts";
 
 const environment = process.argv[2] ?? "staging";
+const repeatAt = process.argv.indexOf("--repeat");
+const repeat = repeatAt === -1 ? 0 : Number(process.argv[repeatAt + 1] ?? "0");
 const appDir = join(root, "apps/keel");
 if (!existsSync(join(appDir, "wrangler.deploy.jsonc"))) throw new Error(`no apps/keel/wrangler.deploy.jsonc: run \`node scripts/deploy.ts ${environment}\` first`);
 
@@ -69,6 +71,15 @@ try {
     check(isDeepStrictEqual(result.tool, result.rest), `MCP whoami's structuredContent equals the REST body for ${agent?.id}`);
   }
   check(!isDeepStrictEqual(results[0]?.rest, results[1]?.tool), "two agents' identities differ across surfaces (the comparison can fail)");
+  if (repeat > 0 && seeded[0] !== undefined) {
+    const rounds: WhoamiSmokeResult[] = [];
+    for (let i = 0; i < repeat; i += 1) rounds.push(await whoamiSmoke(keelUrl, seeded[0]));
+    for (const call of ["token", "rest", "mcp"] as const) {
+      const sorted = rounds.map((r) => r.timings[call]).toSorted((a, b) => a - b);
+      const at = (q: number) => sorted[Math.floor(q * (sorted.length - 1))];
+      console.log(`${call.padEnd(5)} over ${repeat} warm rounds, client-side: p50 ${at(0.5)} ms, p95 ${at(0.95)} ms`);
+    }
+  }
 } catch (error) {
   failures += 1;
   console.log(`FAIL ${error instanceof Error ? error.message : String(error)}`);
