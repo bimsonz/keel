@@ -39,6 +39,20 @@ export function makeIdsMemory() {
   };
 }
 
+/** `sha256:` and the hex digest of a secret, as credentials store it. */
+export async function hashSecret(secret: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret));
+  return `sha256:${[...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** Compares two strings in time independent of where they differ. */
+export function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let difference = 0;
+  for (let i = 0; i < a.length; i += 1) difference |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return difference === 0;
+}
+
 /** Agents and credentials in maps. `seed` writes the projection directly, as enrolment's projector would. */
 export function makeAgentDirectoryMemory() {
   const agents = new Map<AgentId, Agent>();
@@ -57,6 +71,12 @@ export function makeAgentDirectoryMemory() {
         findAgent: (agentId) => Effect.sync(() => Option.fromNullishOr(agents.get(agentId))),
         findCredential: (clientId) => Effect.sync(() => Option.fromNullishOr(credentials.get(clientId))),
         upsert: (agent, credential) => Effect.sync(() => seed(agent, credential)),
+        verifyCredential: (clientId, secret) =>
+          Effect.promise(async () => {
+            const credential = credentials.get(clientId);
+            if (credential === undefined) return Option.none();
+            return constantTimeEqual(await hashSecret(secret), credential.secretHash) ? Option.some(credential.agentId) : Option.none();
+          }),
       }),
     ),
   };

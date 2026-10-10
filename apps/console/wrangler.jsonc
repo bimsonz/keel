@@ -1,5 +1,5 @@
 {
-  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "keel-console",
   "main": "src/index.ts",
   // One compatibility date across every Worker in the repo (rule R13).

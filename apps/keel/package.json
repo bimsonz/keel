@@ -14,7 +14,9 @@
     "@cloudflare/vitest-plugin": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "wrangler": "catalog:"
+    "wrangler": "catalog:",
+    "@effect/vitest": "catalog:",
+    "@keeltown/testing": "workspace:*"
   },
   "exports": {
     ".": "./src/index.ts"
@@ -27,6 +29,7 @@
     "hono": "catalog:",
     "zod": "catalog:",
     "effect": "catalog:",
-    "ulid": "catalog:"
+    "ulid": "catalog:",
+    "jose": "catalog:"
   }
 }

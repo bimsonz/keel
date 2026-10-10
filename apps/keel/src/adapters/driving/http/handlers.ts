@@ -1,19 +1,55 @@
+import { exchangeToken, whoami } from "@keeltown/core/application/identity";
+import { Scope } from "@keeltown/core/domain/identity";
+import { Clock } from "@keeltown/core/ports";
+import { Effect, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
-import type { Caller } from "./caller.ts";
+import type { Caller, Principal } from "./caller.ts";
+import { tokenError, tokenOk, whoamiError, whoamiOk } from "./mappers.ts";
 import { notImplemented } from "./problems.ts";
+import type { Runner } from "./run.ts";
 
 /** Every operation not yet implemented answers the declared 503 `service.not_implemented`. */
 const notYet = (caller: Caller) => notImplemented(caller.requestId);
+
+/** The authorize middleware admitted this caller; a missing principal here is a defect, never a response. */
+function principalOf(caller: Caller): Effect.Effect<Principal> {
+  return caller.principal === null ? Effect.die(new Error("an authenticated operation ran without a principal")) : Effect.succeed(caller.principal);
+}
+
+const decodeScopes = Schema.decodeUnknownOption(Schema.Array(Scope));
 
 /**
  * The one handler object. The generated Hono routes and the generated MCP tools
  * both dispatch into it, so a REST call and a tool call run the same code.
  * Lanes replace a `notYet` with a real handler as they implement each operation.
  */
-export function makeHandlers() {
+export function makeHandlers(run: Runner) {
   return {
-    Auth_exchangeToken: notYet,
-    whoami: notYet,
+    Auth_exchangeToken: (caller: Caller, input: { readonly client_id: string; readonly client_secret: string; readonly scope?: string }) => {
+      const requested = input.scope === undefined ? undefined : decodeScopes(input.scope.split(" ").filter(Boolean));
+      if (requested !== undefined && requested._tag === "None") {
+        return { status: 400 as const, body: { error: "invalid_scope" as const, error_description: "Unknown scope." } };
+      }
+      return run(
+        caller,
+        exchangeToken({
+          clientId: input.client_id,
+          clientSecret: input.client_secret,
+          ...(requested === undefined ? {} : { scopes: requested.value }),
+        }).pipe(
+          Effect.flatMap((granted) => Effect.map(Clock.use((clock) => clock.now), (now) => tokenOk(granted, now))),
+          Effect.catch((error) => Effect.succeed(tokenError(error))),
+        ),
+      );
+    },
+    whoami: (caller: Caller) =>
+      run(
+        caller,
+        principalOf(caller).pipe(
+          Effect.flatMap(whoami),
+          Effect.match({ onSuccess: whoamiOk, onFailure: (error) => whoamiError(caller, error) }),
+        ),
+      ),
     Sessions_openSession: notYet,
     declare: notYet,
     Changes_getChange: notYet,

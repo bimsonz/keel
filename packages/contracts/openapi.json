@@ -162,10 +162,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "operator"
             ]
           }
         ]
@@ -274,10 +271,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:read"
             ]
           }
         ]
@@ -403,17 +397,11 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:read"
             ]
           },
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
               "observer"
             ]
           }
@@ -547,10 +535,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:work"
             ]
           }
         ]
@@ -672,17 +657,11 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:read"
             ]
           },
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
               "observer"
             ]
           }
@@ -831,10 +810,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:work"
             ]
           }
         ]
@@ -957,10 +933,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:read"
             ]
           }
         ]
@@ -1109,10 +1082,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:work"
             ]
           }
         ]
@@ -1279,10 +1249,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:work"
             ]
           }
         ]
@@ -1412,17 +1379,11 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:read"
             ]
           },
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
               "observer"
             ]
           }
@@ -1556,17 +1517,11 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:read"
             ]
           },
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
               "observer"
             ]
           }
@@ -1688,17 +1643,11 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:read"
             ]
           },
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
               "observer"
             ]
           }
@@ -1848,10 +1797,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:work"
             ]
           }
         ]
@@ -1974,17 +1920,11 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:read"
             ]
           },
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
               "observer"
             ]
           }
@@ -2111,17 +2051,11 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:read"
             ]
           },
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
               "observer"
             ]
           }
@@ -2250,10 +2184,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "operator"
             ]
           }
         ]
@@ -2402,10 +2333,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "operator"
             ]
           }
         ]
@@ -2538,18 +2466,12 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
               "observer"
             ]
           },
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:read"
             ]
           }
         ]
@@ -2671,10 +2593,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:read"
             ]
           }
         ]
@@ -2892,10 +2811,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "operator"
             ]
           }
         ]
@@ -3014,10 +2930,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "operator"
             ]
           }
         ]
@@ -3149,17 +3062,11 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:read"
             ]
           },
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
               "observer"
             ]
           }
@@ -3286,10 +3193,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "operator"
             ]
           }
         ]
@@ -3423,10 +3327,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "operator"
             ]
           }
         ]
@@ -3552,17 +3453,11 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:read"
             ]
           },
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
               "observer"
             ]
           }
@@ -3685,10 +3580,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:work"
             ]
           }
         ]
@@ -3811,10 +3703,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:work"
             ]
           }
         ]
@@ -3968,10 +3857,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:work"
             ]
           }
         ]
@@ -4097,17 +3983,11 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:read"
             ]
           },
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
               "observer"
             ]
           }
@@ -4258,10 +4138,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:read"
             ]
           }
         ]
@@ -4386,10 +4263,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:work"
             ]
           }
         ]
@@ -4514,10 +4388,7 @@
         "security": [
           {
             "OAuth2Auth": [
-              "agent:work",
-              "agent:read",
-              "operator",
-              "observer"
+              "agent:work"
             ]
           }
         ]
@@ -5522,8 +5393,7 @@
         "type": "object",
         "required": [
           "type",
-          "tokenUrl",
-          "scopes"
+          "tokenUrl"
         ],
         "properties": {
           "type": {
@@ -5537,10 +5407,6 @@
             "enum": [
               "/v1/oauth/token"
             ]
-          },
-          "scopes": {
-            "type": "array",
-            "items": {}
           }
         },
         "additionalProperties": {
@@ -8484,10 +8350,10 @@
           "clientCredentials": {
             "tokenUrl": "/v1/oauth/token",
             "scopes": {
-              "agent:work": "",
               "agent:read": "",
-              "operator": "",
-              "observer": ""
+              "agent:work": "",
+              "observer": "",
+              "operator": ""
             }
           }
         }

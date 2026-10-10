@@ -3,6 +3,7 @@ import type { Agent } from "@keeltown/core/domain/identity";
 import { AgentId, idPattern, ID_PREFIXES, type IdPrefix, Instant } from "@keeltown/core/kernel";
 import { AgentDirectory, Clock, EntityStore, Ids, TokenIssuer } from "@keeltown/core/ports";
 import { Effect, type Layer, Option, Schema } from "effect";
+import { hashSecret } from "../memory/identity.ts";
 import { TestClock } from "effect/testing";
 
 /**
@@ -15,7 +16,18 @@ import { TestClock } from "effect/testing";
  */
 export type LayerFactory<S> = () => Layer.Layer<S>;
 
-const agentId = Schema.decodeUnknownSync(AgentId)("agt_00000000000000000000000001");
+const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/**
+ * A fresh agent id per test. A real adapter's storage may outlive one test
+ * (D1 persists across a file's tests), so no case may assume an empty store.
+ */
+function freshAgentId(): AgentId {
+  const bytes = crypto.getRandomValues(new Uint8Array(26));
+  return Schema.decodeUnknownSync(AgentId)(`agt_${[...bytes].map((b) => CROCKFORD[b % 32] ?? "0").join("")}`);
+}
+
+const agentId = freshAgentId();
 
 export function describeClockContract(adapter: string, make: LayerFactory<Clock>) {
   describe(`Clock contract: ${adapter}`, () => {
@@ -64,29 +76,45 @@ export const sampleAgent: Agent = {
 
 export function describeAgentDirectoryContract(adapter: string, make: LayerFactory<AgentDirectory>) {
   describe(`AgentDirectory contract: ${adapter}`, () => {
+    it.effect("verifies a credential by its secret, and only by its secret", () =>
+      Effect.gen(function* () {
+        const directory = yield* AgentDirectory;
+        const id = freshAgentId();
+        const clientId = `client-${id}`;
+        const secretHash = yield* Effect.promise(() => hashSecret("s3cret-value"));
+        yield* directory.upsert({ ...sampleAgent, id }, { clientId, agentId: id, secretHash });
+        expect(yield* directory.verifyCredential(clientId, "s3cret-value")).toEqual(Option.some(id));
+        expect(Option.isNone(yield* directory.verifyCredential(clientId, "s3cret-valuE"))).toBe(true);
+        expect(Option.isNone(yield* directory.verifyCredential(`never-${id}`, "s3cret-value"))).toBe(true);
+      }).pipe(Effect.provide(make())),
+    );
     it.effect("finds nothing it was not given", () =>
       Effect.gen(function* () {
         const directory = yield* AgentDirectory;
-        expect(Option.isNone(yield* directory.findAgent(agentId))).toBe(true);
-        expect(Option.isNone(yield* directory.findCredential("no-such-client"))).toBe(true);
+        const id = freshAgentId();
+        expect(Option.isNone(yield* directory.findAgent(id))).toBe(true);
+        expect(Option.isNone(yield* directory.findCredential(`never-${id}`))).toBe(true);
       }).pipe(Effect.provide(make())),
     );
     it.effect("returns an upserted agent and credential exactly", () =>
       Effect.gen(function* () {
         const directory = yield* AgentDirectory;
-        const credential = { clientId: "client-1", agentId, secretHash: `sha256:${"a".repeat(64)}` };
-        yield* directory.upsert(sampleAgent, credential);
-        expect(yield* directory.findAgent(agentId)).toEqual(Option.some(sampleAgent));
-        expect(yield* directory.findCredential("client-1")).toEqual(Option.some(credential));
+        const id = freshAgentId();
+        const agent = { ...sampleAgent, id };
+        const credential = { clientId: `client-${id}`, agentId: id, secretHash: `sha256:${"a".repeat(64)}` };
+        yield* directory.upsert(agent, credential);
+        expect(yield* directory.findAgent(id)).toEqual(Option.some(agent));
+        expect(yield* directory.findCredential(credential.clientId)).toEqual(Option.some(credential));
       }).pipe(Effect.provide(make())),
     );
     it.effect("replaces an agent on a second upsert, so a revocation epoch bump is visible", () =>
       Effect.gen(function* () {
         const directory = yield* AgentDirectory;
-        const credential = { clientId: "client-1", agentId, secretHash: `sha256:${"a".repeat(64)}` };
-        yield* directory.upsert(sampleAgent, credential);
-        yield* directory.upsert({ ...sampleAgent, revocationEpoch: 1, state: "revoked" }, credential);
-        const found = yield* directory.findAgent(agentId);
+        const id = freshAgentId();
+        const credential = { clientId: `client-${id}`, agentId: id, secretHash: `sha256:${"a".repeat(64)}` };
+        yield* directory.upsert({ ...sampleAgent, id }, credential);
+        yield* directory.upsert({ ...sampleAgent, id, revocationEpoch: 1, state: "revoked" }, credential);
+        const found = yield* directory.findAgent(id);
         expect(Option.map(found, (a) => [a.revocationEpoch, a.state])).toEqual(Option.some([1, "revoked"]));
       }).pipe(Effect.provide(make())),
     );

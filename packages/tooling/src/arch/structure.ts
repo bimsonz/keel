@@ -50,6 +50,10 @@ function bindingNames(config: unknown): Set<string> {
     if (typeof value !== "object" || value === null) return;
     for (const [k, v] of Object.entries(value)) {
       if (k === "vars" && typeof v === "object" && v !== null) for (const name of Object.keys(v)) names.add(name);
+      else if (k === "secrets" && typeof v === "object" && v !== null) {
+        const required: unknown = Reflect.get(v, "required");
+        if (Array.isArray(required)) for (const name of required) if (typeof name === "string") names.add(name);
+      }
       else if ((k === "binding" || (k === "name" && key === "bindings")) && typeof v === "string") names.add(v);
       else visit(v, k);
     }

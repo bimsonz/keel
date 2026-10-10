@@ -17,6 +17,11 @@ export interface StoredCredential {
 export class AgentDirectory extends Context.Service<AgentDirectory, {
   readonly findAgent: (agentId: AgentId) => Effect.Effect<Option.Option<Agent>>;
   readonly findCredential: (clientId: string) => Effect.Effect<Option.Option<StoredCredential>>;
+  /**
+   * The agent a client credential belongs to, if `secret` is its secret. The
+   * adapter hashes and compares in constant time, so the secret never leaves it.
+   */
+  readonly verifyCredential: (clientId: string, secret: string) => Effect.Effect<Option.Option<AgentId>>;
   /** Writes the projection of an agent and its credential. */
   readonly upsert: (agent: Agent, credential: StoredCredential) => Effect.Effect<void>;
 }>()("keel/AgentDirectory") {}

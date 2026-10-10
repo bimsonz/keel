@@ -48,6 +48,9 @@ catalogs:
     hono:
       specifier: 4.13.13
       version: 4.13.13
+    jose:
+      specifier: 6.2.12
+      version: 6.2.12
     jsonc-parser:
       specifier: 3.3.1
       version: 3.3.1
@@ -143,6 +146,9 @@ importers:
       hono:
         specifier: 'catalog:'
         version: 4.13.13
+      jose:
+        specifier: 'catalog:'
+        version: 6.2.12
       ulid:
         specifier: 'catalog:'
         version: 3.0.2
@@ -153,6 +159,12 @@ importers:
       '@cloudflare/vitest-plugin':
         specifier: 'catalog:'
         version: 1.4.0(@types/node@22.20.5)(vitest@5.0.3(@types/node@22.20.5)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(yaml@2.9.1)))
+      '@effect/vitest':
+        specifier: 'catalog:'
+        version: 4.0.2(effect@4.0.2)(vitest@5.0.3(@types/node@22.20.5)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(yaml@2.9.1)))
+      '@keeltown/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -1766,6 +1778,9 @@ packages:
 
   isarray@1.0.0:
     resolution: {integrity: sha512-VLghIWNM6ELQzo7zwmcg0NmTVyWKYjvIeM83yjp0wRDTmUnrM678fQbcKBo6n2CJEF0szoG//ytg+TKla89ALQ==}
+
+  jose@6.2.12:
+    resolution: {integrity: sha512-9NiFmJEex0sy2Dk58j2UGBSHgUs2ypF9eZSu4L6vjOX3Dp96Sw1F3uL+H+D1sx02jZZdzUT0HgvCy59CuvXcWw==}
 
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
@@ -3421,6 +3436,8 @@ snapshots:
   is-unicode-supported@2.1.0: {}
 
   isarray@1.0.0: {}
+
+  jose@6.2.12: {}
 
   js-tokens@10.0.0: {}
 

@@ -72,7 +72,10 @@ scalar SubjectKey extends string;
 model KeelClientCredentials {
   type: OAuth2FlowType.clientCredentials;
   tokenUrl: "/v1/oauth/token";
-  scopes: ["agent:work", "agent:read", "operator", "observer"];
+
+  // No `scopes` here: a flow's scopes override the per-operation scopes the
+  // aliases below pass as OAuth2Auth's second argument, and every operation
+  // would then demand all four.
 }
 
 /** Act on changes: declare, revise, submit, resolve. */

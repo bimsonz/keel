@@ -15,6 +15,7 @@ export default defineConfig({
             "packages/*/src/**/*.test.ts",
             "packages/*/test/**/*.test.ts",
             "examples/*/test/**/*.test.ts",
+            "apps/*/test/unit/**/*.test.ts",
           ],
           exclude: ["packages/tooling/test/arch/**", "**/node_modules/**"],
         },

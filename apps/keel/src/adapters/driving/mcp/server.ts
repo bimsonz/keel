@@ -10,25 +10,29 @@ import {
 } from "@modelcontextprotocol/server";
 import type { ToolDeps } from "../../../generated/mcp/mcp-runtime.gen.ts";
 import { registerTools } from "../../../generated/mcp/mcp.gen.ts";
+import { AgentId } from "@keeltown/core/kernel";
+import { Scope } from "@keeltown/core/domain/identity";
+import { Option, Schema } from "effect";
 import { admitsAnonymous, type Caller, type Principal, satisfies, type TokenVerifier } from "../http/caller.ts";
 import type { Handlers } from "../http/handlers.ts";
 
-/** The principal travels from the bearer gate to the tool handlers inside AuthInfo. */
+const decodeAgentId = Schema.decodeUnknownOption(AgentId);
+const decodeScopes = Schema.decodeUnknownOption(Schema.Array(Scope));
+
+/** The principal travels from the bearer gate to the tool handlers inside AuthInfo, and is decoded back out. */
 function principalOf(auth: AuthInfo | undefined): Principal | null {
-  const extra = auth?.extra;
-  if (extra === undefined || typeof extra["agentId"] !== "string") return null;
-  return {
-    agentId: extra["agentId"],
-    scopes: auth?.scopes ?? [],
-    revocationEpoch: typeof extra["revocationEpoch"] === "number" ? extra["revocationEpoch"] : 0,
-  };
+  const agentId = decodeAgentId(auth?.extra?.["agentId"]);
+  const scopes = decodeScopes(auth?.scopes ?? []);
+  const epoch = auth?.extra?.["revocationEpoch"];
+  if (Option.isNone(agentId) || Option.isNone(scopes) || typeof epoch !== "number") return null;
+  return { agentId: agentId.value, scopes: scopes.value, revocationEpoch: epoch };
 }
 
 function toolDeps(principal: Principal | null): ToolDeps<Caller> {
   return {
     // Consulted at registration: a caller is never shown a tool it could not call.
     permits: (requirements) => admitsAnonymous(requirements) || (principal !== null && satisfies(requirements, principal)),
-    context: () => ({ requestId: crypto.randomUUID(), principal }),
+    context: (context) => ({ requestId: crypto.randomUUID(), principal, signal: context.http?.req?.signal ?? new AbortController().signal }),
     noContext: () => ({ content: [{ type: "text", text: "Not authenticated." }], isError: true }),
   };
 }
@@ -47,8 +51,9 @@ export function makeMcpEndpoint(handlers: Handlers, verify: TokenVerifier, allow
   const gate = requireBearerAuth({
     verifier: {
       async verifyAccessToken(token) {
-        const principal = await verify(token);
-        if (principal === null) throw new OAuthError(OAuthErrorCode.InvalidToken, "The bearer token is not valid");
+        const verification = await verify(token);
+        if ("refused" in verification) throw new OAuthError(OAuthErrorCode.InvalidToken, `The bearer token is ${verification.refused}`);
+        const { principal } = verification;
         return {
           token,
           clientId: principal.agentId,

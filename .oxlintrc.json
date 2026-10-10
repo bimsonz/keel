@@ -31,6 +31,17 @@
           "_tag"
         ]
       }
+    ],
+    "vitest/no-standalone-expect": [
+      "error",
+      {
+        "additionalTestBlockFunctions": [
+          "it.effect",
+          "it.effect.each",
+          "it.live",
+          "it.scoped"
+        ]
+      }
     ]
   },
   "ignorePatterns": [

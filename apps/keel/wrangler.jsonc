@@ -1,5 +1,5 @@
 {
-  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "keel",
   "main": "src/index.ts",
   // One compatibility date across every Worker in the repo (rule R13).
@@ -14,5 +14,72 @@
     "KEEL_HOST": "keel.localhost",
     // staging | production | test. Tests rethrow contract drift instead of answering 500.
     "KEEL_ENV": "staging"
-  }
+  },
+  "secrets": {
+    // An Ed25519 private key, as a JWK, that signs agents' bearer tokens.
+    "required": ["KEEL_SIGNING_KEY"]
+  },
+
+  // Every id below is a sentinel. scripts/deploy.ts writes a gitignored
+  // wrangler.deploy.jsonc with the real ids from Terraform, and refuses to
+  // deploy while any sentinel remains, so wrangler never provisions behind
+  // Terraform's back.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "keel-staging",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "AGENT_SESSION", "class_name": "AgentSessionDO" },
+      { "name": "CHANGE", "class_name": "ChangeDO" },
+      { "name": "SUBJECT", "class_name": "SubjectDO" },
+      { "name": "LANE", "class_name": "LaneDO" },
+      { "name": "TRUNK", "class_name": "TrunkDO" },
+      { "name": "PROJECT", "class_name": "ProjectDO" },
+      { "name": "WORKSPACE_POOL", "class_name": "WorkspacePoolDO" },
+      { "name": "PROJECTOR", "class_name": "ProjectorDO" }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "AgentSessionDO",
+        "ChangeDO",
+        "SubjectDO",
+        "LaneDO",
+        "TrunkDO",
+        "ProjectDO",
+        "WorkspacePoolDO",
+        "ProjectorDO"
+      ]
+    }
+  ],
+  "workflows": [{ "name": "keel-precheck", "binding": "PRECHECK", "class_name": "Precheck" }],
+  "queues": {
+    "producers": [{ "binding": "JOBS", "queue": "keel-staging-jobs" }],
+    "consumers": [
+      { "queue": "keel-staging-jobs", "max_retries": 5 },
+      { "queue": "keel-staging-artifacts-events", "max_retries": 5 }
+    ]
+  },
+  "r2_buckets": [
+    { "binding": "BUNDLES", "bucket_name": "keel-staging-bundles" },
+    { "binding": "ARCHIVE", "bucket_name": "keel-staging-archive" }
+  ],
+  "artifacts": [
+    { "binding": "CORE", "namespace": "keel-core" },
+    { "binding": "WORKSPACES", "namespace": "keel-ws-00" }
+  ],
+  "vectorize": [{ "binding": "RECALL", "index_name": "keel-staging-recall" }],
+  "secrets_store_secrets": [
+    { "binding": "DEPLOY_TOKEN", "store_id": "PLACEHOLDER-secrets-store", "secret_name": "keel-deploy-token" }
+  ],
+  "ai": { "binding": "AI" },
+  "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "keel_staging_metrics" }],
+  "services": [{ "binding": "VERIFY", "service": "keel-verify" }]
 }
