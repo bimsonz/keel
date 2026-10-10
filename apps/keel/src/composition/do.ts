@@ -1,5 +1,6 @@
-import type { Clock, EntityStore, EventOutbox, FanOut, Ids } from "@keeltown/core/ports";
+import type { Clock, CodeHost, EntityStore, EventOutbox, FanOut, Ids } from "@keeltown/core/ports";
 import { Layer, ManagedRuntime } from "effect";
+import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
 import { FanOutRpc } from "../adapters/driven/do-rpc/fan-out.ts";
 import { EntityStoreSql, migrateEntityStore } from "../adapters/driven/do-storage/entity-store.ts";
 import { EventOutboxSql, migrateEventOutbox } from "../adapters/driven/do-storage/event-outbox.ts";
@@ -32,4 +33,13 @@ export function durableObjectRuntime(ctx: DurableObjectState, env: Env): Durable
     ),
     fanOut: FanOutRpc(env),
   };
+}
+
+/**
+ * CodeHost over the Worker's Artifacts bindings, keyed by the namespace each is
+ * bound to in wrangler.jsonc: `keel-core` (trunk, staging, guards) and
+ * `keel-ws-00` (workspaces and their mirror).
+ */
+export function codeHostLayer(env: Env): Layer.Layer<CodeHost> {
+  return CodeHostArtifacts({ "keel-core": env.ARTIFACTS, "keel-ws-00": env.WORKSPACES });
 }

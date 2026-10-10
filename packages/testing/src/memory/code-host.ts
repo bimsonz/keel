@@ -47,6 +47,7 @@ const fromGit = <A>(repo: RepoRef, run: () => Promise<A>) =>
 export function makeCodeHostMemory() {
   const repos = new Map<string, MemoryRepo>();
   let scratch = 0;
+  let tokens = 0;
 
   const find = (repo: RepoRef) =>
     Effect.suspend(() => {
@@ -100,7 +101,7 @@ export function makeCodeHostMemory() {
         yield* find(repo);
         const now = yield* EffectClock.currentTimeMillis;
         return {
-          token: `memrepo_${access}_${repoKey(repo)}`,
+          token: `memrepo_${access}_${repoKey(repo)}_${(tokens += 1)}`,
           access,
           expiresAt: Instant(now + ttlSeconds * 1000),
         };

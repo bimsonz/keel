@@ -8,12 +8,15 @@ import type {
   SketchId,
   WorkspaceId,
 } from "../../domain/kernel/index.ts";
+import type { RepoRef } from "./code-host.ts";
 
 /**
  * A workspace handed to its holder. `remote` and `token` go to the holder
  * only: the remote's host carries the account id, and the write token (≤ 2 h)
  * is minted per grant and never stored. `baseSha` is the workspace's head when
- * it was granted: the change's base, which Precheck diffs against.
+ * it was granted: the change's base, which Precheck diffs against. `repo`
+ * names the workspace's repo on the code host, for `hasCommit` and
+ * `diffTrees`; it is never logged next to the remote.
  */
 export interface WorkspaceGrant {
   readonly workspaceId: WorkspaceId;
@@ -21,6 +24,7 @@ export interface WorkspaceGrant {
   readonly token: string;
   readonly expiresAt: Instant;
   readonly baseSha: CommitSha;
+  readonly repo: RepoRef;
 }
 
 /** Why a workspace is collected (its repo deleted). */

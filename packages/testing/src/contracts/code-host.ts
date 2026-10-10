@@ -208,8 +208,10 @@ export function describeCodeHostContract(
         Effect.gen(function* () {
           const host = yield* CodeHost;
           const repo = yield* freshRepo;
+          const minted: string[] = [];
           for (const [access, ttl] of [
             ["read", 120],
+            ["write", 600],
             ["write", 600],
           ] as const) {
             const token = yield* host.mintToken(repo, access, ttl);
@@ -217,7 +219,10 @@ export function describeCodeHostContract(
             expect(token.token.length).toBeGreaterThan(0);
             // A real host stamps expiry with its own clock: allow a minute of skew.
             expect(Math.abs(token.expiresAt - (Date.now() + ttl * 1000))).toBeLessThan(60_000);
+            minted.push(token.token);
           }
+          // Each mint is a new credential, so a re-grant never hands out an earlier one.
+          expect(new Set(minted).size).toBe(minted.length);
         }).pipe(Effect.provide(make())),
     );
 

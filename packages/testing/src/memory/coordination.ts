@@ -70,6 +70,7 @@ export function makeWorkspacePoolMemory(
               token: `memws_${tokens}`,
               expiresAt: Instant(now + 7_200_000),
               baseSha,
+              repo: { namespace: "memory", name: workspaceId },
             };
           }),
         release: (workspaceId, reason = "withdrawn") =>
@@ -183,6 +184,7 @@ export function makeChangesMemory(
       token: `memory-token-${tokens}`,
       expiresAt: Instant(now + 3_600_000),
       baseSha: MEMORY_BASE,
+      repo: { namespace: "memory", name: workspaceId },
     };
   };
   return {

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts
+# kills: pool.collect
+# why: Collection marks a workspace collected without deleting its repo, so its commits stay fetchable by SHA
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 548404e..79a995a 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -275,7 +275,7 @@ export const collectWorkspaces = Effect.fn("coordination/collectWorkspaces")(fun
+   const store = yield* EntityStore;
+   const host = yield* CodeHost;
+   const due = slots(store).filter((s) => s.state === "collecting");
+-  const outcomes = yield* Effect.forEach(due, (slot) => Effect.exit(host.delete(slot.repo)), {
++  const outcomes = yield* Effect.forEach(due, () => Effect.exit(Effect.void), {
+     concurrency: "unbounded",
+   });
+   let deleted = 0;

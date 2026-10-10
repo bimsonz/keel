@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts
+# kills: pool.collect-on-event
+# why: The pool ignores ChangeLanded, so a landed change's workspace is never collected and its repo stays fetchable
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index ade70c2..0d6d11c 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -278,7 +278,6 @@ export const releaseWorkspace = Effect.fn("coordination/releaseWorkspace")(funct
+ 
+ /** How a change's end collects its workspace: superseded counts as withdrawn. */
+ export const COLLECTED_ON: Readonly<Record<string, CollectionReason>> = {
+-  ChangeLanded: "landed",
+   ChangeWithdrawn: "withdrawn",
+   ChangeSuperseded: "withdrawn",
+ };

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts
+# kills: pool.grant-once
+# why: The slot chosen before the transaction is not re-checked inside it, so racing grants share a workspace
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 548404e..8f8b99e 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -99,7 +99,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+       (tx) => {
+         const chosen = slotOf(tx.store, candidate.id);
+         if (
+-          chosen?.state !== "ready" ||
++          chosen === undefined ||
+           chosen.baseSha === undefined ||
+           heldBy(tx.store, holder) !== undefined
+         ) {

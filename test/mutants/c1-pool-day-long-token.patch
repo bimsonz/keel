@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts
+# kills: pool.token-ttl
+# why: A grant's write token lives a day instead of at most two hours
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 548404e..1d8017f 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -40,7 +40,7 @@ import {
+ } from "./state.ts";
+ 
+ /** A grant's write token lives at most this long. */
+-export const GRANT_TTL_SECONDS = 2 * 60 * 60;
++export const GRANT_TTL_SECONDS = 24 * 60 * 60;
+ /** A slot still forking after this long belonged to a refill that died; it is collected. */
+ export const STUCK_FORK_MS = 120_000;
+ const MAIN = "refs/heads/main";

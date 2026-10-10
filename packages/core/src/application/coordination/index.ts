@@ -137,3 +137,6 @@ export const openSketch: (
   purpose: string | undefined,
 ) => Effect.Effect<SketchOpened, PoolExhausted, Clock | Ids | WorkspacePool> =
   stub("coordination/openSketch");
+
+/** The WorkspacePool use-cases. */
+export * from "./workspace-pool/index.ts";

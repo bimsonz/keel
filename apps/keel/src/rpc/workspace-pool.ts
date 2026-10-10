@@ -3,18 +3,19 @@ import { CommitSha, InstantSchema, WorkspaceId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { exitCodec, type ExitJson } from "./exit.ts";
 
+/** A repository on the code host: an Artifacts namespace and a repo name. */
+export const RepoRef = Schema.Struct({ namespace: Schema.String, name: Schema.String });
+
 export const WorkspaceGrant = Schema.Struct({
   workspaceId: WorkspaceId,
   remote: Schema.String,
   token: Schema.String,
   expiresAt: InstantSchema,
   baseSha: CommitSha,
+  repo: RepoRef,
 });
 
 export const CollectionReason = Schema.Literals(["landed", "withdrawn", "expired"]);
-
-/** A repository on the code host: an Artifacts namespace and a repo name. */
-export const RepoRef = Schema.Struct({ namespace: Schema.String, name: Schema.String });
 
 /** What the pool forks from, and how many ready workspaces it keeps. */
 export const PoolConfig = Schema.Struct({

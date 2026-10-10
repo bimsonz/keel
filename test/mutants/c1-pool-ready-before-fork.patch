@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts
+# kills: pool.never-unready
+# why: A slot counts as ready the moment its fork starts, so a grant can reach a workspace that does not exist yet
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 548404e..26c4692 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -172,7 +172,7 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* () {
+     const slot: Slot = {
+       id,
+       repo: { namespace: source.namespace, name: `ws-${id.slice(4).toLowerCase()}` },
+-      state: "forking",
++      state: "ready",
+       since: now,
+     };
+     yield* commit({ entity: { kind: "workspace", id }, cause: `fork-start:${id}` }, (tx) => {

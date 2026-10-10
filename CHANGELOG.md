@@ -19,6 +19,8 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 - `ChangeStarted.baseSha?` and `Change.baseSha?`: the workspace's head at grant, which Precheck diffs against (the `Start` command requires it).
 - `EventDraft.entity?`: a draft may name another entity its Durable Object owns (the Change DO's verdicts). That entity gets its own gap-free `seq` and dedupe keys; the default is still `CommitSpec.entity`.
 
+- `WorkspaceGrant.repo: RepoRef`, on the port and on the WorkspacePool RPC's grant: the workspace's repo on the code host. The Change DO keeps it for `hasCommit` and Precheck for `diffTrees`. It is never logged next to the remote.
+- WorkspacePool use-cases in `@keeltown/core/application/coordination`: `grantWorkspace`, `refillPool`, `releaseWorkspace`, `collectWorkspaces`, `configurePool` and `poolStatus`.
 - `CodeHost.hasCommit(repo, sha) => Effect<boolean, RepoNotFound>`: whether the repo holds a commit, in one object read. Submit's commit-in-workspace check uses it.
 
 ### Changed
