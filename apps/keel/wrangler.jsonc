@@ -103,7 +103,7 @@
   ],
   "vectorize": [{ "binding": "RECALL", "index_name": "keel-staging-recall" }],
   "secrets_store_secrets": [
-    { "binding": "DEPLOY_TOKEN", "store_id": "PLACEHOLDER-secrets-store", "secret_name": "keel-deploy-token" }
+    { "binding": "DEPLOY_TOKEN", "store_id": "PLACEHOLDER-secrets-store", "secret_name": "keel-staging-deploy-token" }
   ],
   "ai": { "binding": "AI" },
   "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "keel_staging_metrics" }],

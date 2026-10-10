@@ -22,6 +22,7 @@ infra/**/.terraform.lock.hcl.bak
 *.tfstate.*
 *.tfplan
 infra/**/backups/
+infra/**/.terraform.tfstate.lock.info
 
 # Control fixtures mirror the real layout, generated paths included, and must be committed.
 !test/controls/**/src/generated/
