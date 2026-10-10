@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts
+# kills: trunk.init-once
+# why: A second initialize with another head answers success, so a seed rerun silently keeps a head it did not ask for
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index eb48b95..e0dc201 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -91,7 +91,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
+     return yield* Effect.die(
+       new Error(`trunk ${projectId} committed Initialize but holds no state`),
+     );
+-  if (committed.duplicate && !committed.sameCommand)
++  if (committed.duplicate && committed.sameCommand && !committed.duplicate)
+     return yield* new PromotionStateRefused({
+       projectId,
+       phase: trunk.phase,

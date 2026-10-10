@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts
+# kills: repos.distinct
+# why: Every project shares one mirror, so a second project's workspaces fork from the first project's code
+diff --git a/packages/core/src/application/integration/project-repos.ts b/packages/core/src/application/integration/project-repos.ts
+index 0ce9e54..ddf87b5 100644
+--- a/packages/core/src/application/integration/project-repos.ts
++++ b/packages/core/src/application/integration/project-repos.ts
+@@ -23,6 +23,6 @@ export const projectRepos = (projectId: ProjectId): ProjectRepos => {
+   return {
+     trunk: { namespace: "keel-core", name },
+     staging: { namespace: "keel-core", name: `${name}-staging` },
+-    mirror: { namespace: "keel-ws-00", name: `${name}-mirror` },
++    mirror: { namespace: "keel-ws-00", name: "mirror" },
+   };
+ };

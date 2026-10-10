@@ -10,6 +10,9 @@ import type { CandidateId, CommitSha, Instant, ProjectId } from "../../domain/ke
 import { stub } from "../not-implemented.ts";
 import type { EntityStore } from "../ports/index.ts";
 
+export * from "./project-repos.ts";
+export * from "./trunk.ts";
+
 /** integration read models reachable from the API. Keel owns the Lane and Trunk DOs behind them. */
 
 export interface TrunkView {
