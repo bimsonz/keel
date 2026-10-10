@@ -1,0 +1,39 @@
+{
+ "run": "conc100-50m-sea",
+ "src": "src-50m",
+ "n": 100,
+ "conc": 100,
+ "ok": 100,
+ "errors": [],
+ "colo": [
+  "LHR",
+  "CDG"
+ ],
+ "placement": [
+  "remote-SEA"
+ ],
+ "forkCall": {
+  "p50": 4913,
+  "p95": 7508,
+  "max": 8431
+ },
+ "ready": {
+  "p50": 4613,
+  "p95": 7190,
+  "max": 8592
+ },
+ "spanFirstForkToLastReadyMs": 8730,
+ "startSpreadMs": 488,
+ "clientWallMs": 11332,
+ "reasons": {
+  "get:NOT_FOUND": 29,
+  "get:FORK_IN_PROGRESS": 283,
+  "READY": 100
+ },
+ "firstAttempt": {
+  "get:NOT_FOUND": 29,
+  "get:FORK_IN_PROGRESS": 71
+ },
+ "readyBeforeForkReturned": 84,
+ "deleted": 100
+}

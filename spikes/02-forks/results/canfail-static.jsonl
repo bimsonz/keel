@@ -1,0 +1,4 @@
+{"colo":"CDG","name":"cf-empty-a","ready":false,"reason":"readCommit:null","del":{"deleted":true,"deleteMs":1412}}
+{"colo":"CDG","name":"never-created-xyz","head":"46cd159c721dcc2f809663bdd7d3c01dc76d3a55","ready":false,"reason":"get:NOT_FOUND","ms":23}
+{"colo":"CDG","name":"src-1m","head":"46cd159c721dcc2f809663bdd7d3c01dc76d3a55","ready":true,"ms":382}
+{"colo":"CDG","name":"src-50m","head":"46cd159c721dcc2f809663bdd7d3c01dc76d3a55","ready":false,"reason":"readCommit:null","ms":512}

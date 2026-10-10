@@ -1,0 +1,39 @@
+{
+ "run": "conc20-50m-lhr",
+ "src": "src-50m",
+ "n": 20,
+ "conc": 20,
+ "ok": 20,
+ "errors": [],
+ "colo": [
+  "CDG",
+  "LHR"
+ ],
+ "placement": [
+  null
+ ],
+ "forkCall": {
+  "p50": 4811,
+  "p95": 6868,
+  "max": 7422
+ },
+ "ready": {
+  "p50": 4531,
+  "p95": 6467,
+  "max": 7187
+ },
+ "spanFirstForkToLastReadyMs": 7471,
+ "startSpreadMs": 465,
+ "clientWallMs": 10437,
+ "reasons": {
+  "get:FORK_IN_PROGRESS": 54,
+  "READY": 20,
+  "get:NOT_FOUND": 5
+ },
+ "firstAttempt": {
+  "get:FORK_IN_PROGRESS": 15,
+  "get:NOT_FOUND": 5
+ },
+ "readyBeforeForkReturned": 19,
+ "deleted": 20
+}

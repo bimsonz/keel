@@ -1,0 +1,18 @@
+{
+  "name": "keel-spike-02-forks",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint -c oxlint.config.json src scripts",
+    "types": "wrangler types",
+    "deploy": "wrangler deploy",
+    "deploy:placed": "wrangler deploy -c wrangler.placed.jsonc"
+  },
+  "devDependencies": {
+    "oxlint": "^1.87.0",
+    "typescript": "^7.0.2",
+    "wrangler": "4.149.0"
+  }
+}

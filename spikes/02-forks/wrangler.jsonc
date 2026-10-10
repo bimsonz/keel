@@ -1,0 +1,27 @@
+// keel-spike-02-forker, default placement. Also consumes account-level Artifacts
+// events (repo.forked, ...) from the Queue event subscription into D1.
+// database_id is filled in by scripts/deploy.sh into wrangler.deploy.jsonc (gitignored).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "keel-spike-02-forker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "artifacts": [{ "binding": "ARTIFACTS", "namespace": "keel-spike-02" }],
+  "d1_databases": [{ "binding": "LOG", "database_name": "keel-spike-02-log", "database_id": "__D1_ID__" }],
+  "workflows": [{ "name": "keel-spike-02-forked-wf", "binding": "FORKED_WF", "class_name": "ForkedEventWorkflow" }],
+  "triggers": {
+    "events": [
+      {
+        "type": "cf.artifacts.repo.forked",
+        "filter": { "namespace": "keel-spike-02" },
+        "targets": [{ "type": "workflow", "workflow_name": "keel-spike-02-forked-wf" }]
+      }
+    ]
+  },
+  "queues": {
+    "consumers": [{ "queue": "keel-spike-02-events", "max_batch_size": 10, "max_batch_timeout": 1 }]
+  }
+}

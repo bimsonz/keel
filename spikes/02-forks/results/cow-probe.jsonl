@@ -1,0 +1,9 @@
+{"colo":"CDG","name":"xns-probe-1","ok":true,"head":"46cd159c721dcc2f809663bdd7d3c01dc76d3a55","trees":3,"blobs":65,"bytes":1048603,"missing":0,"ms":654}
+{"step": "fork-of-fork", "name": "fof-1", "forkError": null, "forkReturnedMs": 4346, "readyMs": 3892, "info": {"name": "fof-1", "source": "artifacts:keel-spike-02/xns-probe-1", "defaultBranch": "main", "readOnly": false, "remote": "https://<acct>.artifacts.cloudflare.net/git/keel-spike-02/fof-1.git", "createdAt": "2026-10-10T19:09:59.390Z"}}
+{"colo":"CDG","out":[{"name":"xns-probe-1","deleted":true,"deleteMs":1715}]}
+{"colo":"CDG","name":"fof-1","ok":true,"head":"46cd159c721dcc2f809663bdd7d3c01dc76d3a55","trees":3,"blobs":65,"bytes":1048603,"missing":0,"ms":3885}
+{"colo":"CDG","id":"i8fdflxvgia8n4we","name":"fof-1","description":null,"defaultBranch":"main","createdAt":"2026-10-10T19:09:59.390Z","updatedAt":"2026-10-10T19:10:02.612Z","lastPushAt":null,"source":"artifacts:keel-spike-02/xns-probe-1","readOnly":false,"remote":"https://<acct>.artifacts.cloudflare.net/git/keel-spike-02/fof-1.git","log":["46cd159c721dcc2f809663bdd7d3c01dc76d3a55"]}
+{"step": "fork root-probe from src-1m", "forkError": null, "forkReturnedMs": 1945, "readyMs": 1388, "source": "artifacts:keel-spike-02/src-1m"}
+{"colo":"CDG","out":[{"name":"src-1m","deleted":true,"deleteMs":2046}]}
+{"colo":"LHR","name":"root-probe","ok":true,"head":"46cd159c721dcc2f809663bdd7d3c01dc76d3a55","trees":3,"blobs":65,"bytes":1048603,"missing":0,"ms":718}
+{"colo":"CDG","id":"73md4vdpobednwsy","name":"root-probe","description":null,"defaultBranch":"main","createdAt":"2026-10-10T19:14:41.908Z","updatedAt":"2026-10-10T19:14:43.180Z","lastPushAt":null,"source":"artifacts:keel-spike-02/src-1m","readOnly":false,"remote":"https://<acct>.artifacts.cloudflare.net/git/keel-spike-02/root-probe.git","log":["46cd159c721dcc2f809663bdd7d3c01dc76d3a55"]}

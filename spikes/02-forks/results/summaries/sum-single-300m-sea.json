@@ -1,0 +1,38 @@
+{
+ "run": "single-300m-sea",
+ "src": "src-300m",
+ "n": 3,
+ "conc": 1,
+ "ok": 3,
+ "errors": [],
+ "colo": [
+  "LHR"
+ ],
+ "placement": [
+  "remote-SEA"
+ ],
+ "forkCall": {
+  "p50": 27330,
+  "p95": 60138,
+  "max": 60138
+ },
+ "ready": {
+  "p50": 32014,
+  "p95": 62454,
+  "max": 62454
+ },
+ "spanFirstForkToLastReadyMs": 113460,
+ "startSpreadMs": 81446,
+ "clientWallMs": 117038,
+ "reasons": {
+  "get:FORK_IN_PROGRESS": 66,
+  "READY": 3,
+  "get:NOT_FOUND": 1
+ },
+ "firstAttempt": {
+  "get:FORK_IN_PROGRESS": 2,
+  "get:NOT_FOUND": 1
+ },
+ "readyBeforeForkReturned": 1,
+ "deleted": 3
+}
