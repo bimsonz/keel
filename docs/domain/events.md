@@ -88,9 +88,9 @@ The Project DO (`project:<id>`) holds the subject registry (keys, aliases, ancho
 | `SketchPromoted` | WorkspacePool DO | `sketchId, changeId` | — | the agent | `declare --from-sketch`: the workspace carries over to the new change |
 | `SketchExpired` | WorkspacePool DO | `sketchId` | the workspace | the agent | Raised by the TTL deadline alarm; the workspace is collected |
 | `SketchDiscarded` | WorkspacePool DO | `sketchId, by` | the workspace | — | The agent dropped the idea |
-| `WorkspaceForked` | WorkspacePool DO | `workspaceId, repo, sourceRepo` | — | — | Translated at the queue doorway from Artifacts' `repo.forked`. The fork joins the ready pool |
+| `WorkspaceForked` | WorkspacePool DO | `workspaceId, repo, sourceRepo` | — | — | Emitted when the pool's own fork call resolves; a fork is ready at once (spike S2). The fork joins the ready pool |
 | `WorkspaceGranted` | WorkspacePool DO | `workspaceId, changeId\|sketchId, expiresAt` | — | the change or sketch, the agent | Handed out exactly once, with a write token shown once |
-| `WorkspacePushed` | WorkspacePool DO (fact) | `workspaceId, ref, sha` | — | the change's agent | Translated from Artifacts' `pushed`. Observes plain-git agents; never authoritative |
+| `WorkspacePushed` | WorkspacePool DO (fact) | `workspaceId, ref, sha` | — | the change's agent | Translated from Artifacts' `pushed` by the PushObserved Workflow, for branch updates only. Observes plain-git agents; never authoritative |
 | `WorkspaceCollected` | WorkspacePool DO | `workspaceId, reason: landed\|withdrawn\|expired` | — | — | The repo is deleted |
 
 ## verification
@@ -168,16 +168,17 @@ A **Batch** is a set of Changes verified together; its **Candidate** is the comp
 
 ## External events
 
-Third-party events never enter the catalogue directly. The queue doorway decodes each one with Effect Schema and translates it into a Keel event, or drops it.
+Third-party events never enter the catalogue directly. Each is decoded with Effect Schema at its doorway and translated into a Keel event, or dropped.
 
 | Source | External event | Becomes |
 |---|---|---|
-| Artifacts (account lifecycle, via the `artifacts-events` queue) | `repo.forked` | `WorkspaceForked` |
-| Artifacts (namespace push trigger) | `pushed` | `WorkspacePushed` (an observation only; `submit` is authoritative) |
+| Artifacts, through a namespace-wide `triggers.events` rule (one per workspace namespace) starting the PushObserved Workflow | `cf.artifacts.repo.pushed` | `WorkspacePushed` for a branch update; tags, notes and deletions are dropped. An observation only: `submit` is authoritative |
+
+Forks are not observed this way: the account's Artifacts lifecycle subscription is not Keel's to hold on a shared account, and namespace triggers do not fire on forks. The WorkspacePool DO emits `WorkspaceForked` itself (spike S2).
 
 ## Subscriptions, in one place
 
 - An agent subscribes to a subject by relying on it.
-- Lanes subscribe to change events; the Trunk DO subscribes to `BatchVerified`; the WorkspacePool DO to `WorkspaceForked`; the Auditor to `TrunkAdvanced`.
+- Lanes subscribe to change events; the Trunk DO subscribes to `BatchVerified`; the Auditor to `TrunkAdvanced`.
 - `ChangeSubmitted` starts Precheck; `BatchFormed` starts KeelVerify; `RulingGiven` resumes a waiting Workflow through `sendEvent`.
 - Every outbox flush nudges the Projector, which drains the operation log and sleeps: the one sanctioned exception to "nothing polls".

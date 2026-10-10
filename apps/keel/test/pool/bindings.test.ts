@@ -10,19 +10,10 @@ describe("bindings inside workerd", () => {
     expect(tables.results.map((row) => row["name"])).toEqual(["agents", "credentials"]);
   });
 
-  it("Queue: the consumer acknowledges an Artifacts fork event and an unknown event alike", async () => {
-    const batch = createMessageBatch("keel-staging-artifacts-events", [
-      {
-        id: "m1",
-        timestamp: new Date(),
-        attempts: 1,
-        body: {
-          type: "cf.artifacts.repo.forked",
-          source: { type: "artifacts", namespace: "keel-core", repoName: "mirror" },
-          payload: { namespace: "keel-ws-00", repoName: "ws-01JZ8PX3K2M5N7Q9R1S3T5V7W9", repoId: "r1" },
-        },
-      },
-      { id: "m2", timestamp: new Date(), attempts: 1, body: { type: "cf.something.else" } },
+  it("Queue: the jobs consumer acknowledges each message on its own", async () => {
+    const batch = createMessageBatch("keel-staging-jobs", [
+      { id: "m1", timestamp: new Date(), attempts: 1, body: { kind: "mirror-sync", dedupeKey: "a" } },
+      { id: "m2", timestamp: new Date(), attempts: 1, body: { kind: "unknown", dedupeKey: "b" } },
     ]);
     const ctx = createExecutionContext();
     await worker.queue(batch, env, ctx);

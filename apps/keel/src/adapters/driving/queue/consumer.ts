@@ -1,9 +1,9 @@
 import { Effect, type ManagedRuntime } from "effect";
-import { translateArtifactsEvent } from "./artifacts-events.ts";
 
 /**
- * The queue doorway. Delivery is at least once, so each message is handled
- * idempotently and acknowledged or retried on its own.
+ * The queue doorway for background jobs. Delivery is at least once, so each
+ * job is handled idempotently by its dedupe key and acknowledged or retried on
+ * its own. No job kinds exist yet; each lane adds its own.
  */
 export function consumeQueue<R>(batch: MessageBatch, runtime: ManagedRuntime.ManagedRuntime<R, never>): Promise<void> {
   return runtime.runPromise(
@@ -11,11 +11,7 @@ export function consumeQueue<R>(batch: MessageBatch, runtime: ManagedRuntime.Man
       batch.messages,
       (message) =>
         Effect.sync(() => {
-          if (batch.queue.endsWith("artifacts-events")) {
-            const event = translateArtifactsEvent(message.body);
-            // The WorkspacePool DO takes WorkspaceForked once it is built; until then it is recorded only.
-            if (event !== null) console.log("artifacts event", event._tag, event.workspaceId);
-          }
+          console.log("job", batch.queue, message.id);
           message.ack();
         }),
       { concurrency: 8, discard: true },

@@ -18,6 +18,7 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
   "public-scrub": [/local filesystem path/, /planted name/],
   "event-names": [/PremiseSuspect is not a past-tense verb/, /catalogued twice/, /ChangeTeleported .* missing from the catalogue/],
   "lint-config": [/nested \.oxlintrc\.json/],
+  "runner-credentials": [/cloudflareCredentials hands a credential/, /sourceControlCredentials hands a credential/],
   R1: [/outside the domain/, /package hono/, /imports Effect from effect/, /\[archunit\] depends on src\/application/],
   R2: [/imports hono/, /generated\/http\/app\.gen\.ts/],
   R3: [/driving adapter imports the driven adapter/, /\[archunit\] depends on src\/adapters\/driven/],
@@ -30,7 +31,7 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
   R10: [/imports agents/, /imports @modelcontextprotocol\/client/],
   R11: [/setInterval polls/, /setAlarm outside/, /must name kind/],
   R12: [/layer folder is missing or empty/],
-  R13: [/account_id is committed/, /database_id holds an account-specific id/, /vars\.KEEL_HOST/, /max_instances/, /workers_dev must be set/, /compatibility dates differ/, /adds binding EXTRA_SECRET/],
+  R13: [/account_id is committed/, /database_id holds an account-specific id/, /vars\.KEEL_HOST/, /MergeBox\) has no max_instances/, /GatedBox\) uses the durable_object policy but is not registered/, /workers_dev must be set/, /compatibility dates differ/, /adds binding EXTRA_SECRET/],
   R14: [/literal against a literal/, /it\.only/],
   R15: [/imports @keeltown\/core\/ports/, /imports \.\.\/adapters\/driven\/system\.ts/],
 };

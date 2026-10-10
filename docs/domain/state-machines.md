@@ -430,7 +430,7 @@ stateDiagram-v2
 
 **Invariants**
 - A ready workspace is granted exactly once; promotion reassigns it from the sketch to the new change, never to a third holder.
-- Fork readiness comes from the `repo.forked` event, never from polling.
+- A fork is ready when the pool's own fork call resolves (spike S2); nothing polls for it.
 
 ---
 

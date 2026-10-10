@@ -19,6 +19,8 @@
   "dependencies": {
     "@keeltown/core": "workspace:*",
     "@keeltown/runner-protocol": "workspace:*",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "@cloudflare/ci": "catalog:",
+    "@cloudflare/sandbox": "catalog:"
   }
 }

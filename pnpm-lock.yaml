@@ -6,6 +6,12 @@ settings:
 
 catalogs:
   default:
+    '@cloudflare/ci':
+      specifier: 0.2.0
+      version: 0.2.0
+    '@cloudflare/sandbox':
+      specifier: 0.12.1
+      version: 0.12.1
     '@cloudflare/vitest-plugin':
       specifier: 1.4.0
       version: 1.4.0
@@ -128,6 +134,9 @@ importers:
 
   apps/keel:
     dependencies:
+      '@cloudflare/ci':
+        specifier: 'catalog:'
+        version: 0.2.0
       '@hono/zod-validator':
         specifier: 'catalog:'
         version: 0.9.1(hono@4.13.13)(zod@4.6.5)
@@ -177,6 +186,12 @@ importers:
 
   apps/keel-verify:
     dependencies:
+      '@cloudflare/ci':
+        specifier: 'catalog:'
+        version: 0.2.0
+      '@cloudflare/sandbox':
+        specifier: 'catalog:'
+        version: 0.12.1
       '@keeltown/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -369,9 +384,29 @@ packages:
       '@typespec/compiler': ^1.17.0
       '@typespec/json-schema': ^1.17.0
 
+  '@cloudflare/ci@0.2.0':
+    resolution: {integrity: sha512-uAr54YhZy4sYHaJM2fYMPg2BtmS2btemBMtED59XDdYQhw08lGr29IS+njNKSWnrBGpbJuQGRWc/jWWiMgg3vg==}
+
+  '@cloudflare/containers@0.3.7':
+    resolution: {integrity: sha512-DM9dm3FnIBSyiSJ1FLavKwl/lk3oAmTaynCzZQ9pZR0ncRPquSxkxd8Nu2MFILxmDDsPkxKsSNEh9mHHMty4Fw==}
+
   '@cloudflare/kv-asset-handler@0.5.0':
     resolution: {integrity: sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==}
     engines: {node: '>=22.0.0'}
+
+  '@cloudflare/sandbox@0.12.1':
+    resolution: {integrity: sha512-P1ZmNDLYtuEY1ZUcAx0OgTol98VqS617LGd4nf1RTOjSV2yHLDAp59NI36/gg3/pxkHPgmAEyFIjH/ie8FoA7g==}
+    peerDependencies:
+      '@openai/agents': ^0.3.3
+      '@opencode-ai/sdk': ^1.1.40
+      '@xterm/xterm': '>=5.0.0'
+    peerDependenciesMeta:
+      '@openai/agents':
+        optional: true
+      '@opencode-ai/sdk':
+        optional: true
+      '@xterm/xterm':
+        optional: true
 
   '@cloudflare/unenv-preset@2.16.2':
     resolution: {integrity: sha512-JBP1+Z7ZSNG/d4mRP+y8VC5dka3tZVMLEZRvS+rzQ4DGV1EoxRFQckcJTTkXbHSQiTj0DtNI01Zwb/V2fX0mvQ==}
@@ -1556,6 +1591,9 @@ packages:
   async@3.2.6:
     resolution: {integrity: sha512-htCUDlxyyCLMgaM3xXg0C0LW2xqfuQ6p05pCEIsXuyQ+a1koYKTuBMzRNwmybfLgvJDMd0r1LTn4+E0Ti6C2AA==}
 
+  aws4fetch@1.0.20:
+    resolution: {integrity: sha512-/djoAN709iY65ETD6LKCtyyEI04XIBP5xVvfmNxsEP0uJB5tyaGBztSryRr4HqMStr9R06PisQE7m9zDTXKu6g==}
+
   balanced-match@4.0.4:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
@@ -1570,6 +1608,9 @@ packages:
   braces@3.0.3:
     resolution: {integrity: sha512-yQbXgO/OSZVD2IsiLlro+7Hf6Q18EJrKSEsdoMzKePKXct3gvD8oLcOQdIzGupr5Fj+EDe8gO/lxc1BzfMpxvA==}
     engines: {node: '>=8'}
+
+  capnweb@0.8.0:
+    resolution: {integrity: sha512-BK/TuXUiyfLSKsmjojn70yN7oYG/JJzoURZ3tckjg5Zj2KcygPm0A5jyOlswK7SYB4f0Gh9tt+RZ132b80iLfA==}
 
   chai@6.3.0:
     resolution: {integrity: sha512-XWAtwJ6OHO+tj0EKCs0Y2UamnyOxseZWltU4x2U2wh8g4AigdjwvtUjvLP2tqkA/avxHEtzxNaqGq/YGNwckKg==}
@@ -2456,7 +2497,25 @@ snapshots:
       '@typespec/compiler': 1.17.0(@types/node@22.20.5)
       '@typespec/json-schema': 1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5))
 
+  '@cloudflare/ci@0.2.0':
+    dependencies:
+      '@cloudflare/sandbox': 0.12.1
+      zod: 4.6.5
+    transitivePeerDependencies:
+      - '@openai/agents'
+      - '@opencode-ai/sdk'
+      - '@xterm/xterm'
+
+  '@cloudflare/containers@0.3.7': {}
+
   '@cloudflare/kv-asset-handler@0.5.0': {}
+
+  '@cloudflare/sandbox@0.12.1':
+    dependencies:
+      '@cloudflare/containers': 0.3.7
+      aws4fetch: 1.0.20
+      capnweb: 0.8.0
+      hono: 4.13.13
 
   '@cloudflare/unenv-preset@2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261006.1)':
     dependencies:
@@ -3237,6 +3296,8 @@ snapshots:
 
   async@3.2.6: {}
 
+  aws4fetch@1.0.20: {}
+
   balanced-match@4.0.4: {}
 
   blake3-wasm@2.1.5: {}
@@ -3248,6 +3309,8 @@ snapshots:
   braces@3.0.3:
     dependencies:
       fill-range: 7.1.1
+
+  capnweb@0.8.0: {}
 
   chai@6.3.0: {}
 

@@ -9,7 +9,12 @@ export { ProjectorDO } from "./adapters/driving/do/projector.ts";
 export { SubjectDO } from "./adapters/driving/do/subject.ts";
 export { TrunkDO } from "./adapters/driving/do/trunk.ts";
 export { WorkspacePoolDO } from "./adapters/driving/do/workspace-pool.ts";
+export { BoxGate } from "./adapters/driving/do/boxgate.ts";
+export { MergeBox } from "./adapters/driving/do/mergebox.ts";
+export { KeelVerify } from "./adapters/driving/workflow/keel-verify.ts";
 export { Precheck } from "./adapters/driving/workflow/precheck.ts";
+export { PushObserved } from "./adapters/driving/workflow/push-observed.ts";
+
 
 export default {
   fetch(request, env, ctx): Response | Promise<Response> {

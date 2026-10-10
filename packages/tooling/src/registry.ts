@@ -2,6 +2,7 @@ import type { GuardOptions, GuardResult } from "./guard.ts";
 import { checkEventNames, EVENT_NAMES } from "./guards/event-names.ts";
 import { checkLintConfig, LINT_CONFIG } from "./guards/lint-config.ts";
 import { checkPublicScrub, PUBLIC_SCRUB } from "./guards/public-scrub.ts";
+import { checkRunnerCredentials, RUNNER_CREDENTIALS } from "./guards/runner-credentials.ts";
 import { checkR8, checkR11, checkR14 } from "./arch/code-rules.ts";
 import { checkR5, checkR6, checkR7, checkR9, checkR10 } from "./arch/imports-rules.ts";
 import { checkR1, checkR2, checkR3, checkR4, checkR15 } from "./arch/layers.ts";
@@ -24,6 +25,7 @@ export const guards: readonly RegisteredGuard[] = [
   { name: PUBLIC_SCRUB, run: checkPublicScrub, controlCanary: "README.md" },
   { name: EVENT_NAMES, run: checkEventNames, controlCanary: "event:ChangeSubmitted" },
   { name: LINT_CONFIG, run: checkLintConfig, controlCanary: ".oxlintrc.json" },
+  { name: RUNNER_CREDENTIALS, run: checkRunnerCredentials, controlCanary: "apps/keel/src/adapters/driving/workflow/keel-verify.ts" },
 ];
 
 /**

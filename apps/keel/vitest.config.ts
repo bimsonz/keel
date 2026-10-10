@@ -25,7 +25,13 @@ export default defineProject({
           {
             name: "keel-verify",
             modules: true,
-            script: `export default { fetch() { return Response.json({ fake: "keel-verify" }); } };`,
+            compatibilityDate: "2026-10-01",
+            script: [
+              `import { DurableObject } from "cloudflare:workers";`,
+              `export class KeelSandbox extends DurableObject {}`,
+              `export default { fetch() { return Response.json({ fake: "keel-verify" }); } };`,
+            ].join("\n"),
+            durableObjects: { SANDBOX: { className: "KeelSandbox", useSQLite: true } },
           },
         ],
       },
@@ -34,6 +40,8 @@ export default defineProject({
   test: {
     name: "pool:keel",
     include: ["test/pool/**/*.test.ts"],
+    // The first test in a pool pays workerd's cold module load (the sandbox SDK alone is ~3.5 s).
+    testTimeout: 30_000,
     setupFiles: ["test/pool/setup.ts"],
   },
 });

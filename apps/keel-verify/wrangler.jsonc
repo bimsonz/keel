@@ -5,12 +5,28 @@
   // One compatibility date across every Worker in the repo (rule R13).
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
-  // Never commit account_id: deploys read CLOUDFLARE_ACCOUNT_ID at runtime (rule R13).
+  // keel-verify holds no credentials: nothing it runs can reach anything worth stealing.
   "workers_dev": true,
   "preview_urls": false,
   "observability": { "enabled": true },
   "vars": {
-    // The public host this Worker answers on. scripts/deploy.ts overrides it per environment.
-    "KEEL_HOST": "keel-verify.localhost"
-  }
+    "KEEL_HOST": "keel-verify.localhost",
+    "BACKUP_BUCKET_NAME": "keel-staging-sandbox-backups",
+    // Container classes under the durable_object scheduling policy, which BoxGate counts (rule R13).
+    "BOXGATE_CLASSES": ""
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "VERIFIER", "class_name": "VerifierDO" },
+      { "name": "SANDBOX", "class_name": "KeelSandbox" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["VerifierDO", "KeelSandbox"] }],
+  // Tier 2 (ExecBox): a classic Sandbox container, so its instances are capped here; the account is shared.
+  "containers": [
+    { "class_name": "KeelSandbox", "image": "./containers/sandbox/Dockerfile", "instance_type": "standard-2", "max_instances": 10 }
+  ],
+  "r2_buckets": [{ "binding": "BACKUP_BUCKET", "bucket_name": "keel-staging-sandbox-backups" }],
+  // Tier 1: throwaway isolates for probes, pure checks and Wasm tools.
+  "worker_loaders": [{ "binding": "LOADER" }]
 }

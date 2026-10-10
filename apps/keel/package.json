@@ -30,6 +30,7 @@
     "zod": "catalog:",
     "effect": "catalog:",
     "ulid": "catalog:",
-    "jose": "catalog:"
+    "jose": "catalog:",
+    "@cloudflare/ci": "catalog:"
   }
 }

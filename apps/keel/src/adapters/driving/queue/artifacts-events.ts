@@ -1,27 +1,19 @@
-import { WorkspaceForked, WorkspacePushed } from "@keeltown/core/domain/coordination";
+import { WorkspacePushed } from "@keeltown/core/domain/coordination";
 import { CommitSha, isId } from "@keeltown/core/kernel";
 import { Option, Schema } from "effect";
 
 /**
- * Artifacts' account and repository events, as Queues delivers them (event
- * schema version 1). Third-party payloads are decoded with Effect Schema at the
- * doorway and translated into Keel events; anything else is dropped.
+ * Artifacts' `pushed` event (event schema version 1), as a namespace-wide
+ * `triggers.events` rule delivers it. Third-party payloads are decoded with
+ * Effect Schema at the doorway and translated into Keel events; anything
+ * else is dropped. Forks are not observed here: the WorkspacePool DO emits
+ * WorkspaceForked when its own fork call resolves (spike S2).
  */
-const Source = Schema.Struct({ type: Schema.String, namespace: Schema.String, repoName: Schema.String });
-
-export const ArtifactsRepoForked = Schema.Struct({
-  type: Schema.Literal("cf.artifacts.repo.forked"),
-  source: Source,
-  payload: Schema.Struct({ namespace: Schema.String, repoName: Schema.String, repoId: Schema.String }),
-});
-
 export const ArtifactsRepoPushed = Schema.Struct({
   type: Schema.Literal("cf.artifacts.repo.pushed"),
-  source: Source,
+  source: Schema.Struct({ type: Schema.String, namespace: Schema.String, repoName: Schema.String }),
   payload: Schema.Struct({ ref: Schema.String, before: Schema.String, after: Schema.String }),
 });
-
-const ArtifactsEvent = Schema.Union([ArtifactsRepoForked, ArtifactsRepoPushed]);
 
 /** Workspace repos are named `ws-<ULID>`; the workspace id is `wsp_<ULID>`. */
 function workspaceIdOf(repoName: string) {
@@ -30,22 +22,16 @@ function workspaceIdOf(repoName: string) {
   return isId("wsp", id) ? id : null;
 }
 
-/** An Artifacts event as the Keel event it means, or null when it means nothing to Keel. */
-export function translateArtifactsEvent(raw: unknown): typeof WorkspaceForked.Type | typeof WorkspacePushed.Type | null {
-  const decoded = Schema.decodeUnknownOption(ArtifactsEvent)(raw);
+const DELETED = /^0+$/;
+
+/** A push to a workspace branch as WorkspacePushed; null for tags, notes, deletions, other repos and anything unreadable. */
+export function translateArtifactsPush(raw: unknown): typeof WorkspacePushed.Type | null {
+  const decoded = Schema.decodeUnknownOption(ArtifactsRepoPushed)(raw);
   if (Option.isNone(decoded)) return null;
-  const event = decoded.value;
-  if (event.type === "cf.artifacts.repo.forked") {
-    const workspaceId = workspaceIdOf(event.payload.repoName);
-    if (workspaceId === null) return null;
-    return WorkspaceForked.make({
-      workspaceId,
-      repo: `${event.payload.namespace}/${event.payload.repoName}`,
-      sourceRepo: `${event.source.namespace}/${event.source.repoName}`,
-    });
-  }
-  const workspaceId = workspaceIdOf(event.source.repoName);
-  const sha = Schema.decodeUnknownOption(CommitSha)(event.payload.after);
+  const { source, payload } = decoded.value;
+  if (!payload.ref.startsWith("refs/heads/") || DELETED.test(payload.after)) return null;
+  const workspaceId = workspaceIdOf(source.repoName);
+  const sha = Schema.decodeUnknownOption(CommitSha)(payload.after);
   if (workspaceId === null || Option.isNone(sha)) return null;
-  return WorkspacePushed.make({ workspaceId, ref: event.payload.ref, sha: sha.value });
+  return WorkspacePushed.make({ workspaceId, ref: payload.ref, sha: sha.value });
 }

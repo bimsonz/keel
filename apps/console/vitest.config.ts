@@ -11,5 +11,7 @@ export default defineProject({
   test: {
     name: "pool:console",
     include: ["test/pool/**/*.test.ts"],
+    // The first test in a pool pays workerd's cold module load (the sandbox SDK alone is ~3.5 s).
+    testTimeout: 30_000,
   },
 });

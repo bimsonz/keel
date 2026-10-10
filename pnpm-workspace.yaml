@@ -23,6 +23,9 @@ catalog:
   oxlint-tsgolint: 7.0.2004
   vitest: 5.0.3
   "@cloudflare/vitest-plugin": 1.4.0
+  # Tier 2: @cloudflare/ci pins the sandbox it runs on; they move together.
+  "@cloudflare/ci": 0.2.0
+  "@cloudflare/sandbox": 0.12.1
   wrangler: 4.149.0
   "@cloudflare/workers-types": 5.20261010.1
   fast-check: 4.10.2

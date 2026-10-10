@@ -136,10 +136,23 @@ export function checkR13(root: string, options: GuardOptions = {}): GuardResult 
       }
     }
     const containers = get("containers");
+    const gated = new Set(
+      typeof vars === "object" && vars !== null && typeof Reflect.get(vars, "BOXGATE_CLASSES") === "string"
+        ? String(Reflect.get(vars, "BOXGATE_CLASSES")).split(",").map((name) => name.trim()).filter(Boolean)
+        : [],
+    );
     if (Array.isArray(containers)) {
       containers.forEach((container: unknown, i) => {
-        const max: unknown = typeof container === "object" && container !== null ? Reflect.get(container, "max_instances") : undefined;
-        if (typeof max !== "number") violations.push({ rule: "R13", file, message: `containers[${i}] has no max_instances; the account is shared` });
+        const field = (key: string): unknown => (typeof container === "object" && container !== null ? Reflect.get(container, key) : undefined);
+        const className = String(field("class_name"));
+        const policy = field("scheduling_policy");
+        if (policy === "durable_object") {
+          if (!gated.has(className)) {
+            violations.push({ rule: "R13", file, message: `containers[${i}] (${className}) uses the durable_object policy but is not registered with BoxGate in vars.BOXGATE_CLASSES` });
+          }
+        } else if (typeof field("max_instances") !== "number") {
+          violations.push({ rule: "R13", file, message: `containers[${i}] (${className}) has no max_instances; the account is shared` });
+        }
       });
     }
     const vitestFile = `apps/${app}/vitest.config.ts`;
