@@ -2,11 +2,12 @@
   "name": "@keeltown/contracts",
   "version": "0.0.0",
   "private": true,
-  "description": "The published wire contract: the committed OpenAPI document",
+  "description": "The published wire contract: the committed OpenAPI document, generated from packages/spec",
   "type": "module",
   "license": "MIT",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./openapi.json": "./openapi.json"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"

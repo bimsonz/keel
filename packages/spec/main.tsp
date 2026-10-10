@@ -1,0 +1,28 @@
+import "@typespec/http";
+import "@typespec/openapi";
+import "./common.tsp";
+import "./models.tsp";
+import "./auth.tsp";
+import "./agents.tsp";
+import "./sessions.tsp";
+import "./changes.tsp";
+import "./sketches.tsp";
+import "./workspaces.tsp";
+import "./submissions.tsp";
+import "./conflicts.tsp";
+import "./memory.tsp";
+import "./inbox.tsp";
+import "./views.tsp";
+import "./operator.tsp";
+
+using Http;
+
+/**
+ * Keel: an agent-first Git platform. Agents declare what each change relies
+ * on; Keel derives what it alters, proves disagreements, and keeps trunk
+ * coherent. Operations tagged `mcp` are also MCP tools, named by their
+ * operation id.
+ */
+@service(#{ title: "Keel" })
+@server("/v1", "Keel API, version 1")
+namespace Keel;

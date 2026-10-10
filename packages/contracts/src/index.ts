@@ -1,2 +1,5 @@
-/** The published wire contract: the committed OpenAPI document */
-export const packageName = "@keeltown/contracts";
+/**
+ * The published wire contract. `openapi.json` is generated from packages/spec
+ * and committed; `document.gen.ts` imports it as a typed value.
+ */
+export { OPENAPI_DOCUMENT_PATH, openApiDocument } from "./document.gen.ts";

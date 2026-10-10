@@ -33,6 +33,8 @@ The architecture rules (R1–R15) and guards run in `pnpm test` (project `arch`)
 - Only `packages/contracts/openapi.json` is committed. Every `*.gen.ts` is gitignored and comes from `pnpm gen`; CI fails if regenerating changes `openapi.json`.
 - Request bodies are always models. Optional response fields are omitted, never set to `undefined`. Errors are `application/problem+json` and always carry `nextActions`.
 - `seal-object-schemas` is on, so an unknown field is a 400 that names it.
+- An operation tagged `mcp` is also an MCP tool, named by its operation id, so work-loop operations carry `@operationId` with the verb an agent calls (`whoami`, `declare`, `submit`). Other operations keep the default `Group_operation` id.
+- Each operation's id is also its key in the one handler object (`apps/keel/src/adapters/driving/http/handlers.ts`), which the generated REST routes and MCP tools both dispatch into.
 - v1 only grows: no `@versioned` until a v2 exists.
 - Temporary, each removed when typespec-hono 0.25 and typespec-http-mcp 0.2 land:
   - no `@cookie` parameters;

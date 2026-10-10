@@ -11,6 +11,8 @@
   "observability": { "enabled": true },
   "vars": {
     // The public host this Worker answers on. scripts/deploy.ts overrides it per environment.
-    "KEEL_HOST": "keel.localhost"
+    "KEEL_HOST": "keel.localhost",
+    // staging | production | test. Tests rethrow contract drift instead of answering 500.
+    "KEEL_ENV": "staging"
   }
 }

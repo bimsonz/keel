@@ -1,0 +1,28 @@
+# Keel's API is generated from this spec; nothing generated is committed except
+# packages/contracts/openapi.json. Run `pnpm gen` from the repo root.
+emit:
+  - typespec-hono
+  - typespec-http-mcp
+  - "@typespec/openapi3"
+  - typespec-openapi-document
+options:
+  typespec-hono:
+    emitter-output-dir: "{project-root}/../../apps/keel/src/generated/http"
+    seal-object-schemas: true
+  # typespec-http-mcp 0.1 runs typespec-http-zod 0.26 and typespec-hono 0.24 runs
+  # 0.27, so they write to separate directories rather than sharing schemas.gen.ts.
+  typespec-http-mcp:
+    emitter-output-dir: "{project-root}/../../apps/keel/src/generated/mcp"
+    seal-object-schemas: true
+    tool-tags: [mcp]
+  "@typespec/openapi3":
+    emitter-output-dir: "{project-root}/../contracts"
+    output-file: openapi.json
+    file-type: json
+    seal-object-schemas: true
+  # The typed module that imports the document lives beside it, in packages/contracts.
+  typespec-openapi-document:
+    emitter-output-dir: "{project-root}/../contracts/src"
+linter:
+  extends:
+    - "typespec-hono/recommended"

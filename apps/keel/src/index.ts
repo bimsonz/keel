@@ -1,9 +1,7 @@
+import { appFor } from "./composition/isolate.ts";
+
 export default {
-  async fetch(request): Promise<Response> {
-    const url = new URL(request.url);
-    if (url.pathname === "/healthz") {
-      return Response.json({ ok: true, service: "keel" });
-    }
-    return new Response("Not found", { status: 404 });
+  fetch(request, env, ctx): Response | Promise<Response> {
+    return appFor(env).fetch(request, env, ctx);
   },
 } satisfies ExportedHandler<Env>;

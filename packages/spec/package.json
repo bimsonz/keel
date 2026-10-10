@@ -4,5 +4,21 @@
   "private": true,
   "description": "Keel's API, specified in TypeSpec: the single source for REST, MCP and the OpenAPI document",
   "type": "module",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "gen": "tsp compile . --pretty=false"
+  },
+  "dependencies": {
+    "@bimsonz/mfp": "github:bimsonz/mfp#v0.1.0-pre.2"
+  },
+  "devDependencies": {
+    "@typespec/compiler": "catalog:",
+    "@typespec/http": "catalog:",
+    "@typespec/json-schema": "catalog:",
+    "@typespec/openapi": "catalog:",
+    "@typespec/openapi3": "catalog:",
+    "typespec-hono": "catalog:",
+    "typespec-http-mcp": "catalog:",
+    "typespec-openapi-document": "catalog:"
+  }
 }
