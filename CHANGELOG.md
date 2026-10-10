@@ -9,6 +9,7 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 ### Added
 
 - Change RPC commands `DeclareCommand` (`changeId`, checked by the DO against its own name; `agentId`, `projectId`, `origin` defaulting to `agent`, the intent, `sketchId?`, `idempotencyKey` as the commit's cause, and `fingerprint`) and `SubmitCommand` (`agentId`, `leaseId`, `commitSha`, `idempotencyKey`). `ChangeRpc.declare` and `submit` take their encoded forms instead of `unknown`.
+- Change RPC for Precheck (Keel implements it in the Change DO): `workspace()` answers `ChangeWorkspace {workspaceId, repo, baseSha, projectId}`; `precheckStarted(PrecheckStartedCommand {revision, instanceId})` commits PrecheckStarted and answers the change; `precheckRefused(PrecheckRefusedCommand {revision, instanceId, reasons})` commits VerdictIssued (`bounce`, `ruling`) and ChangeBounced in one transaction and answers `{change, verdictId}`; `planCompiled(PlanCompiledCommand {revision, instanceId, planHash, steps, costEstimate})` commits PlanCompiled and answers the change. Each is idempotent by `instanceId` (cause `<instanceId>:<method>`) and fails with `ChangeNotFound | ChangeStateRefused`, the latter for a stale revision. `precheckRefused` gains `nextActions` when the kernel `NextAction` lands. `RepoRef` is exported from the WorkspacePool contract.
 
 ### Changed
 

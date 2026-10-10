@@ -12,11 +12,21 @@ import {
   RevisionMismatch,
   SketchNotFound,
 } from "@keeltown/core/domain/coordination";
-import { AgentId, ChangeId, CommitSha, LeaseId, ProjectId, SketchId } from "@keeltown/core/kernel";
+import {
+  AgentId,
+  ChangeId,
+  CommitSha,
+  ContentHash,
+  LeaseId,
+  ProjectId,
+  SketchId,
+  VerdictId,
+  WorkspaceId,
+} from "@keeltown/core/kernel";
 import { Effect, Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
-import { WorkspaceGrant } from "./workspace-pool.ts";
+import { RepoRef, WorkspaceGrant } from "./workspace-pool.ts";
 
 /**
  * Declare a change. `changeId` is the one the agent's AgentSession reserved for
@@ -55,6 +65,55 @@ export const SubmissionStatus = Schema.Struct({
   commitSha: Schema.NullOr(CommitSha),
 });
 
+/**
+ * Where Precheck diffs a change: its workspace repo, the base it was granted
+ * at (`WorkspaceGranted.baseSha`, so a mirror that lags trunk never loses the
+ * base), and the project whose settings hold `protectedPaths`.
+ */
+export const ChangeWorkspace = Schema.Struct({
+  workspaceId: WorkspaceId,
+  repo: RepoRef,
+  baseSha: CommitSha,
+  projectId: ProjectId,
+});
+export type ChangeWorkspace = typeof ChangeWorkspace.Type;
+
+// Precheck's commands. Each is idempotent by `instanceId`: the commit's cause
+// is `<instanceId>:<method>`, so a replayed Workflow step commits nothing new.
+// A `revision` other than the change's current one is refused with
+// ChangeStateRefused, so a stale Precheck can never move a resubmitted change.
+
+/** Precheck has started on a submission: commits PrecheckStarted. */
+export const PrecheckStartedCommand = Schema.Struct({
+  revision: Schema.Int,
+  instanceId: Schema.NonEmptyString,
+});
+export type PrecheckStartedCommand = typeof PrecheckStartedCommand.Type;
+
+/**
+ * Precheck refused the submission. Commits, in one transaction, VerdictIssued
+ * (outcome `bounce`, evidence class `ruling`, citing the refused paths) on the
+ * verdict entity and ChangeBounced naming that verdict.
+ */
+export const PrecheckRefusedCommand = Schema.Struct({
+  revision: Schema.Int,
+  instanceId: Schema.NonEmptyString,
+  reasons: Schema.NonEmptyArray(Schema.String),
+});
+export type PrecheckRefusedCommand = typeof PrecheckRefusedCommand.Type;
+
+/** Precheck passed and compiled the change's Verification Plan: commits PlanCompiled. */
+export const PlanCompiledCommand = Schema.Struct({
+  revision: Schema.Int,
+  instanceId: Schema.NonEmptyString,
+  planHash: ContentHash,
+  steps: Schema.Int,
+  costEstimate: Schema.Number,
+});
+export type PlanCompiledCommand = typeof PlanCompiledCommand.Type;
+
+const PrecheckRefusal = Schema.Union([ChangeNotFound, ChangeStateRefused]);
+
 const Mutation = Schema.Union([ChangeNotFound, LeaseStale, RevisionMismatch, ChangeStateRefused]);
 
 export const ChangeCodecs = {
@@ -72,6 +131,13 @@ export const ChangeCodecs = {
   abandon: exitCodec(Change, Mutation),
   adopt: exitCodec(Change, Schema.Union([ChangeNotFound, ChangeStateRefused])),
   submission: exitCodec(SubmissionStatus, ChangeNotFound),
+  workspace: exitCodec(ChangeWorkspace, PrecheckRefusal),
+  precheckStarted: exitCodec(Change, PrecheckRefusal),
+  precheckRefused: exitCodec(
+    Schema.Struct({ change: Change, verdictId: VerdictId }),
+    PrecheckRefusal,
+  ),
+  planCompiled: exitCodec(Change, PrecheckRefusal),
 };
 
 /**
@@ -90,4 +156,9 @@ export interface ChangeRpc extends EventReceiverRpc {
    * `waitMs` (0–30,000). An in-DO waiter with a setTimeout deadline; no polling.
    */
   submission(waitMs: number): Promise<ExitJson>;
+  /** The change's workspace, base and project, for Precheck's diff. ChangeStateRefused when it holds no workspace. */
+  workspace(): Promise<ExitJson>;
+  precheckStarted(command: typeof PrecheckStartedCommand.Encoded): Promise<ExitJson>;
+  precheckRefused(command: typeof PrecheckRefusedCommand.Encoded): Promise<ExitJson>;
+  planCompiled(command: typeof PlanCompiledCommand.Encoded): Promise<ExitJson>;
 }

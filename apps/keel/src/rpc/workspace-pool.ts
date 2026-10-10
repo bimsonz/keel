@@ -13,7 +13,8 @@ export const WorkspaceGrant = Schema.Struct({
 
 export const CollectionReason = Schema.Literals(["landed", "withdrawn", "expired"]);
 
-const RepoRef = Schema.Struct({ namespace: Schema.String, name: Schema.String });
+/** A repository on the code host: an Artifacts namespace and a repo name. */
+export const RepoRef = Schema.Struct({ namespace: Schema.String, name: Schema.String });
 
 /** What the pool forks from, and how many ready workspaces it keeps. */
 export const PoolConfig = Schema.Struct({
