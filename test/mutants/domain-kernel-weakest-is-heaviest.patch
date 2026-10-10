@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/kernel/kernel.test.ts
+# kills: kernel.evidence-weakest-is-meet
+# why: Taint would launder opinion up to proof
+diff --git a/packages/core/src/domain/kernel/evidence.ts b/packages/core/src/domain/kernel/evidence.ts
+index b519554..8c402b5 100644
+--- a/packages/core/src/domain/kernel/evidence.ts
++++ b/packages/core/src/domain/kernel/evidence.ts
+@@ -11,7 +11,7 @@ const RANK: Record<EvidenceClass, number> = { opinion: 0, testimony: 1, ruling:
+ 
+ /** The weaker of two classes: what a step that consumed both is worth (taint). */
+ export function weakest(a: EvidenceClass, b: EvidenceClass): EvidenceClass {
+-  return RANK[a] <= RANK[b] ? a : b;
++  return RANK[a] >= RANK[b] ? a : b;
+ }
+ 
+ /** Only proof and rulings may fail or clear a change. */

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: compare.invariant-never-contradicts
+# why: A free-form invariant blocks on model comparison alone
+diff --git a/packages/core/src/domain/coordination/compare.ts b/packages/core/src/domain/coordination/compare.ts
+index 3ba404b..8114b4e 100644
+--- a/packages/core/src/domain/coordination/compare.ts
++++ b/packages/core/src/domain/coordination/compare.ts
+@@ -74,7 +74,7 @@ export const compareRead = (premise: ReadProposition, effect: ReadProposition):
+   if (!subjectsRelated(premise.subject, effect.subject)) return { outcome: "unrelated", reason: "subjects-unrelated" };
+   if (!scopesIntersect(premise.scope, effect.scope)) return { outcome: "unrelated", reason: "scopes-disjoint" };
+   if (premise.claim.predicate === "invariant" || effect.claim.predicate === "invariant") {
+-    return { outcome: "needs-probe", reason: "invariant-is-model-compared" };
++    return { outcome: "contradicts", reason: "invariant-is-model-compared" };
+   }
+   if (premise.claim.predicate !== effect.claim.predicate) return { outcome: "unrelated", reason: "predicates-differ" };
+   const decision = decideClaims(premise.claim, effect.claim);

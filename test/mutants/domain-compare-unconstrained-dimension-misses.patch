@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: scope.intersection-laws
+# why: A dimension one scope leaves open is treated as empty
+diff --git a/packages/core/src/domain/coordination/scope.ts b/packages/core/src/domain/coordination/scope.ts
+index 2d491a9..157909d 100644
+--- a/packages/core/src/domain/coordination/scope.ts
++++ b/packages/core/src/domain/coordination/scope.ts
+@@ -39,7 +39,7 @@ export const writeScope = (scope: Scope): string | undefined => {
+ export const scopesIntersect = (a: Scope, b: Scope): boolean =>
+   Object.entries(a).every(([dimension, atoms]) => {
+     const other = b[dimension];
+-    return other === undefined || atoms.some((x) => other.includes(x));
++    return other !== undefined && atoms.some((x) => other.includes(x));
+   });
+ 
+ /** `inner` lies wholly inside `outer`. */

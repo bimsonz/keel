@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/kernel/kernel.test.ts
+# kills: kernel.glob-matches-oracle
+# why: ? only matches a literal question mark
+diff --git a/packages/core/src/domain/kernel/glob.ts b/packages/core/src/domain/kernel/glob.ts
+index 99e5f9a..f2eb8ed 100644
+--- a/packages/core/src/domain/kernel/glob.ts
++++ b/packages/core/src/domain/kernel/glob.ts
+@@ -21,7 +21,7 @@ const matchSegment = (pattern: string, text: string): boolean => {
+       if (!reach[j]) continue;
+       if (p === "*") {
+         for (let k = j; k <= text.length; k++) next[k] = true;
+-      } else if (j < text.length && (p === "?" || p === text[j])) {
++      } else if (j < text.length && (p === text[j])) {
+         next[j + 1] = true;
+       }
+     }

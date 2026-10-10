@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: subject.key-round-trip
+# why: Accepts subject keys with empty or hyphen-edged segments
+diff --git a/packages/core/src/domain/coordination/proposition.ts b/packages/core/src/domain/coordination/proposition.ts
+index b45f529..8453965 100644
+--- a/packages/core/src/domain/coordination/proposition.ts
++++ b/packages/core/src/domain/coordination/proposition.ts
+@@ -28,7 +28,7 @@ export const Strength = Schema.Literals(["must", "should"]);
+ export type Strength = typeof Strength.Type;
+ 
+ /** A named concept in the codebase, e.g. `authz.permission-evaluation`. */
+-export const SubjectKey = Schema.String.check(Schema.isPattern(/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/)).pipe(
++export const SubjectKey = Schema.String.check(Schema.isPattern(/^[a-z0-9.-]+$/)).pipe(
+   Schema.brand("SubjectKey"),
+ );
+ export type SubjectKey = typeof SubjectKey.Type;

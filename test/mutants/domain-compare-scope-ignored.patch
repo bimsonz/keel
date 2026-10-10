@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: compare.unrelated-outside-subject-and-scope
+# why: Propositions in disjoint scopes are compared anyway
+diff --git a/packages/core/src/domain/coordination/compare.ts b/packages/core/src/domain/coordination/compare.ts
+index 3ba404b..7a4c524 100644
+--- a/packages/core/src/domain/coordination/compare.ts
++++ b/packages/core/src/domain/coordination/compare.ts
+@@ -72,7 +72,7 @@ const covers = (premise: ReadProposition, effect: ReadProposition): boolean =>
+ /** Compares two propositions already read onto their lattices. */
+ export const compareRead = (premise: ReadProposition, effect: ReadProposition): Comparison => {
+   if (!subjectsRelated(premise.subject, effect.subject)) return { outcome: "unrelated", reason: "subjects-unrelated" };
+-  if (!scopesIntersect(premise.scope, effect.scope)) return { outcome: "unrelated", reason: "scopes-disjoint" };
++  
+   if (premise.claim.predicate === "invariant" || effect.claim.predicate === "invariant") {
+     return { outcome: "needs-probe", reason: "invariant-is-model-compared" };
+   }

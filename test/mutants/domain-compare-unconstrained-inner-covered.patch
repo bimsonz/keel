@@ -1,0 +1,14 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: scope.intersection-laws
+# why: An unscoped effect is said to fit inside a scoped premise
+diff --git a/packages/core/src/domain/coordination/scope.ts b/packages/core/src/domain/coordination/scope.ts
+index 2d491a9..fff222d 100644
+--- a/packages/core/src/domain/coordination/scope.ts
++++ b/packages/core/src/domain/coordination/scope.ts
+@@ -46,5 +46,5 @@ export const scopesIntersect = (a: Scope, b: Scope): boolean =>
+ export const scopeCovers = (outer: Scope, inner: Scope): boolean =>
+   Object.entries(outer).every(([dimension, atoms]) => {
+     const constrained = inner[dimension];
+-    return constrained !== undefined && constrained.every((x) => atoms.includes(x));
++    return constrained === undefined || constrained.every((x) => atoms.includes(x));
+   });

@@ -1,0 +1,14 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: compare.ordering-pairs
+# why: A reversed ordering only asks for a probe
+diff --git a/packages/core/src/domain/coordination/lattice.ts b/packages/core/src/domain/coordination/lattice.ts
+index f14927f..8a2ef03 100644
+--- a/packages/core/src/domain/coordination/lattice.ts
++++ b/packages/core/src/domain/coordination/lattice.ts
+@@ -253,5 +253,5 @@ export const orderingDecision = (p: Ordering, e: Ordering): RegionDecision =>
+   p.before === e.before && p.after === e.after
+     ? "within"
+     : p.before === e.after && p.after === e.before
+-      ? "disjoint"
++      ? "overlap"
+       : "unrelated";

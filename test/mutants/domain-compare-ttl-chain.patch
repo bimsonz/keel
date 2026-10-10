@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: lattice.session-ttl-needs-probe, compare.matches-lattice-oracle
+# why: Freshness treated as a chain: per-session assumed fresher than every ttl(n)
+diff --git a/packages/core/src/domain/coordination/lattice.ts b/packages/core/src/domain/coordination/lattice.ts
+index f14927f..002f6d3 100644
+--- a/packages/core/src/domain/coordination/lattice.ts
++++ b/packages/core/src/domain/coordination/lattice.ts
+@@ -98,7 +98,7 @@ const sessionCandidates = (ttls: readonly number[]): readonly number[] => {
+   const last = sorted.at(-1);
+   if (last === undefined) return [0];
+   const between = sorted.slice(1).map((n, i) => ((sorted[i] ?? n) + n) / 2);
+-  return [-0.5, ...sorted, ...between, last + 1];
++  return [-0.5];
+ };
+ 
+ const validTtl = (v: Freshness): boolean => !isTtl(v) || (Number.isFinite(v.ttl) && v.ttl >= 0);

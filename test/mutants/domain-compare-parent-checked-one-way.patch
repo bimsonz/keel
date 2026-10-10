@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: compare.parent-subjects-checked
+# why: An effect on a parent subject is not checked against a child's premise
+diff --git a/packages/core/src/domain/coordination/subject.ts b/packages/core/src/domain/coordination/subject.ts
+index 37a7ef5..2c49c65 100644
+--- a/packages/core/src/domain/coordination/subject.ts
++++ b/packages/core/src/domain/coordination/subject.ts
+@@ -23,7 +23,7 @@ export const isAncestorOrSelf = (ancestor: SubjectKey, key: SubjectKey): boolean
+ 
+ /** On one ancestor chain, in either direction: the two can speak about the same thing. */
+ export const subjectsRelated = (a: SubjectKey, b: SubjectKey): boolean =>
+-  isAncestorOrSelf(a, b) || isAncestorOrSelf(b, a);
++  isAncestorOrSelf(a, b);
+ 
+ /** Distinct children of one parent: proximity, never a comparison. */
+ export const subjectsSiblings = (a: SubjectKey, b: SubjectKey): boolean => {

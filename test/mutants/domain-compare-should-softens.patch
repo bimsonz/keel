@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: compare.strength-never-read
+# why: Comparison starts reading the reliance kind
+diff --git a/packages/core/src/domain/coordination/compare.ts b/packages/core/src/domain/coordination/compare.ts
+index 3ba404b..0445f2d 100644
+--- a/packages/core/src/domain/coordination/compare.ts
++++ b/packages/core/src/domain/coordination/compare.ts
+@@ -79,7 +79,7 @@ export const compareRead = (premise: ReadProposition, effect: ReadProposition):
+   if (premise.claim.predicate !== effect.claim.predicate) return { outcome: "unrelated", reason: "predicates-differ" };
+   const decision = decideClaims(premise.claim, effect.claim);
+   if (decision === "within") return { outcome: covers(premise, effect) ? "compatible" : "refines", reason: "lattice" };
+-  if (decision === "disjoint") return { outcome: "contradicts", reason: "lattice" };
++  if (decision === "disjoint") return { outcome: premise.strength === "should" ? "needs-probe" : "contradicts", reason: "lattice" };
+   if (decision === "overlap") return { outcome: "needs-probe", reason: "lattice" };
+   return { outcome: "unrelated", reason: "lattice" };
+ };

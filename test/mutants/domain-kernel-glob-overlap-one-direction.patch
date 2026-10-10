@@ -1,0 +1,14 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/kernel/kernel.test.ts
+# kills: kernel.glob-overlap-sound
+# why: Overlap is checked one way round, so exposure under-reports
+diff --git a/packages/core/src/domain/kernel/glob.ts b/packages/core/src/domain/kernel/glob.ts
+index 99e5f9a..77582fb 100644
+--- a/packages/core/src/domain/kernel/glob.ts
++++ b/packages/core/src/domain/kernel/glob.ts
+@@ -73,5 +73,5 @@ export const globsMayOverlap = (a: string, b: string): boolean => {
+   if (!split(b).some(isWild)) return matchesGlob(a, b);
+   const pa = literalPrefix(a);
+   const pb = literalPrefix(b);
+-  return isPrefix(pa, pb) || isPrefix(pb, pa);
++  return isPrefix(pa, pb);
+ };

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: compare.shape-assignability
+# why: Making a required field optional is not caught
+diff --git a/packages/core/src/domain/coordination/shape.ts b/packages/core/src/domain/coordination/shape.ts
+index 9dbbf97..190c141 100644
+--- a/packages/core/src/domain/coordination/shape.ts
++++ b/packages/core/src/domain/coordination/shape.ts
+@@ -47,7 +47,7 @@ export const assignable = (s: Shape, t: Shape): Tri => {
+         Object.entries(t.fields).map(([name, want]) => {
+           const have = s.fields[name];
+           if (have === undefined) return want.optional;
+-          if (have.optional && !want.optional) return false;
++          
+           return assignable(have.shape, want.shape);
+         }),
+       );

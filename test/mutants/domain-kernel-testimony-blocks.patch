@@ -1,0 +1,14 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/kernel/kernel.test.ts
+# kills: kernel.only-proof-or-ruling-decide
+# why: Testimony could block or clear a change
+diff --git a/packages/core/src/domain/kernel/evidence.ts b/packages/core/src/domain/kernel/evidence.ts
+index b519554..b3c48f7 100644
+--- a/packages/core/src/domain/kernel/evidence.ts
++++ b/packages/core/src/domain/kernel/evidence.ts
+@@ -16,5 +16,5 @@ export function weakest(a: EvidenceClass, b: EvidenceClass): EvidenceClass {
+ 
+ /** Only proof and rulings may fail or clear a change. */
+ export function canBlock(evidence: EvidenceClass): boolean {
+-  return evidence === "proof" || evidence === "ruling";
++  return evidence !== "opinion";
+ }

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/kernel/kernel.test.ts
+# kills: kernel.canonical-json-key-order, kernel.canonical-json-rfc8785
+# why: Canonical form follows insertion order, so equal plans hash differently
+diff --git a/packages/core/src/domain/kernel/hash.ts b/packages/core/src/domain/kernel/hash.ts
+index e13e6a3..7a4fd11 100644
+--- a/packages/core/src/domain/kernel/hash.ts
++++ b/packages/core/src/domain/kernel/hash.ts
+@@ -22,7 +22,7 @@ export type Json = null | boolean | number | string | readonly Json[] | { readon
+ export const canonicalJson = (value: Json): string => {
+   if (value === null || typeof value !== "object") return JSON.stringify(value);
+   if (isJsonArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+-  const keys = Object.keys(value).toSorted();
++  const keys = Object.keys(value);
+   return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(value[k] ?? null)}`).join(",")}}`;
+ };
+ 

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: compare.refines-iff-partial-coverage
+# why: A child-subject effect is said to cover its parent's premise
+diff --git a/packages/core/src/domain/coordination/compare.ts b/packages/core/src/domain/coordination/compare.ts
+index 3ba404b..7859fc1 100644
+--- a/packages/core/src/domain/coordination/compare.ts
++++ b/packages/core/src/domain/coordination/compare.ts
+@@ -67,7 +67,7 @@ const decideClaims = (p: Claim, e: Claim): RegionDecision => {
+ 
+ /** The effect speaks for everything the premise relies on: its subject and its scope. */
+ const covers = (premise: ReadProposition, effect: ReadProposition): boolean =>
+-  isAncestorOrSelf(effect.subject, premise.subject) && scopeCovers(effect.scope, premise.scope);
++  isAncestorOrSelf(premise.subject, effect.subject) && scopeCovers(effect.scope, premise.scope);
+ 
+ /** Compares two propositions already read onto their lattices. */
+ export const compareRead = (premise: ReadProposition, effect: ReadProposition): Comparison => {

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: compare.matches-lattice-oracle
+# why: Regions sharing an endpoint are called contradictory
+diff --git a/packages/core/src/domain/coordination/lattice.ts b/packages/core/src/domain/coordination/lattice.ts
+index f14927f..f1de38a 100644
+--- a/packages/core/src/domain/coordination/lattice.ts
++++ b/packages/core/src/domain/coordination/lattice.ts
+@@ -46,7 +46,7 @@ type Interval = { readonly lo: number; readonly hi: number };
+ 
+ const intervalDecision = (p: Interval, e: Interval): RegionDecision => {
+   if (p.lo <= e.lo && e.hi <= p.hi) return "within";
+-  if (e.hi < p.lo || p.hi < e.lo) return "disjoint";
++  if (e.hi <= p.lo || p.hi <= e.lo) return "disjoint";
+   return "overlap";
+ };
+ 

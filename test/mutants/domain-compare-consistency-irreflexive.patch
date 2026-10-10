@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: lattice.orders-match-spec, lattice.partial-order-laws
+# why: A consistency level is no longer at most itself
+diff --git a/packages/core/src/domain/coordination/lattice.ts b/packages/core/src/domain/coordination/lattice.ts
+index f14927f..2ede64e 100644
+--- a/packages/core/src/domain/coordination/lattice.ts
++++ b/packages/core/src/domain/coordination/lattice.ts
+@@ -139,7 +139,7 @@ const consistencyPosition = (v: Consistency): number =>
+         : 2;
+ 
+ export const consistencyLeq = (a: Consistency, b: Consistency): boolean =>
+-  consistencyPosition(a) <= consistencyPosition(b);
++  consistencyPosition(a) < consistencyPosition(b);
+ 
+ const validConsistency = (v: Consistency): boolean =>
+   typeof v !== "object" || (Number.isFinite(v.bounded) && v.bounded >= 0);
