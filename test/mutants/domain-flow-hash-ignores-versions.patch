@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.plan-hash-content-addressed
+# why: A new step version reuses the old plan hash
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 378e550..29075df 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -396,7 +396,7 @@ export const compile = (
+   const overrides = Object.fromEntries(planned.map((p) => [p.id, table.get(p.id)?.overrides ?? []]));
+   const mayskip = Object.fromEntries(planned.map((p) => [p.id, table.get(p.id)?.mayskip ?? []]));
+   const planHash = contentHashOf(
+-    toJson({ compiler: COMPILER_VERSION, baseCommit: facts.baseCommit, flow: compiled, steps: planned, versions, overrides, mayskip }),
++    toJson({ compiler: COMPILER_VERSION, baseCommit: facts.baseCommit, flow: compiled, steps: planned, overrides, mayskip }),
+   );
+   return Result.succeed({
+     planHash,

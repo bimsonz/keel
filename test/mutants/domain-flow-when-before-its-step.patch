@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.structural-errors
+# why: A when may test a step that has not run
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 378e550..c06aadf 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -135,7 +135,6 @@ const checkStructure = (
+       return checkStructure(flow.body, table, classes, prior, flow.over);
+     case "when": {
+       const errors: CompileError[] = conditionSteps(flow.condition).flatMap(({ step, outcomes, negated }): CompileError[] => {
+-        if (!prior.has(step)) return [new WhenRefersToNonPriorStep({ step })];
+         const declared = table.get(step)?.outcomes ?? [];
+         const undeclared = outcomes.filter((o) => !declared.some((d) => d === o)).map((outcome) => new WhenOutcomeNotDeclared({ step, outcome }));
+         const opinion = !canBlock(classes.get(step) ?? "opinion");

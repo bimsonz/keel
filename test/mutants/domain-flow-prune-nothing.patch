@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.steps-cited-and-pruned
+# why: Every step runs whatever the change touched
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 378e550..7f350fd 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -357,7 +357,7 @@ export const compile = (
+   if (first !== undefined) return Result.fail([first, ...rest]);
+ 
+   const reasons = new Map(used.map((id) => [id, applies(table.get(id) ?? humanClassStep, facts)] as const));
+-  const kept = new Set(used.filter((id) => reasons.get(id)?.applies === true));
++  const kept = new Set(used);
+   const touchesFlow = facts.touchedPaths.filter((p) => policy.humanClassPaths.some((g) => matchesGlob(g, p)));
+   const pruned = prune(flow, kept);
+   const gate: Flow = { _tag: "step", step: HUMAN_CLASS_STEP };

@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.structural-errors
+# why: A cascade may accept the absence of an answer
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 378e550..33d9bb9 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -120,7 +120,6 @@ const checkStructure = (
+           .flatMap(stepsIn)
+           .some((s) => (table.get(s)?.outcomes ?? []).some((o) => flow.accept.includes(o)));
+         if (!reachable) errors.push(new CascadeAcceptUnreachable({ accept: [...flow.accept] }));
+-        if (flow.accept.includes("abstain")) errors.push(new CascadeMayNotAcceptAbstain());
+       }
+       return { errors, ran };
+     }

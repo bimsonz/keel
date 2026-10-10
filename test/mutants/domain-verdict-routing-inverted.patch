@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/verdict.test.ts
+# kills: verdict.opinion-monotone
+# why: An annotation escalates, so a model saying more makes a change less scrutinised
+diff --git a/packages/core/src/domain/verification/verdict.ts b/packages/core/src/domain/verification/verdict.ts
+index 39d8d1b..00c2deb 100644
+--- a/packages/core/src/domain/verification/verdict.ts
++++ b/packages/core/src/domain/verification/verdict.ts
+@@ -88,8 +88,9 @@ const leaf = (ctx: Context, id: string, world: World | undefined): Value => {
+   if (r === undefined) return optional ? pass : { status: "pending", evidence: [], waiting: [id] };
+   switch (r.outcome) {
+     case "pass":
+-    case "annotate":
+       return { status: "pass", outcome: r.outcome, evidence: [r], waiting: [] };
++    case "annotate":
++      return { status: "escalate", outcome: r.outcome, evidence: [r], waiting: [] };
+     case "fail":
+       if (!canBlock(r.evidenceClass)) return { status: "escalate", outcome: r.outcome, evidence: [r], waiting: [] };
+       return ctx.overridden.has(id)

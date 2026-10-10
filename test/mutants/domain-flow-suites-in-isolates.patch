@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.tier-policy
+# why: Project suites are sent to isolates against the tier policy
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 378e550..1feb42e 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -284,7 +284,7 @@ const prune = (flow: Flow, keep: ReadonlySet<string>): Flow | undefined => {
+ const tierFor = (spec: StepSpec, policy: FlowPolicy): TierChoice => {
+   if (spec.tier !== undefined) return { tier: spec.tier, reason: "pinned by the project's flow spec" };
+   if (spec.kind === "human") return { tier: 0, reason: "a human decision: the workflow waits for the event" };
+-  if (spec.suite) return { tier: policy.suiteTier, reason: "policy: project suites run in containers" };
++  if (spec.suite) return { tier: policy.defaultTier, reason: "policy: project suites run in containers" };
+   return { tier: policy.defaultTier, reason: "policy: probes and pure checks run in isolates" };
+ };
+ 

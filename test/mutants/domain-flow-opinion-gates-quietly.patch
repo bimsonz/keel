@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.opinion-gates-only-add-scrutiny
+# why: A quiet model can switch checks off
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 378e550..be81b39 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -139,7 +139,7 @@ const checkStructure = (
+         const declared = table.get(step)?.outcomes ?? [];
+         const undeclared = outcomes.filter((o) => !declared.some((d) => d === o)).map((outcome) => new WhenOutcomeNotDeclared({ step, outcome }));
+         const opinion = !canBlock(classes.get(step) ?? "opinion");
+-        const quiets = opinion && (negated || outcomes.includes("annotate"));
++        const quiets = false;
+         return quiets ? [...undeclared, new WhenOnOpinionMayOnlyAddScrutiny({ step })] : undeclared;
+       });
+       const body = checkStructure(flow.body, table, classes, prior, worlds);

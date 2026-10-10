@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.spec-from-base
+# why: A change can bring its own checks
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 378e550..b646dd9 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -338,7 +338,7 @@ export const compile = (
+   policy: FlowPolicy = defaultFlowPolicy,
+ ): Result.Result<FlowPlan, readonly [CompileError, ...CompileError[]]> => {
+   const errors: CompileError[] = [];
+-  if (spec !== undefined && spec.commit !== facts.baseCommit) {
++  if (spec !== undefined && spec.commit.length === 0) {
+     errors.push(new SpecNotFromBase({ specCommit: spec.commit, baseCommit: facts.baseCommit }));
+   }
+   const table = new Map<string, StepSpec>();

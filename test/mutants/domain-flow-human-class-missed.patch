@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.human-class-when-flow-touched
+# why: Editing the flow itself needs no human
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 378e550..edf2426 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -49,7 +49,7 @@ import type { PlanStep } from "./plan.ts";
+ export const COMPILER_VERSION = "flow-compiler/1";
+ 
+ export const defaultFlowPolicy: FlowPolicy = {
+-  humanClassPaths: [Glob.make(".keel/flow*"), Glob.make(".keel/flow/**"), Glob.make(".keel/plugins/**")],
++  humanClassPaths: [Glob.make(".keel/plugins/**")],
+   suiteTier: 2,
+   defaultTier: 1,
+ };

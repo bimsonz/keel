@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.only-human-overrides
+# why: A deterministic step may override a fail
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index 378e550..585e1c7 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -228,7 +228,7 @@ const typeStep = (spec: StepSpec, effective: EvidenceClass, table: ReadonlyMap<s
+     if (skipped === undefined) errors.push(new UnknownStep({ step: target }));
+     else if (!decides && !skipped.optional) errors.push(new OpinionMaySkipOnlyOptional({ step: spec.id, target }));
+   }
+-  if (spec.overrides.length > 0 && spec.kind !== "human") errors.push(new OnlyHumanMayOverride({ step: spec.id, kind: spec.kind }));
++  if (spec.overrides.length > 0 && spec.kind === "deploy") errors.push(new OnlyHumanMayOverride({ step: spec.id, kind: spec.kind }));
+   for (const target of spec.overrides) if (!table.has(target)) errors.push(new UnknownStep({ step: target }));
+   return errors;
+ };
