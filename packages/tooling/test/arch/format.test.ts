@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import { repoRoot } from "../../src/scan.ts";
 
 const root = repoRoot(import.meta.dirname);
-const oxfmt = (...args: string[]) => spawnSync(join(root, "node_modules/.bin/oxfmt"), args, { cwd: root, encoding: "utf8" });
+const oxfmt = (...args: string[]) =>
+  spawnSync(join(root, "node_modules/.bin/oxfmt"), args, { cwd: root, encoding: "utf8" });
 
 /**
  * `pnpm format:check` (oxfmt) earns trust like every other check: its control
@@ -13,7 +14,12 @@ const oxfmt = (...args: string[]) => spawnSync(join(root, "node_modules/.bin/oxf
  */
 describe("format", () => {
   it("goes red on its control, naming the misformatted file", () => {
-    const run = oxfmt("--list-different", "-c", "test/controls/format/.oxfmtrc.json", "test/controls/format/misformatted.ts");
+    const run = oxfmt(
+      "--list-different",
+      "-c",
+      "test/controls/format/oxfmt.control.json",
+      "test/controls/format/misformatted.ts",
+    );
     expect(run.stdout.trim().split("\n")).toEqual(["test/controls/format/misformatted.ts"]);
     expect(run.status).toBe(1);
   });
