@@ -352,6 +352,12 @@ There was no `exceededMemory`, but given the section above, an `ok` doesn't show
 7. **Clocks.** Timings taken inside a DO need an I/O bracket. `performance.now()` alone across a child call under-reported a 4 s child as 24 ms. Tail `cpuTime` can exceed wall time for heavy suites.
 8. **`@vitest/expect` 5 runs unmodified in workerd** and gives byte-for-byte vitest messages. That makes a high-fidelity probe runner cheap to build.
 9. **Local `wrangler dev` enforces no limits.** It allowed 6 and 12 concurrent children and 400 MiB, and reports CPU 0.
+10. **What a fresh id costs.**
+    - The Dynamic Workers pricing page says a Dynamic Worker "is uniquely identified by its Worker ID and code". So a fresh id per proof run (finding 3) is a new unique Worker, billed at $0.002 per day.
+    - A proven conflict uses about 10 ids: the probe runs ×3 in each of A, B and A+B (the stability rule), plus one run on trunk. That comes to **about $0.02 per conflict** in unique-Worker charges, on top of CPU.
+    - Suites run in Tier 2 (the [go/no-go](#gono-go) below), so they add nothing here.
+    - Wasm tool isolates keep stable ids behind their DO, because they never run repo code ([S18](18-wasm-loader.md)).
+    - This is the figure the cost meter uses.
 
 ## Can-fail demonstrations
 
