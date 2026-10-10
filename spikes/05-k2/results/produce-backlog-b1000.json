@@ -1,0 +1,51 @@
+{
+ "run": "backlog-b1000",
+ "mode": "batch",
+ "batchSize": 1000,
+ "lanes": 1,
+ "producer": "p",
+ "hint": null,
+ "records": 20000,
+ "calls": 20,
+ "bytes": 6000000,
+ "avgRecordBytes": 300,
+ "startedAt": 1791665614036,
+ "doWallMs": 14486,
+ "localWallMs": 15046,
+ "recordsPerSecInDo": 1381,
+ "callLatencyMs": {
+  "n": 20,
+  "min": 459,
+  "p50": 517,
+  "p95": 988,
+  "p99": 2749,
+  "max": 2749,
+  "mean": 724.3
+ },
+ "errors": [],
+ "colos": [
+  "AMS"
+ ],
+ "lat": [
+  2749,
+  890,
+  937,
+  988,
+  973,
+  529,
+  926,
+  522,
+  510,
+  510,
+  488,
+  459,
+  502,
+  532,
+  472,
+  517,
+  468,
+  484,
+  541,
+  489
+ ]
+}

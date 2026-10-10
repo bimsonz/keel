@@ -1,0 +1,27 @@
+{
+ "subName": "keel-spike-05-chaos-dup",
+ "start": "earliest",
+ "created": {
+  "status": 200,
+  "ms": 415,
+  "k2Ms": 82,
+  "body": {
+   "result": {
+    "id": "<id1>"
+   },
+   "success": true,
+   "errors": [],
+   "messages": []
+  }
+ },
+ "cfg": {
+  "sub": "<id1>",
+  "workerId": "projector-chaos-dup",
+  "maxRecords": 1000,
+  "batchesPerAlarm": 1,
+  "chaos": "dup",
+  "maxBatches": 3,
+  "baselineFromFirst": false
+ },
+ "at": 1791665704173
+}

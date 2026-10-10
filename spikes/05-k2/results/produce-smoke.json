@@ -1,0 +1,48 @@
+{
+ "run": "smoke",
+ "mode": "single",
+ "batchSize": 1,
+ "records": 20,
+ "calls": 20,
+ "bytes": 6000,
+ "avgRecordBytes": 300,
+ "startedAt": 1791662178296,
+ "doWallMs": 11970,
+ "localWallMs": 12170,
+ "recordsPerSecInDo": 2,
+ "callLatencyMs": {
+  "n": 20,
+  "min": 442,
+  "p50": 491,
+  "p95": 798,
+  "p99": 2148,
+  "max": 2148,
+  "mean": 598.5
+ },
+ "errors": [],
+ "colos": [
+  "LHR"
+ ],
+ "lat": [
+  2148,
+  798,
+  469,
+  531,
+  533,
+  459,
+  491,
+  579,
+  449,
+  476,
+  489,
+  564,
+  442,
+  498,
+  584,
+  450,
+  484,
+  515,
+  477,
+  534
+ ]
+}

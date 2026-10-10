@@ -1,0 +1,27 @@
+{
+ "subName": "keel-spike-05-lag",
+ "start": "latest",
+ "created": {
+  "status": 200,
+  "ms": 782,
+  "k2Ms": 478,
+  "body": {
+   "result": {
+    "id": "<id1>"
+   },
+   "success": true,
+   "errors": [],
+   "messages": []
+  }
+ },
+ "cfg": {
+  "sub": "<id1>",
+  "workerId": "projector-lag",
+  "maxRecords": 1000,
+  "batchesPerAlarm": 1,
+  "chaos": "none",
+  "maxBatches": 0,
+  "baselineFromFirst": true
+ },
+ "at": 1791665964045
+}

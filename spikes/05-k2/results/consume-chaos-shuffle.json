@@ -1,0 +1,179 @@
+{
+ "subName": "keel-spike-05-chaos-shuffle",
+ "start": "earliest",
+ "stats": {
+  "colo": "AMS",
+  "cfg": {
+   "sub": "<id1>",
+   "workerId": "projector-chaos-shuffle",
+   "maxRecords": 1000,
+   "batchesPerAlarm": 1,
+   "chaos": "shuffle",
+   "maxBatches": 3,
+   "baselineFromFirst": false
+  },
+  "counters": {
+   "nudges": 1,
+   "armed": 1,
+   "alarms": 4,
+   "empty": 0,
+   "foreign": 0
+  },
+  "alarmPending": null,
+  "batches": 3,
+  "records": 3000,
+  "uniqueIds": 3000,
+  "totalObs": 3000,
+  "bytes": 1526979,
+  "spanMs": 4033,
+  "recordsPerSec": 744,
+  "busyRecordsPerSec": 754,
+  "batchSize": {
+   "n": 3,
+   "min": 1000,
+   "p50": 1000,
+   "p95": 1000,
+   "p99": 1000,
+   "max": 1000,
+   "mean": 1000
+  },
+  "consumeMs": {
+   "n": 3,
+   "min": 788,
+   "p50": 792,
+   "p95": 2105,
+   "p99": 2105,
+   "max": 2105,
+   "mean": 1228.33
+  },
+  "processAndAckMs": {
+   "n": 3,
+   "min": 95,
+   "p50": 100,
+   "p95": 100,
+   "p99": 100,
+   "max": 100,
+   "mean": 98.33
+  },
+  "gapBetweenBatchesMs": {
+   "n": 2,
+   "min": 25,
+   "p50": 25,
+   "p95": 28,
+   "p99": 28,
+   "max": 28,
+   "mean": 26.5
+  },
+  "ackNon200": 0,
+  "lag": {
+   "produceToConsume": {
+    "n": 3000,
+    "min": 84703,
+    "p50": 84729,
+    "p95": 86535,
+    "p99": 86535,
+    "max": 86535,
+    "mean": 85322.33
+   },
+   "produceToK2Timestamp": {
+    "n": 3000,
+    "min": 581,
+    "p50": 694,
+    "p95": 2431,
+    "p99": 2431,
+    "max": 2431,
+    "mean": 1235.33
+   },
+   "k2TimestampToConsume": {
+    "n": 3000,
+    "min": 84035,
+    "p50": 84104,
+    "p95": 84122,
+    "p99": 84122,
+    "max": 84122,
+    "mean": 84087
+   }
+  },
+  "findings": {
+   "gap": 385,
+   "regress": 2452
+  },
+  "firstFindings": [
+   {
+    "kind": "gap",
+    "id": "backlog-b1000:repo-037:5",
+    "entity": "repo-037",
+    "seq": 5,
+    "expected": 1,
+    "batch": 1
+   },
+   {
+    "kind": "gap",
+    "id": "backlog-b1000:repo-005:6",
+    "entity": "repo-005",
+    "seq": 6,
+    "expected": 1,
+    "batch": 1
+   },
+   {
+    "kind": "gap",
+    "id": "backlog-b1000:repo-034:18",
+    "entity": "repo-034",
+    "seq": 18,
+    "expected": 1,
+    "batch": 1
+   },
+   {
+    "kind": "gap",
+    "id": "backlog-b1000:repo-008:3",
+    "entity": "repo-008",
+    "seq": 3,
+    "expected": 1,
+    "batch": 1
+   },
+   {
+    "kind": "gap",
+    "id": "backlog-b1000:repo-005:9",
+    "entity": "repo-005",
+    "seq": 9,
+    "expected": 7,
+    "batch": 1
+   },
+   {
+    "kind": "gap",
+    "id": "backlog-b1000:repo-008:18",
+    "entity": "repo-008",
+    "seq": 18,
+    "expected": 4,
+    "batch": 1
+   },
+   {
+    "kind": "gap",
+    "id": "backlog-b1000:repo-027:8",
+    "entity": "repo-027",
+    "seq": 8,
+    "expected": 1,
+    "batch": 1
+   },
+   {
+    "kind": "gap",
+    "id": "backlog-b1000:repo-046:7",
+    "entity": "repo-046",
+    "seq": 7,
+    "expected": 1,
+    "batch": 1
+   }
+  ],
+  "events": [
+   {
+    "t": 1791665703002,
+    "kind": "max-batches",
+    "detail": "{\"done\":3}"
+   }
+  ],
+  "idleAt": null,
+  "firstStart": 1791665698948,
+  "lastAck": 1791665702981
+ },
+ "waitedMs": 4295
+}

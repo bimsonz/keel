@@ -1,0 +1,83 @@
+# S5 teardown 2 (second stream, after the consume runs), 2026-10-10 ~21:04Z: scripts/teardown.sh
+$ GET /token (is a consume token set on the Worker?)
+{
+ "consumeTokenSet": true
+}
+$ GET /subscriptions (before)
+["keel-spike-05-nack", "keel-spike-05-drain", "keel-spike-05-lease", "keel-spike-05-drain10k", "keel-spike-05-chaos-shuffle", "keel-spike-05-chaos-dup", "keel-spike-05-lag"]
+$ DELETE /subscriptions/<id> -> True
+$ DELETE /subscriptions/<id> -> True
+$ DELETE /subscriptions/<id> -> True
+$ DELETE /subscriptions/<id> -> True
+$ DELETE /subscriptions/<id> -> True
+$ DELETE /subscriptions/<id> -> True
+$ DELETE /subscriptions/<id> -> True
+$ GET /subscriptions (after)
+{"result":[],"success":true,"errors":[],"messages":[]}
+$ wrangler secret list (before)
+[
+  {
+    "name": "K2_CONSUME_TOKEN",
+    "type": "secret_text"
+  },
+  {
+    "name": "SPIKE_KEY",
+    "type": "secret_text"
+  }
+]
+$ wrangler secret delete K2_CONSUME_TOKEN
+
+? Are you sure you want to permanently delete the secret K2_CONSUME_TOKEN on the Worker keel-spike-05-log?
+🤖 Using fallback value in non-interactive context: yes
+🌀 Deleting the secret K2_CONSUME_TOKEN on the Worker keel-spike-05-log
+✨ Success! Deleted secret K2_CONSUME_TOKEN
+$ wrangler secret delete SPIKE_KEY
+
+? Are you sure you want to permanently delete the secret SPIKE_KEY on the Worker keel-spike-05-log?
+🤖 Using fallback value in non-interactive context: yes
+🌀 Deleting the secret SPIKE_KEY on the Worker keel-spike-05-log
+✨ Success! Deleted secret SPIKE_KEY
+$ wrangler secret list (after)
+[]
+$ wrangler queues consumer remove keel-spike-05-fallback keel-spike-05-log
+
+Removing consumer from queue keel-spike-05-fallback.
+Removed consumer from queue keel-spike-05-fallback.
+$ wrangler delete keel-spike-05-log --force
+
+Successfully deleted keel-spike-05-log
+
+
+$ wrangler queues delete keel-spike-05-fallback
+
+Deleting queue keel-spike-05-fallback.
+Deleted queue keel-spike-05-fallback.
+$ wrangler queues list | grep -c keel-spike-05 (after)
+0
+$ wrangler k2 streams delete <stream-id> --force
+
+▲ [WARNING] 🚧 `wrangler k2 streams delete` is an open beta command. Please report any issues to https://github.com/cloudflare/workers-sdk/issues/new/choose
+
+
+Successfully deleted K2 stream 'keel_spike_05_ops' (<id>).
+$ wrangler k2 streams list --json (after)
+[]
+$ wrangler k2 streams list --name keel_spike_05 --json (after)
+[]
+
+# Verification
+$ wrangler k2 streams list --json
+[]
+$ wrangler queues list | grep -c keel-spike-05
+0
+$ wrangler deployments list --name keel-spike-05-log
+✘ [ERROR] A request to the Cloudflare API (/accounts/<id>/workers/scripts/keel-spike-05-log/deployments) failed.
+  This Worker does not exist on your account. [code: 10007]
+$ wrangler secret list --name keel-spike-05-log
+✘ [ERROR] Worker "keel-spike-05-log" not found.
+$ GET /accounts/<acct>/workers/scripts -> names matching keel-spike-05
+249 scripts, 0 matching keel-spike-05 (success=True)
+$ GET /accounts/<acct>/workers/durable_objects/namespaces -> script keel-spike-05-log
+195 namespaces, 0 for keel-spike-05-log (success=True)
+$ curl https://keel-spike-05-log.<subdomain>.workers.dev/colo
+HTTP 404

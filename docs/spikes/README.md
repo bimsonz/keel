@@ -18,7 +18,7 @@ Spike code lives in `spikes/NN-slug/`. It is throwaway, and sits outside the pnp
 | S2 | [Forks](02-forks.md) | **Partial: go via pool** | 100 concurrent forks of one source succeed, unthrottled. Ready p95: 3.9 s at 1 MB, **7.2 s at 50 MB** (fails ≤ 5 s); 12–62 s at 300 MB. `repo.forked` untested | Pre-forked pool, refilled in parallel, with TTL clean-up |
 | S3 | [Shallow push](03-shallow-push.md) | **Pass: go with conditions** | A shallow push into an empty repo is accepted, but the shallow boundary is kept; each receive-pack request is capped at ~64 MiB | Full push only under 64 MiB, else chunked; shallow clones push only back to their source |
 | S4 | [Tier 2 container](04-tier2-container.md) | **Pass: go** | The token is injected at egress and absent from env, `/proc` and the filesystem. Cold start 0.57 s p50; warm verify (clone + merge-tree + 214 tests) 6.2 s p50; 10 concurrent in ~16 s; ~5.4 vCPU-s per suite on `standard-2` | None |
-| S5 | K2 | **Not run** | Blocked: the OAuth token lacks `k2.read`/`k2.write`, and there is no K2 consume token | — |
+| S5 | [K2](05-k2.md) | **Go with conditions** | Produce p99 1,411 ms pooled over 21,478 sends (one run's p99 was 2,749 ms, which fails); each `send()` costs a fixed ~400–500 ms. Consume reached 4,454 rec/s at `max_records` 10,000 (pass) but 1,108 at 1,000 (fail). Live lag p50 1.8 s; 0 order or duplicate findings; lease expiry and nack redeliver. The binding is produce-only; consume is HTTP with a token | Not taken: outbox in the same transaction, then batched sends from an alarm; the Projector pulls 10k at a time. The Queues fallback was measured, and it doesn't keep per-entity order |
 | S6 | [Push triggers](06-push-triggers.md) | **Pass: go** | Namespace `triggers.events`: 235/235 ref updates seen, 0 missed, 0 duplicated; p95 3.1 s; no activation gap. Per-repo subscriptions dropped 52 s of pushes | Per-repo subscriptions rejected; `submit` stays authoritative |
 | S8 | [Test harness](08-test-harness.md) | **Pass: go** | Every binding type Keel uses (D1, DO SQLite, Workflow, Queue, service binding, cross-script DO, R2, Effect) green in workerd, each with a seeded defect that goes red | None |
 | S9 | [Emitters](09-emitters.md) | **Go on the fallback** | One handler object serves REST and MCP with no casts; REST body = MCP `structuredContent` in the pool and live on staging. Negotiated shared routes untested (http-mcp 0.1) | 0.27/0.24/0.1/0.5; upgrade once newer releases are published |
@@ -42,7 +42,6 @@ Spike code lives in `spikes/NN-slug/`. It is throwaway, and sits outside the pnp
 
 ## Still open
 
-- **S5 (K2):** needs `wrangler login` with the K2 scopes, plus a K2 consume token.
 - **S16 (b):** calling the Previews REST API from inside a Worker with a per-Worker scoped token held in Secrets Store needs that token.
 - **S16 (a):** the `cand-<id>.<host>` wildcard form needs approval for the DNS change. The path form on workers.dev is measured.
 - **S2:** `repo.forked` event latency. The account-level `artifacts` event source already has its one allowed subscription, held by another workload.

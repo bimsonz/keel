@@ -1,0 +1,151 @@
+{
+ "sub": "<id1>",
+ "log": [
+  {
+   "t": 1791665649955,
+   "label": "subscription created (latest)",
+   "sub": "<id1>"
+  },
+  {
+   "t": 1791665652624,
+   "label": "produced 3 probe records"
+  },
+  {
+   "t": 1791665653384,
+   "label": "w1 consume max_records=1",
+   "status": 200,
+   "batch": "<id2>",
+   "leased_until_ms": 1791665953350,
+   "ids": [
+    "nack:p-probe/repo-000:1"
+   ]
+  },
+  {
+   "t": 1791665653779,
+   "label": "w1 consume again while holding the lease",
+   "status": 200,
+   "batch": "<id2>",
+   "sameBatch": true,
+   "leaseRefreshedByMs": 443,
+   "ids": [
+    "nack:p-probe/repo-000:1"
+   ]
+  },
+  {
+   "t": 1791665654457,
+   "label": "w2 consume max_records=10 while w1 holds its batch",
+   "status": 200,
+   "batch": "<id3>",
+   "ids": [
+    "nack:p-probe/repo-039:1",
+    "nack:p-probe/repo-029:1"
+   ]
+  },
+  {
+   "t": 1791665654599,
+   "label": "w1 nack its 1-record batch",
+   "status": 200,
+   "success": true,
+   "result": {},
+   "errors": [],
+   "k2Ms": 50
+  },
+  {
+   "t": 1791665654966,
+   "label": "w3 consume after the nack",
+   "status": 200,
+   "batch": "<id4>",
+   "newBatchId": true,
+   "ids": [
+    "nack:p-probe/repo-000:1"
+   ],
+   "redeliveredNackedRecord": true,
+   "msAfterNack": 367
+  },
+  {
+   "t": 1791665655021,
+   "label": "w3 ack",
+   "status": 200,
+   "success": true,
+   "result": {},
+   "errors": [],
+   "k2Ms": 40
+  },
+  {
+   "t": 1791665655158,
+   "label": "w2 ack",
+   "status": 200,
+   "success": true,
+   "result": {},
+   "errors": [],
+   "k2Ms": 41
+  },
+  {
+   "t": 1791665656276,
+   "label": "w4 consume",
+   "status": 200,
+   "batch": "<id5>",
+   "ids": [
+    "nack-intruder:p-probe/repo-046:1"
+   ]
+  },
+  {
+   "t": 1791665656329,
+   "label": "extend by a worker that does not hold the lease",
+   "status": 409,
+   "success": false,
+   "result": null,
+   "errors": [
+    {
+     "code": 10218,
+     "message": "Lease is no longer held by this worker"
+    }
+   ],
+   "k2Ms": 36
+  },
+  {
+   "t": 1791665656516,
+   "label": "extend by the lease holder",
+   "status": 200,
+   "success": true,
+   "result": {
+    "leased_until_ms": 1791665956521
+   },
+   "errors": [],
+   "k2Ms": 40
+  },
+  {
+   "t": 1791665656576,
+   "label": "ack by a worker that does not hold the lease",
+   "status": 200,
+   "success": true,
+   "result": {},
+   "errors": [],
+   "k2Ms": 39
+  },
+  {
+   "t": 1791665656980,
+   "label": "w4 consume after the intruder's ack",
+   "status": 200,
+   "batch": null,
+   "sameBatch": false,
+   "ids": []
+  },
+  {
+   "t": 1791665657104,
+   "label": "ack of an unknown batch id",
+   "status": 200,
+   "success": true,
+   "result": {},
+   "errors": [],
+   "k2Ms": 28
+  },
+  {
+   "t": 1791665657515,
+   "label": "final consume",
+   "status": 200,
+   "batch": null,
+   "ids": []
+  }
+ ]
+}

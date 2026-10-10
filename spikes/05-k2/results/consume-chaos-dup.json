@@ -1,0 +1,138 @@
+{
+ "subName": "keel-spike-05-chaos-dup",
+ "start": "earliest",
+ "stats": {
+  "colo": "LHR",
+  "cfg": {
+   "sub": "<id1>",
+   "workerId": "projector-chaos-dup",
+   "maxRecords": 1000,
+   "batchesPerAlarm": 1,
+   "chaos": "dup",
+   "maxBatches": 3,
+   "baselineFromFirst": false
+  },
+  "counters": {
+   "nudges": 1,
+   "armed": 1,
+   "alarms": 4,
+   "empty": 0,
+   "foreign": 0
+  },
+  "alarmPending": null,
+  "batches": 3,
+  "records": 3000,
+  "uniqueIds": 3000,
+  "totalObs": 3003,
+  "bytes": 1526979,
+  "spanMs": 2817,
+  "recordsPerSec": 1065,
+  "busyRecordsPerSec": 1079,
+  "batchSize": {
+   "n": 3,
+   "min": 1000,
+   "p50": 1000,
+   "p95": 1000,
+   "p99": 1000,
+   "max": 1000,
+   "mean": 1000
+  },
+  "consumeMs": {
+   "n": 3,
+   "min": 702,
+   "p50": 767,
+   "p95": 1152,
+   "p99": 1152,
+   "max": 1152,
+   "mean": 873.67
+  },
+  "processAndAckMs": {
+   "n": 3,
+   "min": 47,
+   "p50": 56,
+   "p95": 56,
+   "p99": 56,
+   "max": 56,
+   "mean": 53
+  },
+  "gapBetweenBatchesMs": {
+   "n": 2,
+   "min": 18,
+   "p50": 18,
+   "p95": 19,
+   "p99": 19,
+   "max": 19,
+   "mean": 18.5
+  },
+  "ackNon200": 0,
+  "lag": {
+   "produceToConsume": {
+    "n": 3003,
+    "min": 88844,
+    "p50": 88966,
+    "p95": 90874,
+    "p99": 90874,
+    "max": 90874,
+    "mean": 89561.33
+   },
+   "produceToK2Timestamp": {
+    "n": 3003,
+    "min": 581,
+    "p50": 694,
+    "p95": 2431,
+    "p99": 2431,
+    "max": 2431,
+    "mean": 1235.33
+   },
+   "k2TimestampToConsume": {
+    "n": 3003,
+    "min": 88150,
+    "p50": 88385,
+    "p95": 88443,
+    "p99": 88443,
+    "max": 88443,
+    "mean": 88326
+   }
+  },
+  "findings": {
+   "dup": 3
+  },
+  "firstFindings": [
+   {
+    "kind": "dup",
+    "id": "backlog-b1000:repo-032:1",
+    "entity": "repo-032",
+    "seq": 1,
+    "expected": 19,
+    "batch": 1
+   },
+   {
+    "kind": "dup",
+    "id": "backlog-b1000:repo-001:22",
+    "entity": "repo-001",
+    "seq": 22,
+    "expected": 44,
+    "batch": 2
+   },
+   {
+    "kind": "dup",
+    "id": "backlog-b1000:repo-009:42",
+    "entity": "repo-009",
+    "seq": 42,
+    "expected": 63,
+    "batch": 3
+   }
+  ],
+  "events": [
+   {
+    "t": 1791665707076,
+    "kind": "max-batches",
+    "detail": "{\"done\":3}"
+   }
+  ],
+  "idleAt": null,
+  "firstStart": 1791665704240,
+  "lastAck": 1791665707057
+ },
+ "waitedMs": 4217
+}

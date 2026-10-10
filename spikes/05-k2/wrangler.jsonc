@@ -1,0 +1,27 @@
+// keel-spike-05-log: a producer DO (LogProducer) that writes ops/audit records to
+// K2 through the `k2` binding, and a nudged, alarm-driven consumer DO (Projector)
+// that reads them back over HTTP with a K2 Consume token. The stream ID is filled
+// in by scripts/deploy.sh into wrangler.deploy.jsonc (gitignored).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "keel-spike-05-log",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "k2": [{ "binding": "OPS", "stream": "__STREAM_ID__" }],
+  "vars": { "K2_ENDPOINT": "https://__STREAM_ID__.k2.cloudflarestorage.com" },
+  "durable_objects": {
+    "bindings": [
+      { "name": "PRODUCER", "class_name": "LogProducer" },
+      { "name": "PROJECTOR", "class_name": "Projector" }
+    ]
+  },
+  // Fallback comparison: the same records through a Queue, consumed by this Worker.
+  "queues": {
+    "producers": [{ "binding": "FALLBACK_Q", "queue": "keel-spike-05-fallback" }],
+    "consumers": [{ "queue": "keel-spike-05-fallback", "max_batch_size": 100, "max_batch_timeout": 1 }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LogProducer", "Projector"] }]
+}

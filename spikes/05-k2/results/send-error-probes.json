@@ -1,0 +1,62 @@
+[
+ {
+  "case": "empty batch []",
+  "ms": 187,
+  "result": {
+   "success": false,
+   "error": {
+    "code": 10204,
+    "message": "Request body is invalid",
+    "retryable": false
+   }
+  }
+ },
+ {
+  "case": "one record of 1,000,001 bytes",
+  "ms": 14,
+  "result": {
+   "success": false,
+   "error": {
+    "code": 10207,
+    "message": "Individual record must not exceed 1 MB",
+    "retryable": false
+   }
+  }
+ },
+ {
+  "case": "6 records of 900,000 bytes (5.4 MB batch)",
+  "ms": 14,
+  "result": {
+   "success": false,
+   "error": {
+    "code": 10206,
+    "message": "Payload must not exceed 5 MB",
+    "retryable": false
+   }
+  }
+ },
+ {
+  "case": "string content",
+  "ms": 11,
+  "result": {
+   "success": false,
+   "error": {
+    "code": 10204,
+    "message": "Request body is invalid",
+    "retryable": false
+   }
+  }
+ },
+ {
+  "case": "33 headers on one record",
+  "ms": 12,
+  "result": {
+   "success": false,
+   "error": {
+    "code": 10204,
+    "message": "A record must not contain more than 32 headers",
+    "retryable": false
+   }
+  }
+ }
+]

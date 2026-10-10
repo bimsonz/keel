@@ -1,0 +1,4 @@
+# Event sources a Queue can subscribe to (wrangler 4.149.0). There is no k2 source:
+# K2 cannot push or notify; consumers must pull over HTTP.
+$ wrangler queues subscription create --help
+      --source            The event source type  [string] [required] [choices: "artifacts", "artifacts.repo", "browserRun", "email.sending", "images", "kv", "r2", "superSlurper", "vectorize", "workersAi.model", "workersBuilds.worker", "workflows.workflow"]

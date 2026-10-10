@@ -1,0 +1,41 @@
+{
+ "run": "b1000",
+ "mode": "batch",
+ "batchSize": 1000,
+ "lanes": 1,
+ "producer": "p",
+ "hint": null,
+ "records": 10000,
+ "calls": 10,
+ "bytes": 3000000,
+ "avgRecordBytes": 300,
+ "startedAt": 1791662578943,
+ "doWallMs": 6710,
+ "localWallMs": 6920,
+ "recordsPerSecInDo": 1490,
+ "callLatencyMs": {
+  "n": 10,
+  "min": 439,
+  "p50": 526,
+  "p95": 1020,
+  "p99": 1020,
+  "max": 1020,
+  "mean": 671
+ },
+ "errors": [],
+ "colos": [
+  "LHR"
+ ],
+ "lat": [
+  778,
+  526,
+  971,
+  483,
+  439,
+  446,
+  604,
+  1020,
+  963,
+  480
+ ]
+}

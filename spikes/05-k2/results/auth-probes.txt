@@ -1,0 +1,23 @@
+# Which credentials the stream endpoint accepts (2026-10-10, before the consume token existed).
+
+# 1. wrangler's OAuth login (scopes include k2.read and k2.write), piped from
+#    `wrangler auth token --json` into curl's header stdin so it is never printed:
+$ wrangler auth token --json | <extract token> | curl -H @- https://<stream-id>.k2.cloudflarestorage.com/subscriptions
+{"result":null,"success":false,"errors":[{"code":10210,"message":"Permission denied"}],"messages":[]}
+HTTP 403
+$ wrangler auth token --json | <extract type>
+type: oauth
+
+# 2. No Authorization header:
+$ curl https://<stream-id>.k2.cloudflarestorage.com/subscriptions
+{"result":null,"success":false,"errors":[{"code":10208,"message":"Authorization is required"}],"messages":[]}
+HTTP 401
+
+# 3. HTTP produce on a stream created with the HTTP input disabled (the wrangler default):
+$ curl -X POST -H 'content-type: application/json' --data '{"records":[{"content":"e30="}]}' https://<stream-id>.k2.cloudflarestorage.com/produce
+{"success":false,"error":{"code":10200,"message":"Stream does not exist","retryable":false}}
+HTTP 404
+
+# 4. Shape of `wrangler auth token --json` (values redacted; only field names and lengths):
+{"type": "<str len=5>", "token": "<str len=93>"}
+type value: oauth

@@ -1,0 +1,68 @@
+# S5 teardown, 2026-10-10 ~20:50Z. Pass 1: scripts/teardown.sh
+$ GET /token (is a consume token set on the Worker?)
+{
+ "consumeTokenSet": false
+}
+No consume token was ever set, so no subscription could have been created (subscriptions are a consume-plane call).
+$ wrangler secret list (before)
+[
+  {
+    "name": "SPIKE_KEY",
+    "type": "secret_text"
+  }
+]
+$ wrangler secret delete SPIKE_KEY
+✨ Success! Deleted secret SPIKE_KEY
+$ wrangler secret list (after)
+[]
+$ wrangler delete keel-spike-05-log --force
+(failed silently here: see pass 2)
+$ wrangler deployments list --name keel-spike-05-log (after)
+Version(s):  (100%) 185f86c8-1428-4ad8-bada-e62c65e3be86
+                 Created:  2026-10-10T20:50:33.150Z
+                     Tag:  -
+                 Message:  -
+$ wrangler queues delete keel-spike-05-fallback
+(failed silently here: see pass 2)
+$ wrangler queues list | grep -c keel-spike-05 (after)
+1
+$ wrangler k2 streams delete <stream-id> --force
+Successfully deleted K2 stream 'keel_spike_05_ops' (<id>).
+$ wrangler k2 streams list --json (after)
+[]
+$ wrangler k2 streams list --name keel_spike_05 --json (after)
+[]
+
+# The Worker and queue deletes in pass 1 failed: the Worker could not be deleted while it
+# was a queue consumer (10064), and the queue could not be deleted while a Worker bound it (11005). Pass 2:
+$ wrangler queues consumer remove keel-spike-05-fallback keel-spike-05-log
+Removing consumer from queue keel-spike-05-fallback.
+Removed consumer from queue keel-spike-05-fallback.
+$ wrangler queues delete keel-spike-05-fallback
+Deleting queue keel-spike-05-fallback.
+✘ [ERROR] A request to the Cloudflare API (/accounts/<id>/queues/<id>) failed.
+  Cannot delete queue 'keel-spike-05-fallback' that is still referenced by a binding in a Worker. Unbind queue 'keel-spike-05-fallback' from the Workers 'keel-spike-05-log'; then try again. [code: 11005]
+$ wrangler delete keel-spike-05-log --force
+Successfully deleted keel-spike-05-log
+$ wrangler queues delete keel-spike-05-fallback
+Deleting queue keel-spike-05-fallback.
+Deleted queue keel-spike-05-fallback.
+
+# Verification
+$ wrangler k2 streams list --json
+[]
+$ wrangler queues list | grep -c keel-spike-05
+0
+$ wrangler deployments list --name keel-spike-05-log
+✘ [ERROR] A request to the Cloudflare API (/accounts/<id>/workers/scripts/keel-spike-05-log/deployments) failed.
+  This Worker does not exist on your account. [code: 10007]
+$ wrangler secret list --name keel-spike-05-log
+✘ [ERROR] Worker "keel-spike-05-log" not found.
+  If this is a new Worker, run `wrangler deploy` first to create it.
+  Otherwise, check that the Worker name is correct and you're logged into the right account.
+$ GET /accounts/<acct>/workers/scripts -> names matching keel-spike-05
+251 scripts, 0 matching keel-spike-05 (success=True)
+$ GET /accounts/<acct>/workers/durable_objects/namespaces -> script keel-spike-05-log
+197 namespaces, 0 for keel-spike-05-log (success=True)
+$ curl https://keel-spike-05-log.<subdomain>.workers.dev/colo
+HTTP 404

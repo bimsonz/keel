@@ -1,0 +1,36 @@
+$ wrangler k2 streams create keel-spike-05-ops --retention-seconds 3600 --json
+✘ [ERROR] A request to the Cloudflare API (/accounts/<acct>/k2/streams) failed.
+  name: Entity name must be alphanumeric and contain only underscores. [code: 10204]
+
+$ wrangler k2 streams create keel_spike_05_ops --retention-seconds 3600 --json
+{
+    "id": "<stream-id>",
+    "name": "keel_spike_05_ops",
+    "retention_seconds": 3600,
+    "endpoint": "https://<stream-id>.k2.cloudflarestorage.com",
+    "http": {
+        "enabled": false
+    },
+    "worker_binding": {
+        "enabled": true
+    },
+    "created_at": "2026-10-10T19:49:34.537Z",
+    "modified_at": "2026-10-10T19:49:34.537Z"
+}
+
+# Second creation, after the first stream was torn down (same name, accepted immediately):
+$ wrangler k2 streams create keel_spike_05_ops --retention-seconds 3600 --json
+{
+    "id": "<stream-id-2>",
+    "name": "keel_spike_05_ops",
+    "retention_seconds": 3600,
+    "endpoint": "https://<stream-id-2>.k2.cloudflarestorage.com",
+    "http": {
+        "enabled": false
+    },
+    "worker_binding": {
+        "enabled": true
+    },
+    "created_at": "2026-10-10T20:52:46.929Z",
+    "modified_at": "2026-10-10T20:52:46.929Z"
+}

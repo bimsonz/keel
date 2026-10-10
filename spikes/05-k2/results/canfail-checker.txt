@@ -1,0 +1,18 @@
+$ node scripts/canfail-checker.ts
+ok   clean             records=10000 findings={} (want 0 findings)
+ok   shuffled          records=10000 findings={"gap":248,"regress":9703} (want regress and gap findings)
+ok   duplicated x3     records=10003 findings={"dup":3} (want exactly 3 dup findings)
+ok   adjacent swap x1  records=10000 findings={"gap":1,"regress":1} (want 1 gap + 1 regress)
+ok   dropped x1        records=9999 findings={"gap":1} (want exactly 1 gap)
+exit=0
+
+# Mutation: disable duplicate detection in src/check.ts (if (false && st.seen.has(r.id))), rerun, revert.
+$ node scripts/canfail-checker.ts   # with the mutation
+ok   clean             records=10000 findings={} (want 0 findings)
+ok   shuffled          records=10000 findings={"gap":264,"regress":9668} (want regress and gap findings)
+FAIL duplicated x3     records=10003 findings={"regress":3} (want exactly 3 dup findings)
+ok   adjacent swap x1  records=10000 findings={"gap":1,"regress":1} (want 1 gap + 1 regress)
+ok   dropped x1        records=9999 findings={"gap":1} (want exactly 1 gap)
+exit=1
+$ node scripts/canfail-checker.ts   # reverted
+exit=0

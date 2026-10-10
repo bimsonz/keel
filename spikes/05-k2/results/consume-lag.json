@@ -1,0 +1,105 @@
+{
+ "subName": "keel-spike-05-lag",
+ "start": "earliest",
+ "stats": {
+  "colo": "LHR",
+  "cfg": {
+   "sub": "<id1>",
+   "workerId": "projector-lag",
+   "maxRecords": 1000,
+   "batchesPerAlarm": 1,
+   "chaos": "none",
+   "maxBatches": 0,
+   "baselineFromFirst": true
+  },
+  "counters": {
+   "nudges": 10000,
+   "armed": 288,
+   "alarms": 290,
+   "empty": 87,
+   "foreign": 0
+  },
+  "alarmPending": null,
+  "batches": 203,
+  "records": 10000,
+  "uniqueIds": 10000,
+  "totalObs": 10000,
+  "bytes": 5029029,
+  "spanMs": 203204,
+  "recordsPerSec": 49,
+  "busyRecordsPerSec": 64,
+  "batchSize": {
+   "n": 203,
+   "min": 1,
+   "p50": 50,
+   "p95": 50,
+   "p99": 52,
+   "max": 62,
+   "mean": 49.26
+  },
+  "consumeMs": {
+   "n": 203,
+   "min": 587,
+   "p50": 696,
+   "p95": 906,
+   "p99": 1046,
+   "max": 1062,
+   "mean": 712.21
+  },
+  "processAndAckMs": {
+   "n": 203,
+   "min": 44,
+   "p50": 53,
+   "p95": 85,
+   "p99": 198,
+   "max": 604,
+   "mean": 62.24
+  },
+  "gapBetweenBatchesMs": {
+   "n": 202,
+   "min": 8,
+   "p50": 10,
+   "p95": 647,
+   "p99": 770,
+   "max": 966,
+   "mean": 227.68
+  },
+  "ackNon200": 0,
+  "lag": {
+   "produceToConsume": {
+    "n": 10000,
+    "min": 1061,
+    "p50": 1836,
+    "p95": 2205,
+    "p99": 2550,
+    "max": 2957,
+    "mean": 1827.22
+   },
+   "produceToK2Timestamp": {
+    "n": 10000,
+    "min": 396,
+    "p50": 957,
+    "p95": 1114,
+    "p99": 1230,
+    "max": 1990,
+    "mean": 956.56
+   },
+   "k2TimestampToConsume": {
+    "n": 10000,
+    "min": 503,
+    "p50": 880,
+    "p95": 1177,
+    "p99": 1306,
+    "max": 1580,
+    "mean": 870.67
+   }
+  },
+  "findings": {},
+  "firstFindings": [],
+  "events": [],
+  "idleAt": 1791666169585,
+  "firstStart": 1791665966049,
+  "lastAck": 1791666169253
+ },
+ "waitedMs": 2224
+}

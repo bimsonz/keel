@@ -1,0 +1,84 @@
+{
+ "sub": "<id1>",
+ "log": [
+  {
+   "t": 1791665658358,
+   "label": "subscription created (latest)",
+   "sub": "<id1>"
+  },
+  {
+   "t": 1791665660113,
+   "label": "produced 3 probe records"
+  },
+  {
+   "t": 1791665660877,
+   "label": "w1 consume, then never ack",
+   "status": 200,
+   "batch": "<id2>",
+   "ids": [
+    "lease:p-probe/repo-023:1",
+    "lease:p-probe/repo-020:1",
+    "lease:p-probe/repo-041:1"
+   ],
+   "leased_until_ms": 1791665960870,
+   "leaseMsFromLocalPull": 300757
+  },
+  {
+   "t": 1791665661339,
+   "label": "w2 consume immediately",
+   "status": 200,
+   "batch": null,
+   "ids": []
+  },
+  {
+   "t": 1791665961741,
+   "label": "w2 sees the records again",
+   "polls": 11,
+   "batch": "<id3>",
+   "newBatchId": true,
+   "ids": [
+    "lease:p-probe/repo-023:1",
+    "lease:p-probe/repo-020:1",
+    "lease:p-probe/repo-041:1"
+   ],
+   "sameRecords": true,
+   "msAfterLeasedUntil": 871,
+   "msAfterOriginalPull": 301628
+  },
+  {
+   "t": 1791665961890,
+   "label": "late ack by w1 of the expired batch",
+   "status": 200,
+   "success": true,
+   "result": {},
+   "errors": [],
+   "k2Ms": 31
+  },
+  {
+   "t": 1791665962252,
+   "label": "w2 consume after w1's late ack",
+   "batch": "<id3>",
+   "sameAsRedelivered": true,
+   "ids": [
+    "lease:p-probe/repo-023:1",
+    "lease:p-probe/repo-020:1",
+    "lease:p-probe/repo-041:1"
+   ]
+  },
+  {
+   "t": 1791665962404,
+   "label": "w2 ack",
+   "status": 200,
+   "success": true,
+   "result": {},
+   "errors": [],
+   "k2Ms": 38
+  },
+  {
+   "t": 1791665962749,
+   "label": "final consume",
+   "batch": null,
+   "ids": []
+  }
+ ]
+}

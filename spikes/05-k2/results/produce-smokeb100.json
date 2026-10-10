@@ -1,0 +1,33 @@
+{
+ "run": "smokeb100",
+ "mode": "batch",
+ "batchSize": 100,
+ "records": 500,
+ "calls": 5,
+ "bytes": 150000,
+ "avgRecordBytes": 300,
+ "startedAt": 1791662204567,
+ "doWallMs": 2768,
+ "localWallMs": 2950,
+ "recordsPerSecInDo": 181,
+ "callLatencyMs": {
+  "n": 5,
+  "min": 493,
+  "p50": 503,
+  "p95": 730,
+  "p99": 730,
+  "max": 730,
+  "mean": 553.6
+ },
+ "errors": [],
+ "colos": [
+  "LHR"
+ ],
+ "lat": [
+  730,
+  493,
+  503,
+  499,
+  543
+ ]
+}

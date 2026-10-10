@@ -1,0 +1,29 @@
+
+ ⛅️ wrangler 4.149.0
+────────────────────
+🌀 Creating queue 'keel-spike-05-fallback'
+✅ Created queue 'keel-spike-05-fallback'
+
+Configure your Worker to send messages to this queue:
+
+{
+  "queues": {
+    "producers": [
+      {
+        "queue": "keel-spike-05-fallback",
+        "binding": "keel_spike_05_fallback"
+      }
+    ]
+  }
+}
+Configure your Worker to consume messages from this queue:
+
+{
+  "queues": {
+    "consumers": [
+      {
+        "queue": "keel-spike-05-fallback"
+      }
+    ]
+  }
+}

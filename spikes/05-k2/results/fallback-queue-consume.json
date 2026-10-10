@@ -1,0 +1,87 @@
+{
+ "colo": "SEA",
+ "batches": 130,
+ "total": 11000,
+ "unique": 11000,
+ "firstProducedToLastConsumedMs": 50811,
+ "lag": {
+  "n": 11000,
+  "min": 147,
+  "p50": 438,
+  "p95": 1040,
+  "p99": 1421,
+  "max": 2262,
+  "mean": 524.18
+ },
+ "retried": 0,
+ "findings": {
+  "gap": 1055,
+  "regress": 3283
+ },
+ "firstFindings": [
+  {
+   "kind": "gap",
+   "id": "qb100:qb100/repo-007:12",
+   "entity": "qb100/repo-007",
+   "seq": 12,
+   "expected": 6,
+   "batch": 0
+  },
+  {
+   "kind": "gap",
+   "id": "qb100:qb100/repo-011:6",
+   "entity": "qb100/repo-011",
+   "seq": 6,
+   "expected": 2,
+   "batch": 0
+  },
+  {
+   "kind": "gap",
+   "id": "qb100:qb100/repo-019:10",
+   "entity": "qb100/repo-019",
+   "seq": 10,
+   "expected": 5,
+   "batch": 0
+  },
+  {
+   "kind": "gap",
+   "id": "qb100:qb100/repo-008:8",
+   "entity": "qb100/repo-008",
+   "seq": 8,
+   "expected": 2,
+   "batch": 0
+  },
+  {
+   "kind": "gap",
+   "id": "qb100:qb100/repo-014:6",
+   "entity": "qb100/repo-014",
+   "seq": 6,
+   "expected": 4,
+   "batch": 0
+  },
+  {
+   "kind": "gap",
+   "id": "qb100:qb100/repo-020:11",
+   "entity": "qb100/repo-020",
+   "seq": 11,
+   "expected": 5,
+   "batch": 0
+  },
+  {
+   "kind": "gap",
+   "id": "qb100:qb100/repo-003:6",
+   "entity": "qb100/repo-003",
+   "seq": 6,
+   "expected": 2,
+   "batch": 0
+  },
+  {
+   "kind": "gap",
+   "id": "qb100:qb100/repo-018:6",
+   "entity": "qb100/repo-018",
+   "seq": 6,
+   "expected": 1,
+   "batch": 0
+  }
+ ]
+}

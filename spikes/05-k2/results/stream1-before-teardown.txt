@@ -1,0 +1,32 @@
+$ wrangler k2 streams get <stream-id> --json
+{
+    "id": "<stream-id>",
+    "name": "keel_spike_05_ops",
+    "retention_seconds": 3600,
+    "endpoint": "https://<stream-id>.k2.cloudflarestorage.com",
+    "http": {
+        "enabled": false
+    },
+    "worker_binding": {
+        "enabled": true
+    },
+    "created_at": "2026-10-10T19:49:34.537Z",
+    "modified_at": "2026-10-10T19:49:34.537Z"
+}
+$ wrangler k2 streams list --json
+[
+    {
+        "id": "<stream-id>",
+        "name": "keel_spike_05_ops",
+        "retention_seconds": 3600,
+        "endpoint": "https://<stream-id>.k2.cloudflarestorage.com",
+        "http": {
+            "enabled": false
+        },
+        "worker_binding": {
+            "enabled": true
+        },
+        "created_at": "2026-10-10T19:49:34.537Z",
+        "modified_at": "2026-10-10T19:49:34.537Z"
+    }
+]

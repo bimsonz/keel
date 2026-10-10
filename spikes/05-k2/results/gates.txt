@@ -1,0 +1,29 @@
+$ node scripts/gates.ts   # produce p99 < 2000 ms, consume >= 2000 records/s
+PASS produce seq1k     p99 970 ms < 2000 ms (n=1000 calls, 1000 records)
+PASS produce single10k p99 1392 ms < 2000 ms (n=10000 calls, 10000 records)
+PASS produce b100      p99 774 ms < 2000 ms (n=100 calls, 10000 records)
+PASS produce b1000     p99 1020 ms < 2000 ms (n=10 calls, 10000 records)
+PASS produce b100x10   p99 1246 ms < 2000 ms (n=100 calls, 10000 records)
+FAIL produce backlog-b1000 p99 2749 ms < 2000 ms (n=20 calls, 20000 records)
+PASS produce backlog-b100x10 p99 965 ms < 2000 ms (n=100 calls, 10000 records)
+PASS produce lag       p99 1489 ms < 2000 ms (n=10000 calls, 10000 records)
+FAIL consume drain     1108 records/s >= 2000 (max_records 1000, 30007 records); order/dup findings {}
+PASS consume drain10k  4454 records/s >= 2000 (max_records 10000, 30007 records); order/dup findings {}
+PASS consume lag       order/dup findings {} (10000 records, 10000 unique)
+exit=1
+
+$ node scripts/gates.ts --produce-p99-ms 1   # can-fail: produce gate
+FAIL produce seq1k     p99 970 ms < 1 ms (n=1000 calls, 1000 records)
+FAIL produce single10k p99 1392 ms < 1 ms (n=10000 calls, 10000 records)
+FAIL produce b100      p99 774 ms < 1 ms (n=100 calls, 10000 records)
+FAIL produce b1000     p99 1020 ms < 1 ms (n=10 calls, 10000 records)
+FAIL produce b100x10   p99 1246 ms < 1 ms (n=100 calls, 10000 records)
+FAIL produce backlog-b1000 p99 2749 ms < 1 ms (n=20 calls, 20000 records)
+FAIL produce backlog-b100x10 p99 965 ms < 1 ms (n=100 calls, 10000 records)
+FAIL produce lag       p99 1489 ms < 1 ms (n=10000 calls, 10000 records)
+exit=1
+
+$ node scripts/gates.ts --consume-rps 1000000   # can-fail: consume gate
+FAIL consume drain     1108 records/s >= 1000000 (max_records 1000, 30007 records); order/dup findings {}
+FAIL consume drain10k  4454 records/s >= 1000000 (max_records 10000, 30007 records); order/dup findings {}
+exit=1

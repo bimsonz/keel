@@ -1,0 +1,31 @@
+{
+ "run": "smokeb1000",
+ "mode": "batch",
+ "batchSize": 1000,
+ "records": 3000,
+ "calls": 3,
+ "bytes": 900000,
+ "avgRecordBytes": 300,
+ "startedAt": 1791662207573,
+ "doWallMs": 1729,
+ "localWallMs": 1909,
+ "recordsPerSecInDo": 1735,
+ "callLatencyMs": {
+  "n": 3,
+  "min": 479,
+  "p50": 500,
+  "p95": 750,
+  "p99": 750,
+  "max": 750,
+  "mean": 576.33
+ },
+ "errors": [],
+ "colos": [
+  "LHR"
+ ],
+ "lat": [
+  750,
+  500,
+  479
+ ]
+}
