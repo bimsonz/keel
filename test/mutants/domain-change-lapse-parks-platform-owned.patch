@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.lapse-parks-agent-owned-only
+# why: The lease alarm parks a change the platform holds
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 8b58b69..f43fadb 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -573,7 +573,7 @@ export const decideChange = (
+         renewedAt: change.lease.renewedAt,
+       });
+       return Result.succeed(
+-        isAgentOwned(change.state)
++        !TERMINAL.has(change.state)
+           ? [lapsed, ChangeParked.make({ changeId: id, reason: "lease-lapsed" })]
+           : [lapsed],
+       );

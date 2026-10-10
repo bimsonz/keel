@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.decide-evolvable, change.transitions
+# why: decide queues a change whose plan is not compiled yet
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 8b58b69..af55618 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -465,7 +465,7 @@ export const decideChange = (
+         : refuse(change, command);
+ 
+     case "Queue":
+-      if (!at("verifying")) return refuse(change, command);
++      if (!at("verifying", "deriving")) return refuse(change, command);
+       return (
+         blocked(change, command.blockers) ??
+         Result.succeed([ChangeQueued.make({ changeId: id, laneId: command.laneId })])

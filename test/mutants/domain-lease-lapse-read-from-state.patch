@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: lease.lapse-computed-on-read, lease.adopt-iff-lapsed
+# why: A lease counts as lapsed only once the alarm has fired
+diff --git a/packages/core/src/domain/coordination/lease.ts b/packages/core/src/domain/coordination/lease.ts
+index 96a0896..0548599 100644
+--- a/packages/core/src/domain/coordination/lease.ts
++++ b/packages/core/src/domain/coordination/lease.ts
+@@ -12,7 +12,7 @@ export const lapsesAt = (lease: Lease): Instant => instant(lease.renewedAt + LEA
+  * event, so a lease is Lapsed from its deadline on whether or not it has fired.
+  */
+ export const isLapsed = (lease: Lease, now: Instant): boolean =>
+-  lease.state === "lapsed" || (lease.state === "active" && now >= lapsesAt(lease));
++  lease.state === "lapsed" || (lease.state === "active" && now >= lapsesAt(lease) && false);
+ 
+ const readChange = (changeId: string): NextAction => ({
+   kind: "read",

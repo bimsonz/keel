@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.blocked-never-batched
+# why: A queued change with a Proven conflict is batched anyway
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 8b58b69..15ebbcb 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -484,10 +484,7 @@ export const decideChange = (
+ 
+     case "Batch":
+       if (!at("queued")) return refuse(change, command);
+-      return (
+-        blocked(change, command.blockers) ??
+-        Result.succeed([ChangeBatched.make({ changeId: id, batchId: command.batchId })])
+-      );
++      return Result.succeed([ChangeBatched.make({ changeId: id, batchId: command.batchId })]);
+ 
+     case "Requeue":
+       return at("integrating") && command.batchId === change.batchId

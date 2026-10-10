@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.refusals-guide
+# why: A refused command leaves the agent with nothing to do next
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 8b58b69..5a7c83a 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -223,7 +223,7 @@ const refuse = (change: Change, command: ChangeCommand): Decision =>
+       changeId: change.id,
+       state: change.state,
+       command: command._tag,
+-      nextActions: [readChange(change.id)],
++      nextActions: [],
+     }),
+   );
+ 

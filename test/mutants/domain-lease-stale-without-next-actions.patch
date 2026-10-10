@@ -1,0 +1,21 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: lease.stale-refused
+# why: A stale token is refused without saying what to do next
+diff --git a/packages/core/src/domain/coordination/lease.ts b/packages/core/src/domain/coordination/lease.ts
+index 8a50958..98a00ac 100644
+--- a/packages/core/src/domain/coordination/lease.ts
++++ b/packages/core/src/domain/coordination/lease.ts
+@@ -47,12 +47,7 @@ export const checkLease = (
+     (change.lease.state !== "active" && change.lease.state !== "lapsed")
+   ) {
+     return Result.fail(
+-      new LeaseStale({
+-        changeId: change.id,
+-        leaseId,
+-        reason: "stale",
+-        nextActions: [readChange(change.id)],
+-      }),
++      new LeaseStale({ changeId: change.id, leaseId, reason: "stale", nextActions: [] }),
+     );
+   }
+   if (isLapsed(change.lease, now)) {
