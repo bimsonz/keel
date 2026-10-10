@@ -21,12 +21,17 @@ export type Batch = typeof Batch.Type;
 /** The largest batch a lane forms. */
 export const MAX_BATCH = 16;
 
-/** Batch size from the recent failure rate: N = clamp(ln 0.8 / ln(1 − p), 1, 16). */
+/**
+ * Batch size from the recent failure rate: N = clamp(ln 0.8 / ln(1 − p), 1, 16),
+ * the largest batch that still passes whole with probability 0.8. An unknown
+ * rate (NaN) is treated as the worst case. `log1p` keeps tiny rates exact:
+ * `1 − p` would round to 1 and divide by zero.
+ */
 export function batchSize(failureRate: number): number {
-  if (!(failureRate > 0)) return MAX_BATCH;
-  if (failureRate >= 1) return 1;
-  const n = Math.floor(Math.log(0.8) / Math.log(1 - failureRate));
-  return Math.min(MAX_BATCH, Math.max(1, n));
+  if (Number.isNaN(failureRate) || failureRate >= 1) return 1;
+  if (failureRate <= 0) return MAX_BATCH;
+  const n = Math.floor(Math.log(0.8) / Math.log1p(-failureRate));
+  return Number.isFinite(n) ? Math.min(MAX_BATCH, Math.max(1, n)) : MAX_BATCH;
 }
 
 export const PromotionState = Schema.Literals(["idle", "debouncing", "promoting", "frozen"]);
