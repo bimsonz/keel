@@ -5,7 +5,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { formatResult } from "../guard.ts";
-import { guards } from "../registry.ts";
+import { allChecks as guards } from "../registry.ts";
 import { repoRoot } from "../scan.ts";
 
 const root = repoRoot();
@@ -17,7 +17,7 @@ for (const guard of guards) {
     inert.push(guard.name);
     continue;
   }
-  const result = guard.run(control, {
+  const result = await guard.run(control, {
     skip: [],
     vacuity: { minFiles: 1, canary: guard.controlCanary },
   });

@@ -1,0 +1,8 @@
+{
+  "name": "@keeltown/console",
+  "private": true,
+  "dependencies": {
+    "@keeltown/core": "workspace:*",
+    "@keeltown/sdk": "workspace:*"
+  }
+}

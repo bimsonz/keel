@@ -13,7 +13,7 @@ Keel is an agent-first Git platform on Cloudflare Workers and Artifacts. Use the
 | `pnpm guards` | Workspace guards: nothing private in a public file |
 | `pnpm test` | vitest projects `unit` and `arch` (Node) |
 | `pnpm test:pool` | vitest projects `pool:*`: each Worker's tests inside workerd |
-| `pnpm tooling:controls` | Runs every guard against its control fixture; all must go red |
+| `pnpm tooling:controls` | Runs every guard and rule R1–R15 against its control fixture; all must go red |
 | `pnpm deploy:dry` | `wrangler deploy --dry-run` for every Worker |
 | `pnpm check` | All of the above, in CI order. Green `pnpm check` is the bar for every push |
 
@@ -27,7 +27,27 @@ One hexagon (`packages/core`), entered through several **doorways**: HTTP, MCP, 
 - Import core by subpath: `@keeltown/core/kernel` (the shared kernel: ids, evidence classes, hashes, globs, citations, the event envelope), `@keeltown/core/domain/<context>`, `@keeltown/core/application/<context>`, `@keeltown/core/ports`. The kernel imports no context; every context may import it.
 - Every port has an in-memory adapter and a contract suite in `@keeltown/testing` (`PORTS`). A real adapter registers the same suite with `PORTS.<Port>.contract("d1", makeLayer)`; a contract still marked `todo` is still to be written.
 
-The architecture rules (R1–R15) and guards run in `pnpm test` (project `arch`). Each one reports how many files it read and checks a canary, so a rule aimed at the wrong path fails instead of passing on nothing. When a rule goes **red**, fix the code.
+The architecture rules run in `pnpm guards` and in `pnpm test` (project `arch`), from `packages/tooling/src/arch`:
+
+| Rule | Holds |
+|---|---|
+| R1 | `domain/**` imports only the domain, and from `effect` only `Schema`, `Data`, `Brand`, `Option`, `Result`, `Match`, `Array`, `Order`, `Equal`, `Predicate`, `pipe` |
+| R2 | `application/**` imports only the domain, the application and `effect` |
+| R3 | Driving adapters never import driven adapters; they meet in `composition/` |
+| R4 | No import cycles; a context reaches another only through its `index.ts` (the kernel and the ports are open to all) |
+| R5 | `core` and `gitcore` import no `hono`, `zod`, `cloudflare:*`, `@cloudflare/*`, `agents` or MCP SDK |
+| R6 | `zod` only in generated code |
+| R7 | `cloudflare:workers` only in the DO and Workflow doorways and `composition/` |
+| R8 | Runtimes are built and run only in `composition/` and driving adapters; driving adapters never `forkDetach` or `runFork` |
+| R9 | Public consumers (console, examples, CLI, e2e) depend only on `contracts`, `sdk`, `workspace-git`, `cli` and MFP |
+| R10 | Keel's Workers import no agent runtime, MCP client or model SDK |
+| R11 | No `setInterval`; alarms only through `scheduleAlarm({ kind: "deadline" \| "debounce", reason })` |
+| R12 | Every layer folder exists and holds something |
+| R13 | Wrangler configs: one compatibility date, explicit `workers_dev`/`preview_urls`/`KEEL_HOST`, no `account_id`, every id a sentinel, `max_instances` on containers, no test-only bindings (bar `TEST_*`) |
+| R14 | No literal-against-literal assertions, no `.only` |
+| R15 | `src/rpc/**` imports only core domain types and `effect` |
+
+R1, R3 and R4 run twice: on oxc-parser import records and on ArchUnitTS's dependency graph, which must match at least as many files as the scan read. Every rule reports how many files it read and checks a canary, so a rule aimed at the wrong path fails instead of passing on nothing. Each has a control under `test/controls/R<n>/` that `pnpm tooling:controls` must turn red, for the reasons listed in the arch test. When a rule goes **red**, fix the code, not the rule. A change to a rule says why in its commit message and lands with its control.
 
 ## TypeSpec
 

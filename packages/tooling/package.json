@@ -15,5 +15,10 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "dependencies": {
+    "archunit": "catalog:",
+    "jsonc-parser": "catalog:",
+    "oxc-parser": "catalog:"
   }
 }

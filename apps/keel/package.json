@@ -26,6 +26,7 @@
     "@modelcontextprotocol/server": "catalog:",
     "hono": "catalog:",
     "zod": "catalog:",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "ulid": "catalog:"
   }
 }

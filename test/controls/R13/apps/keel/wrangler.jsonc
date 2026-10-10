@@ -1,0 +1,11 @@
+// Control for R13: an account id, a real-looking database id, no KEEL_HOST,
+// a container with no max_instances, and no workers_dev / preview_urls.
+{
+  "name": "keel",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "account_id": "0123456789abcdef0123456789abcdef",
+  "vars": {},
+  "d1_databases": [{ "binding": "DB", "database_name": "keel", "database_id": "4f1c2a9e-7b3d-4e8a-9c21-5d6e7f8a9b0c" }],
+  "containers": [{ "class_name": "MergeBox", "image": "./Dockerfile" }]
+}

@@ -23,6 +23,8 @@ export default defineConfig({
         test: {
           name: "arch",
           environment: "node",
+          // ArchUnitTS registers its matchers on import and needs vitest's globals to do it.
+          globals: true,
           include: ["packages/tooling/test/arch/**/*.test.ts"],
         },
       },
