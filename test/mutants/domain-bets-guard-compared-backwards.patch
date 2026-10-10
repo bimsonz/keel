@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/bets.test.ts
+# kills: bets.exactly-unguarded
+# why: Guarding is checked the wrong way round
+diff --git a/packages/core/src/domain/coordination/bets.ts b/packages/core/src/domain/coordination/bets.ts
+index 0e6b088..6f47c39 100644
+--- a/packages/core/src/domain/coordination/bets.ts
++++ b/packages/core/src/domain/coordination/bets.ts
+@@ -26,7 +26,7 @@ const isMust = (p: HeldPremise): boolean => (p.proposition.strength ?? "must") =
+ 
+ /** A guarded tenet that speaks for the premise's whole domain, inside what it relies on. */
+ const guarded = (premise: HeldPremise, tenets: readonly GuardedTenet[]): boolean =>
+-  tenets.some((t) => t.guards.length > 0 && compare(premise.proposition, t.proposition).outcome === "compatible");
++  tenets.some((t) => t.guards.length > 0 && compare(t.proposition, premise.proposition).outcome === "compatible");
+ 
+ /**
+  * `other` stands on `premise` when it fails whenever the premise does: a

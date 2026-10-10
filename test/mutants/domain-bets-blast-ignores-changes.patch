@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/bets.test.ts
+# kills: bets.blast-counts-standing
+# why: Blast forgets the live changes standing on the bet
+diff --git a/packages/core/src/domain/coordination/bets.ts b/packages/core/src/domain/coordination/bets.ts
+index 0e6b088..1b17bdf 100644
+--- a/packages/core/src/domain/coordination/bets.ts
++++ b/packages/core/src/domain/coordination/bets.ts
+@@ -57,7 +57,7 @@ export const rankBets = (
+     .map((premise): Bet => {
+       const standing = premises.filter((other) => standsOn(other, premise));
+       const changes = [...new Set(standing.map((p) => p.holder))];
+-      return { premise, blast: changes.length + standing.length, cost: costOf(premise), standing: { changes, premises: standing } };
++      return { premise, blast: standing.length, cost: costOf(premise), standing: { changes, premises: standing } };
+     })
+     .toSorted((a, b) => {
+       const byScore = b.blast / b.cost - a.blast / a.cost;
