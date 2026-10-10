@@ -1,0 +1,55 @@
+{
+ "timingFile": "sub3-timing.json",
+ "queue": "keel-spike-06-repo-q2",
+ "repo": "sc00",
+ "subCreateDone": 1791659559561,
+ "eventsFetchedAt": 1791659964884,
+ "activationGapSeconds": {
+  "lastDroppedPushAt": null,
+  "firstDeliveredPushAt": 1.3
+ },
+ "droppedBeforeActivation": 0,
+ "lateDeliveriesOfEarlyPushes": 0,
+ "rows": [
+  {
+   "i": 0,
+   "secondsAfterSubscription": 1.3,
+   "after": "724f94e4",
+   "queueEvents": 1,
+   "queueLatencyMs": 3792.5,
+   "queueBodyType": "object",
+   "triggerInstances": 1,
+   "triggerLatencyMs": 1530.5
+  },
+  {
+   "i": 1,
+   "secondsAfterSubscription": 12.8,
+   "after": "dfd1499e",
+   "queueEvents": 1,
+   "queueLatencyMs": 2710.5,
+   "queueBodyType": "object",
+   "triggerInstances": 1,
+   "triggerLatencyMs": 1770.5
+  },
+  {
+   "i": 2,
+   "secondsAfterSubscription": 24.1,
+   "after": "e1715eda",
+   "queueEvents": 1,
+   "queueLatencyMs": 1778.5,
+   "queueBodyType": "object",
+   "triggerInstances": 1,
+   "triggerLatencyMs": 1248.5
+  },
+  {
+   "i": 3,
+   "secondsAfterSubscription": 35.5,
+   "after": "39464ed5",
+   "queueEvents": 1,
+   "queueLatencyMs": 5107.5,
+   "queueBodyType": "object",
+   "triggerInstances": 1,
+   "triggerLatencyMs": 1160.5
+  }
+ ]
+}

@@ -1,0 +1,80 @@
+{
+ "phases": [
+  "fresh",
+  "spread",
+  "burst"
+ ],
+ "clockOffsetMs": 72,
+ "pushes": 200,
+ "repos": 50,
+ "instances": 204,
+ "matched": 195,
+ "missed": 5,
+ "missedPushes": [
+  {
+   "seq": 1791658754460,
+   "phase": "fresh",
+   "repo": "r00",
+   "after": "7462b4f4ba"
+  },
+  {
+   "seq": 1791658754461,
+   "phase": "fresh",
+   "repo": "r01",
+   "after": "03c1207cde"
+  },
+  {
+   "seq": 1791658754462,
+   "phase": "fresh",
+   "repo": "r02",
+   "after": "93d70615d3"
+  },
+  {
+   "seq": 1791658754463,
+   "phase": "fresh",
+   "repo": "r03",
+   "after": "60d38bcb94"
+  },
+  {
+   "seq": 1791658754464,
+   "phase": "fresh",
+   "repo": "r04",
+   "after": "ab0bdd7754"
+  }
+ ],
+ "duplicates": 0,
+ "duplicateDetail": [],
+ "unmatchedInstances": 9,
+ "latencyPushDoneToInstanceStartMs": {
+  "all": {
+   "n": 195,
+   "p50": 1463,
+   "p95": 2879,
+   "max": 6186
+  },
+  "fresh": {
+   "n": 45,
+   "p50": 1787,
+   "p95": 2727,
+   "max": 4525
+  },
+  "spread": {
+   "n": 100,
+   "p50": 1368,
+   "p95": 2225,
+   "max": 6186
+  },
+  "burst": {
+   "n": 50,
+   "p50": 1291,
+   "p95": 4512,
+   "max": 5301
+  }
+ },
+ "latencyPushDoneToInstanceCreatedMs": {
+  "n": 195,
+  "p50": 961,
+  "p95": 1641,
+  "max": 2820
+ }
+}

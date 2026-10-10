@@ -1,0 +1,1 @@
+✨ Successfully created event subscription 'keel-spike-06-sc00' with id '<id>'.

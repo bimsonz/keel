@@ -1,0 +1,56 @@
+{
+ "phases": [
+  "fresh",
+  "spread",
+  "burst"
+ ],
+ "clockOffsetMs": 72,
+ "pushes": 200,
+ "repos": 50,
+ "instances": 208,
+ "matched": 199,
+ "missed": 1,
+ "missedPushes": [
+  {
+   "seq": 1791658754460,
+   "phase": "fresh",
+   "repo": "r00",
+   "after": "7462b4f4ba"
+  }
+ ],
+ "duplicates": 0,
+ "duplicateDetail": [],
+ "unmatchedInstances": 9,
+ "latencyPushDoneToInstanceStartMs": {
+  "all": {
+   "n": 199,
+   "p50": 1498,
+   "p95": 3142,
+   "max": 6186
+  },
+  "fresh": {
+   "n": 49,
+   "p50": 1787,
+   "p95": 3416,
+   "max": 4895
+  },
+  "spread": {
+   "n": 100,
+   "p50": 1368,
+   "p95": 2225,
+   "max": 6186
+  },
+  "burst": {
+   "n": 50,
+   "p50": 1291,
+   "p95": 4512,
+   "max": 5301
+  }
+ },
+ "latencyPushDoneToInstanceCreatedMs": {
+  "n": 199,
+  "p50": 961,
+  "p95": 1641,
+  "max": 2820
+ }
+}

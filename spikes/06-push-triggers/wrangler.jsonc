@@ -1,0 +1,31 @@
+// keel-spike-06-trigger: a Workflow started by `triggers.events` on every
+// cf.artifacts.repo.pushed in namespace keel-spike-06, plus a Queue consumer for a
+// per-repo event subscription. database_id is filled in by scripts/deploy.sh into
+// wrangler.deploy.jsonc (gitignored).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "keel-spike-06-trigger",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "artifacts": [{ "binding": "ARTIFACTS", "namespace": "keel-spike-06" }],
+  "d1_databases": [{ "binding": "LOG", "database_name": "keel-spike-06-log", "database_id": "__D1_ID__" }],
+  "workflows": [{ "name": "keel-spike-06-push-wf", "binding": "PUSH_WF", "class_name": "PushEventWorkflow" }],
+  "triggers": {
+    "events": [
+      {
+        "type": "cf.artifacts.repo.pushed",
+        "filter": { "namespace": "keel-spike-06" },
+        "targets": [{ "type": "workflow", "workflow_name": "keel-spike-06-push-wf" }]
+      }
+    ]
+  },
+  "queues": {
+    "consumers": [
+      { "queue": "keel-spike-06-repo-q", "max_batch_size": 10, "max_batch_timeout": 1 },
+      { "queue": "keel-spike-06-repo-q2", "max_batch_size": 10, "max_batch_timeout": 1 }
+    ]
+  }
+}

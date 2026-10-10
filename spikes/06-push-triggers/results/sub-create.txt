@@ -1,0 +1,4 @@
+ ⛅️ wrangler 4.149.0
+────────────────────
+Creating event subscription for queue 'keel-spike-06-repo-q'...
+✨ Successfully created event subscription 'keel-spike-06-sub00' with id '<id>'.

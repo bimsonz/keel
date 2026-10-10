@@ -1,0 +1,58 @@
+{
+ "phases": [
+  "fresh",
+  "spread",
+  "burst"
+ ],
+ "clockOffsetMs": 72,
+ "pushes": 200,
+ "repos": 50,
+ "instances": 211,
+ "matched": 200,
+ "missed": 0,
+ "missedPushes": [],
+ "duplicates": 2,
+ "duplicateDetail": [
+  {
+   "push": 1791658754460,
+   "instances": 2
+  },
+  {
+   "push": 1791658754461,
+   "instances": 2
+  }
+ ],
+ "unmatchedInstances": 9,
+ "latencyPushDoneToInstanceStartMs": {
+  "all": {
+   "n": 200,
+   "p50": 1498,
+   "p95": 3142,
+   "max": 6186
+  },
+  "fresh": {
+   "n": 50,
+   "p50": 1787,
+   "p95": 4067,
+   "max": 4895
+  },
+  "spread": {
+   "n": 100,
+   "p50": 1368,
+   "p95": 2225,
+   "max": 6186
+  },
+  "burst": {
+   "n": 50,
+   "p50": 1291,
+   "p95": 4512,
+   "max": 5301
+  }
+ },
+ "latencyPushDoneToInstanceCreatedMs": {
+  "n": 200,
+  "p50": 959,
+  "p95": 1617,
+  "max": 2820
+ }
+}

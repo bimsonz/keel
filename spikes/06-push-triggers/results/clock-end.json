@@ -1,0 +1,37 @@
+{
+ "measuredAt": 1791659137216,
+ "best": {
+  "rtt": 23,
+  "offset": 21.5
+ },
+ "samples": [
+  {
+   "rtt": 141,
+   "offset": 75.5
+  },
+  {
+   "rtt": 175,
+   "offset": 93.5
+  },
+  {
+   "rtt": 23,
+   "offset": 21.5
+  },
+  {
+   "rtt": 28,
+   "offset": 22
+  },
+  {
+   "rtt": 25,
+   "offset": 20.5
+  },
+  {
+   "rtt": 29,
+   "offset": 21.5
+  },
+  {
+   "rtt": 24,
+   "offset": 21
+  }
+ ]
+}

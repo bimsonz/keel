@@ -1,0 +1,105 @@
+{
+ "timingFile": "sub-timing.json",
+ "queue": "keel-spike-06-repo-q",
+ "repo": "sub00",
+ "subCreateDone": 1791659247409,
+ "eventsFetchedAt": 1791659964884,
+ "activationGapSeconds": {
+  "lastDroppedPushAt": 52,
+  "firstDeliveredPushAt": 63.5
+ },
+ "droppedBeforeActivation": 5,
+ "lateDeliveriesOfEarlyPushes": 0,
+ "rows": [
+  {
+   "i": 0,
+   "secondsAfterSubscription": 5.6,
+   "after": "588291c7",
+   "queueEvents": 0,
+   "queueLatencyMs": null,
+   "queueBodyType": null,
+   "triggerInstances": 1,
+   "triggerLatencyMs": 1925.5
+  },
+  {
+   "i": 1,
+   "secondsAfterSubscription": 17.2,
+   "after": "798e7758",
+   "queueEvents": 0,
+   "queueLatencyMs": null,
+   "queueBodyType": null,
+   "triggerInstances": 1,
+   "triggerLatencyMs": 1215.5
+  },
+  {
+   "i": 2,
+   "secondsAfterSubscription": 28.8,
+   "after": "ebfefb68",
+   "queueEvents": 0,
+   "queueLatencyMs": null,
+   "queueBodyType": null,
+   "triggerInstances": 1,
+   "triggerLatencyMs": 1641.5
+  },
+  {
+   "i": 3,
+   "secondsAfterSubscription": 40.2,
+   "after": "064c698f",
+   "queueEvents": 0,
+   "queueLatencyMs": null,
+   "queueBodyType": null,
+   "triggerInstances": 1,
+   "triggerLatencyMs": 1477.5
+  },
+  {
+   "i": 4,
+   "secondsAfterSubscription": 52,
+   "after": "32a089b3",
+   "queueEvents": 0,
+   "queueLatencyMs": null,
+   "queueBodyType": null,
+   "triggerInstances": 1,
+   "triggerLatencyMs": 1512.5
+  },
+  {
+   "i": 5,
+   "secondsAfterSubscription": 63.5,
+   "after": "5d7f661e",
+   "queueEvents": 1,
+   "queueLatencyMs": 1789.5,
+   "queueBodyType": "object",
+   "triggerInstances": 1,
+   "triggerLatencyMs": 2034.5
+  },
+  {
+   "i": 6,
+   "secondsAfterSubscription": 75.4,
+   "after": "ab09fd83",
+   "queueEvents": 1,
+   "queueLatencyMs": 5458.5,
+   "queueBodyType": "object",
+   "triggerInstances": 1,
+   "triggerLatencyMs": 1092.5
+  },
+  {
+   "i": 7,
+   "secondsAfterSubscription": 87.5,
+   "after": "056ca628",
+   "queueEvents": 1,
+   "queueLatencyMs": 3843.5,
+   "queueBodyType": "object",
+   "triggerInstances": 1,
+   "triggerLatencyMs": 6304.5
+  },
+  {
+   "i": 8,
+   "secondsAfterSubscription": 98.9,
+   "after": "c55d13c5",
+   "queueEvents": 1,
+   "queueLatencyMs": 2906.5,
+   "queueBodyType": "object",
+   "triggerInstances": 1,
+   "triggerLatencyMs": 987.5
+  }
+ ]
+}
