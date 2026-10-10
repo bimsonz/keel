@@ -19,7 +19,9 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
   override async run(event: WorkflowEvent<PrecheckParams>, step: WorkflowStep) {
     const runtime = workflowRuntime(this.env);
     await step.do("derive", async () => {
-      const exit = await runtime.runPromiseExit(Effect.die(new NotImplemented(`precheck of ${event.payload.changeId}`)));
+      const exit = await runtime.runPromiseExit(
+        Effect.die(new NotImplemented(`precheck of ${event.payload.changeId}`)),
+      );
       if (Exit.isFailure(exit) && Cause.squash(exit.cause) instanceof NotImplemented) {
         throw new NonRetryableError("Precheck is not implemented yet");
       }

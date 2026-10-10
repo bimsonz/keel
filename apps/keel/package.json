@@ -3,34 +3,34 @@
   "version": "0.0.0",
   "private": true,
   "description": "The Keel control plane Worker",
-  "type": "module",
   "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "gen": "wrangler types --include-runtime=true --strict-vars=false",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "deploy:dry": "wrangler deploy --dry-run --outdir .wrangler/dry-run"
   },
-  "devDependencies": {
-    "@cloudflare/vitest-plugin": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:",
-    "wrangler": "catalog:",
-    "@effect/vitest": "catalog:",
-    "@keeltown/testing": "workspace:*"
-  },
-  "exports": {
-    ".": "./src/index.ts"
-  },
   "dependencies": {
+    "@cloudflare/ci": "catalog:",
     "@hono/zod-validator": "catalog:",
     "@keeltown/contracts": "workspace:*",
     "@keeltown/core": "workspace:*",
     "@modelcontextprotocol/server": "catalog:",
-    "hono": "catalog:",
-    "zod": "catalog:",
     "effect": "catalog:",
-    "ulid": "catalog:",
+    "hono": "catalog:",
     "jose": "catalog:",
-    "@cloudflare/ci": "catalog:"
+    "ulid": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "catalog:",
+    "@effect/vitest": "catalog:",
+    "@keeltown/testing": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
   }
 }

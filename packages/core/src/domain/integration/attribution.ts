@@ -8,7 +8,13 @@ export type Attribution = {
   readonly graphGap: boolean;
   readonly next:
     | { readonly _tag: "culprit"; readonly id: ChangeId }
-    | { readonly _tag: "leave-one-out"; readonly trials: readonly { readonly without: ChangeId; readonly members: readonly ChangeId[] }[] }
+    | {
+        readonly _tag: "leave-one-out";
+        readonly trials: readonly {
+          readonly without: ChangeId;
+          readonly members: readonly ChangeId[];
+        }[];
+      }
     | { readonly _tag: "none" };
 };
 
@@ -29,7 +35,10 @@ export const attribute = (failingCheck: string, members: readonly BatchMember[])
         ? { _tag: "culprit", id: only }
         : {
             _tag: "leave-one-out",
-            trials: suspects.map((without) => ({ without, members: members.map((m) => m.id).filter((id) => id !== without) })),
+            trials: suspects.map((without) => ({
+              without,
+              members: members.map((m) => m.id).filter((id) => id !== without),
+            })),
           };
   return { suspects, graphGap, next };
 };
@@ -47,7 +56,8 @@ export type Finding =
 export const interpretLeaveOneOut = (results: readonly LeaveOneOutResult[]): Finding => {
   const fixes = results.filter((r) => r.passed).map((r) => r.without);
   const [one] = fixes;
-  if (results.length >= 2 && fixes.length === results.length) return { _tag: "interaction", parties: [...fixes].toSorted() };
+  if (results.length >= 2 && fixes.length === results.length)
+    return { _tag: "interaction", parties: [...fixes].toSorted() };
   if (fixes.length === 1 && one !== undefined) return { _tag: "culprit", id: one };
   return { _tag: "inconclusive" };
 };

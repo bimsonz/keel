@@ -53,22 +53,38 @@ export const IntentRevised = Schema.TaggedStruct("IntentRevised", {
   premisesRetracted: Schema.Array(Proposition),
   declaredEffects: Schema.optional(Schema.Array(Proposition)),
 });
-export const PremiseRelied = Schema.TaggedStruct("PremiseRelied", { subjectId: SubjectId, changeId: ChangeId, premise: Proposition });
+export const PremiseRelied = Schema.TaggedStruct("PremiseRelied", {
+  subjectId: SubjectId,
+  changeId: ChangeId,
+  premise: Proposition,
+});
 export const ChangeSubmitted = Schema.TaggedStruct("ChangeSubmitted", {
   changeId: ChangeId,
   revision: Schema.Int,
   commitSha: CommitSha,
   workspaceId: WorkspaceId,
 });
-export const PrecheckStarted = Schema.TaggedStruct("PrecheckStarted", { changeId: ChangeId, revision: Schema.Int, instanceId: Schema.String });
+export const PrecheckStarted = Schema.TaggedStruct("PrecheckStarted", {
+  changeId: ChangeId,
+  revision: Schema.Int,
+  instanceId: Schema.String,
+});
 export const EffectsDerived = Schema.TaggedStruct("EffectsDerived", {
   changeId: ChangeId,
   revision: Schema.Int,
   effects: Schema.Array(DerivedEffect),
   derivationRef: Schema.String,
 });
-export const DriftDetected = Schema.TaggedStruct("DriftDetected", { changeId: ChangeId, revision: Schema.Int, drift: Schema.Array(Drift) });
-export const ChangeDrifted = Schema.TaggedStruct("ChangeDrifted", { changeId: ChangeId, revision: Schema.Int, blocking: Schema.Array(Drift) });
+export const DriftDetected = Schema.TaggedStruct("DriftDetected", {
+  changeId: ChangeId,
+  revision: Schema.Int,
+  drift: Schema.Array(Drift),
+});
+export const ChangeDrifted = Schema.TaggedStruct("ChangeDrifted", {
+  changeId: ChangeId,
+  revision: Schema.Int,
+  blocking: Schema.Array(Drift),
+});
 export const PlanCompiled = Schema.TaggedStruct("PlanCompiled", {
   changeId: ChangeId,
   revision: Schema.Int,
@@ -76,8 +92,14 @@ export const PlanCompiled = Schema.TaggedStruct("PlanCompiled", {
   steps: Schema.Int,
   costEstimate: Schema.Number,
 });
-export const ChangeQueued = Schema.TaggedStruct("ChangeQueued", { changeId: ChangeId, laneId: Schema.String });
-export const ChangeBatched = Schema.TaggedStruct("ChangeBatched", { changeId: ChangeId, batchId: BatchId });
+export const ChangeQueued = Schema.TaggedStruct("ChangeQueued", {
+  changeId: ChangeId,
+  laneId: Schema.String,
+});
+export const ChangeBatched = Schema.TaggedStruct("ChangeBatched", {
+  changeId: ChangeId,
+  batchId: BatchId,
+});
 export const ChangeRequeued = Schema.TaggedStruct("ChangeRequeued", {
   changeId: ChangeId,
   batchId: BatchId,
@@ -100,7 +122,10 @@ export const ChangeParked = Schema.TaggedStruct("ChangeParked", {
   reason: ParkReason,
   escalationId: Schema.optional(EscalationId),
 });
-export const ChangeResumed = Schema.TaggedStruct("ChangeResumed", { changeId: ChangeId, decisionId: DecisionId });
+export const ChangeResumed = Schema.TaggedStruct("ChangeResumed", {
+  changeId: ChangeId,
+  decisionId: DecisionId,
+});
 export const ChangeAdopted = Schema.TaggedStruct("ChangeAdopted", {
   changeId: ChangeId,
   previousAgentId: AgentId,
@@ -108,13 +133,21 @@ export const ChangeAdopted = Schema.TaggedStruct("ChangeAdopted", {
   leaseId: LeaseId,
   briefRef: Schema.String,
 });
-export const ChangeWithdrawn = Schema.TaggedStruct("ChangeWithdrawn", { changeId: ChangeId, by: Schema.String, reason: Schema.optional(Schema.String) });
+export const ChangeWithdrawn = Schema.TaggedStruct("ChangeWithdrawn", {
+  changeId: ChangeId,
+  by: Schema.String,
+  reason: Schema.optional(Schema.String),
+});
 export const ChangeSuperseded = Schema.TaggedStruct("ChangeSuperseded", {
   changeId: ChangeId,
   by: ChangeId,
   decisionId: Schema.optional(DecisionId),
 });
-export const LeaseLapsed = Schema.TaggedStruct("LeaseLapsed", { changeId: ChangeId, leaseId: LeaseId, renewedAt: InstantSchema });
+export const LeaseLapsed = Schema.TaggedStruct("LeaseLapsed", {
+  changeId: ChangeId,
+  leaseId: LeaseId,
+  renewedAt: InstantSchema,
+});
 
 // Subjects and premises
 
@@ -131,7 +164,11 @@ export const PremiseSuspected = Schema.TaggedStruct("PremiseSuspected", {
   premise: Proposition,
   cause: Schema.Struct({ changeId: ChangeId, effect: Proposition }),
 });
-export const PremiseReaffirmed = Schema.TaggedStruct("PremiseReaffirmed", { subjectId: SubjectId, changeId: ChangeId, premise: Proposition });
+export const PremiseReaffirmed = Schema.TaggedStruct("PremiseReaffirmed", {
+  subjectId: SubjectId,
+  changeId: ChangeId,
+  premise: Proposition,
+});
 
 // Sketches and workspaces
 
@@ -141,10 +178,20 @@ export const SketchOpened = Schema.TaggedStruct("SketchOpened", {
   workspaceId: WorkspaceId,
   expiresAt: InstantSchema,
 });
-export const SketchPromoted = Schema.TaggedStruct("SketchPromoted", { sketchId: SketchId, changeId: ChangeId });
+export const SketchPromoted = Schema.TaggedStruct("SketchPromoted", {
+  sketchId: SketchId,
+  changeId: ChangeId,
+});
 export const SketchExpired = Schema.TaggedStruct("SketchExpired", { sketchId: SketchId });
-export const SketchDiscarded = Schema.TaggedStruct("SketchDiscarded", { sketchId: SketchId, by: Schema.String });
-export const WorkspaceForked = Schema.TaggedStruct("WorkspaceForked", { workspaceId: WorkspaceId, repo: Schema.String, sourceRepo: Schema.String });
+export const SketchDiscarded = Schema.TaggedStruct("SketchDiscarded", {
+  sketchId: SketchId,
+  by: Schema.String,
+});
+export const WorkspaceForked = Schema.TaggedStruct("WorkspaceForked", {
+  workspaceId: WorkspaceId,
+  repo: Schema.String,
+  sourceRepo: Schema.String,
+});
 export const WorkspaceGranted = Schema.TaggedStruct("WorkspaceGranted", {
   workspaceId: WorkspaceId,
   holder: Schema.Union([ChangeId, SketchId]),
@@ -152,7 +199,11 @@ export const WorkspaceGranted = Schema.TaggedStruct("WorkspaceGranted", {
   /** The workspace's head when granted: the change's base. */
   baseSha: CommitSha,
 });
-export const WorkspacePushed = Schema.TaggedStruct("WorkspacePushed", { workspaceId: WorkspaceId, ref: Schema.String, sha: CommitSha });
+export const WorkspacePushed = Schema.TaggedStruct("WorkspacePushed", {
+  workspaceId: WorkspaceId,
+  ref: Schema.String,
+  sha: CommitSha,
+});
 export const WorkspaceCollected = Schema.TaggedStruct("WorkspaceCollected", {
   workspaceId: WorkspaceId,
   reason: Schema.Literals(["landed", "withdrawn", "expired"]),

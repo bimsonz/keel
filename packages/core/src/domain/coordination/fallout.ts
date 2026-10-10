@@ -10,7 +10,11 @@ export type FalloutTarget =
   | { readonly _tag: "premise"; readonly premise: HeldPremise }
   | { readonly _tag: "tenet"; readonly tenet: GuardedTenet };
 
-export type NotifyReason = "subject-touched" | "scope-disjoint" | "sibling-subject" | "shared-anchor";
+export type NotifyReason =
+  | "subject-touched"
+  | "scope-disjoint"
+  | "sibling-subject"
+  | "shared-anchor";
 
 /**
  * How a derived effect spreads to what relied on it.
@@ -51,12 +55,23 @@ const proximity = (relied: Proposition, effect: Proposition): NotifyReason | und
   return anchorPaths(relied).some((path) => paths.includes(path)) ? "shared-anchor" : undefined;
 };
 
-const classify = (target: FalloutTarget, relied: Proposition, effect: DerivedEffect, binding: boolean): Fallout | undefined => {
+const classify = (
+  target: FalloutTarget,
+  relied: Proposition,
+  effect: DerivedEffect,
+  binding: boolean,
+): Fallout | undefined => {
   const comparison = compare(relied, effect.proposition);
   switch (comparison.outcome) {
     case "contradicts":
       return binding
-        ? { _tag: "conflict", target, kind: "semantic", silentRetraction: !effect.declared, comparison }
+        ? {
+            _tag: "conflict",
+            target,
+            kind: "semantic",
+            silentRetraction: !effect.declared,
+            comparison,
+          }
         : { _tag: "suspect", target, comparison };
     case "compatible":
     case "refines":
@@ -85,5 +100,7 @@ export const fallout = (
       const binding = (premise.proposition.strength ?? "must") === "must";
       return classify({ _tag: "premise", premise }, premise.proposition, effect, binding) ?? [];
     }),
-  ...tenets.flatMap((tenet) => classify({ _tag: "tenet", tenet }, tenet.proposition, effect, true) ?? []),
+  ...tenets.flatMap(
+    (tenet) => classify({ _tag: "tenet", tenet }, tenet.proposition, effect, true) ?? [],
+  ),
 ];

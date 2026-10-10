@@ -15,7 +15,6 @@ export { KeelVerify } from "./adapters/driving/workflow/keel-verify.ts";
 export { Precheck } from "./adapters/driving/workflow/precheck.ts";
 export { PushObserved } from "./adapters/driving/workflow/push-observed.ts";
 
-
 export default {
   fetch(request, env, ctx): Response | Promise<Response> {
     return isolateFor(env).app.fetch(request, env, ctx);

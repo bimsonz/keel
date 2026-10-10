@@ -6,7 +6,16 @@
 // and wrangler's automatic provisioning is switched off, so nothing is ever
 // created behind Terraform's back (rule R13).
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { applyEdits, modify, parse, type ParseError, printParseErrorCode } from "jsonc-parser";
@@ -23,7 +32,8 @@ const NO_PROVISIONING = ["--no-x-provision", "--no-x-auto-create"];
 
 type Json = Record<string, unknown>;
 
-const isObject = (value: unknown): value is Json => typeof value === "object" && value !== null && !Array.isArray(value);
+const isObject = (value: unknown): value is Json =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 const objectsAt = (config: Json, key: string): Json[] => {
   const value = config[key];
   return Array.isArray(value) ? value.filter(isObject) : [];
@@ -37,14 +47,21 @@ function parseConfig(text: string, source: string): Json {
   const errors: ParseError[] = [];
   const config: unknown = parse(text, errors, { allowTrailingComma: true });
   if (errors.length > 0 || !isObject(config)) {
-    throw new Error(`${source}: not valid JSONC (${errors.map((e) => printParseErrorCode(e.error)).join(", ")})`);
+    throw new Error(
+      `${source}: not valid JSONC (${errors.map((e) => printParseErrorCode(e.error)).join(", ")})`,
+    );
   }
   return config;
 }
 
 function terraformOutputs(): Map<string, string> {
-  const run = spawnSync("terraform", [`-chdir=${join(root, "infra", environment)}`, "output", "-json"], { encoding: "utf8" });
-  if (run.status !== 0) throw new Error(`terraform output failed for ${environment}:\n${run.stderr}`);
+  const run = spawnSync(
+    "terraform",
+    [`-chdir=${join(root, "infra", environment)}`, "output", "-json"],
+    { encoding: "utf8" },
+  );
+  if (run.status !== 0)
+    throw new Error(`terraform output failed for ${environment}:\n${run.stderr}`);
   const raw: unknown = JSON.parse(run.stdout);
   const outputs = new Map<string, string>();
   if (isObject(raw)) {
@@ -59,17 +76,26 @@ function terraformOutputs(): Map<string, string> {
 function requireOutput(outputs: ReadonlyMap<string, string>, name: string, wanted: string): string {
   const value = outputs.get(name);
   if (value === undefined) {
-    throw new Error(`Terraform output ${name} (for ${wanted}) is missing in ${environment}; run \`node scripts/tf.ts ${environment} apply\`. Refusing to deploy, so wrangler cannot provision it.`);
+    throw new Error(
+      `Terraform output ${name} (for ${wanted}) is missing in ${environment}; run \`node scripts/tf.ts ${environment} apply\`. Refusing to deploy, so wrangler cannot provision it.`,
+    );
   }
   return value;
 }
 
 /** Writes apps/<dir>/wrangler.deploy.jsonc (gitignored) with the real ids and host filled in. */
-function render(dir: string, outputs: ReadonlyMap<string, string>, subdomain: string): { name: string; config: Json } {
+function render(
+  dir: string,
+  outputs: ReadonlyMap<string, string>,
+  subdomain: string,
+): { name: string; config: Json } {
   const source = `apps/${dir}/wrangler.jsonc`;
   let text = readFileSync(join(root, source), "utf8");
   const set = (path: (string | number)[], value: string) => {
-    text = applyEdits(text, modify(text, path, value, { formattingOptions: { insertSpaces: true, tabSize: 2 } }));
+    text = applyEdits(
+      text,
+      modify(text, path, value, { formattingOptions: { insertSpaces: true, tabSize: 2 } }),
+    );
   };
   const committed = parseConfig(text, source);
   const name = stringAt(committed, "name");
@@ -77,18 +103,27 @@ function render(dir: string, outputs: ReadonlyMap<string, string>, subdomain: st
 
   for (const [index, database] of objectsAt(committed, "d1_databases").entries()) {
     const databaseName = stringAt(database, "database_name");
-    if (databaseName !== `keel-${environment}`) throw new Error(`${source}: no Terraform output holds the id of D1 database ${databaseName}`);
-    set(["d1_databases", index, "database_id"], requireOutput(outputs, "d1_database_id", `D1 ${databaseName}`));
+    if (databaseName !== `keel-${environment}`)
+      throw new Error(`${source}: no Terraform output holds the id of D1 database ${databaseName}`);
+    set(
+      ["d1_databases", index, "database_id"],
+      requireOutput(outputs, "d1_database_id", `D1 ${databaseName}`),
+    );
   }
   for (const [index, secret] of objectsAt(committed, "secrets_store_secrets").entries()) {
-    set(["secrets_store_secrets", index, "store_id"], requireOutput(outputs, "secrets_store_id", `secret ${stringAt(secret, "secret_name")}`));
+    set(
+      ["secrets_store_secrets", index, "store_id"],
+      requireOutput(outputs, "secrets_store_id", `secret ${stringAt(secret, "secret_name")}`),
+    );
   }
   set(["vars", "KEEL_HOST"], `${name}.${subdomain}.workers.dev`);
 
   const rendered = parseConfig(text, `apps/${dir}/wrangler.deploy.jsonc`);
   const leftover = SENTINEL.exec(JSON.stringify(rendered));
   if (leftover !== null) {
-    throw new Error(`${source}: sentinel ${leftover[0]} survives rendering. Refusing to deploy: wrangler would provision a resource behind Terraform's back.`);
+    throw new Error(
+      `${source}: sentinel ${leftover[0]} survives rendering. Refusing to deploy: wrangler would provision a resource behind Terraform's back.`,
+    );
   }
   writeFileSync(join(root, "apps", dir, "wrangler.deploy.jsonc"), text);
   return { name, config: rendered };
@@ -99,13 +134,18 @@ async function verifyStores(name: string, config: Json): Promise<void> {
   for (const bucket of objectsAt(config, "r2_buckets")) {
     const bucketName = stringAt(bucket, "bucket_name") ?? "";
     await cloudflare("GET", `/r2/buckets/${bucketName}`).catch((error: unknown) => {
-      throw new Error(`${name}: R2 bucket ${bucketName} does not exist; declare it in infra/${environment}`, { cause: error });
+      throw new Error(
+        `${name}: R2 bucket ${bucketName} does not exist; declare it in infra/${environment}`,
+        { cause: error },
+      );
     });
   }
   for (const database of objectsAt(config, "d1_databases")) {
     const id = stringAt(database, "database_id") ?? "";
     await cloudflare("GET", `/d1/database/${id}`).catch((error: unknown) => {
-      throw new Error(`${name}: D1 database ${id} does not exist; re-run Terraform`, { cause: error });
+      throw new Error(`${name}: D1 database ${id} does not exist; re-run Terraform`, {
+        cause: error,
+      });
     });
   }
 }
@@ -134,11 +174,16 @@ async function signingKey(): Promise<string> {
  */
 async function secretsFor(name: string, config: Json): Promise<Record<string, string>> {
   const secrets = isObject(config["secrets"]) ? config["secrets"]["required"] : undefined;
-  const required = Array.isArray(secrets) ? secrets.filter((s): s is string => typeof s === "string") : [];
+  const required = Array.isArray(secrets)
+    ? secrets.filter((s): s is string => typeof s === "string")
+    : [];
   const existing = new Set<string>();
   if (required.length > 0 && (await workerExists(name))) {
-    const listed: unknown = JSON.parse(wrangler(["secret", "list", "--name", name, "--format", "json"], { quiet: true }));
-    for (const secret of Array.isArray(listed) ? listed.filter(isObject) : []) existing.add(stringAt(secret, "name") ?? "");
+    const listed: unknown = JSON.parse(
+      wrangler(["secret", "list", "--name", name, "--format", "json"], { quiet: true }),
+    );
+    for (const secret of Array.isArray(listed) ? listed.filter(isObject) : [])
+      existing.add(stringAt(secret, "name") ?? "");
   }
   const values: Record<string, string> = {};
   for (const secret of required) {
@@ -152,7 +197,9 @@ async function secretsFor(name: string, config: Json): Promise<Record<string, st
         console.log(`${name}: KEEL_SIGNING_KEY generated (the Worker had none)`);
       }
     } else {
-      throw new Error(`${name} requires secret ${secret}, and scripts/deploy.ts has no source for it`);
+      throw new Error(
+        `${name} requires secret ${secret}, and scripts/deploy.ts has no source for it`,
+      );
     }
   }
   return values;
@@ -173,8 +220,14 @@ function containerBuildEnv(scratch: string): Record<string, string> {
   writeFileSync(join(config, "config.json"), "{}");
   const plugins = join(homedir(), ".docker", "cli-plugins");
   if (existsSync(plugins)) symlinkSync(plugins, join(config, "cli-plugins"));
-  const host = execFileSync("docker", ["context", "inspect", "--format", "{{.Endpoints.docker.Host}}"], { encoding: "utf8" }).trim();
-  const path = (process.env["PATH"] ?? "").split(delimiter).filter((dir) => !existsSync(join(dir, "docker-credential-osxkeychain")));
+  const host = execFileSync(
+    "docker",
+    ["context", "inspect", "--format", "{{.Endpoints.docker.Host}}"],
+    { encoding: "utf8" },
+  ).trim();
+  const path = (process.env["PATH"] ?? "")
+    .split(delimiter)
+    .filter((dir) => !existsSync(join(dir, "docker-credential-osxkeychain")));
   return { PATH: [bin, ...path].join(delimiter), DOCKER_CONFIG: config, DOCKER_HOST: host };
 }
 
@@ -187,7 +240,9 @@ if (subdomain === undefined) throw new Error("The account has no workers.dev sub
 const rendered = APPS.map((dir) => ({ dir, ...render(dir, outputs, subdomain) }));
 for (const app of rendered) await verifyStores(app.name, app.config);
 if (checkOnly) {
-  console.log(`${environment}: every config rendered with no sentinel left, and every bound store exists`);
+  console.log(
+    `${environment}: every config rendered with no sentinel left, and every bound store exists`,
+  );
   process.exit(0);
 }
 
@@ -197,11 +252,16 @@ try {
     const cwd = join(root, "apps", app.dir);
     const args = ["deploy", "-c", "wrangler.deploy.jsonc", ...NO_PROVISIONING];
     if (objectsAt(app.config, "d1_databases").length > 0) {
-      wrangler(["d1", "migrations", "apply", "DB", "--remote", "-c", "wrangler.deploy.jsonc"], { cwd, stream: true });
+      wrangler(["d1", "migrations", "apply", "DB", "--remote", "-c", "wrangler.deploy.jsonc"], {
+        cwd,
+        stream: true,
+      });
     }
     const secrets = await secretsFor(app.name, app.config);
     const containers = objectsAt(app.config, "containers").length > 0;
-    console.log(`\n== ${app.name}: deploying${containers ? " (building its container image)" : ""}`);
+    console.log(
+      `\n== ${app.name}: deploying${containers ? " (building its container image)" : ""}`,
+    );
     wrangler(Object.keys(secrets).length > 0 ? [...args, "--secrets-file", "/dev/stdin"] : args, {
       cwd,
       stream: true,

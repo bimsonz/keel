@@ -13,7 +13,13 @@ import {
 } from "../../domain/identity/index.ts";
 import type { Session } from "../../domain/memory/index.ts";
 import { stub } from "../not-implemented.ts";
-import { AgentDirectory, type Clock, type Ids, type IssuedToken, TokenIssuer } from "../ports/index.ts";
+import {
+  AgentDirectory,
+  type Clock,
+  type Ids,
+  type IssuedToken,
+  TokenIssuer,
+} from "../ports/index.ts";
 
 /** identity use-cases. `whoami` and `exchangeToken` are the exemplar for the rest. */
 
@@ -29,7 +35,9 @@ function refusal(agent: Agent, principal: Principal | null): AgentNotAdmitted["r
  * Who the caller is: the agent behind a verified token, if it may still act.
  * The token's revocation epoch must match the agent's current one.
  */
-export const whoami: (principal: Principal) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted, AgentDirectory> = Effect.fn(
+export const whoami: (
+  principal: Principal,
+) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted, AgentDirectory> = Effect.fn(
   "identity/whoami",
 )(function* (principal: Principal) {
   const directory = yield* AgentDirectory;
@@ -58,24 +66,35 @@ export const TOKEN_TTL_SECONDS = 3600;
 /** Exchanges a client credential for a short-lived bearer token carrying the agent's current epoch. */
 export const exchangeToken: (
   request: TokenRequest,
-) => Effect.Effect<GrantedToken, CredentialRejected | ScopeNotGranted | AgentNotAdmitted, AgentDirectory | TokenIssuer | Clock> =
-  Effect.fn("identity/exchangeToken")(function* (request: TokenRequest) {
-    const directory = yield* AgentDirectory;
-    const agentId = yield* directory.verifyCredential(request.clientId, request.clientSecret);
-    if (Option.isNone(agentId)) return yield* new CredentialRejected();
-    const agent = yield* directory.findAgent(agentId.value);
-    // A credential whose agent has gone is as good as a wrong secret.
-    if (Option.isNone(agent)) return yield* new CredentialRejected();
-    const reason = refusal(agent.value, null);
-    if (reason !== null) return yield* new AgentNotAdmitted({ agentId: agent.value.id, reason });
-    const held = new Set(agent.value.scopes);
-    const scopes = request.scopes ?? agent.value.scopes;
-    const missing = scopes.filter((scope) => !held.has(scope));
-    if (missing.length > 0) return yield* new ScopeNotGranted({ requested: missing });
-    const issuer = yield* TokenIssuer;
-    const token = yield* issuer.issue({ agentId: agent.value.id, projectId: agent.value.projectId, scopes, revocationEpoch: agent.value.revocationEpoch }, TOKEN_TTL_SECONDS);
-    return { ...token, scopes };
-  });
+) => Effect.Effect<
+  GrantedToken,
+  CredentialRejected | ScopeNotGranted | AgentNotAdmitted,
+  AgentDirectory | TokenIssuer | Clock
+> = Effect.fn("identity/exchangeToken")(function* (request: TokenRequest) {
+  const directory = yield* AgentDirectory;
+  const agentId = yield* directory.verifyCredential(request.clientId, request.clientSecret);
+  if (Option.isNone(agentId)) return yield* new CredentialRejected();
+  const agent = yield* directory.findAgent(agentId.value);
+  // A credential whose agent has gone is as good as a wrong secret.
+  if (Option.isNone(agent)) return yield* new CredentialRejected();
+  const reason = refusal(agent.value, null);
+  if (reason !== null) return yield* new AgentNotAdmitted({ agentId: agent.value.id, reason });
+  const held = new Set(agent.value.scopes);
+  const scopes = request.scopes ?? agent.value.scopes;
+  const missing = scopes.filter((scope) => !held.has(scope));
+  if (missing.length > 0) return yield* new ScopeNotGranted({ requested: missing });
+  const issuer = yield* TokenIssuer;
+  const token = yield* issuer.issue(
+    {
+      agentId: agent.value.id,
+      projectId: agent.value.projectId,
+      scopes,
+      revocationEpoch: agent.value.revocationEpoch,
+    },
+    TOKEN_TTL_SECONDS,
+  );
+  return { ...token, scopes };
+});
 
 export interface EnrolRequest {
   readonly name: string;
@@ -90,8 +109,9 @@ export interface Enrolled {
   readonly clientSecret: string;
 }
 
-export const enrolAgent: (request: EnrolRequest) => Effect.Effect<Enrolled, never, AgentDirectory | Ids | Clock> =
-  stub("identity/enrolAgent");
+export const enrolAgent: (
+  request: EnrolRequest,
+) => Effect.Effect<Enrolled, never, AgentDirectory | Ids | Clock> = stub("identity/enrolAgent");
 
 export const openSession: (
   principal: Principal,

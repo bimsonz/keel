@@ -1,7 +1,15 @@
 import { Result } from "effect";
 import type { Anchor } from "../kernel/index.ts";
 import { UnreadableProposition } from "./errors.ts";
-import type { Authority, Bound, Cardinality, ClaimRelation, Consistency, Freshness, Ordering } from "./lattice.ts";
+import type {
+  Authority,
+  Bound,
+  Cardinality,
+  ClaimRelation,
+  Consistency,
+  Freshness,
+  Ordering,
+} from "./lattice.ts";
 import type { Predicate, Proposition, Strength, SubjectKey } from "./proposition.ts";
 import { readScope, type Scope, writeScope } from "./scope.ts";
 import { readShape, type Shape } from "./shape.ts";
@@ -9,14 +17,30 @@ import { readShape, type Shape } from "./shape.ts";
 /** A predicate paired with the value domain it compares over. */
 export type Claim =
   | { readonly predicate: "freshness"; readonly relation: ClaimRelation; readonly value: Freshness }
-  | { readonly predicate: "cardinality"; readonly relation: ClaimRelation; readonly value: Cardinality }
-  | { readonly predicate: "consistency"; readonly relation: ClaimRelation; readonly value: Consistency }
+  | {
+      readonly predicate: "cardinality";
+      readonly relation: ClaimRelation;
+      readonly value: Cardinality;
+    }
+  | {
+      readonly predicate: "consistency";
+      readonly relation: ClaimRelation;
+      readonly value: Consistency;
+    }
   | { readonly predicate: "bound"; readonly relation: ClaimRelation; readonly value: Bound }
   | { readonly predicate: "presence"; readonly relation: "is" | "not"; readonly value: boolean }
   | { readonly predicate: "purity"; readonly relation: "is" | "not"; readonly value: boolean }
   | { readonly predicate: "idempotent"; readonly relation: "is" | "not"; readonly value: boolean }
-  | { readonly predicate: "authority"; readonly relation: "is" | "at-most" | "at-least"; readonly value: Authority }
-  | { readonly predicate: "shape"; readonly relation: "is" | "at-most" | "at-least"; readonly value: Shape }
+  | {
+      readonly predicate: "authority";
+      readonly relation: "is" | "at-most" | "at-least";
+      readonly value: Authority;
+    }
+  | {
+      readonly predicate: "shape";
+      readonly relation: "is" | "at-most" | "at-least";
+      readonly value: Shape;
+    }
   | { readonly predicate: "ordering"; readonly relation: "is"; readonly value: Ordering }
   | { readonly predicate: "invariant"; readonly relation: "is"; readonly value: string };
 
@@ -47,17 +71,23 @@ const readValue = (p: Proposition): Claim | string => {
   const latticeRel = pick(lattice, rel);
   switch (p.predicate) {
     case "freshness": {
-      if (latticeRel === undefined || typeof v !== "string") return "freshness takes is/at-most/at-least/not and a string";
+      if (latticeRel === undefined || typeof v !== "string")
+        return "freshness takes is/at-most/at-least/not and a string";
       const named = pick(freshnessNames, v);
       const ttl = parameter("ttl", v);
-      if (named !== undefined) return { predicate: "freshness", relation: latticeRel, value: named };
-      return ttl === undefined ? `"${v}" is not a freshness` : { predicate: "freshness", relation: latticeRel, value: { ttl } };
+      if (named !== undefined)
+        return { predicate: "freshness", relation: latticeRel, value: named };
+      return ttl === undefined
+        ? `"${v}" is not a freshness`
+        : { predicate: "freshness", relation: latticeRel, value: { ttl } };
     }
     case "consistency": {
-      if (latticeRel === undefined || typeof v !== "string") return "consistency takes is/at-most/at-least/not and a string";
+      if (latticeRel === undefined || typeof v !== "string")
+        return "consistency takes is/at-most/at-least/not and a string";
       const named = pick(consistencyNames, v);
       const bounded = parameter("bounded", v);
-      if (named !== undefined) return { predicate: "consistency", relation: latticeRel, value: named };
+      if (named !== undefined)
+        return { predicate: "consistency", relation: latticeRel, value: named };
       return bounded === undefined
         ? `"${v}" is not a consistency level`
         : { predicate: "consistency", relation: latticeRel, value: { bounded } };
@@ -82,7 +112,10 @@ const readValue = (p: Proposition): Claim | string => {
       if ((rel !== "is" && rel !== "at-most" && rel !== "at-least") || typeof v !== "string") {
         return "authority takes is/at-most/at-least and a comma-separated writer set";
       }
-      const writers = v.split(",").map((w) => w.trim()).filter((w) => w.length > 0);
+      const writers = v
+        .split(",")
+        .map((w) => w.trim())
+        .filter((w) => w.length > 0);
       return new Set(writers).size === writers.length
         ? { predicate: "authority", relation: rel, value: { writers: writers.toSorted() } }
         : "authority names a writer twice";
@@ -98,10 +131,17 @@ const readValue = (p: Proposition): Claim | string => {
         return "shape is not valid JSON";
       }
       const shape = readShape(decoded);
-      return shape === undefined ? "shape is not a structural type" : { predicate: "shape", relation: rel, value: shape };
+      return shape === undefined
+        ? "shape is not a structural type"
+        : { predicate: "shape", relation: rel, value: shape };
     }
     case "ordering":
-      if ((rel !== "before" && rel !== "after") || typeof v !== "string" || v === "" || v === p.subject) {
+      if (
+        (rel !== "before" && rel !== "after") ||
+        typeof v !== "string" ||
+        v === "" ||
+        v === p.subject
+      ) {
         return "ordering takes before/after and another event";
       }
       return {
@@ -117,7 +157,9 @@ const readValue = (p: Proposition): Claim | string => {
 };
 
 /** Reads a wire proposition onto its predicate's lattice, or says why it cannot. */
-export const readClaim = (p: Proposition): Result.Result<ReadProposition, UnreadableProposition> => {
+export const readClaim = (
+  p: Proposition,
+): Result.Result<ReadProposition, UnreadableProposition> => {
   const unreadable = (reason: string) =>
     Result.fail(new UnreadableProposition({ subject: p.subject, predicate: p.predicate, reason }));
   const scope = readScope(p.scope);
@@ -133,10 +175,16 @@ export const readClaim = (p: Proposition): Result.Result<ReadProposition, Unread
   });
 };
 
-const writeValue = (subject: SubjectKey, claim: Claim): { relation: Proposition["relation"]; value: string | number | boolean; unit?: string } => {
+const writeValue = (
+  subject: SubjectKey,
+  claim: Claim,
+): { relation: Proposition["relation"]; value: string | number | boolean; unit?: string } => {
   switch (claim.predicate) {
     case "freshness":
-      return { relation: claim.relation, value: typeof claim.value === "object" ? `ttl:${claim.value.ttl}` : claim.value };
+      return {
+        relation: claim.relation,
+        value: typeof claim.value === "object" ? `ttl:${claim.value.ttl}` : claim.value,
+      };
     case "consistency":
       return {
         relation: claim.relation,
@@ -171,7 +219,11 @@ export type PropositionDetails = {
  * Writes a typed claim as a wire proposition. An ordering claim must name the
  * subject as one of its two events.
  */
-export const writeProposition = (subject: SubjectKey, claim: Claim, details: PropositionDetails = {}): Proposition => {
+export const writeProposition = (
+  subject: SubjectKey,
+  claim: Claim,
+  details: PropositionDetails = {},
+): Proposition => {
   const scope = details.scope === undefined ? undefined : writeScope(details.scope);
   const predicate: Predicate = claim.predicate;
   return {

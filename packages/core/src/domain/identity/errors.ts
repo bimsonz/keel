@@ -2,7 +2,9 @@ import { Schema } from "effect";
 import { AgentId } from "../kernel/index.ts";
 
 /** No agent has this id. */
-export class AgentNotKnown extends Schema.TaggedError<AgentNotKnown>()("AgentNotKnown", { agentId: AgentId }) {}
+export class AgentNotKnown extends Schema.TaggedError<AgentNotKnown>()("AgentNotKnown", {
+  agentId: AgentId,
+}) {}
 
 /** The agent exists but may not act: suspended, revoked, or the token's epoch is stale. */
 export class AgentNotAdmitted extends Schema.TaggedError<AgentNotAdmitted>()("AgentNotAdmitted", {
@@ -11,7 +13,10 @@ export class AgentNotAdmitted extends Schema.TaggedError<AgentNotAdmitted>()("Ag
 }) {}
 
 /** The client id is unknown or the secret does not match. Deliberately says no more than that. */
-export class CredentialRejected extends Schema.TaggedError<CredentialRejected>()("CredentialRejected", {}) {}
+export class CredentialRejected extends Schema.TaggedError<CredentialRejected>()(
+  "CredentialRejected",
+  {},
+) {}
 
 /** A bearer token failed verification: malformed, badly signed, expired, or for another audience. */
 export class TokenRejected extends Schema.TaggedError<TokenRejected>()("TokenRejected", {
@@ -24,6 +29,9 @@ export class ScopeNotGranted extends Schema.TaggedError<ScopeNotGranted>()("Scop
 }) {}
 
 /** An Idempotency-Key the agent already used, sent again with a different request body. */
-export class IdempotencyConflict extends Schema.TaggedError<IdempotencyConflict>()("IdempotencyConflict", {
-  idempotencyKey: Schema.String,
-}) {}
+export class IdempotencyConflict extends Schema.TaggedError<IdempotencyConflict>()(
+  "IdempotencyConflict",
+  {
+    idempotencyKey: Schema.String,
+  },
+) {}

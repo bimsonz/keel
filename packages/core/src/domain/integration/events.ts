@@ -1,5 +1,14 @@
 import { Schema } from "effect";
-import { BatchId, CandidateId, ChangeId, CommitSha, ContentHash, ProjectId, Tier, VerdictId } from "../kernel/index.ts";
+import {
+  BatchId,
+  CandidateId,
+  ChangeId,
+  CommitSha,
+  ContentHash,
+  ProjectId,
+  Tier,
+  VerdictId,
+} from "../kernel/index.ts";
 
 export const BatchFormed = Schema.TaggedStruct("BatchFormed", {
   batchId: BatchId,
@@ -23,7 +32,11 @@ export const VerificationStarted = Schema.TaggedStruct("VerificationStarted", {
   instanceId: Schema.String,
   planHash: ContentHash,
 });
-export const BatchVerified = Schema.TaggedStruct("BatchVerified", { batchId: BatchId, candidateId: CandidateId, verdictId: VerdictId });
+export const BatchVerified = Schema.TaggedStruct("BatchVerified", {
+  batchId: BatchId,
+  candidateId: CandidateId,
+  verdictId: VerdictId,
+});
 export const BatchFailed = Schema.TaggedStruct("BatchFailed", {
   batchId: BatchId,
   candidateId: Schema.optional(CandidateId),
@@ -40,7 +53,11 @@ export const CandidateInvalidated = Schema.TaggedStruct("CandidateInvalidated", 
   batchId: BatchId,
   reason: Schema.Literal("head-moved"),
 });
-export const CandidatePromoted = Schema.TaggedStruct("CandidatePromoted", { candidateId: CandidateId, batchId: BatchId, trunkSha: CommitSha });
+export const CandidatePromoted = Schema.TaggedStruct("CandidatePromoted", {
+  candidateId: CandidateId,
+  batchId: BatchId,
+  trunkSha: CommitSha,
+});
 export const TrunkAdvanced = Schema.TaggedStruct("TrunkAdvanced", {
   projectId: ProjectId,
   from: CommitSha,
@@ -61,7 +78,10 @@ export const PromotionFrozen = Schema.TaggedStruct("PromotionFrozen", {
   expected: CommitSha,
   observed: CommitSha,
 });
-export const PromotionResumed = Schema.TaggedStruct("PromotionResumed", { projectId: ProjectId, by: Schema.String });
+export const PromotionResumed = Schema.TaggedStruct("PromotionResumed", {
+  projectId: ProjectId,
+  by: Schema.String,
+});
 export const AuditCompleted = Schema.TaggedStruct("AuditCompleted", {
   projectId: ProjectId,
   head: CommitSha,

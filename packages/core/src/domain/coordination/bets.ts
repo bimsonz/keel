@@ -9,7 +9,9 @@ export type ProbeCost = Brand.Branded<number, "ProbeCost">;
 const asProbeCost = Brand.nominal<ProbeCost>();
 
 export const probeCost = (cost: number): Result.Result<ProbeCost, InvalidProbeCost> =>
-  Number.isFinite(cost) && cost > 0 ? Result.succeed(asProbeCost(cost)) : Result.fail(new InvalidProbeCost({ cost }));
+  Number.isFinite(cost) && cost > 0
+    ? Result.succeed(asProbeCost(cost))
+    : Result.fail(new InvalidProbeCost({ cost }));
 
 /**
  * A premise no tenet guards: the fleet is betting on it, and its probe is the
@@ -19,14 +21,20 @@ export type Bet = {
   readonly premise: HeldPremise;
   readonly blast: number;
   readonly cost: ProbeCost;
-  readonly standing: { readonly changes: readonly ChangeId[]; readonly premises: readonly HeldPremise[] };
+  readonly standing: {
+    readonly changes: readonly ChangeId[];
+    readonly premises: readonly HeldPremise[];
+  };
 };
 
 const isMust = (p: HeldPremise): boolean => (p.proposition.strength ?? "must") === "must";
 
 /** A guarded tenet that speaks for the premise's whole domain, inside what it relies on. */
 const guarded = (premise: HeldPremise, tenets: readonly GuardedTenet[]): boolean =>
-  tenets.some((t) => t.guards.length > 0 && compare(premise.proposition, t.proposition).outcome === "compatible");
+  tenets.some(
+    (t) =>
+      t.guards.length > 0 && compare(premise.proposition, t.proposition).outcome === "compatible",
+  );
 
 /**
  * `other` stands on `premise` when it fails whenever the premise does: a
@@ -39,7 +47,15 @@ const standsOn = (other: HeldPremise, premise: HeldPremise): boolean =>
 /** The order among equal scores: by holder, then by the claim itself. Narrative never counts. */
 const tieKey = (p: HeldPremise): string => {
   const q = p.proposition;
-  return [p.holder, q.subject, q.predicate, q.relation, String(q.value), q.unit ?? "", q.scope ?? ""].join("\u0000");
+  return [
+    p.holder,
+    q.subject,
+    q.predicate,
+    q.relation,
+    String(q.value),
+    q.unit ?? "",
+    q.scope ?? "",
+  ].join("\u0000");
 };
 
 /**
@@ -57,7 +73,12 @@ export const rankBets = (
     .map((premise): Bet => {
       const standing = premises.filter((other) => standsOn(other, premise));
       const changes = [...new Set(standing.map((p) => p.holder))];
-      return { premise, blast: changes.length + standing.length, cost: costOf(premise), standing: { changes, premises: standing } };
+      return {
+        premise,
+        blast: changes.length + standing.length,
+        cost: costOf(premise),
+        standing: { changes, premises: standing },
+      };
     })
     .toSorted((a, b) => {
       const byScore = b.blast / b.cost - a.blast / a.cost;

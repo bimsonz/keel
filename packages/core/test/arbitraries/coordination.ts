@@ -25,7 +25,12 @@ const mids = ["permission-evaluation", "cache", "audit-log"] as const;
 const leaves = ["read", "write"] as const;
 
 export const subjectArb: fc.Arbitrary<SubjectKey> = fc
-  .tuple(fc.constantFrom(...tops), fc.constantFrom(...mids), fc.constantFrom(...leaves), fc.integer({ min: 1, max: 3 }))
+  .tuple(
+    fc.constantFrom(...tops),
+    fc.constantFrom(...mids),
+    fc.constantFrom(...leaves),
+    fc.integer({ min: 1, max: 3 }),
+  )
   .map(([a, b, c, depth]) => key([a, b, c].slice(0, depth).join(".")));
 
 export const scopeArb: fc.Arbitrary<Scope> = fc
@@ -38,7 +43,12 @@ export const scopeArb: fc.Arbitrary<Scope> = fc
   )
   .map((s): Scope => s);
 
-export const latticeRelationArb: fc.Arbitrary<ClaimRelation> = fc.constantFrom("at-most", "at-least", "is", "not");
+export const latticeRelationArb: fc.Arbitrary<ClaimRelation> = fc.constantFrom(
+  "at-most",
+  "at-least",
+  "is",
+  "not",
+);
 const rangeRelationArb = fc.constantFrom("at-most" as const, "at-least" as const, "is" as const);
 
 export const ttlValues = [0, 30, 60, 300] as const;
@@ -71,16 +81,27 @@ export const authorityArb: fc.Arbitrary<Authority> = fc
 export const shapeArb: fc.Arbitrary<Shape> = fc.letrec<{ shape: Shape }>((tie) => ({
   shape: fc.oneof(
     { depthSize: "small", withCrossShrink: true },
-    fc.constantFrom<Shape>({ _tag: "string" }, { _tag: "number" }, { _tag: "null" }, { _tag: "unknown" }),
+    fc.constantFrom<Shape>(
+      { _tag: "string" },
+      { _tag: "number" },
+      { _tag: "null" },
+      { _tag: "unknown" },
+    ),
     fc.constantFrom("a", "b", 1).map((value): Shape => ({ _tag: "literal", value })),
     fc.constantFrom("Session", "Grant").map((name): Shape => ({ _tag: "opaque", name })),
     tie("shape").map((of): Shape => ({ _tag: "array", of })),
     fc
-      .dictionary(fc.constantFrom("id", "role", "ttl"), fc.record({ shape: tie("shape"), optional: fc.boolean() }), {
-        maxKeys: 3,
-      })
+      .dictionary(
+        fc.constantFrom("id", "role", "ttl"),
+        fc.record({ shape: tie("shape"), optional: fc.boolean() }),
+        {
+          maxKeys: 3,
+        },
+      )
       .map((fields): Shape => ({ _tag: "object", fields })),
-    fc.array(tie("shape"), { minLength: 2, maxLength: 3 }).map((of): Shape => ({ _tag: "union", of })),
+    fc
+      .array(tie("shape"), { minLength: 2, maxLength: 3 })
+      .map((of): Shape => ({ _tag: "union", of })),
   ),
 })).shape;
 
@@ -90,17 +111,41 @@ const events = ["check", "cache", "respond"] as const;
 export const claimArb = (predicate: Predicate, subject: SubjectKey): fc.Arbitrary<Claim> => {
   switch (predicate) {
     case "freshness":
-      return fc.record({ predicate: fc.constant(predicate), relation: latticeRelationArb, value: freshnessArb });
+      return fc.record({
+        predicate: fc.constant(predicate),
+        relation: latticeRelationArb,
+        value: freshnessArb,
+      });
     case "consistency":
-      return fc.record({ predicate: fc.constant(predicate), relation: latticeRelationArb, value: consistencyArb });
+      return fc.record({
+        predicate: fc.constant(predicate),
+        relation: latticeRelationArb,
+        value: consistencyArb,
+      });
     case "cardinality":
-      return fc.record({ predicate: fc.constant(predicate), relation: latticeRelationArb, value: cardinalityArb });
+      return fc.record({
+        predicate: fc.constant(predicate),
+        relation: latticeRelationArb,
+        value: cardinalityArb,
+      });
     case "bound":
-      return fc.record({ predicate: fc.constant(predicate), relation: latticeRelationArb, value: boundArb });
+      return fc.record({
+        predicate: fc.constant(predicate),
+        relation: latticeRelationArb,
+        value: boundArb,
+      });
     case "authority":
-      return fc.record({ predicate: fc.constant(predicate), relation: rangeRelationArb, value: authorityArb });
+      return fc.record({
+        predicate: fc.constant(predicate),
+        relation: rangeRelationArb,
+        value: authorityArb,
+      });
     case "shape":
-      return fc.record({ predicate: fc.constant(predicate), relation: rangeRelationArb, value: shapeArb });
+      return fc.record({
+        predicate: fc.constant(predicate),
+        relation: rangeRelationArb,
+        value: shapeArb,
+      });
     case "presence":
     case "purity":
     case "idempotent":
@@ -110,13 +155,11 @@ export const claimArb = (predicate: Predicate, subject: SubjectKey): fc.Arbitrar
         value: fc.boolean(),
       });
     case "ordering":
-      return fc
-        .tuple(fc.constantFrom(...events), fc.boolean())
-        .map(([event, after]): Claim => ({
-          predicate: "ordering",
-          relation: "is",
-          value: after ? { before: event, after: subject } : { before: subject, after: event },
-        }));
+      return fc.tuple(fc.constantFrom(...events), fc.boolean()).map(([event, after]): Claim => ({
+        predicate: "ordering",
+        relation: "is",
+        value: after ? { before: event, after: subject } : { before: subject, after: event },
+      }));
     default:
       return fc.record({
         predicate: fc.constant("invariant" as const),
@@ -128,7 +171,14 @@ export const claimArb = (predicate: Predicate, subject: SubjectKey): fc.Arbitrar
 
 /** Predicates whose comparison the lattice can decide. */
 export const latticePredicates: readonly Predicate[] = [
-  "freshness", "consistency", "cardinality", "bound", "authority", "presence", "purity", "idempotent",
+  "freshness",
+  "consistency",
+  "cardinality",
+  "bound",
+  "authority",
+  "presence",
+  "purity",
+  "idempotent",
 ];
 
 export const strengthArb: fc.Arbitrary<Strength> = fc.constantFrom("must", "should");
@@ -138,13 +188,24 @@ export const anchorArb: fc.Arbitrary<Anchor> = fc
   .constantFrom(...anchorPaths)
   .map((path) => ({ path, commit: CommitSha.make("a".repeat(40)) }));
 
-export type Generated = { readonly subject: SubjectKey; readonly claim: Claim; readonly scope: Scope; readonly strength: Strength };
+export type Generated = {
+  readonly subject: SubjectKey;
+  readonly claim: Claim;
+  readonly scope: Scope;
+  readonly strength: Strength;
+};
 
 export const generatedArb = (
-  options: { readonly predicates?: readonly Predicate[]; readonly subject?: fc.Arbitrary<SubjectKey> } = {},
+  options: {
+    readonly predicates?: readonly Predicate[];
+    readonly subject?: fc.Arbitrary<SubjectKey>;
+  } = {},
 ): fc.Arbitrary<Generated> =>
   fc
-    .tuple(fc.constantFrom(...(options.predicates ?? latticePredicates)), options.subject ?? subjectArb)
+    .tuple(
+      fc.constantFrom(...(options.predicates ?? latticePredicates)),
+      options.subject ?? subjectArb,
+    )
     .chain(([predicate, subject]) =>
       fc.record({
         subject: fc.constant(subject),
@@ -159,14 +220,19 @@ export const write = (g: Generated, anchors: readonly Anchor[] = []): Propositio
 
 /** A wire proposition, with up to one anchor. */
 export const propositionArb = (
-  options: { readonly predicates?: readonly Predicate[]; readonly subject?: fc.Arbitrary<SubjectKey> } = {},
+  options: {
+    readonly predicates?: readonly Predicate[];
+    readonly subject?: fc.Arbitrary<SubjectKey>;
+  } = {},
 ): fc.Arbitrary<Proposition> =>
-  fc.tuple(generatedArb(options), fc.subarray([...anchorPaths], { maxLength: 1 })).map(([g, paths]) =>
-    write(
-      g,
-      paths.map((path) => ({ path, commit: CommitSha.make("a".repeat(40)) })),
-    ),
-  );
+  fc
+    .tuple(generatedArb(options), fc.subarray([...anchorPaths], { maxLength: 1 }))
+    .map(([g, paths]) =>
+      write(
+        g,
+        paths.map((path) => ({ path, commit: CommitSha.make("a".repeat(40)) })),
+      ),
+    );
 
 /** A premise and an effect on one predicate, usually on related subjects with overlapping scopes. */
 export const comparablePairArb = (predicates: readonly Predicate[] = latticePredicates) =>

@@ -10,7 +10,10 @@ import { type Exit, Schema } from "effect";
  */
 export type ExitJson = Schema.Json;
 
-export function exitCodec<A, AI, E, EI>(success: Schema.Codec<A, AI>, failure: Schema.Codec<E, EI>) {
+export function exitCodec<A, AI, E, EI>(
+  success: Schema.Codec<A, AI>,
+  failure: Schema.Codec<E, EI>,
+) {
   return Schema.toCodecJson(Schema.Exit(success, failure, Schema.Defect()));
 }
 

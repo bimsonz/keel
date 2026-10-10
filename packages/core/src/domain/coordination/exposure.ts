@@ -25,9 +25,14 @@ export type Exposure = {
 const anchorPathsOf = (ps: readonly Proposition[]): ReadonlySet<string> =>
   new Set(ps.flatMap((p) => (p.anchors ?? []).map((a) => a.path)));
 
-const near = (a: SubjectKey, b: SubjectKey): boolean => subjectsRelated(a, b) || subjectsSiblings(a, b);
+const near = (a: SubjectKey, b: SubjectKey): boolean =>
+  subjectsRelated(a, b) || subjectsSiblings(a, b);
 
-export const exposure = (self: ChangeId, intent: Intent, liveChanges: readonly LiveChange[]): Exposure => {
+export const exposure = (
+  self: ChangeId,
+  intent: Intent,
+  liveChanges: readonly LiveChange[],
+): Exposure => {
   const myPremises = intent.premises;
   const myEffects = intent.declaredEffects ?? [];
   const mine = [...myPremises, ...myEffects];
@@ -37,12 +42,21 @@ export const exposure = (self: ChangeId, intent: Intent, liveChanges: readonly L
 
   for (const live of liveChanges.filter((l) => l.id !== self)) {
     const theirPremises = live.intent.premises;
-    const theirEffects = [...(live.intent.declaredEffects ?? []), ...live.derived.map((d) => d.proposition)];
+    const theirEffects = [
+      ...(live.intent.declaredEffects ?? []),
+      ...live.derived.map((d) => d.proposition),
+    ];
     const theirs = [...theirPremises, ...theirEffects];
 
-    const subjects = [...new Set(theirs.filter((t) => mine.some((m) => near(m.subject, t.subject))).map((t) => t.subject))];
+    const subjects = [
+      ...new Set(
+        theirs.filter((t) => mine.some((m) => near(m.subject, t.subject))).map((t) => t.subject),
+      ),
+    ];
     const sharedAnchor = [...anchorPathsOf(theirs)].some((path) => myAnchors.has(path));
-    const footprint = intent.footprint.some((m) => live.intent.footprint.some((t) => globsMayOverlap(m.path, t.path)));
+    const footprint = intent.footprint.some((m) =>
+      live.intent.footprint.some((t) => globsMayOverlap(m.path, t.path)),
+    );
     if (subjects.length > 0 || sharedAnchor || footprint) {
       neighbours.push({
         changeId: live.id,
@@ -57,7 +71,8 @@ export const exposure = (self: ChangeId, intent: Intent, liveChanges: readonly L
       ...theirPremises.flatMap((p) => myEffects.map((e) => [p, e, live.id] as const)),
     ];
     for (const [premise, other, holder] of pairs) {
-      if (compare(premise, other).outcome === "contradicts") contradictions.push({ premise, with: other, holder });
+      if (compare(premise, other).outcome === "contradicts")
+        contradictions.push({ premise, with: other, holder });
     }
   }
 

@@ -18,7 +18,9 @@ export interface AlarmRequest {
 
 /** Creates the alarm table. Called by the Durable Object's composition inside `blockConcurrencyWhile`. */
 export function migrateAlarms(storage: DurableObjectStorage): void {
-  storage.sql.exec("CREATE TABLE IF NOT EXISTS keel_alarms (reason TEXT PRIMARY KEY, kind TEXT NOT NULL, at INTEGER NOT NULL)");
+  storage.sql.exec(
+    "CREATE TABLE IF NOT EXISTS keel_alarms (reason TEXT PRIMARY KEY, kind TEXT NOT NULL, at INTEGER NOT NULL)",
+  );
 }
 
 const toRequest = (row: { reason: string; kind: string; at: number }): AlarmRequest => ({
@@ -29,7 +31,9 @@ const toRequest = (row: { reason: string; kind: string; at: number }): AlarmRequ
 
 /** Arms the platform alarm for the earliest request, or clears it when none is left. */
 async function armEarliest(storage: DurableObjectStorage): Promise<void> {
-  const earliest = storage.sql.exec<{ at: number | null }>("SELECT MIN(at) AS at FROM keel_alarms").one().at;
+  const earliest = storage.sql
+    .exec<{ at: number | null }>("SELECT MIN(at) AS at FROM keel_alarms")
+    .one().at;
   if (earliest === null) {
     await storage.deleteAlarm();
     return;
@@ -37,7 +41,10 @@ async function armEarliest(storage: DurableObjectStorage): Promise<void> {
   if ((await storage.getAlarm()) !== earliest) await storage.setAlarm(earliest);
 }
 
-export async function scheduleAlarm(storage: DurableObjectStorage, request: AlarmRequest): Promise<void> {
+export async function scheduleAlarm(
+  storage: DurableObjectStorage,
+  request: AlarmRequest,
+): Promise<void> {
   storage.sql.exec(
     "INSERT INTO keel_alarms (reason, kind, at) VALUES (?, ?, ?) ON CONFLICT (reason) DO UPDATE SET kind = excluded.kind, at = excluded.at",
     request.reason,
@@ -58,10 +65,16 @@ export async function cancelAlarm(storage: DurableObjectStorage, reason: string)
  * The alarm is re-armed for whatever remains. A handler that needs another
  * deadline arms it again itself, and only while there is still work.
  */
-export async function dueAlarms(storage: DurableObjectStorage, now: number): Promise<readonly AlarmRequest[]> {
+export async function dueAlarms(
+  storage: DurableObjectStorage,
+  now: number,
+): Promise<readonly AlarmRequest[]> {
   const due = storage.transactionSync(() => {
     const rows = storage.sql
-      .exec<{ reason: string; kind: string; at: number }>("SELECT reason, kind, at FROM keel_alarms WHERE at <= ? ORDER BY at, reason", now)
+      .exec<{ reason: string; kind: string; at: number }>(
+        "SELECT reason, kind, at FROM keel_alarms WHERE at <= ? ORDER BY at, reason",
+        now,
+      )
       .toArray();
     storage.sql.exec("DELETE FROM keel_alarms WHERE at <= ?", now);
     return rows.map(toRequest);
@@ -72,5 +85,10 @@ export async function dueAlarms(storage: DurableObjectStorage, now: number): Pro
 
 /** Every request still armed, earliest first. */
 export function armedAlarms(storage: DurableObjectStorage): readonly AlarmRequest[] {
-  return storage.sql.exec<{ reason: string; kind: string; at: number }>("SELECT reason, kind, at FROM keel_alarms ORDER BY at, reason").toArray().map(toRequest);
+  return storage.sql
+    .exec<{ reason: string; kind: string; at: number }>(
+      "SELECT reason, kind, at FROM keel_alarms ORDER BY at, reason",
+    )
+    .toArray()
+    .map(toRequest);
 }

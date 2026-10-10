@@ -31,7 +31,12 @@ export interface ProblemExtras {
 }
 
 /** A problem body. `type` is a URN, so the code never hardcodes a host. */
-export function problem(status: number, code: ProblemCode, requestId: string, extras: ProblemExtras = {}): ProblemBody {
+export function problem(
+  status: number,
+  code: ProblemCode,
+  requestId: string,
+  extras: ProblemExtras = {},
+): ProblemBody {
   return {
     type: `urn:keel:problem:${code}`,
     title: TITLES[code],
@@ -46,7 +51,12 @@ export function problem(status: number, code: ProblemCode, requestId: string, ex
 }
 
 /** A problem as a raw Response, for middleware that answers before any route does. */
-export function problemResponse(status: number, code: ProblemCode, requestId: string, extras: ProblemExtras = {}): Response {
+export function problemResponse(
+  status: number,
+  code: ProblemCode,
+  requestId: string,
+  extras: ProblemExtras = {},
+): Response {
   return new Response(JSON.stringify(problem(status, code, requestId, extras)), {
     status,
     headers: { "content-type": "application/problem+json" },
@@ -54,11 +64,15 @@ export function problemResponse(status: number, code: ProblemCode, requestId: st
 }
 
 /** The declared 503 every operation answers with until its lane implements it. */
-export function notImplemented(requestId: string): { readonly status: 503; readonly body: ProblemBody } {
+export function notImplemented(requestId: string): {
+  readonly status: 503;
+  readonly body: ProblemBody;
+} {
   return {
     status: 503,
     body: problem(503, "service.not_implemented", requestId, {
-      detail: "The operation is in Keel's published contract; its implementation has not landed yet.",
+      detail:
+        "The operation is in Keel's published contract; its implementation has not landed yet.",
     }),
   };
 }

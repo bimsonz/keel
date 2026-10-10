@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "description": "Clean-room git algorithms with a small I/O interface; no Effect, no cloudflare:*",
-  "type": "module",
   "license": "MIT",
+  "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },

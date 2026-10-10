@@ -38,15 +38,19 @@ const cardinalityAbove: Record<Cardinality, readonly Cardinality[]> = {
   "at-least-once": ["at-least-once", "any"],
   any: ["any"],
 };
-export const specCardinalityLeq = (a: Cardinality, b: Cardinality): boolean => cardinalityAbove[a].includes(b);
+export const specCardinalityLeq = (a: Cardinality, b: Cardinality): boolean =>
+  cardinalityAbove[a].includes(b);
 
 const consistencyTier = (v: Consistency): number =>
   typeof v === "object" ? 1 : { eventual: 0, "read-your-writes": 2, linearizable: 3 }[v];
 /** eventual < bounded(t) < read-your-writes < linearizable; bounded(t) ≤ bounded(u) iff t ≥ u. */
 export const specConsistencyLeq = (a: Consistency, b: Consistency): boolean =>
-  typeof a === "object" && typeof b === "object" ? a.bounded >= b.bounded : consistencyTier(a) <= consistencyTier(b);
+  typeof a === "object" && typeof b === "object"
+    ? a.bounded >= b.bounded
+    : consistencyTier(a) <= consistencyTier(b);
 
-export const specAuthorityLeq = (a: Authority, b: Authority): boolean => a.writers.every((w) => b.writers.includes(w));
+export const specAuthorityLeq = (a: Authority, b: Authority): boolean =>
+  a.writers.every((w) => b.writers.includes(w));
 
 export const specBoundLeq = (a: Bound, b: Bound): boolean => a.n <= b.n;
 
@@ -55,11 +59,13 @@ export const specBoundLeq = (a: Bound, b: Bound): boolean => a.n <= b.n;
  * per-session ≤ ttl(n) iff d ≤ n. The incomparable pair is the only unknown,
  * so fixing `d` makes the order total over the values that matter.
  */
-const freshnessLeqIn = (d: number) => (a: Freshness, b: Freshness): boolean => {
-  if (label(a) === "per-session" && typeof b === "object") return d <= b.ttl;
-  if (typeof a === "object" && label(b) === "per-session") return a.ttl <= d;
-  return specFreshnessLeq(a, b) === true;
-};
+const freshnessLeqIn =
+  (d: number) =>
+  (a: Freshness, b: Freshness): boolean => {
+    if (label(a) === "per-session" && typeof b === "object") return d <= b.ttl;
+    if (typeof a === "object" && label(b) === "per-session") return a.ttl <= d;
+    return specFreshnessLeq(a, b) === true;
+  };
 const sessionWorlds = [-0.5, 0, 15, 30, 45, 60, 100, 180, 300, 450, 600, 1000];
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -77,17 +83,29 @@ const member = <V>(leq: (a: V, b: V) => Tri, x: V, relation: ClaimRelation, v: V
 };
 
 const freshnessSamples: readonly Freshness[] = [
-  "per-call", "per-request", "per-session", "static",
+  "per-call",
+  "per-request",
+  "per-session",
+  "static",
   ...[0, 15, 30, 45, 60, 180, 300, 600].map((ttl): Freshness => ({ ttl })),
 ];
 const consistencySamples: readonly Consistency[] = [
-  "eventual", "read-your-writes", "linearizable",
+  "eventual",
+  "read-your-writes",
+  "linearizable",
   ...[0, 0.5, 1, 3, 5, 10].map((bounded): Consistency => ({ bounded })),
 ];
-const cardinalitySamples: readonly Cardinality[] = ["exactly-once", "at-most-once", "at-least-once", "any"];
+const cardinalitySamples: readonly Cardinality[] = [
+  "exactly-once",
+  "at-most-once",
+  "at-least-once",
+  "any",
+];
 const authoritySamples: readonly Authority[] = (() => {
   const universe = ["a", "b", "c", "z"];
-  return Array.from({ length: 16 }, (_, mask) => ({ writers: universe.filter((_w, i) => (mask >> i) % 2 === 1) }));
+  return Array.from({ length: 16 }, (_, mask) => ({
+    writers: universe.filter((_w, i) => (mask >> i) % 2 === 1),
+  }));
 })();
 const boundSamples = [-2, -1, -0.5, 0, 0.5, 1, 3, 5, 7.5, 10, 11];
 
@@ -99,7 +117,10 @@ const over = <V>(
   p: { readonly relation: ClaimRelation; readonly value: V },
   e: { readonly relation: ClaimRelation; readonly value: V },
 ): readonly Membership[] =>
-  samples.map((x) => ({ inEffect: member(leq, x, e.relation, e.value), inPremise: member(leq, x, p.relation, p.value) }));
+  samples.map((x) => ({
+    inEffect: member(leq, x, e.relation, e.value),
+    inPremise: member(leq, x, p.relation, p.value),
+  }));
 
 /** Each sample's membership of the effect's and the premise's regions, or undefined if the oracle abstains. */
 const memberships = (premise: Claim, effect: Claim): readonly Membership[] | undefined => {
@@ -107,14 +128,25 @@ const memberships = (premise: Claim, effect: Claim): readonly Membership[] | und
     case "freshness":
       return undefined;
     case "consistency":
-      return effect.predicate === "consistency" ? over(consistencySamples, specConsistencyLeq, premise, effect) : undefined;
+      return effect.predicate === "consistency"
+        ? over(consistencySamples, specConsistencyLeq, premise, effect)
+        : undefined;
     case "cardinality":
-      return effect.predicate === "cardinality" ? over(cardinalitySamples, specCardinalityLeq, premise, effect) : undefined;
+      return effect.predicate === "cardinality"
+        ? over(cardinalitySamples, specCardinalityLeq, premise, effect)
+        : undefined;
     case "authority":
-      return effect.predicate === "authority" ? over(authoritySamples, specAuthorityLeq, premise, effect) : undefined;
+      return effect.predicate === "authority"
+        ? over(authoritySamples, specAuthorityLeq, premise, effect)
+        : undefined;
     case "bound":
       return effect.predicate === "bound" && effect.value.unit === premise.value.unit
-        ? over(boundSamples.map((n): Bound => ({ n, unit: premise.value.unit })), specBoundLeq, premise, effect)
+        ? over(
+            boundSamples.map((n): Bound => ({ n, unit: premise.value.unit })),
+            specBoundLeq,
+            premise,
+            effect,
+          )
         : undefined;
     case "presence":
     case "purity":
@@ -148,7 +180,8 @@ export const oracleDecision = (premise: Claim, effect: Claim): OracleDecision | 
   if (
     chains.has(premise.predicate) &&
     premise.predicate === effect.predicate &&
-    ((premise.relation === "not" && ranged(effect.relation)) || (effect.relation === "not" && ranged(premise.relation)))
+    ((premise.relation === "not" && ranged(effect.relation)) ||
+      (effect.relation === "not" && ranged(premise.relation)))
   ) {
     return "overlap";
   }

@@ -7,16 +7,22 @@ export const ContentHash = Schema.String.check(Schema.isPattern(/^sha256:[0-9a-f
 export type ContentHash = typeof ContentHash.Type;
 
 /** A git object id: 40 hex digits (SHA-1) or 64 (SHA-256). */
-export const CommitSha = Schema.String.check(Schema.isPattern(/^([0-9a-f]{40}|[0-9a-f]{64})$/)).pipe(
-  Schema.brand("CommitSha"),
-);
+export const CommitSha = Schema.String.check(
+  Schema.isPattern(/^([0-9a-f]{40}|[0-9a-f]{64})$/),
+).pipe(Schema.brand("CommitSha"));
 export type CommitSha = typeof CommitSha.Type;
 
 /**
  * Content addressing without I/O: canonical JSON and SHA-256 (FIPS 180-4),
  * in plain TypeScript, so a plan's hash is a pure function of its content.
  */
-export type Json = null | boolean | number | string | readonly Json[] | { readonly [key: string]: Json };
+export type Json =
+  | null
+  | boolean
+  | number
+  | string
+  | readonly Json[]
+  | { readonly [key: string]: Json };
 
 /** JSON with object keys sorted at every depth; arrays keep their order. */
 export const canonicalJson = (value: Json): string => {
@@ -26,8 +32,9 @@ export const canonicalJson = (value: Json): string => {
   return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(value[k] ?? null)}`).join(",")}}`;
 };
 
-const isJsonArray = (value: readonly Json[] | { readonly [key: string]: Json }): value is readonly Json[] =>
-  Array.isArray(value);
+const isJsonArray = (
+  value: readonly Json[] | { readonly [key: string]: Json },
+): value is readonly Json[] => Array.isArray(value);
 
 const K = [
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -50,7 +57,8 @@ const utf8 = (input: string): number[] => {
     if (cp >= 0xd800 && cp <= 0xdfff) cp = 0xfffd;
     if (cp < 0x80) out.push(cp);
     else if (cp < 0x800) out.push(0xc0 | (cp >> 6), 0x80 | (cp & 0x3f));
-    else if (cp < 0x10000) out.push(0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+    else if (cp < 0x10000)
+      out.push(0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
     else
       out.push(
         0xf0 | (cp >> 18),
@@ -69,9 +77,12 @@ export const sha256Hex = (input: string): string => {
   while (bytes.length % 64 !== 56) bytes.push(0);
   const high = Math.floor(bitLength / 0x100000000);
   const low = bitLength >>> 0;
-  for (const word of [high, low]) bytes.push((word >>> 24) & 0xff, (word >>> 16) & 0xff, (word >>> 8) & 0xff, word & 0xff);
+  for (const word of [high, low])
+    bytes.push((word >>> 24) & 0xff, (word >>> 16) & 0xff, (word >>> 8) & 0xff, word & 0xff);
 
-  const h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+  const h = [
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+  ];
   const w = Array.from<number>({ length: 64 }).fill(0);
   const at = (i: number): number => bytes[i] ?? 0;
   const wt = (i: number): number => w[i] ?? 0;
@@ -110,4 +121,5 @@ export const sha256Hex = (input: string): string => {
 };
 
 /** The content address of a JSON value: SHA-256 over its canonical form. */
-export const contentHashOf = (value: Json): ContentHash => ContentHash.make(`sha256:${sha256Hex(canonicalJson(value))}`);
+export const contentHashOf = (value: Json): ContentHash =>
+  ContentHash.make(`sha256:${sha256Hex(canonicalJson(value))}`);

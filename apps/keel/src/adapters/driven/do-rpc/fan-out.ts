@@ -14,10 +14,13 @@ type Receive = (envelopes: unknown) => Promise<unknown>;
  * previous version may not answer `receive` yet: the call throws, and is retried.
  */
 function receiverFor(env: Env, subscriber: Subscriber): Receive | undefined {
-  if (subscriber === PROJECTOR_NAME) return (envelopes) => env.PROJECTOR.get(env.PROJECTOR.idFromName(subscriber)).receive(envelopes);
+  if (subscriber === PROJECTOR_NAME)
+    return (envelopes) =>
+      env.PROJECTOR.get(env.PROJECTOR.idFromName(subscriber)).receive(envelopes);
   switch (subscriber.slice(0, subscriber.indexOf(":"))) {
     case "agent":
-      return (envelopes) => env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(subscriber)).receive(envelopes);
+      return (envelopes) =>
+        env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(subscriber)).receive(envelopes);
     case "change":
       return (envelopes) => env.CHANGE.get(env.CHANGE.idFromName(subscriber)).receive(envelopes);
     case "subj":
@@ -29,7 +32,8 @@ function receiverFor(env: Env, subscriber: Subscriber): Receive | undefined {
     case "project":
       return (envelopes) => env.PROJECT.get(env.PROJECT.idFromName(subscriber)).receive(envelopes);
     case "pool":
-      return (envelopes) => env.WORKSPACE_POOL.get(env.WORKSPACE_POOL.idFromName(subscriber)).receive(envelopes);
+      return (envelopes) =>
+        env.WORKSPACE_POOL.get(env.WORKSPACE_POOL.idFromName(subscriber)).receive(envelopes);
     default:
       return undefined;
   }
@@ -58,17 +62,26 @@ export function workflowInstanceId(name: string, event: EventEnvelope): string {
 const encodeEnvelope = Schema.encodeSync(EventEnvelope);
 
 function failed(subscriber: Subscriber, reason: unknown) {
-  return new DeliveryFailed({ subscriber, reason: reason instanceof Error ? reason.message : String(reason) });
+  return new DeliveryFailed({
+    subscriber,
+    reason: reason instanceof Error ? reason.message : String(reason),
+  });
 }
 
-function deliverToObject(receive: Receive, subscriber: Subscriber, events: readonly EventEnvelope[]) {
+function deliverToObject(
+  receive: Receive,
+  subscriber: Subscriber,
+  events: readonly EventEnvelope[],
+) {
   return Effect.tryPromise({
     try: () => receive(events.map((event) => encodeEnvelope(event))),
     catch: (cause) => failed(subscriber, cause),
   }).pipe(
     Effect.flatMap((answer) => {
       const exit = decodeExitOrDefect(answer);
-      return Exit.isSuccess(exit) ? Effect.void : Effect.fail(failed(subscriber, Cause.pretty(exit.cause)));
+      return Exit.isSuccess(exit)
+        ? Effect.void
+        : Effect.fail(failed(subscriber, Cause.pretty(exit.cause)));
     }),
   );
 }
@@ -90,12 +103,20 @@ async function exists(workflow: Workflow, id: string): Promise<boolean> {
   }
 }
 
-function startWorkflow(workflow: Workflow, name: string, subscriber: Subscriber, events: readonly EventEnvelope[]) {
+function startWorkflow(
+  workflow: Workflow,
+  name: string,
+  subscriber: Subscriber,
+  events: readonly EventEnvelope[],
+) {
   return Effect.forEach(
     events,
     (event) => {
       const id = workflowInstanceId(name, event);
-      const params = { ...(typeof event.payload === "object" && event.payload !== null ? event.payload : {}), eventId: event.eventId };
+      const params = {
+        ...(typeof event.payload === "object" && event.payload !== null ? event.payload : {}),
+        eventId: event.eventId,
+      };
       return Effect.tryPromise({
         try: async () => {
           try {
@@ -124,10 +145,14 @@ export function FanOutRpc(env: Env): FanOut {
       if (subscriber.startsWith("workflow:")) {
         const name = subscriber.slice("workflow:".length);
         const workflow = workflowFor(env, name);
-        return workflow === undefined ? Effect.fail(failed(subscriber, `no Workflow named ${name}`)) : startWorkflow(workflow, name, subscriber, events);
+        return workflow === undefined
+          ? Effect.fail(failed(subscriber, `no Workflow named ${name}`))
+          : startWorkflow(workflow, name, subscriber, events);
       }
       const receive = receiverFor(env, subscriber);
-      return receive === undefined ? Effect.fail(failed(subscriber, "no Durable Object answers this address")) : deliverToObject(receive, subscriber, events);
+      return receive === undefined
+        ? Effect.fail(failed(subscriber, "no Durable Object answers this address"))
+        : deliverToObject(receive, subscriber, events);
     },
     nudge: Effect.tryPromise(async () => {
       await env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR_NAME)).nudge();

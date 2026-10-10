@@ -49,7 +49,11 @@ import type { PlanStep } from "./plan.ts";
 export const COMPILER_VERSION = "flow-compiler/1";
 
 export const defaultFlowPolicy: FlowPolicy = {
-  humanClassPaths: [Glob.make(".keel/flow*"), Glob.make(".keel/flow/**"), Glob.make(".keel/plugins/**")],
+  humanClassPaths: [
+    Glob.make(".keel/flow*"),
+    Glob.make(".keel/flow/**"),
+    Glob.make(".keel/plugins/**"),
+  ],
   suiteTier: 2,
   defaultTier: 1,
 };
@@ -72,7 +76,11 @@ const stepsIn = (flow: Flow): readonly string[] => {
   }
 };
 
-type Atom = { readonly step: string; readonly outcomes: readonly string[]; readonly negated: boolean };
+type Atom = {
+  readonly step: string;
+  readonly outcomes: readonly string[];
+  readonly negated: boolean;
+};
 
 const conditionSteps = (c: Condition, negated = false): readonly Atom[] => {
   switch (c._tag) {
@@ -99,7 +107,11 @@ const checkStructure = (
   switch (flow._tag) {
     case "step": {
       const spec = table.get(flow.step);
-      if (spec === undefined) return { errors: [new UnknownStep({ step: flow.step })], ran: new Set([...prior, flow.step]) };
+      if (spec === undefined)
+        return {
+          errors: [new UnknownStep({ step: flow.step })],
+          ran: new Set([...prior, flow.step]),
+        };
       const unsupported = (worlds ?? []).filter((w) => !(spec.worlds ?? []).includes(w));
       return {
         errors: unsupported.map((world) => new WorldNotSupported({ step: flow.step, world })),
@@ -134,21 +146,29 @@ const checkStructure = (
     case "worlds":
       return checkStructure(flow.body, table, classes, prior, flow.over);
     case "when": {
-      const errors: CompileError[] = conditionSteps(flow.condition).flatMap(({ step, outcomes, negated }): CompileError[] => {
-        if (!prior.has(step)) return [new WhenRefersToNonPriorStep({ step })];
-        const declared = table.get(step)?.outcomes ?? [];
-        const undeclared = outcomes.filter((o) => !declared.some((d) => d === o)).map((outcome) => new WhenOutcomeNotDeclared({ step, outcome }));
-        const opinion = !canBlock(classes.get(step) ?? "opinion");
-        const quiets = opinion && (negated || outcomes.includes("annotate"));
-        return quiets ? [...undeclared, new WhenOnOpinionMayOnlyAddScrutiny({ step })] : undeclared;
-      });
+      const errors: CompileError[] = conditionSteps(flow.condition).flatMap(
+        ({ step, outcomes, negated }): CompileError[] => {
+          if (!prior.has(step)) return [new WhenRefersToNonPriorStep({ step })];
+          const declared = table.get(step)?.outcomes ?? [];
+          const undeclared = outcomes
+            .filter((o) => !declared.some((d) => d === o))
+            .map((outcome) => new WhenOutcomeNotDeclared({ step, outcome }));
+          const opinion = !canBlock(classes.get(step) ?? "opinion");
+          const quiets = opinion && (negated || outcomes.includes("annotate"));
+          return quiets
+            ? [...undeclared, new WhenOnOpinionMayOnlyAddScrutiny({ step })]
+            : undeclared;
+        },
+      );
       const body = checkStructure(flow.body, table, classes, prior, worlds);
       return { errors: [...errors, ...body.errors], ran: body.ran };
     }
     default: {
       const body = checkStructure(flow.body, table, classes, prior, worlds);
       return {
-        errors: budgetValid(flow.limit) ? body.errors : [new InvalidBudget({ where: "budget node" }), ...body.errors],
+        errors: budgetValid(flow.limit)
+          ? body.errors
+          : [new InvalidBudget({ where: "budget node" }), ...body.errors],
         ran: body.ran,
       };
     }
@@ -165,7 +185,10 @@ const checkStructure = (
 const effectiveClasses = (
   table: ReadonlyMap<string, StepSpec>,
   facts: ChangeFacts["facts"],
-): { readonly classes: ReadonlyMap<string, EvidenceClass>; readonly errors: readonly CompileError[] } => {
+): {
+  readonly classes: ReadonlyMap<string, EvidenceClass>;
+  readonly errors: readonly CompileError[];
+} => {
   const classes = new Map<string, EvidenceClass>();
   const errors: CompileError[] = [];
   const visiting: string[] = [];
@@ -186,14 +209,17 @@ const effectiveClasses = (
     const consumed = spec.reads.map((read): EvidenceClass => {
       if (read._tag === "fact") {
         const cls = facts[read.fact];
-        if (cls === undefined) errors.push(new ReadsUnknown({ step: id, read: `fact:${read.fact}` }));
+        if (cls === undefined)
+          errors.push(new ReadsUnknown({ step: id, read: `fact:${read.fact}` }));
         return cls ?? "opinion";
       }
-      if (!table.has(read.step)) errors.push(new ReadsUnknown({ step: id, read: `step:${read.step}` }));
+      if (!table.has(read.step))
+        errors.push(new ReadsUnknown({ step: id, read: `step:${read.step}` }));
       return visit(read.step);
     });
     visiting.pop();
-    const effective = spec.kind === "human" ? "ruling" : consumed.reduce(weakest, spec.evidenceCeiling);
+    const effective =
+      spec.kind === "human" ? "ruling" : consumed.reduce(weakest, spec.evidenceCeiling);
     classes.set(id, effective);
     return effective;
   };
@@ -216,20 +242,32 @@ const ceilingFits = (spec: StepSpec): boolean => {
   }
 };
 
-const typeStep = (spec: StepSpec, effective: EvidenceClass, table: ReadonlyMap<string, StepSpec>): readonly CompileError[] => {
+const typeStep = (
+  spec: StepSpec,
+  effective: EvidenceClass,
+  table: ReadonlyMap<string, StepSpec>,
+): readonly CompileError[] => {
   const errors: CompileError[] = [];
   if (!spec.outcomes.includes("abstain")) errors.push(new AbstainMissing({ step: spec.id }));
-  if (!ceilingFits(spec)) errors.push(new KindCeilingMismatch({ step: spec.id, kind: spec.kind, ceiling: spec.evidenceCeiling }));
+  if (!ceilingFits(spec))
+    errors.push(
+      new KindCeilingMismatch({ step: spec.id, kind: spec.kind, ceiling: spec.evidenceCeiling }),
+    );
   const decides = canBlock(effective);
-  if (!decides && spec.outcomes.includes("fail")) errors.push(new OnlyProofOrRulingMayFail({ step: spec.id, effectiveClass: effective }));
-  if (!decides && spec.outcomes.includes("pass")) errors.push(new OpinionMayOnlyRoute({ step: spec.id, outcome: "pass" }));
+  if (!decides && spec.outcomes.includes("fail"))
+    errors.push(new OnlyProofOrRulingMayFail({ step: spec.id, effectiveClass: effective }));
+  if (!decides && spec.outcomes.includes("pass"))
+    errors.push(new OpinionMayOnlyRoute({ step: spec.id, outcome: "pass" }));
   for (const target of spec.mayskip) {
     const skipped = table.get(target);
     if (skipped === undefined) errors.push(new UnknownStep({ step: target }));
-    else if (!decides && !skipped.optional) errors.push(new OpinionMaySkipOnlyOptional({ step: spec.id, target }));
+    else if (!decides && !skipped.optional)
+      errors.push(new OpinionMaySkipOnlyOptional({ step: spec.id, target }));
   }
-  if (spec.overrides.length > 0 && spec.kind !== "human") errors.push(new OnlyHumanMayOverride({ step: spec.id, kind: spec.kind }));
-  for (const target of spec.overrides) if (!table.has(target)) errors.push(new UnknownStep({ step: target }));
+  if (spec.overrides.length > 0 && spec.kind !== "human")
+    errors.push(new OnlyHumanMayOverride({ step: spec.id, kind: spec.kind }));
+  for (const target of spec.overrides)
+    if (!table.has(target)) errors.push(new UnknownStep({ step: target }));
   return errors;
 };
 
@@ -282,13 +320,20 @@ const prune = (flow: Flow, keep: ReadonlySet<string>): Flow | undefined => {
 // ---------------------------------------------------------------- planning
 
 const tierFor = (spec: StepSpec, policy: FlowPolicy): TierChoice => {
-  if (spec.tier !== undefined) return { tier: spec.tier, reason: "pinned by the project's flow spec" };
-  if (spec.kind === "human") return { tier: 0, reason: "a human decision: the workflow waits for the event" };
-  if (spec.suite) return { tier: policy.suiteTier, reason: "policy: project suites run in containers" };
+  if (spec.tier !== undefined)
+    return { tier: spec.tier, reason: "pinned by the project's flow spec" };
+  if (spec.kind === "human")
+    return { tier: 0, reason: "a human decision: the workflow waits for the event" };
+  if (spec.suite)
+    return { tier: policy.suiteTier, reason: "policy: project suites run in containers" };
   return { tier: policy.defaultTier, reason: "policy: probes and pure checks run in isolates" };
 };
 
-const worldsOf = (flow: Flow, inherited: readonly World[] | undefined, out: Map<string, readonly World[] | undefined>): void => {
+const worldsOf = (
+  flow: Flow,
+  inherited: readonly World[] | undefined,
+  out: Map<string, readonly World[] | undefined>,
+): void => {
   switch (flow._tag) {
     case "step":
       out.set(flow.step, inherited);
@@ -347,18 +392,25 @@ export const compile = (
 
   const taint = effectiveClasses(table, facts.facts);
   const used = stepsIn(flow);
-  for (const step of new Set(used.filter((s, i) => used.indexOf(s) !== i))) errors.push(new StepUsedTwice({ step }));
+  for (const step of new Set(used.filter((s, i) => used.indexOf(s) !== i)))
+    errors.push(new StepUsedTwice({ step }));
   errors.push(...checkStructure(flow, table, taint.classes, new Set(), undefined).errors);
-  for (const s of table.values()) if (!budgetValid(s.budget)) errors.push(new InvalidBudget({ where: `step ${s.id}` }));
+  for (const s of table.values())
+    if (!budgetValid(s.budget)) errors.push(new InvalidBudget({ where: `step ${s.id}` }));
   errors.push(...taint.errors);
-  for (const s of table.values()) errors.push(...typeStep(s, taint.classes.get(s.id) ?? "opinion", table));
+  for (const s of table.values())
+    errors.push(...typeStep(s, taint.classes.get(s.id) ?? "opinion", table));
 
   const [first, ...rest] = errors;
   if (first !== undefined) return Result.fail([first, ...rest]);
 
-  const reasons = new Map(used.map((id) => [id, applies(table.get(id) ?? humanClassStep, facts)] as const));
+  const reasons = new Map(
+    used.map((id) => [id, applies(table.get(id) ?? humanClassStep, facts)] as const),
+  );
   const kept = new Set(used.filter((id) => reasons.get(id)?.applies === true));
-  const touchesFlow = facts.touchedPaths.filter((p) => policy.humanClassPaths.some((g) => matchesGlob(g, p)));
+  const touchesFlow = facts.touchedPaths.filter((p) =>
+    policy.humanClassPaths.some((g) => matchesGlob(g, p)),
+  );
   const pruned = prune(flow, kept);
   const gate: Flow = { _tag: "step", step: HUMAN_CLASS_STEP };
   const compiled: Flow =
@@ -367,7 +419,10 @@ export const compile = (
       : { _tag: "seq", exitOn: "fail", items: pruned === undefined ? [gate] : [pruned, gate] };
   if (touchesFlow.length > 0) {
     table.set(HUMAN_CLASS_STEP, humanClassStep);
-    reasons.set(HUMAN_CLASS_STEP, { applies: true, because: [`human-class: touches ${touchesFlow.join(", ")}`] });
+    reasons.set(HUMAN_CLASS_STEP, {
+      applies: true,
+      because: [`human-class: touches ${touchesFlow.join(", ")}`],
+    });
   }
 
   const worlds = new Map<string, readonly World[] | undefined>();
@@ -391,12 +446,25 @@ export const compile = (
       },
     ];
   });
-  const costEstimate = planned.reduce((sum, p) => sum + (table.get(p.id)?.budget.usd ?? 0) * Math.max(1, p.worlds?.length ?? 1), 0);
+  const costEstimate = planned.reduce(
+    (sum, p) => sum + (table.get(p.id)?.budget.usd ?? 0) * Math.max(1, p.worlds?.length ?? 1),
+    0,
+  );
   const versions = Object.fromEntries(planned.map((p) => [p.id, table.get(p.id)?.version ?? ""]));
-  const overrides = Object.fromEntries(planned.map((p) => [p.id, table.get(p.id)?.overrides ?? []]));
+  const overrides = Object.fromEntries(
+    planned.map((p) => [p.id, table.get(p.id)?.overrides ?? []]),
+  );
   const mayskip = Object.fromEntries(planned.map((p) => [p.id, table.get(p.id)?.mayskip ?? []]));
   const planHash = contentHashOf(
-    toJson({ compiler: COMPILER_VERSION, baseCommit: facts.baseCommit, flow: compiled, steps: planned, versions, overrides, mayskip }),
+    toJson({
+      compiler: COMPILER_VERSION,
+      baseCommit: facts.baseCommit,
+      flow: compiled,
+      steps: planned,
+      versions,
+      overrides,
+      mayskip,
+    }),
   );
   return Result.succeed({
     planHash,

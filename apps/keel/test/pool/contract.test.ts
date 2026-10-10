@@ -5,7 +5,9 @@ import { BASE, mcp, mcpResult, seedAgent, tokenFor } from "./helpers.ts";
 
 function toolNames(result: Record<string, unknown>): string[] {
   const tools: unknown = result["tools"];
-  return Array.isArray(tools) ? tools.map((tool: unknown) => String(Reflect.get(Object(tool), "name"))).toSorted() : [];
+  return Array.isArray(tools)
+    ? tools.map((tool: unknown) => String(Reflect.get(Object(tool), "name"))).toSorted()
+    : [];
 }
 
 describe("the published contract, through the Worker's fetch handler", () => {
@@ -38,7 +40,9 @@ describe("the published contract, through the Worker's fetch handler", () => {
 
   it("answers a stubbed operation with the declared 503 service.not_implemented", async () => {
     const seeded = await seedAgent();
-    const response = await exports.default.fetch(`${BASE}/v1/inbox`, { headers: { authorization: `Bearer ${await tokenFor(seeded)}` } });
+    const response = await exports.default.fetch(`${BASE}/v1/inbox`, {
+      headers: { authorization: `Bearer ${await tokenFor(seeded)}` },
+    });
     expect(response.status).toBe(503);
     expect((await response.json<{ code: string }>()).code).toBe("service.not_implemented");
   });
@@ -46,7 +50,10 @@ describe("the published contract, through the Worker's fetch handler", () => {
   it("lists exactly the mcp-tagged operations as tools, filtered by the caller's scopes", async () => {
     const tagged = Object.values(openApiDocument.paths)
       .flatMap((path) => Object.values(path))
-      .filter((operation): operation is { operationId: string; tags: string[] } => typeof operation === "object" && operation !== null && "tags" in operation)
+      .filter(
+        (operation): operation is { operationId: string; tags: string[] } =>
+          typeof operation === "object" && operation !== null && "tags" in operation,
+      )
       .filter((operation) => operation.tags.includes("mcp"))
       .map((operation) => operation.operationId);
     const worker = await seedAgent();

@@ -41,7 +41,9 @@ const scopesMeet = (a: Proposition, b: Proposition): boolean => {
 };
 
 const near = (a: Proposition, b: Proposition): boolean =>
-  subjectsRelated(a.subject, b.subject) || subjectsSiblings(a.subject, b.subject) || sharesAnchor(a, b);
+  subjectsRelated(a.subject, b.subject) ||
+  subjectsSiblings(a.subject, b.subject) ||
+  sharesAnchor(a, b);
 
 const graphArb = fc.record({
   change: changeIdArb,
@@ -53,7 +55,12 @@ const graphArb = fc.record({
 const evaluation = key("authz.permission-evaluation");
 const premiseA: HeldPremise = {
   holder: changeIds[0] ?? changeIds[1]!,
-  proposition: { subject: evaluation, predicate: "freshness", relation: "at-most", value: "per-request" },
+  proposition: {
+    subject: evaluation,
+    predicate: "freshness",
+    relation: "at-most",
+    value: "per-request",
+  },
 };
 const cacheEffect = (value: string, declared: boolean): DerivedEffect => ({
   proposition: { subject: evaluation, predicate: "freshness", relation: "is", value },
@@ -85,8 +92,13 @@ describe("fallout", () => {
     );
     expect(conflicts).toBeGreaterThan(0);
     // A contradicted should premise is a suspicion, not a conflict.
-    const should: HeldPremise = { ...premiseA, proposition: { ...premiseA.proposition, strength: "should" } };
-    expect(fallout(changeIds[1]!, cacheEffect("per-session", false), [should], []).map((f) => f._tag)).toEqual(["suspect"]);
+    const should: HeldPremise = {
+      ...premiseA,
+      proposition: { ...premiseA.proposition, strength: "should" },
+    };
+    expect(
+      fallout(changeIds[1]!, cacheEffect("per-session", false), [should], []).map((f) => f._tag),
+    ).toEqual(["suspect"]);
   });
 
   it("[fallout.contradiction-opens-conflict] every contradicted must premise of another change, and every contradicted tenet, gets a conflict", () => {
@@ -117,9 +129,13 @@ describe("fallout", () => {
           .every((p) => {
             const outcome = compare(p.proposition, effect.proposition).outcome;
             const expected =
-              outcome === "compatible" || outcome === "refines" || outcome === "needs-probe" ||
+              outcome === "compatible" ||
+              outcome === "refines" ||
+              outcome === "needs-probe" ||
               (outcome === "contradicts" && !isMust(p.proposition));
-            const got = out.some((f) => f._tag === "suspect" && f.target._tag === "premise" && f.target.premise === p);
+            const got = out.some(
+              (f) => f._tag === "suspect" && f.target._tag === "premise" && f.target.premise === p,
+            );
             return got === expected;
           });
       }),
@@ -131,18 +147,28 @@ describe("fallout", () => {
   it("[fallout.should-premise-only-suspect] contradicting a should premise is suspect, never a conflict", () => {
     fc.assert(
       fc.property(graphArb, ({ change, effect, premises }) => {
-        const shoulds = premises.map((p) => ({ ...p, proposition: { ...p.proposition, strength: "should" as const } }));
+        const shoulds = premises.map((p) => ({
+          ...p,
+          proposition: { ...p.proposition, strength: "should" as const },
+        }));
         return fallout(change, effect, shoulds, []).every((f) => f._tag !== "conflict");
       }),
     );
-    const should: HeldPremise = { ...premiseA, proposition: { ...premiseA.proposition, strength: "should" } };
-    expect(fallout(changeIds[1]!, cacheEffect("per-session", false), [should], []).map((f) => f._tag)).toEqual(["suspect"]);
+    const should: HeldPremise = {
+      ...premiseA,
+      proposition: { ...premiseA.proposition, strength: "should" },
+    };
+    expect(
+      fallout(changeIds[1]!, cacheEffect("per-session", false), [should], []).map((f) => f._tag),
+    ).toEqual(["suspect"]);
   });
 
   it("[fallout.own-premises-excluded] a change's own premises never receive its fallout", () => {
     fc.assert(
       fc.property(graphArb, ({ change, effect, premises, tenets }) =>
-        fallout(change, effect, premises, tenets).every((f) => f.target._tag !== "premise" || f.target.premise.holder !== change),
+        fallout(change, effect, premises, tenets).every(
+          (f) => f.target._tag !== "premise" || f.target.premise.holder !== change,
+        ),
       ),
     );
     expect(fallout(premiseA.holder, cacheEffect("per-session", false), [premiseA], [])).toEqual([]);
@@ -151,7 +177,9 @@ describe("fallout", () => {
   it("[fallout.silent-retraction-iff-undeclared] a conflict is a silent retraction exactly when the effect was undeclared", () => {
     fc.assert(
       fc.property(graphArb, ({ change, effect, premises, tenets }) =>
-        fallout(change, effect, premises, tenets).every((f) => f._tag !== "conflict" || f.silentRetraction === !effect.declared),
+        fallout(change, effect, premises, tenets).every(
+          (f) => f._tag !== "conflict" || f.silentRetraction === !effect.declared,
+        ),
       ),
     );
     const [silent] = fallout(changeIds[1]!, cacheEffect("per-session", false), [premiseA], []);
@@ -166,14 +194,19 @@ describe("fallout", () => {
           .filter((p) => p.holder !== change)
           .every((p) => {
             const unrelated = compare(p.proposition, effect.proposition).outcome === "unrelated";
-            const notified = out.some((f) => f._tag === "notify" && f.target._tag === "premise" && f.target.premise === p);
+            const notified = out.some(
+              (f) => f._tag === "notify" && f.target._tag === "premise" && f.target.premise === p,
+            );
             const reached = out.some((f) => f.target._tag === "premise" && f.target.premise === p);
             if (!unrelated) return !notified;
             return notified === near(p.proposition, effect.proposition) && (notified || !reached);
           });
       }),
     );
-    const sibling: HeldPremise = { ...premiseA, proposition: { ...premiseA.proposition, subject: key("authz.audit-log") } };
+    const sibling: HeldPremise = {
+      ...premiseA,
+      proposition: { ...premiseA.proposition, subject: key("authz.audit-log") },
+    };
     const [notice] = fallout(changeIds[1]!, cacheEffect("per-session", false), [sibling], []);
     expect(notice?._tag === "notify" ? notice.reason : notice?._tag).toBe("sibling-subject");
   });
@@ -188,16 +221,45 @@ describe("exposure", () => {
     fc.assert(
       fc.property(exposureArb, ({ self, intent, others }) => {
         const listed = new Set(exposure(self, intent, others).neighbours.map((n) => n.changeId));
-        const premises: HeldPremise[] = others.flatMap((o) => o.intent.premises.map((proposition) => ({ holder: o.id, proposition })));
+        const premises: HeldPremise[] = others.flatMap((o) =>
+          o.intent.premises.map((proposition) => ({ holder: o.id, proposition })),
+        );
         return (intent.declaredEffects ?? []).every((proposition) =>
-          fallout(self, { proposition, method: "extractor", evidenceClass: "proof", anchors: [], declared: true }, premises, [])
-            .every((f) => f.target._tag !== "premise" || listed.has(f.target.premise.holder)),
+          fallout(
+            self,
+            {
+              proposition,
+              method: "extractor",
+              evidenceClass: "proof",
+              anchors: [],
+              declared: true,
+            },
+            premises,
+            [],
+          ).every((f) => f.target._tag !== "premise" || listed.has(f.target.premise.holder)),
         );
       }),
     );
-    const b: Intent = { revision: 1, goal: "speed up permission checks", footprint: [], premises: [], declaredEffects: [cacheEffect("per-session", true).proposition] };
-    const a = { id: premiseA.holder, intent: { revision: 1, goal: "revoke collaborators", footprint: [], premises: [premiseA.proposition] }, derived: [] };
-    expect(exposure(changeIds[1]!, b, [a]).neighbours.map((n) => n.changeId)).toEqual([premiseA.holder]);
+    const b: Intent = {
+      revision: 1,
+      goal: "speed up permission checks",
+      footprint: [],
+      premises: [],
+      declaredEffects: [cacheEffect("per-session", true).proposition],
+    };
+    const a = {
+      id: premiseA.holder,
+      intent: {
+        revision: 1,
+        goal: "revoke collaborators",
+        footprint: [],
+        premises: [premiseA.proposition],
+      },
+      derived: [],
+    };
+    expect(exposure(changeIds[1]!, b, [a]).neighbours.map((n) => n.changeId)).toEqual([
+      premiseA.holder,
+    ]);
 
     // Overlap through a shared anchor alone: unrelated subjects, no footprint.
     const anchor = { path: "src/authz/cache.ts", commit: CommitSha.make("a".repeat(40)) };
@@ -206,16 +268,54 @@ describe("exposure", () => {
       goal: "cache billing lookups",
       footprint: [],
       premises: [],
-      declaredEffects: [{ subject: key("billing.cache"), predicate: "freshness", relation: "is", value: "per-session", anchors: [anchor] }],
+      declaredEffects: [
+        {
+          subject: key("billing.cache"),
+          predicate: "freshness",
+          relation: "is",
+          value: "per-session",
+          anchors: [anchor],
+        },
+      ],
     };
-    const anchored = { ...a, intent: { ...a.intent, premises: [{ ...premiseA.proposition, anchors: [anchor] }] } };
-    const reached = fallout(changeIds[1]!, { proposition: viaAnchor.declaredEffects![0]!, method: "extractor", evidenceClass: "proof", anchors: [], declared: true }, [{ holder: premiseA.holder, proposition: anchored.intent.premises[0]! }], []);
-    expect(reached.map((f) => (f._tag === "notify" ? f.reason : f._tag))).toEqual(["shared-anchor"]);
-    expect(exposure(changeIds[1]!, viaAnchor, [anchored]).neighbours.map((n) => n.changeId)).toEqual([premiseA.holder]);
+    const anchored = {
+      ...a,
+      intent: { ...a.intent, premises: [{ ...premiseA.proposition, anchors: [anchor] }] },
+    };
+    const reached = fallout(
+      changeIds[1]!,
+      {
+        proposition: viaAnchor.declaredEffects![0]!,
+        method: "extractor",
+        evidenceClass: "proof",
+        anchors: [],
+        declared: true,
+      },
+      [{ holder: premiseA.holder, proposition: anchored.intent.premises[0]! }],
+      [],
+    );
+    expect(reached.map((f) => (f._tag === "notify" ? f.reason : f._tag))).toEqual([
+      "shared-anchor",
+    ]);
+    expect(
+      exposure(changeIds[1]!, viaAnchor, [anchored]).neighbours.map((n) => n.changeId),
+    ).toEqual([premiseA.holder]);
 
     // Overlap through a sibling subject alone.
-    const viaSibling: Intent = { ...viaAnchor, declaredEffects: [{ subject: key("authz.audit-log"), predicate: "freshness", relation: "is", value: "per-session" }] };
-    expect(exposure(changeIds[1]!, viaSibling, [a]).neighbours.map((n) => n.changeId)).toEqual([premiseA.holder]);
+    const viaSibling: Intent = {
+      ...viaAnchor,
+      declaredEffects: [
+        {
+          subject: key("authz.audit-log"),
+          predicate: "freshness",
+          relation: "is",
+          value: "per-session",
+        },
+      ],
+    };
+    expect(exposure(changeIds[1]!, viaSibling, [a]).neighbours.map((n) => n.changeId)).toEqual([
+      premiseA.holder,
+    ]);
   });
 
   it("[exposure.precision-floor] a change with nothing near and no overlapping footprint is never a neighbour", () => {
@@ -225,7 +325,11 @@ describe("exposure", () => {
         const mine = [...intent.premises, ...(intent.declaredEffects ?? [])];
         const listed = new Set(exposure(self, intent, others).neighbours.map((n) => n.changeId));
         return others.every((o) => {
-          const theirs = [...o.intent.premises, ...(o.intent.declaredEffects ?? []), ...o.derived.map((d) => d.proposition)];
+          const theirs = [
+            ...o.intent.premises,
+            ...(o.intent.declaredEffects ?? []),
+            ...o.derived.map((d) => d.proposition),
+          ];
           const isNear = mine.some((m) => theirs.some((t) => near(m, t)));
           const footprint = intent.footprint.length > 0 && o.intent.footprint.length > 0;
           if (isNear || footprint) return true;
@@ -242,10 +346,18 @@ describe("exposure", () => {
       fc.property(exposureArb, ({ self, intent, others }) => {
         const reported = exposure(self, intent, others).contradictions;
         const expected = others.flatMap((o) => {
-          const theirs = [...o.intent.premises, ...(o.intent.declaredEffects ?? []), ...o.derived.map((d) => d.proposition)];
+          const theirs = [
+            ...o.intent.premises,
+            ...(o.intent.declaredEffects ?? []),
+            ...o.derived.map((d) => d.proposition),
+          ];
           return [
-            ...intent.premises.flatMap((p) => theirs.map((t) => ({ premise: p, with: t, holder: self }))),
-            ...o.intent.premises.flatMap((p) => (intent.declaredEffects ?? []).map((e) => ({ premise: p, with: e, holder: o.id }))),
+            ...intent.premises.flatMap((p) =>
+              theirs.map((t) => ({ premise: p, with: t, holder: self })),
+            ),
+            ...o.intent.premises.flatMap((p) =>
+              (intent.declaredEffects ?? []).map((e) => ({ premise: p, with: e, holder: o.id })),
+            ),
           ].filter((c) => compare(c.premise, c.with).outcome === "contradicts");
         });
         expect(reported).toEqual(expected);
@@ -258,11 +370,17 @@ describe("exposure", () => {
       revision: 1,
       goal: "speed up permission checks",
       footprint: [],
-      premises: [{ subject: evaluation, predicate: "freshness", relation: "at-most", value: "hourly" }],
-      declaredEffects: [{ subject: evaluation, predicate: "freshness", relation: "is", value: "per-session" }],
+      premises: [
+        { subject: evaluation, predicate: "freshness", relation: "at-most", value: "hourly" },
+      ],
+      declaredEffects: [
+        { subject: evaluation, predicate: "freshness", relation: "is", value: "per-session" },
+      ],
     };
     const { unreadable } = exposure(changeIds[0]!, intent, []);
-    expect(unreadable.map((u) => [u.predicate, u.reason])).toEqual([["freshness", '"hourly" is not a freshness']]);
+    expect(unreadable.map((u) => [u.predicate, u.reason])).toEqual([
+      ["freshness", '"hourly" is not a freshness'],
+    ]);
     fc.assert(
       fc.property(intentArb, (i) => exposure(changeIds[0]!, i, []).unreadable.length === 0),
     );
@@ -271,8 +389,14 @@ describe("exposure", () => {
 
 describe("the S-1 premise against B's cache", () => {
   it("[fallout.scope-respected] an effect in a disjoint scope only notifies", () => {
-    const scoped: DerivedEffect = { ...cacheEffect("per-session", false), proposition: { ...cacheEffect("per-session", false).proposition, scope: "env:staging" } };
-    const scopedPremise: HeldPremise = { ...premiseA, proposition: { ...premiseA.proposition, scope: "env:prod" } };
+    const scoped: DerivedEffect = {
+      ...cacheEffect("per-session", false),
+      proposition: { ...cacheEffect("per-session", false).proposition, scope: "env:staging" },
+    };
+    const scopedPremise: HeldPremise = {
+      ...premiseA,
+      proposition: { ...premiseA.proposition, scope: "env:prod" },
+    };
     const [only] = fallout(changeIds[1]!, scoped, [scopedPremise], []);
     expect(only?._tag === "notify" ? only.reason : only?._tag).toBe("scope-disjoint");
     expect(scopesMeet(scoped.proposition, scopedPremise.proposition)).toBe(false);

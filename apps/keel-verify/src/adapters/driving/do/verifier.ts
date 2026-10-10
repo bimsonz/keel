@@ -18,6 +18,9 @@ export class VerifierDO extends DurableObject<Env> implements VerifierRpc {
   }
 
   async run(_job: unknown) {
-    return encodeExit(VerifierCodecs.run, Exit.fail(new VerifierUnavailable({ reason: "Tier 1 execution is not implemented yet" })));
+    return encodeExit(
+      VerifierCodecs.run,
+      Exit.fail(new VerifierUnavailable({ reason: "Tier 1 execution is not implemented yet" })),
+    );
   }
 }

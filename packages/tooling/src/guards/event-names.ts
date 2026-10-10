@@ -10,10 +10,41 @@ const MACHINES = "docs/domain/state-machines.md";
 
 /** Irregular past participles accepted as an event's verb. */
 const IRREGULAR = new Set([
-  "Begun", "Broken", "Brought", "Built", "Caught", "Chosen", "Cut", "Done", "Drawn", "Found",
-  "Frozen", "Given", "Held", "Kept", "Known", "Left", "Lost", "Made", "Met", "Paid", "Proven",
-  "Put", "Ran", "Read", "Run", "Sent", "Set", "Shown", "Split", "Taken", "Thrown", "Torn", "Withdrawn",
-  "Won", "Written",
+  "Begun",
+  "Broken",
+  "Brought",
+  "Built",
+  "Caught",
+  "Chosen",
+  "Cut",
+  "Done",
+  "Drawn",
+  "Found",
+  "Frozen",
+  "Given",
+  "Held",
+  "Kept",
+  "Known",
+  "Left",
+  "Lost",
+  "Made",
+  "Met",
+  "Paid",
+  "Proven",
+  "Put",
+  "Ran",
+  "Read",
+  "Run",
+  "Sent",
+  "Set",
+  "Shown",
+  "Split",
+  "Taken",
+  "Thrown",
+  "Torn",
+  "Withdrawn",
+  "Won",
+  "Written",
 ]);
 
 /** Backticked PascalCase names in state-machines.md that are not events. */
@@ -55,11 +86,21 @@ export function checkEventNames(root: string, options: GuardOptions = {}): Guard
   const seen = new Map<string, number>();
   for (const { name, line } of events) {
     if (!isPastTense(name)) {
-      violations.push({ rule: EVENT_NAMES, file: CATALOGUE, line, message: `${name} is not a past-tense verb` });
+      violations.push({
+        rule: EVENT_NAMES,
+        file: CATALOGUE,
+        line,
+        message: `${name} is not a past-tense verb`,
+      });
     }
     const first = seen.get(name);
     if (first !== undefined) {
-      violations.push({ rule: EVENT_NAMES, file: CATALOGUE, line, message: `${name} is catalogued twice (first at line ${first})` });
+      violations.push({
+        rule: EVENT_NAMES,
+        file: CATALOGUE,
+        line,
+        message: `${name} is catalogued twice (first at line ${first})`,
+      });
     } else {
       seen.set(name, line);
     }

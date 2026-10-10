@@ -22,7 +22,12 @@ export type Footprints = {
 
 export type CommutationInput = {
   /** Batch B, verified at `base` on top of its speculative predecessors P. */
-  readonly batch: { readonly id: BatchId; readonly base: CommitSha; readonly predecessors: readonly ChangeId[]; readonly touched: Footprints };
+  readonly batch: {
+    readonly id: BatchId;
+    readonly base: CommitSha;
+    readonly predecessors: readonly ChangeId[];
+    readonly touched: Footprints;
+  };
   /** D: the changes that landed on trunk since `base` and are not in P. */
   readonly intervening: Footprints;
   /** The current head B would be promoted onto. */
@@ -49,13 +54,21 @@ export type Commutation =
       readonly failed: readonly CommutationCondition[];
       readonly scope:
         | { readonly _tag: "all" }
-        | { readonly _tag: "where-they-meet"; readonly affected: readonly string[]; readonly subjects: readonly SubjectKey[] };
+        | {
+            readonly _tag: "where-they-meet";
+            readonly affected: readonly string[];
+            readonly subjects: readonly SubjectKey[];
+          };
     };
 
 const sorted = <T extends string>(xs: readonly T[]): readonly T[] => [...new Set(xs)].toSorted();
-const meet = (a: readonly string[], b: readonly string[]): readonly string[] => sorted(a.filter((x) => b.includes(x)));
+const meet = (a: readonly string[], b: readonly string[]): readonly string[] =>
+  sorted(a.filter((x) => b.includes(x)));
 const linking = (a: readonly SubjectKey[], b: readonly SubjectKey[]): readonly SubjectKey[] =>
-  sorted([...a.filter((x) => b.some((y) => subjectsRelated(x, y))), ...b.filter((y) => a.some((x) => subjectsRelated(x, y)))]);
+  sorted([
+    ...a.filter((x) => b.some((y) => subjectsRelated(x, y))),
+    ...b.filter((y) => a.some((x) => subjectsRelated(x, y))),
+  ]);
 
 /** C2's path half, C3 and C4 for one pair of footprints. */
 const pairwise = (x: Footprints, y: Footprints) => ({
@@ -80,7 +93,12 @@ const canonicalFootprints = (f: Footprints) => ({
 export const proofIdOf = (input: CommutationInput): ContentHash =>
   contentHashOf({
     rule: "commutation/1",
-    batch: { id: input.batch.id, base: input.batch.base, predecessors: sorted(input.batch.predecessors), touched: canonicalFootprints(input.batch.touched) },
+    batch: {
+      id: input.batch.id,
+      base: input.batch.base,
+      predecessors: sorted(input.batch.predecessors),
+      touched: canonicalFootprints(input.batch.touched),
+    },
     intervening: canonicalFootprints(input.intervening),
     head: input.head,
     promoted: sorted(input.promoted.filter((c) => input.batch.predecessors.includes(c))),
@@ -114,17 +132,21 @@ export const commutation = (input: CommutationInput): Commutation => {
   const bd = pairwise(b, d);
   const members = [b, ...input.group.map((g) => g.touched)];
   const pairs = members.flatMap((x, i) => members.slice(i + 1).map((y) => pairwise(x, y)));
-  const barrierTouched = [...b.paths, ...d.paths].some((p) => input.barriers.some((g) => matchesGlob(g, p)));
+  const barrierTouched = [...b.paths, ...d.paths].some((p) =>
+    input.barriers.some((g) => matchesGlob(g, p)),
+  );
 
   const failed: CommutationCondition[] = [];
   if (bd.paths.length > 0 || !input.mergeTreeClean) failed.push("C2");
   if (bd.affected.length > 0) failed.push("C3");
   if (bd.subjects.length > 0) failed.push("C4");
   if (barrierTouched) failed.push("C5");
-  if (pairs.some((p) => p.paths.length > 0 || p.affected.length > 0 || p.subjects.length > 0)) failed.push("C6");
+  if (pairs.some((p) => p.paths.length > 0 || p.affected.length > 0 || p.subjects.length > 0))
+    failed.push("C6");
 
   if (failed.length === 0) return { _tag: "commutes", proofId: proofIdOf(input) };
-  if (barrierTouched || !input.mergeTreeClean) return { _tag: "reverify", failed, scope: { _tag: "all" } };
+  if (barrierTouched || !input.mergeTreeClean)
+    return { _tag: "reverify", failed, scope: { _tag: "all" } };
   return {
     _tag: "reverify",
     failed,

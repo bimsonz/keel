@@ -19,10 +19,17 @@ export const changeIdArb: fc.Arbitrary<ChangeId> = fc.constantFrom(...changeIds)
 
 /** Lattice predicates plus the model-compared and pairwise ones, so every fallout path is reachable. */
 export const graphPredicates: readonly Predicate[] = [
-  "freshness", "cardinality", "authority", "presence", "ordering", "invariant",
+  "freshness",
+  "cardinality",
+  "authority",
+  "presence",
+  "ordering",
+  "invariant",
 ];
 
-export const graphPropositionArb: fc.Arbitrary<Proposition> = propositionArb({ predicates: graphPredicates });
+export const graphPropositionArb: fc.Arbitrary<Proposition> = propositionArb({
+  predicates: graphPredicates,
+});
 
 export const heldPremiseArb: fc.Arbitrary<HeldPremise> = fc.record({
   holder: changeIdArb,
@@ -39,7 +46,9 @@ export const tenetArb: fc.Arbitrary<GuardedTenet> = fc
 
 export const evidenceArb: fc.Arbitrary<EvidenceClass> = fc.constantFrom(...EvidenceClass.literals);
 
-export const derivedEffectArb = (proposition: fc.Arbitrary<Proposition> = graphPropositionArb): fc.Arbitrary<DerivedEffect> =>
+export const derivedEffectArb = (
+  proposition: fc.Arbitrary<Proposition> = graphPropositionArb,
+): fc.Arbitrary<DerivedEffect> =>
   fc.record({
     proposition,
     method: fc.constantFrom("extractor" as const, "clef" as const, "code-model" as const),
@@ -49,7 +58,12 @@ export const derivedEffectArb = (proposition: fc.Arbitrary<Proposition> = graphP
   });
 
 const footprintPaths = [
-  "src/authz/**", "src/authz/check.ts", "src/authz/cache.ts", "src/billing/*.ts", "src/billing/charge.ts", "docs/readme.md",
+  "src/authz/**",
+  "src/authz/check.ts",
+  "src/authz/cache.ts",
+  "src/billing/*.ts",
+  "src/billing/charge.ts",
+  "docs/readme.md",
 ] as const;
 
 export const footprintArb: fc.Arbitrary<readonly FootprintEntry[]> = fc
@@ -74,5 +88,8 @@ export const liveChangeArb = (id: ChangeId): fc.Arbitrary<LiveChange> =>
 /** Live changes with distinct ids, none of them `self`. */
 export const othersArb = (self: ChangeId): fc.Arbitrary<readonly LiveChange[]> =>
   fc
-    .subarray(changeIds.filter((c) => c !== self), { minLength: 1 })
+    .subarray(
+      changeIds.filter((c) => c !== self),
+      { minLength: 1 },
+    )
     .chain((ids) => fc.tuple(...ids.map((id) => liveChangeArb(id))));

@@ -14,7 +14,14 @@ export const DeployTarget = Schema.Literals([
 ]);
 export type DeployTarget = typeof DeployTarget.Type;
 
-export const DeploymentState = Schema.Literals(["previewing", "live", "torn-down", "promoting", "promoted", "rolled-back"]);
+export const DeploymentState = Schema.Literals([
+  "previewing",
+  "live",
+  "torn-down",
+  "promoting",
+  "promoted",
+  "rolled-back",
+]);
 export type DeploymentState = typeof DeploymentState.Type;
 
 export const Deployment = Schema.Struct({

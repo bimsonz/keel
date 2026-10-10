@@ -3,7 +3,11 @@ import { CommitSha } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { exitCodec, type ExitJson } from "./exit.ts";
 
-export const TrunkStatus = Schema.Struct({ head: CommitSha, promotion: PromotionState, redCount: Schema.Int });
+export const TrunkStatus = Schema.Struct({
+  head: CommitSha,
+  promotion: PromotionState,
+  redCount: Schema.Int,
+});
 
 export const TrunkCodecs = {
   status: exitCodec(TrunkStatus, Schema.Never),

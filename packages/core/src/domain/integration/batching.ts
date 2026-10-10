@@ -3,7 +3,11 @@ import type { ChangeId } from "../kernel/index.ts";
 import { batchSize } from "./batch.ts";
 
 /** A change waiting in a lane, with what Keel derived it alters. */
-export type QueuedChange = { readonly id: ChangeId; readonly effects: readonly Proposition[]; readonly risky: boolean };
+export type QueuedChange = {
+  readonly id: ChangeId;
+  readonly effects: readonly Proposition[];
+  readonly risky: boolean;
+};
 
 /** How many speculative batches may be in flight ahead of trunk. */
 export const MAX_SPECULATION = 4;
@@ -15,8 +19,11 @@ const contradict = (a: Proposition, b: Proposition): boolean =>
 export const oppositeEffects = (a: QueuedChange, b: QueuedChange): boolean =>
   a.effects.some((x) => b.effects.some((y) => contradict(x, y)));
 
-const suspected = (pairs: readonly (readonly [ChangeId, ChangeId])[], a: ChangeId, b: ChangeId): boolean =>
-  pairs.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+const suspected = (
+  pairs: readonly (readonly [ChangeId, ChangeId])[],
+  a: ChangeId,
+  b: ChangeId,
+): boolean => pairs.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
 
 /**
  * Belief-aware batching. Batches hold at most N = batchSize(p) changes, never

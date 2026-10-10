@@ -22,8 +22,11 @@ export function makeCandidateComposerMemory(options: { readonly refuse?: readonl
         compose: (base, members) =>
           Effect.gen(function* () {
             const refused = members.filter((m) => options.refuse?.includes(m.changeId));
-            if (refused.length > 0) return yield* new CompositionRefused({ reason: "overlapping edits", paths: [] });
-            const treeSha = yield* Effect.promise(() => sha([base, ...members.map((m) => m.commit)].join("\n")));
+            if (refused.length > 0)
+              return yield* new CompositionRefused({ reason: "overlapping edits", paths: [] });
+            const treeSha = yield* Effect.promise(() =>
+              sha([base, ...members.map((m) => m.commit)].join("\n")),
+            );
             return { treeSha, tier: { tier: 0, reason: "path-disjoint members" } };
           }),
       }),
@@ -46,7 +49,8 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
         head: Effect.sync(() => current),
         push: (from, to) =>
           Effect.suspend(() => {
-            if (from !== current) return Effect.fail(new UnexpectedHead({ expected: from, observed: current }));
+            if (from !== current)
+              return Effect.fail(new UnexpectedHead({ expected: from, observed: current }));
             current = to;
             return Effect.void;
           }),

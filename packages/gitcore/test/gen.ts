@@ -10,8 +10,14 @@ export const PATHS = DIRS.flatMap((d) => NAMES.map((n) => (d ? `${d}/${n}` : n))
 /** File paths that coincide with directories above: dir/file clashes. */
 const CLASH_PATHS = ["a", "a/c", "b"];
 
-const LINES = Array.from({ length: 24 }, (_, i) => `line ${i}: ${"lorem ipsum dolor ".repeat(1 + (i % 3))}`);
-const SUBMODULE_SHAS = ["1111111111111111111111111111111111111111", "2222222222222222222222222222222222222222"];
+const LINES = Array.from(
+  { length: 24 },
+  (_, i) => `line ${i}: ${"lorem ipsum dolor ".repeat(1 + (i % 3))}`,
+);
+const SUBMODULE_SHAS = [
+  "1111111111111111111111111111111111111111",
+  "2222222222222222222222222222222222222222",
+];
 
 const pathArb = fc.oneof(
   { weight: 29, arbitrary: fc.constantFrom(...PATHS) },
@@ -34,11 +40,19 @@ export type Op =
 
 const pick = fc.nat({ max: 63 });
 const textOps = [
-  { weight: 3, arbitrary: fc.record({ k: fc.constant("add" as const), path: pathArb, lines: linesArb }) },
+  {
+    weight: 3,
+    arbitrary: fc.record({ k: fc.constant("add" as const), path: pathArb, lines: linesArb }),
+  },
   { weight: 2, arbitrary: fc.record({ k: fc.constant("modify" as const), pick, lines: linesArb }) },
   {
     weight: 3,
-    arbitrary: fc.record({ k: fc.constant("edit" as const), pick, at: fc.nat({ max: 11 }), line: fc.nat({ max: 23 }) }),
+    arbitrary: fc.record({
+      k: fc.constant("edit" as const),
+      pick,
+      at: fc.nat({ max: 11 }),
+      line: fc.nat({ max: 23 }),
+    }),
   },
   { weight: 2, arbitrary: fc.record({ k: fc.constant("delete" as const), pick }) },
   { weight: 2, arbitrary: fc.record({ k: fc.constant("rename" as const), pick, to: pathArb }) },
@@ -57,7 +71,11 @@ const exoticOps = [
   { weight: 1, arbitrary: fc.record({ k: fc.constant("chmod" as const), pick }) },
   {
     weight: 1,
-    arbitrary: fc.record({ k: fc.constant("symlink" as const), path: pathArb, target: fc.constantFrom("x", "../y", "a/c") }),
+    arbitrary: fc.record({
+      k: fc.constant("symlink" as const),
+      path: pathArb,
+      target: fc.constantFrom("x", "../y", "a/c"),
+    }),
   },
   {
     weight: 1,
@@ -69,13 +87,19 @@ const exoticOps = [
   },
   {
     weight: 1,
-    arbitrary: fc.record({ k: fc.constant("gitlink" as const), path: pathArb, sha: fc.constantFrom(...SUBMODULE_SHAS) }),
+    arbitrary: fc.record({
+      k: fc.constant("gitlink" as const),
+      path: pathArb,
+      sha: fc.constantFrom(...SUBMODULE_SHAS),
+    }),
   },
 ];
 /** Plain text edits only: the cases where a path-level merge can actually succeed. */
 export const textOpArb: fc.Arbitrary<Op> = fc.oneof(...(textOps as fc.WeightedArbitrary<Op>[]));
 /** Everything, including modes, symlinks, binaries and submodules. */
-export const anyOpArb: fc.Arbitrary<Op> = fc.oneof(...([...textOps, ...exoticOps] as fc.WeightedArbitrary<Op>[]));
+export const anyOpArb: fc.Arbitrary<Op> = fc.oneof(
+  ...([...textOps, ...exoticOps] as fc.WeightedArbitrary<Op>[]),
+);
 
 export interface History {
   base: Array<{ path: string; lines: number[] }>;
@@ -86,9 +110,16 @@ export interface History {
   crissCross: { a: Op[]; c: Op[] } | null;
 }
 
-const historyOf = (opArb: fc.Arbitrary<Op>, maxOps: number, baseMax: number): fc.Arbitrary<History> =>
+const historyOf = (
+  opArb: fc.Arbitrary<Op>,
+  maxOps: number,
+  baseMax: number,
+): fc.Arbitrary<History> =>
   fc.record({
-    base: fc.array(fc.record({ path: pathArb, lines: linesArb }), { minLength: 2, maxLength: baseMax }),
+    base: fc.array(fc.record({ path: pathArb, lines: linesArb }), {
+      minLength: 2,
+      maxLength: baseMax,
+    }),
     shared: fc.array(opArb, { maxLength: 2 }),
     ours: fc.array(opArb, { maxLength: maxOps }),
     theirs: fc.array(opArb, { maxLength: maxOps }),
@@ -134,7 +165,11 @@ export function applyOps(start: TreeModel, ops: readonly Op[]): TreeModel {
         break;
       case "modify": {
         const p = at(op.pick);
-        if (p) setPath(t, p, { mode: t.get(p)?.mode === "100755" ? "100755" : "100644", data: render(op.lines) });
+        if (p)
+          setPath(t, p, {
+            mode: t.get(p)?.mode === "100755" ? "100755" : "100644",
+            data: render(op.lines),
+          });
         break;
       }
       case "edit": {
@@ -159,7 +194,12 @@ export function applyOps(start: TreeModel, ops: readonly Op[]): TreeModel {
         if (!p || !f || p === op.to) break;
         t.delete(p);
         let data = f.data;
-        if (op.k === "nearRename" && typeof data === "string" && f.mode !== "120000" && f.mode !== "160000") {
+        if (
+          op.k === "nearRename" &&
+          typeof data === "string" &&
+          f.mode !== "120000" &&
+          f.mode !== "160000"
+        ) {
           const ls = textOf(f).split("\n");
           ls[op.at % Math.max(1, ls.length - 1)] = `${LINES[op.line]} tweaked`;
           data = ls.join("\n");
@@ -203,8 +243,20 @@ export function planCase(h: History, id: number): CasePlan {
     return {
       commits: [
         { mark: 1, ref: ref("base"), parents: [], tree: base, message: "base\n" },
-        { mark: 2, ref: ref("ours"), parents: [1], tree: applyOps(base, [...h.shared, ...h.ours]), message: "ours\n" },
-        { mark: 3, ref: ref("theirs"), parents: [1], tree: applyOps(base, [...h.shared, ...h.theirs]), message: "theirs\n" },
+        {
+          mark: 2,
+          ref: ref("ours"),
+          parents: [1],
+          tree: applyOps(base, [...h.shared, ...h.ours]),
+          message: "ours\n",
+        },
+        {
+          mark: 3,
+          ref: ref("theirs"),
+          parents: [1],
+          tree: applyOps(base, [...h.shared, ...h.theirs]),
+          message: "theirs\n",
+        },
       ],
       oursMark: 2,
       theirsMark: 3,
@@ -217,8 +269,20 @@ export function planCase(h: History, id: number): CasePlan {
       { mark: 1, ref: ref("base"), parents: [], tree: base, message: "base\n" },
       { mark: 2, ref: ref("a"), parents: [1], tree: a, message: "a\n" },
       { mark: 3, ref: ref("c"), parents: [1], tree: c, message: "c\n" },
-      { mark: 4, ref: ref("ours"), parents: [2, 3], tree: applyOps(a, [...h.shared, ...h.ours]), message: "ours\n" },
-      { mark: 5, ref: ref("theirs"), parents: [3, 2], tree: applyOps(c, [...h.shared, ...h.theirs]), message: "theirs\n" },
+      {
+        mark: 4,
+        ref: ref("ours"),
+        parents: [2, 3],
+        tree: applyOps(a, [...h.shared, ...h.ours]),
+        message: "ours\n",
+      },
+      {
+        mark: 5,
+        ref: ref("theirs"),
+        parents: [3, 2],
+        tree: applyOps(c, [...h.shared, ...h.theirs]),
+        message: "theirs\n",
+      },
     ],
     oursMark: 4,
     theirsMark: 5,
@@ -229,5 +293,8 @@ export function planCase(h: History, id: number): CasePlan {
 export function sides(h: History): { readonly a: TreeModel; readonly b: TreeModel } {
   const base = new Map<string, FileSpec>();
   for (const f of h.base) setPath(base, f.path, { mode: "100644", data: render(f.lines) });
-  return { a: applyOps(base, [...h.shared, ...h.ours]), b: applyOps(base, [...h.shared, ...h.theirs]) };
+  return {
+    a: applyOps(base, [...h.shared, ...h.ours]),
+    b: applyOps(base, [...h.shared, ...h.theirs]),
+  };
 }

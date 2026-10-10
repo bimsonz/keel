@@ -1,5 +1,12 @@
 import { type EntityRef, EventEnvelope, Instant, makeId } from "@keeltown/core/kernel";
-import { type Backlog, type DueDeliveries, envelopesFor, EVERY_TYPE, EventOutbox, type PriorCommit } from "@keeltown/core/ports";
+import {
+  type Backlog,
+  type DueDeliveries,
+  envelopesFor,
+  EVERY_TYPE,
+  EventOutbox,
+  type PriorCommit,
+} from "@keeltown/core/ports";
 import { Layer, Schema } from "effect";
 import { monotonicFactory } from "ulid";
 
@@ -18,17 +25,27 @@ export function migrateEventOutbox(storage: DurableObjectStorage): void {
     event_id TEXT NOT NULL UNIQUE, dedupe_key TEXT NOT NULL UNIQUE,
     cause TEXT NOT NULL, fingerprint TEXT, envelope TEXT NOT NULL,
     PRIMARY KEY (entity_kind, entity_id, seq))`);
-  sql.exec("CREATE INDEX IF NOT EXISTS keel_events_by_cause ON keel_events (entity_kind, entity_id, cause)");
-  sql.exec("CREATE TABLE IF NOT EXISTS keel_subscriptions (subscriber TEXT NOT NULL, type TEXT NOT NULL, PRIMARY KEY (subscriber, type))");
+  sql.exec(
+    "CREATE INDEX IF NOT EXISTS keel_events_by_cause ON keel_events (entity_kind, entity_id, cause)",
+  );
+  sql.exec(
+    "CREATE TABLE IF NOT EXISTS keel_subscriptions (subscriber TEXT NOT NULL, type TEXT NOT NULL, PRIMARY KEY (subscriber, type))",
+  );
   sql.exec(`CREATE TABLE IF NOT EXISTS keel_deliveries (
     position INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT NOT NULL, subscriber TEXT NOT NULL,
     attempts INTEGER NOT NULL DEFAULT 0, next_at INTEGER NOT NULL, UNIQUE (event_id, subscriber))`);
-  sql.exec("CREATE INDEX IF NOT EXISTS keel_deliveries_by_subscriber ON keel_deliveries (subscriber, position)");
-  sql.exec("CREATE TABLE IF NOT EXISTS keel_received (dedupe_key TEXT PRIMARY KEY, at INTEGER NOT NULL)");
+  sql.exec(
+    "CREATE INDEX IF NOT EXISTS keel_deliveries_by_subscriber ON keel_deliveries (subscriber, position)",
+  );
+  sql.exec(
+    "CREATE TABLE IF NOT EXISTS keel_received (dedupe_key TEXT PRIMARY KEY, at INTEGER NOT NULL)",
+  );
 }
 
-const decodeEnvelope = (json: string): EventEnvelope => Schema.decodeUnknownSync(EventEnvelope)(JSON.parse(json));
-const encodeEnvelope = (envelope: EventEnvelope): string => JSON.stringify(Schema.encodeSync(EventEnvelope)(envelope));
+const decodeEnvelope = (json: string): EventEnvelope =>
+  Schema.decodeUnknownSync(EventEnvelope)(JSON.parse(json));
+const encodeEnvelope = (envelope: EventEnvelope): string =>
+  JSON.stringify(Schema.encodeSync(EventEnvelope)(envelope));
 
 /**
  * EventOutbox on the Durable Object's own SQLite. Synchronous throughout, so
@@ -41,7 +58,11 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
 
   const subscribers = (type: string): readonly string[] =>
     sql
-      .exec<{ subscriber: string }>("SELECT DISTINCT subscriber FROM keel_subscriptions WHERE type = ? OR type = ? ORDER BY subscriber", type, EVERY_TYPE)
+      .exec<{ subscriber: string }>(
+        "SELECT DISTINCT subscriber FROM keel_subscriptions WHERE type = ? OR type = ? ORDER BY subscriber",
+        type,
+        EVERY_TYPE,
+      )
       .toArray()
       .map((row) => row.subscriber);
 
@@ -49,10 +70,22 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
     EventOutbox,
     EventOutbox.of({
       append: (spec, at, drafts) => {
-        const head = sql
-          .exec<{ seq: number | null }>("SELECT MAX(seq) AS seq FROM keel_events WHERE entity_kind = ? AND entity_id = ?", spec.entity.kind, spec.entity.id)
-          .one().seq ?? 0;
-        const envelopes = envelopesFor(spec, at, head, drafts, () => makeId("evt", nextUlid(at)), subscribers);
+        const head =
+          sql
+            .exec<{ seq: number | null }>(
+              "SELECT MAX(seq) AS seq FROM keel_events WHERE entity_kind = ? AND entity_id = ?",
+              spec.entity.kind,
+              spec.entity.id,
+            )
+            .one().seq ?? 0;
+        const envelopes = envelopesFor(
+          spec,
+          at,
+          head,
+          drafts,
+          () => makeId("evt", nextUlid(at)),
+          subscribers,
+        );
         for (const envelope of envelopes) {
           sql.exec(
             "INSERT INTO keel_events (entity_kind, entity_id, seq, event_id, dedupe_key, cause, fingerprint, envelope) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -66,7 +99,12 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
             encodeEnvelope(envelope),
           );
           for (const subscriber of envelope.notified) {
-            sql.exec("INSERT INTO keel_deliveries (event_id, subscriber, next_at) VALUES (?, ?, ?)", envelope.eventId, subscriber, at);
+            sql.exec(
+              "INSERT INTO keel_deliveries (event_id, subscriber, next_at) VALUES (?, ?, ?)",
+              envelope.eventId,
+              subscriber,
+              at,
+            );
           }
         }
         return envelopes;
@@ -87,12 +125,20 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
       },
       log: (entity: EntityRef) =>
         sql
-          .exec<{ envelope: string }>("SELECT envelope FROM keel_events WHERE entity_kind = ? AND entity_id = ? ORDER BY seq", entity.kind, entity.id)
+          .exec<{ envelope: string }>(
+            "SELECT envelope FROM keel_events WHERE entity_kind = ? AND entity_id = ? ORDER BY seq",
+            entity.kind,
+            entity.id,
+          )
           .toArray()
           .map((row) => decodeEnvelope(row.envelope)),
       subscribe: (subscriber, types) => {
         for (const type of types === EVERY_TYPE ? [EVERY_TYPE] : types) {
-          sql.exec("INSERT INTO keel_subscriptions (subscriber, type) VALUES (?, ?) ON CONFLICT DO NOTHING", subscriber, type);
+          sql.exec(
+            "INSERT INTO keel_subscriptions (subscriber, type) VALUES (?, ?) ON CONFLICT DO NOTHING",
+            subscriber,
+            type,
+          );
         }
       },
       unsubscribe: (subscriber, types) => {
@@ -100,11 +146,20 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
           sql.exec("DELETE FROM keel_subscriptions WHERE subscriber = ?", subscriber);
           return;
         }
-        for (const type of types) sql.exec("DELETE FROM keel_subscriptions WHERE subscriber = ? AND type = ?", subscriber, type);
+        for (const type of types)
+          sql.exec(
+            "DELETE FROM keel_subscriptions WHERE subscriber = ? AND type = ?",
+            subscriber,
+            type,
+          );
       },
       subscribers,
       receive: (dedupeKey, at) =>
-        sql.exec("INSERT INTO keel_received (dedupe_key, at) VALUES (?, ?) ON CONFLICT DO NOTHING", dedupeKey, at).rowsWritten > 0,
+        sql.exec(
+          "INSERT INTO keel_received (dedupe_key, at) VALUES (?, ?) ON CONFLICT DO NOTHING",
+          dedupeKey,
+          at,
+        ).rowsWritten > 0,
       due: (now, limit) => {
         const heads = sql
           .exec<{ subscriber: string; attempts: number; next_at: number }>(
@@ -130,11 +185,22 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
         return due;
       },
       acknowledge: (subscriber, eventIds) => {
-        for (const eventId of eventIds) sql.exec("DELETE FROM keel_deliveries WHERE subscriber = ? AND event_id = ?", subscriber, eventId);
+        for (const eventId of eventIds)
+          sql.exec(
+            "DELETE FROM keel_deliveries WHERE subscriber = ? AND event_id = ?",
+            subscriber,
+            eventId,
+          );
       },
       defer: (subscriber, eventIds, attempts, nextAttemptAt) => {
         for (const eventId of eventIds) {
-          sql.exec("UPDATE keel_deliveries SET attempts = ?, next_at = ? WHERE subscriber = ? AND event_id = ?", attempts, nextAttemptAt, subscriber, eventId);
+          sql.exec(
+            "UPDATE keel_deliveries SET attempts = ?, next_at = ? WHERE subscriber = ? AND event_id = ?",
+            attempts,
+            nextAttemptAt,
+            subscriber,
+            eventId,
+          );
         }
       },
       backlog: () =>
@@ -147,7 +213,12 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
              ORDER BY d.position`,
           )
           .toArray()
-          .map((row): Backlog => ({ subscriber: row.subscriber, pending: row.pending, attempts: row.attempts, nextAttemptAt: Instant(row.next_at) })),
+          .map((row): Backlog => ({
+            subscriber: row.subscriber,
+            pending: row.pending,
+            attempts: row.attempts,
+            nextAttemptAt: Instant(row.next_at),
+          })),
     }),
   );
 }

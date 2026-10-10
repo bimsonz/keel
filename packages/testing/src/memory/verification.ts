@@ -1,5 +1,11 @@
 import { CommitSha, type EscalationId, type GuardId, makeId } from "@keeltown/core/kernel";
-import { FlowSpecInvalid, ModelAbstained, type FlowSpec, type StepResult, type VerificationJob } from "@keeltown/core/domain/verification";
+import {
+  FlowSpecInvalid,
+  ModelAbstained,
+  type FlowSpec,
+  type StepResult,
+  type VerificationJob,
+} from "@keeltown/core/domain/verification";
 import {
   type DecisionRequest,
   type DecisionResponse,
@@ -20,7 +26,9 @@ import { Effect, Layer, Schema } from "effect";
  * `unclear` with certainty, which is the safe answer: opinion that routes
  * nothing.
  */
-export function makeDecisionModelMemory(script?: (request: DecisionRequest) => DecisionResponse | "abstain") {
+export function makeDecisionModelMemory(
+  script?: (request: DecisionRequest) => DecisionResponse | "abstain",
+) {
   const asked: DecisionRequest[] = [];
   return {
     asked,
@@ -32,9 +40,14 @@ export function makeDecisionModelMemory(script?: (request: DecisionRequest) => D
             asked.push(request);
             const answer = script?.(request) ?? {
               model: "scripted",
-              answers: request.questions.map((q) => ({ questionId: q.id, probabilities: { unclear: 1 } })),
+              answers: request.questions.map((q) => ({
+                questionId: q.id,
+                probabilities: { unclear: 1 },
+              })),
             };
-            return answer === "abstain" ? Effect.fail(new ModelAbstained({ reason: "unavailable" })) : Effect.succeed(answer);
+            return answer === "abstain"
+              ? Effect.fail(new ModelAbstained({ reason: "unavailable" }))
+              : Effect.succeed(answer);
           }),
       }),
     ),
@@ -51,7 +64,9 @@ export function makePlatformFunctionMemory(responses: Readonly<Record<string, un
         call: (call) =>
           Effect.suspend(() => {
             calls.push(call);
-            return call.name in responses ? Effect.succeed(responses[call.name]) : Effect.fail(new ModelAbstained({ reason: "unavailable" }));
+            return call.name in responses
+              ? Effect.succeed(responses[call.name])
+              : Effect.fail(new ModelAbstained({ reason: "unavailable" }));
           }),
       }),
     ),
@@ -59,7 +74,9 @@ export function makePlatformFunctionMemory(responses: Readonly<Record<string, un
 }
 
 /** Every step passes at Tier 0 unless `outcome` says otherwise. */
-export function makeVerifierRuntimeMemory(outcome?: (step: VerificationJob["steps"][number]) => StepResult["outcome"]) {
+export function makeVerifierRuntimeMemory(
+  outcome?: (step: VerificationJob["steps"][number]) => StepResult["outcome"],
+) {
   const jobs: VerificationJob[] = [];
   return {
     jobs,
@@ -89,7 +106,9 @@ export function makeFlowSpecSourceMemory(specs: ReadonlyMap<string, FlowSpec> = 
       FlowSpecSource.of({
         read: (projectId, base) => {
           const spec = specs.get(`${projectId}@${base}`);
-          return spec === undefined ? Effect.fail(new FlowSpecInvalid({ reason: "no flow spec at the base commit" })) : Effect.succeed(spec);
+          return spec === undefined
+            ? Effect.fail(new FlowSpecInvalid({ reason: "no flow spec at the base commit" }))
+            : Effect.succeed(spec);
         },
       }),
     ),
@@ -110,8 +129,13 @@ export function makeGuardRepoMemory() {
         admit: (projectId, guardId: GuardId, files) =>
           Effect.sync(() => {
             const existing = guards.get(projectId) ?? [];
-            guards.set(projectId, [...existing, ...[...files.keys()].map((path) => ({ guardId, path }))]);
-            return Schema.decodeUnknownSync(CommitSha)(guardCommit(guards.get(projectId)?.length ?? 0));
+            guards.set(projectId, [
+              ...existing,
+              ...[...files.keys()].map((path) => ({ guardId, path })),
+            ]);
+            return Schema.decodeUnknownSync(CommitSha)(
+              guardCommit(guards.get(projectId)?.length ?? 0),
+            );
           }),
       }),
     ),
@@ -151,4 +175,3 @@ export function makeHumanGateMemory() {
     ),
   };
 }
-

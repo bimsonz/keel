@@ -10,7 +10,11 @@ import { NonRetryableError } from "cloudflare:workflows";
  * writes the pipeline.
  */
 export class KeelVerify extends CIWorkflow<Env> {
-  protected override async pipeline(_event: WorkflowEvent<CiParams>, step: WorkflowStep, _ci: CiContext): Promise<void> {
+  protected override async pipeline(
+    _event: WorkflowEvent<CiParams>,
+    step: WorkflowStep,
+    _ci: CiContext,
+  ): Promise<void> {
     await step.do("plan", async () => {
       throw new NonRetryableError("KeelVerify's pipeline is not implemented yet");
     });

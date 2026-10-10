@@ -35,15 +35,25 @@ function option(name: string): string | undefined {
 const unseeded = Number(option("--unseeded") ?? "5");
 const dir = resolve(root, option("--dir") ?? "test/mutants");
 const valued = new Set(["--unseeded", "--dir"]);
-const filter = process.argv.slice(2).find((arg, i, args) => !arg.startsWith("--") && !valued.has(args[i - 1] ?? "")) ?? "";
+const filter =
+  process.argv
+    .slice(2)
+    .find((arg, i, args) => !arg.startsWith("--") && !valued.has(args[i - 1] ?? "")) ?? "";
 if (!Number.isInteger(unseeded) || unseeded < 0) {
   console.error("--unseeded takes a whole number of runs");
   process.exit(2);
 }
 
-const patches = readdirSync(dir).filter((name) => name.endsWith(".patch") && name.includes(filter)).toSorted();
+const patches = readdirSync(dir)
+  .filter((name) => name.endsWith(".patch") && name.includes(filter))
+  .toSorted();
 
-if (execSync("git status --porcelain --untracked-files=no", { cwd: root, encoding: "utf8" }).trim() !== "") {
+if (
+  execSync("git status --porcelain --untracked-files=no", {
+    cwd: root,
+    encoding: "utf8",
+  }).trim() !== ""
+) {
   console.error("prove:red needs a clean working tree (tracked files); commit or stash first");
   process.exit(2);
 }
@@ -99,13 +109,19 @@ function killsEveryTag(command: string, kills: readonly string[]): string | null
   try {
     const runs = [
       ...SEEDS.map((seed) => ({ label: `seed ${seed}`, seed: String(seed) })),
-      ...Array.from({ length: unseeded }, (_, i) => ({ label: `unseeded run ${i + 1}`, seed: undefined })),
+      ...Array.from({ length: unseeded }, (_, i) => ({
+        label: `unseeded run ${i + 1}`,
+        seed: undefined,
+      })),
     ];
     for (const [index, run] of runs.entries()) {
       const report = join(scratch, `${index}.json`);
       const env: NodeJS.ProcessEnv = { ...process.env, FC_SEED: run.seed };
       if (run.seed === undefined) delete env["FC_SEED"];
-      const result = spawnSync(`${command} --reporter=json --outputFile=${JSON.stringify(report)}`, { cwd: root, shell: true, encoding: "utf8", env });
+      const result = spawnSync(
+        `${command} --reporter=json --outputFile=${JSON.stringify(report)}`,
+        { cwd: root, shell: true, encoding: "utf8", env },
+      );
       let parsed: unknown;
       try {
         parsed = JSON.parse(readFileSync(report, "utf8"));
@@ -114,9 +130,11 @@ function killsEveryTag(command: string, kills: readonly string[]): string | null
       }
       const { failed, seen } = tagsIn(parsed);
       const unseen = kills.filter((tag) => !seen.has(tag));
-      if (unseen.length > 0) return `${run.label}: no test carries ${unseen.map((t) => `[${t}]`).join(", ")}`;
+      if (unseen.length > 0)
+        return `${run.label}: no test carries ${unseen.map((t) => `[${t}]`).join(", ")}`;
       const green = kills.filter((tag) => !failed.has(tag));
-      if (green.length > 0) return `${run.label}: ${green.map((t) => `[${t}]`).join(", ")} stayed green`;
+      if (green.length > 0)
+        return `${run.label}: ${green.map((t) => `[${t}]`).join(", ")} stayed green`;
     }
     return null;
   } finally {
@@ -145,7 +163,9 @@ for (const name of patches) {
       const survived = killsEveryTag(command, kills);
       const seconds = ((Date.now() - started) / 1000).toFixed(1);
       if (survived === null) {
-        console.log(`red ${name} (${seconds}s): ${kills.map((t) => `[${t}]`).join(", ")} failed under seeds ${SEEDS.join(", ")} and ${unseeded} unseeded run(s)`);
+        console.log(
+          `red ${name} (${seconds}s): ${kills.map((t) => `[${t}]`).join(", ")} failed under seeds ${SEEDS.join(", ")} and ${unseeded} unseeded run(s)`,
+        );
       } else {
         survivors.push(name);
         console.log(`SURVIVED ${name} (${seconds}s): ${survived}`);
@@ -157,7 +177,9 @@ for (const name of patches) {
         survivors.push(name);
         console.log(`SURVIVED ${name} (${seconds}s): \`${command}\` stayed green`);
       } else {
-        console.log(`red ${name} (${seconds}s, exit ${run.status}): \`${command}\`\n${excerpt(`${run.stdout}${run.stderr}`)}`);
+        console.log(
+          `red ${name} (${seconds}s, exit ${run.status}): \`${command}\`\n${excerpt(`${run.stdout}${run.stderr}`)}`,
+        );
       }
     }
   } finally {
@@ -165,5 +187,9 @@ for (const name of patches) {
   }
 }
 
-console.log(survivors.length === 0 ? `\nall ${patches.length} mutants went red` : `\nsurvivors: ${survivors.join(", ")}`);
+console.log(
+  survivors.length === 0
+    ? `\nall ${patches.length} mutants went red`
+    : `\nsurvivors: ${survivors.join(", ")}`,
+);
 process.exit(survivors.length === 0 ? 0 : 1);

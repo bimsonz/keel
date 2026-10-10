@@ -50,7 +50,8 @@ function misshapen(row: TreeChange): boolean {
 
 const file = (data: string): FileSpec => ({ mode: "100644", data });
 
-const kind = (mode: string) => (mode === MODE_SYMLINK ? "symlink" : mode === MODE_GITLINK ? "gitlink" : "file");
+const kind = (mode: string) =>
+  mode === MODE_SYMLINK ? "symlink" : mode === MODE_GITLINK ? "gitlink" : "file";
 const bytewise = (x: string, y: string) => Buffer.compare(Buffer.from(x), Buffer.from(y));
 
 describe("diffTrees", () => {
@@ -89,7 +90,9 @@ describe("diffTrees", () => {
         const claimed: (Leaf | undefined)[] = [];
         for (const row of rows) {
           found.push(leaves.get(row.path));
-          claimed.push(row.change === "added" ? undefined : { mode: row.oldMode ?? "", oid: row.oldOid ?? "" });
+          claimed.push(
+            row.change === "added" ? undefined : { mode: row.oldMode ?? "", oid: row.oldOid ?? "" },
+          );
           if (row.change === "deleted") leaves.delete(row.path);
           else leaves.set(row.path, { mode: row.newMode ?? "", oid: row.newOid ?? "" });
         }
@@ -121,7 +124,9 @@ describe("diffTrees", () => {
       fc.asyncProperty(pairArb, async ({ a, b }) => {
         const { store, oldTree, newTree } = await stored(a, b);
         const rows = await diffTrees(store, oldTree, newTree);
-        expect(rows.slice(1).filter((row, i) => bytewise(rows[i]?.path ?? "", row.path) >= 0)).toEqual([]);
+        expect(
+          rows.slice(1).filter((row, i) => bytewise(rows[i]?.path ?? "", row.path) >= 0),
+        ).toEqual([]);
         expect(rows.filter(misshapen)).toEqual([]);
       }),
     );

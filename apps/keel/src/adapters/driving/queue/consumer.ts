@@ -5,7 +5,10 @@ import { Effect, type ManagedRuntime } from "effect";
  * job is handled idempotently by its dedupe key and acknowledged or retried on
  * its own. No job kinds exist yet; each lane adds its own.
  */
-export function consumeQueue<R>(batch: MessageBatch, runtime: ManagedRuntime.ManagedRuntime<R, never>): Promise<void> {
+export function consumeQueue<R>(
+  batch: MessageBatch,
+  runtime: ManagedRuntime.ManagedRuntime<R, never>,
+): Promise<void> {
   return runtime.runPromise(
     Effect.forEach(
       batch.messages,

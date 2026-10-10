@@ -13,24 +13,29 @@
     "KEEL_HOST": "keel-verify.localhost",
     "BACKUP_BUCKET_NAME": "keel-staging-sandbox-backups",
     // Container classes under the durable_object scheduling policy, which BoxGate counts (rule R13).
-    "BOXGATE_CLASSES": ""
+    "BOXGATE_CLASSES": "",
   },
   "durable_objects": {
     "bindings": [
       { "name": "VERIFIER", "class_name": "VerifierDO" },
-      { "name": "SANDBOX", "class_name": "KeelSandbox" }
-    ]
+      { "name": "SANDBOX", "class_name": "KeelSandbox" },
+    ],
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["VerifierDO", "KeelSandbox"] }],
   // Tier 2 (ExecBox): a classic Sandbox container, so its instances are capped here; the account is shared.
   "containers": [
-    { "class_name": "KeelSandbox", "image": "./containers/sandbox/Dockerfile", "instance_type": "standard-2", "max_instances": 10 }
+    {
+      "class_name": "KeelSandbox",
+      "image": "./containers/sandbox/Dockerfile",
+      "instance_type": "standard-2",
+      "max_instances": 10,
+    },
   ],
   "r2_buckets": [
     { "binding": "BACKUP_BUCKET", "bucket_name": "keel-staging-sandbox-backups" },
     // Candidate bundles, which keel writes. keel-verify only reads them (guard: readonly-bundles).
-    { "binding": "BUNDLES", "bucket_name": "keel-staging-bundles" }
+    { "binding": "BUNDLES", "bucket_name": "keel-staging-bundles" },
   ],
   // Tier 1: throwaway isolates for probes, pure checks and Wasm tools.
-  "worker_loaders": [{ "binding": "LOADER" }]
+  "worker_loaders": [{ "binding": "LOADER" }],
 }

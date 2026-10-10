@@ -1,6 +1,13 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent } from "@keeltown/core/domain/identity";
-import { AgentId, idPattern, ID_PREFIXES, type IdPrefix, Instant, ProjectId } from "@keeltown/core/kernel";
+import {
+  AgentId,
+  idPattern,
+  ID_PREFIXES,
+  type IdPrefix,
+  Instant,
+  ProjectId,
+} from "@keeltown/core/kernel";
 import { AgentDirectory, Clock, EntityStore, Ids, TokenIssuer } from "@keeltown/core/ports";
 import { Effect, type Layer, Option, Schema } from "effect";
 import { hashSecret } from "../memory/identity.ts";
@@ -24,7 +31,9 @@ const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
  */
 function freshAgentId(): AgentId {
   const bytes = crypto.getRandomValues(new Uint8Array(26));
-  return Schema.decodeUnknownSync(AgentId)(`agt_${[...bytes].map((b) => CROCKFORD[b % 32] ?? "0").join("")}`);
+  return Schema.decodeUnknownSync(AgentId)(
+    `agt_${[...bytes].map((b) => CROCKFORD[b % 32] ?? "0").join("")}`,
+  );
 }
 
 const agentId = freshAgentId();
@@ -65,7 +74,9 @@ export function describeIdsContract(adapter: string, make: LayerFactory<Ids>) {
 }
 
 /** The project every contract fixture is enrolled in. */
-export const sampleProjectId = Schema.decodeUnknownSync(ProjectId)("prj_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+export const sampleProjectId = Schema.decodeUnknownSync(ProjectId)(
+  "prj_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
+);
 
 export const sampleAgent: Agent = {
   id: agentId,
@@ -78,7 +89,10 @@ export const sampleAgent: Agent = {
   createdAt: Instant(1_760_000_000_000),
 };
 
-export function describeAgentDirectoryContract(adapter: string, make: LayerFactory<AgentDirectory>) {
+export function describeAgentDirectoryContract(
+  adapter: string,
+  make: LayerFactory<AgentDirectory>,
+) {
   describe(`AgentDirectory contract: ${adapter}`, () => {
     it.effect("verifies a credential by its secret, and only by its secret", () =>
       Effect.gen(function* () {
@@ -87,9 +101,15 @@ export function describeAgentDirectoryContract(adapter: string, make: LayerFacto
         const clientId = `client-${id}`;
         const secretHash = yield* Effect.promise(() => hashSecret("s3cret-value"));
         yield* directory.upsert({ ...sampleAgent, id }, { clientId, agentId: id, secretHash });
-        expect(yield* directory.verifyCredential(clientId, "s3cret-value")).toEqual(Option.some(id));
-        expect(Option.isNone(yield* directory.verifyCredential(clientId, "s3cret-valuE"))).toBe(true);
-        expect(Option.isNone(yield* directory.verifyCredential(`never-${id}`, "s3cret-value"))).toBe(true);
+        expect(yield* directory.verifyCredential(clientId, "s3cret-value")).toEqual(
+          Option.some(id),
+        );
+        expect(Option.isNone(yield* directory.verifyCredential(clientId, "s3cret-valuE"))).toBe(
+          true,
+        );
+        expect(
+          Option.isNone(yield* directory.verifyCredential(`never-${id}`, "s3cret-value")),
+        ).toBe(true);
       }).pipe(Effect.provide(make())),
     );
     it.effect("finds nothing it was not given", () =>
@@ -105,28 +125,48 @@ export function describeAgentDirectoryContract(adapter: string, make: LayerFacto
         const directory = yield* AgentDirectory;
         const id = freshAgentId();
         const agent = { ...sampleAgent, id };
-        const credential = { clientId: `client-${id}`, agentId: id, secretHash: `sha256:${"a".repeat(64)}` };
+        const credential = {
+          clientId: `client-${id}`,
+          agentId: id,
+          secretHash: `sha256:${"a".repeat(64)}`,
+        };
         yield* directory.upsert(agent, credential);
         expect(yield* directory.findAgent(id)).toEqual(Option.some(agent));
-        expect(yield* directory.findCredential(credential.clientId)).toEqual(Option.some(credential));
+        expect(yield* directory.findCredential(credential.clientId)).toEqual(
+          Option.some(credential),
+        );
       }).pipe(Effect.provide(make())),
     );
     it.effect("replaces an agent on a second upsert, so a revocation epoch bump is visible", () =>
       Effect.gen(function* () {
         const directory = yield* AgentDirectory;
         const id = freshAgentId();
-        const credential = { clientId: `client-${id}`, agentId: id, secretHash: `sha256:${"a".repeat(64)}` };
+        const credential = {
+          clientId: `client-${id}`,
+          agentId: id,
+          secretHash: `sha256:${"a".repeat(64)}`,
+        };
         yield* directory.upsert({ ...sampleAgent, id }, credential);
-        yield* directory.upsert({ ...sampleAgent, id, revocationEpoch: 1, state: "revoked" }, credential);
+        yield* directory.upsert(
+          { ...sampleAgent, id, revocationEpoch: 1, state: "revoked" },
+          credential,
+        );
         const found = yield* directory.findAgent(id);
-        expect(Option.map(found, (a) => [a.revocationEpoch, a.state])).toEqual(Option.some([1, "revoked"]));
+        expect(Option.map(found, (a) => [a.revocationEpoch, a.state])).toEqual(
+          Option.some([1, "revoked"]),
+        );
       }).pipe(Effect.provide(make())),
     );
   });
 }
 
 export function describeTokenIssuerContract(adapter: string, make: LayerFactory<TokenIssuer>) {
-  const principal = { agentId, projectId: sampleProjectId, scopes: ["agent:read"] as const, revocationEpoch: 3 };
+  const principal = {
+    agentId,
+    projectId: sampleProjectId,
+    scopes: ["agent:read"] as const,
+    revocationEpoch: 3,
+  };
   describe(`TokenIssuer contract: ${adapter}`, () => {
     it.effect("verifies the principal it issued", () =>
       Effect.gen(function* () {
@@ -195,7 +235,8 @@ export function describeEntityStoreContract(adapter: string, make: LayerFactory<
         const store = yield* EntityStore;
         store.put("change", "a", { n: 1 });
         const read = store.get("change", "a");
-        if (read !== null && typeof read === "object" && !Array.isArray(read)) Object.assign(read, { n: 2 });
+        if (read !== null && typeof read === "object" && !Array.isArray(read))
+          Object.assign(read, { n: 2 });
         expect(store.get("change", "a")).toEqual({ n: 1 });
       }).pipe(Effect.provide(make())),
     );

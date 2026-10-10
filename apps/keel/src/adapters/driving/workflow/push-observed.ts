@@ -12,8 +12,11 @@ export class PushObserved extends WorkflowEntrypoint<Env> {
     await step.do("observe", async () => {
       const pushed = translateArtifactsPush(event.payload);
       // The WorkspacePool DO records WorkspacePushed once it is built; until then it is logged only.
-      if (pushed !== null) console.log("workspace pushed", pushed.workspaceId, pushed.ref, pushed.sha);
-      return pushed === null ? null : { workspaceId: pushed.workspaceId, ref: pushed.ref, sha: pushed.sha };
+      if (pushed !== null)
+        console.log("workspace pushed", pushed.workspaceId, pushed.ref, pushed.sha);
+      return pushed === null
+        ? null
+        : { workspaceId: pushed.workspaceId, ref: pushed.ref, sha: pushed.sha };
     });
   }
 }

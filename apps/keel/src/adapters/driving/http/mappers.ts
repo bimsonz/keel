@@ -1,4 +1,10 @@
-import type { AgentNotAdmitted, AgentNotKnown, CredentialRejected, Identity, ScopeNotGranted } from "@keeltown/core/domain/identity";
+import type {
+  AgentNotAdmitted,
+  AgentNotKnown,
+  CredentialRejected,
+  Identity,
+  ScopeNotGranted,
+} from "@keeltown/core/domain/identity";
 import type { GrantedToken } from "@keeltown/core/application/identity";
 import type { Auth_exchangeTokenResult, WhoamiResult } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
@@ -49,7 +55,13 @@ export function whoamiError(caller: Caller, error: AgentNotKnown | AgentNotAdmit
         status: 401,
         body: problem(401, "auth.invalid_token", caller.requestId, {
           detail: "The token names an agent Keel does not know.",
-          nextActions: [{ kind: "call", title: "Exchange your client credentials for a new token", operationId: "Auth_exchangeToken" }],
+          nextActions: [
+            {
+              kind: "call",
+              title: "Exchange your client credentials for a new token",
+              operationId: "Auth_exchangeToken",
+            },
+          ],
         }),
       };
     case "AgentNotAdmitted":
@@ -59,7 +71,13 @@ export function whoamiError(caller: Caller, error: AgentNotKnown | AgentNotAdmit
           detail: `The agent may not act: ${error.reason}.`,
           nextActions:
             error.reason === "stale-epoch"
-              ? [{ kind: "call", title: "Exchange your client credentials for a token at the current epoch", operationId: "Auth_exchangeToken" }]
+              ? [
+                  {
+                    kind: "call",
+                    title: "Exchange your client credentials for a token at the current epoch",
+                    operationId: "Auth_exchangeToken",
+                  },
+                ]
               : [{ kind: "escalate", title: "Ask an operator to reinstate the agent" }],
         }),
       };
@@ -82,14 +100,34 @@ export function tokenOk(granted: GrantedToken, now: number): Auth_exchangeTokenR
   };
 }
 
-export function tokenError(error: CredentialRejected | ScopeNotGranted | AgentNotAdmitted): Auth_exchangeTokenResult {
+export function tokenError(
+  error: CredentialRejected | ScopeNotGranted | AgentNotAdmitted,
+): Auth_exchangeTokenResult {
   switch (error._tag) {
     case "CredentialRejected":
-      return { status: 401, body: { error: "invalid_client", error_description: "Unknown client, or the secret does not match." } };
+      return {
+        status: 401,
+        body: {
+          error: "invalid_client",
+          error_description: "Unknown client, or the secret does not match.",
+        },
+      };
     case "ScopeNotGranted":
-      return { status: 400, body: { error: "invalid_scope", error_description: `Not held: ${error.requested.join(" ")}` } };
+      return {
+        status: 400,
+        body: {
+          error: "invalid_scope",
+          error_description: `Not held: ${error.requested.join(" ")}`,
+        },
+      };
     case "AgentNotAdmitted":
-      return { status: 401, body: { error: "invalid_client", error_description: `The agent may not act: ${error.reason}.` } };
+      return {
+        status: 401,
+        body: {
+          error: "invalid_client",
+          error_description: `The agent may not act: ${error.reason}.`,
+        },
+      };
     default: {
       const unmapped: never = error;
       return unmapped;

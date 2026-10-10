@@ -51,7 +51,11 @@ export function readDelivery(delivery: unknown): readonly Arrival[] {
   return Schema.decodeUnknownSync(Schema.Array(ArrivingEnvelope))(delivery).map((arriving) => ({
     dedupeKey: arriving.dedupeKey,
     envelope: Option.getOrUndefined(
-      Schema.decodeUnknownOption(EventEnvelope)({ ...arriving, affected: arriving.affected ?? [], notified: arriving.notified ?? [] }),
+      Schema.decodeUnknownOption(EventEnvelope)({
+        ...arriving,
+        affected: arriving.affected ?? [],
+        notified: arriving.notified ?? [],
+      }),
     ),
   }));
 }

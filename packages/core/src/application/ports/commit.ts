@@ -19,7 +19,11 @@ export interface Transition<A> {
 export type Committed<A> =
   | { readonly duplicate: false; readonly value: A; readonly events: readonly EventEnvelope[] }
   /** The cause had already committed: nothing was written. `sameCommand` is false when its fingerprint differs. */
-  | { readonly duplicate: true; readonly sameCommand: boolean; readonly events: readonly EventEnvelope[] };
+  | {
+      readonly duplicate: true;
+      readonly sameCommand: boolean;
+      readonly events: readonly EventEnvelope[];
+    };
 
 /** Thrown inside the transaction to roll back a refused decision's writes. */
 class Rollback extends Error {
@@ -48,7 +52,12 @@ export const commit = <A, E>(
     try {
       return store.transaction((): Committed<A> => {
         const prior = outbox.committed(spec.entity, spec.cause);
-        if (prior !== undefined) return { duplicate: true, sameCommand: prior.fingerprint === spec.fingerprint, events: prior.events };
+        if (prior !== undefined)
+          return {
+            duplicate: true,
+            sameCommand: prior.fingerprint === spec.fingerprint,
+            events: prior.events,
+          };
         const decided = decide({ store, outbox });
         if (Result.isFailure(decided)) {
           refusal = decided;
@@ -58,7 +67,8 @@ export const commit = <A, E>(
         return { duplicate: false, value: decided.success.value, events };
       });
     } catch (thrown) {
-      if (thrown instanceof Rollback && refusal !== undefined) return yield* Effect.fail(refusal.failure);
+      if (thrown instanceof Rollback && refusal !== undefined)
+        return yield* Effect.fail(refusal.failure);
       throw thrown;
     }
   });

@@ -34,7 +34,9 @@ export function TokenIssuerJose(options: TokenIssuerOptions) {
       const privateKey = yield* Effect.promise(() => importJWK({ ...jwk, alg: "EdDSA" }, "EdDSA"));
       // The public half: the same key without its private scalar or its signing-only usage.
       const { d: _private, key_ops: _usage, ...publicJwk } = jwk;
-      const publicKey = yield* Effect.promise(() => importJWK({ ...publicJwk, alg: "EdDSA" }, "EdDSA"));
+      const publicKey = yield* Effect.promise(() =>
+        importJWK({ ...publicJwk, alg: "EdDSA" }, "EdDSA"),
+      );
       const kid = jwk.kid ?? "keel";
 
       return TokenIssuer.of({
@@ -44,7 +46,11 @@ export function TokenIssuerJose(options: TokenIssuerOptions) {
             const issuedAt = Math.floor(now / 1000);
             const expiresAt = issuedAt + ttlSeconds;
             const token = yield* Effect.promise(() =>
-              new SignJWT({ prj: principal.projectId, scope: principal.scopes.join(" "), epoch: principal.revocationEpoch })
+              new SignJWT({
+                prj: principal.projectId,
+                scope: principal.scopes.join(" "),
+                epoch: principal.revocationEpoch,
+              })
                 .setProtectedHeader({ alg: "EdDSA", kid, typ: "JWT" })
                 .setSubject(principal.agentId)
                 .setIssuer(options.issuer)
@@ -59,7 +65,13 @@ export function TokenIssuerJose(options: TokenIssuerOptions) {
           Effect.gen(function* () {
             const now = yield* clock.now;
             const verified = yield* Effect.tryPromise({
-              try: () => jwtVerify(token, publicKey, { issuer: options.issuer, audience: AUDIENCE, algorithms: ["EdDSA"], currentDate: new Date(now) }),
+              try: () =>
+                jwtVerify(token, publicKey, {
+                  issuer: options.issuer,
+                  audience: AUDIENCE,
+                  algorithms: ["EdDSA"],
+                  currentDate: new Date(now),
+                }),
               catch: (error) =>
                 new TokenRejected({
                   reason:
@@ -75,10 +87,15 @@ export function TokenIssuerJose(options: TokenIssuerOptions) {
             const claims = yield* Schema.decodeUnknownEffect(Claims)(verified.payload).pipe(
               Effect.mapError(() => new TokenRejected({ reason: "claims" })),
             );
-            const scopes = yield* Schema.decodeUnknownEffect(Schema.Array(Scope))(claims.scope.split(" ").filter(Boolean)).pipe(
-              Effect.mapError(() => new TokenRejected({ reason: "claims" })),
-            );
-            return { agentId: claims.sub, projectId: claims.prj, scopes, revocationEpoch: claims.epoch };
+            const scopes = yield* Schema.decodeUnknownEffect(Schema.Array(Scope))(
+              claims.scope.split(" ").filter(Boolean),
+            ).pipe(Effect.mapError(() => new TokenRejected({ reason: "claims" })));
+            return {
+              agentId: claims.sub,
+              projectId: claims.prj,
+              scopes,
+              revocationEpoch: claims.epoch,
+            };
           }),
       });
     }),

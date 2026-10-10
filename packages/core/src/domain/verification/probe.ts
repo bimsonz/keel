@@ -4,7 +4,11 @@ import type { World } from "./conflict.ts";
 export type ProbeOutcome = "pass" | "fail" | "n/a";
 
 /** One cell of the world matrix: a probe's outcome in one world, on one calibration run. */
-export type ProbeCell = { readonly world: World; readonly run: number; readonly outcome: ProbeOutcome };
+export type ProbeCell = {
+  readonly world: World;
+  readonly run: number;
+  readonly outcome: ProbeOutcome;
+};
 
 /** How many consecutive discriminating runs admission needs. */
 export const ADMISSION_RUNS = 3;
@@ -14,7 +18,11 @@ export type Admission =
   | { readonly _tag: "pending"; readonly complete: number }
   | { readonly _tag: "rejected"; readonly reason: "non-discriminating" | "unstable" };
 
-type Run = { readonly trunk?: ProbeOutcome; readonly holder?: ProbeOutcome; readonly combined?: ProbeOutcome };
+type Run = {
+  readonly trunk?: ProbeOutcome;
+  readonly holder?: ProbeOutcome;
+  readonly combined?: ProbeOutcome;
+};
 
 /**
  * A run discriminates when the probe passes on trunk (or does not apply
@@ -24,7 +32,8 @@ type Run = { readonly trunk?: ProbeOutcome; readonly holder?: ProbeOutcome; read
 const discriminates = (r: Required<Run>): boolean =>
   (r.trunk === "pass" || r.trunk === "n/a") && r.holder === "pass" && r.combined === "fail";
 
-const complete = (r: Run): r is Required<Run> => r.trunk !== undefined && r.holder !== undefined && r.combined !== undefined;
+const complete = (r: Run): r is Required<Run> =>
+  r.trunk !== undefined && r.holder !== undefined && r.combined !== undefined;
 
 /**
  * Probe admission from the world-matrix cells. A probe becomes a guard only
@@ -43,6 +52,9 @@ export const admit = (cells: readonly ProbeCell[]): Admission => {
   }
   const done = [...runs.values()].filter(complete);
   const good = done.filter(discriminates).length;
-  if (good < done.length) return { _tag: "rejected", reason: good === 0 ? "non-discriminating" : "unstable" };
-  return done.length >= ADMISSION_RUNS ? { _tag: "admitted", runs: done.length } : { _tag: "pending", complete: done.length };
+  if (good < done.length)
+    return { _tag: "rejected", reason: good === 0 ? "non-discriminating" : "unstable" };
+  return done.length >= ADMISSION_RUNS
+    ? { _tag: "admitted", runs: done.length }
+    : { _tag: "pending", complete: done.length };
 };

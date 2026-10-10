@@ -50,7 +50,10 @@ export const ConflictProven = Schema.TaggedStruct("ConflictProven", {
     Schema.TaggedStruct("merge-refused", { batchId: BatchId }),
   ]),
 });
-export const ConflictDismissed = Schema.TaggedStruct("ConflictDismissed", { conflictId: ConflictId, evidence: Schema.String });
+export const ConflictDismissed = Schema.TaggedStruct("ConflictDismissed", {
+  conflictId: ConflictId,
+  evidence: Schema.String,
+});
 export const ConflictEscalated = Schema.TaggedStruct("ConflictEscalated", {
   conflictId: ConflictId,
   escalationId: EscalationId,
@@ -61,8 +64,16 @@ export const ConflictResolved = Schema.TaggedStruct("ConflictResolved", {
   move: Move,
   decisionId: Schema.optional(DecisionId),
 });
-export const GuardAdmitted = Schema.TaggedStruct("GuardAdmitted", { guardId: GuardId, probeId: ProbeId, conflictId: ConflictId, runs: Schema.Int });
-export const GuardRetired = Schema.TaggedStruct("GuardRetired", { guardId: GuardId, decisionId: DecisionId });
+export const GuardAdmitted = Schema.TaggedStruct("GuardAdmitted", {
+  guardId: GuardId,
+  probeId: ProbeId,
+  conflictId: ConflictId,
+  runs: Schema.Int,
+});
+export const GuardRetired = Schema.TaggedStruct("GuardRetired", {
+  guardId: GuardId,
+  decisionId: DecisionId,
+});
 export const GuardFailed = Schema.TaggedStruct("GuardFailed", {
   guardId: GuardId,
   batchId: BatchId,
@@ -83,7 +94,10 @@ export const EscalationRaised = Schema.TaggedStruct("EscalationRaised", {
   consequences: Schema.Array(Schema.String),
   about: EntityRef,
 });
-export const EscalationWithdrawn = Schema.TaggedStruct("EscalationWithdrawn", { escalationId: EscalationId, reason: Schema.String });
+export const EscalationWithdrawn = Schema.TaggedStruct("EscalationWithdrawn", {
+  escalationId: EscalationId,
+  reason: Schema.String,
+});
 
 export const VerificationEvent = Schema.Union([
   ConflictSuspected,

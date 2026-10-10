@@ -16,14 +16,14 @@
     "KEEL_ENV": "staging",
     "BACKUP_BUCKET_NAME": "keel-staging-sandbox-backups",
     // Container classes under the durable_object scheduling policy, which BoxGate counts (rule R13).
-    "BOXGATE_CLASSES": ""
+    "BOXGATE_CLASSES": "",
   },
   "secrets": {
     // KEEL_SIGNING_KEY: an Ed25519 private key, as a JWK, that signs agents' bearer tokens.
     // CLOUDFLARE_ACCOUNT_ID: read by @cloudflare/ci; a secret so it is never committed.
     // @cloudflare/ci's CF_TOKEN and R2 S3 keys are deliberately absent: backups go through
     // the BACKUP_BUCKET binding and no runner asks for credentials (guard: runner-credentials).
-    "required": ["KEEL_SIGNING_KEY", "CLOUDFLARE_ACCOUNT_ID"]
+    "required": ["KEEL_SIGNING_KEY", "CLOUDFLARE_ACCOUNT_ID"],
   },
 
   // Every id below is a sentinel. scripts/deploy.ts writes a gitignored
@@ -35,8 +35,8 @@
       "binding": "DB",
       "database_name": "keel-staging",
       "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "migrations"
-    }
+      "migrations_dir": "migrations",
+    },
   ],
   "durable_objects": {
     "bindings": [
@@ -51,8 +51,8 @@
       { "name": "MERGEBOX", "class_name": "MergeBox" },
       { "name": "BOXGATE", "class_name": "BoxGate" },
       // Tier 2 runners live in keel-verify, which holds no credentials.
-      { "name": "SANDBOX", "class_name": "KeelSandbox", "script_name": "keel-verify" }
-    ]
+      { "name": "SANDBOX", "class_name": "KeelSandbox", "script_name": "keel-verify" },
+    ],
   },
   "migrations": [
     {
@@ -67,15 +67,15 @@
         "WorkspacePoolDO",
         "ProjectorDO",
         "MergeBox",
-        "BoxGate"
-      ]
-    }
+        "BoxGate",
+      ],
+    },
   ],
   "workflows": [
     { "name": "keel-precheck", "binding": "PRECHECK", "class_name": "Precheck" },
     // KeelVerify extends @cloudflare/ci's CIWorkflow, which expects this binding name.
     { "name": "keel-verify-batch", "binding": "CI_WORKFLOW", "class_name": "KeelVerify" },
-    { "name": "keel-push-observed", "binding": "PUSH_OBSERVED", "class_name": "PushObserved" }
+    { "name": "keel-push-observed", "binding": "PUSH_OBSERVED", "class_name": "PushObserved" },
   ],
   "triggers": {
     // One namespace-wide rule per shard (S6); per-repo subscriptions dropped pushes.
@@ -83,30 +83,34 @@
       {
         "type": "cf.artifacts.repo.pushed",
         "filter": { "namespace": "keel-ws-00" },
-        "targets": [{ "type": "workflow", "workflow_name": "keel-push-observed" }]
-      }
-    ]
+        "targets": [{ "type": "workflow", "workflow_name": "keel-push-observed" }],
+      },
+    ],
   },
   "queues": {
     "producers": [{ "binding": "JOBS", "queue": "keel-staging-jobs" }],
-    "consumers": [{ "queue": "keel-staging-jobs", "max_retries": 5 }]
+    "consumers": [{ "queue": "keel-staging-jobs", "max_retries": 5 }],
   },
   "r2_buckets": [
     { "binding": "BUNDLES", "bucket_name": "keel-staging-bundles" },
     { "binding": "ARCHIVE", "bucket_name": "keel-staging-archive" },
-    { "binding": "BACKUP_BUCKET", "bucket_name": "keel-staging-sandbox-backups" }
+    { "binding": "BACKUP_BUCKET", "bucket_name": "keel-staging-sandbox-backups" },
   ],
   "artifacts": [
     // ARTIFACTS is the core namespace (trunk, staging, guards); @cloudflare/ci expects this name.
     { "binding": "ARTIFACTS", "namespace": "keel-core" },
-    { "binding": "WORKSPACES", "namespace": "keel-ws-00" }
+    { "binding": "WORKSPACES", "namespace": "keel-ws-00" },
   ],
   "vectorize": [{ "binding": "RECALL", "index_name": "keel-staging-recall" }],
   "secrets_store_secrets": [
-    { "binding": "DEPLOY_TOKEN", "store_id": "PLACEHOLDER-secrets-store", "secret_name": "keel-staging-deploy-token" }
+    {
+      "binding": "DEPLOY_TOKEN",
+      "store_id": "PLACEHOLDER-secrets-store",
+      "secret_name": "keel-staging-deploy-token",
+    },
   ],
   "ai": { "binding": "AI" },
   "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "keel_staging_metrics" }],
   // RPC into keel-verify, for Tier 1 probes, pure checks and Wasm tools.
-  "services": [{ "binding": "VERIFIER", "service": "keel-verify" }]
+  "services": [{ "binding": "VERIFIER", "service": "keel-verify" }],
 }

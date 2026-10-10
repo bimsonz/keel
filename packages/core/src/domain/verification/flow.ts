@@ -25,13 +25,24 @@ export type Flow =
   | { readonly _tag: "step"; readonly step: string }
   | { readonly _tag: "seq"; readonly exitOn: "fail"; readonly items: readonly Flow[] }
   | { readonly _tag: "par"; readonly items: readonly Flow[] }
-  | { readonly _tag: "cascade"; readonly accept: readonly StepOutcome[]; readonly items: readonly Flow[] }
+  | {
+      readonly _tag: "cascade";
+      readonly accept: readonly StepOutcome[];
+      readonly items: readonly Flow[];
+    }
   | { readonly _tag: "worlds"; readonly over: readonly World[]; readonly body: Flow }
   | { readonly _tag: "when"; readonly condition: Condition; readonly body: Flow }
-  | { readonly _tag: "budget"; readonly limit: Budget; readonly onExhaust: "escalate"; readonly body: Flow };
+  | {
+      readonly _tag: "budget";
+      readonly limit: Budget;
+      readonly onExhaust: "escalate";
+      readonly body: Flow;
+    };
 
 /** What a step reads: another step's result, or one of the change's facts. */
-export type Read = { readonly _tag: "step"; readonly step: string } | { readonly _tag: "fact"; readonly fact: string };
+export type Read =
+  | { readonly _tag: "step"; readonly step: string }
+  | { readonly _tag: "fact"; readonly fact: string };
 
 /** One typed step, as the project's flow spec declares it. */
 export type StepSpec = {
@@ -60,7 +71,11 @@ export type StepSpec = {
 };
 
 /** A project's flow, read from `.keel/flow` at the change's base commit. */
-export type FlowDefinition = { readonly commit: CommitSha; readonly flow: Flow; readonly steps: readonly StepSpec[] };
+export type FlowDefinition = {
+  readonly commit: CommitSha;
+  readonly flow: Flow;
+  readonly steps: readonly StepSpec[];
+};
 
 /** Keel's defaults (a verifier pack): used when the project has no flow, and as steps a project flow may name. */
 export type FlowDefaults = { readonly flow: Flow; readonly steps: readonly StepSpec[] };

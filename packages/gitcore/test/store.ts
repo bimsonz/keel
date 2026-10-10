@@ -3,7 +3,15 @@
 
 import { enc } from "../src/bytes.ts";
 import { MissingObject, type TreeReader } from "../src/diff.ts";
-import { decodeTree, encodeTree, type GitObject, hashObject, MODE_GITLINK, MODE_TREE, type TreeEntry } from "../src/objects.ts";
+import {
+  decodeTree,
+  encodeTree,
+  type GitObject,
+  hashObject,
+  MODE_GITLINK,
+  MODE_TREE,
+  type TreeEntry,
+} from "../src/objects.ts";
 import type { TreeModel } from "./git-harness.ts";
 
 /** A leaf as a flat listing sees it. */
@@ -52,7 +60,8 @@ export class MemoryStore implements TreeReader {
         here.push({ name: path, mode: file.mode, oid: await this.put("blob", body) });
       }
     }
-    for (const [dir, below] of dirs) here.push({ name: dir, mode: MODE_TREE, oid: await this.write(below) });
+    for (const [dir, below] of dirs)
+      here.push({ name: dir, mode: MODE_TREE, oid: await this.write(below) });
     return this.put("tree", encodeTree(here));
   }
 
@@ -70,7 +79,8 @@ export class MemoryStore implements TreeReader {
   trees(oid: string, prefix = "", out = new Map<string, string>()): Map<string, string> {
     out.set(prefix, oid);
     for (const e of this.tree(oid)) {
-      if (e.mode === MODE_TREE) this.trees(e.oid, prefix === "" ? e.name : `${prefix}/${e.name}`, out);
+      if (e.mode === MODE_TREE)
+        this.trees(e.oid, prefix === "" ? e.name : `${prefix}/${e.name}`, out);
     }
     return out;
   }

@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "description": "The published wire contract: the committed OpenAPI document, generated from packages/spec",
-  "type": "module",
   "license": "MIT",
+  "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./openapi.json": "./openapi.json"

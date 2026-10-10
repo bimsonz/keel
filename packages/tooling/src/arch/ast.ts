@@ -8,7 +8,9 @@ export interface AstNode {
 }
 
 function isNode(value: unknown): value is AstNode {
-  return typeof value === "object" && value !== null && "type" in value && typeof value.type === "string";
+  return (
+    typeof value === "object" && value !== null && "type" in value && typeof value.type === "string"
+  );
 }
 
 /** Calls `visit` on every node of the file, depth first. */
@@ -33,12 +35,16 @@ export function walkAst(file: string, code: string, visit: (node: AstNode) => vo
 export function memberName(node: AstNode): string | null {
   if (node.type !== "MemberExpression") return null;
   const property = node["property"];
-  return isNode(property) && property.type === "Identifier" && typeof property["name"] === "string" ? property["name"] : null;
+  return isNode(property) && property.type === "Identifier" && typeof property["name"] === "string"
+    ? property["name"]
+    : null;
 }
 
 /** The name of an identifier node, or null. */
 export function identifierName(node: unknown): string | null {
-  return isNode(node) && node.type === "Identifier" && typeof node["name"] === "string" ? node["name"] : null;
+  return isNode(node) && node.type === "Identifier" && typeof node["name"] === "string"
+    ? node["name"]
+    : null;
 }
 
 export function child(node: AstNode, key: string): AstNode | null {

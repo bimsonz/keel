@@ -9,7 +9,10 @@ import type { PlanStep, StepOutcome, StepResult, VerdictOutcome } from "./plan.t
 export type InfraFailure = "timeout" | "rate-limited" | "schema" | "truncated" | "unavailable";
 
 /** What a runner or plugin reports, before Keel trusts it: the outcome may be anything. */
-export type StepReport = Omit<StepResult, "outcome"> & { readonly outcome: string; readonly failure?: InfraFailure };
+export type StepReport = Omit<StepResult, "outcome"> & {
+  readonly outcome: string;
+  readonly failure?: InfraFailure;
+};
 
 const isOutcome = (step: PlanStep, outcome: string): outcome is StepOutcome =>
   (step.outcomes ?? []).some((o) => o === outcome);
@@ -27,7 +30,8 @@ export const coerce = (plan: FlowPlan, report: StepReport): StepResult => {
   const declared = step !== undefined && isOutcome(step, report.outcome);
   const decisive = report.outcome === "pass" || report.outcome === "fail";
   const usable = report.failure === undefined && declared && (!decisive || canBlock(evidenceClass));
-  const outcome: StepOutcome = usable && step !== undefined && isOutcome(step, report.outcome) ? report.outcome : "abstain";
+  const outcome: StepOutcome =
+    usable && step !== undefined && isOutcome(step, report.outcome) ? report.outcome : "abstain";
   const allowedSkips = plan.mayskip[report.stepId] ?? [];
   const allowedOverrides = step?.kind === "human" ? (plan.overrides[report.stepId] ?? []) : [];
   const skips = (report.skips ?? []).filter((s) => allowedSkips.includes(s));
@@ -45,23 +49,42 @@ export const coerce = (plan: FlowPlan, report: StepReport): StepResult => {
 type Status = "pass" | "pending" | "escalate" | "fail";
 const severity: Record<Status, number> = { pass: 0, pending: 1, escalate: 2, fail: 3 };
 
-type Value = { readonly status: Status; readonly outcome?: StepOutcome; readonly evidence: readonly StepResult[]; readonly waiting: readonly string[] };
+type Value = {
+  readonly status: Status;
+  readonly outcome?: StepOutcome;
+  readonly evidence: readonly StepResult[];
+  readonly waiting: readonly string[];
+};
 
 const pass: Value = { status: "pass", evidence: [], waiting: [] };
 
 const combine = (values: readonly Value[]): Value => {
-  const worst = values.reduce<Status>((w, v) => (severity[v.status] > severity[w] ? v.status : w), "pass");
+  const worst = values.reduce<Status>(
+    (w, v) => (severity[v.status] > severity[w] ? v.status : w),
+    "pass",
+  );
   const at = values.filter((v) => v.status === worst);
-  return { status: worst, evidence: at.flatMap((v) => v.evidence), waiting: values.flatMap((v) => v.waiting) };
+  return {
+    status: worst,
+    evidence: at.flatMap((v) => v.evidence),
+    waiting: values.flatMap((v) => v.waiting),
+  };
 };
 
 const resultKey = (step: string, world: World | undefined): string => `${step}@${world ?? ""}`;
 
-const rank = (r: StepResult): number => ({ pass: 0, annotate: 0, abstain: 1, escalate: 2, fail: 3 })[r.outcome];
+const rank = (r: StepResult): number =>
+  ({ pass: 0, annotate: 0, abstain: 1, escalate: 2, fail: 3 })[r.outcome];
 
 /** The more severe of two results, with a total tiebreak, so arrival order never matters. */
 const severer = (a: StepResult, b: StepResult): StepResult =>
-  rank(a) !== rank(b) ? (rank(a) > rank(b) ? a : b) : JSON.stringify(a) >= JSON.stringify(b) ? a : b;
+  rank(a) !== rank(b)
+    ? rank(a) > rank(b)
+      ? a
+      : b
+    : JSON.stringify(a) >= JSON.stringify(b)
+      ? a
+      : b;
 
 /** One result per step and world; if a runner reported twice, the more severe counts. */
 const index = (results: readonly StepResult[]): ReadonlyMap<string, StepResult> => {
@@ -91,7 +114,8 @@ const leaf = (ctx: Context, id: string, world: World | undefined): Value => {
     case "annotate":
       return { status: "pass", outcome: r.outcome, evidence: [r], waiting: [] };
     case "fail":
-      if (!canBlock(r.evidenceClass)) return { status: "escalate", outcome: r.outcome, evidence: [r], waiting: [] };
+      if (!canBlock(r.evidenceClass))
+        return { status: "escalate", outcome: r.outcome, evidence: [r], waiting: [] };
       return ctx.overridden.has(id)
         ? { status: "pass", outcome: r.outcome, evidence: [r], waiting: [] }
         : { status: "fail", outcome: r.outcome, evidence: [r], waiting: [] };
@@ -107,10 +131,12 @@ const leaf = (ctx: Context, id: string, world: World | undefined): Value => {
 const holds = (ctx: Context, c: Condition, world: World | undefined): boolean | "unknown" => {
   switch (c._tag) {
     case "outcome": {
-      const anyWorld = [...ctx.results.values()].filter((x) => x.stepId === c.step).reduce<StepResult | undefined>(
-        (worst, x) => (worst === undefined ? x : severer(worst, x)),
-        undefined,
-      );
+      const anyWorld = [...ctx.results.values()]
+        .filter((x) => x.stepId === c.step)
+        .reduce<StepResult | undefined>(
+          (worst, x) => (worst === undefined ? x : severer(worst, x)),
+          undefined,
+        );
       const r = ctx.results.get(resultKey(c.step, world)) ?? anyWorld;
       return r === undefined ? "unknown" : c.in.includes(r.outcome);
     }
@@ -185,15 +211,29 @@ export type Run = { readonly results: readonly StepResult[]; readonly superseded
 const verdict1 = (plan: FlowPlan, run: Run): Verdict => {
   const steps = new Map(plan.steps.map((s) => [s.id, s]));
   const overridden = new Set(
-    run.results.filter((r) => steps.get(r.stepId)?.kind === "human").flatMap((r) => r.overrides ?? []),
+    run.results
+      .filter((r) => steps.get(r.stepId)?.kind === "human")
+      .flatMap((r) => r.overrides ?? []),
   );
   const ctx: Context = { plan, steps, results: index(run.results), overridden };
   const base = { version: "verdict/1" as const, planHash: plan.planHash };
-  if (run.supersededBy !== undefined) return { ...base, outcome: "supersede", evidence: [], waitingOn: [] };
+  if (run.supersededBy !== undefined)
+    return { ...base, outcome: "supersede", evidence: [], waitingOn: [] };
   const root = evaluate(ctx, plan.flow, undefined);
   const outcome: VerdictOutcome =
-    root.status === "fail" ? "bounce" : root.status === "escalate" ? "park" : root.status === "pending" ? "hold" : "land";
-  return { ...base, outcome, evidence: root.evidence, waitingOn: [...new Set(root.waiting)].toSorted() };
+    root.status === "fail"
+      ? "bounce"
+      : root.status === "escalate"
+        ? "park"
+        : root.status === "pending"
+          ? "hold"
+          : "land";
+  return {
+    ...base,
+    outcome,
+    evidence: root.evidence,
+    waitingOn: [...new Set(root.waiting)].toSorted(),
+  };
 };
 
 /**
@@ -203,5 +243,11 @@ const verdict1 = (plan: FlowPlan, run: Run): Verdict => {
  * a required step) parks for a ruling; a missing result holds; otherwise the
  * change lands.
  */
-export const verdict = (plan: FlowPlan, run: Run, version: string): Result.Result<Verdict, UnknownVerdictVersion> =>
-  version === "verdict/1" ? Result.succeed(verdict1(plan, run)) : Result.fail(new UnknownVerdictVersion({ version }));
+export const verdict = (
+  plan: FlowPlan,
+  run: Run,
+  version: string,
+): Result.Result<Verdict, UnknownVerdictVersion> =>
+  version === "verdict/1"
+    ? Result.succeed(verdict1(plan, run))
+    : Result.fail(new UnknownVerdictVersion({ version }));

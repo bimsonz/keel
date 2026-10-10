@@ -7,6 +7,13 @@ export interface RecallHit {
 }
 
 /** Nearest subjects or decisions to free text. Used for routing, **never for gating**. */
-export class Recall extends Context.Service<Recall, {
-  readonly nearest: (projectId: ProjectId, text: string, k: number) => Effect.Effect<readonly RecallHit[]>;
-}>()("keel/Recall") {}
+export class Recall extends Context.Service<
+  Recall,
+  {
+    readonly nearest: (
+      projectId: ProjectId,
+      text: string,
+      k: number,
+    ) => Effect.Effect<readonly RecallHit[]>;
+  }
+>()("keel/Recall") {}

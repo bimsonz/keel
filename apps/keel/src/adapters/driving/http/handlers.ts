@@ -13,7 +13,9 @@ const notYet = (caller: Caller) => notImplemented(caller.requestId);
 
 /** The authorize middleware admitted this caller; a missing principal here is a defect, never a response. */
 function principalOf(caller: Caller): Effect.Effect<Principal> {
-  return caller.principal === null ? Effect.die(new Error("an authenticated operation ran without a principal")) : Effect.succeed(caller.principal);
+  return caller.principal === null
+    ? Effect.die(new Error("an authenticated operation ran without a principal"))
+    : Effect.succeed(caller.principal);
 }
 
 const decodeScopes = Schema.decodeUnknownOption(Schema.Array(Scope));
@@ -25,10 +27,23 @@ const decodeScopes = Schema.decodeUnknownOption(Schema.Array(Scope));
  */
 export function makeHandlers(run: Runner) {
   return {
-    Auth_exchangeToken: (caller: Caller, input: { readonly client_id: string; readonly client_secret: string; readonly scope?: string }) => {
-      const requested = input.scope === undefined ? undefined : decodeScopes(input.scope.split(" ").filter(Boolean));
+    Auth_exchangeToken: (
+      caller: Caller,
+      input: {
+        readonly client_id: string;
+        readonly client_secret: string;
+        readonly scope?: string;
+      },
+    ) => {
+      const requested =
+        input.scope === undefined
+          ? undefined
+          : decodeScopes(input.scope.split(" ").filter(Boolean));
       if (requested !== undefined && requested._tag === "None") {
-        return { status: 400 as const, body: { error: "invalid_scope" as const, error_description: "Unknown scope." } };
+        return {
+          status: 400 as const,
+          body: { error: "invalid_scope" as const, error_description: "Unknown scope." },
+        };
       }
       return run(
         caller,
@@ -37,7 +52,12 @@ export function makeHandlers(run: Runner) {
           clientSecret: input.client_secret,
           ...(requested === undefined ? {} : { scopes: requested.value }),
         }).pipe(
-          Effect.flatMap((granted) => Effect.map(Clock.use((clock) => clock.now), (now) => tokenOk(granted, now))),
+          Effect.flatMap((granted) =>
+            Effect.map(
+              Clock.use((clock) => clock.now),
+              (now) => tokenOk(granted, now),
+            ),
+          ),
           Effect.catch((error) => Effect.succeed(tokenError(error))),
         ),
       );

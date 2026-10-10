@@ -10,7 +10,8 @@ export function workspaceSources(root: string): string[] {
   const dirs: string[] = [];
   for (const group of ["apps", "packages", "examples"]) {
     if (!existsSync(join(root, group))) continue;
-    for (const name of readdirSync(join(root, group))) dirs.push(`${group}/${name}/src`, `${group}/${name}/test`);
+    for (const name of readdirSync(join(root, group)))
+      dirs.push(`${group}/${name}/src`, `${group}/${name}/test`);
   }
   dirs.push("e2e/src", "e2e/test");
   return dirs;
@@ -25,7 +26,8 @@ function check(
   for (const file of files) {
     for (const ref of file.imports) {
       const reason = forbidden(ref.specifier, file.path);
-      if (reason !== null) violations.push({ rule, file: file.path, line: ref.line, message: reason });
+      if (reason !== null)
+        violations.push({ rule, file: file.path, line: ref.line, message: reason });
     }
   }
   return violations;
@@ -37,42 +39,89 @@ export function checkR5(root: string, options: GuardOptions = {}): GuardResult {
   const violations = check("R5", files, (specifier) => {
     const pkg = packageOf(specifier);
     const banned =
-      pkg === "hono" || pkg === "zod" || pkg === "agents" || specifier.startsWith("cloudflare:") || pkg.startsWith("@cloudflare/") || pkg.startsWith("@modelcontextprotocol/");
-    return banned ? `imports ${specifier}; core and gitcore stay free of frameworks and runtimes` : null;
+      pkg === "hono" ||
+      pkg === "zod" ||
+      pkg === "agents" ||
+      specifier.startsWith("cloudflare:") ||
+      pkg.startsWith("@cloudflare/") ||
+      pkg.startsWith("@modelcontextprotocol/");
+    return banned
+      ? `imports ${specifier}; core and gitcore stay free of frameworks and runtimes`
+      : null;
   });
-  return withVacuityCheck("R5", files.map((f) => f.path), violations, options.vacuity ?? { minFiles: 50, canary: "packages/core/src/application/ports/index.ts" });
+  return withVacuityCheck(
+    "R5",
+    files.map((f) => f.path),
+    violations,
+    options.vacuity ?? { minFiles: 50, canary: "packages/core/src/application/ports/index.ts" },
+  );
 }
 
 /** R6: zod is imported only by generated code. */
 export function checkR6(root: string, options: GuardOptions = {}): GuardResult {
   const files = scanFiles(root, sourcesUnder(root, workspaceSources(root)));
   const violations = check("R6", files, (specifier, file) =>
-    packageOf(specifier) === "zod" && !isGenerated(file) ? `imports ${specifier}; zod belongs to generated code only` : null,
+    packageOf(specifier) === "zod" && !isGenerated(file)
+      ? `imports ${specifier}; zod belongs to generated code only`
+      : null,
   );
-  return withVacuityCheck("R6", files.map((f) => f.path), violations, options.vacuity ?? { minFiles: 80, canary: "apps/keel/src/generated/http/schemas.gen.ts" });
+  return withVacuityCheck(
+    "R6",
+    files.map((f) => f.path),
+    violations,
+    options.vacuity ?? { minFiles: 80, canary: "apps/keel/src/generated/http/schemas.gen.ts" },
+  );
 }
 
 const RUNTIME_DOORWAYS = /^apps\/[^/]+\/src\/(adapters\/driving\/(do|workflow)|composition)\//;
 
 /** R7: `cloudflare:workers` is imported only by the DO and Workflow doorways and the composition roots. */
 export function checkR7(root: string, options: GuardOptions = {}): GuardResult {
-  const files = scanFiles(root, sourcesUnder(root, workspaceSources(root)).filter((p) => !isTest(p)));
-  const violations = check("R7", files, (specifier, file) =>
-    specifier === "cloudflare:workers" && !RUNTIME_DOORWAYS.test(file) ? "imports cloudflare:workers outside a DO or Workflow doorway or a composition root" : null,
+  const files = scanFiles(
+    root,
+    sourcesUnder(root, workspaceSources(root)).filter((p) => !isTest(p)),
   );
-  return withVacuityCheck("R7", files.map((f) => f.path), violations, options.vacuity ?? { minFiles: 80, canary: "apps/keel/src/index.ts" });
+  const violations = check("R7", files, (specifier, file) =>
+    specifier === "cloudflare:workers" && !RUNTIME_DOORWAYS.test(file)
+      ? "imports cloudflare:workers outside a DO or Workflow doorway or a composition root"
+      : null,
+  );
+  return withVacuityCheck(
+    "R7",
+    files.map((f) => f.path),
+    violations,
+    options.vacuity ?? { minFiles: 80, canary: "apps/keel/src/index.ts" },
+  );
 }
 
-const PUBLIC_CONSUMERS = ["apps/console", "examples/swarm", "examples/loadgen", "packages/cli", "e2e"];
-const PUBLIC_PACKAGES = new Set(["@keeltown/contracts", "@keeltown/sdk", "@keeltown/workspace-git", "@keeltown/cli", "@bimsonz/mfp"]);
+const PUBLIC_CONSUMERS = [
+  "apps/console",
+  "examples/swarm",
+  "examples/loadgen",
+  "packages/cli",
+  "e2e",
+];
+const PUBLIC_PACKAGES = new Set([
+  "@keeltown/contracts",
+  "@keeltown/sdk",
+  "@keeltown/workspace-git",
+  "@keeltown/cli",
+  "@bimsonz/mfp",
+]);
 
 function manifestDependencies(root: string, dir: string): string[] {
   const path = join(root, dir, "package.json");
   if (!existsSync(path)) return [];
   const manifest: unknown = JSON.parse(read(root, `${dir}/package.json`));
   const names: string[] = [];
-  for (const field of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
-    const deps: unknown = typeof manifest === "object" && manifest !== null ? Reflect.get(manifest, field) : undefined;
+  for (const field of [
+    "dependencies",
+    "devDependencies",
+    "peerDependencies",
+    "optionalDependencies",
+  ]) {
+    const deps: unknown =
+      typeof manifest === "object" && manifest !== null ? Reflect.get(manifest, field) : undefined;
     if (typeof deps === "object" && deps !== null) names.push(...Object.keys(deps));
   }
   return names;
@@ -89,8 +138,15 @@ export function checkR9(root: string, options: GuardOptions = {}): GuardResult {
     if (!existsSync(join(root, dir, "package.json"))) continue;
     scanned.push(`${dir}/package.json`);
     for (const name of manifestDependencies(root, dir)) {
-      if ((name.startsWith("@keeltown/") || name.startsWith("@bimsonz/")) && !PUBLIC_PACKAGES.has(name)) {
-        violations.push({ rule: "R9", file: `${dir}/package.json`, message: `a public consumer depends on ${name}` });
+      if (
+        (name.startsWith("@keeltown/") || name.startsWith("@bimsonz/")) &&
+        !PUBLIC_PACKAGES.has(name)
+      ) {
+        violations.push({
+          rule: "R9",
+          file: `${dir}/package.json`,
+          message: `a public consumer depends on ${name}`,
+        });
       }
     }
     const files = scanFiles(root, sourcesUnder(root, [`${dir}/src`, `${dir}/test`]));
@@ -98,14 +154,32 @@ export function checkR9(root: string, options: GuardOptions = {}): GuardResult {
     violations.push(
       ...check("R9", files, (specifier) => {
         const pkg = packageOf(specifier);
-        return pkg.startsWith("@keeltown/") && !PUBLIC_PACKAGES.has(pkg) ? `a public consumer imports ${specifier}` : null;
+        return pkg.startsWith("@keeltown/") && !PUBLIC_PACKAGES.has(pkg)
+          ? `a public consumer imports ${specifier}`
+          : null;
       }),
     );
   }
-  return withVacuityCheck("R9", scanned, violations, options.vacuity ?? { minFiles: 5, canary: "apps/console/package.json" });
+  return withVacuityCheck(
+    "R9",
+    scanned,
+    violations,
+    options.vacuity ?? { minFiles: 5, canary: "apps/console/package.json" },
+  );
 }
 
-const AGENT_LIBRARIES = [/^agents$/, /^@modelcontextprotocol\/client$/, /^@modelcontextprotocol\/sdk$/, /^ai$/, /^@ai-sdk\//, /^openai$/, /^@openai\//, /^@anthropic-ai\//, /^langchain$/, /^@langchain\//];
+const AGENT_LIBRARIES = [
+  /^agents$/,
+  /^@modelcontextprotocol\/client$/,
+  /^@modelcontextprotocol\/sdk$/,
+  /^ai$/,
+  /^@ai-sdk\//,
+  /^openai$/,
+  /^@openai\//,
+  /^@anthropic-ai\//,
+  /^langchain$/,
+  /^@langchain\//,
+];
 
 /** R10: Keel's Workers never import an agent runtime, an MCP client, or a model SDK (ADR 0001). */
 export function checkR10(root: string, options: GuardOptions = {}): GuardResult {
@@ -115,5 +189,10 @@ export function checkR10(root: string, options: GuardOptions = {}): GuardResult 
       ? `imports ${specifier}; Keel is a platform agents use, never an agent runtime`
       : null,
   );
-  return withVacuityCheck("R10", files.map((f) => f.path), violations, options.vacuity ?? { minFiles: 15, canary: "apps/keel/src/adapters/driving/mcp/server.ts" });
+  return withVacuityCheck(
+    "R10",
+    files.map((f) => f.path),
+    violations,
+    options.vacuity ?? { minFiles: 15, canary: "apps/keel/src/adapters/driving/mcp/server.ts" },
+  );
 }

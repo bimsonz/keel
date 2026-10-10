@@ -1,26 +1,43 @@
 import { Schema } from "effect";
 import { ConflictId, ContentHash, EscalationId, VerdictId } from "../kernel/index.ts";
 
-export class ConflictNotFound extends Schema.TaggedError<ConflictNotFound>()("ConflictNotFound", { conflictId: ConflictId }) {}
-
-export class VerdictNotFound extends Schema.TaggedError<VerdictNotFound>()("VerdictNotFound", { verdictId: VerdictId }) {}
-
-export class EscalationNotFound extends Schema.TaggedError<EscalationNotFound>()("EscalationNotFound", { escalationId: EscalationId }) {}
-
-/** The move is not allowed for this conflict in its current state. */
-export class MoveRefused extends Schema.TaggedError<MoveRefused>()("MoveRefused", { conflictId: ConflictId, reason: Schema.String }) {}
-
-/** A verifier could not run the job: no capacity, the tier refused it, or the runner failed. */
-export class VerifierUnavailable extends Schema.TaggedError<VerifierUnavailable>()("VerifierUnavailable", {
-  reason: Schema.String,
-  retryAfterMs: Schema.optional(Schema.Int),
+export class ConflictNotFound extends Schema.TaggedError<ConflictNotFound>()("ConflictNotFound", {
+  conflictId: ConflictId,
 }) {}
 
+export class VerdictNotFound extends Schema.TaggedError<VerdictNotFound>()("VerdictNotFound", {
+  verdictId: VerdictId,
+}) {}
+
+export class EscalationNotFound extends Schema.TaggedError<EscalationNotFound>()(
+  "EscalationNotFound",
+  { escalationId: EscalationId },
+) {}
+
+/** The move is not allowed for this conflict in its current state. */
+export class MoveRefused extends Schema.TaggedError<MoveRefused>()("MoveRefused", {
+  conflictId: ConflictId,
+  reason: Schema.String,
+}) {}
+
+/** A verifier could not run the job: no capacity, the tier refused it, or the runner failed. */
+export class VerifierUnavailable extends Schema.TaggedError<VerifierUnavailable>()(
+  "VerifierUnavailable",
+  {
+    reason: Schema.String,
+    retryAfterMs: Schema.optional(Schema.Int),
+  },
+) {}
+
 /** A content-addressed object is missing from the bundle store. */
-export class BundleMissing extends Schema.TaggedError<BundleMissing>()("BundleMissing", { hash: ContentHash }) {}
+export class BundleMissing extends Schema.TaggedError<BundleMissing>()("BundleMissing", {
+  hash: ContentHash,
+}) {}
 
 /** The flow spec at the base commit does not compile. */
-export class FlowSpecInvalid extends Schema.TaggedError<FlowSpecInvalid>()("FlowSpecInvalid", { reason: Schema.String }) {}
+export class FlowSpecInvalid extends Schema.TaggedError<FlowSpecInvalid>()("FlowSpecInvalid", {
+  reason: Schema.String,
+}) {}
 
 /** A decision model or platform function gave no usable answer: timeout, rate limit, schema failure or truncation. Becomes `abstain`. */
 export class ModelAbstained extends Schema.TaggedError<ModelAbstained>()("ModelAbstained", {
@@ -34,52 +51,92 @@ export class SpecNotFromBase extends Schema.TaggedError<SpecNotFromBase>()("Spec
   specCommit: Schema.String,
   baseCommit: Schema.String,
 }) {}
-export class UnknownStep extends Schema.TaggedError<UnknownStep>()("UnknownStep", { step: Schema.String }) {}
-export class StepUsedTwice extends Schema.TaggedError<StepUsedTwice>()("StepUsedTwice", { step: Schema.String }) {}
+export class UnknownStep extends Schema.TaggedError<UnknownStep>()("UnknownStep", {
+  step: Schema.String,
+}) {}
+export class StepUsedTwice extends Schema.TaggedError<StepUsedTwice>()("StepUsedTwice", {
+  step: Schema.String,
+}) {}
 /** Every step can abstain. */
-export class AbstainMissing extends Schema.TaggedError<AbstainMissing>()("AbstainMissing", { step: Schema.String }) {}
-export class KindCeilingMismatch extends Schema.TaggedError<KindCeilingMismatch>()("KindCeilingMismatch", {
+export class AbstainMissing extends Schema.TaggedError<AbstainMissing>()("AbstainMissing", {
   step: Schema.String,
-  kind: Schema.String,
-  ceiling: Schema.String,
 }) {}
+export class KindCeilingMismatch extends Schema.TaggedError<KindCeilingMismatch>()(
+  "KindCeilingMismatch",
+  {
+    step: Schema.String,
+    kind: Schema.String,
+    ceiling: Schema.String,
+  },
+) {}
 /** A step whose evidence is opinion or testimony may only escalate, annotate or abstain. */
-export class OpinionMayOnlyRoute extends Schema.TaggedError<OpinionMayOnlyRoute>()("OpinionMayOnlyRoute", {
-  step: Schema.String,
-  outcome: Schema.String,
-}) {}
+export class OpinionMayOnlyRoute extends Schema.TaggedError<OpinionMayOnlyRoute>()(
+  "OpinionMayOnlyRoute",
+  {
+    step: Schema.String,
+    outcome: Schema.String,
+  },
+) {}
 /** An opinion step may skip only steps the project marked optional. */
-export class OpinionMaySkipOnlyOptional extends Schema.TaggedError<OpinionMaySkipOnlyOptional>()("OpinionMaySkipOnlyOptional", {
-  step: Schema.String,
-  target: Schema.String,
-}) {}
+export class OpinionMaySkipOnlyOptional extends Schema.TaggedError<OpinionMaySkipOnlyOptional>()(
+  "OpinionMaySkipOnlyOptional",
+  {
+    step: Schema.String,
+    target: Schema.String,
+  },
+) {}
 /** Only proof and rulings may fail. */
-export class OnlyProofOrRulingMayFail extends Schema.TaggedError<OnlyProofOrRulingMayFail>()("OnlyProofOrRulingMayFail", {
-  step: Schema.String,
-  effectiveClass: Schema.String,
-}) {}
+export class OnlyProofOrRulingMayFail extends Schema.TaggedError<OnlyProofOrRulingMayFail>()(
+  "OnlyProofOrRulingMayFail",
+  {
+    step: Schema.String,
+    effectiveClass: Schema.String,
+  },
+) {}
 /** Only a human decision overrides a fail. */
-export class OnlyHumanMayOverride extends Schema.TaggedError<OnlyHumanMayOverride>()("OnlyHumanMayOverride", {
+export class OnlyHumanMayOverride extends Schema.TaggedError<OnlyHumanMayOverride>()(
+  "OnlyHumanMayOverride",
+  {
+    step: Schema.String,
+    kind: Schema.String,
+  },
+) {}
+export class ReadsUnknown extends Schema.TaggedError<ReadsUnknown>()("ReadsUnknown", {
   step: Schema.String,
-  kind: Schema.String,
+  read: Schema.String,
 }) {}
-export class ReadsUnknown extends Schema.TaggedError<ReadsUnknown>()("ReadsUnknown", { step: Schema.String, read: Schema.String }) {}
-export class ReadCycle extends Schema.TaggedError<ReadCycle>()("ReadCycle", { steps: Schema.Array(Schema.String) }) {}
-export class WhenRefersToNonPriorStep extends Schema.TaggedError<WhenRefersToNonPriorStep>()("WhenRefersToNonPriorStep", {
-  step: Schema.String,
+export class ReadCycle extends Schema.TaggedError<ReadCycle>()("ReadCycle", {
+  steps: Schema.Array(Schema.String),
 }) {}
-export class WhenOutcomeNotDeclared extends Schema.TaggedError<WhenOutcomeNotDeclared>()("WhenOutcomeNotDeclared", {
-  step: Schema.String,
-  outcome: Schema.String,
+export class WhenRefersToNonPriorStep extends Schema.TaggedError<WhenRefersToNonPriorStep>()(
+  "WhenRefersToNonPriorStep",
+  {
+    step: Schema.String,
+  },
+) {}
+export class WhenOutcomeNotDeclared extends Schema.TaggedError<WhenOutcomeNotDeclared>()(
+  "WhenOutcomeNotDeclared",
+  {
+    step: Schema.String,
+    outcome: Schema.String,
+  },
+) {}
+export class CascadeAcceptUnreachable extends Schema.TaggedError<CascadeAcceptUnreachable>()(
+  "CascadeAcceptUnreachable",
+  {
+    accept: Schema.Array(Schema.String),
+  },
+) {}
+export class WorldNotSupported extends Schema.TaggedError<WorldNotSupported>()(
+  "WorldNotSupported",
+  {
+    step: Schema.String,
+    world: Schema.String,
+  },
+) {}
+export class InvalidBudget extends Schema.TaggedError<InvalidBudget>()("InvalidBudget", {
+  where: Schema.String,
 }) {}
-export class CascadeAcceptUnreachable extends Schema.TaggedError<CascadeAcceptUnreachable>()("CascadeAcceptUnreachable", {
-  accept: Schema.Array(Schema.String),
-}) {}
-export class WorldNotSupported extends Schema.TaggedError<WorldNotSupported>()("WorldNotSupported", {
-  step: Schema.String,
-  world: Schema.String,
-}) {}
-export class InvalidBudget extends Schema.TaggedError<InvalidBudget>()("InvalidBudget", { where: Schema.String }) {}
 
 export type CompileError =
   | SpecNotFromBase
@@ -102,11 +159,17 @@ export type CompileError =
   | InvalidBudget;
 
 /** The verdict function was asked for a version it does not have. */
-export class UnknownVerdictVersion extends Schema.TaggedError<UnknownVerdictVersion>()("UnknownVerdictVersion", {
-  version: Schema.String,
-}) {}
+export class UnknownVerdictVersion extends Schema.TaggedError<UnknownVerdictVersion>()(
+  "UnknownVerdictVersion",
+  {
+    version: Schema.String,
+  },
+) {}
 /** A cascade's acceptance cannot be `abstain`: abstaining is the absence of an answer, and it escalates. */
-export class CascadeMayNotAcceptAbstain extends Schema.TaggedError<CascadeMayNotAcceptAbstain>()("CascadeMayNotAcceptAbstain", {}) {}
+export class CascadeMayNotAcceptAbstain extends Schema.TaggedError<CascadeMayNotAcceptAbstain>()(
+  "CascadeMayNotAcceptAbstain",
+  {},
+) {}
 /**
  * A `when` may consult an opinion only to add scrutiny: the condition must not
  * hold when the opinion merely annotates, and may not negate it. Otherwise a

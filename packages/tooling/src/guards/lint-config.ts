@@ -10,13 +10,22 @@ export const LINT_CONFIG = "lint-config";
  * that lints itself names its config differently and passes it with `-c`.
  */
 export function checkLintConfig(root: string, options: GuardOptions = {}): GuardResult {
-  const configs = walk(root, { keep: (path) => /(^|\/)\.oxlintrc\.json$/.test(path), skip: options.skip ?? ["test/controls"] });
+  const configs = walk(root, {
+    keep: (path) => /(^|\/)\.oxlintrc\.json$/.test(path),
+    skip: options.skip ?? ["test/controls"],
+  });
   const violations = configs
     .filter((path) => path !== ".oxlintrc.json")
     .map((file) => ({
       rule: LINT_CONFIG,
       file,
-      message: "a nested .oxlintrc.json overrides the root lint for its subtree; rename it and pass it with -c",
+      message:
+        "a nested .oxlintrc.json overrides the root lint for its subtree; rename it and pass it with -c",
     }));
-  return withVacuityCheck(LINT_CONFIG, configs, violations, options.vacuity ?? { minFiles: 1, canary: ".oxlintrc.json" });
+  return withVacuityCheck(
+    LINT_CONFIG,
+    configs,
+    violations,
+    options.vacuity ?? { minFiles: 1, canary: ".oxlintrc.json" },
+  );
 }

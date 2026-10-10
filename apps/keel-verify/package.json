@@ -3,24 +3,24 @@
   "version": "0.0.0",
   "private": true,
   "description": "The untrusted execution plane: holds no credentials",
-  "type": "module",
   "license": "MIT",
+  "type": "module",
   "scripts": {
     "gen": "wrangler types --include-runtime=true --strict-vars=false",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "deploy:dry": "wrangler deploy --dry-run --outdir .wrangler/dry-run"
+  },
+  "dependencies": {
+    "@cloudflare/ci": "catalog:",
+    "@cloudflare/sandbox": "catalog:",
+    "@keeltown/core": "workspace:*",
+    "@keeltown/runner-protocol": "workspace:*",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"
-  },
-  "dependencies": {
-    "@keeltown/core": "workspace:*",
-    "@keeltown/runner-protocol": "workspace:*",
-    "effect": "catalog:",
-    "@cloudflare/ci": "catalog:",
-    "@cloudflare/sandbox": "catalog:"
   }
 }

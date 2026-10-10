@@ -7,4 +7,6 @@ export class DeploymentFailed extends Schema.TaggedError<DeploymentFailed>()("De
   reason: Schema.String,
 }) {}
 
-export class SecretMissing extends Schema.TaggedError<SecretMissing>()("SecretMissing", { name: Schema.String }) {}
+export class SecretMissing extends Schema.TaggedError<SecretMissing>()("SecretMissing", {
+  name: Schema.String,
+}) {}

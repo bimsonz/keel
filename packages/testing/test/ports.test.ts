@@ -4,15 +4,47 @@ import { PORTS } from "../src/ports.ts";
 
 /** The ports, one row each. */
 const CONTRACT_PORTS = [
-  "Clock", "Ids", "AgentDirectory", "TokenIssuer", "CodeHost", "WorkspacePool", "SubjectRegistry", "Recall",
-  "Notifier", "Changes", "Inbox", "EntityStore", "EventOutbox", "EventLog", "WorkQueue", "DecisionModel", "PlatformFunction",
-  "VerifierRuntime", "FlowSpecSource", "BundleStore", "GuardRepo", "CandidateComposer", "TrunkWriter",
-  "SessionStore", "MfpWriter", "HumanGate", "Deployer", "SecretsProvider", "Background", "Metrics",
+  "Clock",
+  "Ids",
+  "AgentDirectory",
+  "TokenIssuer",
+  "CodeHost",
+  "WorkspacePool",
+  "SubjectRegistry",
+  "Recall",
+  "Notifier",
+  "Changes",
+  "Inbox",
+  "EntityStore",
+  "EventOutbox",
+  "EventLog",
+  "WorkQueue",
+  "DecisionModel",
+  "PlatformFunction",
+  "VerifierRuntime",
+  "FlowSpecSource",
+  "BundleStore",
+  "GuardRepo",
+  "CandidateComposer",
+  "TrunkWriter",
+  "SessionStore",
+  "MfpWriter",
+  "HumanGate",
+  "Deployer",
+  "SecretsProvider",
+  "Background",
+  "Metrics",
 ];
 
 /** A port is an exported `Context.Service` class keyed under `keel/`. */
 const declared = Object.entries(ports)
-  .filter(([, value]) => typeof value === "function" && "key" in value && typeof value.key === "string" && value.key.startsWith("keel/"))
+  .filter(
+    ([, value]) =>
+      typeof value === "function" &&
+      "key" in value &&
+      typeof value.key === "string" &&
+      value.key.startsWith("keel/"),
+  )
   .map(([name]) => name);
 
 describe("ports", () => {

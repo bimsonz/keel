@@ -3,22 +3,22 @@
   "version": "0.0.0",
   "private": true,
   "description": "Guards and architecture rules for the Keel workspace",
-  "type": "module",
   "license": "MIT",
+  "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
-  "devDependencies": {
-    "@types/node": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
-  },
   "dependencies": {
     "archunit": "catalog:",
     "jsonc-parser": "catalog:",
     "oxc-parser": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

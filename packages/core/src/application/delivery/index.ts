@@ -6,5 +6,8 @@ import type { BundleStore, Deployer } from "../ports/index.ts";
 
 /** delivery use-cases. The Deployer adapters land in L5; the signature is fixed now. */
 
-export const previewCandidate: (candidateId: CandidateId) => Effect.Effect<DeployEvidence, DeploymentFailed, Deployer | BundleStore> =
-  stub("delivery/previewCandidate");
+export const previewCandidate: (
+  candidateId: CandidateId,
+) => Effect.Effect<DeployEvidence, DeploymentFailed, Deployer | BundleStore> = stub(
+  "delivery/previewCandidate",
+);

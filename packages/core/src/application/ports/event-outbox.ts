@@ -1,5 +1,10 @@
 import { Context, Data, type Effect, Schema } from "effect";
-import { type EntityRef, EventEnvelope, type EventId, type Instant } from "../../domain/kernel/index.ts";
+import {
+  type EntityRef,
+  EventEnvelope,
+  type EventId,
+  type Instant,
+} from "../../domain/kernel/index.ts";
 import type { Stored } from "./entity-store.ts";
 
 /**
@@ -64,42 +69,63 @@ export interface Backlog {
  * the same `EntityStore.transaction` as the state it describes. Delivery
  * happens afterwards, in `flushOutbox`.
  */
-export class EventOutbox extends Context.Service<EventOutbox, {
-  /**
-   * Numbers the drafts as the entity's next events (gap-free `seq`), mints
-   * their ids, and owes one delivery per subscriber of each event's type at
-   * this moment, recorded in its `notified[]`. Must run inside the
-   * transaction that writes the state.
-   */
-  readonly append: (spec: CommitSpec, at: Instant, drafts: readonly EventDraft[]) => readonly EventEnvelope[];
-  /** What `cause` already committed for this entity, if it did. */
-  readonly committed: (entity: EntityRef, cause: string) => PriorCommit | undefined;
-  /** The entity's events in `seq` order. Replaying them rebuilds its state. */
-  readonly log: (entity: EntityRef) => readonly EventEnvelope[];
-  /** Owes `subscriber` every later event of these types (or of every type). */
-  readonly subscribe: (subscriber: Subscriber, types: readonly string[] | typeof EVERY_TYPE) => void;
-  /** Stops owing `subscriber` these types; every type when omitted. Deliveries already owed stay owed. */
-  readonly unsubscribe: (subscriber: Subscriber, types?: readonly string[] | typeof EVERY_TYPE) => void;
-  /** The subscribers an event of this type would be delivered to now. */
-  readonly subscribers: (type: string) => readonly Subscriber[];
-  /**
-   * The receiving side: records that an event with this `dedupeKey` arrived.
-   * True the first time, false for a redelivery. Must run inside the
-   * transaction that applies the reaction.
-   */
-  readonly receive: (dedupeKey: string, at: Instant) => boolean;
-  /** Each subscriber's due deliveries, at most `limit` events each. */
-  readonly due: (now: Instant, limit: number) => readonly DueDeliveries[];
-  /** Deliveries that reached their subscriber. Called only after the subscriber answered. */
-  readonly acknowledge: (subscriber: Subscriber, eventIds: readonly string[]) => void;
-  /** Deliveries that failed: try again at `nextAttemptAt`. */
-  readonly defer: (subscriber: Subscriber, eventIds: readonly string[], attempts: number, nextAttemptAt: Instant) => void;
-  /** Every subscriber still owed something. */
-  readonly backlog: () => readonly Backlog[];
-}>()("keel/EventOutbox") {}
+export class EventOutbox extends Context.Service<
+  EventOutbox,
+  {
+    /**
+     * Numbers the drafts as the entity's next events (gap-free `seq`), mints
+     * their ids, and owes one delivery per subscriber of each event's type at
+     * this moment, recorded in its `notified[]`. Must run inside the
+     * transaction that writes the state.
+     */
+    readonly append: (
+      spec: CommitSpec,
+      at: Instant,
+      drafts: readonly EventDraft[],
+    ) => readonly EventEnvelope[];
+    /** What `cause` already committed for this entity, if it did. */
+    readonly committed: (entity: EntityRef, cause: string) => PriorCommit | undefined;
+    /** The entity's events in `seq` order. Replaying them rebuilds its state. */
+    readonly log: (entity: EntityRef) => readonly EventEnvelope[];
+    /** Owes `subscriber` every later event of these types (or of every type). */
+    readonly subscribe: (
+      subscriber: Subscriber,
+      types: readonly string[] | typeof EVERY_TYPE,
+    ) => void;
+    /** Stops owing `subscriber` these types; every type when omitted. Deliveries already owed stay owed. */
+    readonly unsubscribe: (
+      subscriber: Subscriber,
+      types?: readonly string[] | typeof EVERY_TYPE,
+    ) => void;
+    /** The subscribers an event of this type would be delivered to now. */
+    readonly subscribers: (type: string) => readonly Subscriber[];
+    /**
+     * The receiving side: records that an event with this `dedupeKey` arrived.
+     * True the first time, false for a redelivery. Must run inside the
+     * transaction that applies the reaction.
+     */
+    readonly receive: (dedupeKey: string, at: Instant) => boolean;
+    /** Each subscriber's due deliveries, at most `limit` events each. */
+    readonly due: (now: Instant, limit: number) => readonly DueDeliveries[];
+    /** Deliveries that reached their subscriber. Called only after the subscriber answered. */
+    readonly acknowledge: (subscriber: Subscriber, eventIds: readonly string[]) => void;
+    /** Deliveries that failed: try again at `nextAttemptAt`. */
+    readonly defer: (
+      subscriber: Subscriber,
+      eventIds: readonly string[],
+      attempts: number,
+      nextAttemptAt: Instant,
+    ) => void;
+    /** Every subscriber still owed something. */
+    readonly backlog: () => readonly Backlog[];
+  }
+>()("keel/EventOutbox") {}
 
 /** A subscriber did not take a delivery: unreachable, threw, or answered with a failure. */
-export class DeliveryFailed extends Data.TaggedError("DeliveryFailed")<{ readonly subscriber: Subscriber; readonly reason: string }> {}
+export class DeliveryFailed extends Data.TaggedError("DeliveryFailed")<{
+  readonly subscriber: Subscriber;
+  readonly reason: string;
+}> {}
 
 /**
  * How committed events leave the Durable Object. Built by composition from the
@@ -107,7 +133,10 @@ export class DeliveryFailed extends Data.TaggedError("DeliveryFailed")<{ readonl
  */
 export interface FanOut {
   /** Hands these events, oldest first, to one subscriber. Succeeds only once the subscriber has taken them all. */
-  readonly deliver: (subscriber: Subscriber, events: readonly EventEnvelope[]) => Effect.Effect<void, DeliveryFailed>;
+  readonly deliver: (
+    subscriber: Subscriber,
+    events: readonly EventEnvelope[],
+  ) => Effect.Effect<void, DeliveryFailed>;
   /** Tells the Projector there is something new to drain. Best effort: the next flush nudges again. */
   readonly nudge: Effect.Effect<void>;
 }
@@ -128,7 +157,12 @@ export const STUCK_AFTER_ATTEMPTS = 8;
  * one type). Unique across Keel, because it names the emitting entity, and
  * stable across retries, because the cause is.
  */
-export function dedupeKeyOf(entity: EntityRef, cause: string, type: string, ordinal: number): string {
+export function dedupeKeyOf(
+  entity: EntityRef,
+  cause: string,
+  type: string,
+  ordinal: number,
+): string {
   return `${entity.kind}:${entity.id}/${cause}/${type}#${ordinal}`;
 }
 

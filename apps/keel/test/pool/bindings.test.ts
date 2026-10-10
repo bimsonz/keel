@@ -1,4 +1,9 @@
-import { createExecutionContext, createMessageBatch, getQueueResult, introspectWorkflowInstance } from "cloudflare:test";
+import {
+  createExecutionContext,
+  createMessageBatch,
+  getQueueResult,
+  introspectWorkflowInstance,
+} from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import worker from "../../src/index.ts";
 import { describe, expect, it } from "vitest";
@@ -6,13 +11,20 @@ import { describe, expect, it } from "vitest";
 /** Spike S8: each binding type the Keel Worker uses, exercised inside workerd. */
 describe("bindings inside workerd", () => {
   it("D1: the migrated schema is there", async () => {
-    const tables = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('agents', 'credentials') ORDER BY name").all();
+    const tables = await env.DB.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('agents', 'credentials') ORDER BY name",
+    ).all();
     expect(tables.results.map((row) => row["name"])).toEqual(["agents", "credentials"]);
   });
 
   it("Queue: the jobs consumer acknowledges each message on its own", async () => {
     const batch = createMessageBatch("keel-staging-jobs", [
-      { id: "m1", timestamp: new Date(), attempts: 1, body: { kind: "mirror-sync", dedupeKey: "a" } },
+      {
+        id: "m1",
+        timestamp: new Date(),
+        attempts: 1,
+        body: { kind: "mirror-sync", dedupeKey: "a" },
+      },
       { id: "m2", timestamp: new Date(), attempts: 1, body: { kind: "unknown", dedupeKey: "b" } },
     ]);
     const ctx = createExecutionContext();

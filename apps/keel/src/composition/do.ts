@@ -27,7 +27,9 @@ export function durableObjectRuntime(ctx: DurableObjectState, env: Env): Durable
     migrateAlarms(ctx.storage);
   });
   return {
-    runtime: ManagedRuntime.make(Layer.mergeAll(EntityStoreSql(ctx.storage), EventOutboxSql(ctx.storage), SystemLive)),
+    runtime: ManagedRuntime.make(
+      Layer.mergeAll(EntityStoreSql(ctx.storage), EventOutboxSql(ctx.storage), SystemLive),
+    ),
     fanOut: FanOutRpc(env),
   };
 }

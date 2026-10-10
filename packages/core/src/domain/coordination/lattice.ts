@@ -28,7 +28,12 @@ export type Tri = boolean | "unknown";
  * session can outlive or underlive any TTL, so per-session and ttl(n) are
  * incomparable and any comparison between them needs a probe.
  */
-export type Freshness = "per-call" | "per-request" | "per-session" | "static" | { readonly ttl: number };
+export type Freshness =
+  | "per-call"
+  | "per-request"
+  | "per-session"
+  | "static"
+  | { readonly ttl: number };
 
 const isTtl = (v: Freshness): v is { readonly ttl: number } => typeof v === "object";
 
@@ -38,7 +43,8 @@ const freshnessRank = (v: "per-call" | "per-request" | "per-session" | "static")
 export const freshnessLeq = (a: Freshness, b: Freshness): Tri => {
   if (isTtl(a) && isTtl(b)) return a.ttl <= b.ttl;
   if (isTtl(a)) return b === "static" ? true : b === "per-session" ? "unknown" : false;
-  if (isTtl(b)) return a === "per-call" || a === "per-request" ? true : a === "per-session" ? "unknown" : false;
+  if (isTtl(b))
+    return a === "per-call" || a === "per-request" ? true : a === "per-session" ? "unknown" : false;
   return freshnessRank(a) <= freshnessRank(b);
 };
 
@@ -66,10 +72,17 @@ const notDecision = <V>(
   return "overlap";
 };
 
-const involvesNot = (p: { readonly relation: ClaimRelation }, e: { readonly relation: ClaimRelation }): boolean =>
-  p.relation === "not" || e.relation === "not";
+const involvesNot = (
+  p: { readonly relation: ClaimRelation },
+  e: { readonly relation: ClaimRelation },
+): boolean => p.relation === "not" || e.relation === "not";
 
-const interval = (relation: ClaimRelation, position: number, bottom: number, top: number): Interval =>
+const interval = (
+  relation: ClaimRelation,
+  position: number,
+  bottom: number,
+  top: number,
+): Interval =>
   relation === "at-most"
     ? { lo: bottom, hi: position }
     : relation === "at-least"
@@ -110,7 +123,8 @@ export const freshnessDecision = (
   if (!validTtl(p.value) || !validTtl(e.value)) return "overlap";
   if (involvesNot(p, e)) {
     const sessionAgainstTtl =
-      (p.value === "per-session" && isTtl(e.value)) || (isTtl(p.value) && e.value === "per-session");
+      (p.value === "per-session" && isTtl(e.value)) ||
+      (isTtl(p.value) && e.value === "per-session");
     return sessionAgainstTtl ? "overlap" : notDecision(p, e);
   }
   const ttls = [p.value, e.value].flatMap((v) => (isTtl(v) ? [v.ttl] : []));
@@ -127,7 +141,11 @@ export const freshnessDecision = (
 // -------------------------------------------------------------- consistency
 
 /** eventual < bounded(t) < read-your-writes < linearizable; a smaller t is stronger. */
-export type Consistency = "eventual" | "read-your-writes" | "linearizable" | { readonly bounded: number };
+export type Consistency =
+  | "eventual"
+  | "read-your-writes"
+  | "linearizable"
+  | { readonly bounded: number };
 
 const consistencyPosition = (v: Consistency): number =>
   typeof v === "object"
@@ -169,7 +187,10 @@ export const boundDecision = (
   if (p.value.unit !== e.value.unit) return "overlap";
   if (involvesNot(p, e)) return notDecision(p, e);
   const inf = Number.POSITIVE_INFINITY;
-  return intervalDecision(interval(p.relation, p.value.n, -inf, inf), interval(e.relation, e.value.n, -inf, inf));
+  return intervalDecision(
+    interval(p.relation, p.value.n, -inf, inf),
+    interval(e.relation, e.value.n, -inf, inf),
+  );
 };
 
 // ----------------------------------------------------- finite partial orders
@@ -182,14 +203,30 @@ export const boundDecision = (
  */
 export type Cardinality = "exactly-once" | "at-most-once" | "at-least-once" | "any";
 
-export const cardinalities: readonly Cardinality[] = ["exactly-once", "at-most-once", "at-least-once", "any"];
+export const cardinalities: readonly Cardinality[] = [
+  "exactly-once",
+  "at-most-once",
+  "at-least-once",
+  "any",
+];
 
 export const cardinalityLeq = (a: Cardinality, b: Cardinality): boolean =>
   a === b || a === "exactly-once" || b === "any";
 
-const finiteRegion = <V>(all: readonly V[], leq: (a: V, b: V) => boolean, relation: ClaimRelation, v: V): readonly V[] =>
+const finiteRegion = <V>(
+  all: readonly V[],
+  leq: (a: V, b: V) => boolean,
+  relation: ClaimRelation,
+  v: V,
+): readonly V[] =>
   all.filter((x) =>
-    relation === "at-most" ? leq(x, v) : relation === "at-least" ? leq(v, x) : relation === "not" ? x !== v : x === v,
+    relation === "at-most"
+      ? leq(x, v)
+      : relation === "at-least"
+        ? leq(v, x)
+        : relation === "not"
+          ? x !== v
+          : x === v,
   );
 
 const finiteDecision = <V>(premise: readonly V[], effect: readonly V[]): RegionDecision =>
@@ -205,7 +242,10 @@ export const finiteOrderDecision = <V>(
   p: { readonly relation: ClaimRelation; readonly value: V },
   e: { readonly relation: ClaimRelation; readonly value: V },
 ): RegionDecision =>
-  finiteDecision(finiteRegion(all, leq, p.relation, p.value), finiteRegion(all, leq, e.relation, e.value));
+  finiteDecision(
+    finiteRegion(all, leq, p.relation, p.value),
+    finiteRegion(all, leq, e.relation, e.value),
+  );
 
 /** Values with no order between them: presence, purity, idempotence. */
 export const booleans: readonly boolean[] = [true, false];
@@ -217,7 +257,8 @@ export const discreteLeq = <V>(a: V, b: V): boolean => a === b;
 /** Who writes the subject. Ordered by ⊆: `at-most {w}` is "w is the single writer". */
 export type Authority = { readonly writers: readonly string[] };
 
-export const authorityLeq = (a: Authority, b: Authority): boolean => a.writers.every((w) => b.writers.includes(w));
+export const authorityLeq = (a: Authority, b: Authority): boolean =>
+  a.writers.every((w) => b.writers.includes(w));
 
 type WriterInterval = { readonly lo: readonly string[]; readonly hi: readonly string[] | "all" };
 
@@ -237,10 +278,12 @@ export const authorityDecision = (
 ): RegionDecision => {
   const pi = writerInterval(p.relation, p.value);
   const ei = writerInterval(e.relation, e.value);
-  const eWithinP = within(pi.lo, ei.lo) && (pi.hi === "all" || (ei.hi !== "all" && within(ei.hi, pi.hi)));
+  const eWithinP =
+    within(pi.lo, ei.lo) && (pi.hi === "all" || (ei.hi !== "all" && within(ei.hi, pi.hi)));
   if (eWithinP) return "within";
   const lo = [...pi.lo, ...ei.lo];
-  const hi = pi.hi === "all" ? ei.hi : ei.hi === "all" ? pi.hi : pi.hi.filter((w) => ei.hi.includes(w));
+  const hi =
+    pi.hi === "all" ? ei.hi : ei.hi === "all" ? pi.hi : pi.hi.filter((w) => ei.hi.includes(w));
   return within(lo, hi) ? "overlap" : "disjoint";
 };
 

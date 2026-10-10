@@ -10,12 +10,21 @@ export interface SubjectEntry {
 }
 
 /** The project's subjects: resolve by key or anchor, mint when normalisation finds none. */
-export class SubjectRegistry extends Context.Service<SubjectRegistry, {
-  readonly byKey: (projectId: ProjectId, key: SubjectKey) => Effect.Effect<Option.Option<SubjectEntry>>;
-  readonly byAnchor: (projectId: ProjectId, anchor: Anchor) => Effect.Effect<readonly SubjectEntry[]>;
-  readonly mint: (
-    projectId: ProjectId,
-    entry: Omit<SubjectEntry, "id">,
-    mintedBy: "scan" | "clef" | "agent",
-  ) => Effect.Effect<SubjectEntry>;
-}>()("keel/SubjectRegistry") {}
+export class SubjectRegistry extends Context.Service<
+  SubjectRegistry,
+  {
+    readonly byKey: (
+      projectId: ProjectId,
+      key: SubjectKey,
+    ) => Effect.Effect<Option.Option<SubjectEntry>>;
+    readonly byAnchor: (
+      projectId: ProjectId,
+      anchor: Anchor,
+    ) => Effect.Effect<readonly SubjectEntry[]>;
+    readonly mint: (
+      projectId: ProjectId,
+      entry: Omit<SubjectEntry, "id">,
+      mintedBy: "scan" | "clef" | "agent",
+    ) => Effect.Effect<SubjectEntry>;
+  }
+>()("keel/SubjectRegistry") {}

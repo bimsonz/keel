@@ -18,7 +18,9 @@ import { makeMcpEndpoint } from "../adapters/driving/mcp/server.ts";
 export function isolateLayer(env: Env): Layer.Layer<IsolateServices> {
   return Layer.mergeAll(
     AgentDirectoryD1(env.DB),
-    TokenIssuerJose({ privateJwk: env.KEEL_SIGNING_KEY, issuer: env.KEEL_HOST }).pipe(Layer.provide(ClockLive)),
+    TokenIssuerJose({ privateJwk: env.KEEL_SIGNING_KEY, issuer: env.KEEL_HOST }).pipe(
+      Layer.provide(ClockLive),
+    ),
     SystemLive,
   );
 }
@@ -33,7 +35,9 @@ function makeVerifier(runtime: IsolateRuntime): TokenVerifier {
         Effect.flatMap((principal) =>
           whoami(principal).pipe(
             Effect.as<Verification>({ principal }),
-            Effect.catchTag("AgentNotAdmitted", () => Effect.succeed<Verification>({ refused: "revoked" })),
+            Effect.catchTag("AgentNotAdmitted", () =>
+              Effect.succeed<Verification>({ refused: "revoked" }),
+            ),
           ),
         ),
         Effect.catch(() => Effect.succeed<Verification>({ refused: "invalid" })),

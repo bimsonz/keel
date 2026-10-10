@@ -1,15 +1,27 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { BUNDLE_HOSTS, bundleKey, KeelSandbox } from "../../src/adapters/driving/do/keel-sandbox.ts";
+import {
+  BUNDLE_HOSTS,
+  bundleKey,
+  KeelSandbox,
+} from "../../src/adapters/driving/do/keel-sandbox.ts";
 
 const hash = "a".repeat(64);
 
-const glob = (pattern: string) => new RegExp(`^${pattern.split("*").map((part) => part.replaceAll(".", "\\.")).join(".*")}$`);
+const glob = (pattern: string) =>
+  new RegExp(
+    `^${pattern
+      .split("*")
+      .map((part) => part.replaceAll(".", "\\."))
+      .join(".*")}$`,
+  );
 
 /** The handler the containers proxy would pick for `host`: exact match, then the first matching glob. */
 function handlerFor(host: string) {
   const handlers = KeelSandbox.outboundByHost ?? {};
-  return handlers[host] ?? Object.entries(handlers).find(([pattern]) => glob(pattern).test(host))?.[1];
+  return (
+    handlers[host] ?? Object.entries(handlers).find(([pattern]) => glob(pattern).test(host))?.[1]
+  );
 }
 
 async function egress(url: string, init?: RequestInit) {
@@ -33,7 +45,11 @@ describe("KeelSandbox egress", () => {
     }
     if (!(constructed instanceof KeelSandbox)) throw new Error("KeelSandbox did not construct");
     const sandbox = constructed;
-    expect({ enableInternet: sandbox.enableInternet, interceptHttps: sandbox.interceptHttps, allowedHosts: sandbox.allowedHosts }).toEqual({
+    expect({
+      enableInternet: sandbox.enableInternet,
+      interceptHttps: sandbox.interceptHttps,
+      allowedHosts: sandbox.allowedHosts,
+    }).toEqual({
       enableInternet: false,
       interceptHttps: true,
       allowedHosts: [BUNDLE_HOSTS],
@@ -49,13 +65,20 @@ describe("KeelSandbox egress", () => {
   });
 
   it("refuses anything that is not a read of a well-formed hash", async () => {
-    expect((await egress(`https://bundles.keel.internal/${hash}`, { method: "PUT", body: "x" })).status).toBe(405);
+    expect(
+      (await egress(`https://bundles.keel.internal/${hash}`, { method: "PUT", body: "x" })).status,
+    ).toBe(405);
     expect((await egress("https://bundles.keel.internal/../secrets")).status).toBe(400);
     expect((await egress(`https://bundles.keel.internal/${"b".repeat(64)}`)).status).toBe(404);
   });
 
   it("denies every other host at once, over HTTP and HTTPS", async () => {
-    for (const url of ["https://registry.npmjs.org/hono", "http://example.com/", "https://api.cloudflare.com/client/v4", "https://keel.internal.evil.com/"]) {
+    for (const url of [
+      "https://registry.npmjs.org/hono",
+      "http://example.com/",
+      "https://api.cloudflare.com/client/v4",
+      "https://keel.internal.evil.com/",
+    ]) {
       const response = await egress(url);
       expect({ url, status: response.status }).toEqual({ url, status: 403 });
     }

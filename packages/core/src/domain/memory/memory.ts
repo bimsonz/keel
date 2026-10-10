@@ -1,5 +1,14 @@
 import { Schema } from "effect";
-import { AgentId, DecisionId, EscalationId, GuardId, InstantSchema, SessionId, SubjectId, TenetId } from "../kernel/index.ts";
+import {
+  AgentId,
+  DecisionId,
+  EscalationId,
+  GuardId,
+  InstantSchema,
+  SessionId,
+  SubjectId,
+  TenetId,
+} from "../kernel/index.ts";
 import { Predicate, Relation } from "../coordination/index.ts";
 
 export const DecisionState = Schema.Literals(["active", "superseded", "overruled"]);
@@ -12,7 +21,9 @@ export const Decision = Schema.Struct({
   summary: Schema.String,
   scope: Schema.optional(Schema.String),
   evidence: Schema.Array(Schema.String),
-  alternatives: Schema.Array(Schema.Struct({ option: Schema.String, reasonRejected: Schema.String })),
+  alternatives: Schema.Array(
+    Schema.Struct({ option: Schema.String, reasonRejected: Schema.String }),
+  ),
   decidedAt: InstantSchema,
   state: DecisionState,
 });

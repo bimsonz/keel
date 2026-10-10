@@ -17,7 +17,10 @@ export interface SeededAgent {
 }
 
 /** Writes an agent and its credential into the D1 projection, as enrolment's projector will. */
-export async function seedAgent(overrides: Partial<Agent> = {}, scopes: readonly Scope[] = ["agent:read", "agent:work"]): Promise<SeededAgent> {
+export async function seedAgent(
+  overrides: Partial<Agent> = {},
+  scopes: readonly Scope[] = ["agent:read", "agent:work"],
+): Promise<SeededAgent> {
   const agent: Agent = {
     id: makeId("agt", ulid()),
     projectId: sampleProjectId,
@@ -33,7 +36,9 @@ export async function seedAgent(overrides: Partial<Agent> = {}, scopes: readonly
   const clientSecret = `secret-${crypto.randomUUID()}`;
   const secretHash = await hashSecret(clientSecret);
   await Effect.runPromise(
-    AgentDirectory.use((d) => d.upsert(agent, { clientId, agentId: agent.id, secretHash })).pipe(Effect.provide(AgentDirectoryD1(env.DB))),
+    AgentDirectory.use((d) => d.upsert(agent, { clientId, agentId: agent.id, secretHash })).pipe(
+      Effect.provide(AgentDirectoryD1(env.DB)),
+    ),
   );
   return { agent, clientId, clientSecret };
 }
@@ -53,14 +58,20 @@ export async function exchange(seeded: SeededAgent, scope?: string): Promise<Res
 
 export async function tokenFor(seeded: SeededAgent, scope?: string): Promise<string> {
   const response = await exchange(seeded, scope);
-  if (response.status !== 200) throw new Error(`token exchange answered ${response.status}: ${await response.text()}`);
+  if (response.status !== 200)
+    throw new Error(`token exchange answered ${response.status}: ${await response.text()}`);
   return (await response.json<{ access_token: string }>()).access_token;
 }
 
 const MCP_PROTOCOL_VERSION = "2026-07-28";
 
 /** One stateless MCP request, with the headers the 2026-07-28 transport requires. */
-export async function mcp(token: string | null, method: string, params: Record<string, unknown> = {}, name?: string): Promise<Response> {
+export async function mcp(
+  token: string | null,
+  method: string,
+  params: Record<string, unknown> = {},
+  name?: string,
+): Promise<Response> {
   return exports.default.fetch(`${BASE}/mcp`, {
     method: "POST",
     headers: {
@@ -91,9 +102,15 @@ export async function mcp(token: string | null, method: string, params: Record<s
 /** The JSON-RPC result of an MCP response, whether it came back as JSON or as one SSE event. */
 export async function mcpResult(response: Response): Promise<Record<string, unknown>> {
   const text = await response.text();
-  const json = text.startsWith("{") ? text : (text.split("\n").find((line) => line.startsWith("data: "))?.slice(6) ?? "{}");
+  const json = text.startsWith("{")
+    ? text
+    : (text
+        .split("\n")
+        .find((line) => line.startsWith("data: "))
+        ?.slice(6) ?? "{}");
   const message: unknown = JSON.parse(json);
-  const result: unknown = typeof message === "object" && message !== null ? Reflect.get(message, "result") : undefined;
+  const result: unknown =
+    typeof message === "object" && message !== null ? Reflect.get(message, "result") : undefined;
   if (typeof result !== "object" || result === null) throw new Error(`MCP error: ${json}`);
   return Object.fromEntries(Object.entries(result));
 }

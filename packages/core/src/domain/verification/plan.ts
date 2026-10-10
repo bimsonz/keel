@@ -1,7 +1,14 @@
 import { Schema } from "effect";
 import { ContentHash, EvidenceClass, Glob, TierChoice } from "../kernel/index.ts";
 
-export const StepKind = Schema.Literals(["deterministic", "decision-model", "generative", "probe", "human", "deploy"]);
+export const StepKind = Schema.Literals([
+  "deterministic",
+  "decision-model",
+  "generative",
+  "probe",
+  "human",
+  "deploy",
+]);
 export type StepKind = typeof StepKind.Type;
 
 /** Every step can abstain; only proof and rulings may fail (ADR 0005). */

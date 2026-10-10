@@ -70,10 +70,17 @@ export function checkPublicScrub(root: string, options: GuardOptions = {}): Guar
   for (const file of files) {
     const text = read(root, file);
     for (const hit of matchingLines(text, LOCAL_PATH)) {
-      violations.push({ rule: PUBLIC_SCRUB, file, line: hit.line, message: "names a local filesystem path" });
+      violations.push({
+        rule: PUBLIC_SCRUB,
+        file,
+        line: hit.line,
+        message: "names a local filesystem path",
+      });
     }
     text.split("\n").forEach((line, index) => {
-      const named = new Set(termsOf(line).flatMap((term) => FORBIDDEN_TERMS.get(digest(term)) ?? []));
+      const named = new Set(
+        termsOf(line).flatMap((term) => FORBIDDEN_TERMS.get(digest(term)) ?? []),
+      );
       for (const reason of named) {
         violations.push({ rule: PUBLIC_SCRUB, file, line: index + 1, message: `names ${reason}` });
       }

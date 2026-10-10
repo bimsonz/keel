@@ -54,31 +54,43 @@ export function AgentDirectoryD1(db: D1Database) {
     AgentDirectory,
     AgentDirectory.of({
       findAgent: (agentId) =>
-        Effect.promise(() => db.prepare("SELECT * FROM agents WHERE id = ?").bind(agentId).first()).pipe(
-          Effect.map((row) => (row === null ? Option.none() : Option.some(toAgent(row)))),
-        ),
+        Effect.promise(() =>
+          db.prepare("SELECT * FROM agents WHERE id = ?").bind(agentId).first(),
+        ).pipe(Effect.map((row) => (row === null ? Option.none() : Option.some(toAgent(row))))),
       findCredential: (clientId) =>
         Effect.promise(() =>
-          db.prepare("SELECT client_id, agent_id, secret_hash FROM credentials WHERE client_id = ?").bind(clientId).first<{
-            client_id: string;
-            agent_id: string;
-            secret_hash: string;
-          }>(),
+          db
+            .prepare("SELECT client_id, agent_id, secret_hash FROM credentials WHERE client_id = ?")
+            .bind(clientId)
+            .first<{
+              client_id: string;
+              agent_id: string;
+              secret_hash: string;
+            }>(),
         ).pipe(
           Effect.map((row) =>
             row === null
               ? Option.none()
-              : Option.some<StoredCredential>({ clientId: row.client_id, agentId: decodeAgentId(row.agent_id), secretHash: row.secret_hash }),
+              : Option.some<StoredCredential>({
+                  clientId: row.client_id,
+                  agentId: decodeAgentId(row.agent_id),
+                  secretHash: row.secret_hash,
+                }),
           ),
         ),
       verifyCredential: (clientId, secret) =>
         Effect.promise(async () => {
-          const row = await db.prepare("SELECT agent_id, secret_hash FROM credentials WHERE client_id = ?").bind(clientId).first<{
-            agent_id: string;
-            secret_hash: string;
-          }>();
+          const row = await db
+            .prepare("SELECT agent_id, secret_hash FROM credentials WHERE client_id = ?")
+            .bind(clientId)
+            .first<{
+              agent_id: string;
+              secret_hash: string;
+            }>();
           if (row === null) return Option.none();
-          return constantTimeEqual(await hashSecret(secret), row.secret_hash) ? Option.some(decodeAgentId(row.agent_id)) : Option.none();
+          return constantTimeEqual(await hashSecret(secret), row.secret_hash)
+            ? Option.some(decodeAgentId(row.agent_id))
+            : Option.none();
         }),
       upsert: (agent, credential) =>
         Effect.promise(() =>
@@ -89,7 +101,16 @@ export function AgentDirectoryD1(db: D1Database) {
                  ON CONFLICT (id) DO UPDATE SET project_id = excluded.project_id, name = excluded.name, kind = excluded.kind, scopes = excluded.scopes,
                    state = excluded.state, revocation_epoch = excluded.revocation_epoch`,
               )
-              .bind(agent.id, agent.projectId, agent.name, agent.kind, JSON.stringify(agent.scopes), agent.state, agent.revocationEpoch, agent.createdAt),
+              .bind(
+                agent.id,
+                agent.projectId,
+                agent.name,
+                agent.kind,
+                JSON.stringify(agent.scopes),
+                agent.state,
+                agent.revocationEpoch,
+                agent.createdAt,
+              ),
             db
               .prepare(
                 `INSERT INTO credentials (client_id, agent_id, secret_hash) VALUES (?, ?, ?)

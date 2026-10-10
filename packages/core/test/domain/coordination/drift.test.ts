@@ -16,10 +16,22 @@ import {
 } from "../../../src/domain/coordination/index.ts";
 import { Glob } from "../../../src/domain/kernel/index.ts";
 import { key } from "../../arbitraries/coordination.ts";
-import { changeIdArb, changeIds, derivedEffectArb, footprintArb, heldPremiseArb, tenetArb } from "../../arbitraries/graph.ts";
+import {
+  changeIdArb,
+  changeIds,
+  derivedEffectArb,
+  footprintArb,
+  heldPremiseArb,
+  tenetArb,
+} from "../../arbitraries/graph.ts";
 import { fc } from "../../support/fast-check.ts";
 
-const touchedPaths = ["src/authz/check.ts", "src/authz/cache.ts", "src/billing/charge.ts", "docs/readme.md"] as const;
+const touchedPaths = [
+  "src/authz/check.ts",
+  "src/authz/cache.ts",
+  "src/billing/charge.ts",
+  "docs/readme.md",
+] as const;
 const touchedArb: fc.Arbitrary<readonly FootprintEntry[]> = fc
   .subarray([...touchedPaths])
   .map((paths) => paths.map((path) => ({ path: Glob.make(path), op: "edit" as const })));
@@ -77,7 +89,8 @@ const intentOf = (s: Scenario): Intent => ({
   declaredEffects: s.declared,
 });
 
-const run = (s: Scenario): readonly DriftFinding[] => drift(s.self, intentOf(s), s.touched, s.derived, s.premises, s.tenets);
+const run = (s: Scenario): readonly DriftFinding[] =>
+  drift(s.self, intentOf(s), s.touched, s.derived, s.premises, s.tenets);
 
 const scopeOf = (p: Proposition) => Result.getOrThrow(readScope(p.scope));
 
@@ -95,7 +108,10 @@ const covered = (s: Scenario, e: Proposition): boolean =>
 
 const retracts = (s: Scenario, e: Proposition): boolean =>
   s.premises.some(
-    (p) => p.holder !== s.self && (p.proposition.strength ?? "must") === "must" && compare(p.proposition, e).outcome === "contradicts",
+    (p) =>
+      p.holder !== s.self &&
+      (p.proposition.strength ?? "must") === "must" &&
+      compare(p.proposition, e).outcome === "contradicts",
   ) || s.tenets.some((t) => compare(t.proposition, e).outcome === "contradicts");
 
 const decides = (c: DerivedEffect["evidenceClass"]): boolean => c === "proof" || c === "ruling";
@@ -103,7 +119,12 @@ const decides = (c: DerivedEffect["evidenceClass"]): boolean => c === "proof" ||
 const evaluation = key("authz.permission-evaluation");
 const premiseA: HeldPremise = {
   holder: changeIds[0]!,
-  proposition: { subject: evaluation, predicate: "freshness", relation: "at-most", value: "per-request" },
+  proposition: {
+    subject: evaluation,
+    predicate: "freshness",
+    relation: "at-most",
+    value: "per-request",
+  },
 };
 const cache = (value: string, evidenceClass: DerivedEffect["evidenceClass"]): DerivedEffect => ({
   proposition: { subject: evaluation, predicate: "freshness", relation: "is", value },
@@ -113,7 +134,13 @@ const cache = (value: string, evidenceClass: DerivedEffect["evidenceClass"]): De
   declared: false,
 });
 const b: Scenario = {
-  self: changeIds[1]!, derived: [], declared: [], footprint: [], touched: [], premises: [premiseA], tenets: [],
+  self: changeIds[1]!,
+  derived: [],
+  declared: [],
+  footprint: [],
+  touched: [],
+  premises: [premiseA],
+  tenets: [],
 };
 
 describe("drift", () => {
@@ -140,8 +167,12 @@ describe("drift", () => {
         run(s).every((f) => f._tag === "footprint" || f.blocks === decides(f.effect.evidenceClass)),
       ),
     );
-    expect(run({ ...b, derived: [cache("per-call", "proof")] }).map((f) => f.blocks)).toEqual([true]);
-    expect(run({ ...b, derived: [cache("per-call", "ruling")] }).map((f) => f.blocks)).toEqual([true]);
+    expect(run({ ...b, derived: [cache("per-call", "proof")] }).map((f) => f.blocks)).toEqual([
+      true,
+    ]);
+    expect(run({ ...b, derived: [cache("per-call", "ruling")] }).map((f) => f.blocks)).toEqual([
+      true,
+    ]);
   });
 
   it("[drift.reports-exactly-undeclared] an effect gets a finding exactly when no declared effect speaks for it", () => {
@@ -170,20 +201,36 @@ describe("drift", () => {
       ),
     );
     expect(retractions).toBeGreaterThan(0);
-    const should: HeldPremise = { ...premiseA, proposition: { ...premiseA.proposition, strength: "should" } };
-    expect(run({ ...b, premises: [should], derived: [cache("per-session", "opinion")] }).map((f) => f._tag)).toEqual(["undeclared-effect"]);
-    expect(run({ ...b, self: premiseA.holder, derived: [cache("per-session", "opinion")] }).map((f) => f._tag)).toEqual(["undeclared-effect"]);
+    const should: HeldPremise = {
+      ...premiseA,
+      proposition: { ...premiseA.proposition, strength: "should" },
+    };
+    expect(
+      run({ ...b, premises: [should], derived: [cache("per-session", "opinion")] }).map(
+        (f) => f._tag,
+      ),
+    ).toEqual(["undeclared-effect"]);
+    expect(
+      run({ ...b, self: premiseA.holder, derived: [cache("per-session", "opinion")] }).map(
+        (f) => f._tag,
+      ),
+    ).toEqual(["undeclared-effect"]);
   });
 
   it("[drift.footprint-lists-undeclared-paths] footprint drift names exactly the touched paths outside the declared globs", () => {
     fc.assert(
       fc.property(scenarioArb, (s) => {
         const f = run(s).find((x) => x._tag === "footprint");
-        const outside = s.touched.map((t) => t.path).filter((p) => !s.footprint.some((d) => matchesSimple(d.path, p)));
+        const outside = s.touched
+          .map((t) => t.path)
+          .filter((p) => !s.footprint.some((d) => matchesSimple(d.path, p)));
         expect(f?._tag === "footprint" ? f.paths : []).toEqual(outside);
       }),
     );
-    const declared: Scenario = { ...b, footprint: [{ path: Glob.make("src/authz/**"), op: "edit" }] };
+    const declared: Scenario = {
+      ...b,
+      footprint: [{ path: Glob.make("src/authz/**"), op: "edit" }],
+    };
     const touched: FootprintEntry[] = [
       { path: Glob.make("src/authz/cache.ts"), op: "edit" },
       { path: Glob.make("src/billing/charge.ts"), op: "edit" },
@@ -195,10 +242,19 @@ describe("drift", () => {
   it("[drift.severity-by-class] footprint is low, an undeclared effect medium, a silent retraction high", () => {
     fc.assert(
       fc.property(scenarioArb, (s) =>
-        run(s).every((f) => f.drift.class === f._tag && f.drift.severity === { footprint: "low", "undeclared-effect": "medium", "silent-retraction": "high" }[f._tag]),
+        run(s).every(
+          (f) =>
+            f.drift.class === f._tag &&
+            f.drift.severity ===
+              { footprint: "low", "undeclared-effect": "medium", "silent-retraction": "high" }[
+                f._tag
+              ],
+        ),
       ),
     );
-    expect(run({ ...b, derived: [cache("per-session", "opinion")] }).map((f) => f.drift.severity)).toEqual(["high"]);
+    expect(
+      run({ ...b, derived: [cache("per-session", "opinion")] }).map((f) => f.drift.severity),
+    ).toEqual(["high"]);
   });
 });
 

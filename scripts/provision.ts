@@ -8,7 +8,11 @@ const environment = process.argv[2] ?? "staging";
 
 // Exception 1: Artifacts namespaces (no provider resource; REST POST /artifacts/namespaces).
 for (const namespace of ["keel-core", "keel-ws-00"]) {
-  const existing = namesIn(await cloudflare("GET", "/artifacts/namespaces?limit=100"), "namespace", "name");
+  const existing = namesIn(
+    await cloudflare("GET", "/artifacts/namespaces?limit=100"),
+    "namespace",
+    "name",
+  );
   if (existing.includes(namespace)) {
     console.log(`artifacts namespace ${namespace}: exists`);
   } else {
@@ -24,6 +28,9 @@ if (indexes.includes(index)) {
   console.log(`vectorize index ${index}: exists`);
 } else {
   // 768 dimensions: @cf/baai/bge-base-en-v1.5, the embedding model recall uses.
-  await cloudflare("POST", "/vectorize/v2/indexes", { name: index, config: { dimensions: 768, metric: "cosine" } });
+  await cloudflare("POST", "/vectorize/v2/indexes", {
+    name: index,
+    config: { dimensions: 768, metric: "cosine" },
+  });
   console.log(`vectorize index ${index}: created`);
 }

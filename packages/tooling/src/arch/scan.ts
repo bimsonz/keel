@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { read, walk } from "../scan.ts";
 import { importsOf, type ImportRef } from "./imports.ts";
 
-export const TS_SOURCE = (path: string): boolean => /\.(ts|tsx|mts)$/.test(path) && !path.endsWith(".d.ts");
+export const TS_SOURCE = (path: string): boolean =>
+  /\.(ts|tsx|mts)$/.test(path) && !path.endsWith(".d.ts");
 
 /** Generated and test code are excluded unless a rule asks for them. */
 export function isGenerated(path: string): boolean {
@@ -15,8 +16,14 @@ export function isTest(path: string): boolean {
 }
 
 /** TypeScript sources under each existing `dir` of `root`, repo-relative. */
-export function sourcesUnder(root: string, dirs: readonly string[], keep: (path: string) => boolean = TS_SOURCE): string[] {
-  return dirs.flatMap((dir) => (existsSync(join(root, dir)) ? walk(join(root, dir), { keep }).map((p) => `${dir}/${p}`) : []));
+export function sourcesUnder(
+  root: string,
+  dirs: readonly string[],
+  keep: (path: string) => boolean = TS_SOURCE,
+): string[] {
+  return dirs.flatMap((dir) =>
+    existsSync(join(root, dir)) ? walk(join(root, dir), { keep }).map((p) => `${dir}/${p}`) : [],
+  );
 }
 
 export interface ScannedFile {

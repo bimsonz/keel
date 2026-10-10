@@ -14,13 +14,20 @@ const environment = process.argv[2] ?? "staging";
 const repeatAt = process.argv.indexOf("--repeat");
 const repeat = repeatAt === -1 ? 0 : Number(process.argv[repeatAt + 1] ?? "0");
 const appDir = join(root, "apps/keel");
-if (!existsSync(join(appDir, "wrangler.deploy.jsonc"))) throw new Error(`no apps/keel/wrangler.deploy.jsonc: run \`node scripts/deploy.ts ${environment}\` first`);
+if (!existsSync(join(appDir, "wrangler.deploy.jsonc")))
+  throw new Error(
+    `no apps/keel/wrangler.deploy.jsonc: run \`node scripts/deploy.ts ${environment}\` first`,
+  );
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 function ulid(): string {
   let time = "";
-  for (let t = Date.now(), i = 0; i < 10; i += 1, t = Math.floor(t / 32)) time = CROCKFORD.charAt(t % 32) + time;
-  return time + [...crypto.getRandomValues(new Uint8Array(16))].map((b) => CROCKFORD.charAt(b % 32)).join("");
+  for (let t = Date.now(), i = 0; i < 10; i += 1, t = Math.floor(t / 32))
+    time = CROCKFORD.charAt(t % 32) + time;
+  return (
+    time +
+    [...crypto.getRandomValues(new Uint8Array(16))].map((b) => CROCKFORD.charAt(b % 32)).join("")
+  );
 }
 
 async function sha256(text: string): Promise<string> {
@@ -29,7 +36,10 @@ async function sha256(text: string): Promise<string> {
 }
 
 function d1(sql: string): void {
-  wrangler(["d1", "execute", "DB", "--remote", "-c", "wrangler.deploy.jsonc", "--command", sql], { cwd: appDir, quiet: true });
+  wrangler(["d1", "execute", "DB", "--remote", "-c", "wrangler.deploy.jsonc", "--command", sql], {
+    cwd: appDir,
+    quiet: true,
+  });
 }
 
 /** The project smoke agents are enrolled in; nothing else lives there. */
@@ -69,18 +79,29 @@ try {
   console.log(JSON.stringify({ keelUrl, results }, null, 2));
   for (const [index, result] of results.entries()) {
     const agent = seeded[index];
-    const named = ["result", "agent", "id"].reduce<unknown>((value, key) => Reflect.get(Object(value), key), result.rest);
+    const named = ["result", "agent", "id"].reduce<unknown>(
+      (value, key) => Reflect.get(Object(value), key),
+      result.rest,
+    );
     check(named === agent?.id, `REST names agent ${agent?.id}`);
-    check(isDeepStrictEqual(result.tool, result.rest), `MCP whoami's structuredContent equals the REST body for ${agent?.id}`);
+    check(
+      isDeepStrictEqual(result.tool, result.rest),
+      `MCP whoami's structuredContent equals the REST body for ${agent?.id}`,
+    );
   }
-  check(!isDeepStrictEqual(results[0]?.rest, results[1]?.tool), "two agents' identities differ across surfaces (the comparison can fail)");
+  check(
+    !isDeepStrictEqual(results[0]?.rest, results[1]?.tool),
+    "two agents' identities differ across surfaces (the comparison can fail)",
+  );
   if (repeat > 0 && seeded[0] !== undefined) {
     const rounds: WhoamiSmokeResult[] = [];
     for (let i = 0; i < repeat; i += 1) rounds.push(await whoamiSmoke(keelUrl, seeded[0]));
     for (const call of ["token", "rest", "mcp"] as const) {
       const sorted = rounds.map((r) => r.timings[call]).toSorted((a, b) => a - b);
       const at = (q: number) => sorted[Math.floor(q * (sorted.length - 1))];
-      console.log(`${call.padEnd(5)} over ${repeat} warm rounds, client-side: p50 ${at(0.5)} ms, p95 ${at(0.95)} ms`);
+      console.log(
+        `${call.padEnd(5)} over ${repeat} warm rounds, client-side: p50 ${at(0.5)} ms, p95 ${at(0.95)} ms`,
+      );
     }
   }
 } catch (error) {
@@ -89,7 +110,9 @@ try {
 } finally {
   if (seeded.length > 0) {
     const ids = seeded.map((s) => `'${s.id}'`).join(", ");
-    d1(`DELETE FROM credentials WHERE agent_id IN (${ids}); DELETE FROM agents WHERE id IN (${ids});`);
+    d1(
+      `DELETE FROM credentials WHERE agent_id IN (${ids}); DELETE FROM agents WHERE id IN (${ids});`,
+    );
     console.log(`cleaned up ${seeded.length} smoke agent(s)`);
   }
 }

@@ -43,7 +43,12 @@ describe("the Exit envelope over real Durable Object RPC", () => {
   it("brings a defect back as a defect, never as a tagged error", async () => {
     const { stub } = session();
     await runInDurableObject(stub, (_instance: AgentSessionDO, state) => {
-      state.storage.sql.exec("INSERT INTO entities (kind, id, value) VALUES (?, ?, ?)", SNAPSHOT.kind, SNAPSHOT.id, JSON.stringify({ corrupt: true }));
+      state.storage.sql.exec(
+        "INSERT INTO entities (kind, id, value) VALUES (?, ?, ?)",
+        SNAPSHOT.kind,
+        SNAPSHOT.id,
+        JSON.stringify({ corrupt: true }),
+      );
     });
     const exit = decodeExit(AgentSessionCodecs.describe, await stub.describe());
     expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true);

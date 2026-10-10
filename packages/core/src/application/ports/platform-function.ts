@@ -10,6 +10,9 @@ export interface PlatformFunctionCall {
 }
 
 /** **The only way Keel calls a model** (ADR 0001): one call, no loop, no tools. */
-export class PlatformFunction extends Context.Service<PlatformFunction, {
-  readonly call: (call: PlatformFunctionCall) => Effect.Effect<unknown, ModelAbstained>;
-}>()("keel/PlatformFunction") {}
+export class PlatformFunction extends Context.Service<
+  PlatformFunction,
+  {
+    readonly call: (call: PlatformFunctionCall) => Effect.Effect<unknown, ModelAbstained>;
+  }
+>()("keel/PlatformFunction") {}

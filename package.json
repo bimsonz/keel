@@ -1,12 +1,8 @@
 {
   "name": "keel",
   "private": true,
-  "type": "module",
   "license": "MIT",
-  "packageManager": "pnpm@11.18.0",
-  "engines": {
-    "node": ">=22.18.0"
-  },
+  "type": "module",
   "scripts": {
     "gen": "pnpm -r --if-present run gen",
     "lint": "oxlint apps packages examples e2e scripts",
@@ -32,5 +28,9 @@
     "oxlint-tsgolint": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
-  }
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "packageManager": "pnpm@11.18.0"
 }

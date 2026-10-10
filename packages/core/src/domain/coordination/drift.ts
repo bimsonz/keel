@@ -14,8 +14,20 @@ import { isAncestorOrSelf } from "./subject.ts";
  * say what the gap does. Only proof or a ruling can block (ADR 0005).
  */
 export type DriftFinding =
-  | { readonly _tag: "footprint"; readonly drift: Drift; readonly paths: readonly string[]; readonly blocks: false; readonly opensConflict: false }
-  | { readonly _tag: "undeclared-effect"; readonly drift: Drift; readonly effect: DerivedEffect; readonly blocks: boolean; readonly opensConflict: false }
+  | {
+      readonly _tag: "footprint";
+      readonly drift: Drift;
+      readonly paths: readonly string[];
+      readonly blocks: false;
+      readonly opensConflict: false;
+    }
+  | {
+      readonly _tag: "undeclared-effect";
+      readonly drift: Drift;
+      readonly effect: DerivedEffect;
+      readonly blocks: boolean;
+      readonly opensConflict: false;
+    }
   | {
       readonly _tag: "silent-retraction";
       readonly drift: Drift;
@@ -49,7 +61,9 @@ export const isDeclared = (intent: Intent, effect: Proposition): boolean =>
   });
 
 const undeclaredPaths = (intent: Intent, touched: readonly FootprintEntry[]): readonly string[] =>
-  touched.map((t) => t.path).filter((path) => !intent.footprint.some((d) => matchesGlob(d.path, path)));
+  touched
+    .map((t) => t.path)
+    .filter((path) => !intent.footprint.some((d) => matchesGlob(d.path, path)));
 
 /**
  * The drift between `intent` and what the diff did: `touched` is the footprint
@@ -75,7 +89,11 @@ export const drift = (
       : [
           {
             _tag: "footprint",
-            drift: { class: "footprint", severity: "low", detail: `touched outside the declared footprint: ${paths.join(", ")}` },
+            drift: {
+              class: "footprint",
+              severity: "low",
+              detail: `touched outside the declared footprint: ${paths.join(", ")}`,
+            },
             paths,
             blocks: false,
             opensConflict: false,
@@ -85,9 +103,15 @@ export const drift = (
   const effects = derived
     .filter((effect) => !isDeclared(intent, effect.proposition))
     .map((effect): DriftFinding => {
-      const contradicts = (p: Proposition): boolean => compare(p, effect.proposition).outcome === "contradicts";
+      const contradicts = (p: Proposition): boolean =>
+        compare(p, effect.proposition).outcome === "contradicts";
       const against = [
-        ...premises.filter((p) => p.holder !== self && (p.proposition.strength ?? "must") === "must" && contradicts(p.proposition)),
+        ...premises.filter(
+          (p) =>
+            p.holder !== self &&
+            (p.proposition.strength ?? "must") === "must" &&
+            contradicts(p.proposition),
+        ),
         ...tenets.filter((t) => contradicts(t.proposition)),
       ];
       const blocks = canBlock(effect.evidenceClass);
@@ -95,7 +119,11 @@ export const drift = (
       return against.length === 0
         ? {
             _tag: "undeclared-effect",
-            drift: { class: "undeclared-effect", severity: "medium", detail: `undeclared: ${what} (${effect.evidenceClass})` },
+            drift: {
+              class: "undeclared-effect",
+              severity: "medium",
+              detail: `undeclared: ${what} (${effect.evidenceClass})`,
+            },
             effect,
             blocks,
             opensConflict: false,

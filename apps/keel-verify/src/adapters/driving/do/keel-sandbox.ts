@@ -15,13 +15,18 @@ export const bundleKey = (sha256: string): string => `bundles/${sha256}`;
  * no URL or token for it exists outside this handler.
  */
 export async function serveBundle(request: Request, env: Env): Promise<Response> {
-  if (request.method !== "GET" && request.method !== "HEAD") return new Response("bundles are read-only", { status: 405 });
+  if (request.method !== "GET" && request.method !== "HEAD")
+    return new Response("bundles are read-only", { status: 405 });
   const sha256 = new URL(request.url).pathname.replace(/^\/+/, "");
   if (!/^[0-9a-f]{64}$/.test(sha256)) return new Response("not a bundle hash", { status: 400 });
   const object = await env.BUNDLES.get(bundleKey(sha256));
   if (object === null) return new Response("no such bundle", { status: 404 });
   return new Response(request.method === "HEAD" ? null : object.body, {
-    headers: { "content-type": "application/gzip", "content-length": String(object.size), etag: object.httpEtag },
+    headers: {
+      "content-type": "application/gzip",
+      "content-length": String(object.size),
+      etag: object.httpEtag,
+    },
   });
 }
 

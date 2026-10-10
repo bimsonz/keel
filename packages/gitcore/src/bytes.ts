@@ -30,7 +30,10 @@ export function fromHex(h: string): Uint8Array {
 
 export async function sha1(data: Uint8Array): Promise<string> {
   // subtle.digest wants bytes over a plain ArrayBuffer; copy only when they sit on something else.
-  const view = data.buffer instanceof ArrayBuffer ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength) : new Uint8Array(data);
+  const view =
+    data.buffer instanceof ArrayBuffer
+      ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+      : new Uint8Array(data);
   const d = await crypto.subtle.digest("SHA-1", view);
   return toHex(new Uint8Array(d));
 }

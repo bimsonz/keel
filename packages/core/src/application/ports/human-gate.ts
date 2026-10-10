@@ -15,7 +15,10 @@ export interface Ruling {
 }
 
 /** Routes a question to a person and waits, event-driven, for the ruling. The default meanwhile is hold. */
-export class HumanGate extends Context.Service<HumanGate, {
-  readonly raise: (request: EscalationRequest) => Effect.Effect<EscalationId>;
-  readonly awaitRuling: (escalationId: EscalationId) => Effect.Effect<Ruling>;
-}>()("keel/HumanGate") {}
+export class HumanGate extends Context.Service<
+  HumanGate,
+  {
+    readonly raise: (request: EscalationRequest) => Effect.Effect<EscalationId>;
+    readonly awaitRuling: (escalationId: EscalationId) => Effect.Effect<Ruling>;
+  }
+>()("keel/HumanGate") {}

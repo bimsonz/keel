@@ -9,7 +9,12 @@ describe("whoami", () => {
     const seeded = await seedAgent();
     const response = await exchange(seeded);
     expect(response.status).toBe(200);
-    const body = await response.json<{ token_type: string; scope: string; expires_in: number; access_token: string }>();
+    const body = await response.json<{
+      token_type: string;
+      scope: string;
+      expires_in: number;
+      access_token: string;
+    }>();
     expect(body.token_type).toBe("Bearer");
     expect(body.scope).toBe("agent:read agent:work");
     expect(body.expires_in).toBe(3600);
@@ -28,19 +33,34 @@ describe("whoami", () => {
 
   it("answers REST with the agent, in the agent envelope", async () => {
     const seeded = await seedAgent({ name: "rest-agent" });
-    const response = await exports.default.fetch(`${BASE}/v1/agents/me`, { headers: { authorization: `Bearer ${await tokenFor(seeded)}` } });
+    const response = await exports.default.fetch(`${BASE}/v1/agents/me`, {
+      headers: { authorization: `Bearer ${await tokenFor(seeded)}` },
+    });
     expect(response.status).toBe(200);
-    const body = await response.json<{ ok: boolean; result: { agent: { id: string; name: string; scopes: string[] }; session: unknown } }>();
+    const body = await response.json<{
+      ok: boolean;
+      result: { agent: { id: string; name: string; scopes: string[] }; session: unknown };
+    }>();
     expect(body.ok).toBe(true);
-    expect(body.result.agent).toMatchObject({ id: seeded.agent.id, name: "rest-agent", scopes: ["agent:read", "agent:work"] });
+    expect(body.result.agent).toMatchObject({
+      id: seeded.agent.id,
+      name: "rest-agent",
+      scopes: ["agent:read", "agent:work"],
+    });
     expect(body.result.session).toBeNull();
   });
 
   it("answers the MCP tool with exactly the REST body, through the same handler", async () => {
     const seeded = await seedAgent();
     const token = await tokenFor(seeded);
-    const rest = await (await exports.default.fetch(`${BASE}/v1/agents/me`, { headers: { authorization: `Bearer ${token}` } })).json();
-    const tool = await mcpResult(await mcp(token, "tools/call", { name: "whoami", arguments: {} }, "whoami"));
+    const rest = await (
+      await exports.default.fetch(`${BASE}/v1/agents/me`, {
+        headers: { authorization: `Bearer ${token}` },
+      })
+    ).json();
+    const tool = await mcpResult(
+      await mcp(token, "tools/call", { name: "whoami", arguments: {} }, "whoami"),
+    );
     expect(tool["isError"]).not.toBe(true);
     expect(tool["structuredContent"]).toEqual(rest);
   });
@@ -48,8 +68,12 @@ describe("whoami", () => {
   it("refuses a token minted before the agent's revocation epoch moved, as auth.revoked", async () => {
     const seeded = await seedAgent();
     const token = await tokenFor(seeded);
-    await env.DB.prepare("UPDATE agents SET revocation_epoch = revocation_epoch + 1 WHERE id = ?").bind(seeded.agent.id).run();
-    const response = await exports.default.fetch(`${BASE}/v1/agents/me`, { headers: { authorization: `Bearer ${token}` } });
+    await env.DB.prepare("UPDATE agents SET revocation_epoch = revocation_epoch + 1 WHERE id = ?")
+      .bind(seeded.agent.id)
+      .run();
+    const response = await exports.default.fetch(`${BASE}/v1/agents/me`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
     expect(response.status).toBe(401);
     expect((await response.json<{ code: string }>()).code).toBe("auth.revoked");
   });
@@ -58,7 +82,9 @@ describe("whoami", () => {
     const seeded = await seedAgent();
     const [header, payload] = (await tokenFor(seeded)).split(".");
     const forged = `${header}.${payload}.${"A".repeat(86)}`;
-    const response = await exports.default.fetch(`${BASE}/v1/agents/me`, { headers: { authorization: `Bearer ${forged}` } });
+    const response = await exports.default.fetch(`${BASE}/v1/agents/me`, {
+      headers: { authorization: `Bearer ${forged}` },
+    });
     expect(response.status).toBe(401);
     expect((await response.json<{ code: string }>()).code).toBe("auth.invalid_token");
   });

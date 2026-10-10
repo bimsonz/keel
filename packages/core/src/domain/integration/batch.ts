@@ -1,7 +1,16 @@
 import { Schema } from "effect";
 import { BatchId, CandidateId, ChangeId, CommitSha, ProjectId } from "../kernel/index.ts";
 
-export const CandidateState = Schema.Literals(["forming", "assembled", "verifying", "green", "red", "bisected", "promoted", "invalidated"]);
+export const CandidateState = Schema.Literals([
+  "forming",
+  "assembled",
+  "verifying",
+  "green",
+  "red",
+  "bisected",
+  "promoted",
+  "invalidated",
+]);
 export type CandidateState = typeof CandidateState.Type;
 
 /** A set of changes from one lane, composed into one candidate and verified together. */

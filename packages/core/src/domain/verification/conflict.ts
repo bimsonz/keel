@@ -6,7 +6,14 @@ import { Predicate } from "../coordination/index.ts";
 export const ConflictKind = Schema.Literals(["textual", "semantic", "precedent", "interaction"]);
 export type ConflictKind = typeof ConflictKind.Type;
 
-export const ConflictState = Schema.Literals(["suspected", "probing", "proven", "dismissed", "escalated", "resolved"]);
+export const ConflictState = Schema.Literals([
+  "suspected",
+  "probing",
+  "proven",
+  "dismissed",
+  "escalated",
+  "resolved",
+]);
 export type ConflictState = typeof ConflictState.Type;
 
 export const Party = Schema.Union([ChangeId, TenetId]);

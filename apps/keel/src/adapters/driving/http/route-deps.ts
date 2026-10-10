@@ -1,5 +1,11 @@
 import type { AppEnv, RouteDeps } from "../../../generated/http/runtime.gen.ts";
-import { admitsAnonymous, bearerToken, type Caller, satisfies, type TokenVerifier } from "./caller.ts";
+import {
+  admitsAnonymous,
+  bearerToken,
+  type Caller,
+  satisfies,
+  type TokenVerifier,
+} from "./caller.ts";
 import { type ProblemBody, problemResponse } from "./problems.ts";
 
 type Issues = NonNullable<ProblemBody["issues"]>;
@@ -8,13 +14,27 @@ type Issues = NonNullable<ProblemBody["issues"]>;
 function issuesOf(result: { readonly success: boolean }): Issues {
   if (!("error" in result)) return [];
   const error: unknown = result.error;
-  if (typeof error !== "object" || error === null || !("issues" in error) || !Array.isArray(error.issues)) return [];
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    !("issues" in error) ||
+    !Array.isArray(error.issues)
+  )
+    return [];
   return error.issues.flatMap((issue: unknown) => {
-    if (typeof issue !== "object" || issue === null || !("message" in issue) || typeof issue.message !== "string") return [];
+    if (
+      typeof issue !== "object" ||
+      issue === null ||
+      !("message" in issue) ||
+      typeof issue.message !== "string"
+    )
+      return [];
     const path = "path" in issue && Array.isArray(issue.path) ? issue.path : [];
     return [
       {
-        path: path.filter((p: unknown): p is string | number => typeof p === "string" || typeof p === "number"),
+        path: path.filter(
+          (p: unknown): p is string | number => typeof p === "string" || typeof p === "number",
+        ),
         message: issue.message,
       },
     ];
@@ -35,9 +55,17 @@ export function routeDeps(verify: TokenVerifier): RouteDeps<AppEnv, Caller> {
       const verification = token === null ? ({ refused: "invalid" } as const) : await verify(token);
       if ("refused" in verification) {
         return verification.refused === "revoked"
-          ? problemResponse(401, "auth.revoked", requestId, { nextActions: [{ kind: "escalate", title: "Ask an operator to reinstate the agent" }] })
+          ? problemResponse(401, "auth.revoked", requestId, {
+              nextActions: [{ kind: "escalate", title: "Ask an operator to reinstate the agent" }],
+            })
           : problemResponse(401, "auth.invalid_token", requestId, {
-              nextActions: [{ kind: "call", title: "Exchange your client credentials for a token", operationId: "Auth_exchangeToken" }],
+              nextActions: [
+                {
+                  kind: "call",
+                  title: "Exchange your client credentials for a token",
+                  operationId: "Auth_exchangeToken",
+                },
+              ],
             });
       }
       const { principal } = verification;
@@ -49,11 +77,19 @@ export function routeDeps(verify: TokenVerifier): RouteDeps<AppEnv, Caller> {
       c.set("principal", principal);
       return next();
     },
-    context: (c) => ({ requestId: c.get("requestId"), principal: c.get("principal") ?? null, signal: c.req.raw.signal }),
+    context: (c) => ({
+      requestId: c.get("requestId"),
+      principal: c.get("principal") ?? null,
+      signal: c.req.raw.signal,
+    }),
     noContext: (c) => problemResponse(401, "auth.invalid_token", c.get("requestId")),
     notAcceptable: (c, offered) =>
-      problemResponse(406, "request.invalid", c.get("requestId"), { detail: `Acceptable media types: ${offered.join(", ")}` }),
+      problemResponse(406, "request.invalid", c.get("requestId"), {
+        detail: `Acceptable media types: ${offered.join(", ")}`,
+      }),
     invalid: (result, c) =>
-      result.success ? undefined : problemResponse(400, "request.invalid", c.get("requestId"), { issues: issuesOf(result) }),
+      result.success
+        ? undefined
+        : problemResponse(400, "request.invalid", c.get("requestId"), { issues: issuesOf(result) }),
   };
 }

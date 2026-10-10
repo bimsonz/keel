@@ -19,10 +19,15 @@ export const readScope = (wire: string | undefined): Result.Result<Scope, string
   for (const part of wire.split(";")) {
     const [dimension = "", atoms = "", ...rest] = part.split(":").map((s) => s.trim());
     const list = atoms.split("|").map((a) => a.trim());
-    if (rest.length > 0 || !atomPattern.test(dimension) || !list.every((a) => atomPattern.test(a))) {
+    if (
+      rest.length > 0 ||
+      !atomPattern.test(dimension) ||
+      !list.every((a) => atomPattern.test(a))
+    ) {
       return Result.fail(`scope part "${part}" is not dimension:atom|atom`);
     }
-    if (dimensions[dimension] !== undefined) return Result.fail(`scope repeats dimension "${dimension}"`);
+    if (dimensions[dimension] !== undefined)
+      return Result.fail(`scope repeats dimension "${dimension}"`);
     dimensions[dimension] = [...new Set(list)].toSorted();
   }
   return Result.succeed(dimensions);

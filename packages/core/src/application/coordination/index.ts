@@ -15,7 +15,15 @@ import type {
 import type { Principal } from "../../domain/identity/index.ts";
 import type { ChangeId, CommitSha, Instant, LeaseId, SketchId } from "../../domain/kernel/index.ts";
 import { stub } from "../not-implemented.ts";
-import type { Clock, EntityStore, EventOutbox, Ids, SubjectRegistry, WorkspacePool, WorkspaceGrant } from "../ports/index.ts";
+import type {
+  Clock,
+  EntityStore,
+  EventOutbox,
+  Ids,
+  SubjectRegistry,
+  WorkspacePool,
+  WorkspaceGrant,
+} from "../ports/index.ts";
 
 /** coordination use-cases. Signatures are fixed here. */
 
@@ -68,39 +76,64 @@ export interface SketchOpened {
 type DeclarePorts = Clock | Ids | EntityStore | EventOutbox | SubjectRegistry | WorkspacePool;
 type ChangePorts = Clock | EntityStore | EventOutbox;
 
-export const declare: (principal: Principal, input: DeclareInput) => Effect.Effect<Declared, PoolExhausted | SketchNotFound, DeclarePorts> =
+export const declare: (
+  principal: Principal,
+  input: DeclareInput,
+) => Effect.Effect<Declared, PoolExhausted | SketchNotFound, DeclarePorts> =
   stub("coordination/declare");
 
 export const revise: (
   principal: Principal,
   input: ReviseInput,
-) => Effect.Effect<Revised, ChangeNotFound | LeaseStale | RevisionMismatch | ChangeStateRefused, ChangePorts | SubjectRegistry> =
-  stub("coordination/revise");
+) => Effect.Effect<
+  Revised,
+  ChangeNotFound | LeaseStale | RevisionMismatch | ChangeStateRefused,
+  ChangePorts | SubjectRegistry
+> = stub("coordination/revise");
 
 export const rely: (
   principal: Principal,
   input: LeasedCall & { readonly premise: Proposition },
-) => Effect.Effect<Revised, ChangeNotFound | LeaseStale | ChangeStateRefused, ChangePorts | SubjectRegistry> = stub("coordination/rely");
+) => Effect.Effect<
+  Revised,
+  ChangeNotFound | LeaseStale | ChangeStateRefused,
+  ChangePorts | SubjectRegistry
+> = stub("coordination/rely");
 
-export const nearby: (principal: Principal, changeId: ChangeId) => Effect.Effect<Preflight, ChangeNotFound, EntityStore | SubjectRegistry> =
+export const nearby: (
+  principal: Principal,
+  changeId: ChangeId,
+) => Effect.Effect<Preflight, ChangeNotFound, EntityStore | SubjectRegistry> =
   stub("coordination/nearby");
 
 export const abandon: (
   principal: Principal,
   input: LeasedCall & { readonly reason?: string },
-) => Effect.Effect<Change, ChangeNotFound | LeaseStale | ChangeStateRefused, ChangePorts> = stub("coordination/abandon");
+) => Effect.Effect<Change, ChangeNotFound | LeaseStale | ChangeStateRefused, ChangePorts> =
+  stub("coordination/abandon");
 
-export const adopt: (principal: Principal, changeId: ChangeId) => Effect.Effect<Change, ChangeNotFound | ChangeStateRefused, ChangePorts | Ids> =
+export const adopt: (
+  principal: Principal,
+  changeId: ChangeId,
+) => Effect.Effect<Change, ChangeNotFound | ChangeStateRefused, ChangePorts | Ids> =
   stub("coordination/adopt");
 
 export const submit: (
   principal: Principal,
   input: SubmitInput,
-) => Effect.Effect<Change, ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace, ChangePorts> =
-  stub("coordination/submit");
+) => Effect.Effect<
+  Change,
+  ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace,
+  ChangePorts
+> = stub("coordination/submit");
 
-export const getChange: (principal: Principal, changeId: ChangeId) => Effect.Effect<Change, ChangeNotFound, EntityStore> =
-  stub("coordination/getChange");
+export const getChange: (
+  principal: Principal,
+  changeId: ChangeId,
+) => Effect.Effect<Change, ChangeNotFound, EntityStore> = stub("coordination/getChange");
 
-export const openSketch: (principal: Principal, purpose: string | undefined) => Effect.Effect<SketchOpened, PoolExhausted, Clock | Ids | WorkspacePool> =
+export const openSketch: (
+  principal: Principal,
+  purpose: string | undefined,
+) => Effect.Effect<SketchOpened, PoolExhausted, Clock | Ids | WorkspacePool> =
   stub("coordination/openSketch");

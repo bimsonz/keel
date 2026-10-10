@@ -65,7 +65,10 @@ export function makeEventLogMemory() {
   const published: EventEnvelope[] = [];
   return {
     published,
-    layer: Layer.succeed(EventLog, EventLog.of({ publish: (events) => Effect.sync(() => void published.push(...events)) })),
+    layer: Layer.succeed(
+      EventLog,
+      EventLog.of({ publish: (events) => Effect.sync(() => void published.push(...events)) }),
+    ),
   };
 }
 
@@ -86,7 +89,8 @@ export function makeWorkQueueMemory() {
   };
 }
 
-const hex = (bytes: ArrayBuffer): string => [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
+const hex = (bytes: ArrayBuffer): string =>
+  [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
 
 export function makeBundleStoreMemory() {
   const objects = new Map<ContentHash, Uint8Array>();
@@ -97,13 +101,17 @@ export function makeBundleStoreMemory() {
       BundleStore.of({
         put: (bytes) =>
           Effect.promise(async () => {
-            const hash = Schema.decodeUnknownSync(ContentHashSchema)(`sha256:${hex(await crypto.subtle.digest("SHA-256", bytes.slice()))}`);
+            const hash = Schema.decodeUnknownSync(ContentHashSchema)(
+              `sha256:${hex(await crypto.subtle.digest("SHA-256", bytes.slice()))}`,
+            );
             objects.set(hash, bytes.slice());
             return hash;
           }),
         get: (hash) => {
           const bytes = objects.get(hash);
-          return bytes === undefined ? Effect.fail(new BundleMissing({ hash })) : Effect.succeed(bytes.slice());
+          return bytes === undefined
+            ? Effect.fail(new BundleMissing({ hash }))
+            : Effect.succeed(bytes.slice());
         },
       }),
     ),
@@ -143,7 +151,8 @@ export function makeMfpWriterMemory() {
       MfpWriter,
       MfpWriter.of({
         write: (batch) => Effect.sync(() => void records.push(...batch)),
-        note: (commit, batch) => Effect.sync(() => void notes.set(commit, [...(notes.get(commit) ?? []), ...batch])),
+        note: (commit, batch) =>
+          Effect.sync(() => void notes.set(commit, [...(notes.get(commit) ?? []), ...batch])),
       }),
     ),
   };
@@ -155,14 +164,20 @@ export function makeBackgroundMemory() {
 }
 
 export function makeMetricsMemory() {
-  const samples: { readonly name: string; readonly value: number; readonly kind: "count" | "observe" }[] = [];
+  const samples: {
+    readonly name: string;
+    readonly value: number;
+    readonly kind: "count" | "observe";
+  }[] = [];
   return {
     samples,
     layer: Layer.succeed(
       Metrics,
       Metrics.of({
-        count: (name, value) => Effect.sync(() => void samples.push({ name, value, kind: "count" })),
-        observe: (name, value) => Effect.sync(() => void samples.push({ name, value, kind: "observe" })),
+        count: (name, value) =>
+          Effect.sync(() => void samples.push({ name, value, kind: "count" })),
+        observe: (name, value) =>
+          Effect.sync(() => void samples.push({ name, value, kind: "observe" })),
       }),
     ),
   };
@@ -175,7 +190,9 @@ export function makeSecretsProviderMemory(secrets: Readonly<Record<string, strin
       SecretsProvider.of({
         get: (name) => {
           const value = secrets[name];
-          return value === undefined ? Effect.fail(new SecretMissing({ name })) : Effect.succeed(value);
+          return value === undefined
+            ? Effect.fail(new SecretMissing({ name }))
+            : Effect.succeed(value);
         },
       }),
     ),

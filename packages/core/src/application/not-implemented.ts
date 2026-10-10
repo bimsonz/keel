@@ -1,6 +1,5 @@
 import { Effect } from "effect";
 
-
 /**
  * The defect a use-case stub dies with until its lane implements it. It is a
  * defect, not a tagged error, so stubs keep the exact error union their real

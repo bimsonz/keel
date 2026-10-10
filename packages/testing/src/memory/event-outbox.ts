@@ -22,12 +22,28 @@ const DELIVERY = "keel:delivery";
 const DELIVERY_HEAD = { kind: "keel:delivery-head", id: "self" } as const;
 const RECEIVED = "keel:received";
 
-const StoredEvent = Schema.Struct({ cause: Schema.String, fingerprint: Schema.NullOr(Schema.String), envelope: EventEnvelope });
-const StoredDelivery = Schema.Struct({ eventId: Schema.String, eventKey: Schema.String, subscriber: Schema.String, attempts: Schema.Int, nextAt: Schema.Number });
+const StoredEvent = Schema.Struct({
+  cause: Schema.String,
+  fingerprint: Schema.NullOr(Schema.String),
+  envelope: EventEnvelope,
+});
+const StoredDelivery = Schema.Struct({
+  eventId: Schema.String,
+  eventKey: Schema.String,
+  subscriber: Schema.String,
+  attempts: Schema.Int,
+  nextAt: Schema.Number,
+});
 const StoredSubscription = Schema.Struct({ subscriber: Schema.String, type: Schema.String });
 
 function isStored(value: unknown): value is Stored {
-  if (value === null || typeof value === "boolean" || typeof value === "number" || typeof value === "string") return true;
+  if (
+    value === null ||
+    typeof value === "boolean" ||
+    typeof value === "number" ||
+    typeof value === "string"
+  )
+    return true;
   if (Array.isArray(value)) return value.every(isStored);
   return typeof value === "object" && Object.values(value).every(isStored);
 }
@@ -41,7 +57,8 @@ function stored<S extends Schema.Codec<unknown, unknown>>(schema: S, value: S["T
 
 const pad = (n: number) => String(n).padStart(12, "0");
 const entityKey = (entity: EntityRef) => `${entity.kind}:${entity.id}`;
-const byId = (a: { readonly id: string }, b: { readonly id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+const byId = (a: { readonly id: string }, b: { readonly id: string }) =>
+  a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 function ulidOf(n: number): string {
@@ -88,23 +105,54 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
 
   const heads = () => {
     const seen = new Map<string, ReturnType<typeof deliveries>[number]>();
-    for (const delivery of deliveries()) if (!seen.has(delivery.subscriber)) seen.set(delivery.subscriber, delivery);
+    for (const delivery of deliveries())
+      if (!seen.has(delivery.subscriber)) seen.set(delivery.subscriber, delivery);
     return [...seen.values()];
   };
 
   return EventOutbox.of({
     append: (spec, at, drafts) => {
       const previous = eventsOf(spec.entity).at(-1)?.envelope.seq ?? 0;
-      const envelopes = envelopesFor(spec, at, previous, drafts, () => makeId("evt", ulidOf((minted += 1))), subscribers);
-      const taken = new Set(store.list(EVENT).map((row) => Schema.decodeUnknownSync(StoredEvent)(row.value).envelope.dedupeKey));
+      const envelopes = envelopesFor(
+        spec,
+        at,
+        previous,
+        drafts,
+        () => makeId("evt", ulidOf((minted += 1))),
+        subscribers,
+      );
+      const taken = new Set(
+        store
+          .list(EVENT)
+          .map((row) => Schema.decodeUnknownSync(StoredEvent)(row.value).envelope.dedupeKey),
+      );
       let head = store.get(DELIVERY_HEAD.kind, DELIVERY_HEAD.id);
       for (const envelope of envelopes) {
-        if (taken.has(envelope.dedupeKey)) throw new Error(`dedupe key already committed: ${envelope.dedupeKey}`);
+        if (taken.has(envelope.dedupeKey))
+          throw new Error(`dedupe key already committed: ${envelope.dedupeKey}`);
         const eventKey = `${entityKey(envelope.entity)}#${pad(envelope.seq)}`;
-        store.put(EVENT, eventKey, stored(StoredEvent, { cause: spec.cause, fingerprint: spec.fingerprint ?? null, envelope }));
+        store.put(
+          EVENT,
+          eventKey,
+          stored(StoredEvent, {
+            cause: spec.cause,
+            fingerprint: spec.fingerprint ?? null,
+            envelope,
+          }),
+        );
         for (const subscriber of envelope.notified) {
           head = (typeof head === "number" ? head : 0) + 1;
-          store.put(DELIVERY, pad(head), stored(StoredDelivery, { eventId: envelope.eventId, eventKey, subscriber, attempts: 0, nextAt: at }));
+          store.put(
+            DELIVERY,
+            pad(head),
+            stored(StoredDelivery, {
+              eventId: envelope.eventId,
+              eventKey,
+              subscriber,
+              attempts: 0,
+              nextAt: at,
+            }),
+          );
         }
       }
       if (head !== undefined) store.put(DELIVERY_HEAD.kind, DELIVERY_HEAD.id, head);
@@ -120,14 +168,19 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
     log: (entity) => eventsOf(entity).map((row) => row.envelope),
     subscribe: (subscriber, types) => {
       for (const type of types === EVERY_TYPE ? [EVERY_TYPE] : types) {
-        store.put(SUBSCRIPTION, `${subscriber}\u0000${type}`, stored(StoredSubscription, { subscriber, type }));
+        store.put(
+          SUBSCRIPTION,
+          `${subscriber}\u0000${type}`,
+          stored(StoredSubscription, { subscriber, type }),
+        );
       }
     },
     unsubscribe: (subscriber, types) => {
       for (const row of store.list(SUBSCRIPTION)) {
         const subscription = Schema.decodeUnknownSync(StoredSubscription)(row.value);
         if (subscription.subscriber !== subscriber) continue;
-        if (types === undefined || types === EVERY_TYPE || types.includes(subscription.type)) store.remove(SUBSCRIPTION, row.id);
+        if (types === undefined || types === EVERY_TYPE || types.includes(subscription.type))
+          store.remove(SUBSCRIPTION, row.id);
       }
     },
     subscribers,
@@ -143,33 +196,39 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
         const events = deliveries()
           .filter((delivery) => delivery.subscriber === head.subscriber)
           .slice(0, limit)
-          .map((delivery) => Schema.decodeUnknownSync(StoredEvent)(store.get(EVENT, delivery.eventKey)).envelope);
+          .map(
+            (delivery) =>
+              Schema.decodeUnknownSync(StoredEvent)(store.get(EVENT, delivery.eventKey)).envelope,
+          );
         due.push({ subscriber: head.subscriber, attempts: head.attempts, events });
       }
       return due;
     },
     acknowledge: (subscriber, eventIds) => {
       for (const delivery of deliveries()) {
-        if (delivery.subscriber === subscriber && eventIds.includes(delivery.eventId)) store.remove(DELIVERY, delivery.id);
+        if (delivery.subscriber === subscriber && eventIds.includes(delivery.eventId))
+          store.remove(DELIVERY, delivery.id);
       }
     },
     defer: (subscriber, eventIds, attempts, nextAttemptAt) => {
       for (const { id, ...delivery } of deliveries()) {
         if (delivery.subscriber === subscriber && eventIds.includes(delivery.eventId)) {
-          store.put(DELIVERY, id, stored(StoredDelivery, { ...delivery, attempts, nextAt: nextAttemptAt }));
+          store.put(
+            DELIVERY,
+            id,
+            stored(StoredDelivery, { ...delivery, attempts, nextAt: nextAttemptAt }),
+          );
         }
       }
     },
     backlog: () => {
       const all = deliveries();
-      return heads().map(
-        (head): Backlog => ({
-          subscriber: head.subscriber,
-          pending: all.filter((delivery) => delivery.subscriber === head.subscriber).length,
-          attempts: head.attempts,
-          nextAttemptAt: Instant(head.nextAt),
-        }),
-      );
+      return heads().map((head): Backlog => ({
+        subscriber: head.subscriber,
+        pending: all.filter((delivery) => delivery.subscriber === head.subscriber).length,
+        attempts: head.attempts,
+        nextAttemptAt: Instant(head.nextAt),
+      }));
     },
   });
 }
@@ -179,21 +238,27 @@ export function makeEventOutboxMemory() {
   const store = makeEntityStoreMemory();
   return {
     store,
-    layer: Layer.effect(EventOutbox, Effect.map(EntityStore, outboxOver)).pipe(Layer.provideMerge(store.layer)),
+    layer: Layer.effect(EventOutbox, Effect.map(EntityStore, outboxOver)).pipe(
+      Layer.provideMerge(store.layer),
+    ),
   };
 }
 
 /** A fan-out a test scripts: it records every attempt, fails the subscribers in `failing`, and counts nudges. */
 export function makeScriptedFanOut() {
   const attempts: { readonly subscriber: Subscriber; readonly eventIds: readonly string[] }[] = [];
-  const delivered: { readonly subscriber: Subscriber; readonly events: readonly EventEnvelope[] }[] = [];
+  const delivered: {
+    readonly subscriber: Subscriber;
+    readonly events: readonly EventEnvelope[];
+  }[] = [];
   const failing = new Set<Subscriber>();
   let nudges = 0;
   const fanOut: FanOut = {
     deliver: (subscriber, events) =>
       Effect.suspend(() => {
         attempts.push({ subscriber, eventIds: events.map((event) => event.eventId) });
-        if (failing.has(subscriber)) return Effect.fail(new DeliveryFailed({ subscriber, reason: "scripted to fail" }));
+        if (failing.has(subscriber))
+          return Effect.fail(new DeliveryFailed({ subscriber, reason: "scripted to fail" }));
         delivered.push({ subscriber, events: [...events] });
         return Effect.void;
       }),
@@ -208,7 +273,8 @@ export function makeScriptedFanOut() {
     failing,
     nudges: () => nudges,
     /** Every event delivered to `subscriber`, in delivery order. */
-    deliveredTo: (subscriber: Subscriber) => delivered.filter((entry) => entry.subscriber === subscriber).flatMap((entry) => entry.events),
+    deliveredTo: (subscriber: Subscriber) =>
+      delivered.filter((entry) => entry.subscriber === subscriber).flatMap((entry) => entry.events),
   };
 }
 export type ScriptedFanOut = ReturnType<typeof makeScriptedFanOut>;

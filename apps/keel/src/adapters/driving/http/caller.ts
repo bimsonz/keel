@@ -15,21 +15,33 @@ export interface Caller {
 }
 
 /** The outcome of verifying a bearer token. */
-export type Verification = { readonly principal: Principal } | { readonly refused: "invalid" | "revoked" };
+export type Verification =
+  | { readonly principal: Principal }
+  | { readonly refused: "invalid" | "revoked" };
 
 /** Verifies a bearer token: its signature and expiry, then that its agent may still act at that epoch. */
 export type TokenVerifier = (token: string) => Promise<Verification>;
 
 /** Whether `principal` satisfies one of the OpenAPI security requirements. */
-export function satisfies(requirements: readonly Readonly<Record<string, readonly string[]>>[], principal: Principal): boolean {
+export function satisfies(
+  requirements: readonly Readonly<Record<string, readonly string[]>>[],
+  principal: Principal,
+): boolean {
   return requirements.some((requirement) =>
-    Object.values(requirement).every((scopes) => scopes.every((scope) => principal.scopes.some((held) => held === scope))),
+    Object.values(requirement).every((scopes) =>
+      scopes.every((scope) => principal.scopes.some((held) => held === scope)),
+    ),
   );
 }
 
 /** An operation the document publishes with an anonymous alternative (`{}`) needs no token. */
-export function admitsAnonymous(requirements: readonly Readonly<Record<string, readonly string[]>>[]): boolean {
-  return requirements.length === 0 || requirements.some((requirement) => Object.keys(requirement).length === 0);
+export function admitsAnonymous(
+  requirements: readonly Readonly<Record<string, readonly string[]>>[],
+): boolean {
+  return (
+    requirements.length === 0 ||
+    requirements.some((requirement) => Object.keys(requirement).length === 0)
+  );
 }
 
 export function bearerToken(header: string | undefined): string | null {

@@ -20,13 +20,17 @@ describe("object format", () => {
       { name: "l", mode: "120000", oid: blobOid },
     ]);
     git(repo.dir, ["hash-object", "-w", "-t", "tree", "--stdin"], new Uint8Array(0));
-    const viaGit = git(repo.dir, ["mktree", "--missing"], [
-      `100644 blob ${blobOid}\ta0`,
-      "040000 tree 4b825dc642cb6eb9a060e54bf8d69288fbee4904\ta",
-      `100755 blob ${blobOid}\ta.b`,
-      `120000 blob ${blobOid}\tl`,
-      "",
-    ].join("\n")).trim();
+    const viaGit = git(
+      repo.dir,
+      ["mktree", "--missing"],
+      [
+        `100644 blob ${blobOid}\ta0`,
+        "040000 tree 4b825dc642cb6eb9a060e54bf8d69288fbee4904\ta",
+        `100755 blob ${blobOid}\ta.b`,
+        `120000 blob ${blobOid}\tl`,
+        "",
+      ].join("\n"),
+    ).trim();
     expect(await hashObject("tree", tree)).toBe(viaGit);
 
     const commit = encodeCommit({
@@ -37,7 +41,12 @@ describe("object format", () => {
       message: "subject\n\nbody",
       trailers: [["Change-Id", "I0123"]],
     });
-    const viaGitCommit = git(repo.dir, ["commit-tree", viaGit, "-m", "subject\n\nbody\n\nChange-Id: I0123"]).trim();
+    const viaGitCommit = git(repo.dir, [
+      "commit-tree",
+      viaGit,
+      "-m",
+      "subject\n\nbody\n\nChange-Id: I0123",
+    ]).trim();
     expect(await hashObject("commit", commit)).toBe(viaGitCommit);
   });
 });

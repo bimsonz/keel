@@ -25,17 +25,32 @@ async function timed<T>(run: () => Promise<T>): Promise<[T, number]> {
 async function expectOk(response: Response, what: string): Promise<unknown> {
   const text = await response.text();
   if (!response.ok) throw new Error(`${what} answered ${response.status}: ${text.slice(0, 400)}`);
-  return text.startsWith("{") ? JSON.parse(text) : JSON.parse(text.split("\n").find((line) => line.startsWith("data: "))?.slice(6) ?? "null");
+  return text.startsWith("{")
+    ? JSON.parse(text)
+    : JSON.parse(
+        text
+          .split("\n")
+          .find((line) => line.startsWith("data: "))
+          ?.slice(6) ?? "null",
+      );
 }
 
-const field = (value: unknown, key: string): unknown => (typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined);
+const field = (value: unknown, key: string): unknown =>
+  typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
 
-export async function whoamiSmoke(keelUrl: string, credential: Credential): Promise<WhoamiSmokeResult> {
+export async function whoamiSmoke(
+  keelUrl: string,
+  credential: Credential,
+): Promise<WhoamiSmokeResult> {
   const [token, tokenMs] = await timed(async () => {
     const response = await fetch(`${keelUrl}/v1/oauth/token`, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ grant_type: "client_credentials", client_id: credential.clientId, client_secret: credential.clientSecret }),
+      body: new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: credential.clientId,
+        client_secret: credential.clientSecret,
+      }),
     });
     const accessToken = field(await expectOk(response, "token exchange"), "access_token");
     if (typeof accessToken !== "string") throw new Error("token exchange returned no access_token");
@@ -43,7 +58,10 @@ export async function whoamiSmoke(keelUrl: string, credential: Credential): Prom
   });
 
   const [rest, restMs] = await timed(async () =>
-    expectOk(await fetch(`${keelUrl}/v1/agents/me`, { headers: { authorization: `Bearer ${token}` } }), "GET /v1/agents/me"),
+    expectOk(
+      await fetch(`${keelUrl}/v1/agents/me`, { headers: { authorization: `Bearer ${token}` } }),
+      "GET /v1/agents/me",
+    ),
   );
 
   const [result, mcpMs] = await timed(async () => {
@@ -74,7 +92,12 @@ export async function whoamiSmoke(keelUrl: string, credential: Credential): Prom
     });
     return field(await expectOk(response, "MCP tools/call whoami"), "result");
   });
-  if (field(result, "isError") === true) throw new Error(`MCP whoami returned an error: ${JSON.stringify(result)}`);
+  if (field(result, "isError") === true)
+    throw new Error(`MCP whoami returned an error: ${JSON.stringify(result)}`);
 
-  return { rest, tool: field(result, "structuredContent"), timings: { token: tokenMs, rest: restMs, mcp: mcpMs } };
+  return {
+    rest,
+    tool: field(result, "structuredContent"),
+    timings: { token: tokenMs, rest: restMs, mcp: mcpMs },
+  };
 }

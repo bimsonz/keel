@@ -13,7 +13,11 @@ const Hash = Schema.String.check(Schema.isPattern(/^sha256:[0-9a-f]{64}$/));
 const Tier = Schema.Literals([0, 1, 2]);
 
 /** Late results are fenced on (batchId, attempt, chainEpoch): a stale attempt's answer is dropped. */
-export const Fence = Schema.Struct({ batchId: Schema.String, attempt: Schema.Int, chainEpoch: Schema.Int });
+export const Fence = Schema.Struct({
+  batchId: Schema.String,
+  attempt: Schema.Int,
+  chainEpoch: Schema.Int,
+});
 export type Fence = typeof Fence.Type;
 
 export const Budget = Schema.Struct({
@@ -27,7 +31,14 @@ export type Budget = typeof Budget.Type;
 
 export const StepSpec = Schema.Struct({
   stepId: Schema.NonEmptyString,
-  kind: Schema.Literals(["deterministic", "decision-model", "generative", "probe", "human", "deploy"]),
+  kind: Schema.Literals([
+    "deterministic",
+    "decision-model",
+    "generative",
+    "probe",
+    "human",
+    "deploy",
+  ]),
   /** The plugin or tool to run, by content hash. */
   runs: Hash,
   world: Schema.optional(Schema.Literals(["trunk", "A", "B", "AB"])),
@@ -112,7 +123,13 @@ export const ToRunner = Schema.Union([JobSubmitted, JobCancelled]);
 export type ToRunner = typeof ToRunner.Type;
 
 /** Runner → control plane. */
-export const FromRunner = Schema.Union([StepStarted, StepLogChunk, StepFinished, JobFinished, EscalationRequested]);
+export const FromRunner = Schema.Union([
+  StepStarted,
+  StepLogChunk,
+  StepFinished,
+  JobFinished,
+  EscalationRequested,
+]);
 export type FromRunner = typeof FromRunner.Type;
 
 export const RunnerMessage = Schema.Union([ToRunner, FromRunner]);

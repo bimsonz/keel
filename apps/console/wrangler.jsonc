@@ -11,6 +11,6 @@
   "observability": { "enabled": true },
   "vars": {
     // The public host this Worker answers on. scripts/deploy.ts overrides it per environment.
-    "KEEL_HOST": "keel-console.localhost"
-  }
+    "KEEL_HOST": "keel-console.localhost",
+  },
 }

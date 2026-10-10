@@ -4,7 +4,11 @@ import { bodyLimit } from "hono/body-limit";
 import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { registerRoutes } from "../../../generated/http/app.gen.ts";
-import { type AppEnv, ResponseContractError, UndeclaredStatusError } from "../../../generated/http/runtime.gen.ts";
+import {
+  type AppEnv,
+  ResponseContractError,
+  UndeclaredStatusError,
+} from "../../../generated/http/runtime.gen.ts";
 import type { TokenVerifier } from "./caller.ts";
 import type { Handlers } from "./handlers.ts";
 import { problemResponse } from "./problems.ts";
@@ -28,7 +32,10 @@ export function makeApp(options: AppOptions) {
   app.use(
     bodyLimit({
       maxSize: 1024 * 1024,
-      onError: (c) => problemResponse(413, "request.invalid", c.get("requestId"), { detail: "The body exceeds 1 MiB." }),
+      onError: (c) =>
+        problemResponse(413, "request.invalid", c.get("requestId"), {
+          detail: "The body exceeds 1 MiB.",
+        }),
     }),
   );
 

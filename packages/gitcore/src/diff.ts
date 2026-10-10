@@ -5,7 +5,14 @@
 // sorts as if its name ended in "/", so rows come out in bytewise path order.
 // A subtree whose id is the same on both sides is skipped without being read.
 
-import { MODE_GITLINK, MODE_SYMLINK, MODE_TREE, compareTreeEntries, normaliseMode, type TreeEntry } from "./objects.ts";
+import {
+  MODE_GITLINK,
+  MODE_SYMLINK,
+  MODE_TREE,
+  compareTreeEntries,
+  normaliseMode,
+  type TreeEntry,
+} from "./objects.ts";
 
 /** Reads one tree's immediate children. The only I/O the diff needs. */
 export interface TreeReader {
@@ -50,21 +57,37 @@ const join = (prefix: string, name: string) => (prefix === "" ? name : `${prefix
 async function children(reader: TreeReader, oid: string | null): Promise<TreeEntry[]> {
   if (oid === null) return [];
   const entries = await reader.readTree(oid);
-  return entries.map((e) => ({ name: e.name, mode: normaliseMode(e.mode), oid: e.oid })).toSorted(compareTreeEntries);
+  return entries
+    .map((e) => ({ name: e.name, mode: normaliseMode(e.mode), oid: e.oid }))
+    .toSorted(compareTreeEntries);
 }
 
 /** Every leaf under `entry`, as rows of one kind: the side that has it added it, or deleted it. */
-async function leaves(reader: TreeReader, entry: TreeEntry, prefix: string, change: "added" | "deleted"): Promise<TreeChange[]> {
+async function leaves(
+  reader: TreeReader,
+  entry: TreeEntry,
+  prefix: string,
+  change: "added" | "deleted",
+): Promise<TreeChange[]> {
   const path = join(prefix, entry.name);
   if (entry.mode !== MODE_TREE) {
-    return [change === "added" ? { path, change, newOid: entry.oid, newMode: entry.mode } : { path, change, oldOid: entry.oid, oldMode: entry.mode }];
+    return [
+      change === "added"
+        ? { path, change, newOid: entry.oid, newMode: entry.mode }
+        : { path, change, oldOid: entry.oid, oldMode: entry.mode },
+    ];
   }
   const below = await children(reader, entry.oid);
   return (await Promise.all(below.map((child) => leaves(reader, child, path, change)))).flat();
 }
 
 /** Two entries with the same name and the same sort key: both trees, or both leaves. */
-async function changed(reader: TreeReader, before: TreeEntry, after: TreeEntry, prefix: string): Promise<TreeChange[]> {
+async function changed(
+  reader: TreeReader,
+  before: TreeEntry,
+  after: TreeEntry,
+  prefix: string,
+): Promise<TreeChange[]> {
   const path = join(prefix, before.name);
   if (before.mode === MODE_TREE) return walk(reader, before.oid, after.oid, path);
   if (before.mode === after.mode && before.oid === after.oid) return [];
@@ -80,7 +103,12 @@ async function changed(reader: TreeReader, before: TreeEntry, after: TreeEntry, 
   ];
 }
 
-async function walk(reader: TreeReader, before: string | null, after: string | null, prefix: string): Promise<TreeChange[]> {
+async function walk(
+  reader: TreeReader,
+  before: string | null,
+  after: string | null,
+  prefix: string,
+): Promise<TreeChange[]> {
   if (before === after) return [];
   const [left, right] = await Promise.all([children(reader, before), children(reader, after)]);
   const parts: Promise<TreeChange[]>[] = [];
@@ -113,6 +141,10 @@ async function walk(reader: TreeReader, before: string | null, after: string | n
  * - a directory replaced by a file, or the reverse, is a `deleted` row for
  *   each leaf under the directory plus an `added` row for the file.
  */
-export function diffTrees(reader: TreeReader, oldTree: string | null, newTree: string | null): Promise<TreeChange[]> {
+export function diffTrees(
+  reader: TreeReader,
+  oldTree: string | null,
+  newTree: string | null,
+): Promise<TreeChange[]> {
   return walk(reader, oldTree, newTree, "");
 }

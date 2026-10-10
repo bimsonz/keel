@@ -28,9 +28,9 @@ export const Strength = Schema.Literals(["must", "should"]);
 export type Strength = typeof Strength.Type;
 
 /** A named concept in the codebase, e.g. `authz.permission-evaluation`. */
-export const SubjectKey = Schema.String.check(Schema.isPattern(/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/)).pipe(
-  Schema.brand("SubjectKey"),
-);
+export const SubjectKey = Schema.String.check(
+  Schema.isPattern(/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/),
+).pipe(Schema.brand("SubjectKey"));
 export type SubjectKey = typeof SubjectKey.Type;
 
 /**

@@ -4,8 +4,19 @@ import type { ModelAbstained } from "../../domain/verification/index.ts";
 /** One typed question, in the System One shape: yes/no/unclear, a choice (always with `unclear`), or a score. */
 export type Question =
   | { readonly id: string; readonly kind: "noul"; readonly text: string }
-  | { readonly id: string; readonly kind: "choice"; readonly text: string; readonly options: readonly string[] }
-  | { readonly id: string; readonly kind: "score"; readonly text: string; readonly min: number; readonly max: number };
+  | {
+      readonly id: string;
+      readonly kind: "choice";
+      readonly text: string;
+      readonly options: readonly string[];
+    }
+  | {
+      readonly id: string;
+      readonly kind: "score";
+      readonly text: string;
+      readonly min: number;
+      readonly max: number;
+    };
 
 export interface DecisionRequest {
   /** Structured facts. Author narrative stays out. */
@@ -27,6 +38,9 @@ export interface DecisionResponse {
 }
 
 /** A decision model behind the System One request shape (ADR 0012). Its answers are opinion. */
-export class DecisionModel extends Context.Service<DecisionModel, {
-  readonly ask: (request: DecisionRequest) => Effect.Effect<DecisionResponse, ModelAbstained>;
-}>()("keel/DecisionModel") {}
+export class DecisionModel extends Context.Service<
+  DecisionModel,
+  {
+    readonly ask: (request: DecisionRequest) => Effect.Effect<DecisionResponse, ModelAbstained>;
+  }
+>()("keel/DecisionModel") {}

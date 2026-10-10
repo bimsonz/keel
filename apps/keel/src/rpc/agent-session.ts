@@ -1,4 +1,9 @@
-import { AgentNotAdmitted, AgentNotKnown, IdempotencyConflict, InboxPage } from "@keeltown/core/domain/identity";
+import {
+  AgentNotAdmitted,
+  AgentNotKnown,
+  IdempotencyConflict,
+  InboxPage,
+} from "@keeltown/core/domain/identity";
 import { AgentId, ChangeId, InstantSchema, SessionId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
@@ -15,16 +20,28 @@ export const SessionSnapshot = Schema.Struct({
 });
 export type SessionSnapshot = typeof SessionSnapshot.Type;
 
-export const OpenSession = Schema.Struct({ harness: Schema.optional(Schema.String), model: Schema.optional(Schema.String) });
+export const OpenSession = Schema.Struct({
+  harness: Schema.optional(Schema.String),
+  model: Schema.optional(Schema.String),
+});
 
 /** Reserve a change id for a declare's Idempotency-Key. `fingerprint` hashes the request body. */
-export const ReserveChange = Schema.Struct({ idempotencyKey: Schema.String, fingerprint: Schema.String });
+export const ReserveChange = Schema.Struct({
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
 
-export const InboxRead = Schema.Struct({ cursor: Schema.optional(Schema.String), waitMs: Schema.Int });
+export const InboxRead = Schema.Struct({
+  cursor: Schema.optional(Schema.String),
+  waitMs: Schema.Int,
+});
 
 export const AgentSessionCodecs = {
   describe: exitCodec(SessionSnapshot, AgentNotKnown),
-  openSession: exitCodec(Schema.Struct({ id: SessionId, openedAt: InstantSchema }), Schema.Union([AgentNotKnown, AgentNotAdmitted])),
+  openSession: exitCodec(
+    Schema.Struct({ id: SessionId, openedAt: InstantSchema }),
+    Schema.Union([AgentNotKnown, AgentNotAdmitted]),
+  ),
   reserveChange: exitCodec(ChangeId, IdempotencyConflict),
   inbox: exitCodec(InboxPage, AgentNotKnown),
 };

@@ -17,7 +17,9 @@ const reference = (s: string): string => createHash("sha256").update(s, "utf8").
 
 describe("sha256", () => {
   it("[kernel.sha256-fips-vectors] matches the FIPS 180-4 examples", () => {
-    expect(sha256Hex("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    expect(sha256Hex("abc")).toBe(
+      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+    );
     expect(sha256Hex("")).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
     expect(sha256Hex("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq")).toBe(
       "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
@@ -26,7 +28,10 @@ describe("sha256", () => {
 
   it("[kernel.sha256-matches-reference] agrees with node:crypto on any string, lone surrogates included", () => {
     const codeUnit = fc.integer({ min: 0, max: 0xffff }).map((n) => String.fromCharCode(n));
-    const text = fc.oneof(fc.string({ unit: codeUnit, maxLength: 200 }), fc.string({ unit: "grapheme", maxLength: 200 }));
+    const text = fc.oneof(
+      fc.string({ unit: codeUnit, maxLength: 200 }),
+      fc.string({ unit: "grapheme", maxLength: 200 }),
+    );
     fc.assert(
       fc.property(text, (s) => {
         expect(sha256Hex(s)).toBe(reference(s));

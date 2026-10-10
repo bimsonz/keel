@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "description": "Example: hosted agents that use Keel only through its public API",
-  "type": "module",
   "license": "MIT",
+  "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },

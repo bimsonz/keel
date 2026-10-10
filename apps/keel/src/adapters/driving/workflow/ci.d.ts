@@ -16,5 +16,9 @@ export interface CiContext {
 
 /** The CI engine's Workflow, over Cloudflare Artifacts (its default provider). */
 export declare abstract class CIWorkflow<Bindings> extends WorkflowEntrypoint<Bindings, CiParams> {
-  protected abstract pipeline(event: WorkflowEvent<CiParams>, step: WorkflowStep, ci: CiContext): Promise<void>;
+  protected abstract pipeline(
+    event: WorkflowEvent<CiParams>,
+    step: WorkflowStep,
+    ci: CiContext,
+  ): Promise<void>;
 }

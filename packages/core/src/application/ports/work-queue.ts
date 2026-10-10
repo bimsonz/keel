@@ -8,6 +8,9 @@ export interface Job {
   readonly delaySeconds?: number;
 }
 
-export class WorkQueue extends Context.Service<WorkQueue, {
-  readonly enqueue: (jobs: readonly Job[]) => Effect.Effect<void>;
-}>()("keel/WorkQueue") {}
+export class WorkQueue extends Context.Service<
+  WorkQueue,
+  {
+    readonly enqueue: (jobs: readonly Job[]) => Effect.Effect<void>;
+  }
+>()("keel/WorkQueue") {}

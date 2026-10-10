@@ -7,7 +7,14 @@ export interface GuardFile {
 }
 
 /** The guard repo: admitted guards, which agents can never write to. */
-export class GuardRepo extends Context.Service<GuardRepo, {
-  readonly list: (projectId: ProjectId, at: CommitSha) => Effect.Effect<readonly GuardFile[]>;
-  readonly admit: (projectId: ProjectId, guardId: GuardId, files: ReadonlyMap<string, Uint8Array>) => Effect.Effect<CommitSha>;
-}>()("keel/GuardRepo") {}
+export class GuardRepo extends Context.Service<
+  GuardRepo,
+  {
+    readonly list: (projectId: ProjectId, at: CommitSha) => Effect.Effect<readonly GuardFile[]>;
+    readonly admit: (
+      projectId: ProjectId,
+      guardId: GuardId,
+      files: ReadonlyMap<string, Uint8Array>,
+    ) => Effect.Effect<CommitSha>;
+  }
+>()("keel/GuardRepo") {}

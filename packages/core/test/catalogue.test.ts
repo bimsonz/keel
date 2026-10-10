@@ -9,7 +9,11 @@ import { MemoryEvent } from "../src/domain/memory/index.ts";
 import { VerificationEvent } from "../src/domain/verification/index.ts";
 
 /** The `_tag` of each member of a union of tagged structs. */
-function tags(union: { readonly members: readonly { readonly fields: { readonly _tag: { readonly schema: { readonly literal: unknown } } } }[] }): string[] {
+function tags(union: {
+  readonly members: readonly {
+    readonly fields: { readonly _tag: { readonly schema: { readonly literal: unknown } } };
+  }[];
+}): string[] {
   return union.members.map((member) => String(member.fields._tag.schema.literal));
 }
 
@@ -23,7 +27,8 @@ function catalogued(): Map<string, string[]> {
     const heading = /^## (\w+)/.exec(line);
     if (heading?.[1] !== undefined) section = heading[1];
     const event = /^\|\s*`([A-Z][A-Za-z]+)`\s*\|/.exec(line);
-    if (event?.[1] !== undefined) sections.set(section, [...(sections.get(section) ?? []), event[1]]);
+    if (event?.[1] !== undefined)
+      sections.set(section, [...(sections.get(section) ?? []), event[1]]);
   }
   return sections;
 }

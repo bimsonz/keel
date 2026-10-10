@@ -1,9 +1,29 @@
 import { DurableObject } from "cloudflare:workers";
 import type { EntityRef, EventEnvelope } from "@keeltown/core/kernel";
-import { Clock, EntityStore, type EventDraft, EventOutbox, type FanOut, flushOutbox, type Transaction } from "@keeltown/core/ports";
+import {
+  Clock,
+  EntityStore,
+  type EventDraft,
+  EventOutbox,
+  type FanOut,
+  flushOutbox,
+  type Transaction,
+} from "@keeltown/core/ports";
 import { Effect } from "effect";
-import { type DurableObjectRuntime, type DurableObjectServices, durableObjectRuntime } from "../../../composition/do.ts";
-import { type DeliveryReceipt, EventCodecs, type EventReceiverRpc, type ExitCodec, type ExitJson, encodeExit, readDelivery } from "../../../rpc/index.ts";
+import {
+  type DurableObjectRuntime,
+  type DurableObjectServices,
+  durableObjectRuntime,
+} from "../../../composition/do.ts";
+import {
+  type DeliveryReceipt,
+  EventCodecs,
+  type EventReceiverRpc,
+  type ExitCodec,
+  type ExitJson,
+  encodeExit,
+  readDelivery,
+} from "../../../rpc/index.ts";
 import { type AlarmRequest, dueAlarms, scheduleAlarm } from "./alarm.ts";
 
 /** The alarm reasons the backbone owns. Every other reason is the subclass's, handed to `onDeadline`. */
@@ -40,7 +60,10 @@ export abstract class KeelObject extends DurableObject<Env> implements EventRece
   }
 
   /** Runs one call's program, arms the flush for anything it committed, and answers with the Exit envelope. */
-  protected async answer<A, E>(codec: ExitCodec<A, E>, program: Effect.Effect<A, E, DurableObjectServices>): Promise<ExitJson> {
+  protected async answer<A, E>(
+    codec: ExitCodec<A, E>,
+    program: Effect.Effect<A, E, DurableObjectServices>,
+  ): Promise<ExitJson> {
     const exit = await this.runtime.runPromiseExit(program);
     await this.armFlush();
     return encodeExit(codec, exit);
@@ -73,7 +96,15 @@ export abstract class KeelObject extends DurableObject<Env> implements EventRece
           if (arrival.envelope === undefined) return "ignored";
           const reaction = react(arrival.envelope, { store, outbox });
           if (reaction === undefined) return "ignored";
-          outbox.append({ entity: reaction.entity, cause: arrival.dedupeKey, causation: arrival.envelope.eventId }, at, reaction.drafts);
+          outbox.append(
+            {
+              entity: reaction.entity,
+              cause: arrival.dedupeKey,
+              causation: arrival.envelope.eventId,
+            },
+            at,
+            reaction.drafts,
+          );
           return "accepted";
         });
         receipt[outcome] += 1;
@@ -104,14 +135,23 @@ export abstract class KeelObject extends DurableObject<Env> implements EventRece
         return (yield* EventOutbox).due(now, 1).length > 0;
       }),
     );
-    if (owed) await scheduleAlarm(this.ctx.storage, { kind: "debounce", reason: OUTBOX_FLUSH, at: Date.now() });
+    if (owed)
+      await scheduleAlarm(this.ctx.storage, {
+        kind: "debounce",
+        reason: OUTBOX_FLUSH,
+        at: Date.now(),
+      });
   }
 
   private async flush(): Promise<void> {
     const report = await this.runtime.runPromise(flushOutbox(this.fanOut));
     if (report.stuck.length > 0) console.warn("outbox backlog stuck", JSON.stringify(report.stuck));
     if (report.nextAttemptAt !== undefined) {
-      await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason: OUTBOX_REDELIVERY, at: report.nextAttemptAt });
+      await scheduleAlarm(this.ctx.storage, {
+        kind: "deadline",
+        reason: OUTBOX_REDELIVERY,
+        at: report.nextAttemptAt,
+      });
     }
   }
 }

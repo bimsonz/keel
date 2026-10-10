@@ -26,7 +26,10 @@ describe("translating Artifacts pushes", () => {
     ["a git note", push(WORKSPACE, "refs/notes/mfp", SHA)],
     ["a branch deletion", push(WORKSPACE, "refs/heads/main", "0".repeat(40))],
     ["a repo that is not a workspace", push("mirror", "refs/heads/main", SHA)],
-    ["another event type", { ...push(WORKSPACE, "refs/heads/main", SHA), type: "cf.artifacts.repo.cloned" }],
+    [
+      "another event type",
+      { ...push(WORKSPACE, "refs/heads/main", SHA), type: "cf.artifacts.repo.cloned" },
+    ],
     ["something unreadable", { hello: "world" }],
   ])("drops %s", (_what, event) => {
     expect(translateArtifactsPush(event)).toBeNull();

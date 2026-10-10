@@ -53,31 +53,59 @@ export interface TreeChange {
 }
 
 /** No repository by this name in this namespace (never created, or deleted). */
-export class RepoNotFound extends Schema.TaggedError<RepoNotFound>()("RepoNotFound", { repo: RepoRefSchema }) {}
+export class RepoNotFound extends Schema.TaggedError<RepoNotFound>()("RepoNotFound", {
+  repo: RepoRefSchema,
+}) {}
 
 /** The repository exists but has no such ref. */
-export class RefNotFound extends Schema.TaggedError<RefNotFound>()("RefNotFound", { repo: RepoRefSchema, ref: Schema.String }) {}
+export class RefNotFound extends Schema.TaggedError<RefNotFound>()("RefNotFound", {
+  repo: RepoRefSchema,
+  ref: Schema.String,
+}) {}
 
 /** The repository exists but holds no object with this id, e.g. a workspace that lacks the base commit. */
-export class ObjectNotFound extends Schema.TaggedError<ObjectNotFound>()("ObjectNotFound", { repo: RepoRefSchema, oid: Schema.String }) {}
+export class ObjectNotFound extends Schema.TaggedError<ObjectNotFound>()("ObjectNotFound", {
+  repo: RepoRefSchema,
+  oid: Schema.String,
+}) {}
 
 /**
  * Repositories on the code host: create, fork, mint scoped tokens, read, diff
  * and delete. **Never writes git content**: every write is a git push.
  * Missing repos, refs and objects are typed errors; transport failures are defects.
  */
-export class CodeHost extends Context.Service<CodeHost, {
-  readonly create: (repo: RepoRef) => Effect.Effect<RepoRef>;
-  readonly fork: (source: RepoRef, target: RepoRef) => Effect.Effect<RepoRef, RepoNotFound>;
-  readonly mintToken: (repo: RepoRef, access: "read" | "write", ttlSeconds: number) => Effect.Effect<RepoToken, RepoNotFound>;
-  readonly info: (repo: RepoRef) => Effect.Effect<RepoInfo, RepoNotFound>;
-  /** The commit a full ref name (`refs/heads/main`) points at. */
-  readonly head: (repo: RepoRef, ref: string) => Effect.Effect<CommitSha, RepoNotFound | RefNotFound>;
-  /** The commit's whole tree, recursively, in git order (a tree before what it holds). */
-  readonly readTree: (repo: RepoRef, commit: CommitSha) => Effect.Effect<readonly TreeEntry[], RepoNotFound | ObjectNotFound>;
-  readonly readBlob: (repo: RepoRef, oid: string) => Effect.Effect<Uint8Array, RepoNotFound | ObjectNotFound>;
-  /** The leaves that differ from `base` to `head`; unchanged subtrees are skipped by id. */
-  readonly diffTrees: (repo: RepoRef, base: CommitSha, head: CommitSha) => Effect.Effect<readonly TreeChange[], RepoNotFound | ObjectNotFound>;
-  /** Deletes the repo and everything in it. Idempotent: deleting a missing repo succeeds. */
-  readonly delete: (repo: RepoRef) => Effect.Effect<void>;
-}>()("keel/CodeHost") {}
+export class CodeHost extends Context.Service<
+  CodeHost,
+  {
+    readonly create: (repo: RepoRef) => Effect.Effect<RepoRef>;
+    readonly fork: (source: RepoRef, target: RepoRef) => Effect.Effect<RepoRef, RepoNotFound>;
+    readonly mintToken: (
+      repo: RepoRef,
+      access: "read" | "write",
+      ttlSeconds: number,
+    ) => Effect.Effect<RepoToken, RepoNotFound>;
+    readonly info: (repo: RepoRef) => Effect.Effect<RepoInfo, RepoNotFound>;
+    /** The commit a full ref name (`refs/heads/main`) points at. */
+    readonly head: (
+      repo: RepoRef,
+      ref: string,
+    ) => Effect.Effect<CommitSha, RepoNotFound | RefNotFound>;
+    /** The commit's whole tree, recursively, in git order (a tree before what it holds). */
+    readonly readTree: (
+      repo: RepoRef,
+      commit: CommitSha,
+    ) => Effect.Effect<readonly TreeEntry[], RepoNotFound | ObjectNotFound>;
+    readonly readBlob: (
+      repo: RepoRef,
+      oid: string,
+    ) => Effect.Effect<Uint8Array, RepoNotFound | ObjectNotFound>;
+    /** The leaves that differ from `base` to `head`; unchanged subtrees are skipped by id. */
+    readonly diffTrees: (
+      repo: RepoRef,
+      base: CommitSha,
+      head: CommitSha,
+    ) => Effect.Effect<readonly TreeChange[], RepoNotFound | ObjectNotFound>;
+    /** Deletes the repo and everything in it. Idempotent: deleting a missing repo succeeds. */
+    readonly delete: (repo: RepoRef) => Effect.Effect<void>;
+  }
+>()("keel/CodeHost") {}

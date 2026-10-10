@@ -19,8 +19,10 @@ export type Shape =
 
 export type Field = { readonly shape: Shape; readonly optional: boolean };
 
-const and = (xs: readonly Tri[]): Tri => (xs.includes(false) ? false : xs.includes("unknown") ? "unknown" : true);
-const or = (xs: readonly Tri[]): Tri => (xs.includes(true) ? true : xs.includes("unknown") ? "unknown" : false);
+const and = (xs: readonly Tri[]): Tri =>
+  xs.includes(false) ? false : xs.includes("unknown") ? "unknown" : true;
+const or = (xs: readonly Tri[]): Tri =>
+  xs.includes(true) ? true : xs.includes("unknown") ? "unknown" : false;
 
 /** Structural assignability, `s` to `t`, with width subtyping on objects. */
 export const assignable = (s: Shape, t: Shape): Tri => {
@@ -54,7 +56,8 @@ export const assignable = (s: Shape, t: Shape): Tri => {
   }
 };
 
-const decide = (t: Tri): RegionDecision => (t === true ? "within" : t === false ? "disjoint" : "overlap");
+const decide = (t: Tri): RegionDecision =>
+  t === true ? "within" : t === false ? "disjoint" : "overlap";
 
 /**
  * `at-most T`: the subject's shape is assignable to T (a reader relies on it);
@@ -77,7 +80,8 @@ export const shapeDecision = (
     );
   }
   if (e.relation === p.relation) {
-    const inside = e.relation === "at-most" ? assignable(e.value, p.value) : assignable(p.value, e.value);
+    const inside =
+      e.relation === "at-most" ? assignable(e.value, p.value) : assignable(p.value, e.value);
     if (inside === true) return "within";
   }
   return "overlap";

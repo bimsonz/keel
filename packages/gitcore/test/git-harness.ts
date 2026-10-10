@@ -2,7 +2,12 @@
 // --batch` object reader for gitcore, and a fast-import writer for generated
 // histories.
 
-import { type ChildProcessWithoutNullStreams, execFileSync, spawn, spawnSync } from "node:child_process";
+import {
+  type ChildProcessWithoutNullStreams,
+  execFileSync,
+  spawn,
+  spawnSync,
+} from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -35,7 +40,10 @@ export function tempRepo(bare = true): { dir: string; cleanup: () => void } {
 export class CatFileReader implements TreeReader {
   private proc: ChildProcessWithoutNullStreams;
   private buf = Buffer.alloc(0);
-  private waiting: Array<{ resolve: (v: { type: string; body: Uint8Array }) => void; reject: (e: Error) => void }> = [];
+  private waiting: Array<{
+    resolve: (v: { type: string; body: Uint8Array }) => void;
+    reject: (e: Error) => void;
+  }> = [];
   reads = 0;
 
   constructor(dir: string) {
@@ -110,7 +118,8 @@ export interface CommitPlan {
 /** Feed commits to `git fast-import`; returns mark -> commit oid. */
 export function fastImport(dir: string, commits: CommitPlan[]): Map<number, string> {
   const chunks: Buffer[] = [];
-  const w = (s: string | Uint8Array) => chunks.push(typeof s === "string" ? Buffer.from(s) : Buffer.from(s));
+  const w = (s: string | Uint8Array) =>
+    chunks.push(typeof s === "string" ? Buffer.from(s) : Buffer.from(s));
   for (const c of commits) {
     w(`reset ${c.ref}\n`);
     w(`commit ${c.ref}\nmark :${c.mark}\ncommitter t <t@example.com> 1700000000 +0000\n`);

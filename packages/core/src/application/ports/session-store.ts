@@ -9,7 +9,17 @@ export interface SessionMessage {
 }
 
 /** Session transcripts: immutable messages addressed by number. */
-export class SessionStore extends Context.Service<SessionStore, {
-  readonly append: (sessionId: SessionId, messages: readonly SessionMessage[]) => Effect.Effect<void>;
-  readonly read: (sessionId: SessionId, fromSeq: number, toSeq: number) => Effect.Effect<readonly SessionMessage[], SessionNotFound>;
-}>()("keel/SessionStore") {}
+export class SessionStore extends Context.Service<
+  SessionStore,
+  {
+    readonly append: (
+      sessionId: SessionId,
+      messages: readonly SessionMessage[],
+    ) => Effect.Effect<void>;
+    readonly read: (
+      sessionId: SessionId,
+      fromSeq: number,
+      toSeq: number,
+    ) => Effect.Effect<readonly SessionMessage[], SessionNotFound>;
+  }
+>()("keel/SessionStore") {}

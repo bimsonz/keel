@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { compare, type Proposition, SubjectKey, subjectsRelated } from "../../../src/domain/coordination/index.ts";
-import { type ChangeId, CommitSha, Glob, makeId, matchesGlob } from "../../../src/domain/kernel/index.ts";
+import {
+  compare,
+  type Proposition,
+  SubjectKey,
+  subjectsRelated,
+} from "../../../src/domain/coordination/index.ts";
+import {
+  type ChangeId,
+  CommitSha,
+  Glob,
+  makeId,
+  matchesGlob,
+} from "../../../src/domain/kernel/index.ts";
 import {
   attribute,
   type BatchMember,
@@ -22,15 +33,28 @@ const batchId = (n: number) => makeId("bat", String(n).padStart(26, "0"));
 
 // ------------------------------------------------------------- commutation
 
-const pathPool = ["src/authz/check.ts", "src/authz/cache.ts", "src/billing/charge.ts", "pnpm-lock.yaml", "docs/readme.md"] as const;
+const pathPool = [
+  "src/authz/check.ts",
+  "src/authz/cache.ts",
+  "src/billing/charge.ts",
+  "pnpm-lock.yaml",
+  "docs/readme.md",
+] as const;
 const affectedPool = ["test:authz", "test:billing", "guard:G-1", "test:docs"] as const;
-const subjectPool = ["authz.permission-evaluation", "authz.audit-log", "billing.charge", "docs"] as const;
+const subjectPool = [
+  "authz.permission-evaluation",
+  "authz.audit-log",
+  "billing.charge",
+  "docs",
+] as const;
 
 const footprintsArb: fc.Arbitrary<Footprints> = fc.record({
   changes: fc.subarray([...changeIds], { minLength: 1, maxLength: 2 }),
   paths: fc.subarray([...pathPool], { maxLength: 2 }),
   affected: fc.subarray([...affectedPool], { maxLength: 2 }),
-  subjects: fc.subarray([...subjectPool], { maxLength: 2 }).map((s) => s.map((k) => SubjectKey.make(k))),
+  subjects: fc
+    .subarray([...subjectPool], { maxLength: 2 })
+    .map((s) => s.map((k) => SubjectKey.make(k))),
 });
 
 const barriers = [Glob.make("pnpm-lock.yaml"), Glob.make(".keel/policy/**")];
@@ -38,13 +62,21 @@ const head = CommitSha.make("d".repeat(40));
 const base = CommitSha.make("e".repeat(40));
 
 const commutationArb: fc.Arbitrary<CommutationInput> = fc.record({
-  batch: fc.record({ id: fc.constant(batchId(1)), base: fc.constant(base), predecessors: fc.subarray([id(7), id(8)]), touched: footprintsArb }),
+  batch: fc.record({
+    id: fc.constant(batchId(1)),
+    base: fc.constant(base),
+    predecessors: fc.subarray([id(7), id(8)]),
+    touched: footprintsArb,
+  }),
   intervening: footprintsArb,
   head: fc.constant(head),
   promoted: fc.subarray([id(7), id(8)]),
   mergeTreeClean: fc.boolean(),
   barriers: fc.constant(barriers),
-  group: fc.array(fc.record({ id: fc.constantFrom(batchId(2), batchId(3)), touched: footprintsArb }), { maxLength: 2 }),
+  group: fc.array(
+    fc.record({ id: fc.constantFrom(batchId(2), batchId(3)), touched: footprintsArb }),
+    { maxLength: 2 },
+  ),
 });
 
 const disjoint = (n: number): Footprints => ({
@@ -70,9 +102,12 @@ const rev = (f: Footprints): Footprints => ({
   affected: f.affected.toReversed(),
   subjects: f.subjects.toReversed(),
 });
-const shareAny = (a: readonly string[], b: readonly string[]): boolean => a.some((x) => b.includes(x));
-const linked = (a: Footprints, b: Footprints): boolean => a.subjects.some((x) => b.subjects.some((y) => subjectsRelated(x, y)));
-const meets = (a: Footprints, b: Footprints): boolean => shareAny(a.paths, b.paths) || shareAny(a.affected, b.affected) || linked(a, b);
+const shareAny = (a: readonly string[], b: readonly string[]): boolean =>
+  a.some((x) => b.includes(x));
+const linked = (a: Footprints, b: Footprints): boolean =>
+  a.subjects.some((x) => b.subjects.some((y) => subjectsRelated(x, y)));
+const meets = (a: Footprints, b: Footprints): boolean =>
+  shareAny(a.paths, b.paths) || shareAny(a.affected, b.affected) || linked(a, b);
 
 describe("commutation", () => {
   it("[commutation.sound] a batch commutes only when C1 to C6 all hold", () => {
@@ -102,12 +137,33 @@ describe("commutation", () => {
   it("[commutation.each-condition-blocks] breaking any one of C1 to C6 stops a commuting batch", () => {
     const broken: readonly (readonly [string, CommutationInput])[] = [
       ["C1", { ...commuting, promoted: [] }],
-      ["C2 paths", { ...commuting, intervening: shared(commuting.intervening, { paths: ["src/m1.ts"] }) }],
+      [
+        "C2 paths",
+        { ...commuting, intervening: shared(commuting.intervening, { paths: ["src/m1.ts"] }) },
+      ],
       ["C2 merge", { ...commuting, mergeTreeClean: false }],
-      ["C3", { ...commuting, intervening: shared(commuting.intervening, { affected: ["test:m1"] }) }],
-      ["C4", { ...commuting, intervening: shared(commuting.intervening, { subjects: [SubjectKey.make("m1.cache")] }) }],
-      ["C5", { ...commuting, intervening: shared(commuting.intervening, { paths: ["pnpm-lock.yaml"] }) }],
-      ["C6", { ...commuting, group: [{ id: batchId(2), touched: shared(disjoint(3), { affected: ["test:m1"] }) }] }],
+      [
+        "C3",
+        { ...commuting, intervening: shared(commuting.intervening, { affected: ["test:m1"] }) },
+      ],
+      [
+        "C4",
+        {
+          ...commuting,
+          intervening: shared(commuting.intervening, { subjects: [SubjectKey.make("m1.cache")] }),
+        },
+      ],
+      [
+        "C5",
+        { ...commuting, intervening: shared(commuting.intervening, { paths: ["pnpm-lock.yaml"] }) },
+      ],
+      [
+        "C6",
+        {
+          ...commuting,
+          group: [{ id: batchId(2), touched: shared(disjoint(3), { affected: ["test:m1"] }) }],
+        },
+      ],
     ];
     expect(broken.map(([name, input]) => [name, commutation(input)._tag])).toEqual([
       ["C1", "wait"],
@@ -118,7 +174,12 @@ describe("commutation", () => {
       ["C5", "reverify"],
       ["C6", "reverify"],
     ]);
-    fc.assert(fc.property(commutationArb, (input) => input.mergeTreeClean || commutation(input)._tag !== "commutes"));
+    fc.assert(
+      fc.property(
+        commutationArb,
+        (input) => input.mergeTreeClean || commutation(input)._tag !== "commutes",
+      ),
+    );
   });
 
   it("[commutation.reverify-scope-covers-the-meeting] a re-verification covers everything B and D share, and everything when a barrier or the merge failed", () => {
@@ -128,18 +189,31 @@ describe("commutation", () => {
         if (result._tag !== "reverify") return true;
         const b = input.batch.touched;
         const d = input.intervening;
-        const barrier = [...b.paths, ...d.paths].some((p) => input.barriers.some((g) => matchesGlob(g, p)));
+        const barrier = [...b.paths, ...d.paths].some((p) =>
+          input.barriers.some((g) => matchesGlob(g, p)),
+        );
         if (barrier || !input.mergeTreeClean) return result.scope._tag === "all";
         if (result.scope._tag !== "where-they-meet") return false;
         const scope = result.scope;
         return (
-          b.affected.filter((x) => d.affected.includes(x)).every((x) => scope.affected.includes(x)) &&
-          b.subjects.filter((x) => d.subjects.some((y) => subjectsRelated(x, y))).every((x) => scope.subjects.includes(x))
+          b.affected
+            .filter((x) => d.affected.includes(x))
+            .every((x) => scope.affected.includes(x)) &&
+          b.subjects
+            .filter((x) => d.subjects.some((y) => subjectsRelated(x, y)))
+            .every((x) => scope.subjects.includes(x))
         );
       }),
     );
-    const c4 = commutation({ ...commuting, intervening: { ...commuting.intervening, subjects: [SubjectKey.make("m1")] } });
-    expect(c4._tag === "reverify" ? c4.scope : undefined).toEqual({ _tag: "where-they-meet", affected: [], subjects: ["m1"] });
+    const c4 = commutation({
+      ...commuting,
+      intervening: { ...commuting.intervening, subjects: [SubjectKey.make("m1")] },
+    });
+    expect(c4._tag === "reverify" ? c4.scope : undefined).toEqual({
+      _tag: "where-they-meet",
+      affected: [],
+      subjects: ["m1"],
+    });
   });
 
   it("[commutation.wait-for-predecessors] a batch whose predecessors are not all promoted waits, whatever else holds", () => {
@@ -147,10 +221,15 @@ describe("commutation", () => {
       fc.property(commutationArb, (input) => {
         const missing = input.batch.predecessors.filter((p) => !input.promoted.includes(p));
         const result = commutation(input);
-        return missing.length === 0 ? result._tag !== "wait" : result._tag === "wait" && result.unpromoted.length === missing.length;
+        return missing.length === 0
+          ? result._tag !== "wait"
+          : result._tag === "wait" && result.unpromoted.length === missing.length;
       }),
     );
-    expect(commutation({ ...commuting, promoted: [] })).toEqual({ _tag: "wait", unpromoted: [id(7)] });
+    expect(commutation({ ...commuting, promoted: [] })).toEqual({
+      _tag: "wait",
+      unpromoted: [id(7)],
+    });
   });
 
   it("[commutation.proof-id-deterministic] Proof-Id is a function of the C1 to C6 inputs alone, whatever their order", () => {
@@ -158,16 +237,28 @@ describe("commutation", () => {
       fc.property(commutationArb, (input) => {
         const shuffled: CommutationInput = {
           ...input,
-          batch: { ...input.batch, predecessors: input.batch.predecessors.toReversed(), touched: rev(input.batch.touched) },
+          batch: {
+            ...input.batch,
+            predecessors: input.batch.predecessors.toReversed(),
+            touched: rev(input.batch.touched),
+          },
           intervening: rev(input.intervening),
           promoted: input.promoted.toReversed(),
           group: input.group.toReversed().map((g) => ({ ...g, touched: rev(g.touched) })),
         };
         expect(proofIdOf(shuffled)).toBe(proofIdOf(input));
-        expect(proofIdOf({ ...input, head: CommitSha.make("f".repeat(40)) })).not.toBe(proofIdOf(input));
-        expect(proofIdOf({ ...input, intervening: { ...input.intervening, affected: [...input.intervening.affected, "test:new"] } })).not.toBe(
+        expect(proofIdOf({ ...input, head: CommitSha.make("f".repeat(40)) })).not.toBe(
           proofIdOf(input),
         );
+        expect(
+          proofIdOf({
+            ...input,
+            intervening: {
+              ...input.intervening,
+              affected: [...input.intervening.affected, "test:new"],
+            },
+          }),
+        ).not.toBe(proofIdOf(input));
       }),
     );
     const proved = commutation(commuting);
@@ -192,32 +283,53 @@ const queueArb: fc.Arbitrary<readonly QueuedChange[]> = fc
   );
 
 const pairsArb = (queue: readonly QueuedChange[]) =>
-  fc.array(fc.tuple(fc.constantFrom(...queue.map((q) => q.id)), fc.constantFrom(...queue.map((q) => q.id))), { maxLength: 4 });
+  fc.array(
+    fc.tuple(
+      fc.constantFrom(...queue.map((q) => q.id)),
+      fc.constantFrom(...queue.map((q) => q.id)),
+    ),
+    { maxLength: 4 },
+  );
 
 const batchingArb = queueArb.chain((queue) =>
   fc.record({
     queue: fc.constant(queue),
     p: fc.constantFrom(0, 0.01, 0.05, 0.2, 0.5),
-    suspected: queue.length === 0 ? fc.constant<readonly (readonly [ChangeId, ChangeId])[]>([]) : pairsArb(queue),
+    suspected:
+      queue.length === 0
+        ? fc.constant<readonly (readonly [ChangeId, ChangeId])[]>([])
+        : pairsArb(queue),
   }),
 );
 
 const contradicts = (a: Proposition, b: Proposition): boolean =>
   compare(a, b).outcome === "contradicts" || compare(b, a).outcome === "contradicts";
-const opposed = (a: QueuedChange, b: QueuedChange): boolean => a.effects.some((x) => b.effects.some((y) => contradicts(x, y)));
+const opposed = (a: QueuedChange, b: QueuedChange): boolean =>
+  a.effects.some((x) => b.effects.some((y) => contradicts(x, y)));
 
 describe("belief-aware batching", () => {
   it("[batching.size-formula] N = clamp(ln 0.8 / ln(1 − p), 1, 16), so a batch of N passes with probability at least 0.8", () => {
     fc.assert(
-      fc.property(fc.double({ min: 0, max: 1, noNaN: true }), fc.double({ min: 0, max: 1, noNaN: true }), (p, q) => {
-        const n = batchSize(p);
-        const ok = Number.isInteger(n) && n >= 1 && n <= MAX_BATCH;
-        const monotone = p > q || batchSize(p) >= batchSize(q);
-        const reliable = n === 1 || p === 0 || (1 - p) ** n >= 0.8 - 1e-12;
-        return ok && monotone && reliable;
-      }),
+      fc.property(
+        fc.double({ min: 0, max: 1, noNaN: true }),
+        fc.double({ min: 0, max: 1, noNaN: true }),
+        (p, q) => {
+          const n = batchSize(p);
+          const ok = Number.isInteger(n) && n >= 1 && n <= MAX_BATCH;
+          const monotone = p > q || batchSize(p) >= batchSize(q);
+          const reliable = n === 1 || p === 0 || (1 - p) ** n >= 0.8 - 1e-12;
+          return ok && monotone && reliable;
+        },
+      ),
     );
-    expect([batchSize(0), batchSize(5e-324), batchSize(0.01), batchSize(0.2), batchSize(1), batchSize(Number.NaN)]).toEqual([16, 16, 16, 1, 1, 1]);
+    expect([
+      batchSize(0),
+      batchSize(5e-324),
+      batchSize(0.01),
+      batchSize(0.2),
+      batchSize(1),
+      batchSize(Number.NaN),
+    ]).toEqual([16, 16, 16, 1, 1, 1]);
   });
 
   it("[batching.no-suspected-pair] a batch never holds two changes with an open suspected conflict", () => {
@@ -240,13 +352,23 @@ describe("belief-aware batching", () => {
       fc.property(batchingArb, ({ queue, p, suspected }) => {
         const byId = new Map(queue.map((q) => [q.id, q]));
         return planBatches(queue, p, suspected).every((batch) =>
-          batch.every((a, i) => batch.slice(i + 1).every((b) => !opposed(byId.get(a)!, byId.get(b)!))),
+          batch.every((a, i) =>
+            batch.slice(i + 1).every((b) => !opposed(byId.get(a)!, byId.get(b)!)),
+          ),
         );
       }),
     );
     const subject = SubjectKey.make("authz.permission-evaluation");
-    const fresher: QueuedChange = { id: id(1), effects: [{ subject, predicate: "freshness", relation: "is", value: "per-call" }], risky: false };
-    const staler: QueuedChange = { id: id(2), effects: [{ subject, predicate: "freshness", relation: "is", value: "per-session" }], risky: false };
+    const fresher: QueuedChange = {
+      id: id(1),
+      effects: [{ subject, predicate: "freshness", relation: "is", value: "per-call" }],
+      risky: false,
+    };
+    const staler: QueuedChange = {
+      id: id(2),
+      effects: [{ subject, predicate: "freshness", relation: "is", value: "per-session" }],
+      risky: false,
+    };
     expect(planBatches([fresher, staler], 0, [])).toEqual([[id(1)], [id(2)]]);
   });
 
@@ -254,7 +376,9 @@ describe("belief-aware batching", () => {
     fc.assert(
       fc.property(batchingArb, ({ queue, p, suspected }) => {
         const risky = new Set(queue.filter((q) => q.risky).map((q) => q.id));
-        return planBatches(queue, p, suspected).every((batch) => batch.length === 1 || batch.every((c) => !risky.has(c)));
+        return planBatches(queue, p, suspected).every(
+          (batch) => batch.length === 1 || batch.every((c) => !risky.has(c)),
+        );
       }),
     );
     const q: QueuedChange[] = [
@@ -277,7 +401,11 @@ describe("belief-aware batching", () => {
         );
       }),
     );
-    const q = Array.from({ length: 40 }, (_, i): QueuedChange => ({ id: id(i + 1), effects: [], risky: false }));
+    const q = Array.from({ length: 40 }, (_, i): QueuedChange => ({
+      id: id(i + 1),
+      effects: [],
+      risky: false,
+    }));
     expect(planBatches(q, 0.2, []).length).toBe(4);
   });
 
@@ -287,7 +415,8 @@ describe("belief-aware batching", () => {
         const batches = planBatches(queue, p, suspected);
         const byId = new Map(queue.map((q) => [q.id, q]));
         const [first] = queue;
-        const headOk = first === undefined ? batches.length === 0 : (batches[0] ?? []).includes(first.id);
+        const headOk =
+          first === undefined ? batches.length === 0 : (batches[0] ?? []).includes(first.id);
         const waiting = queue.filter((q) => !batches.flat().includes(q.id));
         const fitsSomewhere = (c: QueuedChange): boolean =>
           batches.length < 4 ||
@@ -295,7 +424,12 @@ describe("belief-aware batching", () => {
             (b) =>
               !c.risky &&
               b.length < batchSize(p) &&
-              b.every((m) => !byId.get(m)!.risky && !opposed(byId.get(m)!, c) && !suspected.some(([x, y]) => (x === m && y === c.id) || (x === c.id && y === m))),
+              b.every(
+                (m) =>
+                  !byId.get(m)!.risky &&
+                  !opposed(byId.get(m)!, c) &&
+                  !suspected.some(([x, y]) => (x === m && y === c.id) || (x === c.id && y === m)),
+              ),
           );
         return headOk && waiting.every((c) => !fitsSomewhere(c));
       }),
@@ -309,7 +443,13 @@ describe("belief-aware batching", () => {
 
 const memberArb: fc.Arbitrary<readonly BatchMember[]> = fc
   .subarray([1, 2, 3, 4, 5], { minLength: 1 })
-  .chain((ns) => fc.tuple(...ns.map((n) => fc.record({ id: fc.constant(id(n)), affected: fc.subarray([...affectedPool]) }))));
+  .chain((ns) =>
+    fc.tuple(
+      ...ns.map((n) =>
+        fc.record({ id: fc.constant(id(n)), affected: fc.subarray([...affectedPool]) }),
+      ),
+    ),
+  );
 
 describe("attribution", () => {
   it("[attribution.suspects-touch-the-check] the suspects are exactly the members whose Affected set holds the failing check", () => {
@@ -317,7 +457,10 @@ describe("attribution", () => {
       fc.property(memberArb, fc.constantFrom(...affectedPool), (members, check) => {
         const touching = members.filter((m) => m.affected.includes(check)).map((m) => m.id);
         const { suspects, graphGap } = attribute(check, members);
-        return touching.length === 0 || (!graphGap && JSON.stringify(suspects) === JSON.stringify(touching));
+        return (
+          touching.length === 0 ||
+          (!graphGap && JSON.stringify(suspects) === JSON.stringify(touching))
+        );
       }),
     );
     const members: BatchMember[] = [
@@ -334,7 +477,12 @@ describe("attribution", () => {
         return graphGap && suspects.length === members.length;
       }),
     );
-    expect(attribute("test:unmapped", [{ id: id(1), affected: [] }, { id: id(2), affected: [] }]).suspects).toEqual([id(1), id(2)]);
+    expect(
+      attribute("test:unmapped", [
+        { id: id(1), affected: [] },
+        { id: id(2), affected: [] },
+      ]).suspects,
+    ).toEqual([id(1), id(2)]);
   });
 
   it("[attribution.leave-one-out-trials] several suspects get one trial each, leaving out exactly that suspect", () => {
@@ -345,29 +493,50 @@ describe("attribution", () => {
         return (
           next._tag === "leave-one-out" &&
           next.trials.length === suspects.length &&
-          next.trials.every((t, i) => t.without === suspects[i] && t.members.length === members.length - 1 && !t.members.includes(t.without))
+          next.trials.every(
+            (t, i) =>
+              t.without === suspects[i] &&
+              t.members.length === members.length - 1 &&
+              !t.members.includes(t.without),
+          )
         );
       }),
     );
-    const both: BatchMember[] = [{ id: id(1), affected: ["test:authz"] }, { id: id(2), affected: ["test:authz"] }];
+    const both: BatchMember[] = [
+      { id: id(1), affected: ["test:authz"] },
+      { id: id(2), affected: ["test:authz"] },
+    ];
     expect(attribute("test:authz", both).next).toEqual({
       _tag: "leave-one-out",
-      trials: [{ without: id(1), members: [id(2)] }, { without: id(2), members: [id(1)] }],
+      trials: [
+        { without: id(1), members: [id(2)] },
+        { without: id(2), members: [id(1)] },
+      ],
     });
   });
 
   it("[attribution.reads-leave-one-out] one fixing removal names the culprit; every removal fixing it is an interaction; none is inconclusive", () => {
     fc.assert(
-      fc.property(fc.uniqueArray(changeIdArb, { minLength: 2, maxLength: 4 }), fc.array(fc.boolean(), { minLength: 4, maxLength: 4 }), (ids, passes) => {
-        const results = ids.map((without, i) => ({ without, passed: passes[i] ?? false }));
-        const fixes = results.filter((r) => r.passed);
-        const finding = interpretLeaveOneOut(results);
-        if (fixes.length === results.length) return finding._tag === "interaction" && finding.parties.length === ids.length;
-        if (fixes.length === 1) return finding._tag === "culprit" && finding.id === fixes[0]?.without;
-        return finding._tag === "inconclusive";
-      }),
+      fc.property(
+        fc.uniqueArray(changeIdArb, { minLength: 2, maxLength: 4 }),
+        fc.array(fc.boolean(), { minLength: 4, maxLength: 4 }),
+        (ids, passes) => {
+          const results = ids.map((without, i) => ({ without, passed: passes[i] ?? false }));
+          const fixes = results.filter((r) => r.passed);
+          const finding = interpretLeaveOneOut(results);
+          if (fixes.length === results.length)
+            return finding._tag === "interaction" && finding.parties.length === ids.length;
+          if (fixes.length === 1)
+            return finding._tag === "culprit" && finding.id === fixes[0]?.without;
+          return finding._tag === "inconclusive";
+        },
+      ),
     );
-    expect(interpretLeaveOneOut([{ without: id(1), passed: true }, { without: id(2), passed: true }])._tag).toBe("interaction");
+    expect(
+      interpretLeaveOneOut([
+        { without: id(1), passed: true },
+        { without: id(2), passed: true },
+      ])._tag,
+    ).toBe("interaction");
   });
 });
-

@@ -48,7 +48,8 @@ const matchSegments = (pattern: readonly string[], path: readonly string[]): boo
   return reach[path.length] === true;
 };
 
-export const matchesGlob = (pattern: string, path: string): boolean => matchSegments(split(pattern), split(path));
+export const matchesGlob = (pattern: string, path: string): boolean =>
+  matchSegments(split(pattern), split(path));
 
 export const matchesAny = (patterns: readonly string[], path: string): boolean =>
   patterns.some((p) => matchesGlob(p, path));

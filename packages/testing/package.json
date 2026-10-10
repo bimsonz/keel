@@ -3,16 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "description": "In-memory adapters, port contract suites and fake bindings",
-  "type": "module",
   "license": "MIT",
+  "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
-  },
-  "devDependencies": {
-    "typescript": "catalog:"
   },
   "dependencies": {
     "@effect/vitest": "catalog:",
@@ -20,5 +17,8 @@
     "@keeltown/gitcore": "workspace:*",
     "effect": "catalog:",
     "vitest": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
   }
 }

@@ -26,8 +26,16 @@ export const guards: readonly RegisteredGuard[] = [
   { name: PUBLIC_SCRUB, run: checkPublicScrub, controlCanary: "README.md" },
   { name: EVENT_NAMES, run: checkEventNames, controlCanary: "event:ChangeSubmitted" },
   { name: LINT_CONFIG, run: checkLintConfig, controlCanary: ".oxlintrc.json" },
-  { name: RUNNER_CREDENTIALS, run: checkRunnerCredentials, controlCanary: "apps/keel/src/adapters/driving/workflow/keel-verify.ts" },
-  { name: READONLY_BUNDLES, run: checkReadonlyBundles, controlCanary: "apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts" },
+  {
+    name: RUNNER_CREDENTIALS,
+    run: checkRunnerCredentials,
+    controlCanary: "apps/keel/src/adapters/driving/workflow/keel-verify.ts",
+  },
+  {
+    name: READONLY_BUNDLES,
+    run: checkReadonlyBundles,
+    controlCanary: "apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts",
+  },
 ];
 
 /**

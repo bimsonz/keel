@@ -1,6 +1,13 @@
 import { Context, type Effect } from "effect";
 import type { PoolExhausted } from "../../domain/coordination/index.ts";
-import type { ChangeId, CommitSha, Instant, ProjectId, SketchId, WorkspaceId } from "../../domain/kernel/index.ts";
+import type {
+  ChangeId,
+  CommitSha,
+  Instant,
+  ProjectId,
+  SketchId,
+  WorkspaceId,
+} from "../../domain/kernel/index.ts";
 
 /**
  * A workspace handed to its holder. `remote` and `token` go to the holder
@@ -20,12 +27,18 @@ export interface WorkspaceGrant {
 export type CollectionReason = "landed" | "withdrawn" | "expired";
 
 /** Hands out pre-forked workspaces. A fork is ready when the pool's own `await fork()` resolves (spike S2); nothing polls, and no fork event exists to wait for. */
-export class WorkspacePool extends Context.Service<WorkspacePool, {
-  /**
-   * Idempotent per holder: a retried grant for the same holder returns the
-   * same workspace with a freshly minted token. No ready workspace → PoolExhausted.
-   */
-  readonly grant: (projectId: ProjectId, holder: ChangeId | SketchId) => Effect.Effect<WorkspaceGrant, PoolExhausted>;
-  /** Collects the workspace: its repo is deleted. */
-  readonly release: (workspaceId: WorkspaceId, reason?: CollectionReason) => Effect.Effect<void>;
-}>()("keel/WorkspacePool") {}
+export class WorkspacePool extends Context.Service<
+  WorkspacePool,
+  {
+    /**
+     * Idempotent per holder: a retried grant for the same holder returns the
+     * same workspace with a freshly minted token. No ready workspace → PoolExhausted.
+     */
+    readonly grant: (
+      projectId: ProjectId,
+      holder: ChangeId | SketchId,
+    ) => Effect.Effect<WorkspaceGrant, PoolExhausted>;
+    /** Collects the workspace: its repo is deleted. */
+    readonly release: (workspaceId: WorkspaceId, reason?: CollectionReason) => Effect.Effect<void>;
+  }
+>()("keel/WorkspacePool") {}

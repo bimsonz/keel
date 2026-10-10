@@ -26,7 +26,12 @@ import { isAncestorOrSelf, subjectsRelated } from "./subject.ts";
  * - needs-probe the lattice cannot settle it; only a probe can
  * - unrelated   different subjects, scopes or predicates
  */
-export type ComparisonOutcome = "compatible" | "refines" | "contradicts" | "needs-probe" | "unrelated";
+export type ComparisonOutcome =
+  | "compatible"
+  | "refines"
+  | "contradicts"
+  | "needs-probe"
+  | "unrelated";
 
 export type ComparisonReason =
   | "subjects-unrelated"
@@ -48,11 +53,15 @@ const decideClaims = (p: Claim, e: Claim): RegionDecision => {
     case "bound":
       return e.predicate === p.predicate ? boundDecision(p, e) : "unrelated";
     case "cardinality":
-      return e.predicate === p.predicate ? finiteOrderDecision(cardinalities, cardinalityLeq, p, e) : "unrelated";
+      return e.predicate === p.predicate
+        ? finiteOrderDecision(cardinalities, cardinalityLeq, p, e)
+        : "unrelated";
     case "presence":
     case "purity":
     case "idempotent":
-      return e.predicate === p.predicate ? finiteOrderDecision(booleans, discreteLeq, p, e) : "unrelated";
+      return e.predicate === p.predicate
+        ? finiteOrderDecision(booleans, discreteLeq, p, e)
+        : "unrelated";
     case "authority":
       return e.predicate === p.predicate ? authorityDecision(p, e) : "unrelated";
     case "shape":
@@ -71,14 +80,18 @@ const covers = (premise: ReadProposition, effect: ReadProposition): boolean =>
 
 /** Compares two propositions already read onto their lattices. */
 export const compareRead = (premise: ReadProposition, effect: ReadProposition): Comparison => {
-  if (!subjectsRelated(premise.subject, effect.subject)) return { outcome: "unrelated", reason: "subjects-unrelated" };
-  if (!scopesIntersect(premise.scope, effect.scope)) return { outcome: "unrelated", reason: "scopes-disjoint" };
+  if (!subjectsRelated(premise.subject, effect.subject))
+    return { outcome: "unrelated", reason: "subjects-unrelated" };
+  if (!scopesIntersect(premise.scope, effect.scope))
+    return { outcome: "unrelated", reason: "scopes-disjoint" };
   if (premise.claim.predicate === "invariant" || effect.claim.predicate === "invariant") {
     return { outcome: "needs-probe", reason: "invariant-is-model-compared" };
   }
-  if (premise.claim.predicate !== effect.claim.predicate) return { outcome: "unrelated", reason: "predicates-differ" };
+  if (premise.claim.predicate !== effect.claim.predicate)
+    return { outcome: "unrelated", reason: "predicates-differ" };
   const decision = decideClaims(premise.claim, effect.claim);
-  if (decision === "within") return { outcome: covers(premise, effect) ? "compatible" : "refines", reason: "lattice" };
+  if (decision === "within")
+    return { outcome: covers(premise, effect) ? "compatible" : "refines", reason: "lattice" };
   if (decision === "disjoint") return { outcome: "contradicts", reason: "lattice" };
   if (decision === "overlap") return { outcome: "needs-probe", reason: "lattice" };
   return { outcome: "unrelated", reason: "lattice" };
@@ -90,9 +103,11 @@ export const compareRead = (premise: ReadProposition, effect: ReadProposition): 
  * related subject it needs a probe.
  */
 export const compare = (premise: Proposition, effect: Proposition): Comparison => {
-  if (!subjectsRelated(premise.subject, effect.subject)) return { outcome: "unrelated", reason: "subjects-unrelated" };
+  if (!subjectsRelated(premise.subject, effect.subject))
+    return { outcome: "unrelated", reason: "subjects-unrelated" };
   const p = readClaim(premise);
   const e = readClaim(effect);
-  if (Result.isFailure(p) || Result.isFailure(e)) return { outcome: "needs-probe", reason: "unreadable" };
+  if (Result.isFailure(p) || Result.isFailure(e))
+    return { outcome: "needs-probe", reason: "unreadable" };
   return compareRead(p.success, e.success);
 };

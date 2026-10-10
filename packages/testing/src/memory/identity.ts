@@ -1,12 +1,21 @@
 import { type Agent, type Principal, TokenRejected } from "@keeltown/core/domain/identity";
 import { type AgentId, Instant, makeId } from "@keeltown/core/kernel";
-import { AgentDirectory, Clock, Ids, type StoredCredential, TokenIssuer } from "@keeltown/core/ports";
+import {
+  AgentDirectory,
+  Clock,
+  Ids,
+  type StoredCredential,
+  TokenIssuer,
+} from "@keeltown/core/ports";
 import { Clock as EffectClock, Effect, Layer, Option } from "effect";
 
 /** Time from Effect's own Clock, so `TestClock` drives it in tests. Production uses the same reading. */
 export function makeClockMemory() {
   return {
-    layer: Layer.succeed(Clock, Clock.of({ now: Effect.map(EffectClock.currentTimeMillis, (ms) => Instant(ms)) })),
+    layer: Layer.succeed(
+      Clock,
+      Clock.of({ now: Effect.map(EffectClock.currentTimeMillis, (ms) => Instant(ms)) }),
+    ),
   };
 }
 
@@ -69,13 +78,16 @@ export function makeAgentDirectoryMemory() {
       AgentDirectory,
       AgentDirectory.of({
         findAgent: (agentId) => Effect.sync(() => Option.fromNullishOr(agents.get(agentId))),
-        findCredential: (clientId) => Effect.sync(() => Option.fromNullishOr(credentials.get(clientId))),
+        findCredential: (clientId) =>
+          Effect.sync(() => Option.fromNullishOr(credentials.get(clientId))),
         upsert: (agent, credential) => Effect.sync(() => seed(agent, credential)),
         verifyCredential: (clientId, secret) =>
           Effect.promise(async () => {
             const credential = credentials.get(clientId);
             if (credential === undefined) return Option.none();
-            return constantTimeEqual(await hashSecret(secret), credential.secretHash) ? Option.some(credential.agentId) : Option.none();
+            return constantTimeEqual(await hashSecret(secret), credential.secretHash)
+              ? Option.some(credential.agentId)
+              : Option.none();
           }),
       }),
     ),

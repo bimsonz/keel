@@ -7,8 +7,18 @@ import { child, children, identifierName, walkAst } from "./ast.ts";
 
 /** R12: every layer folder of the hexagon and its doorways exists and holds something. */
 export const LAYER_FOLDERS = [
-  ...["kernel", "identity", "coordination", "verification", "integration", "memory", "delivery"].map((c) => `packages/core/src/domain/${c}`),
-  ...["ports", "identity", "coordination", "verification", "integration", "memory", "delivery"].map((c) => `packages/core/src/application/${c}`),
+  ...[
+    "kernel",
+    "identity",
+    "coordination",
+    "verification",
+    "integration",
+    "memory",
+    "delivery",
+  ].map((c) => `packages/core/src/domain/${c}`),
+  ...["ports", "identity", "coordination", "verification", "integration", "memory", "delivery"].map(
+    (c) => `packages/core/src/application/${c}`,
+  ),
   ...["http", "mcp", "do", "workflow", "queue"].map((d) => `apps/keel/src/adapters/driving/${d}`),
   "apps/keel/src/adapters/driven",
   "apps/keel/src/composition",
@@ -29,12 +39,22 @@ function holdsSomething(dir: string): boolean {
 
 export function checkR12(root: string, options: GuardOptions = {}): GuardResult {
   const found = LAYER_FOLDERS.filter((folder) => holdsSomething(join(root, folder)));
-  const violations: Violation[] = LAYER_FOLDERS.filter((folder) => !found.includes(folder)).map((folder) => ({
-    rule: "R12",
-    file: folder,
-    message: "a layer folder is missing or empty; a rule aimed at it would pass on nothing",
-  }));
-  return withVacuityCheck("R12", found, violations, options.vacuity ?? { minFiles: LAYER_FOLDERS.length, canary: "packages/core/src/domain/kernel" });
+  const violations: Violation[] = LAYER_FOLDERS.filter((folder) => !found.includes(folder)).map(
+    (folder) => ({
+      rule: "R12",
+      file: folder,
+      message: "a layer folder is missing or empty; a rule aimed at it would pass on nothing",
+    }),
+  );
+  return withVacuityCheck(
+    "R12",
+    found,
+    violations,
+    options.vacuity ?? {
+      minFiles: LAYER_FOLDERS.length,
+      canary: "packages/core/src/domain/kernel",
+    },
+  );
 }
 
 const SENTINEL = /^(00000000-0000-0000-0000-000000000000|PLACEHOLDER-.+)$/;
@@ -49,12 +69,14 @@ function bindingNames(config: unknown): Set<string> {
     }
     if (typeof value !== "object" || value === null) return;
     for (const [k, v] of Object.entries(value)) {
-      if (k === "vars" && typeof v === "object" && v !== null) for (const name of Object.keys(v)) names.add(name);
+      if (k === "vars" && typeof v === "object" && v !== null)
+        for (const name of Object.keys(v)) names.add(name);
       else if (k === "secrets" && typeof v === "object" && v !== null) {
         const required: unknown = Reflect.get(v, "required");
-        if (Array.isArray(required)) for (const name of required) if (typeof name === "string") names.add(name);
-      }
-      else if ((k === "binding" || (k === "name" && key === "bindings")) && typeof v === "string") names.add(v);
+        if (Array.isArray(required))
+          for (const name of required) if (typeof name === "string") names.add(name);
+      } else if ((k === "binding" || (k === "name" && key === "bindings")) && typeof v === "string")
+        names.add(v);
       else visit(v, k);
     }
   };
@@ -103,7 +125,11 @@ function testBindingNames(file: string, code: string): string[] {
  * test adds no binding production lacks (helpers prefixed `TEST_` aside).
  */
 export function checkR13(root: string, options: GuardOptions = {}): GuardResult {
-  const apps = existsSync(join(root, "apps")) ? readdirSync(join(root, "apps")).filter((a) => existsSync(join(root, "apps", a, "wrangler.jsonc"))) : [];
+  const apps = existsSync(join(root, "apps"))
+    ? readdirSync(join(root, "apps")).filter((a) =>
+        existsSync(join(root, "apps", a, "wrangler.jsonc")),
+      )
+    : [];
   const violations: Violation[] = [];
   const scanned: string[] = [];
   const dates = new Map<string, string[]>();
@@ -121,37 +147,67 @@ export function checkR13(root: string, options: GuardOptions = {}): GuardResult 
     if (typeof date === "string") dates.set(date, [...(dates.get(date) ?? []), file]);
     else violations.push({ rule: "R13", file, message: "compatibility_date is missing" });
     for (const key of ["workers_dev", "preview_urls"]) {
-      if (typeof get(key) !== "boolean") violations.push({ rule: "R13", file, message: `${key} must be set explicitly` });
+      if (typeof get(key) !== "boolean")
+        violations.push({ rule: "R13", file, message: `${key} must be set explicitly` });
     }
     const vars = get("vars");
-    if (typeof vars !== "object" || vars === null || typeof Reflect.get(vars, "KEEL_HOST") !== "string") {
+    if (
+      typeof vars !== "object" ||
+      vars === null ||
+      typeof Reflect.get(vars, "KEEL_HOST") !== "string"
+    ) {
       violations.push({ rule: "R13", file, message: "vars.KEEL_HOST must be declared" });
     }
-    if (get("account_id") !== undefined) violations.push({ rule: "R13", file, message: "account_id is committed; deploys read CLOUDFLARE_ACCOUNT_ID" });
+    if (get("account_id") !== undefined)
+      violations.push({
+        rule: "R13",
+        file,
+        message: "account_id is committed; deploys read CLOUDFLARE_ACCOUNT_ID",
+      });
     const ids: { path: string; value: unknown }[] = [];
     idFields(config, "", ids);
     for (const { path, value } of ids) {
       if (typeof value !== "string" || !SENTINEL.test(value)) {
-        violations.push({ rule: "R13", file, message: `${path} holds an account-specific id; commit a sentinel (all-zero UUID or PLACEHOLDER-…)` });
+        violations.push({
+          rule: "R13",
+          file,
+          message: `${path} holds an account-specific id; commit a sentinel (all-zero UUID or PLACEHOLDER-…)`,
+        });
       }
     }
     const containers = get("containers");
     const gated = new Set(
-      typeof vars === "object" && vars !== null && typeof Reflect.get(vars, "BOXGATE_CLASSES") === "string"
-        ? String(Reflect.get(vars, "BOXGATE_CLASSES")).split(",").map((name) => name.trim()).filter(Boolean)
+      typeof vars === "object" &&
+        vars !== null &&
+        typeof Reflect.get(vars, "BOXGATE_CLASSES") === "string"
+        ? String(Reflect.get(vars, "BOXGATE_CLASSES"))
+            .split(",")
+            .map((name) => name.trim())
+            .filter(Boolean)
         : [],
     );
     if (Array.isArray(containers)) {
       containers.forEach((container: unknown, i) => {
-        const field = (key: string): unknown => (typeof container === "object" && container !== null ? Reflect.get(container, key) : undefined);
+        const field = (key: string): unknown =>
+          typeof container === "object" && container !== null
+            ? Reflect.get(container, key)
+            : undefined;
         const className = String(field("class_name"));
         const policy = field("scheduling_policy");
         if (policy === "durable_object") {
           if (!gated.has(className)) {
-            violations.push({ rule: "R13", file, message: `containers[${i}] (${className}) uses the durable_object policy but is not registered with BoxGate in vars.BOXGATE_CLASSES` });
+            violations.push({
+              rule: "R13",
+              file,
+              message: `containers[${i}] (${className}) uses the durable_object policy but is not registered with BoxGate in vars.BOXGATE_CLASSES`,
+            });
           }
         } else if (typeof field("max_instances") !== "number") {
-          violations.push({ rule: "R13", file, message: `containers[${i}] (${className}) has no max_instances; the account is shared` });
+          violations.push({
+            rule: "R13",
+            file,
+            message: `containers[${i}] (${className}) has no max_instances; the account is shared`,
+          });
         }
       });
     }
@@ -161,13 +217,26 @@ export function checkR13(root: string, options: GuardOptions = {}): GuardResult 
       const production = bindingNames(config);
       for (const name of testBindingNames(vitestFile, read(root, vitestFile))) {
         if (!production.has(name) && !name.startsWith("TEST_")) {
-          violations.push({ rule: "R13", file: vitestFile, message: `the test adds binding ${name}, which production does not declare` });
+          violations.push({
+            rule: "R13",
+            file: vitestFile,
+            message: `the test adds binding ${name}, which production does not declare`,
+          });
         }
       }
     }
   }
   if (dates.size > 1) {
-    violations.push({ rule: "R13", file: "apps/*/wrangler.jsonc", message: `compatibility dates differ: ${[...dates.keys()].join(", ")}` });
+    violations.push({
+      rule: "R13",
+      file: "apps/*/wrangler.jsonc",
+      message: `compatibility dates differ: ${[...dates.keys()].join(", ")}`,
+    });
   }
-  return withVacuityCheck("R13", scanned, violations, options.vacuity ?? { minFiles: 3, canary: "apps/keel/wrangler.jsonc" });
+  return withVacuityCheck(
+    "R13",
+    scanned,
+    violations,
+    options.vacuity ?? { minFiles: 3, canary: "apps/keel/wrangler.jsonc" },
+  );
 }

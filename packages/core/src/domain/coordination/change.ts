@@ -1,5 +1,12 @@
 import { Schema } from "effect";
-import { AgentId, ChangeId, InstantSchema, LeaseId, SketchId, WorkspaceId } from "../kernel/index.ts";
+import {
+  AgentId,
+  ChangeId,
+  InstantSchema,
+  LeaseId,
+  SketchId,
+  WorkspaceId,
+} from "../kernel/index.ts";
 import { FootprintEntry, Proposition } from "./proposition.ts";
 
 export const ChangeState = Schema.Literals([
@@ -20,7 +27,12 @@ export const ChangeState = Schema.Literals([
 export type ChangeState = typeof ChangeState.Type;
 
 /** States in which the change waits on its agent. A lease lapses only here. */
-export const AGENT_OWNED: ReadonlySet<ChangeState> = new Set(["declared", "working", "drifted", "bounced"]);
+export const AGENT_OWNED: ReadonlySet<ChangeState> = new Set([
+  "declared",
+  "working",
+  "drifted",
+  "bounced",
+]);
 
 export const TERMINAL: ReadonlySet<ChangeState> = new Set(["landed", "withdrawn", "superseded"]);
 
@@ -71,5 +83,14 @@ export const Change = Schema.Struct({
 export type Change = typeof Change.Type;
 
 /** A coordination action Keel suggests or an agent takes. */
-export const Move = Schema.Literals(["proceed", "coordinate", "refine", "sequence", "yield", "merge", "distinguish", "escalate"]);
+export const Move = Schema.Literals([
+  "proceed",
+  "coordinate",
+  "refine",
+  "sequence",
+  "yield",
+  "merge",
+  "distinguish",
+  "escalate",
+]);
 export type Move = typeof Move.Type;

@@ -24,37 +24,48 @@ const worldArb = fc.array(graphPropositionArb, { minLength: 1, maxLength: 3 }).c
     premises: fc.array(
       fc.record({
         holder: changeIdArb,
-        proposition: fc.tuple(fc.constantFrom(...pool), fc.constantFrom("must" as const, "should" as const)).map(
-          ([p, strength]): Proposition => ({ ...p, strength }),
-        ),
+        proposition: fc
+          .tuple(fc.constantFrom(...pool), fc.constantFrom("must" as const, "should" as const))
+          .map(([p, strength]): Proposition => ({ ...p, strength })),
       }),
       { maxLength: 7 },
     ),
     tenets: fc.array(
-      fc.tuple(fc.constantFrom(...pool), fc.boolean(), fc.integer({ min: 1, max: 9 })).map(
-        ([proposition, withGuard, n]): GuardedTenet => ({
+      fc
+        .tuple(fc.constantFrom(...pool), fc.boolean(), fc.integer({ min: 1, max: 9 }))
+        .map(([proposition, withGuard, n]): GuardedTenet => ({
           id: makeId("tnt", String(n).padStart(26, "0")),
           proposition,
           guards: withGuard ? [makeId("grd", String(n).padStart(26, "0"))] : [],
-        }),
-      ),
+        })),
       { maxLength: 2 },
     ),
   }),
 );
 
 const isGuarded = (p: HeldPremise, tenets: readonly GuardedTenet[]): boolean =>
-  tenets.some((t) => t.guards.length > 0 && compare(p.proposition, t.proposition).outcome === "compatible");
+  tenets.some(
+    (t) => t.guards.length > 0 && compare(p.proposition, t.proposition).outcome === "compatible",
+  );
 
 const standingOn = (p: HeldPremise, premises: readonly HeldPremise[]): readonly HeldPremise[] =>
-  premises.filter((o) => (o.proposition.strength ?? "must") === "must" && compare(p.proposition, o.proposition).outcome === "compatible");
+  premises.filter(
+    (o) =>
+      (o.proposition.strength ?? "must") === "must" &&
+      compare(p.proposition, o.proposition).outcome === "compatible",
+  );
 
 const cheap = (p: HeldPremise): ProbeCost => cost(p.holder === changeIds[1] ? 1 : 10);
 
 const evaluation = key("authz.permission-evaluation");
 const premiseA: HeldPremise = {
   holder: changeIds[0]!,
-  proposition: { subject: evaluation, predicate: "freshness", relation: "at-most", value: "per-request" },
+  proposition: {
+    subject: evaluation,
+    predicate: "freshness",
+    relation: "at-most",
+    value: "per-request",
+  },
 };
 
 describe("bets", () => {
@@ -101,37 +112,74 @@ describe("bets", () => {
         return scores.every((s, i) => i === 0 || (scores[i - 1] ?? s) >= s);
       }),
     );
-    const other: HeldPremise = { ...premiseA, holder: changeIds[1]!, proposition: { ...premiseA.proposition, subject: key("billing") } };
-    expect(rankBets([premiseA, other], [], cheap).map((b) => b.premise.holder)).toEqual([changeIds[1], changeIds[0]]);
+    const other: HeldPremise = {
+      ...premiseA,
+      holder: changeIds[1]!,
+      proposition: { ...premiseA.proposition, subject: key("billing") },
+    };
+    expect(rankBets([premiseA, other], [], cheap).map((b) => b.premise.holder)).toEqual([
+      changeIds[1],
+      changeIds[0],
+    ]);
   });
 
   it("[bets.only-must-counts] should premises never add blast to any bet", () => {
     fc.assert(
-      fc.property(worldArb, graphPropositionArb, changeIdArb, ({ premises, tenets }, extra, holder) => {
-        const should: HeldPremise = { holder, proposition: { ...extra, strength: "should" } };
-        const before = new Map(rankBets(premises, tenets, costOf).map((b) => [b.premise, b.blast]));
-        return rankBets([...premises, should], tenets, costOf).every(
-          (b) => b.premise === should || b.blast === before.get(b.premise),
-        );
-      }),
+      fc.property(
+        worldArb,
+        graphPropositionArb,
+        changeIdArb,
+        ({ premises, tenets }, extra, holder) => {
+          const should: HeldPremise = { holder, proposition: { ...extra, strength: "should" } };
+          const before = new Map(
+            rankBets(premises, tenets, costOf).map((b) => [b.premise, b.blast]),
+          );
+          return rankBets([...premises, should], tenets, costOf).every(
+            (b) => b.premise === should || b.blast === before.get(b.premise),
+          );
+        },
+      ),
     );
-    const should: HeldPremise = { ...premiseA, proposition: { ...premiseA.proposition, strength: "should" } };
+    const should: HeldPremise = {
+      ...premiseA,
+      proposition: { ...premiseA.proposition, strength: "should" },
+    };
     expect(rankBets([should], [], costOf).map((b) => b.blast)).toEqual([0]);
   });
 
   it("[bets.narrative-never-counts] gloss, citations and anchors never change the ranking", () => {
     fc.assert(
-      fc.property(worldArb, fc.array(fc.string(), { minLength: 7, maxLength: 7 }), ({ premises, tenets }, glosses) => {
-        const narrated = premises.map((p, i): HeldPremise => ({ ...p, proposition: { ...p.proposition, gloss: glosses[i] ?? "" } }));
-        const plain = rankBets(premises, tenets, costOf).map((b) => [b.premise.holder, b.blast, premises.indexOf(b.premise)]);
-        const told = rankBets(narrated, tenets, costOf).map((b) => [b.premise.holder, b.blast, narrated.indexOf(b.premise)]);
-        expect(told).toEqual(plain);
-      }),
+      fc.property(
+        worldArb,
+        fc.array(fc.string(), { minLength: 7, maxLength: 7 }),
+        ({ premises, tenets }, glosses) => {
+          const narrated = premises.map((p, i): HeldPremise => ({
+            ...p,
+            proposition: { ...p.proposition, gloss: glosses[i] ?? "" },
+          }));
+          const plain = rankBets(premises, tenets, costOf).map((b) => [
+            b.premise.holder,
+            b.blast,
+            premises.indexOf(b.premise),
+          ]);
+          const told = rankBets(narrated, tenets, costOf).map((b) => [
+            b.premise.holder,
+            b.blast,
+            narrated.indexOf(b.premise),
+          ]);
+          expect(told).toEqual(plain);
+        },
+      ),
     );
   });
 
   it("[bets.probe-cost-positive] a probe cost must be positive and finite", () => {
-    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) expect(Result.isFailure(probeCost(bad))).toBe(true);
-    fc.assert(fc.property(fc.double({ min: 1e-9, max: 1e9, noNaN: true }), (n) => Result.isSuccess(probeCost(n))));
+    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY])
+      expect(Result.isFailure(probeCost(bad))).toBe(true);
+    fc.assert(
+      fc.property(fc.double({ min: 1e-9, max: 1e9, noNaN: true }), (n) =>
+        Result.isSuccess(probeCost(n)),
+      ),
+    );
   });
 });

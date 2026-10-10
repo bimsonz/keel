@@ -1,12 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": [
-    "typescript",
-    "unicorn",
-    "import",
-    "vitest",
-    "promise"
-  ],
+  "plugins": ["typescript", "unicorn", "import", "vitest", "promise"],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
@@ -27,20 +21,13 @@
     "no-underscore-dangle": [
       "error",
       {
-        "allow": [
-          "_tag"
-        ]
+        "allow": ["_tag"]
       }
     ],
     "vitest/no-standalone-expect": [
       "error",
       {
-        "additionalTestBlockFunctions": [
-          "it.effect",
-          "it.effect.each",
-          "it.live",
-          "it.scoped"
-        ]
+        "additionalTestBlockFunctions": ["it.effect", "it.effect.each", "it.live", "it.scoped"]
       }
     ]
   },
@@ -56,9 +43,7 @@
   ],
   "overrides": [
     {
-      "files": [
-        "packages/testing/src/contracts/**"
-      ],
+      "files": ["packages/testing/src/contracts/**"],
       "rules": {
         "vitest/warn-todo": "off"
       }
