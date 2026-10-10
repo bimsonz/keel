@@ -399,7 +399,7 @@ stateDiagram-v2
   Revoked --> [*]
 ```
 
-**Terminal:** Revoked. Revocation bumps the agent's revocation epoch, so every token minted before it fails verification.
+**Terminal:** Revoked. Revocation bumps the agent's revocation epoch by exactly one (an agent enrols at epoch 0), so every token minted before it fails verification. A suspended agent's tokens fail too, until it is reinstated.
 
 **Invariant:** declaration fidelity routes review; it never judges the agent.
 
@@ -420,7 +420,9 @@ stateDiagram-v2
   Discarded --> [*]
 ```
 
-**Terminal:** Promoted, Expired, Discarded. A sketch has no intent, no preflight and no integration; `SketchExpired` is raised by its TTL deadline alarm. Promotion hands its workspace to the new change.
+**Terminal:** Promoted, Expired, Discarded. A sketch has no intent, no preflight and no integration; `SketchExpired` is raised by its TTL deadline alarm. Promotion hands its workspace to the new change (`WorkspaceReassigned`).
+
+Whether a sketch has expired is computed on read, from `expiresAt` and the time passed in: from its deadline on it can no longer be promoted or discarded (refused as expired, with declaring a change as the next action), whether or not the alarm has fired. An alarm that fires early commits nothing; the pool re-arms it only while the sketch is Open.
 
 ---
 
@@ -432,7 +434,7 @@ Owner: WorkspacePool DO. A Workspace is the throwaway Artifacts repo a Change or
 stateDiagram-v2
   [*] --> Ready: WorkspaceForked
   Ready --> Granted: WorkspaceGranted
-  Granted --> Granted: SketchPromoted (reassigned to the change)
+  Granted --> Granted: WorkspaceReassigned (from the sketch to its change)
   Granted --> Collected: WorkspaceCollected
   Ready --> Collected: WorkspaceCollected
   Collected --> [*]
@@ -441,7 +443,8 @@ stateDiagram-v2
 **Terminal:** Collected.
 
 **Invariants**
-- A ready workspace is granted exactly once; promotion reassigns it from the sketch to the new change, never to a third holder.
+- A ready workspace is granted exactly once; promotion reassigns it from the sketch to the new change, never to a third holder. A repeated grant to the same holder is a no-op (the pool mints that retry a fresh token), one to another holder is refused, and collecting a collected workspace again is a no-op.
+- The pool's own slots also pass through `forking` (before `WorkspaceForked`, so not yet a workspace) and `collecting` (the repo's deletion in progress, still Collected here).
 - A fork is ready when the pool's own fork call resolves (spike S2); nothing polls for it.
 
 ---

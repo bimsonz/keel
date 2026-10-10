@@ -209,6 +209,12 @@ export const WorkspaceGranted = Schema.TaggedStruct("WorkspaceGranted", {
   /** The workspace's head when granted: the change's base. */
   baseSha: CommitSha,
 });
+/** A promoted sketch's workspace passes to the change it became: Granted → Granted, from a sketch to a change, once. */
+export const WorkspaceReassigned = Schema.TaggedStruct("WorkspaceReassigned", {
+  workspaceId: WorkspaceId,
+  sketchId: SketchId,
+  changeId: ChangeId,
+});
 export const WorkspacePushed = Schema.TaggedStruct("WorkspacePushed", {
   workspaceId: WorkspaceId,
   ref: Schema.String,
@@ -251,6 +257,7 @@ export const CoordinationEvent = Schema.Union([
   SketchDiscarded,
   WorkspaceForked,
   WorkspaceGranted,
+  WorkspaceReassigned,
   WorkspacePushed,
   WorkspaceCollected,
 ]);

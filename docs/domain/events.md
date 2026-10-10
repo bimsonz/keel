@@ -91,6 +91,7 @@ The Project DO (`project:<id>`) holds the subject registry (keys, aliases, ancho
 | `SketchDiscarded` | WorkspacePool DO | `sketchId, by` | the workspace | — | The agent dropped the idea |
 | `WorkspaceForked` | WorkspacePool DO | `workspaceId, repo, sourceRepo` | — | — | Emitted when the pool's own fork call resolves; a fork is ready at once (spike S2). The fork joins the ready pool |
 | `WorkspaceGranted` | WorkspacePool DO | `workspaceId, changeId\|sketchId, expiresAt, baseSha` | — | the change or sketch, the agent | Handed out exactly once; a retried grant for the same holder re-mints the write token, which is never stored or carried in the event. `baseSha` is the workspace's head at grant time, the change's base |
+| `WorkspaceReassigned` | WorkspacePool DO | `workspaceId, sketchId, changeId` | — | the agent | `declare --from-sketch`: the promoted sketch's workspace passes to the change it became, in the same transaction as `SketchPromoted`. Once, and never to a third holder |
 | `WorkspacePushed` | WorkspacePool DO (fact) | `workspaceId, ref, sha` | — | the change's agent | Translated from Artifacts' `pushed` by the PushObserved Workflow, for branch updates only. Observes plain-git agents; never authoritative |
 | `WorkspaceCollected` | WorkspacePool DO | `workspaceId, reason: landed\|withdrawn\|expired` | — | — | The repo is deleted |
 

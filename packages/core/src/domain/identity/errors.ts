@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import { AgentId } from "../kernel/index.ts";
+import { AgentState } from "./agent.ts";
 
 /** No agent has this id. */
 export class AgentNotKnown extends Schema.TaggedError<AgentNotKnown>()("AgentNotKnown", {
@@ -33,5 +34,15 @@ export class IdempotencyConflict extends Schema.TaggedError<IdempotencyConflict>
   "IdempotencyConflict",
   {
     idempotencyKey: Schema.String,
+  },
+) {}
+
+/** The command is not valid in the agent's current state. */
+export class AgentStateRefused extends Schema.TaggedError<AgentStateRefused>()(
+  "AgentStateRefused",
+  {
+    agentId: AgentId,
+    state: Schema.optional(AgentState),
+    command: Schema.String,
   },
 ) {}

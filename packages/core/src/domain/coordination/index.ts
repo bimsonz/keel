@@ -17,4 +17,8 @@ export * from "./preflight.ts";
 export * from "./proposition.ts";
 export * from "./scope.ts";
 export * from "./shape.ts";
+export * from "./sketch.ts";
+export * from "./sketch-machine.ts";
 export * from "./subject.ts";
+export * from "./workspace.ts";
+export * from "./workspace-machine.ts";
