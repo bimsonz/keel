@@ -85,7 +85,12 @@ export const VerdictIssued = Schema.TaggedStruct("VerdictIssued", {
   subject: Schema.Union([ChangeId, BatchId]),
   outcome: VerdictOutcome,
   evidence: Schema.Array(Schema.String),
-  planHash: ContentHash,
+  /**
+   * The plan the verdict was reached under; it always resolves to a plan.
+   * Absent means no plan: a Precheck refusal, a ruling-class verdict reached
+   * before any plan was compiled. Never a fabricated hash.
+   */
+  planHash: Schema.optional(ContentHash),
 });
 export const EscalationRaised = Schema.TaggedStruct("EscalationRaised", {
   escalationId: EscalationId,

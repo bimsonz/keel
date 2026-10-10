@@ -112,7 +112,7 @@ The Project DO (`project:<id>`) holds the subject registry (keys, aliases, ancho
 | `GuardAdmitted` | Subject DO | `guardId, probeId, conflictId, runs: 3` | the guard repo | the parties' agents | Computed from `ProbeRan`: the probe passed on trunk (or did not apply), passed in the premise-holder's world, failed in the combined world, three times. It now guards trunk |
 | `GuardRetired` | Subject DO | `guardId, decisionId` | the guard repo | — | Only a superseding Decision retires a guard |
 | `GuardFailed` | Lane DO (fact) | `guardId, batchId, candidateId, world` | the batch | — | Proof against the candidate; feeds its verdict |
-| `VerdictIssued` | Change DO or Lane DO | `verdictId, subject: changeId\|batchId, outcome: land\|bounce\|park\|hold\|supersede, evidence[], planHash` | the change or batch | the agent(s) | Every step result is part of the evidence |
+| `VerdictIssued` | Change DO or Lane DO | `verdictId, subject: changeId\|batchId, outcome: land\|bounce\|park\|hold\|supersede, evidence[], planHash?` | the change or batch | the agent(s) | Every step result is part of the evidence. `planHash` always resolves to a plan; it is absent only for a Precheck refusal, a ruling-class verdict reached before any plan was compiled |
 | `EscalationRaised` | the raising DO | `escalationId, question, options[], consequences[], about: entity ref` | — | the escalation inbox | A person is asked; the default while open is *hold* |
 | `EscalationWithdrawn` | the raising DO | `escalationId, reason` | — | the escalation inbox | Its subject was resolved some other way before a ruling |
 
