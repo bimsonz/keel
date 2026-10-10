@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/drift.test.ts
+# kills: drift.opinion-never-blocks, drift.proof-or-ruling-blocks
+# why: A model's opinion about an undeclared effect blocks the change
+diff --git a/packages/core/src/domain/coordination/drift.ts b/packages/core/src/domain/coordination/drift.ts
+index 53e57be..ac6a4ba 100644
+--- a/packages/core/src/domain/coordination/drift.ts
++++ b/packages/core/src/domain/coordination/drift.ts
+@@ -90,7 +90,7 @@ export const drift = (
+         ...premises.filter((p) => p.holder !== self && (p.proposition.strength ?? "must") === "must" && contradicts(p.proposition)),
+         ...tenets.filter((t) => contradicts(t.proposition)),
+       ];
+-      const blocks = canBlock(effect.evidenceClass);
++      const blocks = true;
+       const what = `${effect.proposition.subject} ${effect.proposition.predicate} ${effect.proposition.relation} ${String(effect.proposition.value)}`;
+       return against.length === 0
+         ? {

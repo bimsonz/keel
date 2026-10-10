@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/drift.test.ts
+# kills: drift.silent-retraction-iff-contradicting
+# why: A change silently retracts its own premise
+diff --git a/packages/core/src/domain/coordination/drift.ts b/packages/core/src/domain/coordination/drift.ts
+index 53e57be..b4d1bd6 100644
+--- a/packages/core/src/domain/coordination/drift.ts
++++ b/packages/core/src/domain/coordination/drift.ts
+@@ -87,7 +87,7 @@ export const drift = (
+     .map((effect): DriftFinding => {
+       const contradicts = (p: Proposition): boolean => compare(p, effect.proposition).outcome === "contradicts";
+       const against = [
+-        ...premises.filter((p) => p.holder !== self && (p.proposition.strength ?? "must") === "must" && contradicts(p.proposition)),
++        ...premises.filter((p) => (p.proposition.strength ?? "must") === "must" && contradicts(p.proposition)),
+         ...tenets.filter((t) => contradicts(t.proposition)),
+       ];
+       const blocks = canBlock(effect.evidenceClass);

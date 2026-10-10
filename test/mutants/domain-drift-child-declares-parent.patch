@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/drift.test.ts
+# kills: drift.reports-exactly-undeclared
+# why: Only a declaration on a child subject covers an effect
+diff --git a/packages/core/src/domain/coordination/drift.ts b/packages/core/src/domain/coordination/drift.ts
+index 53e57be..0b13c78 100644
+--- a/packages/core/src/domain/coordination/drift.ts
++++ b/packages/core/src/domain/coordination/drift.ts
+@@ -42,7 +42,7 @@ export const isDeclared = (intent: Intent, effect: Proposition): boolean =>
+     const outcome = compare(declared, effect).outcome;
+     return (
+       declared.predicate === effect.predicate &&
+-      isAncestorOrSelf(declared.subject, effect.subject) &&
++      isAncestorOrSelf(effect.subject, declared.subject) &&
+       scopeWithin(declared, effect) &&
+       (outcome === "compatible" || outcome === "refines")
+     );
