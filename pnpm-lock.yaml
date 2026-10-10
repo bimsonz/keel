@@ -93,6 +93,9 @@ catalogs:
     wrangler:
       specifier: 4.149.0
       version: 4.149.0
+    xstate:
+      specifier: 5.33.2
+      version: 5.33.2
     zod:
       specifier: 4.6.5
       version: 4.6.5
@@ -275,6 +278,9 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.3(@types/node@22.20.5)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(yaml@2.9.1))
+      xstate:
+        specifier: 'catalog:'
+        version: 5.33.2
 
   packages/gitcore:
     devDependencies:
@@ -2607,6 +2613,9 @@ packages:
       utf-8-validate:
         optional: true
 
+  xstate@5.33.2:
+    resolution: {integrity: sha512-8tC7yXgeCvpT8gKEeEje6ikJJG1wpnoLiXe+HfECW8m10ubMd3QxKOwWA8KxPJVBcLwfdRoMKYxIBGYKmo37/A==}
+
   xtend@4.0.2:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
     engines: {node: '>=0.4'}
@@ -4342,6 +4351,8 @@ snapshots:
       strip-ansi: 7.2.0
 
   ws@8.21.0: {}
+
+  xstate@5.33.2: {}
 
   xtend@4.0.2: {}
 

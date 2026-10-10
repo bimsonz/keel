@@ -32,6 +32,7 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
     /used for something other than get, head or list/,
     /BUNDLES is destructured/,
   ],
+  "xstate-test-only": [/imports xstate; xstate is a test-only/, /imports @xstate\/inspect/],
   R1: [
     /outside the domain/,
     /package hono/,

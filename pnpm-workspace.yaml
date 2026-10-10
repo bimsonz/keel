@@ -30,6 +30,8 @@ catalog:
   wrangler: 4.149.0
   "@cloudflare/workers-types": 5.20261010.1
   fast-check: 4.10.2
+  # Test-only: the domain machines' XState-format charts; never a runtime (guard xstate-test-only).
+  xstate: 5.33.2
 
   # Architecture rules and guards
   archunit: 2.5.4
