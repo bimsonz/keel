@@ -68,7 +68,7 @@ describe("canonical JSON", () => {
     expect(canonicalJson(input)).toBe(
       String.raw`{"literals":[null,true,false],"numbers":[333333333.3333333,1e+30,4.5,0.002,1e-27],"string":"€$\u000f\nA'B\"\\\\\"/"}`,
     );
-    expect(contentHashOf(input)).toBe(`sha256:${sha256Hex(canonicalJson(input))}`);
+    expect(contentHashOf(input)).toBe(`sha256:${reference(canonicalJson(input))}`);
   });
 
   it("[kernel.canonical-json-key-order] is independent of key insertion order and loses nothing", () => {
