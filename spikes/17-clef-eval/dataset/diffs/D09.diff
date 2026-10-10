@@ -1,0 +1,34 @@
+--- /dev/null
++++ b/migrations/versions/0043_allow_duplicate_secondary_emails.py
+@@ -0,0 +1 @@
++"""Secondary emails may repeat across a user's linked identities."""
++from alembic import op
++
++revision = "0043"
++down_revision = "0042"
++
++
++def upgrade() -> None:
++    op.drop_constraint("uq_user_secondary_emails_address", "user_secondary_emails", type_="unique")
++
++
++def downgrade() -> None:
++    op.create_unique_constraint(
++        "uq_user_secondary_emails_address", "user_secondary_emails", ["user_id", "address"]
++    )
+--- a/accounts/models.py
++++ b/accounts/models.py
+@@ -28 +28 @@ class UserEmail(Base):
+     __tablename__ = "user_emails"
+     __table_args__ = (
+         Index("uq_user_emails_primary", "user_id", unique=True, postgresql_where=text("is_primary")),
+     )
+     user_id = mapped_column(ForeignKey("users.id"))
+     address = mapped_column(String(320))
+     is_primary = mapped_column(Boolean, default=False)
+
+
+ class UserSecondaryEmail(Base):
+     __tablename__ = "user_secondary_emails"
+-    __table_args__ = (UniqueConstraint("user_id", "address", name="uq_user_secondary_emails_address"),)
++    __table_args__ = ()

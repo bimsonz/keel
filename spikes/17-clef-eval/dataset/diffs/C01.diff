@@ -1,0 +1,45 @@
+--- a/src/authz/permissions.ts
++++ b/src/authz/permissions.ts
+@@ -1 +1 @@
+ import type { Db } from "../db";
+ import type { Action, Role } from "./roles";
+ import { roleAllows } from "./roles";
+
++// Permission lookups dominate request latency on busy repos. Keep the
++// resolved role per (session, repo) until the session ends.
++const permissionCache = new Map<string, Role>();
++
++function cacheKey(sessionId: string, repoId: string): string {
++  return sessionId + "|" + repoId;
++}
++
+ export async function canPerform(
+   db: Db,
+-  userId: string,
++  session: { id: string; userId: string },
+   repoId: string,
+   action: Action,
+ ): Promise<boolean> {
+-  const role = await db.roles.find(userId, repoId);
++  const key = cacheKey(session.id, repoId);
++  let role = permissionCache.get(key);
++  if (role === undefined) {
++    role = await db.roles.find(session.userId, repoId);
++    permissionCache.set(key, role);
++  }
+   return roleAllows(role, action);
+ }
++
++export function forgetSession(sessionId: string): void {
++  for (const key of permissionCache.keys()) {
++    if (key.startsWith(sessionId + "|")) permissionCache.delete(key);
++  }
++}
+--- a/src/auth/logout.ts
++++ b/src/auth/logout.ts
+@@ -9 +9 @@ export async function logout(c: Context<AppEnv>) {
+   const session = c.var.session;
+   await c.var.sessions.revoke(session.id);
++  forgetSession(session.id);
+   return c.redirect("/login");
+ }

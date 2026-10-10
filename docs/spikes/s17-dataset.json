@@ -1,0 +1,1979 @@
+{
+  "name": "Keel S17 premise/effect evaluation set",
+  "note": "Effects are hand-derived from each diff; labels are computed on the lattices below and never come from the models under test.",
+  "lattices": {
+    "freshness": {
+      "relation": "le",
+      "order": [
+        "per-call",
+        "per-request",
+        "per-session",
+        "ttl",
+        "static"
+      ]
+    },
+    "cardinality": {
+      "relation": "le",
+      "order": [
+        "exactly-one",
+        "at-most-one",
+        "many"
+      ]
+    },
+    "ordering": {
+      "relation": "le",
+      "order": [
+        "fifo",
+        "per-key-fifo",
+        "unordered"
+      ]
+    },
+    "consistency": {
+      "relation": "le",
+      "order": [
+        "strong",
+        "read-your-writes",
+        "eventual"
+      ]
+    },
+    "presence": {
+      "relation": "le",
+      "order": [
+        "required",
+        "optional",
+        "absent"
+      ]
+    },
+    "authority": {
+      "relation": "le",
+      "order": [
+        "owner",
+        "admin",
+        "maintainer",
+        "member",
+        "authenticated",
+        "anyone"
+      ]
+    },
+    "purity": {
+      "relation": "le",
+      "order": [
+        "pure",
+        "idempotent",
+        "non-idempotent"
+      ]
+    },
+    "bound": {
+      "relation": "le",
+      "order": [
+        "le-1",
+        "le-10",
+        "le-100",
+        "le-1k",
+        "le-10k",
+        "le-100k",
+        "le-1m",
+        "unbounded"
+      ]
+    },
+    "shape": {
+      "relation": "eq",
+      "order": [
+        "integer",
+        "number",
+        "string",
+        "boolean",
+        "array",
+        "object"
+      ]
+    }
+  },
+  "composition": {
+    "total": 40,
+    "core": 30,
+    "coreContradiction": 22,
+    "coreCompatible": 8,
+    "decoys": 10,
+    "decoySameSubjectCompatible": 5,
+    "decoyDifferentSubject": 5,
+    "byPredicate": {
+      "freshness": {
+        "contradiction": 4,
+        "compatible": 1,
+        "decoy": 3
+      },
+      "cardinality": {
+        "contradiction": 2,
+        "compatible": 1,
+        "decoy": 2
+      },
+      "ordering": {
+        "contradiction": 2,
+        "compatible": 1,
+        "decoy": 1
+      },
+      "consistency": {
+        "contradiction": 2,
+        "compatible": 1,
+        "decoy": 1
+      },
+      "presence": {
+        "contradiction": 3,
+        "compatible": 1,
+        "decoy": 0
+      },
+      "authority": {
+        "contradiction": 3,
+        "compatible": 1,
+        "decoy": 0
+      },
+      "purity": {
+        "contradiction": 2,
+        "compatible": 1,
+        "decoy": 1
+      },
+      "bound": {
+        "contradiction": 2,
+        "compatible": 1,
+        "decoy": 1
+      },
+      "shape": {
+        "contradiction": 2,
+        "compatible": 0,
+        "decoy": 1
+      }
+    },
+    "byPrimaryLanguage": {
+      "typescript": 11,
+      "go": 10,
+      "python": 12,
+      "c": 3,
+      "hcl": 4
+    }
+  },
+  "items": [
+    {
+      "id": "C01",
+      "kind": "core",
+      "tags": [
+        "forge-lite-S-1"
+      ],
+      "premise": {
+        "subject": "authz.permission-evaluation",
+        "predicate": "freshness",
+        "relation": "le",
+        "value": "per-request",
+        "scope": "service:forge-lite"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "src/authz/permissions.ts",
+            "language": "typescript",
+            "diff": "--- a/src/authz/permissions.ts\n+++ b/src/authz/permissions.ts\n@@ -1,13 +1,32 @@\n import type { Db } from \"../db\";\n import type { Action, Role } from \"./roles\";\n import { roleAllows } from \"./roles\";\n \n+// Permission lookups dominate request latency on busy repos. Keep the\n+// resolved role per (session, repo) until the session ends.\n+const permissionCache = new Map<string, Role>();\n+\n+function cacheKey(sessionId: string, repoId: string): string {\n+  return sessionId + \"|\" + repoId;\n+}\n+\n export async function canPerform(\n   db: Db,\n-  userId: string,\n+  session: { id: string; userId: string },\n   repoId: string,\n   action: Action,\n ): Promise<boolean> {\n-  const role = await db.roles.find(userId, repoId);\n+  const key = cacheKey(session.id, repoId);\n+  let role = permissionCache.get(key);\n+  if (role === undefined) {\n+    role = await db.roles.find(session.userId, repoId);\n+    permissionCache.set(key, role);\n+  }\n   return roleAllows(role, action);\n }\n+\n+export function forgetSession(sessionId: string): void {\n+  for (const key of permissionCache.keys()) {\n+    if (key.startsWith(sessionId + \"|\")) permissionCache.delete(key);\n+  }\n+}\n"
+          },
+          {
+            "file": "src/auth/logout.ts",
+            "language": "typescript",
+            "diff": "--- a/src/auth/logout.ts\n+++ b/src/auth/logout.ts\n@@ -9,4 +9,5 @@ export async function logout(c: Context<AppEnv>) {\n   const session = c.var.session;\n   await c.var.sessions.revoke(session.id);\n+  forgetSession(session.id);\n   return c.redirect(\"/login\");\n }\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "permissionCache",
+            "kind": "const",
+            "file": "src/authz/permissions.ts",
+            "status": "added"
+          },
+          {
+            "name": "cacheKey",
+            "kind": "function",
+            "file": "src/authz/permissions.ts",
+            "status": "added"
+          },
+          {
+            "name": "canPerform",
+            "kind": "function",
+            "file": "src/authz/permissions.ts",
+            "status": "modified"
+          },
+          {
+            "name": "forgetSession",
+            "kind": "function",
+            "file": "src/authz/permissions.ts",
+            "status": "added"
+          },
+          {
+            "name": "logout",
+            "kind": "function",
+            "file": "src/auth/logout.ts",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "authz.permission-evaluation",
+        "predicate": "freshness",
+        "value": "per-session"
+      },
+      "label": "contradiction",
+      "reason": "The role is cached in a module-level map keyed by (sessionId, repoId) and only dropped at logout, so it is reused across requests for the whole session. per-session ranks above per-request."
+    },
+    {
+      "id": "C02",
+      "kind": "core",
+      "premise": {
+        "subject": "feature-flags.evaluation",
+        "predicate": "freshness",
+        "relation": "le",
+        "value": "per-request",
+        "scope": "service:api"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "internal/flags/flags.go",
+            "language": "go",
+            "diff": "--- a/internal/flags/flags.go\n+++ b/internal/flags/flags.go\n@@ -12,16 +12,17 @@ import (\n type Client struct {\n \tstore Store\n+\tsnapshot map[string]bool\n }\n \n-func New(store Store) *Client {\n-\treturn &Client{store: store}\n+func New(ctx context.Context, store Store) (*Client, error) {\n+\tall, err := store.LoadAll(ctx)\n+\tif err != nil {\n+\t\treturn nil, fmt.Errorf(\"load flags: %w\", err)\n+\t}\n+\treturn &Client{store: store, snapshot: all}, nil\n }\n \n // Enabled reports whether flag is on for the current request.\n func (c *Client) Enabled(ctx context.Context, flag string) bool {\n-\ton, err := c.store.Get(ctx, flag)\n-\tif err != nil {\n-\t\treturn false\n-\t}\n-\treturn on\n+\treturn c.snapshot[flag]\n }\n"
+          },
+          {
+            "file": "cmd/server/main.go",
+            "language": "go",
+            "diff": "--- a/cmd/server/main.go\n+++ b/cmd/server/main.go\n@@ -31,3 +31,6 @@ func main() {\n \tstore := flags.NewPostgresStore(db)\n-\tflagClient := flags.New(store)\n+\tflagClient, err := flags.New(ctx, store)\n+\tif err != nil {\n+\t\tlog.Fatal(err)\n+\t}\n \tsrv := server.New(cfg, db, flagClient)\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "Client.snapshot",
+            "kind": "field",
+            "file": "internal/flags/flags.go",
+            "status": "added"
+          },
+          {
+            "name": "New",
+            "kind": "function",
+            "file": "internal/flags/flags.go",
+            "status": "modified"
+          },
+          {
+            "name": "Client.Enabled",
+            "kind": "method",
+            "file": "internal/flags/flags.go",
+            "status": "modified"
+          },
+          {
+            "name": "main",
+            "kind": "function",
+            "file": "cmd/server/main.go",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "feature-flags.evaluation",
+        "predicate": "freshness",
+        "value": "static"
+      },
+      "label": "contradiction",
+      "reason": "Flags are loaded once in New() at process start into a snapshot map and Enabled() never reloads them. static ranks above per-request."
+    },
+    {
+      "id": "C03",
+      "kind": "core",
+      "premise": {
+        "subject": "billing.plan-limits",
+        "predicate": "freshness",
+        "relation": "le",
+        "value": "ttl",
+        "scope": "service:billing"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "billing/limits.py",
+            "language": "python",
+            "diff": "--- a/billing/limits.py\n+++ b/billing/limits.py\n@@ -1,10 +1,16 @@\n-import json\n+import time\n \n from billing.db import fetch_plan_limits\n \n-# Loaded once when the module is imported.\n-_PLAN_LIMITS = fetch_plan_limits()\n+_TTL_SECONDS = 60\n+_cache: dict[str, tuple[float, dict]] = {}\n \n \n def limits_for(plan_id: str) -> dict:\n-    return _PLAN_LIMITS[plan_id]\n+    now = time.monotonic()\n+    hit = _cache.get(plan_id)\n+    if hit is not None and now - hit[0] < _TTL_SECONDS:\n+        return hit[1]\n+    limits = fetch_plan_limits()[plan_id]\n+    _cache[plan_id] = (now, limits)\n+    return limits\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "_PLAN_LIMITS",
+            "kind": "const",
+            "file": "billing/limits.py",
+            "status": "removed"
+          },
+          {
+            "name": "_cache",
+            "kind": "const",
+            "file": "billing/limits.py",
+            "status": "added"
+          },
+          {
+            "name": "limits_for",
+            "kind": "function",
+            "file": "billing/limits.py",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "billing.plan-limits",
+        "predicate": "freshness",
+        "value": "ttl"
+      },
+      "label": "compatible",
+      "reason": "The import-time snapshot (static) is replaced by a 60-second TTL cache. ttl equals the premise bound, so the premise holds."
+    },
+    {
+      "id": "C04",
+      "kind": "core",
+      "premise": {
+        "subject": "session.revocation-check",
+        "predicate": "freshness",
+        "relation": "le",
+        "value": "per-request",
+        "scope": "service:auth"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "auth/tokens.py",
+            "language": "python",
+            "diff": "--- a/auth/tokens.py\n+++ b/auth/tokens.py\n@@ -1,11 +1,16 @@\n+from cachetools import TTLCache, cached\n+\n from auth.store import revocations\n \n+_revoked_cache = TTLCache(maxsize=50_000, ttl=300)\n+\n \n+@cached(_revoked_cache)\n def is_token_revoked(token_id: str) -> bool:\n     return revocations.exists(token_id)\n \n \n def authenticate(request) -> Principal:\n     token = parse_bearer(request)\n     if is_token_revoked(token.id):\n         raise Unauthorized(\"token revoked\")\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "_revoked_cache",
+            "kind": "const",
+            "file": "auth/tokens.py",
+            "status": "added"
+          },
+          {
+            "name": "is_token_revoked",
+            "kind": "function",
+            "file": "auth/tokens.py",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "session.revocation-check",
+        "predicate": "freshness",
+        "value": "ttl"
+      },
+      "label": "contradiction",
+      "reason": "is_token_revoked is wrapped in a TTLCache with ttl=300, so a revocation can go unseen for five minutes across requests. ttl ranks above per-request."
+    },
+    {
+      "id": "C05",
+      "kind": "core",
+      "premise": {
+        "subject": "privdrop.user-lookup",
+        "predicate": "freshness",
+        "relation": "le",
+        "value": "per-call",
+        "scope": "daemon:privdrop"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "src/privdrop.c",
+            "language": "c",
+            "diff": "--- a/src/privdrop.c\n+++ b/src/privdrop.c\n@@ -40,8 +40,17 @@ static int resolve_user(const char *name, uid_t *uid, gid_t *gid)\n {\n-    struct passwd *pw = getpwnam(name);\n-    if (pw == NULL)\n-        return -1;\n-    *uid = pw->pw_uid;\n-    *gid = pw->pw_gid;\n+    static int resolved = 0;\n+    static uid_t cached_uid;\n+    static gid_t cached_gid;\n+\n+    if (!resolved) {\n+        struct passwd *pw = getpwnam(name);\n+        if (pw == NULL)\n+            return -1;\n+        cached_uid = pw->pw_uid;\n+        cached_gid = pw->pw_gid;\n+        resolved = 1;\n+    }\n+    *uid = cached_uid;\n+    *gid = cached_gid;\n     return 0;\n }\n@@ -71,5 +80,5 @@ int drop_privileges(const char *user)\n     uid_t uid;\n     gid_t gid;\n \n     if (resolve_user(user, &uid, &gid) != 0)\n         return -1;\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "resolve_user",
+            "kind": "function",
+            "file": "src/privdrop.c",
+            "status": "modified"
+          },
+          {
+            "name": "drop_privileges",
+            "kind": "function",
+            "file": "src/privdrop.c",
+            "status": "unchanged"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "privdrop.user-lookup",
+        "predicate": "freshness",
+        "value": "static"
+      },
+      "label": "contradiction",
+      "reason": "resolve_user keeps the first getpwnam result in function-static variables for the life of the process and never refreshes it. static ranks above per-call."
+    },
+    {
+      "id": "C06",
+      "kind": "core",
+      "premise": {
+        "subject": "scheduler.instance",
+        "predicate": "cardinality",
+        "relation": "le",
+        "value": "at-most-one",
+        "scope": "infra:ecs/main"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "infra/scheduler.tf",
+            "language": "hcl",
+            "diff": "--- a/infra/scheduler.tf\n+++ b/infra/scheduler.tf\n@@ -18,9 +18,17 @@ resource \"aws_ecs_service\" \"scheduler\" {\n   name            = \"scheduler\"\n   cluster         = aws_ecs_cluster.main.id\n   task_definition = aws_ecs_task_definition.scheduler.arn\n-  desired_count   = 1\n+  desired_count   = 3\n   launch_type     = \"FARGATE\"\n \n   deployment_minimum_healthy_percent = 0\n   deployment_maximum_percent         = 100\n }\n+\n+resource \"aws_appautoscaling_target\" \"scheduler\" {\n+  service_namespace  = \"ecs\"\n+  resource_id        = \"service/main/scheduler\"\n+  scalable_dimension = \"ecs:service:DesiredCount\"\n+  min_capacity       = 2\n+  max_capacity       = 6\n+}\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "aws_ecs_service.scheduler",
+            "kind": "resource",
+            "file": "infra/scheduler.tf",
+            "status": "modified"
+          },
+          {
+            "name": "aws_appautoscaling_target.scheduler",
+            "kind": "resource",
+            "file": "infra/scheduler.tf",
+            "status": "added"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "scheduler.instance",
+        "predicate": "cardinality",
+        "value": "many"
+      },
+      "label": "contradiction",
+      "reason": "desired_count goes from 1 to 3 and an autoscaling target keeps 2 to 6 scheduler tasks, so several schedulers run at once. many ranks above at-most-one."
+    },
+    {
+      "id": "C07",
+      "kind": "core",
+      "premise": {
+        "subject": "user.primary-email",
+        "predicate": "cardinality",
+        "relation": "le",
+        "value": "at-most-one",
+        "scope": "db:accounts (per user)"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "migrations/versions/0042_relax_primary_email.py",
+            "language": "python",
+            "diff": "--- /dev/null\n+++ b/migrations/versions/0042_relax_primary_email.py\n@@ -0,0 +1,19 @@\n+\"\"\"Allow importing users that arrive with several primary emails.\"\"\"\n+from alembic import op\n+\n+revision = \"0042\"\n+down_revision = \"0041\"\n+\n+\n+def upgrade() -> None:\n+    op.drop_index(\"uq_user_emails_primary\", table_name=\"user_emails\")\n+\n+\n+def downgrade() -> None:\n+    op.create_index(\n+        \"uq_user_emails_primary\",\n+        \"user_emails\",\n+        [\"user_id\"],\n+        unique=True,\n+        postgresql_where=\"is_primary\",\n+    )\n"
+          },
+          {
+            "file": "accounts/models.py",
+            "language": "python",
+            "diff": "--- a/accounts/models.py\n+++ b/accounts/models.py\n@@ -28,7 +28,4 @@ class UserEmail(Base):\n     __tablename__ = \"user_emails\"\n-    __table_args__ = (\n-        Index(\"uq_user_emails_primary\", \"user_id\", unique=True, postgresql_where=text(\"is_primary\")),\n-    )\n     user_id = mapped_column(ForeignKey(\"users.id\"))\n     address = mapped_column(String(320))\n     is_primary = mapped_column(Boolean, default=False)\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "upgrade",
+            "kind": "function",
+            "file": "migrations/versions/0042_relax_primary_email.py",
+            "status": "added"
+          },
+          {
+            "name": "UserEmail.__table_args__",
+            "kind": "attribute",
+            "file": "accounts/models.py",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "user.primary-email",
+        "predicate": "cardinality",
+        "value": "many"
+      },
+      "label": "contradiction",
+      "reason": "The partial unique index on user_emails(user_id) WHERE is_primary is dropped, so a user can have several primary emails. many ranks above at-most-one."
+    },
+    {
+      "id": "C08",
+      "kind": "core",
+      "premise": {
+        "subject": "job.lease",
+        "predicate": "cardinality",
+        "relation": "le",
+        "value": "at-most-one",
+        "scope": "service:queue (per job)"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "internal/queue/claim.go",
+            "language": "go",
+            "diff": "--- a/internal/queue/claim.go\n+++ b/internal/queue/claim.go\n@@ -22,16 +22,21 @@ func (q *Queue) Claim(ctx context.Context, worker string) (*Job, error) {\n \ttx, err := q.db.BeginTx(ctx, nil)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n \tdefer tx.Rollback()\n \n \tvar id int64\n-\terr = tx.QueryRowContext(ctx,\n-\t\t`SELECT id FROM jobs WHERE status = 'queued' ORDER BY id LIMIT 1`).Scan(&id)\n+\terr = tx.QueryRowContext(ctx, `\n+\t\tSELECT id FROM jobs\n+\t\tWHERE status = 'queued'\n+\t\tORDER BY id\n+\t\tLIMIT 1\n+\t\tFOR UPDATE SKIP LOCKED`).Scan(&id)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n-\t_, err = tx.ExecContext(ctx, `INSERT INTO job_leases (job_id, worker) VALUES ($1, $2)`, id, worker)\n+\t_, err = tx.ExecContext(ctx,\n+\t\t`INSERT INTO job_leases (job_id, worker) VALUES ($1, $2) ON CONFLICT (job_id) DO NOTHING`, id, worker)\n \tif err != nil {\n \t\treturn nil, err\n \t}\n"
+          },
+          {
+            "file": "migrations/0019_job_leases_unique.sql",
+            "language": "sql",
+            "diff": "--- a/migrations/0019_job_leases_unique.sql\n+++ b/migrations/0019_job_leases_unique.sql\n@@ -0,0 +1,1 @@\n+ALTER TABLE job_leases ADD CONSTRAINT job_leases_job_id_key UNIQUE (job_id);\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "Queue.Claim",
+            "kind": "method",
+            "file": "internal/queue/claim.go",
+            "status": "modified"
+          },
+          {
+            "name": "job_leases_job_id_key",
+            "kind": "constraint",
+            "file": "migrations/0019_job_leases_unique.sql",
+            "status": "added"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "job.lease",
+        "predicate": "cardinality",
+        "value": "at-most-one"
+      },
+      "label": "compatible",
+      "reason": "The claim now locks the row with FOR UPDATE SKIP LOCKED and job_leases gains UNIQUE(job_id) with ON CONFLICT DO NOTHING, so at most one lease exists per job. at-most-one equals the premise bound."
+    },
+    {
+      "id": "C09",
+      "kind": "core",
+      "premise": {
+        "subject": "webhook.delivery",
+        "predicate": "ordering",
+        "relation": "le",
+        "value": "per-key-fifo",
+        "scope": "service:webhooks (per repository)"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "src/webhooks/dispatcher.ts",
+            "language": "typescript",
+            "diff": "--- a/src/webhooks/dispatcher.ts\n+++ b/src/webhooks/dispatcher.ts\n@@ -30,7 +30,10 @@ export class Dispatcher {\n   async drain(repoId: string): Promise<void> {\n-    const pending = await this.store.pendingFor(repoId); // ordered by sequence\n-    for (const delivery of pending) {\n-      await this.deliver(delivery);\n-      await this.store.markDelivered(delivery.id);\n-    }\n+    const pending = await this.store.pendingFor(repoId); // ordered by sequence\n+    // Deliver in parallel; one slow receiver was holding up the whole repo.\n+    await Promise.all(\n+      pending.map(async (delivery) => {\n+        await this.deliver(delivery);\n+        await this.store.markDelivered(delivery.id);\n+      }),\n+    );\n   }\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "Dispatcher.drain",
+            "kind": "method",
+            "file": "src/webhooks/dispatcher.ts",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "webhook.delivery",
+        "predicate": "ordering",
+        "value": "unordered"
+      },
+      "label": "contradiction",
+      "reason": "drain() now delivers a repo's pending deliveries concurrently with Promise.all, so deliveries within one repo can complete in any order. unordered ranks above per-key-fifo."
+    },
+    {
+      "id": "C10",
+      "kind": "core",
+      "premise": {
+        "subject": "audit-log.append",
+        "predicate": "ordering",
+        "relation": "le",
+        "value": "fifo",
+        "scope": "service:audit"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "internal/audit/writer.go",
+            "language": "go",
+            "diff": "--- a/internal/audit/writer.go\n+++ b/internal/audit/writer.go\n@@ -18,20 +18,24 @@ type Writer struct {\n \tevents chan Event\n \tsink   Sink\n }\n \n-func (w *Writer) Start(ctx context.Context) {\n-\tgo w.loop(ctx)\n+const writerConcurrency = 8\n+\n+func (w *Writer) Start(ctx context.Context) {\n+\tfor i := 0; i < writerConcurrency; i++ {\n+\t\tgo w.loop(ctx)\n+\t}\n }\n \n func (w *Writer) loop(ctx context.Context) {\n \tfor {\n \t\tselect {\n \t\tcase ev := <-w.events:\n \t\t\tif err := w.sink.Append(ctx, ev); err != nil {\n \t\t\t\tlog.Printf(\"audit append: %v\", err)\n \t\t\t}\n \t\tcase <-ctx.Done():\n \t\t\treturn\n \t\t}\n \t}\n }\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "writerConcurrency",
+            "kind": "const",
+            "file": "internal/audit/writer.go",
+            "status": "added"
+          },
+          {
+            "name": "Writer.Start",
+            "kind": "method",
+            "file": "internal/audit/writer.go",
+            "status": "modified"
+          },
+          {
+            "name": "Writer.loop",
+            "kind": "method",
+            "file": "internal/audit/writer.go",
+            "status": "unchanged"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "audit-log.append",
+        "predicate": "ordering",
+        "value": "unordered"
+      },
+      "label": "contradiction",
+      "reason": "Start() launches eight goroutines draining one channel, so appends race and can land out of order. unordered ranks above fifo."
+    },
+    {
+      "id": "C11",
+      "kind": "core",
+      "premise": {
+        "subject": "events.outbox",
+        "predicate": "ordering",
+        "relation": "le",
+        "value": "per-key-fifo",
+        "scope": "service:outbox (per aggregate)"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "outbox/relay.py",
+            "language": "python",
+            "diff": "--- a/outbox/relay.py\n+++ b/outbox/relay.py\n@@ -1,9 +1,18 @@\n+import zlib\n+\n from outbox import db\n from outbox.bus import publish\n \n+PARTITIONS = 16\n+\n \n-def relay(batch_size: int = 100) -> None:\n-    rows = db.fetch_unsent(limit=batch_size)  # ORDER BY id\n-    for row in rows:\n-        publish(row.topic, row.payload)\n-        db.mark_sent(row.id)\n+def partition_of(aggregate_id: str) -> int:\n+    return zlib.crc32(aggregate_id.encode()) % PARTITIONS\n+\n+\n+def relay_partition(partition: int, batch_size: int = 100) -> None:\n+    # One worker per partition; all rows of an aggregate share a partition.\n+    rows = db.fetch_unsent(partition=partition, limit=batch_size)  # ORDER BY id\n+    for row in rows:\n+        publish(row.topic, row.payload, key=row.aggregate_id)\n+        db.mark_sent(row.id)\n"
+          },
+          {
+            "file": "outbox/worker.py",
+            "language": "python",
+            "diff": "--- a/outbox/worker.py\n+++ b/outbox/worker.py\n@@ -8,1 +8,3 @@ def main() -> None:\n-    run_forever(relay)\n+    with ThreadPoolExecutor(max_workers=PARTITIONS) as pool:\n+        for p in range(PARTITIONS):\n+            pool.submit(run_forever, relay_partition, p)\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "PARTITIONS",
+            "kind": "const",
+            "file": "outbox/relay.py",
+            "status": "added"
+          },
+          {
+            "name": "partition_of",
+            "kind": "function",
+            "file": "outbox/relay.py",
+            "status": "added"
+          },
+          {
+            "name": "relay",
+            "kind": "function",
+            "file": "outbox/relay.py",
+            "status": "removed"
+          },
+          {
+            "name": "relay_partition",
+            "kind": "function",
+            "file": "outbox/relay.py",
+            "status": "added"
+          },
+          {
+            "name": "main",
+            "kind": "function",
+            "file": "outbox/worker.py",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "events.outbox",
+        "predicate": "ordering",
+        "value": "per-key-fifo"
+      },
+      "label": "compatible",
+      "reason": "The single global relay becomes 16 partition workers; each aggregate hashes to one partition, which is drained sequentially in id order. Order holds per aggregate only: per-key-fifo equals the premise bound."
+    },
+    {
+      "id": "C12",
+      "kind": "core",
+      "premise": {
+        "subject": "repo.default-branch",
+        "predicate": "consistency",
+        "relation": "le",
+        "value": "strong",
+        "scope": "worker:forge (read path)"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "src/repos/meta.ts",
+            "language": "typescript",
+            "diff": "--- a/src/repos/meta.ts\n+++ b/src/repos/meta.ts\n@@ -8,13 +8,18 @@ export interface Env {\n   DB: D1Database;\n+  REPO_META: KVNamespace;\n }\n \n export async function getDefaultBranch(env: Env, repoId: string): Promise<string> {\n+  const cached = await env.REPO_META.get(\"default-branch:\" + repoId, { cacheTtl: 300 });\n+  if (cached !== null) return cached;\n   const row = await env.DB.prepare(\"SELECT default_branch FROM repos WHERE id = ?\")\n     .bind(repoId)\n     .first<{ default_branch: string }>();\n+  await env.REPO_META.put(\"default-branch:\" + repoId, row!.default_branch);\n   return row!.default_branch;\n }\n \n export async function setDefaultBranch(env: Env, repoId: string, branch: string): Promise<void> {\n   await env.DB.prepare(\"UPDATE repos SET default_branch = ? WHERE id = ?\").bind(branch, repoId).run();\n+  await env.REPO_META.put(\"default-branch:\" + repoId, branch);\n }\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "Env.REPO_META",
+            "kind": "binding",
+            "file": "src/repos/meta.ts",
+            "status": "added"
+          },
+          {
+            "name": "getDefaultBranch",
+            "kind": "function",
+            "file": "src/repos/meta.ts",
+            "status": "modified"
+          },
+          {
+            "name": "setDefaultBranch",
+            "kind": "function",
+            "file": "src/repos/meta.ts",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "repo.default-branch",
+        "predicate": "consistency",
+        "value": "eventual"
+      },
+      "label": "contradiction",
+      "reason": "Reads are served from Workers KV with cacheTtl 300; KV is eventually consistent across locations, so even the writer may read a stale branch elsewhere. eventual ranks above strong."
+    },
+    {
+      "id": "C13",
+      "kind": "core",
+      "premise": {
+        "subject": "account.balance",
+        "predicate": "consistency",
+        "relation": "le",
+        "value": "strong",
+        "scope": "service:ledger (read path)"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "ledger/db.py",
+            "language": "python",
+            "diff": "--- a/ledger/db.py\n+++ b/ledger/db.py\n@@ -4,1 +4,3 @@ from ledger.settings import settings\n primary = create_engine(settings.PRIMARY_URL, pool_size=20)\n+# Asynchronous streaming replica; typically 100 ms to several seconds behind.\n+replica = create_engine(settings.REPLICA_URL, pool_size=40)\n"
+          },
+          {
+            "file": "ledger/queries.py",
+            "language": "python",
+            "diff": "--- a/ledger/queries.py\n+++ b/ledger/queries.py\n@@ -14,8 +14,10 @@ from ledger.db import primary\n+from ledger.db import replica\n \n \n def get_balance(account_id: int) -> Decimal:\n-    with primary.connect() as conn:\n+    # Balance reads are hot; serve them from the replica.\n+    with replica.connect() as conn:\n         row = conn.execute(\n             select(accounts.c.balance).where(accounts.c.id == account_id)\n         ).one()\n     return row.balance\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "replica",
+            "kind": "const",
+            "file": "ledger/db.py",
+            "status": "added"
+          },
+          {
+            "name": "get_balance",
+            "kind": "function",
+            "file": "ledger/queries.py",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "account.balance",
+        "predicate": "consistency",
+        "value": "eventual"
+      },
+      "label": "contradiction",
+      "reason": "get_balance switches from the primary to an asynchronous streaming replica that lags by up to seconds, so any reader can see a stale balance. eventual ranks above strong."
+    },
+    {
+      "id": "C14",
+      "kind": "core",
+      "premise": {
+        "subject": "api.repository.id",
+        "predicate": "shape",
+        "relation": "eq",
+        "value": "integer",
+        "scope": "api:v1"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "internal/api/types.go",
+            "language": "go",
+            "diff": "--- a/internal/api/types.go\n+++ b/internal/api/types.go\n@@ -5,7 +5,7 @@ package api\n type Repository struct {\n-\tID        int64     `json:\"id\"`\n+\tID        string    `json:\"id\"` // ULID; numeric ids are being retired\n \tName      string    `json:\"name\"`\n \tFullName  string    `json:\"full_name\"`\n \tPrivate   bool      `json:\"private\"`\n \tCreatedAt time.Time `json:\"created_at\"`\n }\n"
+          },
+          {
+            "file": "internal/api/convert.go",
+            "language": "go",
+            "diff": "--- a/internal/api/convert.go\n+++ b/internal/api/convert.go\n@@ -11,4 +11,4 @@ func toAPIRepository(r store.Repo) Repository {\n \treturn Repository{\n-\t\tID:        r.ID,\n+\t\tID:        r.ULID,\n \t\tName:      r.Name,\n \t\tFullName:  r.Owner + \"/\" + r.Name,\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "Repository.ID",
+            "kind": "field",
+            "file": "internal/api/types.go",
+            "status": "modified"
+          },
+          {
+            "name": "toAPIRepository",
+            "kind": "function",
+            "file": "internal/api/convert.go",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "api.repository.id",
+        "predicate": "shape",
+        "value": "string"
+      },
+      "label": "contradiction",
+      "reason": "Repository.ID changes from int64 to a string ULID, so the JSON id is a string. shape is compared for equality: string differs from integer."
+    },
+    {
+      "id": "C15",
+      "kind": "core",
+      "premise": {
+        "subject": "order.status",
+        "predicate": "consistency",
+        "relation": "le",
+        "value": "read-your-writes",
+        "scope": "worker:orders (read after write)"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "src/orders/handlers.ts",
+            "language": "typescript",
+            "diff": "--- a/src/orders/handlers.ts\n+++ b/src/orders/handlers.ts\n@@ -12,9 +12,12 @@ app.post(\"/orders/:id/cancel\", async (c) => {\n-  await c.env.DB.prepare(\"UPDATE orders SET status = 'cancelled' WHERE id = ?\").bind(c.req.param(\"id\")).run();\n+  const session = c.env.DB.withSession(\"first-primary\");\n+  await session.prepare(\"UPDATE orders SET status = 'cancelled' WHERE id = ?\").bind(c.req.param(\"id\")).run();\n+  c.header(\"x-d1-bookmark\", session.getBookmark() ?? \"\");\n   return c.json({ ok: true });\n });\n \n app.get(\"/orders/:id\", async (c) => {\n-  const db = c.env.DB.withSession(\"first-unconstrained\");\n+  // Continue the caller's session so a client always sees its own writes.\n+  const db = c.env.DB.withSession(c.req.header(\"x-d1-bookmark\") ?? \"first-unconstrained\");\n   const order = await db.prepare(\"SELECT * FROM orders WHERE id = ?\").bind(c.req.param(\"id\")).first();\n   return c.json(order);\n });\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "POST /orders/:id/cancel",
+            "kind": "route",
+            "file": "src/orders/handlers.ts",
+            "status": "modified"
+          },
+          {
+            "name": "GET /orders/:id",
+            "kind": "route",
+            "file": "src/orders/handlers.ts",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "order.status",
+        "predicate": "consistency",
+        "value": "read-your-writes"
+      },
+      "label": "compatible",
+      "reason": "Reads continue the caller's D1 session from the bookmark returned by the write, so a client sees its own cancellation; other clients may still read a replica. read-your-writes equals the premise bound."
+    },
+    {
+      "id": "C16",
+      "kind": "core",
+      "premise": {
+        "subject": "api.create-issue.title",
+        "predicate": "presence",
+        "relation": "le",
+        "value": "required",
+        "scope": "api:v1"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "src/api/issues.ts",
+            "language": "typescript",
+            "diff": "--- a/src/api/issues.ts\n+++ b/src/api/issues.ts\n@@ -6,5 +6,5 @@ import { z } from \"zod\";\n export const CreateIssue = z.object({\n-  title: z.string().min(1).max(256),\n+  title: z.string().max(256).optional(),\n   body: z.string().max(65536).optional(),\n   labels: z.array(z.string()).max(20).default([]),\n });\n@@ -31,3 +31,7 @@ export async function createIssue(c: Context<AppEnv>) {\n   const input = CreateIssue.parse(await c.req.json());\n-  const issue = await c.var.issues.create({ ...input, repoId: c.req.param(\"repo\") });\n+  const issue = await c.var.issues.create({\n+    ...input,\n+    title: input.title ?? null,\n+    repoId: c.req.param(\"repo\"),\n+  });\n   return c.json(issue, 201);\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "CreateIssue",
+            "kind": "const",
+            "file": "src/api/issues.ts",
+            "status": "modified"
+          },
+          {
+            "name": "createIssue",
+            "kind": "function",
+            "file": "src/api/issues.ts",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "api.create-issue.title",
+        "predicate": "presence",
+        "value": "optional"
+      },
+      "label": "contradiction",
+      "reason": "The zod schema changes title from z.string().min(1) to .optional() and the handler stores null when it is missing. optional ranks above required."
+    },
+    {
+      "id": "C17",
+      "kind": "core",
+      "premise": {
+        "subject": "webhook.payload.repository",
+        "predicate": "presence",
+        "relation": "le",
+        "value": "required",
+        "scope": "api:webhooks"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "internal/webhooks/payload.go",
+            "language": "go",
+            "diff": "--- a/internal/webhooks/payload.go\n+++ b/internal/webhooks/payload.go\n@@ -9,4 +9,5 @@ type Payload struct {\n \tAction     string      `json:\"action\"`\n-\tRepository Repository  `json:\"repository\"`\n+\t// Organisation-level events have no repository.\n+\tRepository *Repository `json:\"repository,omitempty\"`\n \tSender     User        `json:\"sender\"`\n }\n@@ -30,3 +31,7 @@ func Build(ev store.Event) Payload {\n-\tp := Payload{Action: ev.Action, Repository: toRepository(ev.Repo), Sender: toUser(ev.Actor)}\n+\tp := Payload{Action: ev.Action, Sender: toUser(ev.Actor)}\n+\tif ev.Repo != nil {\n+\t\trepo := toRepository(*ev.Repo)\n+\t\tp.Repository = &repo\n+\t}\n \treturn p\n }\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "Payload.Repository",
+            "kind": "field",
+            "file": "internal/webhooks/payload.go",
+            "status": "modified"
+          },
+          {
+            "name": "Build",
+            "kind": "function",
+            "file": "internal/webhooks/payload.go",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "webhook.payload.repository",
+        "predicate": "presence",
+        "value": "optional"
+      },
+      "label": "contradiction",
+      "reason": "Repository becomes a pointer with omitempty and is only set when the event has a repo, so org-level payloads omit it. optional ranks above required."
+    },
+    {
+      "id": "C18",
+      "kind": "core",
+      "premise": {
+        "subject": "user.profile.timezone",
+        "predicate": "presence",
+        "relation": "le",
+        "value": "optional",
+        "scope": "service:accounts"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "accounts/models.py",
+            "language": "python",
+            "diff": "--- a/accounts/models.py\n+++ b/accounts/models.py\n@@ -20,3 +20,3 @@ class Profile(models.Model):\n     user = models.OneToOneField(User, on_delete=models.CASCADE)\n     display_name = models.CharField(max_length=80)\n-    timezone = models.CharField(max_length=64, null=True, blank=True)\n+    timezone = models.CharField(max_length=64, default=\"UTC\")\n"
+          },
+          {
+            "file": "accounts/migrations/0031_profile_timezone_not_null.py",
+            "language": "python",
+            "diff": "--- /dev/null\n+++ b/accounts/migrations/0031_profile_timezone_not_null.py\n@@ -0,0 +1,14 @@\n+from django.db import migrations, models\n+\n+\n+class Migration(migrations.Migration):\n+    dependencies = [(\"accounts\", \"0030_profile_display_name\")]\n+\n+    operations = [\n+        migrations.RunSQL(\"UPDATE accounts_profile SET timezone = 'UTC' WHERE timezone IS NULL\"),\n+        migrations.AlterField(\n+            model_name=\"profile\",\n+            name=\"timezone\",\n+            field=models.CharField(max_length=64, default=\"UTC\"),\n+        ),\n+    ]\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "Profile.timezone",
+            "kind": "field",
+            "file": "accounts/models.py",
+            "status": "modified"
+          },
+          {
+            "name": "Migration",
+            "kind": "class",
+            "file": "accounts/migrations/0031_profile_timezone_not_null.py",
+            "status": "added"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "user.profile.timezone",
+        "predicate": "presence",
+        "value": "required"
+      },
+      "label": "compatible",
+      "reason": "timezone loses null=True, gains default='UTC', and existing NULLs are backfilled, so it is always present. required ranks below optional, so the premise holds."
+    },
+    {
+      "id": "C19",
+      "kind": "core",
+      "premise": {
+        "subject": "server_config.max_conns",
+        "predicate": "presence",
+        "relation": "le",
+        "value": "required",
+        "scope": "daemon:httpd"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "src/config.h",
+            "language": "c",
+            "diff": "--- a/src/config.h\n+++ b/src/config.h\n@@ -12,6 +12,5 @@ struct server_config {\n     char listen_addr[64];\n     int port;\n-    int max_conns;\n     int idle_timeout_sec;\n     char log_path[256];\n };\n"
+          },
+          {
+            "file": "src/config.c",
+            "language": "c",
+            "diff": "--- a/src/config.c\n+++ b/src/config.c\n@@ -48,12 +48,8 @@ static int apply_option(struct server_config *cfg, const char *key, const char *val)\n     if (strcmp(key, \"port\") == 0) {\n         cfg->port = atoi(val);\n         return 0;\n     }\n-    if (strcmp(key, \"max_conns\") == 0) {\n-        cfg->max_conns = atoi(val);\n-        return 0;\n-    }\n     if (strcmp(key, \"idle_timeout_sec\") == 0) {\n         cfg->idle_timeout_sec = atoi(val);\n         return 0;\n     }\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "server_config.max_conns",
+            "kind": "field",
+            "file": "src/config.h",
+            "status": "removed"
+          },
+          {
+            "name": "apply_option",
+            "kind": "function",
+            "file": "src/config.c",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "server_config.max_conns",
+        "predicate": "presence",
+        "value": "absent"
+      },
+      "label": "contradiction",
+      "reason": "The max_conns field is deleted from struct server_config and the max_conns option is no longer parsed. absent ranks above required."
+    },
+    {
+      "id": "C20",
+      "kind": "core",
+      "premise": {
+        "subject": "repo.delete",
+        "predicate": "authority",
+        "relation": "le",
+        "value": "owner",
+        "scope": "api:v1"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "src/routes/repos.ts",
+            "language": "typescript",
+            "diff": "--- a/src/routes/repos.ts\n+++ b/src/routes/repos.ts\n@@ -40,6 +40,7 @@ export function registerRepoRoutes(app: Hono<AppEnv>) {\n   app.delete(\"/repos/:owner/:name\", async (c) => {\n     const repo = await loadRepo(c);\n-    requireOwner(c.var.principal, repo);\n+    // Org admins can now clean up abandoned repos without the owner.\n+    requireRole(c.var.principal, repo, \"admin\");\n     await c.var.repos.delete(repo.id);\n     return c.body(null, 204);\n   });\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "DELETE /repos/:owner/:name",
+            "kind": "route",
+            "file": "src/routes/repos.ts",
+            "status": "modified"
+          },
+          {
+            "name": "requireRole",
+            "kind": "function",
+            "file": "src/routes/repos.ts",
+            "status": "unchanged"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "repo.delete",
+        "predicate": "authority",
+        "value": "admin"
+      },
+      "label": "contradiction",
+      "reason": "requireOwner is replaced with requireRole(..., \"admin\"), so admins as well as owners may delete a repo. admin ranks above owner."
+    },
+    {
+      "id": "C21",
+      "kind": "core",
+      "premise": {
+        "subject": "org.invite-member",
+        "predicate": "authority",
+        "relation": "le",
+        "value": "admin",
+        "scope": "service:orgs"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "orgs/views.py",
+            "language": "python",
+            "diff": "--- a/orgs/views.py\n+++ b/orgs/views.py\n@@ -55,5 +55,5 @@ class InvitationViewSet(viewsets.ModelViewSet):\n     serializer_class = InvitationSerializer\n-    permission_classes = [IsAuthenticated, IsOrgAdmin]\n+    permission_classes = [IsAuthenticated, IsOrgMember]\n \n     def perform_create(self, serializer):\n         serializer.save(org=self.get_org(), invited_by=self.request.user)\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "InvitationViewSet.permission_classes",
+            "kind": "attribute",
+            "file": "orgs/views.py",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "org.invite-member",
+        "predicate": "authority",
+        "value": "member"
+      },
+      "label": "contradiction",
+      "reason": "permission_classes changes from IsOrgAdmin to IsOrgMember, so any org member may send invitations. member ranks above admin."
+    },
+    {
+      "id": "C22",
+      "kind": "core",
+      "premise": {
+        "subject": "storage.release-artifacts.write",
+        "predicate": "authority",
+        "relation": "le",
+        "value": "maintainer",
+        "scope": "infra:gcp"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "infra/storage.tf",
+            "language": "hcl",
+            "diff": "--- a/infra/storage.tf\n+++ b/infra/storage.tf\n@@ -30,8 +30,15 @@ resource \"google_storage_bucket\" \"release_artifacts\" {\n   uniform_bucket_level_access = true\n }\n \n resource \"google_storage_bucket_iam_member\" \"release_maintainers_write\" {\n   bucket = google_storage_bucket.release_artifacts.name\n   role   = \"roles/storage.objectCreator\"\n   member = \"group:release-maintainers@example.org\"\n }\n+\n+# Let CI runners from any project upload nightly builds.\n+resource \"google_storage_bucket_iam_member\" \"release_any_write\" {\n+  bucket = google_storage_bucket.release_artifacts.name\n+  role   = \"roles/storage.objectCreator\"\n+  member = \"allAuthenticatedUsers\"\n+}\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "google_storage_bucket_iam_member.release_any_write",
+            "kind": "resource",
+            "file": "infra/storage.tf",
+            "status": "added"
+          },
+          {
+            "name": "google_storage_bucket_iam_member.release_maintainers_write",
+            "kind": "resource",
+            "file": "infra/storage.tf",
+            "status": "unchanged"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "storage.release-artifacts.write",
+        "predicate": "authority",
+        "value": "authenticated"
+      },
+      "label": "contradiction",
+      "reason": "A new IAM binding grants roles/storage.objectCreator on the bucket to allAuthenticatedUsers, so any authenticated Google principal can write. authenticated ranks above maintainer."
+    },
+    {
+      "id": "C23",
+      "kind": "core",
+      "premise": {
+        "subject": "protected-branch.force-push",
+        "predicate": "authority",
+        "relation": "le",
+        "value": "maintainer",
+        "scope": "service:git"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "internal/protect/rules.go",
+            "language": "go",
+            "diff": "--- a/internal/protect/rules.go\n+++ b/internal/protect/rules.go\n@@ -22,5 +22,7 @@ func (r *Rules) CanForcePush(p Principal, b Branch) bool {\n \tif b.Protected {\n-\t\treturn p.Role.AtLeast(RoleMaintainer)\n+\t\t// Force pushes to protected branches rewrote release history twice\n+\t\t// this quarter; only admins (and owners) may do it now.\n+\t\treturn p.Role.AtLeast(RoleAdmin)\n \t}\n \treturn p.Role.AtLeast(RoleMember)\n }\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "Rules.CanForcePush",
+            "kind": "method",
+            "file": "internal/protect/rules.go",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "protected-branch.force-push",
+        "predicate": "authority",
+        "value": "admin"
+      },
+      "label": "compatible",
+      "reason": "Force-pushing a protected branch now needs RoleAdmin instead of RoleMaintainer. admin ranks below maintainer, so the premise holds."
+    },
+    {
+      "id": "C24",
+      "kind": "core",
+      "premise": {
+        "subject": "payments.capture-handler",
+        "predicate": "purity",
+        "relation": "le",
+        "value": "idempotent",
+        "scope": "service:payments"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "src/payments/capture.ts",
+            "language": "typescript",
+            "diff": "--- a/src/payments/capture.ts\n+++ b/src/payments/capture.ts\n@@ -14,12 +14,7 @@ export async function handleCapture(req: CaptureRequest, deps: Deps): Promise<CaptureResult> {\n-  const existing = await deps.captures.findByIdempotencyKey(req.idempotencyKey);\n-  if (existing) return existing.result;\n-\n   const charge = await deps.psp.capture({\n     paymentIntent: req.paymentIntentId,\n     amount: req.amountMinor,\n-    idempotencyKey: req.idempotencyKey,\n   });\n-  const result = { chargeId: charge.id, status: charge.status };\n-  await deps.captures.save(req.idempotencyKey, result);\n-  return result;\n+  await deps.ledger.append({ type: \"capture\", chargeId: charge.id, amount: req.amountMinor });\n+  return { chargeId: charge.id, status: charge.status };\n }\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "handleCapture",
+            "kind": "function",
+            "file": "src/payments/capture.ts",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "payments.capture-handler",
+        "predicate": "purity",
+        "value": "non-idempotent"
+      },
+      "label": "contradiction",
+      "reason": "The idempotency-key lookup and the key passed to the PSP are removed, and every call appends a ledger entry, so a retried capture charges and records twice. non-idempotent ranks above idempotent."
+    },
+    {
+      "id": "C25",
+      "kind": "core",
+      "premise": {
+        "subject": "pricing.compute-quote",
+        "predicate": "purity",
+        "relation": "le",
+        "value": "pure",
+        "scope": "service:pricing"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "pricing/quote.py",
+            "language": "python",
+            "diff": "--- a/pricing/quote.py\n+++ b/pricing/quote.py\n@@ -1,7 +1,12 @@\n+import json\n+\n+from pricing.cache import redis_client\n from pricing.tax import TAX_RATES\n \n \n def compute_quote(items: list[LineItem], region: str) -> Quote:\n     subtotal = sum(i.unit_price * i.qty for i in items)\n     tax = subtotal * TAX_RATES[region]\n-    return Quote(subtotal=subtotal, tax=tax, total=subtotal + tax)\n+    quote = Quote(subtotal=subtotal, tax=tax, total=subtotal + tax)\n+    redis_client.set(\"quote:\" + quote_key(items, region), json.dumps(quote.as_dict()), ex=3600)\n+    return quote\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "compute_quote",
+            "kind": "function",
+            "file": "pricing/quote.py",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "pricing.compute-quote",
+        "predicate": "purity",
+        "value": "idempotent"
+      },
+      "label": "contradiction",
+      "reason": "compute_quote now writes the quote to Redis under a key derived from its inputs: a side effect, but repeating it leaves the same state. idempotent ranks above pure."
+    },
+    {
+      "id": "C26",
+      "kind": "core",
+      "premise": {
+        "subject": "billing.invoice-paid-handler",
+        "predicate": "purity",
+        "relation": "le",
+        "value": "idempotent",
+        "scope": "service:billing"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "internal/billing/events.go",
+            "language": "go",
+            "diff": "--- a/internal/billing/events.go\n+++ b/internal/billing/events.go\n@@ -30,5 +30,7 @@ func (h *Handler) HandleInvoicePaid(ctx context.Context, ev Event) error {\n-\t_, err := h.db.ExecContext(ctx,\n-\t\t`INSERT INTO credits (account_id, amount_cents) VALUES ($1, $2)`,\n-\t\tev.AccountID, ev.AmountCents)\n+\t// Providers redeliver events; the event id makes a redelivery a no-op.\n+\t_, err := h.db.ExecContext(ctx,\n+\t\t`INSERT INTO credits (event_id, account_id, amount_cents) VALUES ($1, $2, $3)\n+\t\t ON CONFLICT (event_id) DO NOTHING`,\n+\t\tev.ID, ev.AccountID, ev.AmountCents)\n \treturn err\n }\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "Handler.HandleInvoicePaid",
+            "kind": "method",
+            "file": "internal/billing/events.go",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "billing.invoice-paid-handler",
+        "predicate": "purity",
+        "value": "idempotent"
+      },
+      "label": "compatible",
+      "reason": "The credit insert is keyed by event_id with ON CONFLICT DO NOTHING, so a redelivered event leaves the same state. idempotent equals the premise bound."
+    },
+    {
+      "id": "C27",
+      "kind": "core",
+      "premise": {
+        "subject": "api.list-commits.page-size",
+        "predicate": "bound",
+        "relation": "le",
+        "value": "le-100",
+        "scope": "api:v1"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "src/api/commits.ts",
+            "language": "typescript",
+            "diff": "--- a/src/api/commits.ts\n+++ b/src/api/commits.ts\n@@ -18,4 +18,5 @@ export async function listCommits(c: Context<AppEnv>) {\n-  const perPage = Math.min(Number(c.req.query(\"per_page\") ?? 30), 100);\n+  // Mirror clients asked for bigger pages to cut round trips.\n+  const perPage = Math.min(Number(c.req.query(\"per_page\") ?? 30), 1000);\n   const page = Math.max(Number(c.req.query(\"page\") ?? 1), 1);\n   const commits = await c.var.git.log(c.req.param(\"repo\"), { offset: (page - 1) * perPage, limit: perPage });\n   return c.json(commits);\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "listCommits",
+            "kind": "function",
+            "file": "src/api/commits.ts",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "api.list-commits.page-size",
+        "predicate": "bound",
+        "value": "le-1k"
+      },
+      "label": "contradiction",
+      "reason": "The per_page clamp rises from 100 to 1000, which falls in the 101 to 1,000 bucket. le-1k ranks above le-100."
+    },
+    {
+      "id": "C28",
+      "kind": "core",
+      "premise": {
+        "subject": "http-parser.header-count",
+        "predicate": "bound",
+        "relation": "le",
+        "value": "le-100",
+        "scope": "lib:httpd"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "src/http_parser.h",
+            "language": "c",
+            "diff": "--- a/src/http_parser.h\n+++ b/src/http_parser.h\n@@ -8,8 +8,9 @@\n-#define MAX_HEADERS 64\n+#define INITIAL_HEADER_CAPACITY 16\n \n struct http_request {\n     char method[16];\n     char path[2048];\n-    struct header headers[MAX_HEADERS];\n+    struct header *headers;\n+    size_t header_cap;\n     size_t header_count;\n };\n"
+          },
+          {
+            "file": "src/http_parser.c",
+            "language": "c",
+            "diff": "--- a/src/http_parser.c\n+++ b/src/http_parser.c\n@@ -120,6 +120,12 @@ static int add_header(struct http_request *req, const char *name, const char *value)\n {\n-    if (req->header_count >= MAX_HEADERS)\n-        return HTTP_ERR_TOO_MANY_HEADERS;\n+    if (req->header_count == req->header_cap) {\n+        size_t cap = req->header_cap ? req->header_cap * 2 : INITIAL_HEADER_CAPACITY;\n+        struct header *grown = realloc(req->headers, cap * sizeof *grown);\n+        if (grown == NULL)\n+            return HTTP_ERR_NOMEM;\n+        req->headers = grown;\n+        req->header_cap = cap;\n+    }\n     copy_header(&req->headers[req->header_count++], name, value);\n     return 0;\n }\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "MAX_HEADERS",
+            "kind": "macro",
+            "file": "src/http_parser.h",
+            "status": "removed"
+          },
+          {
+            "name": "http_request.headers",
+            "kind": "field",
+            "file": "src/http_parser.h",
+            "status": "modified"
+          },
+          {
+            "name": "add_header",
+            "kind": "function",
+            "file": "src/http_parser.c",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "http-parser.header-count",
+        "predicate": "bound",
+        "value": "unbounded"
+      },
+      "label": "contradiction",
+      "reason": "The MAX_HEADERS array and its check are replaced by a realloc-doubling vector with no cap, so the header count is unbounded. unbounded ranks above le-100."
+    },
+    {
+      "id": "C29",
+      "kind": "core",
+      "premise": {
+        "subject": "db.max-connections",
+        "predicate": "bound",
+        "relation": "le",
+        "value": "le-100",
+        "scope": "infra:aws/rds"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "infra/db.tf",
+            "language": "hcl",
+            "diff": "--- a/infra/db.tf\n+++ b/infra/db.tf\n@@ -40,7 +40,7 @@ resource \"aws_db_parameter_group\" \"app\" {\n   family = \"postgres16\"\n \n   parameter {\n     name         = \"max_connections\"\n-    value        = \"200\"\n+    value        = \"80\"\n     apply_method = \"pending-reboot\"\n   }\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "aws_db_parameter_group.app",
+            "kind": "resource",
+            "file": "infra/db.tf",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "db.max-connections",
+        "predicate": "bound",
+        "value": "le-100"
+      },
+      "label": "compatible",
+      "reason": "max_connections drops from 200 to 80, which is within 11 to 100. le-100 equals the premise bound."
+    },
+    {
+      "id": "C30",
+      "kind": "core",
+      "premise": {
+        "subject": "api.event.created_at",
+        "predicate": "shape",
+        "relation": "eq",
+        "value": "integer",
+        "scope": "api:v1"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "events/schemas.py",
+            "language": "python",
+            "diff": "--- a/events/schemas.py\n+++ b/events/schemas.py\n@@ -1,3 +1,4 @@\n+from datetime import datetime\n from typing import Any\n \n from pydantic import BaseModel, ConfigDict\n@@ -9,6 +10,6 @@ class EventOut(BaseModel):\n     id: int\n     kind: str\n-    created_at: int  # unix seconds\n+    created_at: datetime\n     payload: dict[str, Any]\n \n     model_config = ConfigDict(from_attributes=True)\n"
+          },
+          {
+            "file": "events/routes.py",
+            "language": "python",
+            "diff": "--- a/events/routes.py\n+++ b/events/routes.py\n@@ -22,2 +22,2 @@ async def get_event(event_id: int) -> JSONResponse:\n     ev = await store.get(event_id)\n-    return JSONResponse(EventOut.model_validate(ev).model_dump())\n+    return JSONResponse(EventOut.model_validate(ev).model_dump(mode=\"json\"))\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "EventOut.created_at",
+            "kind": "field",
+            "file": "events/schemas.py",
+            "status": "modified"
+          },
+          {
+            "name": "get_event",
+            "kind": "function",
+            "file": "events/routes.py",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "api.event.created_at",
+        "predicate": "shape",
+        "value": "string"
+      },
+      "label": "contradiction",
+      "reason": "created_at changes from int (unix seconds) to datetime, and the route dumps with mode=\"json\", which pydantic serialises as an ISO-8601 string. string differs from integer."
+    },
+    {
+      "id": "D01",
+      "kind": "decoy",
+      "decoyType": "same-subject-compatible",
+      "premise": {
+        "subject": "authz.permission-evaluation",
+        "predicate": "freshness",
+        "relation": "le",
+        "value": "per-request",
+        "scope": "service:forge-lite"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "src/authz/permissions.ts",
+            "language": "typescript",
+            "diff": "--- a/src/authz/permissions.ts\n+++ b/src/authz/permissions.ts\n@@ -1,13 +1,26 @@\n import type { Db } from \"../db\";\n import type { Action, Role } from \"./roles\";\n import { roleAllows } from \"./roles\";\n \n+// A request may check several actions on the same repo; resolve the role\n+// once per request. The memo is created per request and dies with it.\n+export type RoleMemo = Map<string, Role>;\n+\n+export function newRoleMemo(): RoleMemo {\n+  return new Map();\n+}\n+\n export async function canPerform(\n   db: Db,\n   userId: string,\n   repoId: string,\n   action: Action,\n+  memo: RoleMemo,\n ): Promise<boolean> {\n-  const role = await db.roles.find(userId, repoId);\n+  let role = memo.get(repoId);\n+  if (role === undefined) {\n+    role = await db.roles.find(userId, repoId);\n+    memo.set(repoId, role);\n+  }\n   return roleAllows(role, action);\n }\n"
+          },
+          {
+            "file": "src/middleware/authz.ts",
+            "language": "typescript",
+            "diff": "--- a/src/middleware/authz.ts\n+++ b/src/middleware/authz.ts\n@@ -5,3 +5,4 @@\n export const authz = createMiddleware<AppEnv>(async (c, next) => {\n+  c.set(\"roleMemo\", newRoleMemo());\n   await next();\n });\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "RoleMemo",
+            "kind": "type",
+            "file": "src/authz/permissions.ts",
+            "status": "added"
+          },
+          {
+            "name": "newRoleMemo",
+            "kind": "function",
+            "file": "src/authz/permissions.ts",
+            "status": "added"
+          },
+          {
+            "name": "canPerform",
+            "kind": "function",
+            "file": "src/authz/permissions.ts",
+            "status": "modified"
+          },
+          {
+            "name": "authz",
+            "kind": "middleware",
+            "file": "src/middleware/authz.ts",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "authz.permission-evaluation",
+        "predicate": "freshness",
+        "value": "per-request"
+      },
+      "label": "compatible",
+      "reason": "Near miss of the S-1 pair: the role memo is created per request in the middleware and passed down, so it never outlives the request. per-request equals the premise bound."
+    },
+    {
+      "id": "D02",
+      "kind": "decoy",
+      "decoyType": "same-subject-compatible",
+      "premise": {
+        "subject": "repo.settings",
+        "predicate": "consistency",
+        "relation": "le",
+        "value": "strong",
+        "scope": "service:repos"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "repos/settings.py",
+            "language": "python",
+            "diff": "--- a/repos/settings.py\n+++ b/repos/settings.py\n@@ -1,9 +1,22 @@\n+from cachetools import LRUCache\n+\n from repos.db import db\n \n+_cache: LRUCache = LRUCache(maxsize=10_000)\n+\n \n def get_settings(repo_id: int) -> dict:\n-    return db.fetch_settings(repo_id)\n+    # The version lookup reads the primary on every call, so a cached body is\n+    # only reused while it is still the latest committed version.\n+    version = db.fetch_settings_version(repo_id)\n+    key = (repo_id, version)\n+    body = _cache.get(key)\n+    if body is None:\n+        body = db.fetch_settings_at(repo_id, version)\n+        _cache[key] = body\n+    return body\n \n \n def update_settings(repo_id: int, changes: dict) -> dict:\n-    return db.update_settings(repo_id, changes)\n+    # Every write bumps the version, which invalidates the cached body.\n+    return db.update_settings(repo_id, changes, bump_version=True)\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "_cache",
+            "kind": "const",
+            "file": "repos/settings.py",
+            "status": "added"
+          },
+          {
+            "name": "get_settings",
+            "kind": "function",
+            "file": "repos/settings.py",
+            "status": "modified"
+          },
+          {
+            "name": "update_settings",
+            "kind": "function",
+            "file": "repos/settings.py",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "repo.settings",
+        "predicate": "consistency",
+        "value": "strong"
+      },
+      "label": "compatible",
+      "reason": "A cache is added, but it is keyed by (repo_id, version), the version is read from the primary on every call, and every write bumps it, so a stale body is never served. strong equals the premise bound."
+    },
+    {
+      "id": "D03",
+      "kind": "decoy",
+      "decoyType": "same-subject-compatible",
+      "premise": {
+        "subject": "payments.capture-handler",
+        "predicate": "purity",
+        "relation": "le",
+        "value": "idempotent",
+        "scope": "service:payments"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "internal/payments/capture.go",
+            "language": "go",
+            "diff": "--- a/internal/payments/capture.go\n+++ b/internal/payments/capture.go\n@@ -20,11 +20,18 @@ func (h *Handler) Capture(ctx context.Context, req CaptureRequest) (*Result, error) {\n \tif res, ok := h.results.Get(ctx, req.IdempotencyKey); ok {\n \t\treturn res, nil\n \t}\n-\tcharge, err := h.psp.Capture(ctx, req.PaymentIntentID, req.AmountMinor, req.IdempotencyKey)\n+\tvar charge *psp.Charge\n+\terr := retry.Do(ctx, retry.Exponential(100*time.Millisecond, 5), func() error {\n+\t\tvar err error\n+\t\t// Every attempt reuses the caller's idempotency key, so the PSP\n+\t\t// collapses retries into a single capture.\n+\t\tcharge, err = h.psp.Capture(ctx, req.PaymentIntentID, req.AmountMinor, req.IdempotencyKey)\n+\t\treturn err\n+\t})\n \tif err != nil {\n \t\treturn nil, err\n \t}\n \tres := &Result{ChargeID: charge.ID, Status: charge.Status}\n \th.results.Put(ctx, req.IdempotencyKey, res)\n \treturn res, nil\n }\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "Handler.Capture",
+            "kind": "method",
+            "file": "internal/payments/capture.go",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "payments.capture-handler",
+        "predicate": "purity",
+        "value": "idempotent"
+      },
+      "label": "compatible",
+      "reason": "A retry loop is added, but the result lookup by idempotency key stays and every attempt reuses the caller's key, so retries collapse into one capture. idempotent equals the premise bound."
+    },
+    {
+      "id": "D04",
+      "kind": "decoy",
+      "decoyType": "same-subject-compatible",
+      "premise": {
+        "subject": "api.list-commits.page-size",
+        "predicate": "bound",
+        "relation": "le",
+        "value": "le-100",
+        "scope": "api:v1"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "src/api/pagination.ts",
+            "language": "typescript",
+            "diff": "--- /dev/null\n+++ b/src/api/pagination.ts\n@@ -0,0 +1,9 @@\n+export const DEFAULT_PAGE_SIZE = 30;\n+export const MAX_PAGE_SIZE = 100;\n+export const MAX_EXPORT_ROWS = 50_000;\n+\n+export function pageParams(query: (name: string) => string | undefined) {\n+  const perPage = Math.min(Math.max(Number(query(\"per_page\") ?? DEFAULT_PAGE_SIZE), 1), MAX_PAGE_SIZE);\n+  const page = Math.max(Number(query(\"page\") ?? 1), 1);\n+  return { perPage, offset: (page - 1) * perPage };\n+}\n"
+          },
+          {
+            "file": "src/api/commits.ts",
+            "language": "typescript",
+            "diff": "--- a/src/api/commits.ts\n+++ b/src/api/commits.ts\n@@ -18,5 +18,4 @@ export async function listCommits(c: Context<AppEnv>) {\n-  const perPage = Math.min(Number(c.req.query(\"per_page\") ?? 30), 100);\n-  const page = Math.max(Number(c.req.query(\"page\") ?? 1), 1);\n-  const commits = await c.var.git.log(c.req.param(\"repo\"), { offset: (page - 1) * perPage, limit: perPage });\n+  const { perPage, offset } = pageParams((n) => c.req.query(n));\n+  const commits = await c.var.git.log(c.req.param(\"repo\"), { offset, limit: perPage });\n   return c.json(commits);\n }\n@@ -40,2 +39,2 @@ export async function exportCommits(c: Context<AppEnv>) {\n-  const rows = await c.var.git.log(c.req.param(\"repo\"), { offset: 0, limit: 10_000 });\n+  const rows = await c.var.git.log(c.req.param(\"repo\"), { offset: 0, limit: MAX_EXPORT_ROWS });\n   return streamCsv(c, rows);\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "MAX_PAGE_SIZE",
+            "kind": "const",
+            "file": "src/api/pagination.ts",
+            "status": "added"
+          },
+          {
+            "name": "MAX_EXPORT_ROWS",
+            "kind": "const",
+            "file": "src/api/pagination.ts",
+            "status": "added"
+          },
+          {
+            "name": "pageParams",
+            "kind": "function",
+            "file": "src/api/pagination.ts",
+            "status": "added"
+          },
+          {
+            "name": "listCommits",
+            "kind": "function",
+            "file": "src/api/commits.ts",
+            "status": "modified"
+          },
+          {
+            "name": "exportCommits",
+            "kind": "function",
+            "file": "src/api/commits.ts",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "api.list-commits.page-size",
+        "predicate": "bound",
+        "value": "le-100"
+      },
+      "label": "compatible",
+      "reason": "The clamp moves into pageParams with MAX_PAGE_SIZE = 100; the 50,000 constant applies to the export endpoint, a different subject. le-100 equals the premise bound."
+    },
+    {
+      "id": "D05",
+      "kind": "decoy",
+      "decoyType": "same-subject-compatible",
+      "premise": {
+        "subject": "scheduler.instance",
+        "predicate": "cardinality",
+        "relation": "le",
+        "value": "at-most-one",
+        "scope": "infra:ecs/main"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "infra/scheduler.tf",
+            "language": "hcl",
+            "diff": "--- a/infra/scheduler.tf\n+++ b/infra/scheduler.tf\n@@ -18,9 +18,18 @@ resource \"aws_ecs_service\" \"scheduler\" {\n   name            = \"scheduler\"\n   cluster         = aws_ecs_cluster.main.id\n   task_definition = aws_ecs_task_definition.scheduler.arn\n   desired_count   = 1\n   launch_type     = \"FARGATE\"\n \n-  deployment_minimum_healthy_percent = 50\n-  deployment_maximum_percent         = 200\n+  # Never run the old and new scheduler side by side during a deploy.\n+  deployment_minimum_healthy_percent = 0\n+  deployment_maximum_percent         = 100\n }\n+\n+resource \"aws_appautoscaling_target\" \"api\" {\n+  service_namespace  = \"ecs\"\n+  resource_id        = \"service/main/api\"\n+  scalable_dimension = \"ecs:service:DesiredCount\"\n+  min_capacity       = 3\n+  max_capacity       = 12\n+}\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "aws_ecs_service.scheduler",
+            "kind": "resource",
+            "file": "infra/scheduler.tf",
+            "status": "modified"
+          },
+          {
+            "name": "aws_appautoscaling_target.api",
+            "kind": "resource",
+            "file": "infra/scheduler.tf",
+            "status": "added"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "scheduler.instance",
+        "predicate": "cardinality",
+        "value": "at-most-one"
+      },
+      "label": "compatible",
+      "reason": "desired_count stays 1 and the deployment maximum drops from 200% to 100%, so even during a deploy only one scheduler runs; the new autoscaling target is for the api service. at-most-one equals the premise bound."
+    },
+    {
+      "id": "D06",
+      "kind": "decoy",
+      "decoyType": "different-subject",
+      "premise": {
+        "subject": "authz.permission-evaluation",
+        "predicate": "freshness",
+        "relation": "le",
+        "value": "per-request",
+        "scope": "service:forge-lite"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "src/ui/preferences.ts",
+            "language": "typescript",
+            "diff": "--- /dev/null\n+++ b/src/ui/preferences.ts\n@@ -0,0 +1,18 @@\n+import type { Db } from \"../db\";\n+\n+export interface UiPreferences {\n+  theme: \"light\" | \"dark\" | \"system\";\n+  density: \"comfortable\" | \"compact\";\n+}\n+\n+// Theme and density rarely change; keep them for the whole session.\n+const sessionPrefs = new Map<string, UiPreferences>();\n+\n+export async function preferencesFor(db: Db, sessionId: string, userId: string): Promise<UiPreferences> {\n+  let prefs = sessionPrefs.get(sessionId);\n+  if (prefs === undefined) {\n+    prefs = await db.preferences.find(userId);\n+    sessionPrefs.set(sessionId, prefs);\n+  }\n+  return prefs;\n+}\n"
+          },
+          {
+            "file": "src/routes/repo-page.ts",
+            "language": "typescript",
+            "diff": "--- a/src/routes/repo-page.ts\n+++ b/src/routes/repo-page.ts\n@@ -12,6 +12,7 @@ export async function repoPage(c: Context<AppEnv>) {\n   const repo = await loadRepo(c);\n   if (!(await canPerform(c.var.db, c.var.session.userId, repo.id, \"read\"))) {\n     return c.notFound();\n   }\n-  return c.html(renderRepo(repo));\n+  const prefs = await preferencesFor(c.var.db, c.var.session.id, c.var.session.userId);\n+  return c.html(renderRepo(repo, prefs));\n }\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "sessionPrefs",
+            "kind": "const",
+            "file": "src/ui/preferences.ts",
+            "status": "added"
+          },
+          {
+            "name": "preferencesFor",
+            "kind": "function",
+            "file": "src/ui/preferences.ts",
+            "status": "added"
+          },
+          {
+            "name": "repoPage",
+            "kind": "function",
+            "file": "src/routes/repo-page.ts",
+            "status": "modified"
+          },
+          {
+            "name": "canPerform",
+            "kind": "function",
+            "file": "src/authz/permissions.ts",
+            "status": "unchanged"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "authz.permission-evaluation",
+        "predicate": "freshness",
+        "value": "per-call"
+      },
+      "label": "compatible",
+      "reason": "The per-session cache holds UI theme preferences, not permissions; canPerform is untouched and is still called on every page request. The subject keeps its prior per-call value, which is within per-request."
+    },
+    {
+      "id": "D07",
+      "kind": "decoy",
+      "decoyType": "different-subject",
+      "premise": {
+        "subject": "session.revocation-check",
+        "predicate": "freshness",
+        "relation": "le",
+        "value": "per-request",
+        "scope": "service:auth"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "auth/tokens.py",
+            "language": "python",
+            "diff": "--- a/auth/tokens.py\n+++ b/auth/tokens.py\n@@ -1,12 +1,22 @@\n+from cachetools import TTLCache, cached\n+\n from auth.store import revocations\n+from profiles.store import profiles\n+\n+_avatar_cache = TTLCache(maxsize=50_000, ttl=300)\n \n \n def is_token_revoked(token_id: str) -> bool:\n     return revocations.exists(token_id)\n \n \n+@cached(_avatar_cache)\n+def avatar_url(user_id: str) -> str:\n+    return profiles.avatar_url(user_id)\n+\n+\n def authenticate(request) -> Principal:\n     token = parse_bearer(request)\n     if is_token_revoked(token.id):\n         raise Unauthorized(\"token revoked\")\n-    return Principal(user_id=token.sub)\n+    return Principal(user_id=token.sub, avatar=avatar_url(token.sub))\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "_avatar_cache",
+            "kind": "const",
+            "file": "auth/tokens.py",
+            "status": "added"
+          },
+          {
+            "name": "avatar_url",
+            "kind": "function",
+            "file": "auth/tokens.py",
+            "status": "added"
+          },
+          {
+            "name": "is_token_revoked",
+            "kind": "function",
+            "file": "auth/tokens.py",
+            "status": "unchanged"
+          },
+          {
+            "name": "authenticate",
+            "kind": "function",
+            "file": "auth/tokens.py",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "session.revocation-check",
+        "predicate": "freshness",
+        "value": "per-call"
+      },
+      "label": "compatible",
+      "reason": "The TTLCache wraps avatar_url; is_token_revoked is unchanged and still queries the store on every call. per-call is within per-request."
+    },
+    {
+      "id": "D08",
+      "kind": "decoy",
+      "decoyType": "different-subject",
+      "premise": {
+        "subject": "audit-log.append",
+        "predicate": "ordering",
+        "relation": "le",
+        "value": "fifo",
+        "scope": "service:audit"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "internal/media/thumbnails.go",
+            "language": "go",
+            "diff": "--- a/internal/media/thumbnails.go\n+++ b/internal/media/thumbnails.go\n@@ -15,7 +15,12 @@ type Thumbnailer struct {\n \tjobs  chan Job\n \tstore BlobStore\n }\n \n-func (t *Thumbnailer) Start(ctx context.Context) {\n-\tgo t.loop(ctx)\n+const ThumbnailWorkers = 8\n+\n+// Thumbnails are independent; render them concurrently, in any order.\n+func (t *Thumbnailer) Start(ctx context.Context) {\n+\tfor i := 0; i < ThumbnailWorkers; i++ {\n+\t\tgo t.loop(ctx)\n+\t}\n }\n"
+          },
+          {
+            "file": "internal/server/server.go",
+            "language": "go",
+            "diff": "--- a/internal/server/server.go\n+++ b/internal/server/server.go\n@@ -40,4 +40,5 @@ func Run(ctx context.Context, cfg Config) error {\n \tauditWriter := audit.NewWriter(auditSink)\n \tauditWriter.Start(ctx) // single goroutine: preserves append order\n \tthumbs := media.NewThumbnailer(blobs)\n \tthumbs.Start(ctx)\n+\tlog.Printf(\"thumbnailer started with %d workers\", media.ThumbnailWorkers)\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "ThumbnailWorkers",
+            "kind": "const",
+            "file": "internal/media/thumbnails.go",
+            "status": "added"
+          },
+          {
+            "name": "Thumbnailer.Start",
+            "kind": "method",
+            "file": "internal/media/thumbnails.go",
+            "status": "modified"
+          },
+          {
+            "name": "Run",
+            "kind": "function",
+            "file": "internal/server/server.go",
+            "status": "modified"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "audit-log.append",
+        "predicate": "ordering",
+        "value": "fifo"
+      },
+      "label": "compatible",
+      "reason": "The eight-worker pool is for thumbnails; the audit writer still starts a single goroutine that preserves append order. fifo equals the premise bound."
+    },
+    {
+      "id": "D09",
+      "kind": "decoy",
+      "decoyType": "different-subject",
+      "premise": {
+        "subject": "user.primary-email",
+        "predicate": "cardinality",
+        "relation": "le",
+        "value": "at-most-one",
+        "scope": "db:accounts (per user)"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "migrations/versions/0043_allow_duplicate_secondary_emails.py",
+            "language": "python",
+            "diff": "--- /dev/null\n+++ b/migrations/versions/0043_allow_duplicate_secondary_emails.py\n@@ -0,0 +1,15 @@\n+\"\"\"Secondary emails may repeat across a user's linked identities.\"\"\"\n+from alembic import op\n+\n+revision = \"0043\"\n+down_revision = \"0042\"\n+\n+\n+def upgrade() -> None:\n+    op.drop_constraint(\"uq_user_secondary_emails_address\", \"user_secondary_emails\", type_=\"unique\")\n+\n+\n+def downgrade() -> None:\n+    op.create_unique_constraint(\n+        \"uq_user_secondary_emails_address\", \"user_secondary_emails\", [\"user_id\", \"address\"]\n+    )\n"
+          },
+          {
+            "file": "accounts/models.py",
+            "language": "python",
+            "diff": "--- a/accounts/models.py\n+++ b/accounts/models.py\n@@ -28,12 +28,12 @@ class UserEmail(Base):\n     __tablename__ = \"user_emails\"\n     __table_args__ = (\n         Index(\"uq_user_emails_primary\", \"user_id\", unique=True, postgresql_where=text(\"is_primary\")),\n     )\n     user_id = mapped_column(ForeignKey(\"users.id\"))\n     address = mapped_column(String(320))\n     is_primary = mapped_column(Boolean, default=False)\n \n \n class UserSecondaryEmail(Base):\n     __tablename__ = \"user_secondary_emails\"\n-    __table_args__ = (UniqueConstraint(\"user_id\", \"address\", name=\"uq_user_secondary_emails_address\"),)\n+    __table_args__ = ()\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "upgrade",
+            "kind": "function",
+            "file": "migrations/versions/0043_allow_duplicate_secondary_emails.py",
+            "status": "added"
+          },
+          {
+            "name": "UserSecondaryEmail.__table_args__",
+            "kind": "attribute",
+            "file": "accounts/models.py",
+            "status": "modified"
+          },
+          {
+            "name": "UserEmail.__table_args__",
+            "kind": "attribute",
+            "file": "accounts/models.py",
+            "status": "unchanged"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "user.primary-email",
+        "predicate": "cardinality",
+        "value": "at-most-one"
+      },
+      "label": "compatible",
+      "reason": "The dropped unique constraint is on user_secondary_emails; the partial unique index on primary emails stays. at-most-one equals the premise bound."
+    },
+    {
+      "id": "D10",
+      "kind": "decoy",
+      "decoyType": "different-subject",
+      "premise": {
+        "subject": "api.issue.id",
+        "predicate": "shape",
+        "relation": "eq",
+        "value": "integer",
+        "scope": "api:v1"
+      },
+      "change": {
+        "hunks": [
+          {
+            "file": "internal/api/issue.go",
+            "language": "go",
+            "diff": "--- a/internal/api/issue.go\n+++ b/internal/api/issue.go\n@@ -7,7 +7,7 @@ package api\n type Issue struct {\n \tID     int64  `json:\"id\"`\n-\tNodeID int64  `json:\"node_id\"`\n+\tNodeID string `json:\"node_id\"` // global relay-style id, e.g. \"I_kwDOAB\"\n \tNumber int    `json:\"number\"`\n \tTitle  string `json:\"title\"`\n \tState  string `json:\"state\"`\n }\n"
+          }
+        ],
+        "symbols": [
+          {
+            "name": "Issue.NodeID",
+            "kind": "field",
+            "file": "internal/api/issue.go",
+            "status": "modified"
+          },
+          {
+            "name": "Issue.ID",
+            "kind": "field",
+            "file": "internal/api/issue.go",
+            "status": "unchanged"
+          }
+        ]
+      },
+      "groundTruthEffect": {
+        "subject": "api.issue.id",
+        "predicate": "shape",
+        "value": "integer"
+      },
+      "label": "compatible",
+      "reason": "Only NodeID changes from int64 to string; Issue.ID stays int64. integer equals the premise value."
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+--- a/src/authz/permissions.ts
++++ b/src/authz/permissions.ts
+@@ -1 +1 @@
+ import type { Db } from "../db";
+ import type { Action, Role } from "./roles";
+ import { roleAllows } from "./roles";
+
++// A request may check several actions on the same repo; resolve the role
++// once per request. The memo is created per request and dies with it.
++export type RoleMemo = Map<string, Role>;
++
++export function newRoleMemo(): RoleMemo {
++  return new Map();
++}
++
+ export async function canPerform(
+   db: Db,
+   userId: string,
+   repoId: string,
+   action: Action,
++  memo: RoleMemo,
+ ): Promise<boolean> {
+-  const role = await db.roles.find(userId, repoId);
++  let role = memo.get(repoId);
++  if (role === undefined) {
++    role = await db.roles.find(userId, repoId);
++    memo.set(repoId, role);
++  }
+   return roleAllows(role, action);
+ }
+--- a/src/middleware/authz.ts
++++ b/src/middleware/authz.ts
+@@ -5 +5 @@
+ export const authz = createMiddleware<AppEnv>(async (c, next) => {
++  c.set("roleMemo", newRoleMemo());
+   await next();
+ });

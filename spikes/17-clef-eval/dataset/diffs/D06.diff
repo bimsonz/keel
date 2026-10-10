@@ -1,0 +1,32 @@
+--- /dev/null
++++ b/src/ui/preferences.ts
+@@ -0,0 +1 @@
++import type { Db } from "../db";
++
++export interface UiPreferences {
++  theme: "light" | "dark" | "system";
++  density: "comfortable" | "compact";
++}
++
++// Theme and density rarely change; keep them for the whole session.
++const sessionPrefs = new Map<string, UiPreferences>();
++
++export async function preferencesFor(db: Db, sessionId: string, userId: string): Promise<UiPreferences> {
++  let prefs = sessionPrefs.get(sessionId);
++  if (prefs === undefined) {
++    prefs = await db.preferences.find(userId);
++    sessionPrefs.set(sessionId, prefs);
++  }
++  return prefs;
++}
+--- a/src/routes/repo-page.ts
++++ b/src/routes/repo-page.ts
+@@ -12 +12 @@ export async function repoPage(c: Context<AppEnv>) {
+   const repo = await loadRepo(c);
+   if (!(await canPerform(c.var.db, c.var.session.userId, repo.id, "read"))) {
+     return c.notFound();
+   }
+-  return c.html(renderRepo(repo));
++  const prefs = await preferencesFor(c.var.db, c.var.session.id, c.var.session.userId);
++  return c.html(renderRepo(repo, prefs));
+ }

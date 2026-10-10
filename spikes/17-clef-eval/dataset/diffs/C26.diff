@@ -1,0 +1,13 @@
+--- a/internal/billing/events.go
++++ b/internal/billing/events.go
+@@ -30 +30 @@ func (h *Handler) HandleInvoicePaid(ctx context.Context, ev Event) error {
+-    _, err := h.db.ExecContext(ctx,
+-        `INSERT INTO credits (account_id, amount_cents) VALUES ($1, $2)`,
+-        ev.AccountID, ev.AmountCents)
++    // Providers redeliver events; the event id makes a redelivery a no-op.
++    _, err := h.db.ExecContext(ctx,
++        `INSERT INTO credits (event_id, account_id, amount_cents) VALUES ($1, $2, $3)
++         ON CONFLICT (event_id) DO NOTHING`,
++        ev.ID, ev.AccountID, ev.AmountCents)
+     return err
+ }

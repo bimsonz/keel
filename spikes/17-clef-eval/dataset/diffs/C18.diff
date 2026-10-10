@@ -1,0 +1,24 @@
+--- a/accounts/models.py
++++ b/accounts/models.py
+@@ -20 +20 @@ class Profile(models.Model):
+     user = models.OneToOneField(User, on_delete=models.CASCADE)
+     display_name = models.CharField(max_length=80)
+-    timezone = models.CharField(max_length=64, null=True, blank=True)
++    timezone = models.CharField(max_length=64, default="UTC")
+--- /dev/null
++++ b/accounts/migrations/0031_profile_timezone_not_null.py
+@@ -0,0 +1 @@
++from django.db import migrations, models
++
++
++class Migration(migrations.Migration):
++    dependencies = [("accounts", "0030_profile_display_name")]
++
++    operations = [
++        migrations.RunSQL("UPDATE accounts_profile SET timezone = 'UTC' WHERE timezone IS NULL"),
++        migrations.AlterField(
++            model_name="profile",
++            name="timezone",
++            field=models.CharField(max_length=64, default="UTC"),
++        ),
++    ]

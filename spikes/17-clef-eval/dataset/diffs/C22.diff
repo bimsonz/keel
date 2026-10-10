@@ -1,0 +1,18 @@
+--- a/infra/storage.tf
++++ b/infra/storage.tf
+@@ -30 +30 @@ resource "google_storage_bucket" "release_artifacts" {
+   uniform_bucket_level_access = true
+ }
+
+ resource "google_storage_bucket_iam_member" "release_maintainers_write" {
+   bucket = google_storage_bucket.release_artifacts.name
+   role   = "roles/storage.objectCreator"
+   member = "group:release-maintainers@example.org"
+ }
++
++# Let CI runners from any project upload nightly builds.
++resource "google_storage_bucket_iam_member" "release_any_write" {
++  bucket = google_storage_bucket.release_artifacts.name
++  role   = "roles/storage.objectCreator"
++  member = "allAuthenticatedUsers"
++}

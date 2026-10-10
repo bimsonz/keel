@@ -1,0 +1,325 @@
+[
+  {
+    "name": "clef-endpoint/model=clef",
+    "status": 200,
+    "ok": true,
+    "ms": 268,
+    "model": "clef",
+    "choice": "per-session",
+    "probabilities": {
+      "per-call": 0.0187,
+      "per-request": 0.0972,
+      "per-session": 0.6689,
+      "ttl": 0.0756,
+      "static": 0.0325,
+      "unclear": 0.1071
+    },
+    "probabilityKeyOrder": [
+      "per-call",
+      "per-request",
+      "per-session",
+      "ttl",
+      "static",
+      "unclear"
+    ],
+    "confidence": 0.3705,
+    "usage": {
+      "input_tokens": 359,
+      "output_tokens": 0
+    }
+  },
+  {
+    "name": "clef-endpoint/model=clef (repeat)",
+    "status": 200,
+    "ok": true,
+    "ms": 202,
+    "model": "clef",
+    "choice": "per-session",
+    "probabilities": {
+      "per-call": 0.0187,
+      "per-request": 0.0972,
+      "per-session": 0.6689,
+      "ttl": 0.0756,
+      "static": 0.0325,
+      "unclear": 0.1071
+    },
+    "probabilityKeyOrder": [
+      "per-call",
+      "per-request",
+      "per-session",
+      "ttl",
+      "static",
+      "unclear"
+    ],
+    "confidence": 0.3705,
+    "usage": {
+      "input_tokens": 359,
+      "output_tokens": 0
+    }
+  },
+  {
+    "name": "clef-endpoint/model=clef-flash",
+    "status": 200,
+    "ok": false,
+    "ms": 96,
+    "error": {
+      "name": "AiError",
+      "constructor": "InferenceUpstreamError",
+      "message": "5012: {\"error\":{\"type\":\"invalid_request\",\"message\":\"Unsupported model 'clef-flash'. Use 'clef'.\"}}"
+    }
+  },
+  {
+    "name": "flash-endpoint/model=clef-flash",
+    "status": 200,
+    "ok": true,
+    "ms": 127,
+    "model": "clef-flash",
+    "choice": "per-request",
+    "probabilities": {
+      "per-call": 0.0443,
+      "per-request": 0.619,
+      "per-session": 0.2636,
+      "ttl": 0.0264,
+      "static": 0.014,
+      "unclear": 0.0327
+    },
+    "probabilityKeyOrder": [
+      "per-call",
+      "per-request",
+      "per-session",
+      "ttl",
+      "static",
+      "unclear"
+    ],
+    "confidence": 0.3479,
+    "usage": {
+      "input_tokens": 359,
+      "output_tokens": 0
+    }
+  },
+  {
+    "name": "flash-endpoint/model=clef-flash (repeat)",
+    "status": 200,
+    "ok": true,
+    "ms": 129,
+    "model": "clef-flash",
+    "choice": "per-request",
+    "probabilities": {
+      "per-call": 0.0443,
+      "per-request": 0.619,
+      "per-session": 0.2636,
+      "ttl": 0.0264,
+      "static": 0.014,
+      "unclear": 0.0327
+    },
+    "probabilityKeyOrder": [
+      "per-call",
+      "per-request",
+      "per-session",
+      "ttl",
+      "static",
+      "unclear"
+    ],
+    "confidence": 0.3479,
+    "usage": {
+      "input_tokens": 359,
+      "output_tokens": 0
+    }
+  },
+  {
+    "name": "flash-endpoint/model=clef",
+    "status": 200,
+    "ok": false,
+    "ms": 162,
+    "error": {
+      "name": "AiError",
+      "constructor": "InferenceUpstreamError",
+      "message": "5012: {\"error\":{\"type\":\"invalid_request\",\"message\":\"Unsupported model 'clef'. Use 'clef-flash'.\"}}"
+    }
+  },
+  {
+    "name": "clef-endpoint/model omitted",
+    "status": 200,
+    "ok": true,
+    "ms": 117,
+    "model": "clef",
+    "choice": "per-session",
+    "probabilities": {
+      "per-call": 0.0187,
+      "per-request": 0.0972,
+      "per-session": 0.6689,
+      "ttl": 0.0756,
+      "static": 0.0325,
+      "unclear": 0.1071
+    },
+    "probabilityKeyOrder": [
+      "per-call",
+      "per-request",
+      "per-session",
+      "ttl",
+      "static",
+      "unclear"
+    ],
+    "confidence": 0.3705,
+    "usage": {
+      "input_tokens": 359,
+      "output_tokens": 0
+    }
+  },
+  {
+    "name": "clef-endpoint/model=' clef '",
+    "status": 200,
+    "ok": true,
+    "ms": 220,
+    "model": "clef",
+    "choice": "per-session",
+    "probabilities": {
+      "per-call": 0.0187,
+      "per-request": 0.0972,
+      "per-session": 0.6689,
+      "ttl": 0.0756,
+      "static": 0.0325,
+      "unclear": 0.1071
+    },
+    "probabilityKeyOrder": [
+      "per-call",
+      "per-request",
+      "per-session",
+      "ttl",
+      "static",
+      "unclear"
+    ],
+    "confidence": 0.3705,
+    "usage": {
+      "input_tokens": 359,
+      "output_tokens": 0
+    }
+  },
+  {
+    "name": "clef-endpoint/model=bogus",
+    "status": 200,
+    "ok": false,
+    "ms": 22,
+    "error": {
+      "name": "AiError",
+      "constructor": "InferenceUpstreamError",
+      "message": "5006: Error: '/model' failed test ^\\s*(clef|clef-flash)\\s*$ patttern"
+    }
+  },
+  {
+    "name": "clef/criteria keys reversed",
+    "status": 200,
+    "ok": true,
+    "ms": 154,
+    "model": "clef",
+    "choice": "per-session",
+    "probabilities": {
+      "unclear": 0.1071,
+      "static": 0.0325,
+      "ttl": 0.0756,
+      "per-session": 0.6689,
+      "per-request": 0.0972,
+      "per-call": 0.0187
+    },
+    "probabilityKeyOrder": [
+      "unclear",
+      "static",
+      "ttl",
+      "per-session",
+      "per-request",
+      "per-call"
+    ],
+    "confidence": 0.3705,
+    "usage": {
+      "input_tokens": 359,
+      "output_tokens": 0
+    }
+  },
+  {
+    "name": "flash/criteria keys reversed",
+    "status": 200,
+    "ok": true,
+    "ms": 146,
+    "model": "clef-flash",
+    "choice": "per-request",
+    "probabilities": {
+      "unclear": 0.0327,
+      "static": 0.014,
+      "ttl": 0.0264,
+      "per-session": 0.2636,
+      "per-request": 0.619,
+      "per-call": 0.0443
+    },
+    "probabilityKeyOrder": [
+      "unclear",
+      "static",
+      "ttl",
+      "per-session",
+      "per-request",
+      "per-call"
+    ],
+    "confidence": 0.3479,
+    "usage": {
+      "input_tokens": 359,
+      "output_tokens": 0
+    }
+  },
+  {
+    "name": "clef/state keys reordered",
+    "status": 200,
+    "ok": true,
+    "ms": 132,
+    "model": "clef",
+    "choice": "per-session",
+    "probabilities": {
+      "per-call": 0.0187,
+      "per-request": 0.0972,
+      "per-session": 0.6689,
+      "ttl": 0.0756,
+      "static": 0.0325,
+      "unclear": 0.1071
+    },
+    "probabilityKeyOrder": [
+      "per-call",
+      "per-request",
+      "per-session",
+      "ttl",
+      "static",
+      "unclear"
+    ],
+    "confidence": 0.3705,
+    "usage": {
+      "input_tokens": 359,
+      "output_tokens": 0
+    }
+  },
+  {
+    "name": "flash/state keys reordered",
+    "status": 200,
+    "ok": true,
+    "ms": 127,
+    "model": "clef-flash",
+    "choice": "per-request",
+    "probabilities": {
+      "per-call": 0.0443,
+      "per-request": 0.619,
+      "per-session": 0.2636,
+      "ttl": 0.0264,
+      "static": 0.014,
+      "unclear": 0.0327
+    },
+    "probabilityKeyOrder": [
+      "per-call",
+      "per-request",
+      "per-session",
+      "ttl",
+      "static",
+      "unclear"
+    ],
+    "confidence": 0.3479,
+    "usage": {
+      "input_tokens": 359,
+      "output_tokens": 0
+    }
+  }
+]

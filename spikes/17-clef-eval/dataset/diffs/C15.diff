@@ -1,0 +1,17 @@
+--- a/src/orders/handlers.ts
++++ b/src/orders/handlers.ts
+@@ -12 +12 @@ app.post("/orders/:id/cancel", async (c) => {
+-  await c.env.DB.prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?").bind(c.req.param("id")).run();
++  const session = c.env.DB.withSession("first-primary");
++  await session.prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?").bind(c.req.param("id")).run();
++  c.header("x-d1-bookmark", session.getBookmark() ?? "");
+   return c.json({ ok: true });
+ });
+
+ app.get("/orders/:id", async (c) => {
+-  const db = c.env.DB.withSession("first-unconstrained");
++  // Continue the caller's session so a client always sees its own writes.
++  const db = c.env.DB.withSession(c.req.header("x-d1-bookmark") ?? "first-unconstrained");
+   const order = await db.prepare("SELECT * FROM orders WHERE id = ?").bind(c.req.param("id")).first();
+   return c.json(order);
+ });

@@ -1,0 +1,23 @@
+--- a/billing/limits.py
++++ b/billing/limits.py
+@@ -1 +1 @@
+-import json
++import time
+
+ from billing.db import fetch_plan_limits
+
+-# Loaded once when the module is imported.
+-_PLAN_LIMITS = fetch_plan_limits()
++_TTL_SECONDS = 60
++_cache: dict[str, tuple[float, dict]] = {}
+
+
+ def limits_for(plan_id: str) -> dict:
+-    return _PLAN_LIMITS[plan_id]
++    now = time.monotonic()
++    hit = _cache.get(plan_id)
++    if hit is not None and now - hit[0] < _TTL_SECONDS:
++        return hit[1]
++    limits = fetch_plan_limits()[plan_id]
++    _cache[plan_id] = (now, limits)
++    return limits

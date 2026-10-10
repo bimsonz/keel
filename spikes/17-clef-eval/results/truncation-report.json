@@ -1,0 +1,317 @@
+{
+  "clef-flash": {
+    "cap": 24000,
+    "rows": [
+      {
+        "target": 20480,
+        "trueTokens": 20444,
+        "oversize": false,
+        "service": "full (20444)",
+        "answer": "per-session",
+        "pPerSession": 0.7002,
+        "ms": 4604,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": false,
+        "true count vs docs window (can-fail)": false,
+        "post-call usage == cap": false
+      },
+      {
+        "target": 23552,
+        "trueTokens": 23538,
+        "oversize": false,
+        "service": "full (23538)",
+        "answer": "per-session",
+        "pPerSession": 0.4952,
+        "ms": 5222,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": false,
+        "true count vs docs window (can-fail)": false,
+        "post-call usage == cap": false
+      },
+      {
+        "target": 24576,
+        "trueTokens": 24490,
+        "oversize": true,
+        "service": "silently truncated to 24000",
+        "answer": "unclear",
+        "pPerSession": 0.0757,
+        "ms": 5313,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": false,
+        "true count vs docs window (can-fail)": false,
+        "post-call usage == cap": true
+      },
+      {
+        "target": 25600,
+        "trueTokens": 25561,
+        "oversize": true,
+        "service": "silently truncated to 24000",
+        "answer": "unclear",
+        "pPerSession": 0.0757,
+        "ms": 5644,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": false,
+        "true count vs docs window (can-fail)": true,
+        "post-call usage == cap": true
+      },
+      {
+        "target": 32768,
+        "trueTokens": 32701,
+        "oversize": true,
+        "service": "silently truncated to 24000",
+        "answer": "unclear",
+        "pPerSession": 0.0757,
+        "ms": 5347,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": true,
+        "true count vs docs window (can-fail)": true,
+        "post-call usage == cap": true
+      },
+      {
+        "target": 51200,
+        "trueTokens": 51146,
+        "oversize": true,
+        "service": "silently truncated to 24000",
+        "answer": "unclear",
+        "pPerSession": 0.0757,
+        "ms": 5420,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": true,
+        "true count vs docs window (can-fail)": true,
+        "post-call usage == cap": true
+      },
+      {
+        "target": 61440,
+        "trueTokens": 61380,
+        "oversize": true,
+        "service": "silently truncated to 24000",
+        "answer": "unclear",
+        "pPerSession": 0.0757,
+        "ms": 5500,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": true,
+        "true count vs docs window (can-fail)": true,
+        "post-call usage == cap": true
+      },
+      {
+        "target": 64512,
+        "trueTokens": 64474,
+        "oversize": true,
+        "service": "silently truncated to 24000",
+        "answer": "unclear",
+        "pPerSession": 0.0757,
+        "ms": 5530,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": true,
+        "true count vs docs window (can-fail)": true,
+        "post-call usage == cap": true
+      },
+      {
+        "target": 65536,
+        "trueTokens": 65426,
+        "oversize": true,
+        "service": "silently truncated to 24000",
+        "answer": "unclear",
+        "pPerSession": 0.0757,
+        "ms": 5890,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": true,
+        "true count vs docs window (can-fail)": true,
+        "post-call usage == cap": true
+      },
+      {
+        "target": 67584,
+        "trueTokens": 67568,
+        "oversize": true,
+        "service": "5021: The estimated number of input and maximum output token",
+        "answer": "-",
+        "ms": 46,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": true,
+        "true count vs docs window (can-fail)": true,
+        "post-call usage == cap": false
+      },
+      {
+        "target": 81920,
+        "trueTokens": 81848,
+        "oversize": true,
+        "service": "5021: The estimated number of input and maximum output token",
+        "answer": "-",
+        "ms": 51,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": true,
+        "true count vs docs window (can-fail)": true,
+        "post-call usage == cap": false
+      }
+    ],
+    "summary": {
+      "calibrated": {
+        "oversizeDetected": "9/9",
+        "falseAlarms": "2/2"
+      },
+      "guaranteed": {
+        "oversizeDetected": "9/9",
+        "falseAlarms": "2/2"
+      },
+      "disabled (can-fail)": {
+        "oversizeDetected": "0/9",
+        "falseAlarms": "0/2"
+      },
+      "floor=4.0 (can-fail)": {
+        "oversizeDetected": "7/9",
+        "falseAlarms": "0/2"
+      },
+      "true count vs docs window (can-fail)": {
+        "oversizeDetected": "8/9",
+        "falseAlarms": "0/2"
+      },
+      "post-call usage == cap": {
+        "oversizeDetected": "7/9",
+        "falseAlarms": "0/2"
+      }
+    }
+  },
+  "clef": {
+    "cap": 64000,
+    "rows": [
+      {
+        "target": 51200,
+        "trueTokens": 51146,
+        "oversize": false,
+        "service": "full (51146)",
+        "answer": "per-session",
+        "pPerSession": 0.9427,
+        "ms": 6266,
+        "calibrated": false,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": false,
+        "true count vs docs window (can-fail)": false,
+        "post-call usage == cap": false
+      },
+      {
+        "target": 61440,
+        "trueTokens": 61380,
+        "oversize": false,
+        "service": "full (61380)",
+        "answer": "per-session",
+        "pPerSession": 0.9358,
+        "ms": 7118,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": false,
+        "true count vs docs window (can-fail)": false,
+        "post-call usage == cap": false
+      },
+      {
+        "target": 64512,
+        "trueTokens": 64474,
+        "oversize": true,
+        "service": "silently truncated to 64000",
+        "answer": "unclear",
+        "pPerSession": 0.0078,
+        "ms": 7706,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": false,
+        "true count vs docs window (can-fail)": false,
+        "post-call usage == cap": true
+      },
+      {
+        "target": 65536,
+        "trueTokens": 65426,
+        "oversize": true,
+        "service": "silently truncated to 64000",
+        "answer": "unclear",
+        "pPerSession": 0.0078,
+        "ms": 7485,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": false,
+        "true count vs docs window (can-fail)": false,
+        "post-call usage == cap": true
+      },
+      {
+        "target": 67584,
+        "trueTokens": 67568,
+        "oversize": true,
+        "service": "silently truncated to 64000",
+        "answer": "unclear",
+        "pPerSession": 0.0078,
+        "ms": 8202,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": false,
+        "true count vs docs window (can-fail)": true,
+        "post-call usage == cap": true
+      },
+      {
+        "target": 81920,
+        "trueTokens": 81848,
+        "oversize": true,
+        "service": "silently truncated to 64000",
+        "answer": "unclear",
+        "pPerSession": 0.0078,
+        "ms": 7793,
+        "calibrated": true,
+        "guaranteed": true,
+        "disabled (can-fail)": false,
+        "floor=4.0 (can-fail)": false,
+        "true count vs docs window (can-fail)": true,
+        "post-call usage == cap": true
+      }
+    ],
+    "summary": {
+      "calibrated": {
+        "oversizeDetected": "4/4",
+        "falseAlarms": "1/2"
+      },
+      "guaranteed": {
+        "oversizeDetected": "4/4",
+        "falseAlarms": "2/2"
+      },
+      "disabled (can-fail)": {
+        "oversizeDetected": "0/4",
+        "falseAlarms": "0/2"
+      },
+      "floor=4.0 (can-fail)": {
+        "oversizeDetected": "0/4",
+        "falseAlarms": "0/2"
+      },
+      "true count vs docs window (can-fail)": {
+        "oversizeDetected": "2/4",
+        "falseAlarms": "0/2"
+      },
+      "post-call usage == cap": {
+        "oversizeDetected": "4/4",
+        "falseAlarms": "0/2"
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+--- a/repos/settings.py
++++ b/repos/settings.py
+@@ -1 +1 @@
++from cachetools import LRUCache
++
+ from repos.db import db
+
++_cache: LRUCache = LRUCache(maxsize=10_000)
++
+
+ def get_settings(repo_id: int) -> dict:
+-    return db.fetch_settings(repo_id)
++    # The version lookup reads the primary on every call, so a cached body is
++    # only reused while it is still the latest committed version.
++    version = db.fetch_settings_version(repo_id)
++    key = (repo_id, version)
++    body = _cache.get(key)
++    if body is None:
++        body = db.fetch_settings_at(repo_id, version)
++        _cache[key] = body
++    return body
+
+
+ def update_settings(repo_id: int, changes: dict) -> dict:
+-    return db.update_settings(repo_id, changes)
++    # Every write bumps the version, which invalidates the cached body.
++    return db.update_settings(repo_id, changes, bump_version=True)

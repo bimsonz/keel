@@ -1,0 +1,20 @@
+--- a/ledger/db.py
++++ b/ledger/db.py
+@@ -4 +4 @@ from ledger.settings import settings
+ primary = create_engine(settings.PRIMARY_URL, pool_size=20)
++# Asynchronous streaming replica; typically 100 ms to several seconds behind.
++replica = create_engine(settings.REPLICA_URL, pool_size=40)
+--- a/ledger/queries.py
++++ b/ledger/queries.py
+@@ -14 +14 @@ from ledger.db import primary
++from ledger.db import replica
+
+
+ def get_balance(account_id: int) -> Decimal:
+-    with primary.connect() as conn:
++    # Balance reads are hot; serve them from the replica.
++    with replica.connect() as conn:
+         row = conn.execute(
+             select(accounts.c.balance).where(accounts.c.id == account_id)
+         ).one()
+     return row.balance

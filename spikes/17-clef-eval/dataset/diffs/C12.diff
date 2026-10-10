@@ -1,0 +1,21 @@
+--- a/src/repos/meta.ts
++++ b/src/repos/meta.ts
+@@ -8 +8 @@ export interface Env {
+   DB: D1Database;
++  REPO_META: KVNamespace;
+ }
+
+ export async function getDefaultBranch(env: Env, repoId: string): Promise<string> {
++  const cached = await env.REPO_META.get("default-branch:" + repoId, { cacheTtl: 300 });
++  if (cached !== null) return cached;
+   const row = await env.DB.prepare("SELECT default_branch FROM repos WHERE id = ?")
+     .bind(repoId)
+     .first<{ default_branch: string }>();
++  await env.REPO_META.put("default-branch:" + repoId, row!.default_branch);
+   return row!.default_branch;
+ }
+
+ export async function setDefaultBranch(env: Env, repoId: string, branch: string): Promise<void> {
+   await env.DB.prepare("UPDATE repos SET default_branch = ? WHERE id = ?").bind(branch, repoId).run();
++  await env.REPO_META.put("default-branch:" + repoId, branch);
+ }

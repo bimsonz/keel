@@ -1,0 +1,32 @@
+--- /dev/null
++++ b/migrations/versions/0042_relax_primary_email.py
+@@ -0,0 +1 @@
++"""Allow importing users that arrive with several primary emails."""
++from alembic import op
++
++revision = "0042"
++down_revision = "0041"
++
++
++def upgrade() -> None:
++    op.drop_index("uq_user_emails_primary", table_name="user_emails")
++
++
++def downgrade() -> None:
++    op.create_index(
++        "uq_user_emails_primary",
++        "user_emails",
++        ["user_id"],
++        unique=True,
++        postgresql_where="is_primary",
++    )
+--- a/accounts/models.py
++++ b/accounts/models.py
+@@ -28 +28 @@ class UserEmail(Base):
+     __tablename__ = "user_emails"
+-    __table_args__ = (
+-        Index("uq_user_emails_primary", "user_id", unique=True, postgresql_where=text("is_primary")),
+-    )
+     user_id = mapped_column(ForeignKey("users.id"))
+     address = mapped_column(String(320))
+     is_primary = mapped_column(Boolean, default=False)

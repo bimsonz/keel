@@ -1,0 +1,25 @@
+--- a/internal/media/thumbnails.go
++++ b/internal/media/thumbnails.go
+@@ -15 +15 @@ type Thumbnailer struct {
+     jobs  chan Job
+     store BlobStore
+ }
+
+-func (t *Thumbnailer) Start(ctx context.Context) {
+-    go t.loop(ctx)
++const ThumbnailWorkers = 8
++
++// Thumbnails are independent; render them concurrently, in any order.
++func (t *Thumbnailer) Start(ctx context.Context) {
++    for i := 0; i < ThumbnailWorkers; i++ {
++        go t.loop(ctx)
++    }
+ }
+--- a/internal/server/server.go
++++ b/internal/server/server.go
+@@ -40 +40 @@ func Run(ctx context.Context, cfg Config) error {
+     auditWriter := audit.NewWriter(auditSink)
+     auditWriter.Start(ctx) // single goroutine: preserves append order
+     thumbs := media.NewThumbnailer(blobs)
+     thumbs.Start(ctx)
++    log.Printf("thumbnailer started with %d workers", media.ThumbnailWorkers)

@@ -1,0 +1,5930 @@
+{
+  "primary": {
+    "rule": "keel-mass",
+    "t": 0.5
+  },
+  "clef-flash": {
+    "calls": 168,
+    "errors": 0,
+    "retries": 0,
+    "modes": {
+      "joint": {
+        "unclearShare": 0.041666666666666664,
+        "v0ValueAccuracy": 0.875,
+        "permutedAgreementAll3": 0.9,
+        "flipRatePairwise": 0.06666666666666667,
+        "verdictAgreementAll3": 0.975,
+        "rules": {
+          "single-argmax": [
+            {
+              "t": 0,
+              "recall": 1,
+              "precision": 0.9565217391304348,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0.02631578947368421,
+              "tp": 22,
+              "fp": 1,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.3,
+              "recall": 1,
+              "precision": 0.9565217391304348,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0.02631578947368421,
+              "tp": 22,
+              "fp": 1,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.4,
+              "recall": 1,
+              "precision": 0.9565217391304348,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0.02631578947368421,
+              "tp": 22,
+              "fp": 1,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.5,
+              "recall": 0.8181818181818182,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.8,
+              "risk": 0,
+              "tp": 18,
+              "fp": 0,
+              "fn": 4,
+              "misses": [
+                "C05",
+                "C12",
+                "C24",
+                "C25"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.6,
+              "recall": 0.7727272727272727,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.7,
+              "risk": 0,
+              "tp": 17,
+              "fp": 0,
+              "fn": 5,
+              "misses": [
+                "C02",
+                "C05",
+                "C12",
+                "C24",
+                "C25"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.7,
+              "recall": 0.5909090909090909,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.55,
+              "risk": 0,
+              "tp": 13,
+              "fp": 0,
+              "fn": 9,
+              "misses": [
+                "C01",
+                "C02",
+                "C05",
+                "C12",
+                "C21",
+                "C24",
+                "C25",
+                "C28",
+                "C30"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.8,
+              "recall": 0.5,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.45,
+              "risk": 0,
+              "tp": 11,
+              "fp": 0,
+              "fn": 11,
+              "misses": [
+                "C01",
+                "C02",
+                "C05",
+                "C06",
+                "C12",
+                "C13",
+                "C21",
+                "C24",
+                "C25",
+                "C28",
+                "C30"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.13636363636363635,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.1,
+              "risk": 0,
+              "tp": 3,
+              "fp": 0,
+              "fn": 19,
+              "misses": [
+                "C01",
+                "C02",
+                "C04",
+                "C05",
+                "C06",
+                "C07",
+                "C09",
+                "C10",
+                "C12",
+                "C13",
+                "C19",
+                "C20",
+                "C21",
+                "C22",
+                "C24",
+                "C25",
+                "C27",
+                "C28",
+                "C30"
+              ],
+              "falseFlags": []
+            }
+          ],
+          "single-mass": [
+            {
+              "t": 0,
+              "recall": 1,
+              "precision": 0.5789473684210527,
+              "decoyFpRate": 0.8,
+              "compatibleFpRate": 1,
+              "coverage": 0.95,
+              "risk": 0.42105263157894735,
+              "tp": 22,
+              "fp": 16,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "C03",
+                "C08",
+                "C11",
+                "C15",
+                "C18",
+                "C23",
+                "C26",
+                "C29",
+                "D01",
+                "D02",
+                "D03",
+                "D04",
+                "D05",
+                "D08",
+                "D09",
+                "D10"
+              ]
+            },
+            {
+              "t": 0.3,
+              "recall": 1,
+              "precision": 0.9565217391304348,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0.02631578947368421,
+              "tp": 22,
+              "fp": 1,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.4,
+              "recall": 1,
+              "precision": 0.9565217391304348,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0.02631578947368421,
+              "tp": 22,
+              "fp": 1,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.5,
+              "recall": 0.9545454545454546,
+              "precision": 0.9545454545454546,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0.05263157894736842,
+              "tp": 21,
+              "fp": 1,
+              "fn": 1,
+              "misses": [
+                "C24"
+              ],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.6,
+              "recall": 0.9090909090909091,
+              "precision": 0.9523809523809523,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.9,
+              "risk": 0.027777777777777776,
+              "tp": 20,
+              "fp": 1,
+              "fn": 2,
+              "misses": [
+                "C24",
+                "C25"
+              ],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.7,
+              "recall": 0.9090909090909091,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.875,
+              "risk": 0,
+              "tp": 20,
+              "fp": 0,
+              "fn": 2,
+              "misses": [
+                "C24",
+                "C25"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.8,
+              "recall": 0.7272727272727273,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.75,
+              "risk": 0,
+              "tp": 16,
+              "fp": 0,
+              "fn": 6,
+              "misses": [
+                "C01",
+                "C06",
+                "C12",
+                "C24",
+                "C25",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.45454545454545453,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.55,
+              "risk": 0,
+              "tp": 10,
+              "fp": 0,
+              "fn": 12,
+              "misses": [
+                "C01",
+                "C02",
+                "C06",
+                "C07",
+                "C09",
+                "C12",
+                "C21",
+                "C24",
+                "C25",
+                "C27",
+                "C28",
+                "C30"
+              ],
+              "falseFlags": []
+            }
+          ],
+          "keel-argmax": [
+            {
+              "t": 0,
+              "recall": 0.9545454545454546,
+              "precision": 0.9545454545454546,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.875,
+              "risk": 0.02857142857142857,
+              "tp": 21,
+              "fp": 1,
+              "fn": 1,
+              "misses": [
+                "C05"
+              ],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.3,
+              "recall": 0.9545454545454546,
+              "precision": 0.9545454545454546,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.875,
+              "risk": 0.02857142857142857,
+              "tp": 21,
+              "fp": 1,
+              "fn": 1,
+              "misses": [
+                "C05"
+              ],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.4,
+              "recall": 0.9545454545454546,
+              "precision": 0.9545454545454546,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.875,
+              "risk": 0.02857142857142857,
+              "tp": 21,
+              "fp": 1,
+              "fn": 1,
+              "misses": [
+                "C05"
+              ],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.5,
+              "recall": 0.7727272727272727,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.75,
+              "risk": 0,
+              "tp": 17,
+              "fp": 0,
+              "fn": 5,
+              "misses": [
+                "C02",
+                "C05",
+                "C12",
+                "C24",
+                "C25"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.6,
+              "recall": 0.7272727272727273,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.675,
+              "risk": 0,
+              "tp": 16,
+              "fp": 0,
+              "fn": 6,
+              "misses": [
+                "C02",
+                "C05",
+                "C06",
+                "C12",
+                "C24",
+                "C25"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.7,
+              "recall": 0.5454545454545454,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.525,
+              "risk": 0,
+              "tp": 12,
+              "fp": 0,
+              "fn": 10,
+              "misses": [
+                "C01",
+                "C02",
+                "C05",
+                "C06",
+                "C12",
+                "C21",
+                "C24",
+                "C25",
+                "C28",
+                "C30"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.8,
+              "recall": 0.5,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.45,
+              "risk": 0,
+              "tp": 11,
+              "fp": 0,
+              "fn": 11,
+              "misses": [
+                "C01",
+                "C02",
+                "C05",
+                "C06",
+                "C12",
+                "C13",
+                "C21",
+                "C24",
+                "C25",
+                "C28",
+                "C30"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.13636363636363635,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.1,
+              "risk": 0,
+              "tp": 3,
+              "fp": 0,
+              "fn": 19,
+              "misses": [
+                "C01",
+                "C02",
+                "C04",
+                "C05",
+                "C06",
+                "C07",
+                "C09",
+                "C10",
+                "C12",
+                "C13",
+                "C19",
+                "C20",
+                "C21",
+                "C22",
+                "C24",
+                "C25",
+                "C27",
+                "C28",
+                "C30"
+              ],
+              "falseFlags": []
+            }
+          ],
+          "keel-mass": [
+            {
+              "t": 0,
+              "recall": 1,
+              "precision": 0.5789473684210527,
+              "decoyFpRate": 0.8,
+              "compatibleFpRate": 1,
+              "coverage": 0.95,
+              "risk": 0.42105263157894735,
+              "tp": 22,
+              "fp": 16,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "C03",
+                "C08",
+                "C11",
+                "C15",
+                "C18",
+                "C23",
+                "C26",
+                "C29",
+                "D01",
+                "D02",
+                "D03",
+                "D04",
+                "D05",
+                "D08",
+                "D09",
+                "D10"
+              ]
+            },
+            {
+              "t": 0.3,
+              "recall": 1,
+              "precision": 0.9565217391304348,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0.02631578947368421,
+              "tp": 22,
+              "fp": 1,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.4,
+              "recall": 1,
+              "precision": 0.9565217391304348,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0.02631578947368421,
+              "tp": 22,
+              "fp": 1,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.5,
+              "recall": 0.9545454545454546,
+              "precision": 0.9545454545454546,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0.05263157894736842,
+              "tp": 21,
+              "fp": 1,
+              "fn": 1,
+              "misses": [
+                "C24"
+              ],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.6,
+              "recall": 0.8636363636363636,
+              "precision": 0.95,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.875,
+              "risk": 0.02857142857142857,
+              "tp": 19,
+              "fp": 1,
+              "fn": 3,
+              "misses": [
+                "C06",
+                "C24",
+                "C25"
+              ],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.7,
+              "recall": 0.7727272727272727,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.8,
+              "risk": 0,
+              "tp": 17,
+              "fp": 0,
+              "fn": 5,
+              "misses": [
+                "C06",
+                "C12",
+                "C24",
+                "C25",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.8,
+              "recall": 0.7272727272727273,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.75,
+              "risk": 0,
+              "tp": 16,
+              "fp": 0,
+              "fn": 6,
+              "misses": [
+                "C01",
+                "C06",
+                "C12",
+                "C24",
+                "C25",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.36363636363636365,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.5,
+              "risk": 0,
+              "tp": 8,
+              "fp": 0,
+              "fn": 14,
+              "misses": [
+                "C01",
+                "C02",
+                "C06",
+                "C07",
+                "C09",
+                "C10",
+                "C12",
+                "C13",
+                "C21",
+                "C24",
+                "C25",
+                "C27",
+                "C28",
+                "C30"
+              ],
+              "falseFlags": []
+            }
+          ]
+        },
+        "perItem": [
+          {
+            "id": "C01",
+            "truth": "per-session",
+            "label": "contradiction",
+            "chosen": [
+              "per-session",
+              "per-session",
+              "per-session"
+            ],
+            "pChosen": [
+              0.693,
+              0.889,
+              0.929
+            ],
+            "pViolate": [
+              0.744,
+              0.931,
+              0.956
+            ]
+          },
+          {
+            "id": "C02",
+            "truth": "static",
+            "label": "contradiction",
+            "chosen": [
+              "static",
+              "static",
+              "static"
+            ],
+            "pChosen": [
+              0.516,
+              0.525,
+              0.482
+            ],
+            "pViolate": [
+              0.846,
+              0.924,
+              0.924
+            ]
+          },
+          {
+            "id": "C03",
+            "truth": "ttl",
+            "label": "compatible",
+            "chosen": [
+              "ttl",
+              "ttl",
+              "ttl"
+            ],
+            "pChosen": [
+              0.93,
+              0.941,
+              0.933
+            ],
+            "pViolate": [
+              0.014,
+              0.013,
+              0.015
+            ]
+          },
+          {
+            "id": "C04",
+            "truth": "ttl",
+            "label": "contradiction",
+            "chosen": [
+              "ttl",
+              "ttl",
+              "ttl"
+            ],
+            "pChosen": [
+              0.885,
+              0.923,
+              0.919
+            ],
+            "pViolate": [
+              0.928,
+              0.953,
+              0.954
+            ]
+          },
+          {
+            "id": "C05",
+            "truth": "static",
+            "label": "contradiction",
+            "chosen": [
+              "per-session",
+              "static",
+              "per-session"
+            ],
+            "pChosen": [
+              0.431,
+              0.527,
+              0.448
+            ],
+            "pViolate": [
+              0.926,
+              0.952,
+              0.953
+            ]
+          },
+          {
+            "id": "C06",
+            "truth": "many",
+            "label": "contradiction",
+            "chosen": [
+              "many",
+              "many",
+              "many"
+            ],
+            "pChosen": [
+              0.723,
+              0.644,
+              0.585
+            ],
+            "pViolate": [
+              0.723,
+              0.644,
+              0.585
+            ]
+          },
+          {
+            "id": "C07",
+            "truth": "many",
+            "label": "contradiction",
+            "chosen": [
+              "many",
+              "many",
+              "many"
+            ],
+            "pChosen": [
+              0.879,
+              0.884,
+              0.845
+            ],
+            "pViolate": [
+              0.879,
+              0.884,
+              0.845
+            ]
+          },
+          {
+            "id": "C08",
+            "truth": "at-most-one",
+            "label": "compatible",
+            "chosen": [
+              "at-most-one",
+              "at-most-one",
+              "at-most-one"
+            ],
+            "pChosen": [
+              0.568,
+              0.82,
+              0.758
+            ],
+            "pViolate": [
+              0.025,
+              0.02,
+              0.031
+            ]
+          },
+          {
+            "id": "C09",
+            "truth": "unordered",
+            "label": "contradiction",
+            "chosen": [
+              "unordered",
+              "unordered",
+              "unordered"
+            ],
+            "pChosen": [
+              0.899,
+              0.916,
+              0.892
+            ],
+            "pViolate": [
+              0.899,
+              0.916,
+              0.892
+            ]
+          },
+          {
+            "id": "C10",
+            "truth": "unordered",
+            "label": "contradiction",
+            "chosen": [
+              "unordered",
+              "unordered",
+              "unordered"
+            ],
+            "pChosen": [
+              0.877,
+              0.871,
+              0.893
+            ],
+            "pViolate": [
+              0.923,
+              0.895,
+              0.916
+            ]
+          },
+          {
+            "id": "C11",
+            "truth": "per-key-fifo",
+            "label": "compatible",
+            "chosen": [
+              "per-key-fifo",
+              "per-key-fifo",
+              "per-key-fifo"
+            ],
+            "pChosen": [
+              0.883,
+              0.883,
+              0.913
+            ],
+            "pViolate": [
+              0.058,
+              0.045,
+              0.031
+            ]
+          },
+          {
+            "id": "C12",
+            "truth": "eventual",
+            "label": "contradiction",
+            "chosen": [
+              "eventual",
+              "eventual",
+              "eventual"
+            ],
+            "pChosen": [
+              0.489,
+              0.438,
+              0.757
+            ],
+            "pViolate": [
+              0.745,
+              0.675,
+              0.85
+            ]
+          },
+          {
+            "id": "C13",
+            "truth": "eventual",
+            "label": "contradiction",
+            "chosen": [
+              "eventual",
+              "eventual",
+              "eventual"
+            ],
+            "pChosen": [
+              0.796,
+              0.865,
+              0.833
+            ],
+            "pViolate": [
+              0.947,
+              0.91,
+              0.88
+            ]
+          },
+          {
+            "id": "C14",
+            "truth": "string",
+            "label": "contradiction",
+            "chosen": [
+              "string",
+              "string",
+              "string"
+            ],
+            "pChosen": [
+              0.911,
+              0.933,
+              0.919
+            ],
+            "pViolate": [
+              0.961,
+              0.97,
+              0.965
+            ]
+          },
+          {
+            "id": "C15",
+            "truth": "read-your-writes",
+            "label": "compatible",
+            "chosen": [
+              "read-your-writes",
+              "read-your-writes",
+              "read-your-writes"
+            ],
+            "pChosen": [
+              0.663,
+              0.873,
+              0.683
+            ],
+            "pViolate": [
+              0.034,
+              0.029,
+              0.058
+            ]
+          },
+          {
+            "id": "C16",
+            "truth": "optional",
+            "label": "contradiction",
+            "chosen": [
+              "optional",
+              "optional",
+              "optional"
+            ],
+            "pChosen": [
+              0.94,
+              0.955,
+              0.949
+            ],
+            "pViolate": [
+              0.961,
+              0.97,
+              0.966
+            ]
+          },
+          {
+            "id": "C17",
+            "truth": "optional",
+            "label": "contradiction",
+            "chosen": [
+              "optional",
+              "optional",
+              "optional"
+            ],
+            "pChosen": [
+              0.949,
+              0.944,
+              0.918
+            ],
+            "pViolate": [
+              0.963,
+              0.961,
+              0.941
+            ]
+          },
+          {
+            "id": "C18",
+            "truth": "required",
+            "label": "compatible",
+            "chosen": [
+              "required",
+              "required",
+              "required"
+            ],
+            "pChosen": [
+              0.89,
+              0.931,
+              0.937
+            ],
+            "pViolate": [
+              0.022,
+              0.011,
+              0.011
+            ]
+          },
+          {
+            "id": "C19",
+            "truth": "absent",
+            "label": "contradiction",
+            "chosen": [
+              "absent",
+              "absent",
+              "absent"
+            ],
+            "pChosen": [
+              0.884,
+              0.96,
+              0.963
+            ],
+            "pViolate": [
+              0.976,
+              0.984,
+              0.983
+            ]
+          },
+          {
+            "id": "C20",
+            "truth": "admin",
+            "label": "contradiction",
+            "chosen": [
+              "admin",
+              "admin",
+              "admin"
+            ],
+            "pChosen": [
+              0.835,
+              0.854,
+              0.877
+            ],
+            "pViolate": [
+              0.926,
+              0.936,
+              0.949
+            ]
+          },
+          {
+            "id": "C21",
+            "truth": "member",
+            "label": "contradiction",
+            "chosen": [
+              "member",
+              "member",
+              "member"
+            ],
+            "pChosen": [
+              0.699,
+              0.907,
+              0.914
+            ],
+            "pViolate": [
+              0.874,
+              0.958,
+              0.957
+            ]
+          },
+          {
+            "id": "C22",
+            "truth": "authenticated",
+            "label": "contradiction",
+            "chosen": [
+              "authenticated",
+              "authenticated",
+              "authenticated"
+            ],
+            "pChosen": [
+              0.865,
+              0.886,
+              0.89
+            ],
+            "pViolate": [
+              0.913,
+              0.932,
+              0.945
+            ]
+          },
+          {
+            "id": "C23",
+            "truth": "admin",
+            "label": "compatible",
+            "chosen": [
+              "admin",
+              "admin",
+              "admin"
+            ],
+            "pChosen": [
+              0.844,
+              0.932,
+              0.861
+            ],
+            "pViolate": [
+              0.057,
+              0.03,
+              0.064
+            ]
+          },
+          {
+            "id": "C24",
+            "truth": "non-idempotent",
+            "label": "contradiction",
+            "chosen": [
+              "non-idempotent",
+              "non-idempotent",
+              "non-idempotent"
+            ],
+            "pChosen": [
+              0.404,
+              0.467,
+              0.447
+            ],
+            "pViolate": [
+              0.404,
+              0.467,
+              0.447
+            ]
+          },
+          {
+            "id": "C25",
+            "truth": "idempotent",
+            "label": "contradiction",
+            "chosen": [
+              "idempotent",
+              "idempotent",
+              "idempotent"
+            ],
+            "pChosen": [
+              0.422,
+              0.748,
+              0.716
+            ],
+            "pViolate": [
+              0.559,
+              0.899,
+              0.92
+            ]
+          },
+          {
+            "id": "C26",
+            "truth": "idempotent",
+            "label": "compatible",
+            "chosen": [
+              "idempotent",
+              "idempotent",
+              "idempotent"
+            ],
+            "pChosen": [
+              0.744,
+              0.909,
+              0.874
+            ],
+            "pViolate": [
+              0.041,
+              0.023,
+              0.029
+            ]
+          },
+          {
+            "id": "C27",
+            "truth": "le-1k",
+            "label": "contradiction",
+            "chosen": [
+              "le-1k",
+              "le-1k",
+              "le-1k"
+            ],
+            "pChosen": [
+              0.812,
+              0.924,
+              0.931
+            ],
+            "pViolate": [
+              0.867,
+              0.958,
+              0.963
+            ]
+          },
+          {
+            "id": "C28",
+            "truth": "unbounded",
+            "label": "contradiction",
+            "chosen": [
+              "unbounded",
+              "unbounded",
+              "unbounded"
+            ],
+            "pChosen": [
+              0.682,
+              0.634,
+              0.669
+            ],
+            "pViolate": [
+              0.777,
+              0.675,
+              0.697
+            ]
+          },
+          {
+            "id": "C29",
+            "truth": "le-100",
+            "label": "compatible",
+            "chosen": [
+              "le-100",
+              "le-100",
+              "le-100"
+            ],
+            "pChosen": [
+              0.822,
+              0.902,
+              0.887
+            ],
+            "pViolate": [
+              0.109,
+              0.065,
+              0.074
+            ]
+          },
+          {
+            "id": "C30",
+            "truth": "string",
+            "label": "contradiction",
+            "chosen": [
+              "string",
+              "string",
+              "string"
+            ],
+            "pChosen": [
+              0.651,
+              0.784,
+              0.881
+            ],
+            "pViolate": [
+              0.859,
+              0.959,
+              0.959
+            ]
+          },
+          {
+            "id": "D01",
+            "truth": "per-request",
+            "label": "compatible",
+            "chosen": [
+              "per-request",
+              "per-request",
+              "per-request"
+            ],
+            "pChosen": [
+              0.884,
+              0.902,
+              0.9
+            ],
+            "pViolate": [
+              0.057,
+              0.06,
+              0.062
+            ]
+          },
+          {
+            "id": "D02",
+            "truth": "strong",
+            "label": "compatible",
+            "chosen": [
+              "read-your-writes",
+              "read-your-writes",
+              "read-your-writes"
+            ],
+            "pChosen": [
+              0.461,
+              0.752,
+              0.864
+            ],
+            "pViolate": [
+              0.661,
+              0.829,
+              0.926
+            ]
+          },
+          {
+            "id": "D03",
+            "truth": "idempotent",
+            "label": "compatible",
+            "chosen": [
+              "idempotent",
+              "idempotent",
+              "idempotent"
+            ],
+            "pChosen": [
+              0.583,
+              0.806,
+              0.857
+            ],
+            "pViolate": [
+              0.074,
+              0.039,
+              0.033
+            ]
+          },
+          {
+            "id": "D04",
+            "truth": "le-100",
+            "label": "compatible",
+            "chosen": [
+              "le-100",
+              "le-100",
+              "le-100"
+            ],
+            "pChosen": [
+              0.783,
+              0.902,
+              0.903
+            ],
+            "pViolate": [
+              0.114,
+              0.044,
+              0.038
+            ]
+          },
+          {
+            "id": "D05",
+            "truth": "at-most-one",
+            "label": "compatible",
+            "chosen": [
+              "exactly-one",
+              "at-most-one",
+              "at-most-one"
+            ],
+            "pChosen": [
+              0.535,
+              0.727,
+              0.621
+            ],
+            "pViolate": [
+              0.064,
+              0.029,
+              0.029
+            ]
+          },
+          {
+            "id": "D06",
+            "truth": "per-call",
+            "label": "compatible",
+            "chosen": [
+              "unclear",
+              "unclear",
+              "unclear"
+            ],
+            "pChosen": [
+              0.601,
+              0.847,
+              0.802
+            ],
+            "pViolate": [
+              0.207,
+              0.06,
+              0.057
+            ]
+          },
+          {
+            "id": "D07",
+            "truth": "per-call",
+            "label": "compatible",
+            "chosen": [
+              "unclear",
+              "unclear",
+              "per-call"
+            ],
+            "pChosen": [
+              0.479,
+              0.454,
+              0.615
+            ],
+            "pViolate": [
+              0.359,
+              0.075,
+              0.047
+            ]
+          },
+          {
+            "id": "D08",
+            "truth": "fifo",
+            "label": "compatible",
+            "chosen": [
+              "fifo",
+              "fifo",
+              "fifo"
+            ],
+            "pChosen": [
+              0.615,
+              0.926,
+              0.943
+            ],
+            "pViolate": [
+              0.281,
+              0.044,
+              0.034
+            ]
+          },
+          {
+            "id": "D09",
+            "truth": "at-most-one",
+            "label": "compatible",
+            "chosen": [
+              "at-most-one",
+              "at-most-one",
+              "exactly-one"
+            ],
+            "pChosen": [
+              0.478,
+              0.743,
+              0.509
+            ],
+            "pViolate": [
+              0.027,
+              0.021,
+              0.022
+            ]
+          },
+          {
+            "id": "D10",
+            "truth": "integer",
+            "label": "compatible",
+            "chosen": [
+              "integer",
+              "integer",
+              "integer"
+            ],
+            "pChosen": [
+              0.893,
+              0.945,
+              0.948
+            ],
+            "pViolate": [
+              0.082,
+              0.043,
+              0.041
+            ]
+          }
+        ]
+      },
+      "separate": {
+        "unclearShare": 0.03333333333333333,
+        "v0ValueAccuracy": 0.875,
+        "permutedAgreementAll3": 0.925,
+        "flipRatePairwise": 0.05,
+        "verdictAgreementAll3": 0.95,
+        "rules": {
+          "single-argmax": [
+            {
+              "t": 0,
+              "recall": 0.9545454545454546,
+              "precision": 0.9130434782608695,
+              "decoyFpRate": 0.2,
+              "compatibleFpRate": 0,
+              "coverage": 0.975,
+              "risk": 0.07692307692307693,
+              "tp": 21,
+              "fp": 2,
+              "fn": 1,
+              "misses": [
+                "C24"
+              ],
+              "falseFlags": [
+                "D02",
+                "D07"
+              ]
+            },
+            {
+              "t": 0.3,
+              "recall": 0.9545454545454546,
+              "precision": 0.9130434782608695,
+              "decoyFpRate": 0.2,
+              "compatibleFpRate": 0,
+              "coverage": 0.975,
+              "risk": 0.07692307692307693,
+              "tp": 21,
+              "fp": 2,
+              "fn": 1,
+              "misses": [
+                "C24"
+              ],
+              "falseFlags": [
+                "D02",
+                "D07"
+              ]
+            },
+            {
+              "t": 0.4,
+              "recall": 0.9545454545454546,
+              "precision": 0.9130434782608695,
+              "decoyFpRate": 0.2,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0.05263157894736842,
+              "tp": 21,
+              "fp": 2,
+              "fn": 1,
+              "misses": [
+                "C24"
+              ],
+              "falseFlags": [
+                "D02",
+                "D07"
+              ]
+            },
+            {
+              "t": 0.5,
+              "recall": 0.9545454545454546,
+              "precision": 0.9130434782608695,
+              "decoyFpRate": 0.2,
+              "compatibleFpRate": 0,
+              "coverage": 0.925,
+              "risk": 0.05405405405405406,
+              "tp": 21,
+              "fp": 2,
+              "fn": 1,
+              "misses": [
+                "C24"
+              ],
+              "falseFlags": [
+                "D02",
+                "D07"
+              ]
+            },
+            {
+              "t": 0.6,
+              "recall": 0.9545454545454546,
+              "precision": 0.9545454545454546,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.875,
+              "risk": 0.02857142857142857,
+              "tp": 21,
+              "fp": 1,
+              "fn": 1,
+              "misses": [
+                "C24"
+              ],
+              "falseFlags": [
+                "D07"
+              ]
+            },
+            {
+              "t": 0.7,
+              "recall": 0.6818181818181818,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.65,
+              "risk": 0,
+              "tp": 15,
+              "fp": 0,
+              "fn": 7,
+              "misses": [
+                "C01",
+                "C02",
+                "C05",
+                "C12",
+                "C24",
+                "C25",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.8,
+              "recall": 0.6363636363636364,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.575,
+              "risk": 0,
+              "tp": 14,
+              "fp": 0,
+              "fn": 8,
+              "misses": [
+                "C01",
+                "C02",
+                "C05",
+                "C06",
+                "C12",
+                "C24",
+                "C25",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.4090909090909091,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.325,
+              "risk": 0,
+              "tp": 9,
+              "fp": 0,
+              "fn": 13,
+              "misses": [
+                "C01",
+                "C02",
+                "C05",
+                "C06",
+                "C12",
+                "C13",
+                "C21",
+                "C22",
+                "C24",
+                "C25",
+                "C27",
+                "C28",
+                "C30"
+              ],
+              "falseFlags": []
+            }
+          ],
+          "single-mass": [
+            {
+              "t": 0,
+              "recall": 1,
+              "precision": 0.5641025641025641,
+              "decoyFpRate": 0.9,
+              "compatibleFpRate": 1,
+              "coverage": 0.975,
+              "risk": 0.4358974358974359,
+              "tp": 22,
+              "fp": 17,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "C03",
+                "C08",
+                "C11",
+                "C15",
+                "C18",
+                "C23",
+                "C26",
+                "C29",
+                "D01",
+                "D02",
+                "D03",
+                "D04",
+                "D05",
+                "D07",
+                "D08",
+                "D09",
+                "D10"
+              ]
+            },
+            {
+              "t": 0.3,
+              "recall": 1,
+              "precision": 0.9166666666666666,
+              "decoyFpRate": 0.2,
+              "compatibleFpRate": 0,
+              "coverage": 0.975,
+              "risk": 0.05128205128205128,
+              "tp": 22,
+              "fp": 2,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "D02",
+                "D07"
+              ]
+            },
+            {
+              "t": 0.4,
+              "recall": 0.9545454545454546,
+              "precision": 0.9130434782608695,
+              "decoyFpRate": 0.2,
+              "compatibleFpRate": 0,
+              "coverage": 0.975,
+              "risk": 0.07692307692307693,
+              "tp": 21,
+              "fp": 2,
+              "fn": 1,
+              "misses": [
+                "C24"
+              ],
+              "falseFlags": [
+                "D02",
+                "D07"
+              ]
+            },
+            {
+              "t": 0.5,
+              "recall": 0.9545454545454546,
+              "precision": 0.9130434782608695,
+              "decoyFpRate": 0.2,
+              "compatibleFpRate": 0,
+              "coverage": 0.975,
+              "risk": 0.07692307692307693,
+              "tp": 21,
+              "fp": 2,
+              "fn": 1,
+              "misses": [
+                "C24"
+              ],
+              "falseFlags": [
+                "D02",
+                "D07"
+              ]
+            },
+            {
+              "t": 0.6,
+              "recall": 0.9545454545454546,
+              "precision": 0.9130434782608695,
+              "decoyFpRate": 0.2,
+              "compatibleFpRate": 0,
+              "coverage": 0.975,
+              "risk": 0.07692307692307693,
+              "tp": 21,
+              "fp": 2,
+              "fn": 1,
+              "misses": [
+                "C24"
+              ],
+              "falseFlags": [
+                "D02",
+                "D07"
+              ]
+            },
+            {
+              "t": 0.7,
+              "recall": 0.9545454545454546,
+              "precision": 0.9545454545454546,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.925,
+              "risk": 0.02702702702702703,
+              "tp": 21,
+              "fp": 1,
+              "fn": 1,
+              "misses": [
+                "C24"
+              ],
+              "falseFlags": [
+                "D07"
+              ]
+            },
+            {
+              "t": 0.8,
+              "recall": 0.7727272727272727,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.8,
+              "risk": 0,
+              "tp": 17,
+              "fp": 0,
+              "fn": 5,
+              "misses": [
+                "C01",
+                "C06",
+                "C24",
+                "C25",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.6818181818181818,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.7,
+              "risk": 0,
+              "tp": 15,
+              "fp": 0,
+              "fn": 7,
+              "misses": [
+                "C01",
+                "C02",
+                "C06",
+                "C12",
+                "C24",
+                "C25",
+                "C28"
+              ],
+              "falseFlags": []
+            }
+          ],
+          "keel-argmax": [
+            {
+              "t": 0,
+              "recall": 0.9090909090909091,
+              "precision": 0.9523809523809523,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.9,
+              "risk": 0.027777777777777776,
+              "tp": 20,
+              "fp": 1,
+              "fn": 2,
+              "misses": [
+                "C05",
+                "C24"
+              ],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.3,
+              "recall": 0.9090909090909091,
+              "precision": 0.9523809523809523,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.9,
+              "risk": 0.027777777777777776,
+              "tp": 20,
+              "fp": 1,
+              "fn": 2,
+              "misses": [
+                "C05",
+                "C24"
+              ],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.4,
+              "recall": 0.9090909090909091,
+              "precision": 0.9523809523809523,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.9,
+              "risk": 0.027777777777777776,
+              "tp": 20,
+              "fp": 1,
+              "fn": 2,
+              "misses": [
+                "C05",
+                "C24"
+              ],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.5,
+              "recall": 0.8636363636363636,
+              "precision": 0.95,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.85,
+              "risk": 0.029411764705882353,
+              "tp": 19,
+              "fp": 1,
+              "fn": 3,
+              "misses": [
+                "C05",
+                "C24",
+                "C28"
+              ],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.6,
+              "recall": 0.7727272727272727,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.725,
+              "risk": 0,
+              "tp": 17,
+              "fp": 0,
+              "fn": 5,
+              "misses": [
+                "C02",
+                "C05",
+                "C12",
+                "C24",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.7,
+              "recall": 0.6363636363636364,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.625,
+              "risk": 0,
+              "tp": 14,
+              "fp": 0,
+              "fn": 8,
+              "misses": [
+                "C01",
+                "C02",
+                "C05",
+                "C12",
+                "C24",
+                "C25",
+                "C28",
+                "C30"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.8,
+              "recall": 0.5454545454545454,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.5,
+              "risk": 0,
+              "tp": 12,
+              "fp": 0,
+              "fn": 10,
+              "misses": [
+                "C01",
+                "C02",
+                "C05",
+                "C06",
+                "C12",
+                "C24",
+                "C25",
+                "C27",
+                "C28",
+                "C30"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.22727272727272727,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.225,
+              "risk": 0,
+              "tp": 5,
+              "fp": 0,
+              "fn": 17,
+              "misses": [
+                "C01",
+                "C02",
+                "C05",
+                "C06",
+                "C07",
+                "C09",
+                "C10",
+                "C12",
+                "C13",
+                "C20",
+                "C21",
+                "C22",
+                "C24",
+                "C25",
+                "C27",
+                "C28",
+                "C30"
+              ],
+              "falseFlags": []
+            }
+          ],
+          "keel-mass": [
+            {
+              "t": 0,
+              "recall": 1,
+              "precision": 0.5789473684210527,
+              "decoyFpRate": 0.8,
+              "compatibleFpRate": 1,
+              "coverage": 0.95,
+              "risk": 0.42105263157894735,
+              "tp": 22,
+              "fp": 16,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "C03",
+                "C08",
+                "C11",
+                "C15",
+                "C18",
+                "C23",
+                "C26",
+                "C29",
+                "D01",
+                "D02",
+                "D03",
+                "D04",
+                "D05",
+                "D08",
+                "D09",
+                "D10"
+              ]
+            },
+            {
+              "t": 0.3,
+              "recall": 1,
+              "precision": 0.9565217391304348,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0.02631578947368421,
+              "tp": 22,
+              "fp": 1,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.4,
+              "recall": 0.9545454545454546,
+              "precision": 0.9545454545454546,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0.05263157894736842,
+              "tp": 21,
+              "fp": 1,
+              "fn": 1,
+              "misses": [
+                "C24"
+              ],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.5,
+              "recall": 0.9545454545454546,
+              "precision": 0.9545454545454546,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0.05263157894736842,
+              "tp": 21,
+              "fp": 1,
+              "fn": 1,
+              "misses": [
+                "C24"
+              ],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.6,
+              "recall": 0.9090909090909091,
+              "precision": 0.9523809523809523,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 0.9,
+              "risk": 0.027777777777777776,
+              "tp": 20,
+              "fp": 1,
+              "fn": 2,
+              "misses": [
+                "C24",
+                "C28"
+              ],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.7,
+              "recall": 0.9090909090909091,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.875,
+              "risk": 0,
+              "tp": 20,
+              "fp": 0,
+              "fn": 2,
+              "misses": [
+                "C24",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.8,
+              "recall": 0.6818181818181818,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.75,
+              "risk": 0,
+              "tp": 15,
+              "fp": 0,
+              "fn": 7,
+              "misses": [
+                "C01",
+                "C02",
+                "C06",
+                "C12",
+                "C24",
+                "C25",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.5,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.575,
+              "risk": 0,
+              "tp": 11,
+              "fp": 0,
+              "fn": 11,
+              "misses": [
+                "C01",
+                "C02",
+                "C06",
+                "C07",
+                "C09",
+                "C12",
+                "C24",
+                "C25",
+                "C27",
+                "C28",
+                "C30"
+              ],
+              "falseFlags": []
+            }
+          ]
+        },
+        "perItem": [
+          {
+            "id": "C01",
+            "truth": "per-session",
+            "label": "contradiction",
+            "chosen": [
+              "per-session",
+              "per-session",
+              "per-session"
+            ],
+            "pChosen": [
+              0.687,
+              0.65,
+              0.726
+            ],
+            "pViolate": [
+              0.721,
+              0.722,
+              0.793
+            ]
+          },
+          {
+            "id": "C02",
+            "truth": "static",
+            "label": "contradiction",
+            "chosen": [
+              "static",
+              "static",
+              "static"
+            ],
+            "pChosen": [
+              0.617,
+              0.589,
+              0.537
+            ],
+            "pViolate": [
+              0.89,
+              0.894,
+              0.784
+            ]
+          },
+          {
+            "id": "C03",
+            "truth": "ttl",
+            "label": "compatible",
+            "chosen": [
+              "ttl",
+              "ttl",
+              "ttl"
+            ],
+            "pChosen": [
+              0.975,
+              0.965,
+              0.964
+            ],
+            "pViolate": [
+              0.004,
+              0.005,
+              0.007
+            ]
+          },
+          {
+            "id": "C04",
+            "truth": "ttl",
+            "label": "contradiction",
+            "chosen": [
+              "ttl",
+              "ttl",
+              "ttl"
+            ],
+            "pChosen": [
+              0.957,
+              0.944,
+              0.95
+            ],
+            "pViolate": [
+              0.973,
+              0.966,
+              0.967
+            ]
+          },
+          {
+            "id": "C05",
+            "truth": "static",
+            "label": "contradiction",
+            "chosen": [
+              "per-session",
+              "per-session",
+              "static"
+            ],
+            "pChosen": [
+              0.609,
+              0.479,
+              0.542
+            ],
+            "pViolate": [
+              0.93,
+              0.944,
+              0.924
+            ]
+          },
+          {
+            "id": "C06",
+            "truth": "many",
+            "label": "contradiction",
+            "chosen": [
+              "many",
+              "many",
+              "many"
+            ],
+            "pChosen": [
+              0.773,
+              0.804,
+              0.725
+            ],
+            "pViolate": [
+              0.773,
+              0.804,
+              0.725
+            ]
+          },
+          {
+            "id": "C07",
+            "truth": "many",
+            "label": "contradiction",
+            "chosen": [
+              "many",
+              "many",
+              "many"
+            ],
+            "pChosen": [
+              0.938,
+              0.899,
+              0.893
+            ],
+            "pViolate": [
+              0.938,
+              0.899,
+              0.893
+            ]
+          },
+          {
+            "id": "C08",
+            "truth": "at-most-one",
+            "label": "compatible",
+            "chosen": [
+              "at-most-one",
+              "at-most-one",
+              "at-most-one"
+            ],
+            "pChosen": [
+              0.67,
+              0.691,
+              0.583
+            ],
+            "pViolate": [
+              0.028,
+              0.019,
+              0.02
+            ]
+          },
+          {
+            "id": "C09",
+            "truth": "unordered",
+            "label": "contradiction",
+            "chosen": [
+              "unordered",
+              "unordered",
+              "unordered"
+            ],
+            "pChosen": [
+              0.932,
+              0.89,
+              0.844
+            ],
+            "pViolate": [
+              0.932,
+              0.89,
+              0.844
+            ]
+          },
+          {
+            "id": "C10",
+            "truth": "unordered",
+            "label": "contradiction",
+            "chosen": [
+              "unordered",
+              "unordered",
+              "unordered"
+            ],
+            "pChosen": [
+              0.948,
+              0.923,
+              0.863
+            ],
+            "pViolate": [
+              0.968,
+              0.938,
+              0.909
+            ]
+          },
+          {
+            "id": "C11",
+            "truth": "per-key-fifo",
+            "label": "compatible",
+            "chosen": [
+              "per-key-fifo",
+              "per-key-fifo",
+              "per-key-fifo"
+            ],
+            "pChosen": [
+              0.938,
+              0.915,
+              0.947
+            ],
+            "pViolate": [
+              0.025,
+              0.043,
+              0.019
+            ]
+          },
+          {
+            "id": "C12",
+            "truth": "eventual",
+            "label": "contradiction",
+            "chosen": [
+              "eventual",
+              "eventual",
+              "eventual"
+            ],
+            "pChosen": [
+              0.639,
+              0.594,
+              0.532
+            ],
+            "pViolate": [
+              0.831,
+              0.842,
+              0.788
+            ]
+          },
+          {
+            "id": "C13",
+            "truth": "eventual",
+            "label": "contradiction",
+            "chosen": [
+              "eventual",
+              "eventual",
+              "eventual"
+            ],
+            "pChosen": [
+              0.868,
+              0.877,
+              0.85
+            ],
+            "pViolate": [
+              0.96,
+              0.957,
+              0.925
+            ]
+          },
+          {
+            "id": "C14",
+            "truth": "string",
+            "label": "contradiction",
+            "chosen": [
+              "string",
+              "string",
+              "string"
+            ],
+            "pChosen": [
+              0.952,
+              0.938,
+              0.954
+            ],
+            "pViolate": [
+              0.984,
+              0.977,
+              0.986
+            ]
+          },
+          {
+            "id": "C15",
+            "truth": "read-your-writes",
+            "label": "compatible",
+            "chosen": [
+              "read-your-writes",
+              "read-your-writes",
+              "read-your-writes"
+            ],
+            "pChosen": [
+              0.733,
+              0.718,
+              0.847
+            ],
+            "pViolate": [
+              0.032,
+              0.041,
+              0.044
+            ]
+          },
+          {
+            "id": "C16",
+            "truth": "optional",
+            "label": "contradiction",
+            "chosen": [
+              "optional",
+              "optional",
+              "optional"
+            ],
+            "pChosen": [
+              0.956,
+              0.965,
+              0.943
+            ],
+            "pViolate": [
+              0.971,
+              0.979,
+              0.962
+            ]
+          },
+          {
+            "id": "C17",
+            "truth": "optional",
+            "label": "contradiction",
+            "chosen": [
+              "optional",
+              "optional",
+              "optional"
+            ],
+            "pChosen": [
+              0.972,
+              0.967,
+              0.976
+            ],
+            "pViolate": [
+              0.981,
+              0.977,
+              0.984
+            ]
+          },
+          {
+            "id": "C18",
+            "truth": "required",
+            "label": "compatible",
+            "chosen": [
+              "required",
+              "required",
+              "required"
+            ],
+            "pChosen": [
+              0.893,
+              0.899,
+              0.901
+            ],
+            "pViolate": [
+              0.035,
+              0.033,
+              0.032
+            ]
+          },
+          {
+            "id": "C19",
+            "truth": "absent",
+            "label": "contradiction",
+            "chosen": [
+              "absent",
+              "absent",
+              "absent"
+            ],
+            "pChosen": [
+              0.953,
+              0.948,
+              0.967
+            ],
+            "pViolate": [
+              0.981,
+              0.984,
+              0.983
+            ]
+          },
+          {
+            "id": "C20",
+            "truth": "admin",
+            "label": "contradiction",
+            "chosen": [
+              "admin",
+              "admin",
+              "admin"
+            ],
+            "pChosen": [
+              0.908,
+              0.834,
+              0.911
+            ],
+            "pViolate": [
+              0.965,
+              0.947,
+              0.963
+            ]
+          },
+          {
+            "id": "C21",
+            "truth": "member",
+            "label": "contradiction",
+            "chosen": [
+              "member",
+              "member",
+              "member"
+            ],
+            "pChosen": [
+              0.875,
+              0.918,
+              0.86
+            ],
+            "pViolate": [
+              0.947,
+              0.968,
+              0.946
+            ]
+          },
+          {
+            "id": "C22",
+            "truth": "authenticated",
+            "label": "contradiction",
+            "chosen": [
+              "authenticated",
+              "authenticated",
+              "authenticated"
+            ],
+            "pChosen": [
+              0.885,
+              0.919,
+              0.899
+            ],
+            "pViolate": [
+              0.937,
+              0.954,
+              0.963
+            ]
+          },
+          {
+            "id": "C23",
+            "truth": "admin",
+            "label": "compatible",
+            "chosen": [
+              "admin",
+              "admin",
+              "admin"
+            ],
+            "pChosen": [
+              0.941,
+              0.955,
+              0.926
+            ],
+            "pViolate": [
+              0.025,
+              0.019,
+              0.032
+            ]
+          },
+          {
+            "id": "C24",
+            "truth": "non-idempotent",
+            "label": "contradiction",
+            "chosen": [
+              "idempotent",
+              "idempotent",
+              "non-idempotent"
+            ],
+            "pChosen": [
+              0.373,
+              0.396,
+              0.486
+            ],
+            "pViolate": [
+              0.354,
+              0.328,
+              0.486
+            ]
+          },
+          {
+            "id": "C25",
+            "truth": "idempotent",
+            "label": "contradiction",
+            "chosen": [
+              "idempotent",
+              "idempotent",
+              "idempotent"
+            ],
+            "pChosen": [
+              0.693,
+              0.756,
+              0.769
+            ],
+            "pViolate": [
+              0.781,
+              0.809,
+              0.858
+            ]
+          },
+          {
+            "id": "C26",
+            "truth": "idempotent",
+            "label": "compatible",
+            "chosen": [
+              "idempotent",
+              "idempotent",
+              "idempotent"
+            ],
+            "pChosen": [
+              0.834,
+              0.851,
+              0.784
+            ],
+            "pViolate": [
+              0.048,
+              0.036,
+              0.065
+            ]
+          },
+          {
+            "id": "C27",
+            "truth": "le-1k",
+            "label": "contradiction",
+            "chosen": [
+              "le-1k",
+              "le-1k",
+              "le-1k"
+            ],
+            "pChosen": [
+              0.864,
+              0.886,
+              0.757
+            ],
+            "pViolate": [
+              0.922,
+              0.934,
+              0.857
+            ]
+          },
+          {
+            "id": "C28",
+            "truth": "unbounded",
+            "label": "contradiction",
+            "chosen": [
+              "unbounded",
+              "unbounded",
+              "unbounded"
+            ],
+            "pChosen": [
+              0.611,
+              0.45,
+              0.703
+            ],
+            "pViolate": [
+              0.72,
+              0.519,
+              0.808
+            ]
+          },
+          {
+            "id": "C29",
+            "truth": "le-100",
+            "label": "compatible",
+            "chosen": [
+              "le-100",
+              "le-100",
+              "le-100"
+            ],
+            "pChosen": [
+              0.843,
+              0.856,
+              0.832
+            ],
+            "pViolate": [
+              0.091,
+              0.08,
+              0.103
+            ]
+          },
+          {
+            "id": "C30",
+            "truth": "string",
+            "label": "contradiction",
+            "chosen": [
+              "string",
+              "string",
+              "string"
+            ],
+            "pChosen": [
+              0.809,
+              0.836,
+              0.662
+            ],
+            "pViolate": [
+              0.938,
+              0.967,
+              0.896
+            ]
+          },
+          {
+            "id": "D01",
+            "truth": "per-request",
+            "label": "compatible",
+            "chosen": [
+              "per-request",
+              "per-request",
+              "per-request"
+            ],
+            "pChosen": [
+              0.944,
+              0.942,
+              0.946
+            ],
+            "pViolate": [
+              0.024,
+              0.026,
+              0.03
+            ]
+          },
+          {
+            "id": "D02",
+            "truth": "strong",
+            "label": "compatible",
+            "chosen": [
+              "read-your-writes",
+              "read-your-writes",
+              "read-your-writes"
+            ],
+            "pChosen": [
+              0.521,
+              0.602,
+              0.506
+            ],
+            "pViolate": [
+              0.615,
+              0.727,
+              0.682
+            ]
+          },
+          {
+            "id": "D03",
+            "truth": "idempotent",
+            "label": "compatible",
+            "chosen": [
+              "idempotent",
+              "idempotent",
+              "idempotent"
+            ],
+            "pChosen": [
+              0.717,
+              0.757,
+              0.71
+            ],
+            "pViolate": [
+              0.068,
+              0.049,
+              0.06
+            ]
+          },
+          {
+            "id": "D04",
+            "truth": "le-100",
+            "label": "compatible",
+            "chosen": [
+              "le-100",
+              "le-100",
+              "le-100"
+            ],
+            "pChosen": [
+              0.661,
+              0.667,
+              0.753
+            ],
+            "pViolate": [
+              0.144,
+              0.164,
+              0.174
+            ]
+          },
+          {
+            "id": "D05",
+            "truth": "at-most-one",
+            "label": "compatible",
+            "chosen": [
+              "at-most-one",
+              "at-most-one",
+              "at-most-one"
+            ],
+            "pChosen": [
+              0.473,
+              0.639,
+              0.491
+            ],
+            "pViolate": [
+              0.078,
+              0.061,
+              0.071
+            ]
+          },
+          {
+            "id": "D06",
+            "truth": "per-call",
+            "label": "compatible",
+            "chosen": [
+              "unclear",
+              "unclear",
+              "unclear"
+            ],
+            "pChosen": [
+              0.623,
+              0.394,
+              0.613
+            ],
+            "pViolate": [
+              0.124,
+              0.322,
+              0.167
+            ]
+          },
+          {
+            "id": "D07",
+            "truth": "per-call",
+            "label": "compatible",
+            "chosen": [
+              "ttl",
+              "ttl",
+              "unclear"
+            ],
+            "pChosen": [
+              0.652,
+              0.341,
+              0.417
+            ],
+            "pViolate": [
+              0.741,
+              0.457,
+              0.301
+            ]
+          },
+          {
+            "id": "D08",
+            "truth": "fifo",
+            "label": "compatible",
+            "chosen": [
+              "fifo",
+              "fifo",
+              "fifo"
+            ],
+            "pChosen": [
+              0.808,
+              0.863,
+              0.876
+            ],
+            "pViolate": [
+              0.119,
+              0.09,
+              0.054
+            ]
+          },
+          {
+            "id": "D09",
+            "truth": "at-most-one",
+            "label": "compatible",
+            "chosen": [
+              "at-most-one",
+              "at-most-one",
+              "at-most-one"
+            ],
+            "pChosen": [
+              0.562,
+              0.842,
+              0.83
+            ],
+            "pViolate": [
+              0.03,
+              0.029,
+              0.035
+            ]
+          },
+          {
+            "id": "D10",
+            "truth": "integer",
+            "label": "compatible",
+            "chosen": [
+              "integer",
+              "integer",
+              "integer"
+            ],
+            "pChosen": [
+              0.892,
+              0.911,
+              0.918
+            ],
+            "pViolate": [
+              0.093,
+              0.077,
+              0.07
+            ]
+          }
+        ]
+      }
+    },
+    "jointVsSeparate": {
+      "sameChoice": 0.925,
+      "maxProbabilityDelta": 0.4529
+    },
+    "batch64CrossQuestion": {
+      "aloneChoice": "c-per-session",
+      "aloneProbabilities": {
+        "a-per-call": 0.0276,
+        "b-per-request": 0.2311,
+        "c-per-session": 0.6871,
+        "d-ttl": 0.025,
+        "e-static": 0.0091,
+        "f-unclear": 0.0201
+      },
+      "inBatchChoice": "c-per-session",
+      "inBatchProbabilities": {
+        "a-per-call": 0.045,
+        "b-per-request": 0.2231,
+        "c-per-session": 0.6661,
+        "d-ttl": 0.0202,
+        "e-static": 0.0107,
+        "f-unclear": 0.0349
+      },
+      "batchDeterministic": true
+    },
+    "latency": {
+      "q1": {
+        "calls": 120,
+        "callP50": 227,
+        "callP95": 852,
+        "perQuestionP50": 227,
+        "perQuestionP95": 852,
+        "clientP50": 302,
+        "inputTokensP50": 612
+      },
+      "q3": {
+        "calls": 40,
+        "callP50": 335,
+        "callP95": 1050,
+        "perQuestionP50": 111.7,
+        "perQuestionP95": 350,
+        "clientP50": 411,
+        "inputTokensP50": 1091
+      },
+      "q64": {
+        "calls": 8,
+        "callP50": 3624,
+        "callP95": 5225,
+        "perQuestionP50": 56.6,
+        "perQuestionP95": 81.6,
+        "clientP50": 3648,
+        "inputTokensP50": 16223
+      }
+    }
+  },
+  "clef": {
+    "calls": 168,
+    "errors": 0,
+    "retries": 0,
+    "modes": {
+      "joint": {
+        "unclearShare": 0,
+        "v0ValueAccuracy": 0.95,
+        "permutedAgreementAll3": 0.95,
+        "flipRatePairwise": 0.03333333333333333,
+        "verdictAgreementAll3": 0.975,
+        "rules": {
+          "single-argmax": [
+            {
+              "t": 0,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.3,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.4,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.5,
+              "recall": 0.9545454545454546,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.975,
+              "risk": 0,
+              "tp": 21,
+              "fp": 0,
+              "fn": 1,
+              "misses": [
+                "C12"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.6,
+              "recall": 0.9545454545454546,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.9,
+              "risk": 0,
+              "tp": 21,
+              "fp": 0,
+              "fn": 1,
+              "misses": [
+                "C12"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.7,
+              "recall": 0.9090909090909091,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.825,
+              "risk": 0,
+              "tp": 20,
+              "fp": 0,
+              "fn": 2,
+              "misses": [
+                "C12",
+                "C24"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.8,
+              "recall": 0.7727272727272727,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.725,
+              "risk": 0,
+              "tp": 17,
+              "fp": 0,
+              "fn": 5,
+              "misses": [
+                "C07",
+                "C12",
+                "C13",
+                "C24",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.5909090909090909,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.575,
+              "risk": 0,
+              "tp": 13,
+              "fp": 0,
+              "fn": 9,
+              "misses": [
+                "C05",
+                "C06",
+                "C07",
+                "C09",
+                "C10",
+                "C12",
+                "C13",
+                "C24",
+                "C28"
+              ],
+              "falseFlags": []
+            }
+          ],
+          "single-mass": [
+            {
+              "t": 0,
+              "recall": 1,
+              "precision": 0.55,
+              "decoyFpRate": 1,
+              "compatibleFpRate": 1,
+              "coverage": 1,
+              "risk": 0.45,
+              "tp": 22,
+              "fp": 18,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "C03",
+                "C08",
+                "C11",
+                "C15",
+                "C18",
+                "C23",
+                "C26",
+                "C29",
+                "D01",
+                "D02",
+                "D03",
+                "D04",
+                "D05",
+                "D06",
+                "D07",
+                "D08",
+                "D09",
+                "D10"
+              ]
+            },
+            {
+              "t": 0.3,
+              "recall": 1,
+              "precision": 0.9565217391304348,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0.025,
+              "tp": 22,
+              "fp": 1,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.4,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.5,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.6,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.7,
+              "recall": 0.9545454545454546,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0,
+              "tp": 21,
+              "fp": 0,
+              "fn": 1,
+              "misses": [
+                "C24"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.8,
+              "recall": 0.8636363636363636,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.9,
+              "risk": 0,
+              "tp": 19,
+              "fp": 0,
+              "fn": 3,
+              "misses": [
+                "C07",
+                "C24",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.7272727272727273,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.775,
+              "risk": 0,
+              "tp": 16,
+              "fp": 0,
+              "fn": 6,
+              "misses": [
+                "C06",
+                "C07",
+                "C09",
+                "C12",
+                "C24",
+                "C28"
+              ],
+              "falseFlags": []
+            }
+          ],
+          "keel-argmax": [
+            {
+              "t": 0,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.3,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.4,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.5,
+              "recall": 0.9545454545454546,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.9,
+              "risk": 0,
+              "tp": 21,
+              "fp": 0,
+              "fn": 1,
+              "misses": [
+                "C12"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.6,
+              "recall": 0.9090909090909091,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.825,
+              "risk": 0,
+              "tp": 20,
+              "fp": 0,
+              "fn": 2,
+              "misses": [
+                "C06",
+                "C12"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.7,
+              "recall": 0.8181818181818182,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.775,
+              "risk": 0,
+              "tp": 18,
+              "fp": 0,
+              "fn": 4,
+              "misses": [
+                "C06",
+                "C12",
+                "C24",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.8,
+              "recall": 0.6818181818181818,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.675,
+              "risk": 0,
+              "tp": 15,
+              "fp": 0,
+              "fn": 7,
+              "misses": [
+                "C05",
+                "C06",
+                "C07",
+                "C12",
+                "C13",
+                "C24",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.5454545454545454,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.55,
+              "risk": 0,
+              "tp": 12,
+              "fp": 0,
+              "fn": 10,
+              "misses": [
+                "C05",
+                "C06",
+                "C07",
+                "C09",
+                "C10",
+                "C12",
+                "C13",
+                "C20",
+                "C24",
+                "C28"
+              ],
+              "falseFlags": []
+            }
+          ],
+          "keel-mass": [
+            {
+              "t": 0,
+              "recall": 1,
+              "precision": 0.55,
+              "decoyFpRate": 1,
+              "compatibleFpRate": 1,
+              "coverage": 1,
+              "risk": 0.45,
+              "tp": 22,
+              "fp": 18,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "C03",
+                "C08",
+                "C11",
+                "C15",
+                "C18",
+                "C23",
+                "C26",
+                "C29",
+                "D01",
+                "D02",
+                "D03",
+                "D04",
+                "D05",
+                "D06",
+                "D07",
+                "D08",
+                "D09",
+                "D10"
+              ]
+            },
+            {
+              "t": 0.3,
+              "recall": 1,
+              "precision": 0.9565217391304348,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0.025,
+              "tp": 22,
+              "fp": 1,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.4,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.975,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.5,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.975,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.6,
+              "recall": 0.9545454545454546,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0,
+              "tp": 21,
+              "fp": 0,
+              "fn": 1,
+              "misses": [
+                "C06"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.7,
+              "recall": 0.9090909090909091,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.925,
+              "risk": 0,
+              "tp": 20,
+              "fp": 0,
+              "fn": 2,
+              "misses": [
+                "C06",
+                "C24"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.8,
+              "recall": 0.8181818181818182,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.875,
+              "risk": 0,
+              "tp": 18,
+              "fp": 0,
+              "fn": 4,
+              "misses": [
+                "C06",
+                "C07",
+                "C24",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.6363636363636364,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.725,
+              "risk": 0,
+              "tp": 14,
+              "fp": 0,
+              "fn": 8,
+              "misses": [
+                "C05",
+                "C06",
+                "C07",
+                "C09",
+                "C12",
+                "C13",
+                "C24",
+                "C28"
+              ],
+              "falseFlags": []
+            }
+          ]
+        },
+        "perItem": [
+          {
+            "id": "C01",
+            "truth": "per-session",
+            "label": "contradiction",
+            "chosen": [
+              "per-session",
+              "per-session",
+              "per-session"
+            ],
+            "pChosen": [
+              0.933,
+              0.976,
+              0.976
+            ],
+            "pViolate": [
+              0.958,
+              0.984,
+              0.984
+            ]
+          },
+          {
+            "id": "C02",
+            "truth": "static",
+            "label": "contradiction",
+            "chosen": [
+              "static",
+              "static",
+              "static"
+            ],
+            "pChosen": [
+              0.946,
+              0.976,
+              0.974
+            ],
+            "pViolate": [
+              0.97,
+              0.986,
+              0.983
+            ]
+          },
+          {
+            "id": "C03",
+            "truth": "ttl",
+            "label": "compatible",
+            "chosen": [
+              "ttl",
+              "ttl",
+              "ttl"
+            ],
+            "pChosen": [
+              0.973,
+              0.988,
+              0.985
+            ],
+            "pViolate": [
+              0.006,
+              0.002,
+              0.002
+            ]
+          },
+          {
+            "id": "C04",
+            "truth": "ttl",
+            "label": "contradiction",
+            "chosen": [
+              "ttl",
+              "ttl",
+              "ttl"
+            ],
+            "pChosen": [
+              0.971,
+              0.98,
+              0.981
+            ],
+            "pViolate": [
+              0.979,
+              0.987,
+              0.988
+            ]
+          },
+          {
+            "id": "C05",
+            "truth": "static",
+            "label": "contradiction",
+            "chosen": [
+              "static",
+              "static",
+              "static"
+            ],
+            "pChosen": [
+              0.882,
+              0.899,
+              0.774
+            ],
+            "pViolate": [
+              0.958,
+              0.95,
+              0.853
+            ]
+          },
+          {
+            "id": "C06",
+            "truth": "many",
+            "label": "contradiction",
+            "chosen": [
+              "many",
+              "many",
+              "many"
+            ],
+            "pChosen": [
+              0.871,
+              0.518,
+              0.66
+            ],
+            "pViolate": [
+              0.871,
+              0.518,
+              0.66
+            ]
+          },
+          {
+            "id": "C07",
+            "truth": "many",
+            "label": "contradiction",
+            "chosen": [
+              "many",
+              "many",
+              "many"
+            ],
+            "pChosen": [
+              0.781,
+              0.895,
+              0.868
+            ],
+            "pViolate": [
+              0.781,
+              0.895,
+              0.868
+            ]
+          },
+          {
+            "id": "C08",
+            "truth": "at-most-one",
+            "label": "compatible",
+            "chosen": [
+              "at-most-one",
+              "at-most-one",
+              "at-most-one"
+            ],
+            "pChosen": [
+              0.539,
+              0.909,
+              0.882
+            ],
+            "pViolate": [
+              0.044,
+              0.018,
+              0.022
+            ]
+          },
+          {
+            "id": "C09",
+            "truth": "unordered",
+            "label": "contradiction",
+            "chosen": [
+              "unordered",
+              "unordered",
+              "unordered"
+            ],
+            "pChosen": [
+              0.837,
+              0.884,
+              0.91
+            ],
+            "pViolate": [
+              0.837,
+              0.884,
+              0.91
+            ]
+          },
+          {
+            "id": "C10",
+            "truth": "unordered",
+            "label": "contradiction",
+            "chosen": [
+              "unordered",
+              "unordered",
+              "unordered"
+            ],
+            "pChosen": [
+              0.861,
+              0.953,
+              0.956
+            ],
+            "pViolate": [
+              0.907,
+              0.961,
+              0.965
+            ]
+          },
+          {
+            "id": "C11",
+            "truth": "per-key-fifo",
+            "label": "compatible",
+            "chosen": [
+              "per-key-fifo",
+              "per-key-fifo",
+              "per-key-fifo"
+            ],
+            "pChosen": [
+              0.928,
+              0.93,
+              0.95
+            ],
+            "pViolate": [
+              0.021,
+              0.022,
+              0.012
+            ]
+          },
+          {
+            "id": "C12",
+            "truth": "eventual",
+            "label": "contradiction",
+            "chosen": [
+              "eventual",
+              "eventual",
+              "eventual"
+            ],
+            "pChosen": [
+              0.42,
+              0.653,
+              0.73
+            ],
+            "pViolate": [
+              0.814,
+              0.853,
+              0.845
+            ]
+          },
+          {
+            "id": "C13",
+            "truth": "eventual",
+            "label": "contradiction",
+            "chosen": [
+              "eventual",
+              "eventual",
+              "eventual"
+            ],
+            "pChosen": [
+              0.743,
+              0.871,
+              0.832
+            ],
+            "pViolate": [
+              0.901,
+              0.92,
+              0.872
+            ]
+          },
+          {
+            "id": "C14",
+            "truth": "string",
+            "label": "contradiction",
+            "chosen": [
+              "string",
+              "string",
+              "string"
+            ],
+            "pChosen": [
+              0.967,
+              0.98,
+              0.978
+            ],
+            "pViolate": [
+              0.987,
+              0.991,
+              0.987
+            ]
+          },
+          {
+            "id": "C15",
+            "truth": "read-your-writes",
+            "label": "compatible",
+            "chosen": [
+              "read-your-writes",
+              "read-your-writes",
+              "read-your-writes"
+            ],
+            "pChosen": [
+              0.627,
+              0.635,
+              0.401
+            ],
+            "pViolate": [
+              0.15,
+              0.088,
+              0.11
+            ]
+          },
+          {
+            "id": "C16",
+            "truth": "optional",
+            "label": "contradiction",
+            "chosen": [
+              "optional",
+              "optional",
+              "optional"
+            ],
+            "pChosen": [
+              0.963,
+              0.955,
+              0.965
+            ],
+            "pViolate": [
+              0.973,
+              0.969,
+              0.975
+            ]
+          },
+          {
+            "id": "C17",
+            "truth": "optional",
+            "label": "contradiction",
+            "chosen": [
+              "optional",
+              "optional",
+              "optional"
+            ],
+            "pChosen": [
+              0.981,
+              0.971,
+              0.958
+            ],
+            "pViolate": [
+              0.985,
+              0.977,
+              0.967
+            ]
+          },
+          {
+            "id": "C18",
+            "truth": "required",
+            "label": "compatible",
+            "chosen": [
+              "required",
+              "required",
+              "required"
+            ],
+            "pChosen": [
+              0.959,
+              0.959,
+              0.955
+            ],
+            "pViolate": [
+              0.011,
+              0.008,
+              0.008
+            ]
+          },
+          {
+            "id": "C19",
+            "truth": "absent",
+            "label": "contradiction",
+            "chosen": [
+              "absent",
+              "absent",
+              "absent"
+            ],
+            "pChosen": [
+              0.982,
+              0.985,
+              0.988
+            ],
+            "pViolate": [
+              0.988,
+              0.989,
+              0.992
+            ]
+          },
+          {
+            "id": "C20",
+            "truth": "admin",
+            "label": "contradiction",
+            "chosen": [
+              "admin",
+              "admin",
+              "admin"
+            ],
+            "pChosen": [
+              0.947,
+              0.853,
+              0.908
+            ],
+            "pViolate": [
+              0.982,
+              0.915,
+              0.947
+            ]
+          },
+          {
+            "id": "C21",
+            "truth": "member",
+            "label": "contradiction",
+            "chosen": [
+              "member",
+              "member",
+              "member"
+            ],
+            "pChosen": [
+              0.928,
+              0.926,
+              0.933
+            ],
+            "pViolate": [
+              0.969,
+              0.967,
+              0.961
+            ]
+          },
+          {
+            "id": "C22",
+            "truth": "authenticated",
+            "label": "contradiction",
+            "chosen": [
+              "authenticated",
+              "authenticated",
+              "authenticated"
+            ],
+            "pChosen": [
+              0.953,
+              0.982,
+              0.985
+            ],
+            "pViolate": [
+              0.987,
+              0.991,
+              0.992
+            ]
+          },
+          {
+            "id": "C23",
+            "truth": "admin",
+            "label": "compatible",
+            "chosen": [
+              "admin",
+              "admin",
+              "admin"
+            ],
+            "pChosen": [
+              0.966,
+              0.955,
+              0.957
+            ],
+            "pViolate": [
+              0.009,
+              0.01,
+              0.01
+            ]
+          },
+          {
+            "id": "C24",
+            "truth": "non-idempotent",
+            "label": "contradiction",
+            "chosen": [
+              "non-idempotent",
+              "non-idempotent",
+              "non-idempotent"
+            ],
+            "pChosen": [
+              0.652,
+              0.806,
+              0.816
+            ],
+            "pViolate": [
+              0.652,
+              0.806,
+              0.816
+            ]
+          },
+          {
+            "id": "C25",
+            "truth": "idempotent",
+            "label": "contradiction",
+            "chosen": [
+              "idempotent",
+              "idempotent",
+              "idempotent"
+            ],
+            "pChosen": [
+              0.92,
+              0.961,
+              0.977
+            ],
+            "pViolate": [
+              0.943,
+              0.975,
+              0.985
+            ]
+          },
+          {
+            "id": "C26",
+            "truth": "idempotent",
+            "label": "compatible",
+            "chosen": [
+              "idempotent",
+              "idempotent",
+              "idempotent"
+            ],
+            "pChosen": [
+              0.962,
+              0.983,
+              0.985
+            ],
+            "pViolate": [
+              0.013,
+              0.007,
+              0.005
+            ]
+          },
+          {
+            "id": "C27",
+            "truth": "le-1k",
+            "label": "contradiction",
+            "chosen": [
+              "le-1k",
+              "le-1k",
+              "le-1k"
+            ],
+            "pChosen": [
+              0.951,
+              0.977,
+              0.972
+            ],
+            "pViolate": [
+              0.971,
+              0.989,
+              0.986
+            ]
+          },
+          {
+            "id": "C28",
+            "truth": "unbounded",
+            "label": "contradiction",
+            "chosen": [
+              "unbounded",
+              "unbounded",
+              "unbounded"
+            ],
+            "pChosen": [
+              0.767,
+              0.686,
+              0.722
+            ],
+            "pViolate": [
+              0.797,
+              0.735,
+              0.774
+            ]
+          },
+          {
+            "id": "C29",
+            "truth": "le-100",
+            "label": "compatible",
+            "chosen": [
+              "le-100",
+              "le-100",
+              "le-100"
+            ],
+            "pChosen": [
+              0.959,
+              0.964,
+              0.979
+            ],
+            "pViolate": [
+              0.024,
+              0.023,
+              0.014
+            ]
+          },
+          {
+            "id": "C30",
+            "truth": "string",
+            "label": "contradiction",
+            "chosen": [
+              "string",
+              "string",
+              "string"
+            ],
+            "pChosen": [
+              0.95,
+              0.973,
+              0.972
+            ],
+            "pViolate": [
+              0.97,
+              0.985,
+              0.982
+            ]
+          },
+          {
+            "id": "D01",
+            "truth": "per-request",
+            "label": "compatible",
+            "chosen": [
+              "per-request",
+              "per-request",
+              "per-request"
+            ],
+            "pChosen": [
+              0.972,
+              0.97,
+              0.98
+            ],
+            "pViolate": [
+              0.009,
+              0.01,
+              0.008
+            ]
+          },
+          {
+            "id": "D02",
+            "truth": "strong",
+            "label": "compatible",
+            "chosen": [
+              "strong",
+              "strong",
+              "read-your-writes"
+            ],
+            "pChosen": [
+              0.515,
+              0.598,
+              0.48
+            ],
+            "pViolate": [
+              0.393,
+              0.338,
+              0.569
+            ]
+          },
+          {
+            "id": "D03",
+            "truth": "idempotent",
+            "label": "compatible",
+            "chosen": [
+              "idempotent",
+              "idempotent",
+              "idempotent"
+            ],
+            "pChosen": [
+              0.862,
+              0.9,
+              0.895
+            ],
+            "pViolate": [
+              0.052,
+              0.038,
+              0.05
+            ]
+          },
+          {
+            "id": "D04",
+            "truth": "le-100",
+            "label": "compatible",
+            "chosen": [
+              "le-100",
+              "le-100",
+              "le-100"
+            ],
+            "pChosen": [
+              0.924,
+              0.973,
+              0.972
+            ],
+            "pViolate": [
+              0.047,
+              0.017,
+              0.019
+            ]
+          },
+          {
+            "id": "D05",
+            "truth": "at-most-one",
+            "label": "compatible",
+            "chosen": [
+              "exactly-one",
+              "exactly-one",
+              "exactly-one"
+            ],
+            "pChosen": [
+              0.783,
+              0.837,
+              0.829
+            ],
+            "pViolate": [
+              0.025,
+              0.048,
+              0.042
+            ]
+          },
+          {
+            "id": "D06",
+            "truth": "per-call",
+            "label": "compatible",
+            "chosen": [
+              "per-call",
+              "per-call",
+              "per-call"
+            ],
+            "pChosen": [
+              0.585,
+              0.916,
+              0.796
+            ],
+            "pViolate": [
+              0.136,
+              0.019,
+              0.015
+            ]
+          },
+          {
+            "id": "D07",
+            "truth": "per-call",
+            "label": "compatible",
+            "chosen": [
+              "per-call",
+              "per-call",
+              "per-call"
+            ],
+            "pChosen": [
+              0.91,
+              0.977,
+              0.971
+            ],
+            "pViolate": [
+              0.035,
+              0.01,
+              0.011
+            ]
+          },
+          {
+            "id": "D08",
+            "truth": "fifo",
+            "label": "compatible",
+            "chosen": [
+              "fifo",
+              "fifo",
+              "fifo"
+            ],
+            "pChosen": [
+              0.889,
+              0.972,
+              0.977
+            ],
+            "pViolate": [
+              0.062,
+              0.013,
+              0.011
+            ]
+          },
+          {
+            "id": "D09",
+            "truth": "at-most-one",
+            "label": "compatible",
+            "chosen": [
+              "exactly-one",
+              "at-most-one",
+              "at-most-one"
+            ],
+            "pChosen": [
+              0.661,
+              0.818,
+              0.852
+            ],
+            "pViolate": [
+              0.016,
+              0.023,
+              0.015
+            ]
+          },
+          {
+            "id": "D10",
+            "truth": "integer",
+            "label": "compatible",
+            "chosen": [
+              "integer",
+              "integer",
+              "integer"
+            ],
+            "pChosen": [
+              0.943,
+              0.973,
+              0.969
+            ],
+            "pViolate": [
+              0.046,
+              0.02,
+              0.022
+            ]
+          }
+        ]
+      },
+      "separate": {
+        "unclearShare": 0,
+        "v0ValueAccuracy": 0.925,
+        "permutedAgreementAll3": 0.925,
+        "flipRatePairwise": 0.05,
+        "verdictAgreementAll3": 1,
+        "rules": {
+          "single-argmax": [
+            {
+              "t": 0,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.3,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.4,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.5,
+              "recall": 0.9545454545454546,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0,
+              "tp": 21,
+              "fp": 0,
+              "fn": 1,
+              "misses": [
+                "C12"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.6,
+              "recall": 0.9545454545454546,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.925,
+              "risk": 0,
+              "tp": 21,
+              "fp": 0,
+              "fn": 1,
+              "misses": [
+                "C12"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.7,
+              "recall": 0.9090909090909091,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.85,
+              "risk": 0,
+              "tp": 20,
+              "fp": 0,
+              "fn": 2,
+              "misses": [
+                "C12",
+                "C24"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.8,
+              "recall": 0.7727272727272727,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.775,
+              "risk": 0,
+              "tp": 17,
+              "fp": 0,
+              "fn": 5,
+              "misses": [
+                "C06",
+                "C12",
+                "C13",
+                "C24",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.5454545454545454,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.575,
+              "risk": 0,
+              "tp": 12,
+              "fp": 0,
+              "fn": 10,
+              "misses": [
+                "C05",
+                "C06",
+                "C07",
+                "C09",
+                "C10",
+                "C12",
+                "C13",
+                "C24",
+                "C25",
+                "C28"
+              ],
+              "falseFlags": []
+            }
+          ],
+          "single-mass": [
+            {
+              "t": 0,
+              "recall": 1,
+              "precision": 0.55,
+              "decoyFpRate": 1,
+              "compatibleFpRate": 1,
+              "coverage": 1,
+              "risk": 0.45,
+              "tp": 22,
+              "fp": 18,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "C03",
+                "C08",
+                "C11",
+                "C15",
+                "C18",
+                "C23",
+                "C26",
+                "C29",
+                "D01",
+                "D02",
+                "D03",
+                "D04",
+                "D05",
+                "D06",
+                "D07",
+                "D08",
+                "D09",
+                "D10"
+              ]
+            },
+            {
+              "t": 0.3,
+              "recall": 1,
+              "precision": 0.9565217391304348,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0.025,
+              "tp": 22,
+              "fp": 1,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.4,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.5,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.6,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.7,
+              "recall": 0.9545454545454546,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.95,
+              "risk": 0,
+              "tp": 21,
+              "fp": 0,
+              "fn": 1,
+              "misses": [
+                "C24"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.8,
+              "recall": 0.9090909090909091,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.925,
+              "risk": 0,
+              "tp": 20,
+              "fp": 0,
+              "fn": 2,
+              "misses": [
+                "C06",
+                "C24"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.7272727272727273,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.8,
+              "risk": 0,
+              "tp": 16,
+              "fp": 0,
+              "fn": 6,
+              "misses": [
+                "C06",
+                "C07",
+                "C09",
+                "C12",
+                "C24",
+                "C28"
+              ],
+              "falseFlags": []
+            }
+          ],
+          "keel-argmax": [
+            {
+              "t": 0,
+              "recall": 0.9545454545454546,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.925,
+              "risk": 0,
+              "tp": 21,
+              "fp": 0,
+              "fn": 1,
+              "misses": [
+                "C12"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.3,
+              "recall": 0.9545454545454546,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.925,
+              "risk": 0,
+              "tp": 21,
+              "fp": 0,
+              "fn": 1,
+              "misses": [
+                "C12"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.4,
+              "recall": 0.9545454545454546,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.925,
+              "risk": 0,
+              "tp": 21,
+              "fp": 0,
+              "fn": 1,
+              "misses": [
+                "C12"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.5,
+              "recall": 0.9545454545454546,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.925,
+              "risk": 0,
+              "tp": 21,
+              "fp": 0,
+              "fn": 1,
+              "misses": [
+                "C12"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.6,
+              "recall": 0.9090909090909091,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.875,
+              "risk": 0,
+              "tp": 20,
+              "fp": 0,
+              "fn": 2,
+              "misses": [
+                "C12",
+                "C13"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.7,
+              "recall": 0.7272727272727273,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.75,
+              "risk": 0,
+              "tp": 16,
+              "fp": 0,
+              "fn": 6,
+              "misses": [
+                "C06",
+                "C07",
+                "C09",
+                "C12",
+                "C13",
+                "C24"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.8,
+              "recall": 0.6363636363636364,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.7,
+              "risk": 0,
+              "tp": 14,
+              "fp": 0,
+              "fn": 8,
+              "misses": [
+                "C05",
+                "C06",
+                "C07",
+                "C09",
+                "C12",
+                "C13",
+                "C24",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.45454545454545453,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.475,
+              "risk": 0,
+              "tp": 10,
+              "fp": 0,
+              "fn": 12,
+              "misses": [
+                "C05",
+                "C06",
+                "C07",
+                "C09",
+                "C10",
+                "C12",
+                "C13",
+                "C21",
+                "C22",
+                "C24",
+                "C25",
+                "C28"
+              ],
+              "falseFlags": []
+            }
+          ],
+          "keel-mass": [
+            {
+              "t": 0,
+              "recall": 1,
+              "precision": 0.55,
+              "decoyFpRate": 1,
+              "compatibleFpRate": 1,
+              "coverage": 1,
+              "risk": 0.45,
+              "tp": 22,
+              "fp": 18,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "C03",
+                "C08",
+                "C11",
+                "C15",
+                "C18",
+                "C23",
+                "C26",
+                "C29",
+                "D01",
+                "D02",
+                "D03",
+                "D04",
+                "D05",
+                "D06",
+                "D07",
+                "D08",
+                "D09",
+                "D10"
+              ]
+            },
+            {
+              "t": 0.3,
+              "recall": 1,
+              "precision": 0.9565217391304348,
+              "decoyFpRate": 0.1,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0.025,
+              "tp": 22,
+              "fp": 1,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": [
+                "D02"
+              ]
+            },
+            {
+              "t": 0.4,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.5,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.6,
+              "recall": 1,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 1,
+              "risk": 0,
+              "tp": 22,
+              "fp": 0,
+              "fn": 0,
+              "misses": [],
+              "falseFlags": []
+            },
+            {
+              "t": 0.7,
+              "recall": 0.8181818181818182,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.875,
+              "risk": 0,
+              "tp": 18,
+              "fp": 0,
+              "fn": 4,
+              "misses": [
+                "C06",
+                "C07",
+                "C09",
+                "C24"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.8,
+              "recall": 0.7272727272727273,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.825,
+              "risk": 0,
+              "tp": 16,
+              "fp": 0,
+              "fn": 6,
+              "misses": [
+                "C06",
+                "C07",
+                "C09",
+                "C12",
+                "C24",
+                "C28"
+              ],
+              "falseFlags": []
+            },
+            {
+              "t": 0.9,
+              "recall": 0.5909090909090909,
+              "precision": 1,
+              "decoyFpRate": 0,
+              "compatibleFpRate": 0,
+              "coverage": 0.7,
+              "risk": 0,
+              "tp": 13,
+              "fp": 0,
+              "fn": 9,
+              "misses": [
+                "C06",
+                "C07",
+                "C09",
+                "C10",
+                "C12",
+                "C13",
+                "C24",
+                "C25",
+                "C28"
+              ],
+              "falseFlags": []
+            }
+          ]
+        },
+        "perItem": [
+          {
+            "id": "C01",
+            "truth": "per-session",
+            "label": "contradiction",
+            "chosen": [
+              "per-session",
+              "per-session",
+              "per-session"
+            ],
+            "pChosen": [
+              0.945,
+              0.943,
+              0.95
+            ],
+            "pViolate": [
+              0.962,
+              0.969,
+              0.97
+            ]
+          },
+          {
+            "id": "C02",
+            "truth": "static",
+            "label": "contradiction",
+            "chosen": [
+              "static",
+              "static",
+              "static"
+            ],
+            "pChosen": [
+              0.944,
+              0.909,
+              0.939
+            ],
+            "pViolate": [
+              0.966,
+              0.97,
+              0.969
+            ]
+          },
+          {
+            "id": "C03",
+            "truth": "ttl",
+            "label": "compatible",
+            "chosen": [
+              "ttl",
+              "ttl",
+              "ttl"
+            ],
+            "pChosen": [
+              0.973,
+              0.982,
+              0.979
+            ],
+            "pViolate": [
+              0.007,
+              0.004,
+              0.005
+            ]
+          },
+          {
+            "id": "C04",
+            "truth": "ttl",
+            "label": "contradiction",
+            "chosen": [
+              "ttl",
+              "ttl",
+              "ttl"
+            ],
+            "pChosen": [
+              0.975,
+              0.972,
+              0.966
+            ],
+            "pViolate": [
+              0.982,
+              0.98,
+              0.975
+            ]
+          },
+          {
+            "id": "C05",
+            "truth": "static",
+            "label": "contradiction",
+            "chosen": [
+              "static",
+              "static",
+              "static"
+            ],
+            "pChosen": [
+              0.893,
+              0.786,
+              0.77
+            ],
+            "pViolate": [
+              0.958,
+              0.946,
+              0.952
+            ]
+          },
+          {
+            "id": "C06",
+            "truth": "many",
+            "label": "contradiction",
+            "chosen": [
+              "many",
+              "many",
+              "many"
+            ],
+            "pChosen": [
+              0.768,
+              0.667,
+              0.69
+            ],
+            "pViolate": [
+              0.768,
+              0.667,
+              0.69
+            ]
+          },
+          {
+            "id": "C07",
+            "truth": "many",
+            "label": "contradiction",
+            "chosen": [
+              "many",
+              "many",
+              "many"
+            ],
+            "pChosen": [
+              0.898,
+              0.683,
+              0.852
+            ],
+            "pViolate": [
+              0.898,
+              0.683,
+              0.852
+            ]
+          },
+          {
+            "id": "C08",
+            "truth": "at-most-one",
+            "label": "compatible",
+            "chosen": [
+              "exactly-one",
+              "exactly-one",
+              "at-most-one"
+            ],
+            "pChosen": [
+              0.479,
+              0.487,
+              0.571
+            ],
+            "pViolate": [
+              0.034,
+              0.021,
+              0.028
+            ]
+          },
+          {
+            "id": "C09",
+            "truth": "unordered",
+            "label": "contradiction",
+            "chosen": [
+              "unordered",
+              "unordered",
+              "unordered"
+            ],
+            "pChosen": [
+              0.864,
+              0.698,
+              0.747
+            ],
+            "pViolate": [
+              0.864,
+              0.698,
+              0.747
+            ]
+          },
+          {
+            "id": "C10",
+            "truth": "unordered",
+            "label": "contradiction",
+            "chosen": [
+              "unordered",
+              "unordered",
+              "unordered"
+            ],
+            "pChosen": [
+              0.878,
+              0.836,
+              0.851
+            ],
+            "pViolate": [
+              0.916,
+              0.857,
+              0.893
+            ]
+          },
+          {
+            "id": "C11",
+            "truth": "per-key-fifo",
+            "label": "compatible",
+            "chosen": [
+              "per-key-fifo",
+              "per-key-fifo",
+              "per-key-fifo"
+            ],
+            "pChosen": [
+              0.927,
+              0.919,
+              0.941
+            ],
+            "pViolate": [
+              0.022,
+              0.029,
+              0.018
+            ]
+          },
+          {
+            "id": "C12",
+            "truth": "eventual",
+            "label": "contradiction",
+            "chosen": [
+              "eventual",
+              "read-your-writes",
+              "read-your-writes"
+            ],
+            "pChosen": [
+              0.419,
+              0.427,
+              0.416
+            ],
+            "pViolate": [
+              0.836,
+              0.78,
+              0.805
+            ]
+          },
+          {
+            "id": "C13",
+            "truth": "eventual",
+            "label": "contradiction",
+            "chosen": [
+              "eventual",
+              "eventual",
+              "eventual"
+            ],
+            "pChosen": [
+              0.79,
+              0.673,
+              0.546
+            ],
+            "pViolate": [
+              0.908,
+              0.875,
+              0.914
+            ]
+          },
+          {
+            "id": "C14",
+            "truth": "string",
+            "label": "contradiction",
+            "chosen": [
+              "string",
+              "string",
+              "string"
+            ],
+            "pChosen": [
+              0.968,
+              0.98,
+              0.978
+            ],
+            "pViolate": [
+              0.986,
+              0.992,
+              0.991
+            ]
+          },
+          {
+            "id": "C15",
+            "truth": "read-your-writes",
+            "label": "compatible",
+            "chosen": [
+              "read-your-writes",
+              "read-your-writes",
+              "read-your-writes"
+            ],
+            "pChosen": [
+              0.621,
+              0.728,
+              0.858
+            ],
+            "pViolate": [
+              0.13,
+              0.063,
+              0.036
+            ]
+          },
+          {
+            "id": "C16",
+            "truth": "optional",
+            "label": "contradiction",
+            "chosen": [
+              "optional",
+              "optional",
+              "optional"
+            ],
+            "pChosen": [
+              0.971,
+              0.953,
+              0.958
+            ],
+            "pViolate": [
+              0.98,
+              0.975,
+              0.971
+            ]
+          },
+          {
+            "id": "C17",
+            "truth": "optional",
+            "label": "contradiction",
+            "chosen": [
+              "optional",
+              "optional",
+              "optional"
+            ],
+            "pChosen": [
+              0.98,
+              0.975,
+              0.978
+            ],
+            "pViolate": [
+              0.985,
+              0.981,
+              0.984
+            ]
+          },
+          {
+            "id": "C18",
+            "truth": "required",
+            "label": "compatible",
+            "chosen": [
+              "required",
+              "required",
+              "required"
+            ],
+            "pChosen": [
+              0.962,
+              0.963,
+              0.954
+            ],
+            "pViolate": [
+              0.011,
+              0.01,
+              0.014
+            ]
+          },
+          {
+            "id": "C19",
+            "truth": "absent",
+            "label": "contradiction",
+            "chosen": [
+              "absent",
+              "absent",
+              "absent"
+            ],
+            "pChosen": [
+              0.982,
+              0.983,
+              0.984
+            ],
+            "pViolate": [
+              0.988,
+              0.989,
+              0.99
+            ]
+          },
+          {
+            "id": "C20",
+            "truth": "admin",
+            "label": "contradiction",
+            "chosen": [
+              "admin",
+              "admin",
+              "admin"
+            ],
+            "pChosen": [
+              0.961,
+              0.931,
+              0.952
+            ],
+            "pViolate": [
+              0.986,
+              0.981,
+              0.985
+            ]
+          },
+          {
+            "id": "C21",
+            "truth": "member",
+            "label": "contradiction",
+            "chosen": [
+              "member",
+              "member",
+              "member"
+            ],
+            "pChosen": [
+              0.94,
+              0.95,
+              0.877
+            ],
+            "pViolate": [
+              0.972,
+              0.979,
+              0.938
+            ]
+          },
+          {
+            "id": "C22",
+            "truth": "authenticated",
+            "label": "contradiction",
+            "chosen": [
+              "authenticated",
+              "authenticated",
+              "authenticated"
+            ],
+            "pChosen": [
+              0.963,
+              0.963,
+              0.866
+            ],
+            "pViolate": [
+              0.992,
+              0.983,
+              0.984
+            ]
+          },
+          {
+            "id": "C23",
+            "truth": "admin",
+            "label": "compatible",
+            "chosen": [
+              "admin",
+              "admin",
+              "admin"
+            ],
+            "pChosen": [
+              0.969,
+              0.969,
+              0.969
+            ],
+            "pViolate": [
+              0.009,
+              0.009,
+              0.009
+            ]
+          },
+          {
+            "id": "C24",
+            "truth": "non-idempotent",
+            "label": "contradiction",
+            "chosen": [
+              "non-idempotent",
+              "non-idempotent",
+              "non-idempotent"
+            ],
+            "pChosen": [
+              0.686,
+              0.775,
+              0.694
+            ],
+            "pViolate": [
+              0.686,
+              0.775,
+              0.694
+            ]
+          },
+          {
+            "id": "C25",
+            "truth": "idempotent",
+            "label": "contradiction",
+            "chosen": [
+              "idempotent",
+              "idempotent",
+              "idempotent"
+            ],
+            "pChosen": [
+              0.89,
+              0.869,
+              0.855
+            ],
+            "pViolate": [
+              0.92,
+              0.897,
+              0.886
+            ]
+          },
+          {
+            "id": "C26",
+            "truth": "idempotent",
+            "label": "compatible",
+            "chosen": [
+              "idempotent",
+              "idempotent",
+              "idempotent"
+            ],
+            "pChosen": [
+              0.962,
+              0.961,
+              0.965
+            ],
+            "pViolate": [
+              0.016,
+              0.015,
+              0.018
+            ]
+          },
+          {
+            "id": "C27",
+            "truth": "le-1k",
+            "label": "contradiction",
+            "chosen": [
+              "le-1k",
+              "le-1k",
+              "le-1k"
+            ],
+            "pChosen": [
+              0.934,
+              0.958,
+              0.949
+            ],
+            "pViolate": [
+              0.962,
+              0.98,
+              0.973
+            ]
+          },
+          {
+            "id": "C28",
+            "truth": "unbounded",
+            "label": "contradiction",
+            "chosen": [
+              "unbounded",
+              "unbounded",
+              "unbounded"
+            ],
+            "pChosen": [
+              0.757,
+              0.751,
+              0.743
+            ],
+            "pViolate": [
+              0.804,
+              0.791,
+              0.774
+            ]
+          },
+          {
+            "id": "C29",
+            "truth": "le-100",
+            "label": "compatible",
+            "chosen": [
+              "le-100",
+              "le-100",
+              "le-100"
+            ],
+            "pChosen": [
+              0.947,
+              0.946,
+              0.954
+            ],
+            "pViolate": [
+              0.03,
+              0.035,
+              0.03
+            ]
+          },
+          {
+            "id": "C30",
+            "truth": "string",
+            "label": "contradiction",
+            "chosen": [
+              "string",
+              "string",
+              "string"
+            ],
+            "pChosen": [
+              0.96,
+              0.97,
+              0.972
+            ],
+            "pViolate": [
+              0.978,
+              0.986,
+              0.984
+            ]
+          },
+          {
+            "id": "D01",
+            "truth": "per-request",
+            "label": "compatible",
+            "chosen": [
+              "per-request",
+              "per-request",
+              "per-request"
+            ],
+            "pChosen": [
+              0.973,
+              0.981,
+              0.979
+            ],
+            "pViolate": [
+              0.009,
+              0.007,
+              0.007
+            ]
+          },
+          {
+            "id": "D02",
+            "truth": "strong",
+            "label": "compatible",
+            "chosen": [
+              "strong",
+              "strong",
+              "strong"
+            ],
+            "pChosen": [
+              0.558,
+              0.506,
+              0.508
+            ],
+            "pViolate": [
+              0.343,
+              0.4,
+              0.338
+            ]
+          },
+          {
+            "id": "D03",
+            "truth": "idempotent",
+            "label": "compatible",
+            "chosen": [
+              "idempotent",
+              "idempotent",
+              "idempotent"
+            ],
+            "pChosen": [
+              0.879,
+              0.848,
+              0.879
+            ],
+            "pViolate": [
+              0.043,
+              0.049,
+              0.049
+            ]
+          },
+          {
+            "id": "D04",
+            "truth": "le-100",
+            "label": "compatible",
+            "chosen": [
+              "le-100",
+              "le-100",
+              "le-100"
+            ],
+            "pChosen": [
+              0.93,
+              0.945,
+              0.94
+            ],
+            "pViolate": [
+              0.043,
+              0.037,
+              0.041
+            ]
+          },
+          {
+            "id": "D05",
+            "truth": "at-most-one",
+            "label": "compatible",
+            "chosen": [
+              "exactly-one",
+              "exactly-one",
+              "exactly-one"
+            ],
+            "pChosen": [
+              0.893,
+              0.805,
+              0.838
+            ],
+            "pViolate": [
+              0.013,
+              0.012,
+              0.009
+            ]
+          },
+          {
+            "id": "D06",
+            "truth": "per-call",
+            "label": "compatible",
+            "chosen": [
+              "per-call",
+              "per-call",
+              "per-call"
+            ],
+            "pChosen": [
+              0.911,
+              0.812,
+              0.921
+            ],
+            "pViolate": [
+              0.039,
+              0.105,
+              0.02
+            ]
+          },
+          {
+            "id": "D07",
+            "truth": "per-call",
+            "label": "compatible",
+            "chosen": [
+              "per-call",
+              "per-call",
+              "per-call"
+            ],
+            "pChosen": [
+              0.881,
+              0.889,
+              0.937
+            ],
+            "pViolate": [
+              0.049,
+              0.048,
+              0.028
+            ]
+          },
+          {
+            "id": "D08",
+            "truth": "fifo",
+            "label": "compatible",
+            "chosen": [
+              "fifo",
+              "fifo",
+              "fifo"
+            ],
+            "pChosen": [
+              0.927,
+              0.944,
+              0.899
+            ],
+            "pViolate": [
+              0.052,
+              0.04,
+              0.077
+            ]
+          },
+          {
+            "id": "D09",
+            "truth": "at-most-one",
+            "label": "compatible",
+            "chosen": [
+              "exactly-one",
+              "at-most-one",
+              "at-most-one"
+            ],
+            "pChosen": [
+              0.647,
+              0.818,
+              0.939
+            ],
+            "pViolate": [
+              0.01,
+              0.009,
+              0.009
+            ]
+          },
+          {
+            "id": "D10",
+            "truth": "integer",
+            "label": "compatible",
+            "chosen": [
+              "integer",
+              "integer",
+              "integer"
+            ],
+            "pChosen": [
+              0.96,
+              0.969,
+              0.972
+            ],
+            "pViolate": [
+              0.032,
+              0.024,
+              0.022
+            ]
+          }
+        ]
+      }
+    },
+    "jointVsSeparate": {
+      "sameChoice": 0.9583333333333334,
+      "maxProbabilityDelta": 0.4653
+    },
+    "batch64CrossQuestion": {
+      "aloneChoice": "c-per-session",
+      "aloneProbabilities": {
+        "a-per-call": 0.0154,
+        "b-per-request": 0.0144,
+        "c-per-session": 0.9453,
+        "d-ttl": 0.0126,
+        "e-static": 0.0042,
+        "f-unclear": 0.0081
+      },
+      "inBatchChoice": "c-per-session",
+      "inBatchProbabilities": {
+        "a-per-call": 0.0223,
+        "b-per-request": 0.0183,
+        "c-per-session": 0.9296,
+        "d-ttl": 0.0126,
+        "e-static": 0.0038,
+        "f-unclear": 0.0134
+      },
+      "batchDeterministic": true
+    },
+    "latency": {
+      "q1": {
+        "calls": 120,
+        "callP50": 236,
+        "callP95": 465,
+        "perQuestionP50": 236,
+        "perQuestionP95": 465,
+        "clientP50": 263,
+        "inputTokensP50": 612
+      },
+      "q3": {
+        "calls": 40,
+        "callP50": 281,
+        "callP95": 483,
+        "perQuestionP50": 93.7,
+        "perQuestionP95": 161,
+        "clientP50": 298,
+        "inputTokensP50": 1091
+      },
+      "q64": {
+        "calls": 8,
+        "callP50": 1856,
+        "callP95": 1996,
+        "perQuestionP50": 29,
+        "perQuestionP95": 31.2,
+        "clientP50": 1887,
+        "inputTokensP50": 16223
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+--- a/auth/tokens.py
++++ b/auth/tokens.py
+@@ -1 +1 @@
++from cachetools import TTLCache, cached
++
+ from auth.store import revocations
++from profiles.store import profiles
++
++_avatar_cache = TTLCache(maxsize=50_000, ttl=300)
+
+
+ def is_token_revoked(token_id: str) -> bool:
+     return revocations.exists(token_id)
+
+
++@cached(_avatar_cache)
++def avatar_url(user_id: str) -> str:
++    return profiles.avatar_url(user_id)
++
++
+ def authenticate(request) -> Principal:
+     token = parse_bearer(request)
+     if is_token_revoked(token.id):
+         raise Unauthorized("token revoked")
+-    return Principal(user_id=token.sub)
++    return Principal(user_id=token.sub, avatar=avatar_url(token.sub))
