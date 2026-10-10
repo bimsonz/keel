@@ -5,10 +5,23 @@ import {
   ChangeId,
   CommitSha,
   ContentHash,
+  InstantSchema,
   ProjectId,
   Tier,
   VerdictId,
 } from "../kernel/index.ts";
+
+/**
+ * Who a failed batch is blamed on: one member, a refused composition
+ * (`textual`), every subset passing while the union fails (`interaction`),
+ * the infrastructure (`infra`), or nobody yet (`unattributed`: a
+ * multi-member failure `attribute` could not pin, the only kind bisected).
+ */
+export const BatchAttribution = Schema.Union([
+  ChangeId,
+  Schema.Literals(["textual", "interaction", "infra", "unattributed"]),
+]);
+export type BatchAttribution = typeof BatchAttribution.Type;
 
 export const BatchFormed = Schema.TaggedStruct("BatchFormed", {
   batchId: BatchId,
@@ -17,6 +30,10 @@ export const BatchFormed = Schema.TaggedStruct("BatchFormed", {
   base: CommitSha,
   attempt: Schema.Int,
   chainEpoch: Schema.Int,
+  /** Optional only so events from before it was added still decode; the Lane always sets it. */
+  projectId: Schema.optional(ProjectId),
+  /** Changes the batch was verified on top of that trunk does not hold yet (its speculation chain). */
+  predecessors: Schema.optional(Schema.Array(ChangeId)),
 });
 export const CandidateAssembled = Schema.TaggedStruct("CandidateAssembled", {
   candidateId: CandidateId,
@@ -36,12 +53,16 @@ export const BatchVerified = Schema.TaggedStruct("BatchVerified", {
   batchId: BatchId,
   candidateId: CandidateId,
   verdictId: VerdictId,
+  /** What the Trunk DO needs to promote the batch: optional only so older events still decode. */
+  members: Schema.optional(Schema.Array(ChangeId)),
+  base: Schema.optional(CommitSha),
+  predecessors: Schema.optional(Schema.Array(ChangeId)),
 });
 export const BatchFailed = Schema.TaggedStruct("BatchFailed", {
   batchId: BatchId,
   candidateId: Schema.optional(CandidateId),
   verdictId: VerdictId,
-  attribution: Schema.Union([ChangeId, Schema.Literals(["textual", "interaction", "infra"])]),
+  attribution: BatchAttribution,
 });
 export const CandidateBisected = Schema.TaggedStruct("CandidateBisected", {
   candidateId: CandidateId,
@@ -69,7 +90,8 @@ export const TrunkAdvanced = Schema.TaggedStruct("TrunkAdvanced", {
 export const PromotionDeclined = Schema.TaggedStruct("PromotionDeclined", {
   projectId: ProjectId,
   batchId: BatchId,
-  reason: Schema.Literal("commutation-failed"),
+  /** `frozen`: the batch was in the group a freeze stopped, and the operator's resume drops it. */
+  reason: Schema.Literals(["commutation-failed", "frozen"]),
   reverify: Schema.Array(ChangeId),
 });
 export const PromotionFrozen = Schema.TaggedStruct("PromotionFrozen", {
@@ -81,6 +103,33 @@ export const PromotionFrozen = Schema.TaggedStruct("PromotionFrozen", {
 export const PromotionResumed = Schema.TaggedStruct("PromotionResumed", {
   projectId: ProjectId,
   by: Schema.String,
+  /** The head the operator confirms trunk is at; optional only so older events still decode. */
+  head: Schema.optional(CommitSha),
+});
+/** The trunk's first known head, from the project's seed or an operator. Nothing promotes before it. */
+export const TrunkInitialized = Schema.TaggedStruct("TrunkInitialized", {
+  projectId: ProjectId,
+  head: CommitSha,
+  by: Schema.String,
+});
+/**
+ * The write-ahead log entry (ADR 0003): the group about to be pushed, written
+ * before the compose. It is resolved by exactly one `TrunkAdvanced` or `PromotionFrozen`.
+ */
+export const PromotionStarted = Schema.TaggedStruct("PromotionStarted", {
+  projectId: ProjectId,
+  groupId: Schema.String,
+  old: CommitSha,
+  members: Schema.Array(ChangeId),
+  batches: Schema.Array(BatchId),
+  proofIds: Schema.Array(Schema.String),
+  committerTime: InstantSchema,
+});
+/** The group's composed commit, recorded before the first push: every retry pushes this SHA, never a recompose. */
+export const PromotionComposed = Schema.TaggedStruct("PromotionComposed", {
+  projectId: ProjectId,
+  groupId: Schema.String,
+  sha: CommitSha,
 });
 export const AuditCompleted = Schema.TaggedStruct("AuditCompleted", {
   projectId: ProjectId,
@@ -103,6 +152,9 @@ export const IntegrationEvent = Schema.Union([
   PromotionDeclined,
   PromotionFrozen,
   PromotionResumed,
+  TrunkInitialized,
+  PromotionStarted,
+  PromotionComposed,
   AuditCompleted,
 ]);
 export type IntegrationEvent = typeof IntegrationEvent.Type;

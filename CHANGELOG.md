@@ -13,6 +13,9 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 - The Change and Lease state machines: `decideChange(state, command, {now, changeId})` and `evolveChange(state, {at, payload})`, with `replayChange`, the `ChangeCommand` union and the `ChangeEvent` schema; lease helpers `isLapsed`, `lapsesAt`, `checkLease` and `renew`. Kernel `Decide` takes a trailing `facts` parameter; new `Committed<E>`, `IllegalTransition` and the `NextAction` schema.
 - Event `ChangeStarted {changeId, workspaceId}` (Declared → Working). `ChangeBounced.nextActions?` (never empty when emitted). Optional `commitSha`, `laneId`, `batchId` and `escalationId` on `Change`.
 - Errors `ChangeBlocked` and `LeaseNotLapsed`; `LeaseStale` gains `reason?: stale|lapsed`, and every change error gains `nextActions?`.
+- The Candidate and trunk Promotion state machines: `decideCandidate`/`evolveCandidate`/`replayCandidate` with `CandidateCommand`, `CandidateEvent`, `isBisectable`, `isCandidateTerminal`; `decidePromotion`/`evolvePromotion`/`replayPromotion` with `PromotionCommand`, `TrunkEvent`, `CommutationFacts`, `pushTarget`; schemas `Trunk`, `QueuedBatch`, `PendingGroup`.
+- Entity kind `trunk` (`trunk:<projectId>`). Events `TrunkInitialized {projectId, head, by}`, `PromotionStarted` (the WAL entry) and `PromotionComposed {projectId, groupId, sha}`. `BatchFailed.attribution` gains `unattributed`; `PromotionDeclined.reason` gains `frozen`. Optional `projectId` and `predecessors` on `BatchFormed`, `members`, `base` and `predecessors` on `BatchVerified`, `head` on `PromotionResumed`, `predecessors` and `attribution` on `Batch`.
+- Errors `CandidateStateRefused`, `ResultFenced` (terminal: a fenced result is never retried), `InvalidBatch`, `TrunkNotInitialized`, `PromotionStateRefused`.
 
 ### Changed
 

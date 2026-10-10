@@ -21,6 +21,7 @@ Terms are in [CONTEXT.md](../../CONTEXT.md).
 | probe | the DO that owns its conflict | as its conflict |
 | guard | the DO that owns the conflict it proved | as its conflict |
 | batch | Lane DO | `lane:<project>:<id>` |
+| trunk (promotion) | Trunk DO | `trunk:<projectId>`: its own entity kind and seq, apart from the project's |
 | candidate | Lane DO | `lane:<project>:<id>` |
 | verdict | the DO that issued it: Change DO for a change, Lane DO for a batch | as its issuer |
 | decision | Subject DO | `subj:<project>:<key>` |
@@ -252,13 +253,13 @@ stateDiagram-v2
 | Forming | Assembled | GitCore composes the tree (Tier 0), or MergeBox when GitCore refuses (Tier 2) | — | `CandidateAssembled` (with tier and reason) |
 | Forming | Red | GitCore and MergeBox both refuse to compose | — | `BatchFailed {attribution: textual}`, then a textual `ConflictSuspected` → `ConflictProven`, owned by the Lane DO |
 | Assembled | Verifying | KeelVerify instance created | — | `VerificationStarted` |
-| Verifying | Green | The union of the members' plans passes | Results fenced on `(batchId, attempt, chainEpoch)` | `BatchVerified` |
-| Verifying | Red | A step fails after a flake rerun | — | `BatchFailed` (attribution: a change, `interaction` or `infra`) |
-| Red | Bisected | More than one member, and the failure is not yet attributed | — | `CandidateBisected` (new batches) |
+| Verifying | Green | The union of the members' plans passes | Results fenced on `(batchId, attempt, chainEpoch)`: a result for another attempt or epoch is refused and never retried | `BatchVerified` (with the members, base and predecessors the Trunk DO needs) |
+| Verifying | Red | A step fails after a flake rerun | Fenced as above; a blamed change is a member | `BatchFailed` (attribution: a change, `interaction`, `infra`, or `unattributed` when several members could be to blame) |
+| Red | Bisected | More than one member, and the failure is `unattributed` | — | `CandidateBisected` (new batches) |
 | Green | Promoted | Caused by `TrunkAdvanced` | — | `CandidatePromoted` |
 | Green | Invalidated | Caused by `PromotionDeclined`: trunk moved and the commutation rule fails | — | `CandidateInvalidated` |
 
-**Terminal:** Promoted, Invalidated, Bisected, Red (a refused composition, or a single attributed member, which bounces).
+**Terminal:** Promoted, Invalidated, Bisected, Red (unless it is `unattributed` with several members, which is bisected).
 
 **Invariants**
 - An interaction failure (every subset passes, the union fails) opens an `interaction` conflict owned by the Lane DO.
@@ -270,30 +271,37 @@ Owner: Trunk DO (`trunk:<project>`), the one writer of trunk ([ADR 0003](../adr/
 
 ```mermaid
 stateDiagram-v2
-  [*] --> Idle
-  Idle --> Debouncing: BatchVerified arrives
-  Debouncing --> Promoting: debounce deadline (~100 ms)
+  [*] --> Idle: TrunkInitialized
+  Idle --> Debouncing: BatchVerified received
+  Debouncing --> Promoting: PromotionStarted (the WAL entry)
   Debouncing --> Idle: PromotionDeclined (every batch)
-  Promoting --> Promoting: head still old → retry same SHA
+  Promoting --> Promoting: PromotionComposed / head still old → retry the recorded SHA
   Promoting --> Idle: TrunkAdvanced
   Promoting --> Frozen: PromotionFrozen
+  Debouncing --> Frozen: PromotionFrozen
   Frozen --> Idle: PromotionResumed
 ```
 
+The Trunk DO's state is folded from its own events and from the `BatchVerified` it receives, recorded in the same transaction as its reaction ([ADR 0009](../adr/0009-event-driven-outbox.md)), so replaying both in commit order rebuilds it.
+
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
-| Idle | Debouncing | A `BatchVerified` arrives | — | none: the debounce alarm is armed (a named debounce) |
-| Debouncing | Promoting | The debounce deadline fires | The commutation rule (C1–C6) holds for at least one batch | `PromotionDeclined` for each batch it fails for; the WAL entry `PendingGroup {old, members, committerTime}` is written for the rest |
-| Debouncing | Idle | The commutation rule fails for every batch | — | `PromotionDeclined` for each |
-| Promoting | Promoting | Read-back shows the head is still `old` | — | none: the push is retried with the same SHA |
-| Promoting | Idle | Read-back shows the head is `new` | — | `TrunkAdvanced` |
+| — | Idle | The project's seed, or an operator, names trunk's first head | — | `TrunkInitialized {head}`. Before it, nothing is queued or promoted (refused: not initialized) |
+| Idle | Debouncing | A `BatchVerified` arrives | — | the received `BatchVerified` is recorded; the debounce alarm is armed (a named debounce). In any other phase the batch only queues |
+| Debouncing | Promoting | The debounce deadline fires | The observed head is trunk's known head; queued batches are taken first in, first out: one that commutes (C1–C6) joins the group, one that does not is declined, one that must wait stops the queue there | `PromotionDeclined` for each declined batch, then `PromotionStarted {old, members, batches, proofIds, committerTime}`: the WAL entry |
+| Debouncing | Idle, or Debouncing | The commutation rule admits no batch | — | `PromotionDeclined` for each declined batch; Debouncing again while batches still wait |
+| Debouncing | Frozen | The observed head is not trunk's known head | — | `PromotionFrozen` |
+| Promoting | Promoting | The group is composed, before the first push | — | `PromotionComposed {sha}`: every retry pushes this SHA |
+| Promoting | Promoting | Read-back shows the head is still `old` | — | none: the push is retried with the recorded SHA. A recompose that differs from it is never pushed: `PromotionFrozen` |
+| Promoting | Idle, or Debouncing | Read-back shows the head is the recorded SHA | — | `TrunkAdvanced`; Debouncing again if batches arrived meanwhile |
 | Promoting | Frozen | Read-back shows any other head | — | `PromotionFrozen` |
-| Frozen | Idle | An operator releases the freeze | Scope `operator` | `PromotionResumed` |
+| Frozen | Idle, or Debouncing | An operator releases the freeze, confirming trunk's head | Scope `operator` | `PromotionDeclined {reason: frozen}` for each batch of the stopped group, then `PromotionResumed {head}` |
 
 The Auditor's full-suite run on each new head is recorded as `AuditCompleted`. On red it bisects across commutation-promoted commits and declares a revert change with `origin: auditor`, which lands like any other change.
 
 **Invariants**
-- The compose is deterministic, so a retry produces the same SHA.
+- A retry pushes the SHA recorded in `PromotionComposed`, never a recompose: compose is deterministic only within one code version, and a Durable Object can run the previous version for minutes after a deploy.
+- Every WAL group ends exactly once, in `TrunkAdvanced` or `PromotionFrozen`. Nothing promotes from Frozen until `PromotionResumed`.
 - Artifacts' own compare-and-swap, if it exists, is a second fence and never the only one.
 
 ---

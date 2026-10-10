@@ -15,6 +15,8 @@ export const EntityKind = Schema.Literals([
   "batch",
   "candidate",
   "project",
+  /** The Trunk DO's promotion state, keyed by project (`trunk:<projectId>`), with its own seq. */
+  "trunk",
   "decision",
   "tenet",
   "escalation",

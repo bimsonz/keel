@@ -25,7 +25,7 @@ Every event has the same envelope:
 
 **One transition, one event.** An entity's transition is triggered by a command or by another entity's event. Either way the entity commits exactly one event of its own, named for the transition, with `causation` set when an event caused it. Events that record a fact without changing their entity's lifecycle (`DriftDetected`, `GuardFailed`, `PreflightIssued`) are called out as such.
 
-**Entity kinds:** `agent`, `session`, `change`, `subject`, `sketch`, `workspace`, `conflict`, `probe`, `guard`, `verdict`, `batch`, `candidate`, `project`, `decision`, `tenet`, `escalation`, `deployment`.
+**Entity kinds:** `agent`, `session`, `change`, `subject`, `sketch`, `workspace`, `conflict`, `probe`, `guard`, `verdict`, `batch`, `candidate`, `project`, `trunk`, `decision`, `tenet`, `escalation`, `deployment`.
 
 **ID prefixes.** From the API contract: `agt_ ses_ chg_ wsp_ sk_ sub_ cnd_ vrd_ cfl_ dec_ prb_`. Added here for entities the API does not yet expose: `evt_` (event), `bat_` (batch), `grd_` (guard), `tnt_` (tenet), `lse_` (lease), `esc_` (escalation), `dpl_` (deployment).
 
@@ -121,18 +121,21 @@ A **Batch** is a set of Changes verified together; its **Candidate** is the comp
 
 | Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
 |---|---|---|---|---|---|
-| `BatchFormed` | Lane DO | `batchId, laneId, members: changeId[], base, attempt, chainEpoch` | each member change | member Change DOs, `workflow:KeelVerify` | **Starts KeelVerify.** Never contains two changes with an open suspected conflict or opposite effects on one subject |
+| `BatchFormed` | Lane DO | `batchId, laneId, members: changeId[], base, attempt, chainEpoch, projectId, predecessors: changeId[]` | each member change | member Change DOs, `workflow:KeelVerify` | **Starts KeelVerify.** Never contains two changes with an open suspected conflict or opposite effects on one subject |
 | `CandidateAssembled` | Lane DO | `candidateId, batchId, treeSha, composer: gitcore\|mergebox, tier, tierReason` | — | Projector | The candidate is bundled to R2 |
 | `VerificationStarted` | Lane DO | `candidateId, batchId, instanceId, planHash` | — | Projector | The union of the members' plans runs across the tiers |
-| `BatchVerified` | Lane DO | `batchId, candidateId, verdictId` | — | Trunk DO | **Trunk promotion debounces.** Late results are fenced on `(batchId, attempt, chainEpoch)` |
-| `BatchFailed` | Lane DO | `batchId, candidateId?, verdictId, attribution: changeId\|textual\|interaction\|infra` | each member change | member Change DOs | Flake rerun, then attribution, then bisection. `textual`: GitCore and MergeBox both refused to compose, a proven textual conflict. `interaction`: every subset passes and the union fails, an interaction conflict. Both are owned by the Lane DO |
+| `BatchVerified` | Lane DO | `batchId, candidateId, verdictId, members: changeId[], base, predecessors: changeId[]` | — | Trunk DO | **Trunk promotion debounces.** Late results are fenced on `(batchId, attempt, chainEpoch)`; a fenced result is never retried. The Trunk DO records the event it receives and folds it into its state |
+| `BatchFailed` | Lane DO | `batchId, candidateId?, verdictId, attribution: changeId\|textual\|interaction\|infra\|unattributed` | each member change | member Change DOs | Flake rerun, then attribution, then bisection. `textual`: GitCore and MergeBox both refused to compose, a proven textual conflict. `interaction`: every subset passes and the union fails, an interaction conflict. Both are owned by the Lane DO. `unattributed`: a failure of several members that attribution could not pin; only it is bisected |
 | `CandidateBisected` | Lane DO | `candidateId, batchId, into: batchId[]` | each member change | member Change DOs | Leave-one-out or a 4-way split |
 | `CandidateInvalidated` | Lane DO | `candidateId, batchId, reason: head-moved` | each member change | member Change DOs | Caused by `PromotionDeclined`; only the intersection is re-verified |
 | `CandidatePromoted` | Lane DO | `candidateId, batchId, trunkSha` | — | — | Caused by `TrunkAdvanced` |
+| `TrunkInitialized` | Trunk DO | `projectId, head, by` | — | Projector | The trunk's first known head, from the project's seed or an operator. Nothing is queued or promoted before it |
+| `PromotionStarted` | Trunk DO | `projectId, groupId, old, members: changeId[], batches: batchId[], proofIds[], committerTime` | — | Projector | The write-ahead log entry ([ADR 0003](../adr/0003-trunk-single-writer-wal.md)), committed with the batches' declines. Resolved by exactly one `TrunkAdvanced` or `PromotionFrozen` |
+| `PromotionComposed` | Trunk DO | `projectId, groupId, sha` | — | — | The group's composed commit, recorded before the first push. Every retry pushes this SHA; a recompose that differs freezes promotion instead |
 | `TrunkAdvanced` | Trunk DO | `projectId, from, to, groupId, members: changeId[], proofIds[]` | each member change | member Change DOs, member lanes, the Auditor, Projector | Each member lands. The Auditor runs the full suite on the new head |
-| `PromotionDeclined` | Trunk DO | `projectId, batchId, reason: commutation-failed, reverify: changeId[]` | the batch | the batch's Lane DO | Trunk moved since the batch was verified and the commutation rule fails for it |
+| `PromotionDeclined` | Trunk DO | `projectId, batchId, reason: commutation-failed\|frozen, reverify: changeId[]` | the batch | the batch's Lane DO | Trunk moved since the batch was verified and the commutation rule fails for it; or (`frozen`) the batch was in the group a freeze stopped, and the operator's resume drops it |
 | `PromotionFrozen` | Trunk DO | `projectId, groupId, expected, observed` | — | the escalation inbox | Trunk's head was neither the old nor the new SHA; a person is alerted |
-| `PromotionResumed` | Trunk DO | `projectId, by` | — | Projector | An operator released the freeze |
+| `PromotionResumed` | Trunk DO | `projectId, by, head` | — | Projector | An operator released the freeze, confirming trunk's head |
 | `AuditCompleted` | Trunk DO (fact) | `projectId, head, outcome: green\|red, suspects: changeId[], runRef` | — | Projector, the escalation inbox when red | The Auditor's full-suite run on a new head (Tier 2). On red it bisects across commutation-promoted commits and declares a revert change with `origin: auditor` |
 
 ## memory

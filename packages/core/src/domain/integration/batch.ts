@@ -1,5 +1,14 @@
 import { Schema } from "effect";
-import { BatchId, CandidateId, ChangeId, CommitSha, ProjectId } from "../kernel/index.ts";
+import {
+  BatchId,
+  CandidateId,
+  ChangeId,
+  CommitSha,
+  InstantSchema,
+  ProjectId,
+  VerdictId,
+} from "../kernel/index.ts";
+import { BatchAttribution } from "./events.ts";
 
 export const CandidateState = Schema.Literals([
   "forming",
@@ -24,6 +33,10 @@ export const Batch = Schema.Struct({
   chainEpoch: Schema.Int,
   candidateId: Schema.optional(CandidateId),
   state: CandidateState,
+  /** The speculation chain it was verified on top of. */
+  predecessors: Schema.optional(Schema.Array(ChangeId)),
+  /** Who a Red batch is blamed on. */
+  attribution: Schema.optional(BatchAttribution),
 });
 export type Batch = typeof Batch.Type;
 
@@ -45,3 +58,38 @@ export function batchSize(failureRate: number): number {
 
 export const PromotionState = Schema.Literals(["idle", "debouncing", "promoting", "frozen"]);
 export type PromotionState = typeof PromotionState.Type;
+
+/** A verified batch waiting at the Trunk DO, in arrival order. */
+export const QueuedBatch = Schema.Struct({
+  batchId: BatchId,
+  candidateId: CandidateId,
+  verdictId: VerdictId,
+  members: Schema.Array(ChangeId),
+  base: CommitSha,
+  predecessors: Schema.Array(ChangeId),
+});
+export type QueuedBatch = typeof QueuedBatch.Type;
+
+/** The open write-ahead log entry: the group being pushed, and once composed, the one SHA every retry pushes. */
+export const PendingGroup = Schema.Struct({
+  groupId: Schema.String,
+  old: CommitSha,
+  batches: Schema.Array(QueuedBatch),
+  proofIds: Schema.Array(Schema.String),
+  committerTime: InstantSchema,
+  composed: Schema.optional(CommitSha),
+});
+export type PendingGroup = typeof PendingGroup.Type;
+
+/** The Trunk DO's state: the one writer of trunk (ADR 0003). */
+export const Trunk = Schema.Struct({
+  projectId: ProjectId,
+  phase: PromotionState,
+  head: CommitSha,
+  queue: Schema.Array(QueuedBatch),
+  /** Every change promoted so far, for commutation's wait check. */
+  promoted: Schema.Array(ChangeId),
+  wal: Schema.optional(PendingGroup),
+  frozen: Schema.optional(Schema.Struct({ expected: CommitSha, observed: CommitSha })),
+});
+export type Trunk = typeof Trunk.Type;
