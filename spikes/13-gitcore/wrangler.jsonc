@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "keel-spike-13-gitcore",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "limits": { "cpu_ms": 300000, "subrequests": 50000 },
+  "artifacts": [
+    { "binding": "ARTIFACTS", "namespace": "keel-spike-13" },
+    { "binding": "ARTIFACTS_EU", "namespace": "keel-spike-13-eu" },
+    { "binding": "ARTIFACTS_W", "namespace": "keel-spike-13-w" }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "SPIKE", "class_name": "SpikeDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SpikeDO"] }]
+}

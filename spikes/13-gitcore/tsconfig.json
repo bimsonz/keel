@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "lib": ["es2023"],
+    "types": ["./worker-configuration.d.ts", "node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src", "test", "scripts", "vitest.config.ts"]
+}

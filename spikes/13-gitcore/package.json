@@ -1,0 +1,24 @@
+{
+  "name": "keel-spike-13-gitcore",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "wrangler types > /dev/null && tsc --noEmit",
+    "lint": "oxlint -c oxlint.config.json src test scripts",
+    "test": "vitest run",
+    "types": "wrangler types",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "pako": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "fast-check": "^4.10.2",
+    "oxlint": "^1.87.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3",
+    "wrangler": "4.149.0"
+  }
+}
