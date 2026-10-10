@@ -140,3 +140,6 @@ export const openSketch: (
 
 /** The WorkspacePool use-cases. */
 export * from "./workspace-pool/index.ts";
+
+/** The isolate's gateway to the Change and AgentSession DOs. */
+export * from "./gateway.ts";

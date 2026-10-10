@@ -459,6 +459,16 @@
               }
             }
           },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "409": {
             "description": "The request conflicts with the current state of the server.",
             "content": {
@@ -1257,7 +1267,7 @@
     },
     "/changes/{changeId}/submission": {
       "get": {
-        "operationId": "Submissions_getSubmission",
+        "operationId": "status",
         "summary": "Get a change's submission status",
         "description": "Where a submitted change is now. `?wait` long-polls until it moves.",
         "parameters": [
@@ -1374,7 +1384,8 @@
           }
         },
         "tags": [
-          "Submissions"
+          "Submissions",
+          "mcp"
         ],
         "security": [
           {
@@ -7299,7 +7310,13 @@
           "rate.limited",
           "service.unavailable",
           "service.not_implemented",
-          "internal.defect"
+          "internal.defect",
+          "change.not_found",
+          "change.lease_stale",
+          "change.state_refused",
+          "change.commit_not_in_workspace",
+          "workspace.pool_exhausted",
+          "sketch.not_found"
         ],
         "description": "Machine-readable reason for a problem. Dotted; lanes add codes as they build."
       },

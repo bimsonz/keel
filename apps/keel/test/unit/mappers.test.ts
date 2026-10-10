@@ -40,7 +40,6 @@ describe("mappers", () => {
 /** The operations still answering 503 service.not_implemented. Shrinks, visibly, as lanes land each one. */
 const STUBBED = [
   "Sessions_openSession",
-  "declare",
   "Changes_getChange",
   "revise",
   "rely",
@@ -49,15 +48,12 @@ const STUBBED = [
   "sketch",
   "Workspaces_refreshWorkspaceToken",
   "Workspaces_releaseWorkspace",
-  "submit",
-  "Submissions_getSubmission",
   "Conflicts_listConflicts",
   "Conflicts_getConflict",
   "resolve",
   "why",
   "Memory_listDecisions",
   "Memory_getDecision",
-  "inbox",
   "Inbox_listEvents",
   "Views_getVerdict",
   "Views_getCandidate",
@@ -79,9 +75,10 @@ describe("stubbed operations", () => {
     });
     const answers = await Promise.all(
       Object.entries(handlers).map(async ([operation, handler]) => {
-        const result: unknown = await Promise.resolve(
-          Reflect.apply(handler, undefined, [caller, {}]),
-        ).catch(() => null);
+        // `{}` is not valid input; an implemented handler may throw on it, which counts as not a stub.
+        const result: unknown = await Promise.resolve()
+          .then(() => Reflect.apply(handler, undefined, [caller, {}]))
+          .catch(() => null);
         return {
           operation,
           status: result === null ? null : Reflect.get(Object(result), "status"),

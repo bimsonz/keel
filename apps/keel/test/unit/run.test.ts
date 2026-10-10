@@ -1,6 +1,8 @@
 import {
   makeAgentDirectoryMemory,
+  makeChangesMemory,
   makeClockMemory,
+  makeInboxMemory,
   makeIdsMemory,
   makeTokenIssuerMemory,
 } from "@keeltown/testing";
@@ -15,6 +17,8 @@ const runtime = ManagedRuntime.make(
     makeTokenIssuerMemory().layer.pipe(Layer.provide(clock)),
     clock,
     makeIdsMemory().layer,
+    makeChangesMemory().layer,
+    makeInboxMemory().layer,
   ),
 );
 const run = makeRunner(runtime);

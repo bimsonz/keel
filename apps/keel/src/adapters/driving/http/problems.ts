@@ -21,6 +21,12 @@ const TITLES: Record<ProblemCode, string> = {
   "service.unavailable": "Keel cannot serve this right now",
   "service.not_implemented": "This operation is part of the contract but not implemented yet",
   "internal.defect": "Keel hit a defect while serving this request",
+  "change.not_found": "No such change",
+  "change.lease_stale": "The lease is not the change's active lease",
+  "change.state_refused": "The change's state does not allow this",
+  "change.commit_not_in_workspace": "The commit is not in the change's workspace",
+  "workspace.pool_exhausted": "No workspace is ready yet",
+  "sketch.not_found": "No such sketch",
 };
 
 export interface ProblemExtras {

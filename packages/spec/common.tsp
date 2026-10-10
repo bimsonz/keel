@@ -113,6 +113,12 @@ union ProblemCode {
   serviceUnavailable: "service.unavailable",
   serviceNotImplemented: "service.not_implemented",
   internalDefect: "internal.defect",
+  changeNotFound: "change.not_found",
+  changeLeaseStale: "change.lease_stale",
+  changeStateRefused: "change.state_refused",
+  changeCommitNotInWorkspace: "change.commit_not_in_workspace",
+  workspacePoolExhausted: "workspace.pool_exhausted",
+  sketchNotFound: "sketch.not_found",
 }
 
 /** What an agent can do next. Each one can be fed straight into the matching tool. */

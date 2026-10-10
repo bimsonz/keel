@@ -96,7 +96,7 @@ interface Changes {
   `declare`(...IdempotencyKey, @body body: DeclareRequest): {
     @statusCode statusCode: 201;
     @body body: DeclaredEnvelope;
-  } | Conflict | StandardErrors;
+  } | NotFound | Conflict | StandardErrors;
 
   /** Read a change. */
   @summary("Get a change")

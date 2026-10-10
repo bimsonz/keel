@@ -1,11 +1,11 @@
 import { NotImplemented } from "@keeltown/core/not-implemented";
-import type { AgentDirectory, Clock, Ids, TokenIssuer } from "@keeltown/core/ports";
+import type { AgentDirectory, Changes, Clock, Ids, Inbox, TokenIssuer } from "@keeltown/core/ports";
 import { Cause, type Effect, Exit, type ManagedRuntime } from "effect";
 import type { Caller } from "./caller.ts";
 import { notImplemented, problem, type ProblemBody } from "./problems.ts";
 
 /** The services the isolate runtime provides to use-cases reached over HTTP and MCP. */
-export type IsolateServices = AgentDirectory | TokenIssuer | Clock | Ids;
+export type IsolateServices = AgentDirectory | TokenIssuer | Clock | Ids | Changes | Inbox;
 
 /** What a request answers with when its effect dies rather than failing with a declared error. */
 export type DefectResult =

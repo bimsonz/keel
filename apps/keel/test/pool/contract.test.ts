@@ -40,14 +40,17 @@ describe("the published contract, through the Worker's fetch handler", () => {
 
   it("answers a stubbed operation with the declared 503 service.not_implemented", async () => {
     const seeded = await seedAgent();
-    const response = await exports.default.fetch(`${BASE}/v1/inbox`, {
-      headers: { authorization: `Bearer ${await tokenFor(seeded)}` },
-    });
+    const response = await exports.default.fetch(
+      `${BASE}/v1/changes/chg_01JZ8PT2C4E6G8J0M2N4Q6S8V0`,
+      {
+        headers: { authorization: `Bearer ${await tokenFor(seeded)}` },
+      },
+    );
     expect(response.status).toBe(503);
     expect((await response.json<{ code: string }>()).code).toBe("service.not_implemented");
   });
 
-  it("lists exactly the mcp-tagged operations as tools, filtered by the caller's scopes", async () => {
+  it("[a11.mcp-gate] lists exactly the mcp-tagged operations as tools, filtered by the caller's scopes", async () => {
     const tagged = Object.values(openApiDocument.paths)
       .flatMap((path) => Object.values(path))
       .filter(
@@ -61,7 +64,7 @@ describe("the published contract, through the Worker's fetch handler", () => {
     const all = await mcpResult(await mcp(await tokenFor(worker), "tools/list"));
     const readOnly = await mcpResult(await mcp(await tokenFor(reader), "tools/list"));
     expect(toolNames(all)).toEqual(tagged.toSorted());
-    expect(toolNames(readOnly)).toEqual(["inbox", "nearby", "whoami", "why"]);
+    expect(toolNames(readOnly)).toEqual(["inbox", "nearby", "status", "whoami", "why"]);
   });
 
   it("refuses the MCP endpoint without a token", async () => {

@@ -2,6 +2,7 @@ import {
   AGENT_OWNED,
   type Change,
   ChangeNotFound,
+  type ChangeState,
   ChangeStateRefused,
   CommitNotInWorkspace,
   LeaseStale,
@@ -28,10 +29,11 @@ import {
   Recall,
   SubjectRegistry,
   type SubjectEntry,
+  type SubmissionStatus,
   type WorkspaceGrant,
   WorkspacePool,
 } from "@keeltown/core/ports";
-import { Clock as EffectClock, Effect, Layer, Option } from "effect";
+import { Duration, Clock as EffectClock, Effect, Layer, Option } from "effect";
 
 const MEMORY_BASE = CommitSha.make("0".repeat(40));
 
@@ -156,22 +158,50 @@ export function makeNotifierMemory() {
 const sequentialId = (n: number) => String(n).padStart(26, "0");
 
 /**
- * Change DOs as a map, for the isolate's `Changes` port. `declare` opens a
- * change in `declared` with an active lease and a workspace, idempotent by
- * (agent, Idempotency-Key); `submit` checks the lease and the state, as the
- * Change DO does; `awaitSubmission` answers at once. `capacity` bounds the
- * workspaces it will grant; `foreignCommits` are commits no workspace holds.
+ * Callbacks waiting on a key, each removed when it fires or its wait ends.
+ * Both waits below are waiters with a deadline, as the DOs' are; nothing polls.
  */
-export function makeChangesMemory(
-  options: { readonly capacity?: number; readonly foreignCommits?: ReadonlySet<string> } = {},
-) {
+function makeWaiters<K>() {
+  const waiting = new Map<K, Set<() => void>>();
+  return {
+    wake: (key: K): void => {
+      const callbacks = waiting.get(key);
+      waiting.delete(key);
+      for (const callback of callbacks ?? []) callback();
+    },
+    /** Resolves on the next `wake(key)`, or after `seconds`, whichever is first. */
+    wait: (key: K, seconds: number): Effect.Effect<void> =>
+      seconds <= 0
+        ? Effect.void
+        : Effect.callback<void>((resume) => {
+            const callback = () => resume(Effect.void);
+            waiting.set(key, new Set([...(waiting.get(key) ?? []), callback]));
+            return Effect.sync(() => waiting.get(key)?.delete(callback));
+          }).pipe(Effect.timeoutOption(Duration.seconds(seconds)), Effect.asVoid),
+  };
+}
+
+/**
+ * Change DOs as a map, for the isolate's `Changes` port. `declare` opens a
+ * change that is `working` (the DO commits ChangeStarted with the declaration),
+ * with an active lease and a workspace, idempotent by (agent, Idempotency-Key).
+ * `submit` checks the lease and the state, as the Change DO does, and accepts
+ * only a commit `push`ed to the change's workspace. `awaitSubmission` waits
+ * for `settle` (or a submit) to move the change, up to its deadline.
+ * `capacity` bounds the workspaces it will grant.
+ */
+export function makeChangesMemory(options: { readonly capacity?: number } = {}) {
   const changes = new Map<ChangeId, Change>();
   const commits = new Map<ChangeId, CommitSha>();
   const workspaces = new Map<ChangeId, WorkspaceId>();
+  const pushed = new Map<WorkspaceId, Set<string>>();
   const reservations = new Map<
     string,
     { readonly changeId: ChangeId; readonly fingerprint: string }
   >();
+  const waiters = makeWaiters<ChangeId>();
+  /** A submit replays by its cause, the Idempotency-Key, as the DO's commit does. */
+  const submits = new Map<string, Change>();
   let sequence = 0;
   let tokens = 0;
   const grant = (changeId: ChangeId, now: Instant): WorkspaceGrant => {
@@ -187,9 +217,26 @@ export function makeChangesMemory(
       repo: { namespace: "memory", name: workspaceId },
     };
   };
+  const status = (change: Change): SubmissionStatus => ({
+    change,
+    commitSha: commits.get(change.id) ?? null,
+  });
+  /** A commit lands in a workspace, as an agent's `git push` would put it there. */
+  const push = (workspaceId: WorkspaceId, sha: CommitSha): void => {
+    pushed.set(workspaceId, new Set([...(pushed.get(workspaceId) ?? []), sha]));
+  };
+  /** The platform moves a change on (a verdict, a landing), waking anyone waiting on it. */
+  const settle = (changeId: ChangeId, state: ChangeState): void => {
+    const change = changes.get(changeId);
+    if (change === undefined) throw new Error(`no change ${changeId}`);
+    changes.set(changeId, { ...change, state });
+    waiters.wake(changeId);
+  };
   return {
     changes,
     commits,
+    push,
+    settle,
     layer: Layer.succeed(
       Changes,
       Changes.of({
@@ -217,7 +264,7 @@ export function makeChangesMemory(
               id: makeId("chg", sequentialId((sequence += 1))),
               agentId: principal.agentId,
               origin: "agent",
-              state: "declared",
+              state: "working",
               intent: {
                 revision: 1,
                 goal: input.goal,
@@ -249,6 +296,8 @@ export function makeChangesMemory(
           }),
         submit: (_principal, input) =>
           Effect.gen(function* () {
+            const replayed = submits.get(`${input.changeId} ${input.idempotencyKey}`);
+            if (replayed !== undefined) return replayed;
             const change = changes.get(input.changeId);
             if (change === undefined)
               return yield* new ChangeNotFound({ changeId: input.changeId });
@@ -261,7 +310,8 @@ export function makeChangesMemory(
                 state: change.state,
                 command: "submit",
               });
-            if (options.foreignCommits?.has(input.commitSha) === true) {
+            const workspace = workspaces.get(change.id);
+            if (workspace === undefined || pushed.get(workspace)?.has(input.commitSha) !== true) {
               return yield* new CommitNotInWorkspace({
                 changeId: change.id,
                 commitSha: input.commitSha,
@@ -270,6 +320,8 @@ export function makeChangesMemory(
             const submitted: Change = { ...change, state: "submitted" };
             changes.set(change.id, submitted);
             commits.set(change.id, input.commitSha);
+            submits.set(`${input.changeId} ${input.idempotencyKey}`, submitted);
+            waiters.wake(change.id);
             return submitted;
           }),
         get: (changeId) =>
@@ -279,23 +331,32 @@ export function makeChangesMemory(
               ? Effect.fail(new ChangeNotFound({ changeId }))
               : Effect.succeed(change);
           }),
-        awaitSubmission: (changeId) =>
-          Effect.suspend(() => {
-            const change = changes.get(changeId);
-            return change === undefined
-              ? Effect.fail(new ChangeNotFound({ changeId }))
-              : Effect.succeed({ change, commitSha: commits.get(changeId) ?? null });
+        awaitSubmission: (changeId, waitSeconds) =>
+          Effect.gen(function* () {
+            const before = changes.get(changeId);
+            if (before === undefined) return yield* new ChangeNotFound({ changeId });
+            yield* waiters.wait(changeId, waitSeconds);
+            return status(changes.get(changeId) ?? before);
           }),
       }),
     ),
   };
 }
 
-/** Agents' inboxes as lists. `deliver` appends a notice; the cursor is the count already read. */
+/**
+ * Agents' inboxes as lists. `deliver` appends a notice and wakes a waiting
+ * read; the cursor is the count already read.
+ */
 export function makeInboxMemory() {
   const inboxes = new Map<AgentId, AgentNotice[]>();
+  const waiters = makeWaiters<AgentId>();
   const deliver = (agentId: AgentId, notice: AgentNotice): void => {
     inboxes.set(agentId, [...(inboxes.get(agentId) ?? []), notice]);
+    waiters.wake(agentId);
+  };
+  const page = (agentId: AgentId, from: number) => {
+    const notices = inboxes.get(agentId) ?? [];
+    return { notices: notices.slice(from), cursor: String(Math.max(from, notices.length)) };
   };
   return {
     inboxes,
@@ -303,11 +364,11 @@ export function makeInboxMemory() {
     layer: Layer.succeed(
       Inbox,
       Inbox.of({
-        read: (agentId, cursor) =>
-          Effect.sync(() => {
-            const notices = inboxes.get(agentId) ?? [];
+        read: (agentId, cursor, waitSeconds) =>
+          Effect.gen(function* () {
             const from = cursor === undefined ? 0 : Math.max(0, Number.parseInt(cursor, 10) || 0);
-            return { notices: notices.slice(from), cursor: String(notices.length) };
+            if (page(agentId, from).notices.length === 0) yield* waiters.wait(agentId, waitSeconds);
+            return page(agentId, from);
           }),
       }),
     ),

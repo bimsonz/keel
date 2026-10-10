@@ -66,13 +66,19 @@ export async function tokenFor(seeded: SeededAgent, scope?: string): Promise<str
 const MCP_PROTOCOL_VERSION = "2026-07-28";
 
 /** One stateless MCP request, with the headers the 2026-07-28 transport requires. */
+/** How a test reaches a Worker: the deployed fetch handler by default, or an app built over test Layers. */
+export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
+
+export const worker: Fetch = (url, init) => exports.default.fetch(url, init);
+
 export async function mcp(
   token: string | null,
   method: string,
   params: Record<string, unknown> = {},
   name?: string,
+  via: Fetch = worker,
 ): Promise<Response> {
-  return exports.default.fetch(`${BASE}/mcp`, {
+  return via(`${BASE}/mcp`, {
     method: "POST",
     headers: {
       host: "keel.localhost",

@@ -1,7 +1,10 @@
 import { whoami } from "@keeltown/core/application/identity";
-import { TokenIssuer } from "@keeltown/core/ports";
+import type { AgentId } from "@keeltown/core/kernel";
+import { stub } from "@keeltown/core/not-implemented";
+import { Changes, type Inbox, TokenIssuer } from "@keeltown/core/ports";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
+import { InboxRpc } from "../adapters/driven/do-rpc/inbox.ts";
 import { TokenIssuerJose } from "../adapters/driven/jose/token-issuer.ts";
 import { ClockLive, SystemLive } from "../adapters/driven/system.ts";
 import { makeApp } from "../adapters/driving/http/app.ts";
@@ -15,14 +18,42 @@ import { makeMcpEndpoint } from "../adapters/driving/mcp/server.ts";
  * ManagedRuntime per Env, built only from binding-backed adapters; nothing
  * request-scoped is cached in it.
  */
-export function isolateLayer(env: Env): Layer.Layer<IsolateServices> {
+export function isolateLayer(
+  env: Env,
+  overrides: IsolateOverrides = {},
+): Layer.Layer<IsolateServices> {
+  const agentSession = (agentId: AgentId) =>
+    env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`));
   return Layer.mergeAll(
+    overrides.changes ?? ChangesPending,
+    overrides.inbox ?? InboxRpc(agentSession),
     AgentDirectoryD1(env.DB),
     TokenIssuerJose({ privateJwk: env.KEEL_SIGNING_KEY, issuer: env.KEEL_HOST }).pipe(
       Layer.provide(ClockLive),
     ),
     SystemLive,
   );
+}
+
+/**
+ * The Change DO does not implement ChangeRpc yet, so its stub
+ * has no methods to call. Until it does, the work loop answers the declared
+ * 503; then this becomes `ChangesRpc({ change, agentSession })`.
+ */
+const ChangesPending = Layer.succeed(
+  Changes,
+  Changes.of({
+    declare: stub("coordination/declare"),
+    submit: stub("coordination/submit"),
+    get: stub("coordination/getChange"),
+    awaitSubmission: stub("coordination/awaitSubmission"),
+  }),
+);
+
+/** Pool tests swap the work loop's DO-backed ports for in-memory ones; production passes none. */
+export interface IsolateOverrides {
+  readonly changes?: Layer.Layer<Changes>;
+  readonly inbox?: Layer.Layer<Inbox>;
 }
 
 export type IsolateRuntime = ManagedRuntime.ManagedRuntime<IsolateServices, never>;
@@ -52,19 +83,24 @@ interface Isolate {
 
 const isolates = new WeakMap<Env, Isolate>();
 
+/** The app over a given layer. `isolateFor` caches the production one per Env; pool tests build their own. */
+export function makeIsolate(env: Env, layer: Layer.Layer<IsolateServices>): Isolate {
+  const runtime = ManagedRuntime.make(layer);
+  const handlers = makeHandlers(makeRunner(runtime));
+  const verify = makeVerifier(runtime);
+  const app = makeApp({
+    handlers,
+    verify,
+    mcp: makeMcpEndpoint(handlers, verify, [env.KEEL_HOST]),
+    rethrowContractDrift: env.KEEL_ENV === "test",
+  });
+  return { runtime, app };
+}
+
 export function isolateFor(env: Env): Isolate {
   let isolate = isolates.get(env);
   if (isolate === undefined) {
-    const runtime = ManagedRuntime.make(isolateLayer(env));
-    const handlers = makeHandlers(makeRunner(runtime));
-    const verify = makeVerifier(runtime);
-    const app = makeApp({
-      handlers,
-      verify,
-      mcp: makeMcpEndpoint(handlers, verify, [env.KEEL_HOST]),
-      rethrowContractDrift: env.KEEL_ENV === "test",
-    });
-    isolate = { runtime, app };
+    isolate = makeIsolate(env, isolateLayer(env));
     isolates.set(env, isolate);
   }
   return isolate;

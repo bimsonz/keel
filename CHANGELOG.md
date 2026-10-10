@@ -24,8 +24,13 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 - WorkspacePool use-cases in `@keeltown/core/application/coordination`: `grantWorkspace`, `refillPool`, `releaseWorkspace`, `collectWorkspaces`, `configurePool` and `poolStatus`.
 - `CodeHost.hasCommit(repo, sha) => Effect<boolean, RepoNotFound>`: whether the repo holds a commit, in one object read. Submit's commit-in-workspace check uses it.
 
+- The work loop's first operations, end to end: `declare`, `submit`, `status` and `inbox` reach one handler object over REST and MCP. The isolate's use-cases `declareChange`, `submitChange`, `submissionOf` and `readInbox` (`application/coordination/gateway.ts`); `Changes` and `Inbox` over Durable Object RPC (`adapters/driven/do-rpc`), with `fingerprint` a SHA-256 of the canonical declare body.
+- ProblemCodes `change.not_found`, `change.lease_stale`, `change.state_refused`, `change.commit_not_in_workspace`, `workspace.pool_exhausted` (503 with `retryAfterMs` and `retry-after`) and `sketch.not_found`. `declare` gains a 404 for an unknown sketch.
+- Contract suites for `Changes` (10 cases) and `Inbox` (4 cases) in `@keeltown/testing`. A real adapter registers with a harness (`push` a commit into a grant's workspace, `deliver` a notice). The in-memory adapters wait with deadlines, as the DOs do; declare answers `working`; and a submit replays by its Idempotency-Key.
+
 ### Changed
 
+- The submission status operation is an MCP tool: `@tag("mcp")` with `@operationId("status")`. Its operationId was `Submissions_getSubmission` (an unused rename), so an agent over MCP can wait on its own submission.
 - `ChangeCodecs.declare` answers `{change, preflight, grant: WorkspaceGrant}` and fails with `ChangeStateRefused | PoolExhausted | SketchNotFound`, because the Change DO takes its workspace before it decides (unused since contracts-v0).
 
 ## contracts-v0 (10 Oct 2026)

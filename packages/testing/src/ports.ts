@@ -9,7 +9,9 @@ import {
   memoryOutboxHarness,
   type OutboxHarness,
 } from "./contracts/index.ts";
+import { describeChangesContract, type ChangesHarness } from "./contracts/changes.ts";
 import { describeCodeHostContract } from "./contracts/code-host.ts";
+import { describeInboxContract, type InboxHarness } from "./contracts/inbox.ts";
 import * as codeHost from "./memory/code-host.ts";
 import * as coordination from "./memory/coordination.ts";
 import * as delivery from "./memory/delivery.ts";
@@ -19,7 +21,8 @@ import * as integration from "./memory/integration.ts";
 import * as storage from "./memory/storage.ts";
 import * as verification from "./memory/verification.ts";
 import { CommitSha } from "@keeltown/core/kernel";
-import { Layer, Schema } from "effect";
+import type { Changes, Inbox } from "@keeltown/core/ports";
+import { Effect, Layer, Schema } from "effect";
 
 /**
  * Every port, with its in-memory
@@ -50,6 +53,41 @@ const eventOutbox = {
   verifyMemory: () => describeEventOutboxContract("in-memory", memoryOutboxHarness),
 };
 
+/** A port whose suite needs a harness beside its Layer: the Layer is the harness's. */
+function harnessed<S, H extends { readonly layer: Layer.Layer<S> }>(
+  harness: () => H,
+  contract: (adapter: string, make: () => H) => void,
+) {
+  return {
+    memory: () => harness().layer,
+    contract,
+    verifyMemory: () => contract("in-memory", harness),
+  };
+}
+
+function memoryChangesHarness(): ChangesHarness {
+  const memory = coordination.makeChangesMemory();
+  let commits = 0;
+  return {
+    layer: memory.layer,
+    push: (grant) =>
+      Effect.sync(() => {
+        commits += 1;
+        const sha = CommitSha.make(commits.toString(16).padStart(40, "a"));
+        memory.push(grant.workspaceId, sha);
+        return sha;
+      }),
+  };
+}
+
+function memoryInboxHarness(): InboxHarness {
+  const memory = coordination.makeInboxMemory();
+  return {
+    layer: memory.layer,
+    deliver: (agentId, notice) => Effect.sync(() => memory.deliver(agentId, notice)),
+  };
+}
+
 const GENESIS = Schema.decodeUnknownSync(CommitSha)("0".repeat(40));
 
 export const PORTS = {
@@ -78,11 +116,8 @@ export const PORTS = {
     pending("Recall", ["nearest"]),
   ),
   Notifier: port(() => coordination.makeNotifierMemory().layer, pending("Notifier", ["notify"])),
-  Changes: port(
-    () => coordination.makeChangesMemory().layer,
-    pending("Changes", ["declare", "submit", "get", "awaitSubmission"]),
-  ),
-  Inbox: port(() => coordination.makeInboxMemory().layer, pending("Inbox", ["read"])),
+  Changes: harnessed<Changes, ChangesHarness>(memoryChangesHarness, describeChangesContract),
+  Inbox: harnessed<Inbox, InboxHarness>(memoryInboxHarness, describeInboxContract),
   EntityStore: port(() => storage.makeEntityStoreMemory().layer, describeEntityStoreContract),
   EventOutbox: eventOutbox,
   EventLog: port(() => storage.makeEventLogMemory().layer, pending("EventLog", ["publish"])),

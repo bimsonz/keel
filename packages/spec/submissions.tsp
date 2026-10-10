@@ -44,6 +44,8 @@ interface Submissions {
 
   /** Where a submitted change is now. `?wait` long-polls until it moves. */
   @summary("Get a change's submission status")
+  @tag("mcp")
+  @operationId("status")
   @useAuth(AgentRead | Observer)
   @route("/changes/{changeId}/submission")
   @get

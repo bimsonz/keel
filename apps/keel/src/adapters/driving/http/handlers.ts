@@ -1,12 +1,32 @@
+import {
+  declareChange,
+  readInbox,
+  submissionOf,
+  submitChange,
+} from "@keeltown/core/application/coordination";
 import { exchangeToken, whoami } from "@keeltown/core/application/identity";
 import { Scope } from "@keeltown/core/domain/identity";
 import { Clock } from "@keeltown/core/ports";
-import { Effect, Schema } from "effect";
+import { Effect, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
 import type { Caller, Principal } from "./caller.ts";
 import { tokenError, tokenOk, whoamiError, whoamiOk } from "./mappers.ts";
 import { notImplemented } from "./problems.ts";
 import type { Runner } from "./run.ts";
+import {
+  changeIdInput,
+  declareError,
+  declareInput,
+  declareOk,
+  inboxOk,
+  type Input,
+  invalid,
+  statusError,
+  statusOk,
+  submitError,
+  submitInput,
+  submitOk,
+} from "./work-loop.ts";
 
 /** Every operation not yet implemented answers the declared 503 `service.not_implemented`. */
 const notYet = (caller: Caller) => notImplemented(caller.requestId);
@@ -71,7 +91,17 @@ export function makeHandlers(run: Runner) {
         ),
       ),
     Sessions_openSession: notYet,
-    declare: notYet,
+    declare: (caller: Caller, input: Input<"declare">) => {
+      const decoded = declareInput(input);
+      if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+      return run(
+        caller,
+        principalOf(caller).pipe(
+          Effect.flatMap((principal) => declareChange(principal, decoded.success)),
+          Effect.match({ onSuccess: declareOk, onFailure: (error) => declareError(caller, error) }),
+        ),
+      );
+    },
     Changes_getChange: notYet,
     revise: notYet,
     rely: notYet,
@@ -80,15 +110,47 @@ export function makeHandlers(run: Runner) {
     sketch: notYet,
     Workspaces_refreshWorkspaceToken: notYet,
     Workspaces_releaseWorkspace: notYet,
-    submit: notYet,
-    Submissions_getSubmission: notYet,
+    submit: (caller: Caller, input: Input<"submit">) => {
+      const decoded = submitInput(input);
+      if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+      return run(
+        caller,
+        principalOf(caller).pipe(
+          Effect.flatMap((principal) => submitChange(principal, decoded.success)),
+          Effect.match({
+            onSuccess: (change) => submitOk(change, decoded.success.commitSha),
+            onFailure: (error) => submitError(caller, error),
+          }),
+        ),
+      );
+    },
+    status: (caller: Caller, input: Input<"status">) => {
+      const changeId = changeIdInput(input.changeId);
+      if (Result.isFailure(changeId)) return invalid(caller, changeId.failure);
+      return run(
+        caller,
+        submissionOf(changeId.success, input.wait).pipe(
+          Effect.match({
+            onSuccess: (status) => statusOk(caller, status),
+            onFailure: (error) => statusError(caller, error),
+          }),
+        ),
+      );
+    },
     Conflicts_listConflicts: notYet,
     Conflicts_getConflict: notYet,
     resolve: notYet,
     why: notYet,
     Memory_listDecisions: notYet,
     Memory_getDecision: notYet,
-    inbox: notYet,
+    inbox: (caller: Caller, input: Input<"inbox">) =>
+      run(
+        caller,
+        principalOf(caller).pipe(
+          Effect.flatMap((principal) => readInbox(principal, input.cursor, input.wait)),
+          Effect.map(inboxOk),
+        ),
+      ),
     Inbox_listEvents: notYet,
     Views_getVerdict: notYet,
     Views_getCandidate: notYet,
