@@ -1,12 +1,12 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/bindings.test.ts -t Queue
 diff --git a/apps/keel/src/adapters/driving/queue/consumer.ts b/apps/keel/src/adapters/driving/queue/consumer.ts
-index 2a80d68..cb44651 100644
+index 08c0d94..4427d65 100644
 --- a/apps/keel/src/adapters/driving/queue/consumer.ts
 +++ b/apps/keel/src/adapters/driving/queue/consumer.ts
-@@ -16,7 +16,7 @@ export function consumeQueue<R>(batch: MessageBatch, runtime: ManagedRuntime.Man
-             // The WorkspacePool DO takes WorkspaceForked once it is built; until then it is recorded only.
-             if (event !== null) console.log("artifacts event", event._tag, event.workspaceId);
-           }
+@@ -12,7 +12,7 @@ export function consumeQueue<R>(batch: MessageBatch, runtime: ManagedRuntime.Man
+       (message) =>
+         Effect.sync(() => {
+           console.log("job", batch.queue, message.id);
 -          message.ack();
 +          message.retry();
          }),

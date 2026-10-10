@@ -30,6 +30,11 @@ for (const name of patches) {
     survivors.push(name);
     continue;
   }
+  if (spawnSync("git", ["apply", "--check", path], { cwd: root }).status !== 0) {
+    console.log(`STALE ${name}: no longer applies to the code it mutates; regenerate it`);
+    survivors.push(name);
+    continue;
+  }
   execSync(`git apply ${JSON.stringify(path)}`, { cwd: root });
   try {
     const started = Date.now();
