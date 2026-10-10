@@ -120,9 +120,10 @@ export function describeCodeHostContract(
             yield* tagOf(host.diffTrees(ghost, sha, sha)),
             yield* tagOf(host.mintToken(ghost, "read", 60)),
             yield* tagOf(host.info(ghost)),
+            yield* tagOf(host.hasCommit(ghost, sha)),
             yield* tagOf(host.fork(ghost, fixture.scratch())),
           ];
-          expect(tags).toEqual(Array.from({ length: 7 }, () => "RepoNotFound"));
+          expect(tags).toEqual(Array.from({ length: 8 }, () => "RepoNotFound"));
           expect(yield* Effect.flip(host.head(ghost, MAIN))).toMatchObject({
             repo: { namespace: ghost.namespace, name: ghost.name },
           });
@@ -182,6 +183,23 @@ export function describeCodeHostContract(
         expect(mine.remote).toContain(repo.name);
         expect(theirs.remote).not.toBe(mine.remote);
       }).pipe(Effect.provide(make())),
+    );
+
+    it.live(
+      "[codehost.has-commit] hasCommit finds a commit and its parent, and nothing the repo lacks",
+      () =>
+        Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const fixture = yield* CodeHostFixture;
+          const repo = yield* freshRepo;
+          const base = yield* fixture.commit(repo, MAIN, BASE);
+          const head = yield* fixture.commit(repo, MAIN, HEAD);
+          expect([
+            yield* host.hasCommit(repo, head),
+            yield* host.hasCommit(repo, base),
+            yield* host.hasCommit(repo, unknownSha()),
+          ]).toEqual([true, true, false]);
+        }).pipe(Effect.provide(make())),
     );
 
     it.live(

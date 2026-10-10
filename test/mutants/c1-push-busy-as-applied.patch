@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/push.test.ts
+# kills: push.busy
+# why: Applied means "no ref said ng", so an answer that carries no ref status at all counts as applied
+diff --git a/packages/gitcore/src/push.ts b/packages/gitcore/src/push.ts
+index 5759ed7..e36a1c7 100644
+--- a/packages/gitcore/src/push.ts
++++ b/packages/gitcore/src/push.ts
+@@ -136,8 +136,7 @@ export function outcomeOf(updates: readonly RefUpdate[], report: Report): PushOu
+       status: 200,
+       message: `server refused the push: ${report.errors.join("; ")}`,
+     };
+-  const applied =
+-    report.unpack === "ok" && updates.every((u) => report.refs.get(u.ref)?.ok === true);
++  const applied = updates.every((u) => report.refs.get(u.ref)?.ok !== false);
+   return applied
+     ? { kind: "applied" }
+     : { kind: "rejected", unpack: report.unpack, refs: Object.fromEntries(report.refs) };

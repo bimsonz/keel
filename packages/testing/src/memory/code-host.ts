@@ -117,6 +117,8 @@ export function makeCodeHostMemory() {
           ? Effect.fail(new RefNotFound({ repo: plain(repo), ref }))
           : Effect.succeed(sha);
       }),
+    hasCommit: (repo, sha) =>
+      Effect.map(find(repo), (found) => found.objects.get(sha)?.type === "commit"),
     readTree: (repo, commit) =>
       Effect.gen(function* () {
         const found = yield* find(repo);

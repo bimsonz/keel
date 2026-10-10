@@ -18,6 +18,8 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 - Errors `CandidateStateRefused`, `ResultFenced` (terminal: a fenced result is never retried), `InvalidBatch`, `TrunkNotInitialized`, `PromotionStateRefused`.
 - `ChangeStarted.baseSha?` and `Change.baseSha?`: the workspace's head at grant, which Precheck diffs against (the `Start` command requires it).
 
+- `CodeHost.hasCommit(repo, sha) => Effect<boolean, RepoNotFound>`: whether the repo holds a commit, in one object read. Submit's commit-in-workspace check uses it.
+
 ### Changed
 
 - `ChangeCodecs.declare` answers `{change, preflight, grant: WorkspaceGrant}` and fails with `ChangeStateRefused | PoolExhausted | SketchNotFound`, because the Change DO takes its workspace before it decides (unused since contracts-v0).

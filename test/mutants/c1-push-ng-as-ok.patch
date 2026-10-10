@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/push.test.ts
+# kills: push.report
+# why: An "ng" ref status reads as ok, so a push the server refused on a stale old id looks applied
+diff --git a/packages/gitcore/src/push.ts b/packages/gitcore/src/push.ts
+index 5759ed7..d63ff40 100644
+--- a/packages/gitcore/src/push.ts
++++ b/packages/gitcore/src/push.ts
+@@ -94,10 +94,7 @@ export function parseReport(buf: Uint8Array): Report {
+     else if (line.startsWith("ng ")) {
+       const rest = line.slice(3);
+       const sp = rest.indexOf(" ");
+-      refs.set(sp < 0 ? rest : rest.slice(0, sp), {
+-        ok: false,
+-        reason: sp < 0 ? "" : rest.slice(sp + 1),
+-      });
++      refs.set(sp < 0 ? rest : rest.slice(0, sp), { ok: true });
+     }
+   };
+   for (const payload of readPkts(buf)) if (payload !== null) lines(payload);

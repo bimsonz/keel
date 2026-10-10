@@ -90,6 +90,8 @@ export class CodeHost extends Context.Service<
       repo: RepoRef,
       ref: string,
     ) => Effect.Effect<CommitSha, RepoNotFound | RefNotFound>;
+    /** Whether the repo holds this commit: one object read, for the commit-in-workspace check. */
+    readonly hasCommit: (repo: RepoRef, sha: CommitSha) => Effect.Effect<boolean, RepoNotFound>;
     /** The commit's whole tree, recursively, in git order (a tree before what it holds). */
     readonly readTree: (
       repo: RepoRef,

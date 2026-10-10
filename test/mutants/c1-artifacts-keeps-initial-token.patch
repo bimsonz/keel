@@ -1,0 +1,22 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/artifacts-code-host.test.ts
+# kills: artifacts.no-standing-token
+# why: The day-long write token that create() and fork() return is left active on every pooled repo
+diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+index 0ae7032..32d432d 100644
+--- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
++++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
+@@ -147,14 +147,12 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
+       create: (repo) =>
+         Effect.promise(async () => {
+           const created = await binding(repo).create(repo.name);
+-          await revoke(binding(repo), repo.name, created.token);
+           return repo;
+         }),
+       fork: (source, target) =>
+         source.namespace === target.namespace
+           ? onRepo(source, async (handle) => {
+               const forked = await handle.fork(target.name, { defaultBranchOnly: true });
+-              await revoke(binding(target), target.name, forked.token);
+               return target;
+             })
+           : Effect.die(

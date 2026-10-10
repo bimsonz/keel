@@ -18,6 +18,7 @@
     "@hono/zod-validator": "catalog:",
     "@keeltown/contracts": "workspace:*",
     "@keeltown/core": "workspace:*",
+    "@keeltown/gitcore": "workspace:*",
     "@modelcontextprotocol/server": "catalog:",
     "effect": "catalog:",
     "hono": "catalog:",

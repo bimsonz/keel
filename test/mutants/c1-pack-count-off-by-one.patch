@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/push.test.ts
+# kills: push.pack-valid, push.report
+# why: The pack header declares one object more than it holds
+diff --git a/packages/gitcore/src/pack-write.ts b/packages/gitcore/src/pack-write.ts
+index 858829b..ceea014 100644
+--- a/packages/gitcore/src/pack-write.ts
++++ b/packages/gitcore/src/pack-write.ts
+@@ -31,7 +31,7 @@ export async function zlibDeflate(data: Uint8Array): Promise<Uint8Array> {
+ export async function writePack(objects: readonly GitObject[]): Promise<Uint8Array> {
+   const header = new Uint8Array(12);
+   header.set([0x50, 0x41, 0x43, 0x4b, 0, 0, 0, 2]);
+-  new DataView(header.buffer).setUint32(8, objects.length);
++  new DataView(header.buffer).setUint32(8, objects.length + 1);
+   const parts: Uint8Array[] = [header];
+   for (const o of objects) {
+     parts.push(objectHeader(TYPE_CODE[o.type], o.body.length), await zlibDeflate(o.body));
