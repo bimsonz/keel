@@ -1,7 +1,10 @@
 import { Schema } from "effect";
 import {
   AgentId,
+  BatchId,
   ChangeId,
+  CommitSha,
+  EscalationId,
   InstantSchema,
   LeaseId,
   SketchId,
@@ -35,6 +38,9 @@ export const AGENT_OWNED: ReadonlySet<ChangeState> = new Set([
 ]);
 
 export const TERMINAL: ReadonlySet<ChangeState> = new Set(["landed", "withdrawn", "superseded"]);
+
+/** Whether the change waits on its agent. In every other non-terminal state the platform owns it. */
+export const isAgentOwned = (state: ChangeState): boolean => AGENT_OWNED.has(state);
 
 export const ParkReason = Schema.Literals(["awaiting-ruling", "lease-lapsed"]);
 export type ParkReason = typeof ParkReason.Type;
@@ -79,6 +85,14 @@ export const Change = Schema.Struct({
   workspaceId: Schema.optional(WorkspaceId),
   fromSketch: Schema.optional(SketchId),
   createdAt: InstantSchema,
+  /** The commit last submitted; it is the commit that lands. */
+  commitSha: Schema.optional(CommitSha),
+  /** The lane it was queued on, while Queued or Integrating. */
+  laneId: Schema.optional(Schema.String),
+  /** The batch it belongs to, while Integrating. Requeue and bounce from Integrating are fenced on it. */
+  batchId: Schema.optional(BatchId),
+  /** The escalation it waits on, while Parked awaiting a ruling. */
+  escalationId: Schema.optional(EscalationId),
 });
 export type Change = typeof Change.Type;
 

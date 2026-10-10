@@ -50,8 +50,9 @@ The AgentSession DO (`agent:<id>`) is the source of truth for an agent. D1's `Ag
 |---|---|---|---|---|---|
 | `IntentDeclared` | Change DO | `changeId, agentId, origin: agent\|auditor\|operator, sketchId?, revision: 1, goal, footprint, premises[], leaseId` | each Subject relied on | Subject DOs relied on, the agent | The change is subscribed to each subject it relies on ("relying is subscribing"); preflight runs. `origin: auditor` marks the Auditor's auto-revert, a platform-authored change that lands like any other |
 | `PreflightIssued` | Change DO (fact) | `changeId, revision, neighbours[], contradictions[], precedents[], suggestedMove` | — | the agent | The agent sees overlap, contradictions, precedents and a Move before writing code. Footprint overlap is *exposure* and appears only in `neighbours`: proximity never opens a conflict |
+| `ChangeStarted` | Change DO | `changeId, workspaceId` | — | the agent | Caused by `WorkspaceGranted` or `SketchPromoted`: Declared → Working, in that workspace |
 | `IntentRevised` | Change DO | `changeId, revision, goal?, footprint?, premisesAdded[], premisesRetracted[]` | Subjects whose premises changed | Subject DOs touched, the agent | Subscriptions follow the premises; preflight re-runs |
-| `PremiseRelied` | Subject DO | `subjectId, changeId, premise: {predicate, relation, value, scope}` | — | the change's agent | The holder is notified of later fallout on this subject |
+| `PremiseRelied` | Subject DO | `subjectId, changeId, premise: {predicate, relation, value, scope}` | — | the change's agent | The Subject DO's reaction to a change's `rely`, which the Change DO commits as `IntentRevised {premisesAdded: [premise]}`. The holder is notified of later fallout on this subject |
 | `ChangeSubmitted` | Change DO | `changeId, revision, commitSha, workspaceId` | — | `workflow:Precheck`, the change's lane | **Starts Precheck.** The authoritative signal: push events only observe |
 | `PrecheckStarted` | Change DO | `changeId, revision, instanceId` | — | Projector | The console follows the instance |
 | `EffectsDerived` | Change DO (recorded from Precheck) | `changeId, revision, effects[], derivationRef` | Subjects altered | Subject DOs altered | Fallout runs on each altered subject; `derivationRef` points at the MFP derivation record |
@@ -62,7 +63,7 @@ The AgentSession DO (`agent:<id>`) is the source of truth for an agent. D1's `Ag
 | `ChangeBatched` | Change DO | `changeId, batchId` | — | the agent | Caused by `BatchFormed` |
 | `ChangeRequeued` | Change DO | `changeId, batchId, reason: infra-failure\|bisection\|invalidated` | the lane | Lane DO | Re-enters the lane with no blame |
 | `ChangeLanded` | Change DO | `changeId, commitSha, trunkSha, candidateId, proofId` | Subjects altered, the workspace | Subject DOs, the agent, WorkspacePool DO, Projector | Caused by `TrunkAdvanced`. Trailers and the MFP note are written; tenets are established; the workspace is collected; `Deployer` promotion begins |
-| `ChangeBounced` | Change DO | `changeId, verdictId, reasons[], nextActions[]` | — | the agent | The agent fixes and resubmits |
+| `ChangeBounced` | Change DO | `changeId, verdictId, reasons[], nextActions[]` | — | the agent | The agent fixes and resubmits. `nextActions` is never empty |
 | `ChangeParked` | Change DO | `changeId, reason: awaiting-ruling\|lease-lapsed, escalationId?` | — | the agent | Waits for a ruling, or for adoption |
 | `ChangeResumed` | Change DO | `changeId, decisionId` | — | the agent | Caused by `RulingGiven`; verification continues |
 | `ChangeAdopted` | Change DO | `changeId, previousAgentId, agentId, leaseId, briefRef` | the previous lease | both agents | Re-leased under the same Change-Id with a cold-start brief |

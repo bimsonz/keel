@@ -11,6 +11,7 @@ import {
   EscalationId,
   InstantSchema,
   LeaseId,
+  NextAction,
   SketchId,
   SubjectId,
   VerdictId,
@@ -52,6 +53,11 @@ export const IntentRevised = Schema.TaggedStruct("IntentRevised", {
   premisesAdded: Schema.Array(Proposition),
   premisesRetracted: Schema.Array(Proposition),
   declaredEffects: Schema.optional(Schema.Array(Proposition)),
+});
+/** Declared → Working: the pool granted a workspace, or the promoted sketch's workspace was reassigned. */
+export const ChangeStarted = Schema.TaggedStruct("ChangeStarted", {
+  changeId: ChangeId,
+  workspaceId: WorkspaceId,
 });
 export const PremiseRelied = Schema.TaggedStruct("PremiseRelied", {
   subjectId: SubjectId,
@@ -116,6 +122,8 @@ export const ChangeBounced = Schema.TaggedStruct("ChangeBounced", {
   changeId: ChangeId,
   verdictId: VerdictId,
   reasons: Schema.Array(Schema.String),
+  /** Always set, never empty, by `decideChange`; optional only so events committed before it was added still decode. */
+  nextActions: Schema.optional(Schema.Array(NextAction)),
 });
 export const ChangeParked = Schema.TaggedStruct("ChangeParked", {
   changeId: ChangeId,
@@ -213,6 +221,7 @@ export const CoordinationEvent = Schema.Union([
   IntentDeclared,
   PreflightIssued,
   IntentRevised,
+  ChangeStarted,
   PremiseRelied,
   ChangeSubmitted,
   PrecheckStarted,

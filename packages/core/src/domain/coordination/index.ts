@@ -1,6 +1,7 @@
 /** coordination: changes, intents, propositions, subjects, preflight, leases, sketches and fallout. */
 export * from "./bets.ts";
 export * from "./change.ts";
+export * from "./change-machine.ts";
 export * from "./claim.ts";
 export * from "./compare.ts";
 export * from "./derivation.ts";
@@ -11,6 +12,7 @@ export * from "./exposure.ts";
 export * from "./fallout.ts";
 export * from "./graph.ts";
 export * from "./lattice.ts";
+export * from "./lease.ts";
 export * from "./preflight.ts";
 export * from "./proposition.ts";
 export * from "./scope.ts";

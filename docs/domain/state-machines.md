@@ -41,8 +41,8 @@ Owner: Change DO.
 ```mermaid
 stateDiagram-v2
   [*] --> Declared: IntentDeclared
-  Declared --> Working: WorkspaceGranted / SketchPromoted
-  Working --> Working: IntentRevised / PremiseRelied
+  Declared --> Working: ChangeStarted
+  Working --> Working: IntentRevised
   Working --> Submitted: ChangeSubmitted
   Submitted --> Deriving: PrecheckStarted
   Deriving --> Drifted: ChangeDrifted
@@ -53,6 +53,7 @@ stateDiagram-v2
   Verifying --> Bounced: ChangeBounced
   Verifying --> Parked: ChangeParked
   Queued --> Integrating: ChangeBatched
+  Queued --> Bounced: ChangeBounced
   Integrating --> Queued: ChangeRequeued
   Integrating --> Bounced: ChangeBounced
   Integrating --> Landed: ChangeLanded
@@ -69,25 +70,26 @@ stateDiagram-v2
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
 | — | Declared | `declare` (or `declare --from-sketch`), or the Auditor declaring a revert | Scope `agent:work` for agents | `IntentDeclared {origin}` (lease issued), then `PreflightIssued` |
-| Declared | Working | The pool grants a workspace, or the promoted sketch's workspace is reassigned | — | caused by `WorkspaceGranted` or `SketchPromoted` |
-| Working | Working | `revise` / `rely` | Valid lease; `If-Match` on the current revision | `IntentRevised` / `PremiseRelied` |
+| Declared | Working | The pool grants a workspace, or the promoted sketch's workspace is reassigned | — | `ChangeStarted` (caused by `WorkspaceGranted` or `SketchPromoted`) |
+| Working | Working | `revise` / `rely` | Valid lease; `If-Match` on the current revision (`revise`) | `IntentRevised`, then `PreflightIssued`. A `rely` is a revision that adds one premise; the Subject DO answers it with its own `PremiseRelied` |
 | Working, Bounced | Submitted | `submit {changeId, commitSha}` | Valid lease; the commit is in the change's workspace | `ChangeSubmitted` |
 | Submitted | Deriving | Precheck instance created | — | `PrecheckStarted` |
 | Deriving | Bounced | Precheck: a protected or guard path is touched | — | `ChangeBounced` |
 | Deriving | Drifted | Precheck: drift needs the agent (an undeclared proof-class effect) | — | `ChangeDrifted` |
 | Deriving | Verifying | Precheck: effects derived, drift classified, plan compiled | — | `EffectsDerived`, `DriftDetected`, then `PlanCompiled` |
 | Drifted, Bounced | Working | `revise` | Valid lease | `IntentRevised` |
-| Verifying | Queued | The plan's pre-queue steps pass and no Proven conflict is open | — | `ChangeQueued` |
+| Verifying | Queued | The plan's pre-queue steps pass | No Proven conflict is open, no guard fails, no high-severity drift is unresolved; otherwise the command is refused as blocked, with no event | `ChangeQueued` |
 | Verifying | Bounced | A conflict is proven against the change, or a guard fails | — | `ChangeBounced` |
 | Verifying | Parked | A human-class conflict or step | — | `ChangeParked {reason: awaiting-ruling}` |
-| Queued | Integrating | Caused by `BatchFormed` | — | `ChangeBatched` |
+| Queued | Integrating | Caused by `BatchFormed` | Nothing blocks it, as for queueing; a blocked change refuses the batch and is bounced | `ChangeBatched` |
+| Queued | Bounced | A conflict is proven against the change (caused by `ConflictProven`), or it is blocked when batched | — | `ChangeBounced` |
 | Integrating | Queued | Caused by `BatchFailed {infra}`, `CandidateBisected` or `CandidateInvalidated` | Two infra failures requeue with no blame | `ChangeRequeued` |
 | Integrating | Bounced | Caused by `BatchFailed` attributed to this change | — | `ChangeBounced` |
-| Integrating | Landed | Caused by `TrunkAdvanced` | No open Proven conflict, no failing guard, no unresolved high-severity drift | `ChangeLanded` |
+| Integrating | Landed | Caused by `TrunkAdvanced` | None: `TrunkAdvanced` is a fact, so landing is never refused. The invariant is enforced before trunk moves: at queueing, by Queued → Bounced, and by the lane pulling a blocked member out before promotion (`CandidateInvalidated`, then `ChangeRequeued {reason: invalidated}`) | `ChangeLanded` |
 | Parked (awaiting-ruling) | Verifying | Caused by `RulingGiven` | — | `ChangeResumed` |
 | Parked (awaiting-ruling) | Bounced | Caused by `RulingGiven` choosing to bounce | — | `ChangeBounced` |
-| Parked (lease-lapsed) | Working | `adopt` | The lease is Lapsed | `ChangeAdopted` (new lease; the old token is fenced) |
-| Parked (awaiting-ruling) | Parked (awaiting-ruling) | `adopt` | The lease is Lapsed | `ChangeAdopted`: the change keeps waiting, now with the new lease |
+| Parked (lease-lapsed) | Working | `adopt` | The lease is Lapsed | `ChangeAdopted` (new lease; the old token is fenced). A change parked before its workspace was granted returns to Declared |
+| any other non-terminal state | the same state | `adopt` | The lease is Lapsed | `ChangeAdopted`: the change keeps waiting (e.g. Parked awaiting-ruling, Verifying), now with the new lease |
 | an agent-owned state | Parked (lease-lapsed) | The lease's deadline alarm | The lease lapsed: 15 minutes since `renewedAt` | `LeaseLapsed`, then `ChangeParked {reason: lease-lapsed}` |
 | a platform-owned state | an agent-owned state, with a Lapsed lease | Any transition into Bounced, Drifted, or Working after a ruling | The lease lapsed while the platform owned the change | that transition's event, then `ChangeParked {reason: lease-lapsed}` in the same transaction |
 | any but Integrating and terminal | Withdrawn | `abandon` | Valid lease, or scope `operator` | `ChangeWithdrawn` |
@@ -97,7 +99,7 @@ stateDiagram-v2
 
 **Invariants and properties**
 - Trunk advances only through the Trunk DO; no agent ever holds a trunk token.
-- A change cannot land with an open Proven conflict, a failing guard, or unresolved high-severity drift.
+- A change cannot land with an open Proven conflict, a failing guard, or unresolved high-severity drift. Landing records a fact and is never refused, so this is enforced earlier: a blocked change is never queued, and never batched (it is bounced from Queued instead).
 - Effects used in any verdict are derived by Keel, never taken from the agent.
 - A lapse parks only agent-owned states. In Integrating the change belongs to its batch, so withdrawal waits until the batch resolves.
 - **No orphaned change:** for every event sequence, a change in an agent-owned state has an Active lease or is Parked. (Property-tested: a lease lapsing in any platform-owned state, followed by any transition into an agent-owned state, ends Parked.)
@@ -132,8 +134,10 @@ stateDiagram-v2
 **Terminal:** Released, Superseded.
 
 **Invariants**
-- Every mutating call on a change carries its `leaseId`; a call with a stale token is refused with next actions. "No lease" is never permission.
-- Whether a lease has lapsed is computed on read; the alarm only makes the lapse visible as an event. It is a deadline, never a polling loop.
+- Every mutating call on a change carries its `leaseId`; a call with a stale token is refused with next actions. "No lease" is never permission. Once the deadline passes, the current token is refused too (as lapsed, with adoption as the next action), whether or not the alarm has fired.
+- Every refusal and every bounce carries at least one next action.
+- Whether a lease has lapsed is computed on read, from `renewedAt` and the time passed in; the alarm only makes the lapse visible as an event. It is a deadline, never a polling loop, and it is re-armed only while the lease is Active.
+- `renewedAt` is state the Change DO persists, not an event, so a replay rebuilds every other field exactly and gives the lease's issue time as `renewedAt`.
 - Adoption is a lease operation: it is allowed whenever the lease is Lapsed, whatever the change is waiting on.
 
 ---

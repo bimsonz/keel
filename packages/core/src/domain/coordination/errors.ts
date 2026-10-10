@@ -1,15 +1,57 @@
 import { Schema } from "effect";
-import { ChangeId, LeaseId, SketchId, WorkspaceId } from "../kernel/index.ts";
+import {
+  ChangeId,
+  ConflictId,
+  GuardId,
+  InstantSchema,
+  LeaseId,
+  NextAction,
+  SketchId,
+  WorkspaceId,
+} from "../kernel/index.ts";
 import { ChangeState } from "./change.ts";
+import { Drift } from "./derivation.ts";
+
+/**
+ * What to do instead. `decideChange` sets it, never empty, on every refusal;
+ * it is optional only so a refusal from an older caller still decodes.
+ */
+const nextActions = Schema.optional(Schema.Array(NextAction));
 
 export class ChangeNotFound extends Schema.TaggedError<ChangeNotFound>()("ChangeNotFound", {
   changeId: ChangeId,
+  nextActions,
 }) {}
 
-/** The call carried a lease that is not the change's active lease. */
+/**
+ * The call carried a lease that is not the change's active lease: another
+ * lease's token (`stale`), or the current token after the lease lapsed
+ * (`lapsed`, computed from `renewedAt` whether or not the alarm has fired).
+ */
 export class LeaseStale extends Schema.TaggedError<LeaseStale>()("LeaseStale", {
   changeId: ChangeId,
   leaseId: LeaseId,
+  reason: Schema.optional(Schema.Literals(["stale", "lapsed"])),
+  nextActions,
+}) {}
+
+/** `adopt` while the lease is still alive: adoption needs a Lapsed lease. */
+export class LeaseNotLapsed extends Schema.TaggedError<LeaseNotLapsed>()("LeaseNotLapsed", {
+  changeId: ChangeId,
+  lapsesAt: InstantSchema,
+  nextActions: Schema.Array(NextAction),
+}) {}
+
+/**
+ * The change may not be queued, or stay queued, while a Proven conflict is
+ * open against it, a guard fails on it, or high-severity drift is unresolved.
+ */
+export class ChangeBlocked extends Schema.TaggedError<ChangeBlocked>()("ChangeBlocked", {
+  changeId: ChangeId,
+  conflicts: Schema.Array(ConflictId),
+  guards: Schema.Array(GuardId),
+  drift: Schema.Array(Drift),
+  nextActions: Schema.Array(NextAction),
 }) {}
 
 /** `If-Match` named a revision other than the current one. */
@@ -17,6 +59,7 @@ export class RevisionMismatch extends Schema.TaggedError<RevisionMismatch>()("Re
   changeId: ChangeId,
   expected: Schema.Int,
   actual: Schema.Int,
+  nextActions,
 }) {}
 
 /** The command is not valid in the change's current state. */
@@ -26,6 +69,7 @@ export class ChangeStateRefused extends Schema.TaggedError<ChangeStateRefused>()
     changeId: ChangeId,
     state: ChangeState,
     command: Schema.String,
+    nextActions,
   },
 ) {}
 
@@ -49,6 +93,7 @@ export class CommitNotInWorkspace extends Schema.TaggedError<CommitNotInWorkspac
   {
     changeId: ChangeId,
     commitSha: Schema.String,
+    nextActions,
   },
 ) {}
 
