@@ -1,0 +1,86 @@
+Agent B, revised after the ruling "a cache is allowed if revocation invalidates it".
+
+The role cache subscribes to collaborator.removed (src/authz/cache.ts:42) and
+evicts every entry the revoked collaborator holds on that repository, across
+all of their sessions. No new tests: the revocation probe guards it.
+
+Apply from fixtures/forge-lite on base + A + B: git apply scenarios/s1/b-revised.patch
+
+diff --git a/src/authz/cache.ts b/src/authz/cache.ts
+index b01d0a8..226ab3a 100644
+--- a/src/authz/cache.ts
++++ b/src/authz/cache.ts
+@@ -7,21 +7,27 @@ import type { Store } from "../store/types.ts";
+  * and a session tends to make many requests against the same repository, so
+  * only the first of them pays for the lookup.
+  *
+- * Nothing here needs invalidating, because collaborator roles only ever go
+- * up: a collaborator can be added or promoted, never demoted or removed. A
+- * cached role may lag behind a promotion but never exceeds what the caller
+- * holds, so requirePermission trusts a cached role when it is enough for the
+- * action and looks the caller up again when it falls short.
++ * Promotions need no invalidation: requirePermission trusts a cached role
++ * when it is enough for the action and looks the caller up again when it
++ * falls short. Revocation takes a role away, so revoking a collaborator
++ * evicts every entry they hold on that repository, in all of their sessions.
+  */
+ export class RoleCache {
+-  readonly #roles = new Map<string, CollaboratorRole>();
++  readonly #entries = new Map<string, Entry>();
+ 
+   get(sessionId: string, repoId: string): CollaboratorRole | undefined {
+-    return this.#roles.get(key(sessionId, repoId));
++    return this.#entries.get(key(sessionId, repoId))?.role;
+   }
+ 
+-  set(sessionId: string, repoId: string, role: CollaboratorRole): void {
+-    this.#roles.set(key(sessionId, repoId), role);
++  set(sessionId: string, userId: string, repoId: string, role: CollaboratorRole): void {
++    this.#entries.set(key(sessionId, repoId), { userId, repoId, role });
++  }
++
++  /** Forgets `userId`'s role on `repoId` in every one of their sessions. */
++  evict(userId: string, repoId: string): void {
++    for (const [entryKey, entry] of this.#entries) {
++      if (entry.userId === userId && entry.repoId === repoId) this.#entries.delete(entryKey);
++    }
+   }
+ }
+ 
+@@ -31,12 +37,21 @@ const caches = new WeakMap<Store, RoleCache>();
+ export function roleCacheFor(store: Store): RoleCache {
+   let cache = caches.get(store);
+   if (cache === undefined) {
+-    cache = new RoleCache();
+-    caches.set(store, cache);
++    const created = new RoleCache();
++    // A revoked collaborator must be refused on their next request, warm session or not.
++    store.events.subscribe("collaborator.removed", (event) => created.evict(event.userId, event.repoId));
++    caches.set(store, created);
++    cache = created;
+   }
+   return cache;
+ }
+ 
++interface Entry {
++  readonly userId: string;
++  readonly repoId: string;
++  readonly role: CollaboratorRole;
++}
++
+ function key(sessionId: string, repoId: string): string {
+   return `${sessionId}:${repoId}`;
+ }
+diff --git a/src/authz/require-permission.ts b/src/authz/require-permission.ts
+index 7e66708..c2b9dca 100644
+--- a/src/authz/require-permission.ts
++++ b/src/authz/require-permission.ts
+@@ -45,7 +45,7 @@ function callerRole(c: Context<AppEnv>, repo: RepoRecord, action: Action): Role
+   if (cached !== undefined && allows(cached, action, repo.visibility)) return cached;
+ 
+   const role = evaluateRole(store, repo, session.userId);
+-  if (role !== null && role !== "owner") cache.set(session.id, repo.id, role);
++  if (role !== null && role !== "owner") cache.set(session.id, session.userId, repo.id, role);
+   return role;
+ }
+ 

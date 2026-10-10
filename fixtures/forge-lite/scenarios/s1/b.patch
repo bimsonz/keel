@@ -1,0 +1,237 @@
+Agent B: speed up permission checks.
+
+Adds src/authz/cache.ts, a per-session cache of evaluated collaborator roles
+keyed by (session, repository), and uses it in requirePermission. There is no
+invalidation: on the base fixture a collaborator's role only ever goes up, and
+a cached role that falls short of an action is looked up again.
+
+Derived effect: permission evaluation freshness becomes per-session.
+
+Apply from fixtures/forge-lite on the base fixture: git apply scenarios/s1/b.patch
+
+diff --git a/src/authz/cache.ts b/src/authz/cache.ts
+new file mode 100644
+index 0000000..b01d0a8
+--- /dev/null
++++ b/src/authz/cache.ts
+@@ -0,0 +1,42 @@
++import type { CollaboratorRole } from "../domain/roles.ts";
++import type { Store } from "../store/types.ts";
++
++/**
++ * Per-session cache of evaluated collaborator roles, keyed by (session,
++ * repository). Evaluating a role costs a collaborator lookup in the store,
++ * and a session tends to make many requests against the same repository, so
++ * only the first of them pays for the lookup.
++ *
++ * Nothing here needs invalidating, because collaborator roles only ever go
++ * up: a collaborator can be added or promoted, never demoted or removed. A
++ * cached role may lag behind a promotion but never exceeds what the caller
++ * holds, so requirePermission trusts a cached role when it is enough for the
++ * action and looks the caller up again when it falls short.
++ */
++export class RoleCache {
++  readonly #roles = new Map<string, CollaboratorRole>();
++
++  get(sessionId: string, repoId: string): CollaboratorRole | undefined {
++    return this.#roles.get(key(sessionId, repoId));
++  }
++
++  set(sessionId: string, repoId: string, role: CollaboratorRole): void {
++    this.#roles.set(key(sessionId, repoId), role);
++  }
++}
++
++const caches = new WeakMap<Store, RoleCache>();
++
++/** The role cache for `store`. Each store, and so each app, gets its own. */
++export function roleCacheFor(store: Store): RoleCache {
++  let cache = caches.get(store);
++  if (cache === undefined) {
++    cache = new RoleCache();
++    caches.set(store, cache);
++  }
++  return cache;
++}
++
++function key(sessionId: string, repoId: string): string {
++  return `${sessionId}:${repoId}`;
++}
+diff --git a/src/authz/require-permission.ts b/src/authz/require-permission.ts
+index f33711c..7e66708 100644
+--- a/src/authz/require-permission.ts
++++ b/src/authz/require-permission.ts
+@@ -4,6 +4,7 @@ import type { Role } from "../domain/roles.ts";
+ import type { AppEnv } from "../http/env.ts";
+ import { forbidden, notFound, unauthenticated, type Problem } from "../http/problem.ts";
+ import type { RepoRecord } from "../store/types.ts";
++import { roleCacheFor } from "./cache.ts";
+ import { evaluateRole } from "./evaluate.ts";
+ 
+ /**
+@@ -12,8 +13,9 @@ import { evaluateRole } from "./evaluate.ts";
+  * that role allows `action`. On success the handler finds `repo` and `role`
+  * on the context.
+  *
+- * The role is read from the store on every request, so a change to someone's
+- * access applies from their very next request.
++ * Ownership is read from the repository record, loaded fresh on every
++ * request. Collaborator roles are cached per session (see cache.ts), so a
++ * session pays for the collaborator lookup once per repository.
+  *
+  * A caller who cannot see the repository gets 404, exactly as if it did not
+  * exist. A caller who can see it but may not act gets 403, or 401 when they
+@@ -22,7 +24,7 @@ import { evaluateRole } from "./evaluate.ts";
+ export function requirePermission(action: Action): MiddlewareHandler<AppEnv> {
+   return async (c, next) => {
+     const repo = loadRepo(c);
+-    const role = callerRole(c, repo);
++    const role = callerRole(c, repo, action);
+     if (!allows(role, action, repo.visibility)) throw denial(c, repo, role, action);
+     c.set("repo", repo);
+     c.set("role", role);
+@@ -30,10 +32,21 @@ export function requirePermission(action: Action): MiddlewareHandler<AppEnv> {
+   };
+ }
+ 
+-function callerRole(c: Context<AppEnv>, repo: RepoRecord): Role | null {
+-  const { user } = c.var;
+-  if (user === undefined) return null;
+-  return evaluateRole(c.var.deps.store, repo, user.id);
++function callerRole(c: Context<AppEnv>, repo: RepoRecord, action: Action): Role | null {
++  const { session } = c.var;
++  if (session === undefined) return null;
++  if (repo.ownerId === session.userId) return "owner";
++
++  const { store } = c.var.deps;
++  const cache = roleCacheFor(store);
++  const cached = cache.get(session.id, repo.id);
++  // Enough is enough. A cached role that falls short is looked up again, in
++  // case the caller has been promoted since it was cached.
++  if (cached !== undefined && allows(cached, action, repo.visibility)) return cached;
++
++  const role = evaluateRole(store, repo, session.userId);
++  if (role !== null && role !== "owner") cache.set(session.id, repo.id, role);
++  return role;
+ }
+ 
+ function loadRepo(c: Context<AppEnv>): RepoRecord {
+diff --git a/test/permission-cache.test.ts b/test/permission-cache.test.ts
+new file mode 100644
+index 0000000..eb76127
+--- /dev/null
++++ b/test/permission-cache.test.ts
+@@ -0,0 +1,113 @@
++import { describe, expect, it } from "vitest";
++import { MemoryStore } from "../src/store/memory.ts";
++import type { CollaboratorRecord } from "../src/store/types.ts";
++import { harness, problem } from "./support/harness.ts";
++
++/** Counts collaborator lookups, which is the work the role cache saves. */
++class CountingStore extends MemoryStore {
++  lookups = 0;
++
++  override getCollaborator(repoId: string, userId: string): CollaboratorRecord | undefined {
++    this.lookups += 1;
++    return super.getCollaborator(repoId, userId);
++  }
++}
++
++const SHA = "d".repeat(40);
++
++/** Alice owns the private alice/forge; Bob writes to it. */
++async function forge() {
++  const store = new CountingStore();
++  const h = harness({ store });
++  const alice = await h.user("alice");
++  const bob = await h.user("bob");
++  await h.createRepo(alice, "forge", "private");
++  await h.addCollaborator(alice, "forge", "bob", "write");
++  return { h, store, alice, bob };
++}
++
++/** How many collaborator lookups `work` caused. */
++async function lookupsDuring(store: CountingStore, work: () => Promise<void>): Promise<number> {
++  const before = store.lookups;
++  await work();
++  return store.lookups - before;
++}
++
++describe("permission cache", () => {
++  it("looks a session's role up on its first request to a repository", async () => {
++    const { store, bob } = await forge();
++    let status = 0;
++    const lookups = await lookupsDuring(store, async () => {
++      status = (await bob.get("/repos/alice/forge")).status;
++    });
++    expect(status).toBe(200);
++    expect(lookups).toBe(1);
++  });
++
++  it("answers the same session's later requests from the cache", async () => {
++    const { store, bob } = await forge();
++    await bob.get("/repos/alice/forge");
++    const statuses: number[] = [];
++    const lookups = await lookupsDuring(store, async () => {
++      statuses.push((await bob.get("/repos/alice/forge")).status);
++      statuses.push((await bob.put("/repos/alice/forge/refs/heads/main", { sha: SHA })).status);
++      statuses.push((await bob.get("/repos/alice/forge/refs")).status);
++    });
++    expect(statuses).toEqual([200, 201, 200]);
++    expect(lookups).toBe(0);
++  });
++
++  it("starts every new session cold", async () => {
++    const { h, store, bob } = await forge();
++    await bob.get("/repos/alice/forge");
++    const phone = h.client(await h.login("bob"), "bob");
++    const lookups = await lookupsDuring(store, async () => {
++      await phone.get("/repos/alice/forge");
++      await phone.get("/repos/alice/forge");
++    });
++    expect(lookups).toBe(1);
++  });
++
++  it("keeps a separate entry for each repository", async () => {
++    const { h, store, alice, bob } = await forge();
++    await h.createRepo(alice, "anvil", "private");
++    await h.addCollaborator(alice, "anvil", "bob", "read");
++    const lookups = await lookupsDuring(store, async () => {
++      await bob.get("/repos/alice/forge");
++      await bob.get("/repos/alice/anvil");
++      await bob.get("/repos/alice/forge");
++      await bob.get("/repos/alice/anvil");
++    });
++    expect(lookups).toBe(2);
++  });
++
++  it("never lends one session's entry to another user", async () => {
++    const { h, store, bob } = await forge();
++    await bob.get("/repos/alice/forge");
++    const carol = await h.user("carol");
++    let status = 0;
++    const lookups = await lookupsDuring(store, async () => {
++      status = (await carol.get("/repos/alice/forge")).status;
++    });
++    expect(status).toBe(404);
++    expect(lookups).toBe(1);
++  });
++
++  it("looks again when the cached role falls short, so a promotion applies at once", async () => {
++    const { alice, bob } = await forge();
++    expect((await bob.get("/repos/alice/forge")).status).toBe(200);
++    await problem(await bob.delete("/repos/alice/forge"), 403);
++    expect((await alice.patch("/repos/alice/forge/collaborators/bob", { role: "admin" })).status).toBe(200);
++    expect((await bob.delete("/repos/alice/forge")).status).toBe(204);
++  });
++
++  it("does no collaborator lookup for the owner or for anonymous callers", async () => {
++    const { h, store, alice } = await forge();
++    const lookups = await lookupsDuring(store, async () => {
++      await alice.get("/repos/alice/forge");
++      await alice.put("/repos/alice/forge/labels/bug", {});
++      await h.anonymous.get("/repos/alice/forge");
++    });
++    expect(lookups).toBe(0);
++  });
++});

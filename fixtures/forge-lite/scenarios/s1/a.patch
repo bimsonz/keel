@@ -1,0 +1,207 @@
+Agent A: owners can revoke collaborators, effective immediately.
+
+Adds DELETE /repos/:owner/:repo/collaborators/:username (remove-collaborator,
+admin or owner) and Store.removeCollaborator, which emits collaborator.removed.
+
+Premise relied on: permission evaluation freshness is at most per-request.
+requirePermission reads the caller's role from the store on every request, so
+a revoked collaborator's next request is refused. Nothing under src/authz/
+changes.
+
+Apply from fixtures/forge-lite on the base fixture: git apply scenarios/s1/a.patch
+
+diff --git a/src/domain/permissions.ts b/src/domain/permissions.ts
+index 7c9cfbf..0284cd9 100644
+--- a/src/domain/permissions.ts
++++ b/src/domain/permissions.ts
+@@ -10,6 +10,7 @@ export const ACTIONS = [
+   "change-visibility",
+   "add-collaborator",
+   "change-role",
++  "remove-collaborator",
+   "delete-repo",
+   "transfer",
+ ] as const;
+@@ -24,6 +25,7 @@ const MINIMUM_ROLE: Readonly<Record<Action, Role>> = {
+   "change-visibility": "admin",
+   "add-collaborator": "admin",
+   "change-role": "admin",
++  "remove-collaborator": "admin",
+   "delete-repo": "admin",
+   transfer: "owner",
+ };
+diff --git a/src/events.ts b/src/events.ts
+index d559bd2..88c5fae 100644
+--- a/src/events.ts
++++ b/src/events.ts
+@@ -104,6 +104,16 @@ export interface CollaboratorRoleChanged {
+   readonly changedBy: string;
+ }
+ 
++export interface CollaboratorRemoved {
++  readonly type: "collaborator.removed";
++  readonly at: number;
++  readonly repoId: string;
++  readonly userId: string;
++  /** The role the collaborator held until now. */
++  readonly role: CollaboratorRole;
++  readonly removedBy: string;
++}
++
+ export type DomainEvent =
+   | UserCreated
+   | SessionCreated
+@@ -116,7 +126,8 @@ export type DomainEvent =
+   | RefUpdated
+   | LabelSaved
+   | CollaboratorAdded
+-  | CollaboratorRoleChanged;
++  | CollaboratorRoleChanged
++  | CollaboratorRemoved;
+ 
+ export type EventType = DomainEvent["type"];
+ export type EventOfType<T extends EventType> = Extract<DomainEvent, { type: T }>;
+diff --git a/src/routes/collaborators.ts b/src/routes/collaborators.ts
+index d62152c..2f3c51a 100644
+--- a/src/routes/collaborators.ts
++++ b/src/routes/collaborators.ts
+@@ -53,7 +53,8 @@ export const collaboratorRoutes = new Hono<AppEnv>()
+     const target = targetUser(c);
+     const current = store.getCollaborator(repo.id, target.id);
+     if (current === undefined) throw notFound(`${target.username} is not a collaborator on this repository`);
+-    // Access only ever grows: there is no way to lower a role or take one away.
++    // Roles are only ever raised here. To reduce someone's access, remove them
++    // (DELETE) and add them back with the lower role.
+     if (compareRoles(role, current.role) < 0) {
+       throw conflict(
+         "role-downgrade",
+@@ -63,6 +64,20 @@ export const collaboratorRoutes = new Hono<AppEnv>()
+     if (role === current.role) return c.json(collaboratorView(current, target));
+     const updated = store.changeCollaboratorRole(repo.id, target.id, role, actor.id, clock.now());
+     return c.json(collaboratorView(updated, target));
++  })
++
++  .delete("/repos/:owner/:repo/collaborators/:username", requirePermission("remove-collaborator"), (c) => {
++    const { store, clock } = c.var.deps;
++    const { user: actor } = requireUser(c);
++    const repo = c.var.repo;
++    const target = targetUser(c);
++    if (store.getCollaborator(repo.id, target.id) === undefined) {
++      throw notFound(`${target.username} is not a collaborator on this repository`);
++    }
++    // Effective immediately: requirePermission evaluates the caller's role from
++    // the store on every request, so the revoked user's next request is refused.
++    store.removeCollaborator(repo.id, target.id, actor.id, clock.now());
++    return c.body(null, 204);
+   });
+ 
+ async function readRole(c: Context<AppEnv>): Promise<CollaboratorRole> {
+diff --git a/src/store/memory.ts b/src/store/memory.ts
+index 1314726..ad61468 100644
+--- a/src/store/memory.ts
++++ b/src/store/memory.ts
+@@ -238,6 +238,13 @@ export class MemoryStore implements Store {
+     return updated;
+   }
+ 
++  removeCollaborator(repoId: string, userId: string, removedBy: string, at: number): void {
++    const collaborators = this.#bucket(this.#collaborators, repoId);
++    const removed = this.#require(collaborators, userId, "collaborator");
++    collaborators.delete(userId);
++    this.events.emit({ type: "collaborator.removed", at, repoId, userId, role: removed.role, removedBy });
++  }
++
+   // Helpers
+ 
+   #require<V>(map: Map<string, V>, key: string, what: string): V {
+diff --git a/src/store/types.ts b/src/store/types.ts
+index 8dc01e4..d743adf 100644
+--- a/src/store/types.ts
++++ b/src/store/types.ts
+@@ -97,4 +97,6 @@ export interface Store {
+     changedBy: string,
+     at: number,
+   ): CollaboratorRecord;
++  /** Takes away every role `userId` holds on `repoId` as a collaborator. */
++  removeCollaborator(repoId: string, userId: string, removedBy: string, at: number): void;
+ }
+diff --git a/test/revoke-collaborator.test.ts b/test/revoke-collaborator.test.ts
+new file mode 100644
+index 0000000..1c37caa
+--- /dev/null
++++ b/test/revoke-collaborator.test.ts
+@@ -0,0 +1,74 @@
++import { describe, expect, it } from "vitest";
++import type { CollaboratorRole } from "../src/domain/roles.ts";
++import type { CollaboratorView } from "../src/http/views.ts";
++import { START, harness, json, problem } from "./support/harness.ts";
++
++/** Alice owns alice/forge with Bob as a collaborator. Bob is signed in. */
++async function forgeWithBob(role: CollaboratorRole = "admin", visibility: "public" | "private" = "public") {
++  const h = harness();
++  const alice = await h.user("alice");
++  const bob = await h.user("bob");
++  await h.createRepo(alice, "forge", visibility);
++  await h.addCollaborator(alice, "forge", "bob", role);
++  return { h, alice, bob };
++}
++
++describe("revoking a collaborator", () => {
++  it("removes them from the collaborator list", async () => {
++    const { alice } = await forgeWithBob("write");
++    expect((await alice.delete("/repos/alice/forge/collaborators/bob")).status).toBe(204);
++    expect(await json<CollaboratorView[]>(await alice.get("/repos/alice/forge/collaborators"))).toEqual([]);
++  });
++
++  it("stops a revoked admin from deleting the repository", async () => {
++    const { alice, bob } = await forgeWithBob("admin");
++    expect((await alice.delete("/repos/alice/forge/collaborators/bob")).status).toBe(204);
++    expect((await problem(await bob.delete("/repos/alice/forge"), 403)).detail).toBe(
++      "delete-repo on alice/forge requires the admin role",
++    );
++    expect((await alice.get("/repos/alice/forge")).status).toBe(200);
++  });
++
++  it("hides a private repository from the revoked collaborator", async () => {
++    const { alice, bob } = await forgeWithBob("read", "private");
++    expect((await alice.delete("/repos/alice/forge/collaborators/bob")).status).toBe(204);
++    await problem(await bob.get("/repos/alice/forge"), 404);
++  });
++
++  it("emits collaborator.removed with the role taken away and the acting user", async () => {
++    const { h, alice } = await forgeWithBob("maintain");
++    h.clock.advance(5_000);
++    await alice.delete("/repos/alice/forge/collaborators/bob");
++    expect(h.events.at(-1)).toEqual({
++      type: "collaborator.removed",
++      at: START + 5_000,
++      repoId: "repo_1",
++      userId: "usr_2",
++      role: "maintain",
++      removedBy: "usr_1",
++    });
++  });
++
++  it("answers 404 for someone who is not a collaborator", async () => {
++    const { h, alice } = await forgeWithBob();
++    await h.signUp("carol");
++    const res = await alice.delete("/repos/alice/forge/collaborators/carol");
++    expect((await problem(res, 404)).detail).toBe("carol is not a collaborator on this repository");
++  });
++
++  it("is reserved for admins and the owner", async () => {
++    const { h, alice } = await forgeWithBob();
++    const carol = await h.user("carol");
++    await h.addCollaborator(alice, "forge", "carol", "maintain");
++    const res = await carol.delete("/repos/alice/forge/collaborators/bob");
++    expect((await problem(res, 403)).detail).toBe("remove-collaborator on alice/forge requires the admin role");
++  });
++
++  it("lets the owner add a revoked collaborator back with a lower role", async () => {
++    const { h, alice, bob } = await forgeWithBob("admin");
++    await alice.delete("/repos/alice/forge/collaborators/bob");
++    await h.addCollaborator(alice, "forge", "bob", "read");
++    expect((await bob.get("/repos/alice/forge")).status).toBe(200);
++    await problem(await bob.delete("/repos/alice/forge"), 403);
++  });
++});
