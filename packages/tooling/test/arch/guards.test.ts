@@ -25,6 +25,8 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
   "runner-credentials": [
     /cloudflareCredentials hands a credential/,
     /sourceControlCredentials hands a credential/,
+    /runner call leaves sourceControlCredentials unset/,
+    /runner options are not an object literal/,
   ],
   "readonly-bundles": [
     /used for something other than get, head or list/,
