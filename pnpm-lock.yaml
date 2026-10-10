@@ -269,9 +269,18 @@ importers:
 
   packages/gitcore:
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.20.5
+      fast-check:
+        specifier: 'catalog:'
+        version: 4.10.2
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.3(@types/node@22.20.5)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(yaml@2.9.1))
 
   packages/runner-protocol:
     dependencies:
@@ -331,6 +340,9 @@ importers:
       '@keeltown/core':
         specifier: workspace:*
         version: link:../core
+      '@keeltown/gitcore':
+        specifier: workspace:*
+        version: link:../gitcore
       effect:
         specifier: 'catalog:'
         version: 4.0.2

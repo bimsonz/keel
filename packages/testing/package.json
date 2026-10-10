@@ -17,6 +17,7 @@
   "dependencies": {
     "@effect/vitest": "catalog:",
     "@keeltown/core": "workspace:*",
+    "@keeltown/gitcore": "workspace:*",
     "effect": "catalog:",
     "vitest": "catalog:"
   }

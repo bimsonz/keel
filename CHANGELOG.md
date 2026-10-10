@@ -17,6 +17,9 @@ Changes since `contracts-v0-rc1` (`3e7c7f1`, 10 Oct 2026), all additive or fixes
 - Ports `Changes` (the isolate's gateway to the Change DOs: `declare`, `submit`, `get`, `awaitSubmission`) and `Inbox` (`read`, long-polling), each with an in-memory adapter.
 - Change RPC `submission(waitMs)`, answering `SubmissionStatus {change, commitSha}`; AgentSession RPC `reserveChange({idempotencyKey, fingerprint})` (a declare retried with the same key reaches the same change; the same key with another body is `IdempotencyConflict`) and `inbox({cursor, waitMs})`.
 - Identity domain: `IdempotencyConflict`, and the `AgentNotice` and `InboxPage` schemas (the `Notifier` port re-exports `AgentNotice`, unchanged in shape).
+- `CodeHost.diffTrees(repo, base, head)`: the leaves that differ between two commits, as `git diff-tree -r --no-renames` reports them, as `TreeChange` rows in bytewise path order. Unchanged subtrees are skipped by id.
+- `CodeHost.delete(repo)`: idempotent. Workspaces are collected by deleting their repo.
+- `CodeHostFixture` in `@keeltown/testing`: `commit(repo, ref, files)` and `scratch()`, provided by `makeCodeHostMemory().layer`. Tests seed repos through it, because `CodeHost` never writes git content.
 
 ### Fixed
 
@@ -26,6 +29,8 @@ Changes since `contracts-v0-rc1` (`3e7c7f1`, 10 Oct 2026), all additive or fixes
 ### Changed
 
 - The MFP library is pinned at `github:bimsonz/mfp#v0.1.0-pre.3`.
+- `CodeHost` reads fail with typed errors instead of dying: `RepoNotFound` (every read, `diffTrees`, `mintToken`, and `fork`'s source), `RefNotFound` (`head`), and `ObjectNotFound` (`readTree`, `readBlob`, and `diffTrees` when the repo lacks `base` or `head`). This narrows the error channels, but the port had no callers yet. Transport failures stay defects. `TreeEntry.type` gains `"commit"` for submodules, and `readTree` is documented as the commit's recursive listing.
+- The in-memory `CodeHost` stores real git objects through gitcore. It fails `RepoNotFound` for a repo it never created or has deleted; it used to create the repo on the first read. Its `seed()` is replaced by `CodeHostFixture`.
 
 ## contracts-v0-rc1 (10 Oct 2026)
 

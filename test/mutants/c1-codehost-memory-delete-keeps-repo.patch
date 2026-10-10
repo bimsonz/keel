@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts
+# kills: codehost.delete
+# why: The in-memory host ignores delete, so a collected workspace stays readable
+diff --git a/packages/testing/src/memory/code-host.ts b/packages/testing/src/memory/code-host.ts
+index bd5ea93..04148eb 100644
+--- a/packages/testing/src/memory/code-host.ts
++++ b/packages/testing/src/memory/code-host.ts
+@@ -98,7 +98,7 @@ export function makeCodeHostMemory() {
+         const after = yield* rootTree(repo, found, head);
+         return yield* fromGit(repo, () => diffTrees(reader(found), before, after));
+       }),
+-    delete: (repo) => Effect.sync(() => void repos.delete(repoKey(repo))),
++    delete: () => Effect.void,
+   });
+ 
+   const fixture = CodeHostFixture.of({

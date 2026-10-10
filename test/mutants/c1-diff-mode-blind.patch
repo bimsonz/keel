@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test
+# kills: diff.apply, diff.differential
+# why: Leaves are compared by id alone, so a mode-only change (chmod) is not reported
+diff --git a/packages/gitcore/src/diff.ts b/packages/gitcore/src/diff.ts
+index 87cbbb5..256652b 100644
+--- a/packages/gitcore/src/diff.ts
++++ b/packages/gitcore/src/diff.ts
+@@ -67,7 +67,7 @@ async function leaves(reader: TreeReader, entry: TreeEntry, prefix: string, chan
+ async function changed(reader: TreeReader, before: TreeEntry, after: TreeEntry, prefix: string): Promise<TreeChange[]> {
+   const path = join(prefix, before.name);
+   if (before.mode === MODE_TREE) return walk(reader, before.oid, after.oid, path);
+-  if (before.mode === after.mode && before.oid === after.oid) return [];
++  if (before.oid === after.oid) return [];
+   return [
+     {
+       path,

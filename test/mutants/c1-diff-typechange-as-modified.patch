@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test
+# kills: diff.kind-and-order, diff.differential
+# why: A file that became a symlink or a submodule is reported as modified, not type-changed
+diff --git a/packages/gitcore/src/diff.ts b/packages/gitcore/src/diff.ts
+index 87cbbb5..7401c37 100644
+--- a/packages/gitcore/src/diff.ts
++++ b/packages/gitcore/src/diff.ts
+@@ -71,7 +71,7 @@ async function changed(reader: TreeReader, before: TreeEntry, after: TreeEntry,
+   return [
+     {
+       path,
+-      change: leafKind(before.mode) === leafKind(after.mode) ? "modified" : "type-changed",
++      change: "modified",
+       oldOid: before.oid,
+       newOid: after.oid,
+       oldMode: before.mode,

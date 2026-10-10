@@ -6,6 +6,8 @@ import {
   describePendingContract,
   describeTokenIssuerContract,
 } from "./contracts/index.ts";
+import { describeCodeHostContract } from "./contracts/code-host.ts";
+import * as codeHost from "./memory/code-host.ts";
 import * as coordination from "./memory/coordination.ts";
 import * as delivery from "./memory/delivery.ts";
 import * as identity from "./memory/identity.ts";
@@ -40,7 +42,7 @@ export const PORTS = {
     () => identity.makeTokenIssuerMemory().layer.pipe(Layer.provide(identity.makeClockMemory().layer)),
     describeTokenIssuerContract,
   ),
-  CodeHost: port(() => coordination.makeCodeHostMemory().layer, pending("CodeHost", ["create", "fork", "mintToken", "head", "readTree", "readBlob"])),
+  CodeHost: port(() => codeHost.makeCodeHostMemory().layer, describeCodeHostContract),
   WorkspacePool: port(() => coordination.makeWorkspacePoolMemory().layer, pending("WorkspacePool", ["grant", "release"])),
   SubjectRegistry: port(() => coordination.makeSubjectRegistryMemory().layer, pending("SubjectRegistry", ["byKey", "byAnchor", "mint"])),
   Recall: port(() => coordination.makeRecallMemory(coordination.makeSubjectRegistryMemory()).layer, pending("Recall", ["nearest"])),

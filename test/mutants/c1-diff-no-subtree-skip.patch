@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test
+# kills: diff.identical-empty, diff.reads-exact
+# why: Subtrees with the same id on both sides are walked instead of skipped: the rows stay right, the reads do not
+diff --git a/packages/gitcore/src/diff.ts b/packages/gitcore/src/diff.ts
+index 87cbbb5..4634e52 100644
+--- a/packages/gitcore/src/diff.ts
++++ b/packages/gitcore/src/diff.ts
+@@ -81,7 +81,6 @@ async function changed(reader: TreeReader, before: TreeEntry, after: TreeEntry,
+ }
+ 
+ async function walk(reader: TreeReader, before: string | null, after: string | null, prefix: string): Promise<TreeChange[]> {
+-  if (before === after) return [];
+   const [left, right] = await Promise.all([children(reader, before), children(reader, after)]);
+   const parts: Promise<TreeChange[]>[] = [];
+   let i = 0;

@@ -9,7 +9,7 @@ export interface WorkspaceGrant {
   readonly expiresAt: Instant;
 }
 
-/** Hands out pre-forked workspaces. Readiness comes from the fork event, never from polling. */
+/** Hands out pre-forked workspaces. A fork is ready when the pool's own `await fork()` resolves (spike S2); nothing polls, and no fork event exists to wait for. */
 export class WorkspacePool extends Context.Service<WorkspacePool, {
   readonly grant: (projectId: ProjectId, holder: ChangeId | SketchId) => Effect.Effect<WorkspaceGrant, PoolExhausted>;
   readonly release: (workspaceId: WorkspaceId) => Effect.Effect<void>;
