@@ -44,3 +44,6 @@ export class UnreadableProposition extends Schema.TaggedError<UnreadableProposit
   predicate: Schema.String,
   reason: Schema.String,
 }) {}
+
+/** A probe's cost must be a positive, finite number: blast is divided by it. */
+export class InvalidProbeCost extends Schema.TaggedError<InvalidProbeCost>()("InvalidProbeCost", { cost: Schema.Number }) {}
