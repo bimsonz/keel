@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/run.test.ts
+diff --git a/apps/keel/src/adapters/driving/http/run.ts b/apps/keel/src/adapters/driving/http/run.ts
+index 4973a7a..1eea446 100644
+--- a/apps/keel/src/adapters/driving/http/run.ts
++++ b/apps/keel/src/adapters/driving/http/run.ts
+@@ -21,7 +21,7 @@ export type Runner = <A>(caller: Caller, effect: Effect.Effect<A, never, Isolate
+ 
+ export function makeRunner(runtime: ManagedRuntime.ManagedRuntime<IsolateServices, never>): Runner {
+   return async (caller, effect) => {
+-    const exit = await runtime.runPromiseExit(effect, { signal: caller.signal });
++    const exit = await runtime.runPromiseExit(effect);
+     if (Exit.isSuccess(exit)) return exit.value;
+     const defect = Cause.squash(exit.cause);
+     if (defect instanceof NotImplemented) return notImplemented(caller.requestId);
