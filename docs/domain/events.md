@@ -33,12 +33,14 @@ Every event has the same envelope:
 
 ## identity
 
+The AgentSession DO (`agent:<id>`) is the source of truth for an agent. D1's `AgentDirectory` is a projected index of it (client-credential hash → agent), fed from these events.
+
 | Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
 |---|---|---|---|---|---|
-| `AgentEnrolled` | identity (operator command) | `agentId, name, kind: interactive\|hosted\|human, scopes[]` | — | Projector | Catalog row created |
-| `AgentSuspended` | identity (operator command) | `agentId, reason, by` | the agent's open changes | the agent's AgentSession DO, Projector | Token exchange and every call refused until reinstated; its leases stop renewing |
-| `AgentReinstated` | identity (operator command) | `agentId, by` | — | the agent's AgentSession DO, Projector | Calls accepted again |
-| `AgentRevoked` | identity (operator command) | `agentId, revocationEpoch, by` | the agent's open changes, its leases | the agent's AgentSession DO, Projector | Revocation epoch bumped, so every token minted before it is rejected; its changes park for adoption |
+| `AgentEnrolled` | AgentSession DO (operator command) | `agentId, name, kind: interactive\|hosted\|human, scopes[]` | — | Projector | Catalog row created |
+| `AgentSuspended` | AgentSession DO (operator command) | `agentId, reason, by` | the agent's open changes | the agent's AgentSession DO, Projector | Token exchange and every call refused until reinstated; its leases stop renewing |
+| `AgentReinstated` | AgentSession DO (operator command) | `agentId, by` | — | the agent's AgentSession DO, Projector | Calls accepted again |
+| `AgentRevoked` | AgentSession DO (operator command) | `agentId, revocationEpoch, by` | the agent's open changes, its leases | the agent's AgentSession DO, Projector | Revocation epoch bumped, so every token minted before it is rejected; its changes park for adoption |
 
 ## coordination
 
@@ -46,8 +48,8 @@ Every event has the same envelope:
 
 | Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
 |---|---|---|---|---|---|
-| `IntentDeclared` | Change DO | `changeId, agentId, revision: 1, goal, footprint, premises[], leaseId` | each Subject relied on | Subject DOs relied on, the agent | The change is subscribed to each subject it relies on ("relying is subscribing"); preflight runs |
-| `PreflightIssued` | Change DO (fact) | `changeId, revision, neighbours[], contradictions[], precedents[], suggestedMove` | — | the agent | The agent sees overlap, contradictions, precedents and a Move before writing code |
+| `IntentDeclared` | Change DO | `changeId, agentId, origin: agent\|auditor\|operator, sketchId?, revision: 1, goal, footprint, premises[], leaseId` | each Subject relied on | Subject DOs relied on, the agent | The change is subscribed to each subject it relies on ("relying is subscribing"); preflight runs. `origin: auditor` marks the Auditor's auto-revert, a platform-authored change that lands like any other |
+| `PreflightIssued` | Change DO (fact) | `changeId, revision, neighbours[], contradictions[], precedents[], suggestedMove` | — | the agent | The agent sees overlap, contradictions, precedents and a Move before writing code. Footprint overlap is *exposure* and appears only in `neighbours`: proximity never opens a conflict |
 | `IntentRevised` | Change DO | `changeId, revision, goal?, footprint?, premisesAdded[], premisesRetracted[]` | Subjects whose premises changed | Subject DOs touched, the agent | Subscriptions follow the premises; preflight re-runs |
 | `PremiseRelied` | Subject DO | `subjectId, changeId, premise: {predicate, relation, value, scope}` | — | the change's agent | The holder is notified of later fallout on this subject |
 | `ChangeSubmitted` | Change DO | `changeId, revision, commitSha, workspaceId` | — | `workflow:Precheck`, the change's lane | **Starts Precheck.** The authoritative signal: push events only observe |
@@ -65,13 +67,16 @@ Every event has the same envelope:
 | `ChangeResumed` | Change DO | `changeId, decisionId` | — | the agent | Caused by `RulingGiven`; verification continues |
 | `ChangeAdopted` | Change DO | `changeId, previousAgentId, agentId, leaseId, briefRef` | the previous lease | both agents | Re-leased under the same Change-Id with a cold-start brief |
 | `ChangeWithdrawn` | Change DO | `changeId, by, reason?` | the workspace, subscriptions | Subject DOs relied on, Lane DO, WorkspacePool DO | Subscriptions dropped; workspace collected |
-| `ChangeSuperseded` | Change DO | `changeId, by: changeId` | the workspace, subscriptions | Subject DOs relied on, Lane DO, WorkspacePool DO | An alternative landed instead |
+| `ChangeSuperseded` | Change DO | `changeId, by: changeId, decisionId?` | the workspace, subscriptions | Subject DOs relied on, Lane DO, WorkspacePool DO | An alternative landed instead: by a ruling, or by policy, when the alternative retracting a tenet loses automatically (then caused by the winner's `ChangeLanded`) |
 | `LeaseLapsed` | Change DO | `changeId, leaseId, renewedAt` | — | the agent | Raised by the lease's deadline alarm, 15 minutes after the last renewal. Parks the change if it is in a state the agent owns |
 
 ### Subjects and premises
 
+The Project DO (`project:<id>`) holds the subject registry (keys, aliases, anchors), so minting is replayable; each Subject DO holds that subject's premises, tenets and decisions.
+
 | Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
 |---|---|---|---|---|---|
+| `SubjectMinted` | Project DO | `subjectId, key, anchors[], gloss, mintedBy: scan\|clef\|agent` | — | Projector | Normalisation found no existing subject for a proposition; the new subject joins the registry |
 | `PremiseSuspected` | Subject DO | `subjectId, changeId (holder), premise, cause: {changeId, effect}` | the holder's change | the holder's agent | Fallout's *suspect* outcome: the holder re-affirms or revises |
 | `PremiseReaffirmed` | Subject DO | `subjectId, changeId, premise` | — | Projector | The suspicion is cleared |
 
@@ -90,20 +95,24 @@ Every event has the same envelope:
 
 ## verification
 
+**Conflicts are owned by kind.** The Subject DO owns `semantic` and `precedent` conflicts. `textual` (a refused merge) and `interaction` (every subset of a batch passes, the union fails) conflicts have no subject, so the Lane DO owns them. A conflict's probes, guards and escalations belong to the DO that owns the conflict; "Subject DO" below means "the conflict's owner" for those events.
+
 | Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
 |---|---|---|---|---|---|
-| `ConflictSuspected` | Subject DO | `conflictId, kind: textual\|footprint\|semantic\|precedent, parties: (changeId\|tenetId)[], subjectId, predicate` | each party | the parties' agents | A probe is drafted, unless the kind is proven directly (a refused merge, a failing guard) |
-| `ProbeDrafted` | Subject DO | `probeId, conflictId, attempt (≤3), bundleHash` | — | — | The world matrix runs the probe in A, B and A+B |
-| `ProbeDiscarded` | Subject DO | `probeId, reason: non-discriminating\|unstable\|draft-failed` | the conflict | — | A non-discriminating probe dismisses the conflict; three failed drafts make it unprovable |
+| `ConflictSuspected` | Subject DO or Lane DO (by kind) | `conflictId, kind: textual\|semantic\|precedent\|interaction, parties: (changeId\|tenetId)[], subjectId?, predicate?` (present for `semantic` and `precedent`) | each party | the parties' agents | A probe is drafted, unless the kind is proven directly (a refused merge, a failing guard) |
+| `ProbeDrafted` | Subject DO | `probeId, conflictId, attempts (≤3), bundleHash` | — | — | The probe entity begins here. The world matrix runs it on trunk and in A, B and A+B |
+| `ProbeRan` | Subject DO (fact) | `probeId, conflictId, world: trunk\|A\|B\|AB, run: 1..3, outcome: pass\|fail\|n/a, resultRef` | — | Projector | One cell of the world matrix. Admission is computed from these, and Conflict Theatre fills the matrix from them |
+| `ProbeDiscarded` | Subject DO | `probeId, reason: non-discriminating\|unstable\|draft-failed` | the conflict | — | A non-discriminating probe dismisses the conflict; an unstable one, or three failed drafts, make it unprovable. With `draft-failed` it is the probe's first and only event |
 | `ConflictProven` | Subject DO | `conflictId, evidence: {probeId\|guardId\|mergeRefusal}` | each party | the parties' agents, the lane | The change bounces with evidence, or escalates if human-class |
 | `ConflictDismissed` | Subject DO | `conflictId, evidence` | each party | the parties' agents | The dismissal is recorded as evidence |
 | `ConflictEscalated` | Subject DO | `conflictId, escalationId, reason: human-class\|unprovable` | each party | the escalation inbox | The parties park until a ruling |
 | `ConflictResolved` | Subject DO | `conflictId, move, decisionId?` | each party | the parties' agents | The chosen Move applies |
-| `GuardAdmitted` | Subject DO | `guardId, probeId, conflictId, runs: 3` | the guard repo | the parties' agents | The probe passed on trunk, passed in the premise-holder's world, failed in the combined world, three times. It now guards trunk |
+| `GuardAdmitted` | Subject DO | `guardId, probeId, conflictId, runs: 3` | the guard repo | the parties' agents | Computed from `ProbeRan`: the probe passed on trunk (or did not apply), passed in the premise-holder's world, failed in the combined world, three times. It now guards trunk |
 | `GuardRetired` | Subject DO | `guardId, decisionId` | the guard repo | — | Only a superseding Decision retires a guard |
 | `GuardFailed` | Lane DO (fact) | `guardId, batchId, candidateId, world` | the batch | — | Proof against the candidate; feeds its verdict |
 | `VerdictIssued` | Change DO or Lane DO | `verdictId, subject: changeId\|batchId, outcome: land\|bounce\|park\|hold\|supersede, evidence[], planHash` | the change or batch | the agent(s) | Every step result is part of the evidence |
-| `EscalationRaised` | Subject DO or Change DO | `escalationId, question, options[], consequences[], about: entity ref` | — | the escalation inbox | A person is asked; the default is *hold* |
+| `EscalationRaised` | the raising DO | `escalationId, question, options[], consequences[], about: entity ref` | — | the escalation inbox | A person is asked; the default while open is *hold* |
+| `EscalationWithdrawn` | the raising DO | `escalationId, reason` | — | the escalation inbox | Its subject was resolved some other way before a ruling |
 
 ## integration
 
@@ -115,19 +124,21 @@ A **Batch** is a set of Changes verified together; its **Candidate** is the comp
 | `CandidateAssembled` | Lane DO | `candidateId, batchId, treeSha, composer: gitcore\|mergebox, tier, tierReason` | — | Projector | The candidate is bundled to R2 |
 | `VerificationStarted` | Lane DO | `candidateId, batchId, instanceId, planHash` | — | Projector | The union of the members' plans runs across the tiers |
 | `BatchVerified` | Lane DO | `batchId, candidateId, verdictId` | — | Trunk DO | **Trunk promotion debounces.** Late results are fenced on `(batchId, attempt, chainEpoch)` |
-| `BatchFailed` | Lane DO | `batchId, candidateId, verdictId, attribution: changeId\|interaction\|infra` | each member change | member Change DOs | Flake rerun, then attribution, then bisection; an interaction failure opens a semantic Conflict |
+| `BatchFailed` | Lane DO | `batchId, candidateId?, verdictId, attribution: changeId\|textual\|interaction\|infra` | each member change | member Change DOs | Flake rerun, then attribution, then bisection. `textual`: GitCore and MergeBox both refused to compose, a proven textual conflict. `interaction`: every subset passes and the union fails, an interaction conflict. Both are owned by the Lane DO |
 | `CandidateBisected` | Lane DO | `candidateId, batchId, into: batchId[]` | each member change | member Change DOs | Leave-one-out or a 4-way split |
-| `CandidateInvalidated` | Lane DO | `candidateId, batchId, reason: head-moved` | each member change | member Change DOs | The commutation rule failed; only the intersection is re-verified |
+| `CandidateInvalidated` | Lane DO | `candidateId, batchId, reason: head-moved` | each member change | member Change DOs | Caused by `PromotionDeclined`; only the intersection is re-verified |
 | `CandidatePromoted` | Lane DO | `candidateId, batchId, trunkSha` | — | — | Caused by `TrunkAdvanced` |
 | `TrunkAdvanced` | Trunk DO | `projectId, from, to, groupId, members: changeId[], proofIds[]` | each member change | member Change DOs, member lanes, the Auditor, Projector | Each member lands. The Auditor runs the full suite on the new head |
+| `PromotionDeclined` | Trunk DO | `projectId, batchId, reason: commutation-failed, reverify: changeId[]` | the batch | the batch's Lane DO | Trunk moved since the batch was verified and the commutation rule fails for it |
 | `PromotionFrozen` | Trunk DO | `projectId, groupId, expected, observed` | — | the escalation inbox | Trunk's head was neither the old nor the new SHA; a person is alerted |
 | `PromotionResumed` | Trunk DO | `projectId, by` | — | Projector | An operator released the freeze |
+| `AuditCompleted` | Trunk DO (fact) | `projectId, head, outcome: green\|red, suspects: changeId[], runRef` | — | Projector, the escalation inbox when red | The Auditor's full-suite run on a new head (Tier 2). On red it bisects across commutation-promoted commits and declares a revert change with `origin: auditor` |
 
 ## memory
 
 | Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
 |---|---|---|---|---|---|
-| `RulingGiven` | Subject DO or Change DO | `escalationId, option, by, rationale?` | the parties | parked changes, waiting Workflows | Resumes Workflows through `sendEvent` |
+| `RulingGiven` | the escalation's raising DO | `escalationId, option, by, rationale?` | the parties | parked changes, waiting Workflows | Resumes Workflows through `sendEvent` |
 | `DecisionRecorded` | Subject DO | `decisionId, escalationId, scope, evidence[], alternatives: [{option, reasonRejected}]` | subjects in scope | Projector | Becomes a precedent for later changes |
 | `DecisionSuperseded` | Subject DO | `decisionId, by: decisionId` | subjects in scope | Projector | — |
 | `DecisionOverruled` | Subject DO | `decisionId, by: decisionId, requestedBy: changeId` | subjects in scope | Projector | — |

@@ -69,7 +69,7 @@ _Avoid_: risk, gamble (outside prose)
 ### Verification
 
 **Conflict**:
-A disagreement between two Changes, or between a Change and a Tenet. Its kind is textual, footprint, semantic or precedent. A Conflict is a first-class object with a resolution path.
+A disagreement between two Changes, or between a Change and a Tenet. Its kind is textual, semantic, precedent or interaction (a batch whose union fails while every subset passes). Overlapping footprints are not a Conflict: proximity is exposure, reported in preflight. A Conflict is a first-class object with a resolution path.
 _Avoid_: merge conflict (that is only the textual kind), clash
 
 **Fallout**:

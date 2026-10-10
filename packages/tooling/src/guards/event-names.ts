@@ -12,7 +12,7 @@ const MACHINES = "docs/domain/state-machines.md";
 const IRREGULAR = new Set([
   "Begun", "Broken", "Brought", "Built", "Caught", "Chosen", "Cut", "Done", "Drawn", "Found",
   "Frozen", "Given", "Held", "Kept", "Known", "Left", "Lost", "Made", "Met", "Paid", "Proven",
-  "Put", "Read", "Run", "Sent", "Set", "Shown", "Split", "Taken", "Thrown", "Torn", "Withdrawn",
+  "Put", "Ran", "Read", "Run", "Sent", "Set", "Shown", "Split", "Taken", "Thrown", "Torn", "Withdrawn",
   "Won", "Written",
 ]);
 
