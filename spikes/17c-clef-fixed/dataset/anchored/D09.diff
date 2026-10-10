@@ -1,0 +1,10 @@
+--- a/accounts/models.py
++++ b/accounts/models.py
+@@ -28 +28 @@ class UserEmail(Base):
+     __tablename__ = "user_emails"
+     __table_args__ = (
+         Index("uq_user_emails_primary", "user_id", unique=True, postgresql_where=text("is_primary")),
+     )
+     user_id = mapped_column(ForeignKey("users.id"))
+     address = mapped_column(String(320))
+     is_primary = mapped_column(Boolean, default=False)

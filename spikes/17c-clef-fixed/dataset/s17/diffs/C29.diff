@@ -1,0 +1,11 @@
+--- a/infra/db.tf
++++ b/infra/db.tf
+@@ -40 +40 @@ resource "aws_db_parameter_group" "app" {
+   family = "postgres16"
+
+   parameter {
+     name         = "max_connections"
+-    value        = "200"
++    value        = "80"
+     apply_method = "pending-reboot"
+   }

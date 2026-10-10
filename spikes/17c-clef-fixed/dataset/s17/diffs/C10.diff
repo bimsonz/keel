@@ -1,0 +1,29 @@
+--- a/internal/audit/writer.go
++++ b/internal/audit/writer.go
+@@ -18 +18 @@ type Writer struct {
+     events chan Event
+     sink   Sink
+ }
+
+-func (w *Writer) Start(ctx context.Context) {
+-    go w.loop(ctx)
++const writerConcurrency = 8
++
++func (w *Writer) Start(ctx context.Context) {
++    for i := 0; i < writerConcurrency; i++ {
++        go w.loop(ctx)
++    }
+ }
+
+ func (w *Writer) loop(ctx context.Context) {
+     for {
+         select {
+         case ev := <-w.events:
+             if err := w.sink.Append(ctx, ev); err != nil {
+                 log.Printf("audit append: %v", err)
+             }
+         case <-ctx.Done():
+             return
+         }
+     }
+ }

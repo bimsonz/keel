@@ -1,0 +1,9 @@
+--- a/internal/api/issue.go
++++ b/internal/api/issue.go
+@@ -7 +7 @@ package api
+ type Issue struct {
+     ID     int64  `json:"id"`
+     Number int    `json:"number"`
+     Title  string `json:"title"`
+     State  string `json:"state"`
+ }

@@ -1,0 +1,37 @@
+--- a/src/authz/cache.ts
++++ b/src/authz/cache.ts
+@@ -16,11 +16,11 @@ export class RoleCache {
+   readonly #entries = new Map<string, Entry>();
+ 
+   get(sessionId: string, repoId: string): CollaboratorRole | undefined {
+-    return this.#entries.get(key(sessionId, repoId))?.role;
++    return this.#entries.get(`${sessionId}:${repoId}`)?.role;
+   }
+ 
+   set(sessionId: string, userId: string, repoId: string, role: CollaboratorRole): void {
+-    this.#entries.set(key(sessionId, repoId), { userId, repoId, role });
++    this.#entries.set(`${sessionId}:${repoId}`, { userId, repoId, role });
+   }
+ 
+   /** Forgets `userId`'s role on `repoId` in every one of their sessions. */
+@@ -37,11 +37,9 @@ const caches = new WeakMap<Store, RoleCache>();
+ export function roleCacheFor(store: Store): RoleCache {
+   let cache = caches.get(store);
+   if (cache === undefined) {
+-    const created = new RoleCache();
+-    store.events.subscribe("collaborator.removed", (event) => created.evict(event.userId, event.repoId));
+-    caches.set(store, created);
+-    cache = created;
++    cache = new RoleCache();
++    caches.set(store, cache);
+   }
+   return cache;
+ }
+@@ -51,7 +49,3 @@ interface Entry {
+   readonly repoId: string;
+   readonly role: CollaboratorRole;
+ }
+-
+-function key(sessionId: string, repoId: string): string {
+-  return `${sessionId}:${repoId}`;
+-}

@@ -1,0 +1,18 @@
+--- a/internal/webhooks/payload.go
++++ b/internal/webhooks/payload.go
+@@ -9 +9 @@ type Payload struct {
+     Action     string      `json:"action"`
+-    Repository Repository  `json:"repository"`
++    // Organisation-level events have no repository.
++    Repository *Repository `json:"repository,omitempty"`
+     Sender     User        `json:"sender"`
+ }
+@@ -30 +31 @@ func Build(ev store.Event) Payload {
+-    p := Payload{Action: ev.Action, Repository: toRepository(ev.Repo), Sender: toUser(ev.Actor)}
++    p := Payload{Action: ev.Action, Sender: toUser(ev.Actor)}
++    if ev.Repo != nil {
++        repo := toRepository(*ev.Repo)
++        p.Repository = &repo
++    }
+     return p
+ }

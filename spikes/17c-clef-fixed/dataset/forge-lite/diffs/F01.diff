@@ -1,0 +1,87 @@
+--- /dev/null
++++ b/src/authz/cache.ts
+@@ -0,0 +1,42 @@
++import type { CollaboratorRole } from "../domain/roles.ts";
++import type { Store } from "../store/types.ts";
++
++export class RoleCache {
++  readonly #roles = new Map<string, CollaboratorRole>();
++
++  get(sessionId: string, repoId: string): CollaboratorRole | undefined {
++    return this.#roles.get(key(sessionId, repoId));
++  }
++
++  set(sessionId: string, repoId: string, role: CollaboratorRole): void {
++    this.#roles.set(key(sessionId, repoId), role);
++  }
++}
++
++const caches = new WeakMap<Store, RoleCache>();
++
++/** The role cache for `store`. Each store, and so each app, gets its own. */
++export function roleCacheFor(store: Store): RoleCache {
++  let cache = caches.get(store);
++  if (cache === undefined) {
++    cache = new RoleCache();
++    caches.set(store, cache);
++  }
++  return cache;
++}
++
++function key(sessionId: string, repoId: string): string {
++  return `${sessionId}:${repoId}`;
++}
+--- a/src/authz/require-permission.ts
++++ b/src/authz/require-permission.ts
+@@ -4,6 +4,7 @@ import type { Role } from "../domain/roles.ts";
+ import type { AppEnv } from "../http/env.ts";
+ import { forbidden, notFound, unauthenticated, type Problem } from "../http/problem.ts";
+ import type { RepoRecord } from "../store/types.ts";
++import { roleCacheFor } from "./cache.ts";
+ import { evaluateRole } from "./evaluate.ts";
+ 
+ /**
+@@ -12,8 +13,9 @@ import { evaluateRole } from "./evaluate.ts";
+  * that role allows `action`. On success the handler finds `repo` and `role`
+  * on the context.
+  *
+- * The role is read from the store on every request, so a change to someone's
+- * access applies from their very next request.
+  *
+  * A caller who cannot see the repository gets 404, exactly as if it did not
+  * exist. A caller who can see it but may not act gets 403, or 401 when they
+@@ -22,7 +24,7 @@ import { evaluateRole } from "./evaluate.ts";
+ export function requirePermission(action: Action): MiddlewareHandler<AppEnv> {
+   return async (c, next) => {
+     const repo = loadRepo(c);
+-    const role = callerRole(c, repo);
++    const role = callerRole(c, repo, action);
+     if (!allows(role, action, repo.visibility)) throw denial(c, repo, role, action);
+     c.set("repo", repo);
+     c.set("role", role);
+@@ -30,10 +32,21 @@ export function requirePermission(action: Action): MiddlewareHandler<AppEnv> {
+   };
+ }
+ 
+-function callerRole(c: Context<AppEnv>, repo: RepoRecord): Role | null {
+-  const { user } = c.var;
+-  if (user === undefined) return null;
+-  return evaluateRole(c.var.deps.store, repo, user.id);
++function callerRole(c: Context<AppEnv>, repo: RepoRecord, action: Action): Role | null {
++  const { session } = c.var;
++  if (session === undefined) return null;
++  if (repo.ownerId === session.userId) return "owner";
++
++  const { store } = c.var.deps;
++  const cache = roleCacheFor(store);
++  const cached = cache.get(session.id, repo.id);
++  // Enough is enough. A cached role that falls short is looked up again, in
++  // case the caller has been promoted since it was cached.
++  if (cached !== undefined && allows(cached, action, repo.visibility)) return cached;
++
++  const role = evaluateRole(store, repo, session.userId);
++  if (role !== null && role !== "owner") cache.set(session.id, repo.id, role);
++  return role;
+ }
+ 
+ function loadRepo(c: Context<AppEnv>): RepoRecord {

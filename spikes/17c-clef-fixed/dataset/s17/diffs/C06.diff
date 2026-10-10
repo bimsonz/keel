@@ -1,0 +1,21 @@
+--- a/infra/scheduler.tf
++++ b/infra/scheduler.tf
+@@ -18 +18 @@ resource "aws_ecs_service" "scheduler" {
+   name            = "scheduler"
+   cluster         = aws_ecs_cluster.main.id
+   task_definition = aws_ecs_task_definition.scheduler.arn
+-  desired_count   = 1
++  desired_count   = 3
+   launch_type     = "FARGATE"
+
+   deployment_minimum_healthy_percent = 0
+   deployment_maximum_percent         = 100
+ }
++
++resource "aws_appautoscaling_target" "scheduler" {
++  service_namespace  = "ecs"
++  resource_id        = "service/main/scheduler"
++  scalable_dimension = "ecs:service:DesiredCount"
++  min_capacity       = 2
++  max_capacity       = 6
++}

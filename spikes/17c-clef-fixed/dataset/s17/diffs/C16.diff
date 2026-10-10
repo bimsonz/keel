@@ -1,0 +1,18 @@
+--- a/src/api/issues.ts
++++ b/src/api/issues.ts
+@@ -6 +6 @@ import { z } from "zod";
+ export const CreateIssue = z.object({
+-  title: z.string().min(1).max(256),
++  title: z.string().max(256).optional(),
+   body: z.string().max(65536).optional(),
+   labels: z.array(z.string()).max(20).default([]),
+ });
+@@ -31 +31 @@ export async function createIssue(c: Context<AppEnv>) {
+   const input = CreateIssue.parse(await c.req.json());
+-  const issue = await c.var.issues.create({ ...input, repoId: c.req.param("repo") });
++  const issue = await c.var.issues.create({
++    ...input,
++    title: input.title ?? null,
++    repoId: c.req.param("repo"),
++  });
+   return c.json(issue, 201);

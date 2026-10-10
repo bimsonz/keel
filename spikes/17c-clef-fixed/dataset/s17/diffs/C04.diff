@@ -1,0 +1,19 @@
+--- a/auth/tokens.py
++++ b/auth/tokens.py
+@@ -1 +1 @@
++from cachetools import TTLCache, cached
++
+ from auth.store import revocations
+
++_revoked_cache = TTLCache(maxsize=50_000, ttl=300)
++
+
++@cached(_revoked_cache)
+ def is_token_revoked(token_id: str) -> bool:
+     return revocations.exists(token_id)
+
+
+ def authenticate(request) -> Principal:
+     token = parse_bearer(request)
+     if is_token_revoked(token.id):
+         raise Unauthorized("token revoked")

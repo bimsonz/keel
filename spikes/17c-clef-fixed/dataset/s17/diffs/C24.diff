@@ -1,0 +1,17 @@
+--- a/src/payments/capture.ts
++++ b/src/payments/capture.ts
+@@ -14 +14 @@ export async function handleCapture(req: CaptureRequest, deps: Deps): Promise<CaptureResult> {
+-  const existing = await deps.captures.findByIdempotencyKey(req.idempotencyKey);
+-  if (existing) return existing.result;
+-
+   const charge = await deps.psp.capture({
+     paymentIntent: req.paymentIntentId,
+     amount: req.amountMinor,
+-    idempotencyKey: req.idempotencyKey,
+   });
+-  const result = { chargeId: charge.id, status: charge.status };
+-  await deps.captures.save(req.idempotencyKey, result);
+-  return result;
++  await deps.ledger.append({ type: "capture", chargeId: charge.id, amount: req.amountMinor });
++  return { chargeId: charge.id, status: charge.status };
+ }

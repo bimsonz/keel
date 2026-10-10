@@ -1,0 +1,7 @@
+--- a/auth/tokens.py
++++ b/auth/tokens.py
+@@ -1 +1 @@
+ from auth.store import revocations
+
+ def is_token_revoked(token_id: str) -> bool:
+     return revocations.exists(token_id)

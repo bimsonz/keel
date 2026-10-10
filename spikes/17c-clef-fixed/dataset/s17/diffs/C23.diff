@@ -1,0 +1,10 @@
+--- a/internal/protect/rules.go
++++ b/internal/protect/rules.go
+@@ -22 +22 @@ func (r *Rules) CanForcePush(p Principal, b Branch) bool {
+     if b.Protected {
+-        return p.Role.AtLeast(RoleMaintainer)
++        // Force pushes to protected branches rewrote release history twice this quarter.
++        return p.Role.AtLeast(RoleAdmin)
+     }
+     return p.Role.AtLeast(RoleMember)
+ }

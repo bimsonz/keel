@@ -1,0 +1,37 @@
+--- a/internal/flags/flags.go
++++ b/internal/flags/flags.go
+@@ -12 +12 @@ import (
+ type Client struct {
+     store Store
++    snapshot map[string]bool
+ }
+
+-func New(store Store) *Client {
+-    return &Client{store: store}
++func New(ctx context.Context, store Store) (*Client, error) {
++    all, err := store.LoadAll(ctx)
++    if err != nil {
++        return nil, fmt.Errorf("load flags: %w", err)
++    }
++    return &Client{store: store, snapshot: all}, nil
+ }
+
+ // Enabled reports whether flag is on for the current request.
+ func (c *Client) Enabled(ctx context.Context, flag string) bool {
+-    on, err := c.store.Get(ctx, flag)
+-    if err != nil {
+-        return false
+-    }
+-    return on
++    return c.snapshot[flag]
+ }
+--- a/cmd/server/main.go
++++ b/cmd/server/main.go
+@@ -31 +31 @@ func main() {
+     store := flags.NewPostgresStore(db)
+-    flagClient := flags.New(store)
++    flagClient, err := flags.New(ctx, store)
++    if err != nil {
++        log.Fatal(err)
++    }
+     srv := server.New(cfg, db, flagClient)
