@@ -19,13 +19,17 @@
     "BOXGATE_CLASSES": "",
     // The region of this deployment's Artifacts namespaces. Repo-touching DOs are placed near it.
     "ARTIFACTS_LOCATION_HINT": "wnam",
+    // How many ready workspaces a new project's pool keeps forked ahead of declares.
+    "POOL_TARGET": "4",
   },
   "secrets": {
     // KEEL_SIGNING_KEY: an Ed25519 private key, as a JWK, that signs agents' bearer tokens.
     // CLOUDFLARE_ACCOUNT_ID: read by @cloudflare/ci; a secret so it is never committed.
     // @cloudflare/ci's CF_TOKEN and R2 S3 keys are deliberately absent: backups go through
     // the BACKUP_BUCKET binding and no runner asks for credentials (guard: runner-credentials).
-    "required": ["KEEL_SIGNING_KEY", "CLOUDFLARE_ACCOUNT_ID"],
+    // KEEL_BOOTSTRAP_SECRET: exchanged as client `keel-bootstrap` for a token that may only enrol
+    // agents, so a new deployment can enrol its first operator. From Terraform; rotate to retire.
+    "required": ["KEEL_SIGNING_KEY", "CLOUDFLARE_ACCOUNT_ID", "KEEL_BOOTSTRAP_SECRET"],
   },
 
   // Every id below is a sentinel. scripts/deploy.ts writes a gitignored

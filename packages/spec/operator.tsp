@@ -16,6 +16,10 @@ model ProjectView {
 model CreateProjectRequest {
   @minLength(1)
   name: string;
+
+  /** The repository in Keel's core namespace that trunk is forked from. It must already hold the code. */
+  @minLength(1)
+  source: string;
 }
 
 model ProjectSettings {
@@ -36,6 +40,9 @@ model EnrolAgentRequest {
 
   kind: AgentKind;
   scopes: Scope[];
+
+  /** The one project the agent works in. Defaults to the operator's own project. */
+  projectId?: ProjectId;
 }
 
 model EnrolledAgent {
@@ -76,7 +83,7 @@ interface Operator {
   createProject(...IdempotencyKey, @body body: CreateProjectRequest): {
     @statusCode statusCode: 201;
     @body body: ProjectView;
-  } | StandardErrors;
+  } | NotFound | Conflict | StandardErrors;
 
   @summary("Get a project's settings")
   @useAuth(OperatorScope)
@@ -97,7 +104,7 @@ interface Operator {
   enrolAgent(...IdempotencyKey, @body body: EnrolAgentRequest): {
     @statusCode statusCode: 201;
     @body body: EnrolledAgent;
-  } | StandardErrors;
+  } | Conflict | StandardErrors;
 
   @summary("List escalations")
   @useAuth(OperatorScope)

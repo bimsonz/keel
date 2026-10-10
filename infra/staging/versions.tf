@@ -6,6 +6,10 @@ terraform {
       source  = "cloudflare/cloudflare"
       version = "5.26.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "3.9.1"
+    }
   }
 
   # State is shared through the R2 bucket keel-tfstate. Until its S3 credentials

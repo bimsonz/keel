@@ -79,3 +79,12 @@ resource "cloudflare_secrets_store_secret" "deploy_token" {
     ignore_changes = [value]
   }
 }
+
+# The bootstrap credential's secret: exchanged as client `keel-bootstrap` for a
+# token that may only enrol agents, so a new deployment can enrol its first
+# operator through the API. scripts/deploy.ts sets it as KEEL_BOOTSTRAP_SECRET
+# and the seed reads it from the output. Replace this resource to retire it.
+resource "random_password" "bootstrap" {
+  length  = 48
+  special = false
+}

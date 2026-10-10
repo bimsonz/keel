@@ -43,3 +43,32 @@ export async function fingerprintOf(body: unknown): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
   return `sha256:${[...digest].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
+
+const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/**
+ * A ULID body derived from `parts`: SHA-256 of the parts joined by NUL, read
+ * as 128 bits in Crockford base32 (so the first character is 0–7, as a ULID's
+ * must be). An idempotent create derives its DO's id this way from the caller
+ * and the Idempotency-Key, so a retry reaches the same DO with no reservation.
+ */
+export async function derivedUlid(...parts: readonly string[]): Promise<string> {
+  const bytes = new TextEncoder().encode(parts.join("\u0000"));
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  let bits = 0n;
+  for (const byte of digest.subarray(0, 16)) bits = (bits << 8n) | BigInt(byte);
+  let body = "";
+  for (let i = 0; i < 26; i += 1) {
+    body = CROCKFORD.charAt(Number(bits & 31n)) + body;
+    bits >>= 5n;
+  }
+  return body;
+}
+
+/** `sha256:` and the hex digest of a string, as credentials store a secret. */
+export async function sha256Of(text: string): Promise<string> {
+  const digest = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)),
+  );
+  return `sha256:${[...digest].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+}

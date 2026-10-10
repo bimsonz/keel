@@ -5,6 +5,7 @@ import {
   AgentSessionCodecs,
   ChangeCodecs,
   DeclareCommand,
+  type EnrolCommand,
   type InboxRead,
   type ReserveChange,
   SubmitCommand,
@@ -23,11 +24,12 @@ export interface ChangeStub {
 export interface AgentSessionStub {
   reserveChange(request: typeof ReserveChange.Encoded): Promise<unknown>;
   inbox(request: typeof InboxRead.Encoded): Promise<unknown>;
+  enrol(command: typeof EnrolCommand.Encoded): Promise<unknown>;
 }
 
 export interface ChangeObjects {
   readonly change: (changeId: ChangeId) => ChangeStub;
-  readonly agentSession: (agentId: AgentId) => AgentSessionStub;
+  readonly agentSession: (agentId: AgentId) => Pick<AgentSessionStub, "reserveChange" | "inbox">;
 }
 
 const encodeDeclare = Schema.encodeSync(DeclareCommand);

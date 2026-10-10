@@ -97,6 +97,16 @@
               }
             }
           },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Client error",
             "headers": {
@@ -2876,6 +2886,26 @@
               }
             }
           },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Client error",
             "headers": {
@@ -4884,12 +4914,18 @@
       "CreateProjectRequest": {
         "type": "object",
         "required": [
-          "name"
+          "name",
+          "source"
         ],
         "properties": {
           "name": {
             "type": "string",
             "minLength": 1
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The repository in Keel's core namespace that trunk is forked from. It must already hold the code."
           }
         },
         "additionalProperties": {
@@ -5099,6 +5135,14 @@
             "items": {
               "$ref": "#/components/schemas/Scope"
             }
+          },
+          "projectId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectId"
+              }
+            ],
+            "description": "The one project the agent works in. Defaults to the operator's own project."
           }
         },
         "additionalProperties": {

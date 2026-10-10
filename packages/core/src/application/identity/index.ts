@@ -4,8 +4,8 @@ import {
   type Agent,
   AgentNotAdmitted,
   AgentNotKnown,
-  type AgentKind,
   CredentialRejected,
+  type IdempotencyConflict,
   type Identity,
   type Principal,
   type Scope,
@@ -16,6 +16,9 @@ import { stub } from "../not-implemented.ts";
 import {
   AgentDirectory,
   type Clock,
+  type EnrolInput,
+  type Enrolment,
+  Enrolments,
   type Ids,
   type IssuedToken,
   TokenIssuer,
@@ -96,22 +99,16 @@ export const exchangeToken: (
   return { ...token, scopes };
 });
 
-export interface EnrolRequest {
-  readonly name: string;
-  readonly kind: AgentKind;
-  readonly scopes: readonly Scope[];
-}
-
-export interface Enrolled {
-  readonly agent: Agent;
-  readonly clientId: string;
-  /** Shown once. */
-  readonly clientSecret: string;
-}
-
+/**
+ * Enrols an agent in its AgentSession DO, which projects it into the
+ * AgentDirectory before answering. The doorways have already checked the
+ * operator scope; the bootstrap credential may call only this.
+ */
 export const enrolAgent: (
-  request: EnrolRequest,
-) => Effect.Effect<Enrolled, never, AgentDirectory | Ids | Clock> = stub("identity/enrolAgent");
+  principal: Principal,
+  input: EnrolInput,
+) => Effect.Effect<Enrolment, IdempotencyConflict, Enrolments> = (principal, input) =>
+  Enrolments.use((enrolments) => enrolments.enrol(principal, input));
 
 export const openSession: (
   principal: Principal,

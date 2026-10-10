@@ -15,6 +15,8 @@ const CONTRACT_PORTS = [
   "Notifier",
   "Changes",
   "Inbox",
+  "Projects",
+  "Enrolments",
   "EntityStore",
   "EventOutbox",
   "EventLog",

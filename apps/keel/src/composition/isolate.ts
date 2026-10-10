@@ -1,10 +1,20 @@
 import { whoami } from "@keeltown/core/application/identity";
-import type { AgentId, ChangeId } from "@keeltown/core/kernel";
-import { type Changes, type Inbox, TokenIssuer } from "@keeltown/core/ports";
+import type { AgentId, ChangeId, ProjectId } from "@keeltown/core/kernel";
+import {
+  type AgentDirectory,
+  type Changes,
+  type Enrolments,
+  type Inbox,
+  type Projects,
+  TokenIssuer,
+} from "@keeltown/core/ports";
 import { Effect, Layer, ManagedRuntime } from "effect";
+import { AgentDirectoryWithBootstrap } from "../adapters/driven/bootstrap/directory.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
+import { EnrolmentsRpc } from "../adapters/driven/do-rpc/enrolments.ts";
 import { InboxRpc } from "../adapters/driven/do-rpc/inbox.ts";
+import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { TokenIssuerJose } from "../adapters/driven/jose/token-issuer.ts";
 import { ClockLive, SystemLive } from "../adapters/driven/system.ts";
 import { makeApp } from "../adapters/driving/http/app.ts";
@@ -26,10 +36,17 @@ export function isolateLayer(
     env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`));
   const change = (changeId: ChangeId) =>
     env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`));
+  const project = (projectId: ProjectId) =>
+    env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`));
+  const directory = AgentDirectoryWithBootstrap(env.KEEL_BOOTSTRAP_SECRET).pipe(
+    Layer.provide(AgentDirectoryD1(env.DB)),
+  );
   return Layer.mergeAll(
     overrides.changes ?? ChangesRpc({ change, agentSession }),
     overrides.inbox ?? InboxRpc(agentSession),
-    AgentDirectoryD1(env.DB),
+    overrides.projects ?? ProjectsRpc(project),
+    (overrides.enrolments ?? EnrolmentsRpc(agentSession)).pipe(Layer.provide(directory)),
+    directory,
     TokenIssuerJose({ privateJwk: env.KEEL_SIGNING_KEY, issuer: env.KEEL_HOST }).pipe(
       Layer.provide(ClockLive),
     ),
@@ -41,6 +58,9 @@ export function isolateLayer(
 export interface IsolateOverrides {
   readonly changes?: Layer.Layer<Changes>;
   readonly inbox?: Layer.Layer<Inbox>;
+  readonly projects?: Layer.Layer<Projects>;
+  /** May need the AgentDirectory, as the in-memory enrolments project into it. */
+  readonly enrolments?: Layer.Layer<Enrolments, never, AgentDirectory>;
 }
 
 export type IsolateRuntime = ManagedRuntime.ManagedRuntime<IsolateServices, never>;

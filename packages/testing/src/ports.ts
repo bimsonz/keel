@@ -11,6 +11,7 @@ import {
 } from "./contracts/index.ts";
 import { describeChangesContract, type ChangesHarness } from "./contracts/changes.ts";
 import { describeCodeHostContract } from "./contracts/code-host.ts";
+import { describeEnrolmentsContract, type EnrolmentsHarness } from "./contracts/enrolments.ts";
 import { describeInboxContract, type InboxHarness } from "./contracts/inbox.ts";
 import { describeWorkspacePoolContract, type StockedPool } from "./contracts/workspace-pool.ts";
 import {
@@ -21,16 +22,25 @@ import {
   describeVerifierRuntimeContract,
   freshId,
 } from "./contracts/verification.ts";
+import { describeProjectsContract, type ProjectsHarness } from "./contracts/projects.ts";
 import * as codeHost from "./memory/code-host.ts";
 import * as coordination from "./memory/coordination.ts";
 import * as delivery from "./memory/delivery.ts";
 import * as outbox from "./memory/event-outbox.ts";
 import * as identity from "./memory/identity.ts";
 import * as integration from "./memory/integration.ts";
+import * as operator from "./memory/operator.ts";
 import * as storage from "./memory/storage.ts";
 import * as verification from "./memory/verification.ts";
 import { CommitSha } from "@keeltown/core/kernel";
-import type { BatchVerdicts, Changes, Inbox } from "@keeltown/core/ports";
+import type {
+  AgentDirectory,
+  BatchVerdicts,
+  Changes,
+  Enrolments,
+  Inbox,
+  Projects,
+} from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 
 /**
@@ -121,6 +131,23 @@ function memoryBatchVerdictsHarness(): BatchVerdictsHarness {
   return { layer: lane.layer, laneId: "lane:prj:default", fence, candidateId };
 }
 
+/** The in-memory Projects can fork from one source repo, which the suite names. */
+function memoryProjectsHarness(): ProjectsHarness {
+  const source = "fixture-source";
+  return { layer: operator.makeProjectsMemory({ sources: [source] }).layer, source };
+}
+
+/** In-memory Enrolments project into an in-memory AgentDirectory, which the suite reads. */
+function memoryEnrolmentsHarness(): EnrolmentsHarness {
+  const directory = identity.makeAgentDirectoryMemory().layer;
+  return {
+    layer: Layer.merge(
+      operator.makeEnrolmentsMemory().layer.pipe(Layer.provide(directory)),
+      directory,
+    ),
+  };
+}
+
 const GENESIS = Schema.decodeUnknownSync(CommitSha)("0".repeat(40));
 
 export const PORTS = {
@@ -148,6 +175,11 @@ export const PORTS = {
   Notifier: port(() => coordination.makeNotifierMemory().layer, pending("Notifier", ["notify"])),
   Changes: harnessed<Changes, ChangesHarness>(memoryChangesHarness, describeChangesContract),
   Inbox: harnessed<Inbox, InboxHarness>(memoryInboxHarness, describeInboxContract),
+  Projects: harnessed<Projects, ProjectsHarness>(memoryProjectsHarness, describeProjectsContract),
+  Enrolments: harnessed<Enrolments | AgentDirectory, EnrolmentsHarness>(
+    memoryEnrolmentsHarness,
+    describeEnrolmentsContract,
+  ),
   EntityStore: port(() => storage.makeEntityStoreMemory().layer, describeEntityStoreContract),
   EventOutbox: eventOutbox,
   EventLog: port(() => storage.makeEventLogMemory().layer, pending("EventLog", ["publish"])),

@@ -2,8 +2,10 @@ import {
   makeAgentDirectoryMemory,
   makeChangesMemory,
   makeClockMemory,
+  makeEnrolmentsMemory,
   makeInboxMemory,
   makeIdsMemory,
+  makeProjectsMemory,
   makeTokenIssuerMemory,
 } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime } from "effect";
@@ -11,9 +13,12 @@ import { afterAll, describe, expect, it } from "vitest";
 import { makeRunner } from "../../src/adapters/driving/http/run.ts";
 
 const clock = makeClockMemory().layer;
+const directory = makeAgentDirectoryMemory().layer;
 const runtime = ManagedRuntime.make(
   Layer.mergeAll(
-    makeAgentDirectoryMemory().layer,
+    directory,
+    makeProjectsMemory().layer,
+    makeEnrolmentsMemory().layer.pipe(Layer.provide(directory)),
     makeTokenIssuerMemory().layer.pipe(Layer.provide(clock)),
     clock,
     makeIdsMemory().layer,

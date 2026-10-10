@@ -168,11 +168,16 @@ async function signingKey(): Promise<string> {
 }
 
 /**
- * The value of every secret the config requires. CLOUDFLARE_ACCOUNT_ID is set
- * on every deploy; KEEL_SIGNING_KEY only when the Worker lacks one, because a
- * new key invalidates every token already issued.
+ * The value of every secret the config requires. CLOUDFLARE_ACCOUNT_ID and
+ * KEEL_BOOTSTRAP_SECRET (Terraform's output, so replacing it there rotates it
+ * here) are set on every deploy; KEEL_SIGNING_KEY only when the Worker lacks
+ * one, because a new key invalidates every token already issued.
  */
-async function secretsFor(name: string, config: Json): Promise<Record<string, string>> {
+async function secretsFor(
+  name: string,
+  config: Json,
+  outputs: ReadonlyMap<string, string>,
+): Promise<Record<string, string>> {
   const secrets = isObject(config["secrets"]) ? config["secrets"]["required"] : undefined;
   const required = Array.isArray(secrets)
     ? secrets.filter((s): s is string => typeof s === "string")
@@ -189,6 +194,8 @@ async function secretsFor(name: string, config: Json): Promise<Record<string, st
   for (const secret of required) {
     if (secret === "CLOUDFLARE_ACCOUNT_ID") {
       values[secret] = accountId();
+    } else if (secret === "KEEL_BOOTSTRAP_SECRET") {
+      values[secret] = requireOutput(outputs, "bootstrap_secret", secret);
     } else if (secret === "KEEL_SIGNING_KEY") {
       if (existing.has(secret)) {
         console.log(`${name}: KEEL_SIGNING_KEY kept`);
@@ -257,7 +264,7 @@ try {
         stream: true,
       });
     }
-    const secrets = await secretsFor(app.name, app.config);
+    const secrets = await secretsFor(app.name, app.config, outputs);
     const containers = objectsAt(app.config, "containers").length > 0;
     console.log(
       `\n== ${app.name}: deploying${containers ? " (building its container image)" : ""}`,

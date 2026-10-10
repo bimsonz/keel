@@ -1,16 +1,25 @@
 import {
+  createProject,
   declareChange,
   readInbox,
   submissionOf,
   submitChange,
 } from "@keeltown/core/application/coordination";
-import { exchangeToken, whoami } from "@keeltown/core/application/identity";
-import { Scope } from "@keeltown/core/domain/identity";
+import { enrolAgent, exchangeToken, whoami } from "@keeltown/core/application/identity";
+import { isBootstrap, Scope } from "@keeltown/core/domain/identity";
 import { Clock } from "@keeltown/core/ports";
 import { Effect, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
 import type { Caller, Principal } from "./caller.ts";
 import { tokenError, tokenOk, whoamiError, whoamiOk } from "./mappers.ts";
+import {
+  bootstrapConfined,
+  createProjectError,
+  createProjectOk,
+  enrolAgentError,
+  enrolAgentOk,
+  enrolInput,
+} from "./operator.ts";
 import { notImplemented } from "./problems.ts";
 import type { Runner } from "./run.ts";
 import {
@@ -40,13 +49,42 @@ function principalOf(caller: Caller): Effect.Effect<Principal> {
 
 const decodeScopes = Schema.decodeUnknownOption(Schema.Array(Scope));
 
+/** What the bootstrap credential may call: enrolment, and the anonymous token exchange. */
+export const BOOTSTRAP_MAY_CALL: ReadonlySet<string> = new Set([
+  "Auth_exchangeToken",
+  "Operator_enrolAgent",
+]);
+
+/**
+ * Least privilege for the bootstrap credential: every operation but those it
+ * may call answers 403 with a next action, before its handler runs. One check
+ * at the handler object covers REST and MCP alike.
+ */
+function confineBootstrap<H extends Operations<Caller>>(handlers: H): H {
+  return new Proxy(handlers, {
+    get(target, operation, receiver) {
+      const handler: unknown = Reflect.get(target, operation, receiver);
+      if (
+        typeof operation !== "string" ||
+        typeof handler !== "function" ||
+        BOOTSTRAP_MAY_CALL.has(operation)
+      )
+        return handler;
+      return (caller: Caller, ...rest: readonly unknown[]) =>
+        isBootstrap(caller.principal)
+          ? bootstrapConfined(caller.requestId)
+          : Reflect.apply(handler, target, [caller, ...rest]);
+    },
+  });
+}
+
 /**
  * The one handler object. The generated Hono routes and the generated MCP tools
  * both dispatch into it, so a REST call and a tool call run the same code.
  * Lanes replace a `notYet` with a real handler as they implement each operation.
  */
 export function makeHandlers(run: Runner) {
-  return {
+  return confineBootstrap({
     Auth_exchangeToken: (
       caller: Caller,
       input: {
@@ -157,13 +195,42 @@ export function makeHandlers(run: Runner) {
     Views_listLanes: notYet,
     Views_getTrunk: notYet,
     Operator_listProjects: notYet,
-    Operator_createProject: notYet,
+    Operator_createProject: (caller: Caller, input: Input<"Operator_createProject">) =>
+      run(
+        caller,
+        principalOf(caller).pipe(
+          Effect.flatMap((principal) =>
+            createProject(principal, {
+              name: input.name,
+              source: input.source,
+              idempotencyKey: input["idempotency-key"],
+            }),
+          ),
+          Effect.match({
+            onSuccess: createProjectOk,
+            onFailure: (error) => createProjectError(caller, error),
+          }),
+        ),
+      ),
     Operator_getSettings: notYet,
     Operator_putSettings: notYet,
-    Operator_enrolAgent: notYet,
+    Operator_enrolAgent: (caller: Caller, input: Input<"Operator_enrolAgent">) => {
+      const decoded = enrolInput(input);
+      if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+      return run(
+        caller,
+        principalOf(caller).pipe(
+          Effect.flatMap((principal) => enrolAgent(principal, decoded.success)),
+          Effect.match({
+            onSuccess: enrolAgentOk,
+            onFailure: (error) => enrolAgentError(caller, error),
+          }),
+        ),
+      );
+    },
     Operator_listEscalations: notYet,
     Operator_giveRuling: notYet,
-  } satisfies Operations<Caller>;
+  } satisfies Operations<Caller>);
 }
 
 export type Handlers = ReturnType<typeof makeHandlers>;

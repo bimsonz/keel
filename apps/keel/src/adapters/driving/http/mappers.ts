@@ -1,4 +1,5 @@
 import type {
+  Agent,
   AgentNotAdmitted,
   AgentNotKnown,
   CredentialRejected,
@@ -21,6 +22,19 @@ function iso(ms: number): string {
   return new Date(ms).toISOString();
 }
 
+/** An agent as the API publishes it (`AgentProfile`). */
+export function agentProfile(agent: Agent) {
+  return {
+    id: agent.id,
+    projectId: agent.projectId,
+    name: agent.name,
+    kind: agent.kind,
+    scopes: [...agent.scopes],
+    revocationEpoch: agent.revocationEpoch,
+    createdAt: iso(agent.createdAt),
+  };
+}
+
 export function whoamiOk(identity: Identity): WhoamiResult {
   const { agent } = identity;
   return {
@@ -29,15 +43,7 @@ export function whoamiOk(identity: Identity): WhoamiResult {
       ok: true,
       summary: `You are ${agent.name} (${agent.id}), holding ${agent.scopes.join(", ")}.`,
       result: {
-        agent: {
-          id: agent.id,
-          projectId: agent.projectId,
-          name: agent.name,
-          kind: agent.kind,
-          scopes: [...agent.scopes],
-          revocationEpoch: agent.revocationEpoch,
-          createdAt: iso(agent.createdAt),
-        },
+        agent: agentProfile(agent),
         session: identity.session === null ? null : { id: identity.session.id },
       },
       findings: [],

@@ -10,3 +10,8 @@ output "secrets_store_id" {
 output "deploy_token_secret_name" {
   value = cloudflare_secrets_store_secret.deploy_token.name
 }
+
+output "bootstrap_secret" {
+  value     = random_password.bootstrap.result
+  sensitive = true
+}
