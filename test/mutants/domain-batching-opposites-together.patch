@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/integration.test.ts
+# kills: batching.no-opposite-effects
+# why: Opposite effects on one subject share a batch
+diff --git a/packages/core/src/domain/integration/batching.ts b/packages/core/src/domain/integration/batching.ts
+index 34bf38c..ca4782e 100644
+--- a/packages/core/src/domain/integration/batching.ts
++++ b/packages/core/src/domain/integration/batching.ts
+@@ -39,7 +39,7 @@ export const planBatches = (
+       !change.risky &&
+       !alone.has(i) &&
+       batch.length < n &&
+-      batch.every((m) => !suspected(openSuspected, m.id, change.id) && !oppositeEffects(m, change));
++      batch.every((m) => !suspected(openSuspected, m.id, change.id));
+     const slot = batches.findIndex(fits);
+     if (slot !== -1) batches[slot]?.push(change);
+     else if (batches.length < maxDepth) {

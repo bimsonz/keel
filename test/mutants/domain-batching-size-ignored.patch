@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/integration.test.ts
+# kills: batching.bounded
+# why: Batches grow past N
+diff --git a/packages/core/src/domain/integration/batching.ts b/packages/core/src/domain/integration/batching.ts
+index 34bf38c..23ccf35 100644
+--- a/packages/core/src/domain/integration/batching.ts
++++ b/packages/core/src/domain/integration/batching.ts
+@@ -38,7 +38,6 @@ export const planBatches = (
+     const fits = (batch: readonly QueuedChange[], i: number): boolean =>
+       !change.risky &&
+       !alone.has(i) &&
+-      batch.length < n &&
+       batch.every((m) => !suspected(openSuspected, m.id, change.id) && !oppositeEffects(m, change));
+     const slot = batches.findIndex(fits);
+     if (slot !== -1) batches[slot]?.push(change);

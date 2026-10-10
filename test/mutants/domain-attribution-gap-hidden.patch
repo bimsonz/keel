@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/integration.test.ts
+# kills: attribution.graph-gap-suspects-all
+# why: An unmapped failure blames no one and hides the missing edge
+diff --git a/packages/core/src/domain/integration/attribution.ts b/packages/core/src/domain/integration/attribution.ts
+index b6511e3..5345edf 100644
+--- a/packages/core/src/domain/integration/attribution.ts
++++ b/packages/core/src/domain/integration/attribution.ts
+@@ -19,7 +19,7 @@ export type Attribution = {
+  */
+ export const attribute = (failingCheck: string, members: readonly BatchMember[]): Attribution => {
+   const touching = members.filter((m) => m.affected.includes(failingCheck));
+-  const graphGap = touching.length === 0;
++  const graphGap = false;
+   const suspects = (graphGap ? members : touching).map((m) => m.id);
+   const [only] = suspects;
+   const next: Attribution["next"] =

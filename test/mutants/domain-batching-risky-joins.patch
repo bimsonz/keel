@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/integration.test.ts
+# kills: batching.risky-alone
+# why: A risky change joins other changes
+diff --git a/packages/core/src/domain/integration/batching.ts b/packages/core/src/domain/integration/batching.ts
+index 34bf38c..b1c38c3 100644
+--- a/packages/core/src/domain/integration/batching.ts
++++ b/packages/core/src/domain/integration/batching.ts
+@@ -36,7 +36,6 @@ export const planBatches = (
+   const alone = new Set<number>();
+   for (const change of queue) {
+     const fits = (batch: readonly QueuedChange[], i: number): boolean =>
+-      !change.risky &&
+       !alone.has(i) &&
+       batch.length < n &&
+       batch.every((m) => !suspected(openSuspected, m.id, change.id) && !oppositeEffects(m, change));

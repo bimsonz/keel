@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/integration.test.ts
+# kills: batching.head-first-and-greedy
+# why: Every change gets its own batch, starving the queue
+diff --git a/packages/core/src/domain/integration/batching.ts b/packages/core/src/domain/integration/batching.ts
+index 34bf38c..ea47592 100644
+--- a/packages/core/src/domain/integration/batching.ts
++++ b/packages/core/src/domain/integration/batching.ts
+@@ -40,7 +40,7 @@ export const planBatches = (
+       !alone.has(i) &&
+       batch.length < n &&
+       batch.every((m) => !suspected(openSuspected, m.id, change.id) && !oppositeEffects(m, change));
+-    const slot = batches.findIndex(fits);
++    const slot = -1;
+     if (slot !== -1) batches[slot]?.push(change);
+     else if (batches.length < maxDepth) {
+       if (change.risky) alone.add(batches.length);

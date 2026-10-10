@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/integration.test.ts
+# kills: commutation.wait-for-predecessors, commutation.each-condition-blocks
+# why: A batch lands before its speculative predecessors
+diff --git a/packages/core/src/domain/integration/commutation.ts b/packages/core/src/domain/integration/commutation.ts
+index f6d64c3..20ad035 100644
+--- a/packages/core/src/domain/integration/commutation.ts
++++ b/packages/core/src/domain/integration/commutation.ts
+@@ -107,7 +107,6 @@ export const proofIdOf = (input: CommutationInput): ContentHash =>
+  */
+ export const commutation = (input: CommutationInput): Commutation => {
+   const unpromoted = input.batch.predecessors.filter((c) => !input.promoted.includes(c));
+-  if (unpromoted.length > 0) return { _tag: "wait", unpromoted: sorted(unpromoted) };
+ 
+   const b = input.batch.touched;
+   const d = input.intervening;

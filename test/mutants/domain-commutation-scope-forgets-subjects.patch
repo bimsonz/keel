@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/integration.test.ts
+# kills: commutation.reverify-scope-covers-the-meeting
+# why: A subject link is reported but nothing anchored to it is re-run
+diff --git a/packages/core/src/domain/integration/commutation.ts b/packages/core/src/domain/integration/commutation.ts
+index f6d64c3..ec5204d 100644
+--- a/packages/core/src/domain/integration/commutation.ts
++++ b/packages/core/src/domain/integration/commutation.ts
+@@ -131,7 +131,7 @@ export const commutation = (input: CommutationInput): Commutation => {
+     scope: {
+       _tag: "where-they-meet",
+       affected: sorted([...bd.affected, ...pairs.flatMap((p) => p.affected)]),
+-      subjects: sorted([...bd.subjects, ...pairs.flatMap((p) => p.subjects)]),
++      subjects: [],
+     },
+   };
+ };

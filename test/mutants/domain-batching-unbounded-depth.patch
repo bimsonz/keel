@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/integration.test.ts
+# kills: batching.bounded
+# why: Speculation runs unboundedly deep
+diff --git a/packages/core/src/domain/integration/batching.ts b/packages/core/src/domain/integration/batching.ts
+index 34bf38c..8201e3d 100644
+--- a/packages/core/src/domain/integration/batching.ts
++++ b/packages/core/src/domain/integration/batching.ts
+@@ -42,7 +42,7 @@ export const planBatches = (
+       batch.every((m) => !suspected(openSuspected, m.id, change.id) && !oppositeEffects(m, change));
+     const slot = batches.findIndex(fits);
+     if (slot !== -1) batches[slot]?.push(change);
+-    else if (batches.length < maxDepth) {
++    else {
+       if (change.risky) alone.add(batches.length);
+       batches.push([change]);
+     }

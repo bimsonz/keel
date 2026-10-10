@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/integration.test.ts
+# kills: commutation.proof-id-deterministic
+# why: One proof would cover promotion onto any head
+diff --git a/packages/core/src/domain/integration/commutation.ts b/packages/core/src/domain/integration/commutation.ts
+index f6d64c3..1675a07 100644
+--- a/packages/core/src/domain/integration/commutation.ts
++++ b/packages/core/src/domain/integration/commutation.ts
+@@ -82,7 +82,6 @@ export const proofIdOf = (input: CommutationInput): ContentHash =>
+     rule: "commutation/1",
+     batch: { id: input.batch.id, base: input.batch.base, predecessors: sorted(input.batch.predecessors), touched: canonicalFootprints(input.batch.touched) },
+     intervening: canonicalFootprints(input.intervening),
+-    head: input.head,
+     promoted: sorted(input.promoted.filter((c) => input.batch.predecessors.includes(c))),
+     mergeTreeClean: input.mergeTreeClean,
+     barriers: sorted(input.barriers),

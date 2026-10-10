@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/integration.test.ts
+# kills: commutation.proof-id-deterministic
+# why: Proof-Id changes with input order
+diff --git a/packages/core/src/domain/integration/commutation.ts b/packages/core/src/domain/integration/commutation.ts
+index f6d64c3..e41619a 100644
+--- a/packages/core/src/domain/integration/commutation.ts
++++ b/packages/core/src/domain/integration/commutation.ts
+@@ -80,7 +80,7 @@ const canonicalFootprints = (f: Footprints) => ({
+ export const proofIdOf = (input: CommutationInput): ContentHash =>
+   contentHashOf({
+     rule: "commutation/1",
+-    batch: { id: input.batch.id, base: input.batch.base, predecessors: sorted(input.batch.predecessors), touched: canonicalFootprints(input.batch.touched) },
++    batch: { id: input.batch.id, base: input.batch.base, predecessors: input.batch.predecessors, touched: canonicalFootprints(input.batch.touched) },
+     intervening: canonicalFootprints(input.intervening),
+     head: input.head,
+     promoted: sorted(input.promoted.filter((c) => input.batch.predecessors.includes(c))),

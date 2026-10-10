@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/integration.test.ts
+# kills: commutation.sound, commutation.each-condition-blocks
+# why: An unclean merge-tree still commutes
+diff --git a/packages/core/src/domain/integration/commutation.ts b/packages/core/src/domain/integration/commutation.ts
+index f6d64c3..30d8388 100644
+--- a/packages/core/src/domain/integration/commutation.ts
++++ b/packages/core/src/domain/integration/commutation.ts
+@@ -117,7 +117,7 @@ export const commutation = (input: CommutationInput): Commutation => {
+   const barrierTouched = [...b.paths, ...d.paths].some((p) => input.barriers.some((g) => matchesGlob(g, p)));
+ 
+   const failed: CommutationCondition[] = [];
+-  if (bd.paths.length > 0 || !input.mergeTreeClean) failed.push("C2");
++  if (bd.paths.length > 0) failed.push("C2");
+   if (bd.affected.length > 0) failed.push("C3");
+   if (bd.subjects.length > 0) failed.push("C4");
+   if (barrierTouched) failed.push("C5");
