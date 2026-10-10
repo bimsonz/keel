@@ -1,0 +1,37 @@
+## fork refs right after the fork
+953da79edb2d	HEAD
+4b006007923a	refs/heads/agent/shallow
+3eaa2b901b34	refs/heads/agent/shallow-33811
+ab0cd48aead3	refs/heads/agent/shallow-91812
+953da79edb2d	refs/heads/main
+src non-default branch tip (not copied by a default-branch-only fork): 4b006007923a
+
+## push F1, F2 (F2 on F1) to fork main; F3 to a temp branch, then delete the branch
+F1=9f481acb38f8 F2=4a1711e9bd1f F3=2c8354800962
+fork refs now:
+4a1711e9bd1f	HEAD
+4b006007923a	refs/heads/agent/shallow
+3eaa2b901b34	refs/heads/agent/shallow-33811
+ab0cd48aead3	refs/heads/agent/shallow-91812
+4a1711e9bd1f	refs/heads/main
+
+## push S1 to src main after the fork (exists only in src)
+S1=8d8b772287c7
+
+## fetch by SHA from the fork into a fresh empty repo
+advertised-tip-F2 (4a1711e9bd1f)   v2 exit=0   object-present=yes 
+reachable-non-tip-F1 (9f481acb38f8) v2 exit=0   object-present=yes 
+unreachable-F3 (2c8354800962)      v2 exit=0   object-present=yes 
+source-only-S1 (8d8b772287c7)      v2 exit=128 object-present=no  error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500 fatal: expected 'packfile' 
+src-branch-not-forked (4b006007923a) v2 exit=0   object-present=yes 
+nonexistent (3e31944ec8e1)         v2 exit=128 object-present=no  error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500 fatal: expected 'packfile' 
+advertised-tip-F2 (4a1711e9bd1f)   v0 exit=0   object-present=yes 
+reachable-non-tip-F1 (9f481acb38f8) v0 exit=0   object-present=yes 
+unreachable-F3 (2c8354800962)      v0 exit=0   object-present=yes 
+source-only-S1 (8d8b772287c7)      v0 exit=128 object-present=no  error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500 fatal: the remote end hung up unexpectedly 
+src-branch-not-forked (4b006007923a) v0 exit=0   object-present=yes 
+nonexistent (3e31944ec8e1)         v0 exit=128 object-present=no  error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500 fatal: the remote end hung up unexpectedly 
+
+## the realistic flow: a full clone of src fetches the agent's tip from the fork by SHA
+into-src-clone-F2 (4a1711e9bd1f)   v2 exit=0   object-present=yes 
+  ms=431 parent-chain-ok=yes

@@ -1,0 +1,9 @@
+main~2 new-objects=49.0MiB exit=0 ms=2748  * [new branch] 6ef99a1031761fcdb9b10ea5a2edf2cb5b9caac7 -> main 
+main~1 new-objects=49.0MiB exit=0 ms=2813  6ef99a1..20b6b33 20b6b33e86626c13d03916786a7c3aca7e55579f -> main 
+main new-objects=47.0MiB exit=0 ms=2408  20b6b33..a43feb3 a43feb3426bb95b9968e96c64f87efabe0b0a6b9 -> main 
+remote main: a43feb3426bb local: a43feb3426bb
+
+clone back exit=0 ms=3216
+fsck --full: ok
+head=a43feb3426bb commits=3 pack=145.07 MiB
+Deleted Artifacts repo "big" from namespace "keel-spike-03".

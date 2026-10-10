@@ -1,0 +1,7 @@
+{
+  "name": "keel-spike-03-forker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "artifacts": [{ "binding": "ARTIFACTS", "namespace": "keel-spike-03" }]
+}

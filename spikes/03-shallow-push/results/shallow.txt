@@ -1,0 +1,44 @@
+## 1. shallow clone of src
+clone exit=0 ms=878
+is-shallow=true commits-local=1 boundary=953da79edb2d
+new commit=ab0cd48aead3 parent=953da79edb2d
+
+## 2. push the shallow clone to the EMPTY repo shallow-dst
+To https://<acct>.artifacts.cloudflare.net/git/keel-spike-03/shallow-dst.git
+ * [new branch]      HEAD -> main
+push exit=0 ms=673
+shallow lines sent: > shallow 953da79edb2d 
+dst refs: ab0cd48aead3	HEAD ab0cd48aead3	refs/heads/main 
+
+## 3. does shallow-dst serve a valid clone?
+  clone: 
+  shallow=true commits=2
+  fsck: 
+  server-recorded shallow boundary: 953da79edb2d 
+  unshallow: 
+  after --unshallow: exit=0 shallow=true commits=2
+VERIFY FAIL [dst] plain clone is shallow: history truncated at the boundary
+-- shallow clone of dst (depth 1)
+
+depth-1 clone exit=0 fsck-ok
+-- into a fresh repo, fetch by SHA from dst: the shallow root itself, then its parent (absent on dst)
+warning: rejected 953da79edb2d8c853d1619e2c5cfe0f787677c9b because shallow roots are not allowed to be updated
+fetch boundary 953da79edb2d exit=0 object-present=yes
+warning: rejected ab0cd48aead3b5f3d4433444c4a81ac02e1798d5 because shallow roots are not allowed to be updated
+fetch tip ab0cd48aead3 exit=0 object-present=yes shallow=false
+From https://<acct>.artifacts.cloudflare.net/git/keel-spike-03/shallow-dst
+ * branch            ab0cd48aead3b5f3d4433444c4a81ac02e1798d5 -> FETCH_HEAD
+fetch tip with --update-shallow exit=0 object-present=yes shallow=true
+error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500
+fatal: expected 'packfile'
+fetch boundary's parent 92014fdc862c (not on dst) exit=128
+
+## 4. push the same shallow clone back to src (which holds the history) as agent/shallow-<pid>
+To https://<acct>.artifacts.cloudflare.net/git/keel-spike-03/src.git
+ * [new branch]      HEAD -> agent/shallow-91812
+push exit=0 ms=427
+  clone: 
+  shallow=false commits=53
+  fsck: 
+  root commits: 1
+VERIFY OK   [src]

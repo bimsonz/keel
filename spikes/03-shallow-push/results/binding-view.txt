@@ -1,0 +1,15 @@
+$ scripts/call.sh "/log?name=shallow-dst&limit=50"
+200 0.292660
+[{"hash": "ab0cd48aead3", "parents": ["953da79edb2d"], "message": "agent commit on shallow clone"}, {"hash": "953da79edb2d", "parents": ["92014fdc862c"], "message": "seed 50"}]
+$ scripts/call.sh "/commit?name=shallow-dst&hash=<boundary parent 92014fdc862c...>"
+200 0.225888
+null
+$ scripts/call.sh "/info?name=src"   # lastPushAt after several pushes
+200 0.577466
+ "updatedAt": "2026-10-10T18:56:55.496Z",
+ "lastPushAt": null,
+$ scripts/call.sh "/info?name=fork1"
+200 0.199081
+ "updatedAt": "2026-10-10T19:11:43.224Z",
+ "lastPushAt": null,
+ "source": "artifacts:keel-spike-03/src",

@@ -1,0 +1,18 @@
+200 3.463749
+{
+ "forkMs": 3385,
+ "readyAfterMs": 23,
+ "polls": 1,
+ "info": {
+  "id": "l3ifkyeimlo3gzrv",
+  "name": "fork1",
+  "description": null,
+  "defaultBranch": "main",
+  "createdAt": "2026-10-10T19:11:40.695Z",
+  "updatedAt": "2026-10-10T19:11:43.224Z",
+  "lastPushAt": null,
+  "source": "artifacts:keel-spike-03/src",
+  "readOnly": false,
+  "remote": "https://<acct>.artifacts.cloudflare.net/git/keel-spike-03/fork1.git"
+ }
+}

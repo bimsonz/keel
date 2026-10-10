@@ -1,0 +1,8 @@
+generated: files=67MB .git=66MB objects=82 head=15abaaa5c4b560f5194d9123f587cabfc3cc5a14
+pack on disk: 64.03 MiB
+Writing objects: 100% (82/82), 64.03 MiB | 70.73 MiB/s, done.
+error: remote unpack failed: receive-pack request exceeds maximum size
+ ! [remote rejected] main -> main (receive-pack request exceeds maximum size)
+error: failed to push some refs to 'https://<acct>.artifacts.cloudflare.net/git/keel-spike-03/big.git'
+push exit=1 ms=4546
+remote main:  local: 15abaaa5c4b5
