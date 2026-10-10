@@ -9,7 +9,7 @@ import {
   flushOutbox,
   type Transaction,
 } from "@keeltown/core/ports";
-import { Effect } from "effect";
+import { Effect, Layer } from "effect";
 import {
   type DurableObjectRuntime,
   type DurableObjectServices,
@@ -50,14 +50,15 @@ export interface Reaction {
  * - Override `onDeadline` for the object's own alarms, armed with `scheduleAlarm`.
  * - A method that long-polls waits on `waiters`, which every answer and alarm wakes.
  */
-export abstract class KeelObject extends DurableObject<Env> implements EventReceiverRpc {
-  protected readonly runtime: DurableObjectRuntime;
+export abstract class KeelObjectWith<R> extends DurableObject<Env> implements EventReceiverRpc {
+  protected readonly runtime: DurableObjectRuntime<R>;
   protected readonly waiters = new Waiters();
   private readonly fanOut: FanOut;
 
-  constructor(ctx: DurableObjectState, env: Env) {
+  /** `driven` holds the adapters the object's own use-cases need beyond the backbone, built in composition. */
+  constructor(ctx: DurableObjectState, env: Env, driven: Layer.Layer<R>) {
     super(ctx, env);
-    const composed = durableObjectRuntime(ctx, env);
+    const composed = durableObjectRuntime(ctx, env, driven);
     this.runtime = composed.runtime;
     this.fanOut = composed.fanOut;
   }
@@ -65,7 +66,7 @@ export abstract class KeelObject extends DurableObject<Env> implements EventRece
   /** Runs one call's program, arms the flush for anything it committed, and answers with the Exit envelope. */
   protected async answer<A, E>(
     codec: ExitCodec<A, E>,
-    program: Effect.Effect<A, E, DurableObjectServices>,
+    program: Effect.Effect<A, E, DurableObjectServices | R>,
   ): Promise<ExitJson> {
     const exit = await this.runtime.runPromiseExit(program);
     this.waiters.wake();
@@ -158,5 +159,12 @@ export abstract class KeelObject extends DurableObject<Env> implements EventRece
         at: report.nextAttemptAt,
       });
     }
+  }
+}
+
+/** A Keel Durable Object whose use-cases need nothing beyond the backbone. */
+export abstract class KeelObject extends KeelObjectWith<never> {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env, Layer.empty);
   }
 }

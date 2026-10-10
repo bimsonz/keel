@@ -60,6 +60,43 @@ export const SubmitCommand = Schema.Struct({
 });
 export type SubmitCommand = typeof SubmitCommand.Type;
 
+/** Revise a change's intent under its lease. `ifMatchRevision` is the revision the caller last read (If-Match). */
+export const ReviseCommand = Schema.Struct({
+  agentId: AgentId,
+  leaseId: LeaseId,
+  ifMatchRevision: Schema.Int,
+  goal: Schema.optional(Schema.NonEmptyString),
+  footprint: Schema.optional(Schema.Array(FootprintEntry)),
+  premisesAdded: Schema.Array(Proposition),
+  premisesRetracted: Schema.Array(Proposition),
+  declaredEffects: Schema.optional(Schema.Array(Proposition)),
+  idempotencyKey: Schema.String,
+});
+export type ReviseCommand = typeof ReviseCommand.Type;
+
+/** Who may withdraw a change: the holder of its lease, or an operator (a parked change, say). */
+export const WithdrawAuthority = Schema.Union([
+  Schema.TaggedStruct("Lease", { leaseId: LeaseId }),
+  Schema.TaggedStruct("Operator", { by: Schema.String }),
+]);
+export type WithdrawAuthority = typeof WithdrawAuthority.Type;
+
+/** Withdraw a change. */
+export const AbandonCommand = Schema.Struct({
+  agentId: AgentId,
+  authority: WithdrawAuthority,
+  reason: Schema.optional(Schema.String),
+  idempotencyKey: Schema.String,
+});
+export type AbandonCommand = typeof AbandonCommand.Type;
+
+/** Adopt a change whose lease has lapsed: `agentId` takes a new lease, which fences the old token. */
+export const AdoptCommand = Schema.Struct({
+  agentId: AgentId,
+  idempotencyKey: Schema.String,
+});
+export type AdoptCommand = typeof AdoptCommand.Type;
+
 /** A change's submission as it stands: the change, and the commit last submitted for it. */
 export const SubmissionStatus = Schema.Struct({
   change: Change,
@@ -150,10 +187,10 @@ export const ChangeCodecs = {
 export interface ChangeRpc extends EventReceiverRpc {
   get(): Promise<ExitJson>;
   declare(command: typeof DeclareCommand.Encoded): Promise<ExitJson>;
-  revise(command: unknown): Promise<ExitJson>;
+  revise(command: typeof ReviseCommand.Encoded): Promise<ExitJson>;
   submit(command: typeof SubmitCommand.Encoded): Promise<ExitJson>;
-  abandon(command: unknown): Promise<ExitJson>;
-  adopt(command: unknown): Promise<ExitJson>;
+  abandon(command: typeof AbandonCommand.Encoded): Promise<ExitJson>;
+  adopt(command: typeof AdoptCommand.Encoded): Promise<ExitJson>;
   /**
    * The change once its submission state moves, or as it stands after
    * `waitMs` (0–30,000). An in-DO waiter with a setTimeout deadline; no polling.
