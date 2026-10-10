@@ -24,6 +24,8 @@ One hexagon (`packages/core`), entered through several **doorways**: HTTP, MCP, 
 - `domain/` is pure and synchronous. `application/` holds use-cases (`Effect.fn`) and **ports** (`Context.Service` shapes). Each bounded context exposes only its `index.ts`.
 - Driving adapters (doorways) and driven adapters (port implementations) meet only in `composition/`, the one place `env` becomes objects.
 - `src/rpc/` holds DO RPC contracts that both sides import; it imports nothing but `core` domain types and `effect`.
+- Import core by subpath: `@keeltown/core/kernel` (the shared kernel: ids, evidence classes, hashes, globs, citations, the event envelope), `@keeltown/core/domain/<context>`, `@keeltown/core/application/<context>`, `@keeltown/core/ports`. The kernel imports no context; every context may import it.
+- Every port has an in-memory adapter and a contract suite in `@keeltown/testing` (`PORTS`). A real adapter registers the same suite with `PORTS.<Port>.contract("d1", makeLayer)`; a contract still marked `todo` is still to be written.
 
 The architecture rules (R1–R15) and guards run in `pnpm test` (project `arch`). Each one reports how many files it read and checks a canary, so a rule aimed at the wrong path fails instead of passing on nothing. When a rule goes **red**, fix the code.
 

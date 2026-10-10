@@ -15,5 +15,10 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"
+  },
+  "dependencies": {
+    "@keeltown/core": "workspace:*",
+    "@keeltown/runner-protocol": "workspace:*",
+    "effect": "catalog:"
   }
 }

@@ -1,0 +1,26 @@
+import { Schema } from "effect";
+
+/** The kinds of entity a Durable Object owns (docs/domain/state-machines.md § Ownership). */
+export const EntityKind = Schema.Literals([
+  "agent",
+  "session",
+  "change",
+  "subject",
+  "sketch",
+  "workspace",
+  "conflict",
+  "probe",
+  "guard",
+  "verdict",
+  "batch",
+  "candidate",
+  "project",
+  "decision",
+  "tenet",
+  "escalation",
+  "deployment",
+]);
+export type EntityKind = typeof EntityKind.Type;
+
+export const EntityRef = Schema.Struct({ kind: EntityKind, id: Schema.String });
+export type EntityRef = typeof EntityRef.Type;

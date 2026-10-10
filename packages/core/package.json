@@ -6,12 +6,21 @@
   "type": "module",
   "license": "MIT",
   "exports": {
-    ".": "./src/index.ts"
+    "./kernel": "./src/domain/kernel/index.ts",
+    "./domain/*": "./src/domain/*/index.ts",
+    "./application/*": "./src/application/*/index.ts",
+    "./ports": "./src/application/ports/index.ts",
+    "./not-implemented": "./src/application/not-implemented.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p test/tsconfig.json"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "@types/node": "catalog:",
+    "vitest": "catalog:"
+  },
+  "dependencies": {
+    "effect": "catalog:"
   }
 }

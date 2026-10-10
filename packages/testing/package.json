@@ -13,5 +13,11 @@
   },
   "devDependencies": {
     "typescript": "catalog:"
+  },
+  "dependencies": {
+    "@effect/vitest": "catalog:",
+    "@keeltown/core": "workspace:*",
+    "effect": "catalog:",
+    "vitest": "catalog:"
   }
 }

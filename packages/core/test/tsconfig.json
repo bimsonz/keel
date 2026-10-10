@@ -1,0 +1,8 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    // Tests may read files; the hexagon's own source never sees Node.
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}

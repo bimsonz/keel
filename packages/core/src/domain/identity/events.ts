@@ -1,0 +1,16 @@
+import { Schema } from "effect";
+import { AgentId } from "../kernel/index.ts";
+import { AgentKind, Scope } from "./agent.ts";
+
+export const AgentEnrolled = Schema.TaggedStruct("AgentEnrolled", {
+  agentId: AgentId,
+  name: Schema.NonEmptyString,
+  kind: AgentKind,
+  scopes: Schema.Array(Scope),
+});
+export const AgentSuspended = Schema.TaggedStruct("AgentSuspended", { agentId: AgentId, reason: Schema.String, by: Schema.String });
+export const AgentReinstated = Schema.TaggedStruct("AgentReinstated", { agentId: AgentId, by: Schema.String });
+export const AgentRevoked = Schema.TaggedStruct("AgentRevoked", { agentId: AgentId, revocationEpoch: Schema.Int, by: Schema.String });
+
+export const IdentityEvent = Schema.Union([AgentEnrolled, AgentSuspended, AgentReinstated, AgentRevoked]);
+export type IdentityEvent = typeof IdentityEvent.Type;

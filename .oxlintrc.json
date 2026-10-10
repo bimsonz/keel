@@ -1,6 +1,12 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "import", "vitest", "promise"],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "import",
+    "vitest",
+    "promise"
+  ],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
@@ -17,7 +23,15 @@
     "typescript/consistent-type-imports": "error",
     "import/no-cycle": "error",
     "vitest/no-focused-tests": "error",
-    "no-console": "off"
+    "no-console": "off",
+    "no-underscore-dangle": [
+      "error",
+      {
+        "allow": [
+          "_tag"
+        ]
+      }
+    ]
   },
   "ignorePatterns": [
     "**/node_modules/**",
@@ -28,5 +42,15 @@
     "test/controls/**",
     "fixtures/**",
     "spikes/**"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "packages/testing/src/contracts/**"
+      ],
+      "rules": {
+        "vitest/warn-todo": "off"
+      }
+    }
   ]
 }

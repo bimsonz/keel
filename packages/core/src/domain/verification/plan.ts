@@ -1,0 +1,58 @@
+import { Schema } from "effect";
+import { ContentHash, EvidenceClass, Glob, TierChoice } from "../kernel/index.ts";
+
+export const StepKind = Schema.Literals(["deterministic", "decision-model", "generative", "probe", "human", "deploy"]);
+export type StepKind = typeof StepKind.Type;
+
+/** Every step can abstain; only proof and rulings may fail (ADR 0005). */
+export const StepOutcome = Schema.Literals(["pass", "fail", "escalate", "annotate", "abstain"]);
+export type StepOutcome = typeof StepOutcome.Type;
+
+/** A project's flow spec and plugin hashes, as read from the base commit. */
+export const FlowSpec = Schema.Struct({
+  source: Schema.String,
+  hash: ContentHash,
+  plugins: Schema.Array(ContentHash),
+});
+export type FlowSpec = typeof FlowSpec.Type;
+
+export const PlanStep = Schema.Struct({
+  id: Schema.NonEmptyString,
+  kind: StepKind,
+  evidenceCeiling: EvidenceClass,
+  appliesTo: Schema.Array(Glob),
+  tier: TierChoice,
+  /** Why this step exists for this change: the premise, effect or rule that put it here. */
+  because: Schema.String,
+});
+export type PlanStep = typeof PlanStep.Type;
+
+/** The throwaway pipeline compiled for one change. Content-addressed by `planHash`. */
+export const VerificationPlan = Schema.Struct({
+  planHash: ContentHash,
+  steps: Schema.Array(PlanStep),
+  costEstimate: Schema.Number,
+});
+export type VerificationPlan = typeof VerificationPlan.Type;
+
+/** One unit of execution handed to a verifier: a bundle and the steps to run on it. */
+export const VerificationJob = Schema.Struct({
+  jobId: Schema.NonEmptyString,
+  bundle: ContentHash,
+  steps: Schema.Array(PlanStep),
+  fence: Schema.Struct({ batchId: Schema.String, attempt: Schema.Int, chainEpoch: Schema.Int }),
+});
+export type VerificationJob = typeof VerificationJob.Type;
+
+export const StepResult = Schema.Struct({
+  stepId: Schema.NonEmptyString,
+  outcome: StepOutcome,
+  evidenceClass: EvidenceClass,
+  tier: TierChoice,
+  durationMs: Schema.Number,
+  resultRef: Schema.optional(Schema.String),
+});
+export type StepResult = typeof StepResult.Type;
+
+export const VerdictOutcome = Schema.Literals(["land", "bounce", "park", "hold", "supersede"]);
+export type VerdictOutcome = typeof VerdictOutcome.Type;

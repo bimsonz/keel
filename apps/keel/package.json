@@ -25,6 +25,7 @@
     "@keeltown/core": "workspace:*",
     "@modelcontextprotocol/server": "catalog:",
     "hono": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "effect": "catalog:"
   }
 }
