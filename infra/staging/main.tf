@@ -10,6 +10,8 @@ locals {
 resource "cloudflare_d1_database" "keel" {
   account_id = var.account_id
   name       = local.prefix
+  # The API reports this explicitly; left unset, every plan would try to clear it.
+  read_replication = { mode = "disabled" }
 }
 
 # Background jobs: mirror sync, notes, fork cleanup, embeddings, webhooks.
@@ -34,6 +36,25 @@ resource "cloudflare_r2_bucket" "archive" {
 resource "cloudflare_r2_bucket" "sandbox_backups" {
   account_id = var.account_id
   name       = "${local.prefix}-sandbox-backups"
+}
+
+# @cloudflare/ci backs a sandbox up after every run that exits 0, and a verify
+# run exits 0 whatever its verdict, so backups pile up without this. A day
+# covers a retry; nothing restores from an older one.
+resource "cloudflare_r2_bucket_lifecycle" "sandbox_backups" {
+  account_id  = var.account_id
+  bucket_name = cloudflare_r2_bucket.sandbox_backups.name
+  rules = [{
+    id         = "expire-after-1-day"
+    enabled    = true
+    conditions = { prefix = "" }
+    delete_objects_transition = {
+      condition = { type = "Age", max_age = 86400 }
+    }
+    abort_multipart_uploads_transition = {
+      condition = { type = "Age", max_age = 86400 }
+    }
+  }]
 }
 
 # The account's Secrets Store (one per account), which holds per-Worker deploy tokens.
