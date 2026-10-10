@@ -11,7 +11,8 @@ export default defineProject({
   test: {
     name: "pool:keel-verify",
     include: ["test/pool/**/*.test.ts"],
-    // The first test in a pool pays workerd's cold module load (the sandbox SDK alone is ~3.5 s).
-    testTimeout: 30_000,
+    // The first test in a pool pays workerd's cold module load (the sandbox SDK alone is ~3.5 s),
+    // which reached 28–30 s on a loaded machine (10 Oct, load average ~400).
+    testTimeout: 60_000,
   },
 });
