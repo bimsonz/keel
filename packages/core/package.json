@@ -16,8 +16,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p test/tsconfig.json"
   },
   "devDependencies": {
-    "typescript": "catalog:",
     "@types/node": "catalog:",
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "dependencies": {
