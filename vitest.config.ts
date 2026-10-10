@@ -26,6 +26,8 @@ export default defineConfig({
           environment: "node",
           // ArchUnitTS registers its matchers on import and needs vitest's globals to do it.
           globals: true,
+          // Whole-tree scans and ArchUnitTS's TypeScript program take seconds on CI runners.
+          testTimeout: 60_000,
           include: ["packages/tooling/test/arch/**/*.test.ts"],
         },
       },
