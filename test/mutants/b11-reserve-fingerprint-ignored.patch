@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/agent-session.test.ts
+# kills: b11.reserve
+# why: a reused key answers its change id whatever the body, so a different declare lands on the old change
+diff --git a/packages/core/src/application/identity/reservations.ts b/packages/core/src/application/identity/reservations.ts
+index 1d5f769..5ffa84a 100644
+--- a/packages/core/src/application/identity/reservations.ts
++++ b/packages/core/src/application/identity/reservations.ts
+@@ -40,7 +40,7 @@ export const reserveChange: (
+         const held =
+           stored === undefined ? undefined : Schema.decodeUnknownSync(Reservation)(stored);
+         if (held !== undefined && now - held.at < RESERVATION_TTL_MS) {
+-          return held.fingerprint === request.fingerprint
++          return true
+             ? Result.succeed({ drafts: [], value: held.changeId })
+             : Result.fail(new IdempotencyConflict({ idempotencyKey: request.idempotencyKey }));
+         }

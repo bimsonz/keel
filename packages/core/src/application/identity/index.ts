@@ -117,3 +117,6 @@ export const openSession: (
   principal: Principal,
   details: { readonly harness?: string; readonly model?: string },
 ) => Effect.Effect<Session, AgentNotKnown, Ids | Clock> = stub("identity/openSession");
+
+export * from "./inbox.ts";
+export * from "./reservations.ts";

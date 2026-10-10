@@ -1,3 +1,4 @@
+import { readInbox, recordDelivery, reserveChange } from "@keeltown/core/application/identity";
 import { AgentNotKnown } from "@keeltown/core/domain/identity";
 import { NotImplemented } from "@keeltown/core/not-implemented";
 import { AgentId, type EventEnvelope } from "@keeltown/core/kernel";
@@ -6,9 +7,9 @@ import { Effect, Schema } from "effect";
 import {
   AgentSessionCodecs,
   type AgentSessionRpc,
-  type InboxRead,
+  InboxRead,
   type OpenSession,
-  type ReserveChange,
+  ReserveChange,
   SessionSnapshot,
 } from "../../../rpc/index.ts";
 import { KeelObject, type Reaction } from "./keel-object.ts";
@@ -19,12 +20,6 @@ const agentIdOf = (name: string | undefined) =>
 
 /** Where the snapshot of this agent's session state lives in the DO's EntityStore. */
 export const SNAPSHOT = { kind: "agent-session", id: "self" } as const;
-
-/** The agent's inbox: one row per event delivered to it, in arrival order. B1.2 turns these into notices. */
-export const INBOX = { kind: "inbox", head: { kind: "inbox-head", id: "self" } } as const;
-
-/** Inbox positions sort as strings. */
-const position = (n: number) => String(n).padStart(12, "0");
 
 /**
  * The AgentSession DO (`agent:<id>`): inbox, cursor, leases, fidelity and the
@@ -51,30 +46,30 @@ export class AgentSessionDO extends KeelObject implements AgentSessionRpc {
     );
   }
 
-  /** Every event delivered to the agent joins its inbox. */
+  /** Every event delivered to the agent joins its inbox; `answer` then wakes any inbox waiting on it. */
   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
-    const head = tx.store.get(INBOX.head.kind, INBOX.head.id);
-    const next = (typeof head === "number" ? head : 0) + 1;
-    tx.store.put(INBOX.kind, position(next), {
-      eventId: event.eventId,
-      type: event.type,
-      entity: event.entity,
-      seq: event.seq,
-      at: event.at,
-    });
-    tx.store.put(INBOX.head.kind, INBOX.head.id, next);
+    recordDelivery(tx.store, event);
     return { entity: { kind: "agent", id: agentIdOf(this.ctx.id.name) }, drafts: [] };
   }
 
-  // Keel implements these two; until then they cross as a NotImplemented defect.
-  async reserveChange(_request: typeof ReserveChange.Encoded) {
-    return this.answer(
-      AgentSessionCodecs.reserveChange,
-      Effect.die(new NotImplemented("identity/reserveChange")),
+  async reserveChange(request: typeof ReserveChange.Encoded) {
+    const agentId = agentIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(ReserveChange)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap((decoded) => reserveChange(agentId, decoded)),
     );
+    return this.answer(AgentSessionCodecs.reserveChange, program);
   }
 
-  async inbox(_request: typeof InboxRead.Encoded) {
-    return this.answer(AgentSessionCodecs.inbox, Effect.die(new NotImplemented("identity/inbox")));
+  /** The notices after `cursor`; with `waitMs` above 0 and none yet, the first page a commit brings, or an empty one at the deadline. */
+  async inbox(request: typeof InboxRead.Encoded) {
+    const waiters = this.waiters;
+    const program = Schema.decodeUnknownEffect(InboxRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ cursor, waitMs }) =>
+        waiters.until(waitMs, readInbox(cursor), (page) => page.notices.length > 0),
+      ),
+    );
+    return this.answer(AgentSessionCodecs.inbox, program);
   }
 }

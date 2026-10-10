@@ -25,6 +25,7 @@ import {
   readDelivery,
 } from "../../../rpc/index.ts";
 import { type AlarmRequest, dueAlarms, scheduleAlarm } from "./alarm.ts";
+import { Waiters } from "./waiters.ts";
 
 /** The alarm reasons the backbone owns. Every other reason is the subclass's, handed to `onDeadline`. */
 export const OUTBOX_FLUSH = "outbox flush";
@@ -47,9 +48,11 @@ export interface Reaction {
  *   reacted to in one transaction, so a redelivery is a no-op and a crash
  *   leaves it unreceived. Override `react` to handle them.
  * - Override `onDeadline` for the object's own alarms, armed with `scheduleAlarm`.
+ * - A method that long-polls waits on `waiters`, which every answer and alarm wakes.
  */
 export abstract class KeelObject extends DurableObject<Env> implements EventReceiverRpc {
   protected readonly runtime: DurableObjectRuntime;
+  protected readonly waiters = new Waiters();
   private readonly fanOut: FanOut;
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -65,6 +68,7 @@ export abstract class KeelObject extends DurableObject<Env> implements EventRece
     program: Effect.Effect<A, E, DurableObjectServices>,
   ): Promise<ExitJson> {
     const exit = await this.runtime.runPromiseExit(program);
+    this.waiters.wake();
     await this.armFlush();
     return encodeExit(codec, exit);
   }
@@ -124,6 +128,7 @@ export abstract class KeelObject extends DurableObject<Env> implements EventRece
         await this.onDeadline(request);
       }
     }
+    this.waiters.wake();
     await this.armFlush();
   }
 
