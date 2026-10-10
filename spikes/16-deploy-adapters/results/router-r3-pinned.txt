@@ -1,0 +1,37 @@
+# router bench r3 mode=pinned 2026-10-10T19:20:07Z
+colo: LHR
+build base: {"id":"26ea5d8b504649d7c29d","buildMs":94,"storeMs":245,"mainModule":"bundle.js","moduleBytes":{"bundle.js":90008},"assets":["/app.js","/index.html"],"warnings":[],"roundTripMs":786,"sourceFiles":27}
+build A:    {"id":"3c9508648f271a181919","buildMs":71,"storeMs":630,"mainModule":"bundle.js","moduleBytes":{"bundle.js":90909},"assets":["/app.js","/index.html"],"warnings":[],"roundTripMs":1645,"sourceFiles":27}
+## network floor: GET / on the router (no candidate work) x20
+{"label":"floor","n":20,"codes":"200","ttfbMs":{"min":30,"p50":84,"p95":176,"max":176},"afterTlsMs":{"p50":40,"p95":151},"samplesMs":[69,176,51,38,133,30,128,84,165,168,142,171,33,32,43,176,148,103,39,36]}
+## cold API (GET /users/ghost on a never-served id)
+  c5a9ff70fd51dd4d63ee build=557ms ttfb-line: 404 0.009081 0.021081 0.590470 0.590573
+  f406c83a89618474df80 build=953ms ttfb-line: 404 0.010856 0.027103 0.822600 0.822728
+  8e8b5d60ecd815b3ef22 build=518ms ttfb-line: 404 0.009913 0.021340 0.762947 0.763063
+  37a4336db755d09156c0 build=908ms ttfb-line: 404 0.008790 0.021882 0.741500 0.741617
+  b8ad5bb7ee2fa0a34158 build=1316ms ttfb-line: 404 0.009143 0.019024 1.280761 1.280874
+{"label":"cold-api","n":5,"codes":"404","ttfbMs":{"min":590,"p50":763,"p95":1281,"max":1281},"afterTlsMs":{"p50":742,"p95":1262},"samplesMs":[590,823,763,742,1281]}
+## cold asset (GET /app.js on a never-served id)
+  dd3e951522f2a9292f27 ttfb-line: 200 0.008510 0.016851 0.758845 0.758948
+  d59cba7598d405709299 ttfb-line: 200 0.008185 0.019059 0.596323 0.596467
+  360eb12be3bb054f8385 ttfb-line: 200 0.008961 0.027657 0.793075 0.832435
+  c24df21e4e6fd066841c ttfb-line: 200 0.009329 0.020399 0.792148 0.792277
+  b5cc51b02339bcaecacd ttfb-line: 200 0.008075 0.018789 0.539392 0.539526
+{"label":"cold-asset","n":5,"codes":"200","ttfbMs":{"min":539,"p50":759,"p95":793,"max":793},"afterTlsMs":{"p50":742,"p95":772},"samplesMs":[759,596,793,792,539]}
+## warm API x20 (base 26ea5d8b504649d7c29d)
+{"label":"warm-api","n":20,"codes":"404","ttfbMs":{"min":42,"p50":73,"p95":218,"max":230},"afterTlsMs":{"p50":48,"p95":179},"samplesMs":[58,125,230,158,138,74,50,165,73,55,218,42,186,175,46,61,44,48,202,56]}
+## warm asset x20 (base 26ea5d8b504649d7c29d)
+{"label":"warm-asset","n":20,"codes":"200","ttfbMs":{"min":80,"p50":137,"p95":231,"max":249},"afterTlsMs":{"p50":115,"p95":207},"samplesMs":[155,135,249,221,80,223,86,159,80,217,86,231,214,86,152,160,137,81,88,80]}
+## warm index.html x20 (base 26ea5d8b504649d7c29d)
+{"label":"warm-index","n":20,"codes":"200","ttfbMs":{"min":70,"p50":125,"p95":293,"max":364},"afterTlsMs":{"p50":79,"p95":205},"samplesMs":[125,81,161,93,107,102,232,199,364,70,230,80,214,80,293,91,121,165,169,167]}
+## worlds: base and A behave differently
+base 26ea5d8b504649d7c29d: {"classify":{"world":"base","status":404,"contentType":"text/plain; charset=UTF-8","ms":72}} {"flow":[{"step":"sign up alice","status":201},{"step":"sign up bob","status":201},{"step":"alice logs in","status":201},{"step":"alice creates forge","status":201},{"step":"alice adds bob as admin","status":201},{"step":"alice revokes bob","status":404,"detail":"404 Not Found"}]}  exit=0
+A    3c9508648f271a181919: {"classify":{"world":"A","status":404,"contentType":"application/problem+json","ms":726}} {"flow":[{"step":"sign up alice","status":201},{"step":"sign up bob","status":201},{"step":"alice logs in","status":201},{"step":"alice creates forge","status":201},{"step":"alice adds bob as admin","status":201},{"step":"alice revokes bob","status":204}]}  exit=0
+## can fail
+wrong expectation (base probed as A): {"classify":{"world":"base","status":404,"contentType":"text/plain; charset=UTF-8","ms":85}} MISMATCH: expected world A, got base  exit=1
+unknown id 0000000000deadbeef00: {  "error": "candidate-not-found",  "id": "0000000000deadbeef00"} http=404 ct=application/json
+unknown id, asset path: {  "error": "candidate-not-found",  "id": "0000000000deadbeef00"} http=404
+malformed id: {  "error": "invalid-candidate-id",  "id": "not-a-hash"} http=404
+a 1-char change of a real id (26ea5d8b504649d7c29d -> 26ea5d8b504649d7c290): {  "error": "candidate-not-found",  "id": "26ea5d8b504649d7c290"} http=404
+admin without token: {  "error": "unauthorized"} http=401
+ttfb gate can fail (warm API with --max-ms 1): {"label":"gate-check","n":3,"codes":"404","ttfbMs":{"min":45,"p50":49,"p95":50,"max":50},"afterTlsMs":{"p50":27,"p95":33},"samplesMs":[50,49,45]} FAIL gate-check: 3/3 samples at or over 1 ms or bad status  exit=1

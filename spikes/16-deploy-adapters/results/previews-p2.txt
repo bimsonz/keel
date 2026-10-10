@@ -1,0 +1,24 @@
+# previews p2 2026-10-10T19:13:23Z
+### wrangler preview --name p2-a (A): exit=0 in 6630 ms
+preview url: https://p2-a-keel-spike-16-app.<subdomain>.workers.dev
+deployment url: https://907e9116-keel-spike-16-app.<subdomain>.workers.dev
+preview resource: {"preview":{"id":"71571a5dc6da4c26b0a6d0a5b0b1438d","name":"p2-a","slug":"p2-a","keys":["id","slug","name","tags","observability","logpush","tail_consumers","urls","created_on","updated_on","deployed_on"]},"deployment":{"id":"907e9116-62e3-4529-8c39-05fd4f46c968","keys":["id","number","startup_time_ms","compatibility_date","main_module","annotations","usage_model","urls","source","created_on","assets","author_id","author_email"],"annotations":{"workers/message":"keel spike 16 A","workers/triggered_by":"create_preview_deployment_api"}}}
+first byte, first request to the preview URL (API): 404 0.052903 0.082833 0.665706 0.665824
+first byte, first request (asset /app.js): 200 0.021302 0.054486 0.416475 0.416592
+warm API x20: {"label":"preview-A-warm-api","n":20,"codes":"404","ttfbMs":{"min":88,"p50":186,"p95":314,"max":383},"afterTlsMs":{"p50":137,"p95":262},"samplesMs":[383,163,167,244,155,290,223,314,88,223,202,252,108,225,196,163,135,186,148,155]}
+warm asset x20: {"label":"preview-A-warm-asset","n":20,"codes":"200","ttfbMs":{"min":101,"p50":179,"p95":223,"max":229},"afterTlsMs":{"p50":132,"p95":178},"samplesMs":[179,223,172,101,229,187,192,151,177,204,208,144,180,185,169,202,138,131,217,129]}
+world via preview url: {"classify":{"world":"A","status":404,"contentType":"application/problem+json","ms":244}} exit=0
+world via deployment url: {"classify":{"world":"A","status":404,"contentType":"application/problem+json","ms":188}} exit=0
+x-robots-tag on workers.dev preview: x-robots-tag: noindex
+### wrangler preview --name p2-base (base): exit=0 in 6388 ms
+preview url: https://p2-base-keel-spike-16-app.<subdomain>.workers.dev
+deployment url: https://d8b197d4-keel-spike-16-app.<subdomain>.workers.dev
+preview resource: {"preview":{"id":"9211d41bb73748a59e9bf4420f9777a4","name":"p2-base","slug":"p2-base","keys":["id","slug","name","tags","observability","logpush","tail_consumers","urls","created_on","updated_on","deployed_on"]},"deployment":{"id":"d8b197d4-25c2-4231-a131-fda9d363cf35","keys":["id","number","startup_time_ms","compatibility_date","main_module","annotations","usage_model","urls","source","created_on","assets","author_id","author_email"],"annotations":{"workers/message":"keel spike 16 base","workers/triggered_by":"create_preview_deployment_api"}}}
+first byte, first request to the preview URL (API): 404 0.043210 0.054755 0.573654 0.573769
+first byte, first request (asset /app.js): 200 0.020235 0.046696 0.206893 0.206992
+warm API x20: {"label":"preview-base-warm-api","n":20,"codes":"404","ttfbMs":{"min":70,"p50":140,"p95":306,"max":339},"afterTlsMs":{"p50":88,"p95":255},"samplesMs":[209,116,90,339,130,203,162,138,173,291,169,94,123,96,140,161,208,306,70,119]}
+warm asset x20: {"label":"preview-base-warm-asset","n":20,"codes":"200","ttfbMs":{"min":108,"p50":173,"p95":267,"max":304},"afterTlsMs":{"p50":140,"p95":215},"samplesMs":[247,168,188,173,186,108,173,144,187,239,108,200,220,164,267,173,147,173,304,201]}
+world via preview url: {"classify":{"world":"base","status":404,"contentType":"text/plain; charset=UTF-8","ms":230}} exit=0
+world via deployment url: {"classify":{"world":"base","status":404,"contentType":"text/plain; charset=UTF-8","ms":310}} exit=0
+x-robots-tag on workers.dev preview: x-robots-tag: noindex
+production still serves base (preview did not touch it): {"classify":{"world":"base","status":404,"contentType":"text/plain; charset=UTF-8","ms":170}} exit=0

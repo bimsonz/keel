@@ -1,0 +1,6 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": { "correctness": "error", "suspicious": "warn" },
+  "env": { "browser": true, "node": true, "es2024": true },
+  "ignorePatterns": ["node_modules", "build", "results"]
+}

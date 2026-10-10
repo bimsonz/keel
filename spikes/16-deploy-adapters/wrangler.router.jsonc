@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "keel-spike-16-router",
+  "main": "src/router.ts",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "worker_loaders": [{ "binding": "LOADER" }],
+  "r2_buckets": [{ "binding": "BUNDLES", "bucket_name": "keel-spike-16-bundles" }],
+  // One object per candidate id: pins a candidate's requests to one host isolate.
+  "durable_objects": { "bindings": [{ "name": "HOST", "class_name": "CandidateHost" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CandidateHost"] }],
+  // In-Worker builds run esbuild-wasm; give them room.
+  "limits": { "cpu_ms": 300000 },
+  "observability": { "enabled": true }
+}

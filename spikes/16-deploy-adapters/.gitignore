@@ -1,0 +1,5 @@
+node_modules/
+.wrangler/
+# Generated: candidate copies, built bundles, deploy configs carrying the subdomain.
+build/
+wrangler.*.local.jsonc

@@ -1,0 +1,18 @@
+# delete a candidate, then keep asking for it (stateless /cand path) 2026-10-10T19:16:49Z
+candidate 19f4148f6e9ac3457697 before delete: 404 404 404 404 404 404 404 404 404 404 
+DELETE /admin/cand/19f4148f6e9ac3457697: {"deleted":["bundles/19f4148f6e9ac3457697/assets/.salt","bundles/19f4148f6e9ac3457697/assets/app.js","bundles/19f4148f6e9ac3457697/assets/index.html","bundles/19f4148f6e9ac3457697/worker.json"]}
+after delete, round 1 (20 requests; 404 = gone, else still served from a warm router isolate's cache): 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 
+after delete, round 2 (20 requests; 404 = gone, else still served from a warm router isolate's cache): 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 
+after delete, round 3 (20 requests; 404 = gone, else still served from a warm router isolate's cache): 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 404 
+asset path after delete: 200 404 200 404 200 200 200 404 404 200 
+# NOTE: the block above is inconclusive for the API path (forge-lite's /users/ghost is itself a 404); the asset line shows stale 200s. Redone below with the served-by header.
+# delete r2, candidate 9b7c225e2344153d8382 2026-10-10T19:17:17Z. Each token is <http>/<served-by>; 'gone' = router answered candidate-not-found
+before: api: 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 
+before: asset: 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 
+DELETE: {"deleted":["bundles/9b7c225e2344153d8382/assets/.salt","bundles/9b7c225e2344153d8382/assets/app.js","bundles/9b7c225e2344153d8382/assets/index.html","bundles/9b7c225e2344153d8382/worker.json"]}
+after, round 1 api:   404/isolate 404/gone 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/gone 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 
+after, round 1 asset: 200/asset 404/gone 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 404/gone 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 
+after, round 2 api:   404/isolate 404/isolate 404/isolate 404/isolate 404/gone 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/gone 404/gone 404/isolate 404/isolate 404/isolate 404/gone 404/isolate 404/isolate 404/isolate 
+after, round 2 asset: 404/gone 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 404/gone 200/asset 200/asset 200/asset 200/asset 
+after, round 3 api:   404/isolate 404/isolate 404/isolate 404/isolate 404/gone 404/isolate 404/isolate 404/gone 404/isolate 404/isolate 404/isolate 404/isolate 404/gone 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/gone 
+after, round 3 asset: 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 404/gone 200/asset 200/asset 200/asset 404/gone 404/gone 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 404/gone 

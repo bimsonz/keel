@@ -1,0 +1,109 @@
+# rollout c1 2026-10-10T19:08:35Z
+### deploy base (100%): wrangler deploy <scratch> -c <home-path> --message base -> exit=0 in 11872 ms
+    Uploaded 2 of 2 assets
+    ✨ Success! Uploaded 2 files (1.35 sec)
+    Total Upload: 93.35 KiB / gzip: 22.38 KiB
+    Worker Startup Time: 2 ms
+    Uploaded keel-spike-16-app (7.43 sec)
+    Deployed keel-spike-16-app triggers (1.98 sec)
+      https://keel-spike-16-app.<subdomain>.workers.dev
+    Current Version ID: f671353b-c023-4a03-8caf-4770cca3e99e
+base version: f671353b-c023-4a03-8caf-4770cca3e99e
+propagation to base: {"target":"base","polls":442,"seen":{"base":10,"A":0,"unknown":432},"msToStreakEnd":11813,"verdict":"ok"}
+### upload A as a version (0% traffic): wrangler versions upload <scratch> -c <home-path> --message candidate A --tag cand-a -> exit=0 in 7166 ms
+    Total Upload: 94.13 KiB / gzip: 22.46 KiB
+    Worker Startup Time: 2 ms
+    Uploaded keel-spike-16-app (4.41 sec)
+    Worker Version ID: a029e446-363e-4ae4-8eb6-1b1769dfd4ad
+    Version Preview URL: https://a029e446-keel-spike-16-app.<subdomain>.workers.dev
+    To deploy this version to production traffic use the command wrangler versions deploy
+    Changes to non-versioned settings (config properties 'logpush' or 'tail_consumers') take effect after your next deployment using the command wrangler versions deploy
+    Changes to triggers (routes, custom domains, cron schedules, etc) must be applied with the command wrangler triggers deploy
+A version: a029e446-363e-4ae4-8eb6-1b1769dfd4ad
+still base after upload (20 samples, expect 0% A): {"n":20,"counts":{"base":20,"A":0,"unknown":0},"observedPctA":0,"expectedPctA":0,"toleranceCount":1,"override":null,"ms":300,"verdict":"ok"} exit=0
+### deploy A 10% / base 90%: wrangler versions deploy a029e446-363e-4ae4-8eb6-1b1769dfd4ad@10% f671353b-c023-4a03-8caf-4770cca3e99e@90% -c <home-path> -y --message A at 10% -> exit=0 in 7964 ms
+    │ Synced non-versioned settings:
+    │                      logpush:  false
+    │                observability:  enabled:             true
+    │                                head_sampling_rate:  1
+    │               tail_consumers:  <skipped>
+    │     streaming_tail_consumers:  <skipped>
+    │
+    ╰  SUCCESS  Deployed keel-spike-16-app version a029e446-363e-4ae4-8eb6-1b1769dfd4ad at 10% and version f671353b-c023-4a03-8caf-4770cca3e99e at 90% (2.61 sec)
+time to first A response: {"target":"A","polls":4,"seen":{"base":3,"A":1,"unknown":0},"msToStreakEnd":515,"verdict":"ok"}
+split, 200 samples, expect 10% A: {"n":200,"counts":{"base":181,"A":19,"unknown":0},"observedPctA":9.5,"expectedPctA":10,"toleranceCount":12.7,"override":null,"ms":875,"verdict":"ok"} exit=0
+CAN FAIL: a fresh 200 samples checked against a wrong expectation of 50% A: {"n":200,"counts":{"base":188,"A":12,"unknown":0},"observedPctA":6,"expectedPctA":50,"toleranceCount":21.2,"override":null,"ms":1061,"verdict":"MISMATCH"} exit=1
+CAN FAIL: and against 0% A: {"n":200,"counts":{"base":176,"A":24,"unknown":0},"observedPctA":12,"expectedPctA":0,"toleranceCount":1,"override":null,"ms":846,"verdict":"MISMATCH"} exit=1
+override header -> A (20 samples, expect 100% A): {"n":20,"counts":{"base":1,"A":19,"unknown":0},"observedPctA":95,"expectedPctA":100,"toleranceCount":1,"override":"keel-spike-16-app=\"a029e446-363e-4ae4-8eb6-1b1769dfd4ad\"","ms":306,"verdict":"ok"} exit=0
+override header -> base (20 samples, expect 0% A): {"n":20,"counts":{"base":20,"A":0,"unknown":0},"observedPctA":0,"expectedPctA":0,"toleranceCount":1,"override":"keel-spike-16-app=\"f671353b-c023-4a03-8caf-4770cca3e99e\"","ms":264,"verdict":"ok"} exit=0
+override header naming a version not in the deployment (expect it to be ignored, ~10% A): {"n":40,"counts":{"base":37,"A":3,"unknown":0},"observedPctA":7.5,"expectedPctA":10,"toleranceCount":5.7,"override":"keel-spike-16-app=\"00000000-0000-0000-0000-000000000000\"","ms":336,"verdict":"ok"} exit=0
+### deploy A 100%: wrangler versions deploy a029e446-363e-4ae4-8eb6-1b1769dfd4ad@100% -c <home-path> -y --message A at 100% -> exit=0 in 6562 ms
+    │ Synced non-versioned settings:
+    │                      logpush:  false
+    │                observability:  enabled:             true
+    │                                head_sampling_rate:  1
+    │               tail_consumers:  <skipped>
+    │     streaming_tail_consumers:  <skipped>
+    │
+    ╰  SUCCESS  Deployed keel-spike-16-app version a029e446-363e-4ae4-8eb6-1b1769dfd4ad at 100% (2.31 sec)
+propagation to A: {"target":"A","polls":245,"seen":{"base":115,"A":130,"unknown":0},"msToStreakEnd":7923,"verdict":"ok"}
+after promote, 100 samples, expect 100% A: {"n":100,"counts":{"base":7,"A":93,"unknown":0},"observedPctA":93,"expectedPctA":100,"toleranceCount":1,"override":null,"ms":633,"verdict":"MISMATCH"} exit=1
+### rollback to base: wrangler rollback f671353b-c023-4a03-8caf-4770cca3e99e -c <home-path> -y -m rollback to base -> exit=0 in 4528 ms
+    │       Message:  base
+    │
+    ? Are you sure you want to deploy this Worker Version to 100% of traffic?
+    🤖 Using fallback value in non-interactive context: yes
+    Performing rollback...
+    │
+    ╰  SUCCESS  Worker Version f671353b-c023-4a03-8caf-4770cca3e99e has been deployed to 100% of traffic.
+    Current Version ID: f671353b-c023-4a03-8caf-4770cca3e99e
+propagation to base: {"target":"base","polls":93,"seen":{"base":22,"A":71,"unknown":0},"msToStreakEnd":3220,"verdict":"ok"}
+after rollback, 100 samples, expect 0% A: {"n":100,"counts":{"base":62,"A":38,"unknown":0},"observedPctA":38,"expectedPctA":0,"toleranceCount":1,"override":null,"ms":542,"verdict":"MISMATCH"} exit=1
+after rollback, revoke flow: {"classify":{"world":"base","status":404,"contentType":"text/plain; charset=UTF-8","ms":161}} {"flow":[{"step":"sign up alice","status":201},{"step":"sign up bob","status":201},{"step":"alice logs in","status":201},{"step":"alice creates forge","status":401,"detail":"the bearer token is not valid"},{"step":"alice adds bob as admin","status":404,"detail":"repository alicen4xz40/forge not found"},{"step":"alice revokes bob","status":401,"detail":"the bearer token is not valid"}]} 
+### deployments list: wrangler deployments list -c <home-path> -> exit=0 in 2599 ms
+    Created:     2026-10-10T19:09:39.408Z
+    Author:      <email>
+    Source:      Unknown (deployment)
+    Message:     rollback to base
+    Version(s):  (100%) f671353b-c023-4a03-8caf-4770cca3e99e
+                     Created:  2026-10-10T19:08:45.182Z
+                         Tag:  -
+                     Message:  base
+     ⛅️ wrangler 4.149.0
+    ────────────────────
+    Created:     2026-10-10T19:08:45.182Z
+    Author:      <email>
+    Source:      Upload
+    Message:     base
+    Version(s):  (100%) f671353b-c023-4a03-8caf-4770cca3e99e
+                     Created:  2026-10-10T19:08:45.182Z
+                         Tag:  -
+                     Message:  base
+    Created:     2026-10-10T19:09:12.631Z
+    Author:      <email>
+    Source:      Unknown (deployment)
+    Message:     A at 10%
+    Version(s):  (10%) a029e446-363e-4ae4-8eb6-1b1769dfd4ad
+                     Created:  2026-10-10T19:09:05.410Z
+                         Tag:  cand-a
+                     Message:  candidate A
+                 (90%) f671353b-c023-4a03-8caf-4770cca3e99e
+                     Created:  2026-10-10T19:08:45.182Z
+                         Tag:  -
+                     Message:  base
+    Created:     2026-10-10T19:09:24.098Z
+    Author:      <email>
+    Source:      Unknown (deployment)
+    Message:     A at 100%
+    Version(s):  (100%) a029e446-363e-4ae4-8eb6-1b1769dfd4ad
+                     Created:  2026-10-10T19:09:05.410Z
+                         Tag:  cand-a
+                     Message:  candidate A
+    Created:     2026-10-10T19:09:39.408Z
+    Author:      <email>
+    Source:      Unknown (deployment)
+    Message:     rollback to base
+    Version(s):  (100%) f671353b-c023-4a03-8caf-4770cca3e99e
+                     Created:  2026-10-10T19:08:45.182Z
+                         Tag:  -
+                     Message:  base

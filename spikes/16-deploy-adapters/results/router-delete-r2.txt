@@ -1,0 +1,22 @@
+# delete check r2, candidate 2606a794b6ab09d436ee 2026-10-10T19:18:49Z
+warm-up api:   404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 404/isolate 
+warm-up asset: 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 200/asset 
+DELETE: {"deleted":["bundles/2606a794b6ab09d436ee/assets/.salt","bundles/2606a794b6ab09d436ee/assets/app.js","bundles/2606a794b6ab09d436ee/assets/index.html","bundles/2606a794b6ab09d436ee/worker.json"]}
+t+259ms: 404/isolate 404/gone 404/isolate 404/gone 404/isolate 404/gone 404/isolate 404/gone 404/gone 404/gone 
+t+1316ms: 404/gone 404/gone 404/isolate 404/gone 404/gone 404/gone 404/isolate 404/gone 404/gone 404/gone 
+t+2499ms: 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 
+t+3956ms: 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 
+t+5083ms: 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 
+t+6767ms: 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 
+t+8712ms: 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 
+t+10276ms: 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 
+t+11988ms: 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 
+t+13499ms: 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 
+t+15006ms: 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 
+t+16628ms: 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 
+t+18612ms: 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 
+t+19935ms: 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 
+t+21350ms: 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 
+t+22845ms: 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 
+t+24379ms: 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 404/gone 
+verdict: ok (nothing served after the window, no empty 200s)

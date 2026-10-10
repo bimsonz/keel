@@ -1,0 +1,97 @@
+# teardown d1 2026-10-10T19:24:08Z
+## inventory before
+previews: {"count":6,"names":["rest-a","rest-base","p2-base","p2-a","p1-base","p1-a"]} 
+router bundles: 158 objects, 40 candidates
+urls used: 16
+## previews
+$ wrangler preview delete --name p1-a --worker-name keel-spike-16-app -y -> exit=0 in 1808 ms
+    ▲ [WARNING] 🚧 `wrangler preview delete` is an open beta command. Please report any issues to https://github.com/cloudflare/workers-sdk/issues/new/choose
+    ✨ Preview "p1-a" deleted successfully.
+$ wrangler preview delete --name p1-base --worker-name keel-spike-16-app -y -> exit=0 in 1697 ms
+    ▲ [WARNING] 🚧 `wrangler preview delete` is an open beta command. Please report any issues to https://github.com/cloudflare/workers-sdk/issues/new/choose
+    ✨ Preview "p1-base" deleted successfully.
+$ wrangler preview delete --name p2-a --worker-name keel-spike-16-app -y -> exit=0 in 1820 ms
+    ▲ [WARNING] 🚧 `wrangler preview delete` is an open beta command. Please report any issues to https://github.com/cloudflare/workers-sdk/issues/new/choose
+    ✨ Preview "p2-a" deleted successfully.
+$ wrangler preview delete --name p2-base --worker-name keel-spike-16-app -y -> exit=0 in 1746 ms
+    ▲ [WARNING] 🚧 `wrangler preview delete` is an open beta command. Please report any issues to https://github.com/cloudflare/workers-sdk/issues/new/choose
+    ✨ Preview "p2-base" deleted successfully.
+REST delete rest-a: {"deleted":"rest-a","ms":1079} 
+REST delete rest-base: {"deleted":"rest-base","ms":1175} 
+previews after: {"count":0,"names":[]} 
+## candidates (R2 objects)
+DELETE /admin/all: 158 objects, 40 candidates deleted
+GET /admin/all after: 0 objects
+## Workers
+versions of keel-spike-16-app before delete: 2 listed
+secrets of keel-spike-16-router before delete: "name": "ADMIN_TOKEN" 
+$ wrangler delete --name keel-spike-16-app --force -> exit=0 in 2617 ms
+    Successfully deleted keel-spike-16-app
+$ wrangler delete --name keel-spike-16-router --force -> exit=0 in 2721 ms
+    Successfully deleted keel-spike-16-router
+## bucket
+$ wrangler r2 bucket delete keel-spike-16-bundles -> exit=0 in 1732 ms
+    Deleting bucket keel-spike-16-bundles.
+    Deleted bucket keel-spike-16-bundles.
+## proof: nothing left
+$ wrangler deployments list --name keel-spike-16-app -> exit=1 in 1810 ms
+      If you think this is a bug, please open an issue at: https://github.com/cloudflare/workers-sdk/issues/new/choose
+    🪵  Logs were written to "<home-path>"
+$ wrangler versions list --name keel-spike-16-app -> exit=1 in 1732 ms
+      If you think this is a bug, please open an issue at: https://github.com/cloudflare/workers-sdk/issues/new/choose
+    🪵  Logs were written to "<home-path>"
+$ wrangler secret list --name keel-spike-16-app -> exit=1 in 1520 ms
+      Otherwise, check that the Worker name is correct and you're logged into the right account.
+    🪵  Logs were written to "<home-path>"
+$ wrangler deployments list --name keel-spike-16-router -> exit=1 in 1555 ms
+      If you think this is a bug, please open an issue at: https://github.com/cloudflare/workers-sdk/issues/new/choose
+    🪵  Logs were written to "<home-path>"
+$ wrangler versions list --name keel-spike-16-router -> exit=1 in 1518 ms
+      If you think this is a bug, please open an issue at: https://github.com/cloudflare/workers-sdk/issues/new/choose
+    🪵  Logs were written to "<home-path>"
+$ wrangler secret list --name keel-spike-16-router -> exit=1 in 1626 ms
+      Otherwise, check that the Worker name is correct and you're logged into the right account.
+    🪵  Logs were written to "<home-path>"
+previews list on the deleted Worker:   codes: [ 10007 ] } 
+r2 buckets named keel-spike-16-*: 0 (0 = none)
+r2 bucket info: ✘ [ERROR] A request to the Cloudflare API (/accounts/<account-id>/r2/buckets/keel-spike-16-bundles) failed.
+0 Durable Object namespaces for keel-spike-16-* (0 = none)
+## every URL used, until it answers 404 (max 60 s each)
+https://1742daca-keel-spike-16-app.<subdomain>.workers.dev -> 404 after 111 ms
+https://7a8d65ac-keel-spike-16-app.<subdomain>.workers.dev -> 404 after 196 ms
+https://907e9116-keel-spike-16-app.<subdomain>.workers.dev -> 404 after 259 ms
+https://a029e446-keel-spike-16-app.<subdomain>.workers.dev -> 404 after 189 ms
+https://d8b197d4-keel-spike-16-app.<subdomain>.workers.dev -> 404 after 148 ms
+https://eb53ad2c-keel-spike-16-app.<subdomain>.workers.dev -> 404 after 214 ms
+https://eda6bfa6-keel-spike-16-app.<subdomain>.workers.dev -> 404 after 117 ms
+https://fe3de8f5-keel-spike-16-app.<subdomain>.workers.dev -> 404 after 266 ms
+https://keel-spike-16-app.<subdomain>.workers.dev -> 404 after 130 ms
+https://keel-spike-16-router.<subdomain>.workers.dev -> 404 after 167 ms
+https://p1-a-keel-spike-16-app.<subdomain>.workers.dev -> 404 after 190 ms
+https://p1-base-keel-spike-16-app.<subdomain>.workers.dev -> 404 after 255 ms
+https://p2-a-keel-spike-16-app.<subdomain>.workers.dev -> 404 after 322 ms
+https://p2-base-keel-spike-16-app.<subdomain>.workers.dev -> 404 after 197 ms
+https://rest-a-keel-spike-16-app.<subdomain>.workers.dev -> 404 after 101 ms
+https://rest-base-keel-spike-16-app.<subdomain>.workers.dev -> 404 after 184 ms
+## proof, error lines captured (2026-10-10T19:25:44Z)
+$ wrangler deployments list --name keel-spike-16-app
+    ✘ [ERROR] A request to the Cloudflare API (/accounts/<account-id>/workers/scripts/keel-spike-16-app/deployments) failed.
+      This Worker does not exist on your account. [code: 10007]
+$ wrangler versions list --name keel-spike-16-app
+    ✘ [ERROR] A request to the Cloudflare API (/accounts/<account-id>/workers/scripts/keel-spike-16-app/versions?deployable=true) failed.
+      This Worker does not exist on your account. [code: 10007]
+$ wrangler secret list --name keel-spike-16-app
+    ✘ [ERROR] Worker "keel-spike-16-app" not found.
+$ wrangler deployments list --name keel-spike-16-router
+    ✘ [ERROR] A request to the Cloudflare API (/accounts/<account-id>/workers/scripts/keel-spike-16-router/deployments) failed.
+      This Worker does not exist on your account. [code: 10007]
+$ wrangler versions list --name keel-spike-16-router
+    ✘ [ERROR] A request to the Cloudflare API (/accounts/<account-id>/workers/scripts/keel-spike-16-router/versions?deployable=true) failed.
+      This Worker does not exist on your account. [code: 10007]
+$ wrangler secret list --name keel-spike-16-router
+    ✘ [ERROR] Worker "keel-spike-16-router" not found.
+$ wrangler r2 bucket info keel-spike-16-bundles
+    ✘ [ERROR] A request to the Cloudflare API (/accounts/<account-id>/r2/buckets/keel-spike-16-bundles) failed.
+      The specified bucket does not exist. [code: 10006]
+$ wrangler r2 bucket list | grep -c keel-spike-16
+    0

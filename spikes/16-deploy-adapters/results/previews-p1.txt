@@ -1,0 +1,5 @@
+# NOTE: first run. Both previews were created (exit=0) but the JSON parse failed: wrangler preview --json prints asset-sync lines before the JSON. Fixed for p2.
+# previews p1 2026-10-10T19:12:48Z
+### wrangler preview --name p1-a (A): exit=0 in 6332 ms
+### wrangler preview --name p1-base (base): exit=0 in 6298 ms
+production still serves base (preview did not touch it): {"classify":{"world":"base","status":404,"contentType":"text/plain; charset=UTF-8","ms":208}} exit=0

@@ -1,0 +1,23 @@
+# previews REST adapter, modules built in-Worker by the router, token = wrangler OAuth (local) 2026-10-10T19:15:28Z
+create rest-a from candidate 3c9508648f271a181919 (A): {"candidateId":"3c9508648f271a181919","preview":{"id":"62c85db490af42b6990aafcf84496c7e","name":"rest-a","created":true,"urls":["https://rest-a-keel-spike-16-app.<subdomain>.workers.dev"]},"deployment":{"id":"7a8d65ac-e2a4-4f15-84bd-7644f8ca6a9f","number":1,"urls":["https://7a8d65ac-keel-spike-16-app.<subdomain>.workers.dev"]},"ms":{"fetchBundle":534,"upsertPreview":2053,"createDeployment":1861,"total":4447}}
+first byte, first request (API): 404 0.052041 0.063480 0.604975 0.605110
+warm API x20: {"label":"rest-A-warm-api","n":20,"codes":"404","ttfbMs":{"min":46,"p50":149,"p95":276,"max":298},"afterTlsMs":{"p50":122,"p95":255},"samplesMs":[149,276,86,127,298,209,46,201,77,135,139,276,189,187,134,158,71,150,190,53]}
+world via preview url: {"classify":{"world":"A","status":404,"contentType":"application/problem+json","ms":138}} exit=0
+world via deployment url: {"classify":{"world":"A","status":404,"contentType":"application/problem+json","ms":289}} exit=0
+asset path on a modules-only preview (/app.js; no assets uploaded, so the Worker answers): 404 text/plain; charset=UTF-8
+create rest-base from candidate 26ea5d8b504649d7c29d (base): {"candidateId":"26ea5d8b504649d7c29d","preview":{"id":"ee5cf1fceabf49d7b6ad31e8af03908d","name":"rest-base","created":true,"urls":["https://rest-base-keel-spike-16-app.<subdomain>.workers.dev"]},"deployment":{"id":"eda6bfa6-5fdb-461d-b9fe-6ec40ea4b1f6","number":1,"urls":["https://eda6bfa6-keel-spike-16-app.<subdomain>.workers.dev"]},"ms":{"fetchBundle":326,"upsertPreview":1859,"createDeployment":2000,"total":4185}}
+first byte, first request (API): 404 0.073354 0.088063 0.889477 0.889611
+warm API x20: {"label":"rest-base-warm-api","n":20,"codes":"404","ttfbMs":{"min":32,"p50":156,"p95":280,"max":282},"afterTlsMs":{"p50":135,"p95":259},"samplesMs":[161,274,162,280,117,149,194,272,282,217,120,151,192,32,156,143,254,134,45,131]}
+world via preview url: {"classify":{"world":"base","status":404,"contentType":"text/plain; charset=UTF-8","ms":210}} exit=0
+world via deployment url: {"classify":{"world":"base","status":404,"contentType":"text/plain; charset=UTF-8","ms":141}} exit=0
+asset path on a modules-only preview (/app.js; no assets uploaded, so the Worker answers): 404 text/plain; charset=UTF-8
+## update: push base's modules as a new deployment of preview rest-a
+update rest-a with candidate 26ea5d8b504649d7c29d: {"candidateId":"26ea5d8b504649d7c29d","preview":{"id":"62c85db490af42b6990aafcf84496c7e","name":"rest-a","created":false,"urls":["https://rest-a-keel-spike-16-app.<subdomain>.workers.dev"]},"deployment":{"id":"eb53ad2c-7842-432f-a0bb-004913ea8946","number":2,"urls":["https://eb53ad2c-keel-spike-16-app.<subdomain>.workers.dev"]},"ms":{"fetchBundle":407,"upsertPreview":986,"createDeployment":1814,"total":3207}}
+preview url flips to base: {"target":"base","polls":58,"seen":{"base":48,"A":10,"unknown":0},"msToStreakEnd":4491,"verdict":"ok"}
+  (from start of update to 10 consecutive base: 7852 ms)
+old deployment url (A) is immutable: {"classify":{"world":"A","status":404,"contentType":"application/problem+json","ms":177}} exit=0
+## can fail
+bad token:     throw new PreviewsApiError(
+PreviewsApiError: GET /workers/workers/keel-spike-16-app/previews/rest-x: HTTP 400 [9106] Authentication failed (status: 400)
+missing worker:     throw new PreviewsApiError(
+PreviewsApiError: POST /workers/workers/keel-spike-16-no-such-worker/previews: HTTP 404 [10007] This Worker does not exist on your account.

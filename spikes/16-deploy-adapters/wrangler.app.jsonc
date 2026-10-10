@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // No "main": the candidate's entry is passed on the command line, e.g.
+  //   wrangler deploy <candidate>/src/index.ts -c wrangler.app.jsonc
+  "name": "keel-spike-16-app",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": { "directory": "./assets" },
+  // Workers Previews: an empty block means "same settings as production".
+  "previews": {},
+  "observability": { "enabled": true }
+}

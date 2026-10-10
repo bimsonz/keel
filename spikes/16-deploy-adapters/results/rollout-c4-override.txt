@@ -1,0 +1,7 @@
+# override header on a settled 10/90 split 2026-10-10T19:23:13Z
+versions deploy A 10% / base 90%: exit=0
+settle (expect ~10% A, 400 samples, after 15 s wait): {"n":400,"counts":{"base":352,"A":48,"unknown":0},"observedPctA":12,"expectedPctA":10,"toleranceCount":18,"override":null,"ms":2109,"verdict":"ok"}
+override -> A (100 samples, expect 100% A): {"n":100,"counts":{"base":0,"A":100,"unknown":0},"observedPctA":100,"expectedPctA":100,"toleranceCount":1,"override":"keel-spike-16-app=\"a029e446-363e-4ae4-8eb6-1b1769dfd4ad\"","ms":808,"verdict":"ok"} exit=0
+override -> B (100 samples, expect 0% A): {"n":100,"counts":{"base":100,"A":0,"unknown":0},"observedPctA":0,"expectedPctA":0,"toleranceCount":1,"override":"keel-spike-16-app=\"f671353b-c023-4a03-8caf-4770cca3e99e\"","ms":917,"verdict":"ok"} exit=0
+CAN FAIL: override -> base checked against 100% A: {"n":100,"counts":{"base":100,"A":0,"unknown":0},"observedPctA":0,"expectedPctA":100,"toleranceCount":1,"override":"keel-spike-16-app=\"f671353b-c023-4a03-8caf-4770cca3e99e\"","ms":773,"verdict":"MISMATCH"} exit=1
+override naming another Worker (expect ignored, ~10% A; checked against 100% so it must MISMATCH): {"n":100,"counts":{"base":88,"A":12,"unknown":0},"observedPctA":12,"expectedPctA":100,"toleranceCount":1,"override":"other-worker=\"a029e446-363e-4ae4-8eb6-1b1769dfd4ad\"","ms":678,"verdict":"MISMATCH"} exit=1
