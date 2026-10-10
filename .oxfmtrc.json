@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  // What the codebase already does; everything else is oxfmt's default.
+  "semi": true,
+  "singleQuote": false,
+  "ignorePatterns": [
+    // Another lane's workspaces, outside the pnpm workspace.
+    "spikes/**",
+    "fixtures/**",
+    "docs/spikes/**",
+    // Emitter and wrangler output: drift checks compare it byte for byte.
+    "packages/contracts/openapi.json",
+    "**/generated/**",
+    "**/*.gen.ts",
+    "**/worker-configuration.d.ts",
+    "pnpm-lock.yaml",
+    // Controls and mutants are deliberate as written; the format control is checked on its own.
+    "test/controls/**",
+    "test/mutants/**",
+    // Prose: hand-written tables and wrapping stay as the author left them.
+    "**/*.md"
+  ]
+}

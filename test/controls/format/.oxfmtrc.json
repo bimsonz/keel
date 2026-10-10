@@ -1,0 +1,6 @@
+{
+  "$schema": "../../../node_modules/oxfmt/configuration_schema.json",
+  // The root options without its ignore list, so this control is checked at all.
+  "semi": true,
+  "singleQuote": false
+}
