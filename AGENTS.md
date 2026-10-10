@@ -98,6 +98,12 @@ Read `node_modules/effect/ai-docs` first, then [docs/effect.md](docs/effect.md) 
 
 A check counts only after it has been seen **red**. Every rule and guard has a control in `test/controls/`; every property test has a seeded wrong implementation; every e2e scenario has a negative-control arm. A new check lands with its control.
 
+Seeded wrong implementations live in `test/mutants/*.patch`. Line 1 is `# expect-red: <command>`; a property-test mutant adds `# kills: tag-a, tag-b`, naming tests whose titles carry `[tag-a]`. `pnpm prove:red [filter] [--unseeded N]` applies each patch, runs it and reverts it:
+- a tagged patch runs under `FC_SEED` 42, 1337 and 20261014 plus N unseeded runs (default 5), with vitest's JSON reporter, and is red only if **every claimed tag** fails in **every** run. An exit code is not enough: one tag failing can hide another that passes;
+- an untagged patch is red when its command exits non-zero.
+
+The runner's own control is `node scripts/prove-red.ts --dir test/controls/prove-red`, which must report its two-tag patch as a survivor. Generate a patch with `git diff -- <paths>` so it carries nothing else, and regenerate it when it reports `STALE`.
+
 ## Git
 
 - Trunk-based: commit to `main`, `git pull --rebase` before every push, and push every commit. A red `main` stops the line: whoever broke it fixes or reverts within 15 minutes.
