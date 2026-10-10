@@ -233,6 +233,18 @@ describe("verdict", () => {
         expect(verdict(plan, { results: shuffled }, "verdict/1")).toEqual(verdict(plan, { results }, "verdict/1"));
       }),
     );
+    // A condition outside the worlds node reads a step that ran in several worlds.
+    const matrix = build([specStep("probe", { worlds: ["A", "AB"], outcomes: ["pass", "annotate", "abstain"] }), specStep("deep")], {
+      _tag: "seq",
+      exitOn: "fail",
+      items: [
+        { _tag: "worlds", over: ["A", "AB"], body: { _tag: "step", step: "probe" } },
+        { _tag: "when", condition: { _tag: "outcome", step: "probe", in: ["annotate"] }, body: { _tag: "step", step: "deep" } },
+      ],
+    });
+    const inA = res(matrix, "probe", "pass", "A");
+    const inAB = res(matrix, "probe", "annotate", "AB");
+    expect(decide(matrix, { results: [inA, inAB] })).toBe(decide(matrix, { results: [inAB, inA] }));
   });
 
   it("[verdict.versioned] the verdict is a versioned function, stamped with its version and plan, and superseding wins", () => {
