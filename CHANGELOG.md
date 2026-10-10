@@ -17,6 +17,7 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 - Entity kind `trunk` (`trunk:<projectId>`). Events `TrunkInitialized {projectId, head, by}`, `PromotionStarted` (the WAL entry) and `PromotionComposed {projectId, groupId, sha}`. `BatchFailed.attribution` gains `unattributed`; `PromotionDeclined.reason` gains `frozen`. Optional `projectId` and `predecessors` on `BatchFormed`, `members`, `base` and `predecessors` on `BatchVerified`, `head` on `PromotionResumed`, `predecessors` and `attribution` on `Batch`.
 - Errors `CandidateStateRefused`, `ResultFenced` (terminal: a fenced result is never retried), `InvalidBatch`, `TrunkNotInitialized`, `PromotionStateRefused`.
 - `ChangeStarted.baseSha?` and `Change.baseSha?`: the workspace's head at grant, which Precheck diffs against (the `Start` command requires it).
+- `EventDraft.entity?`: a draft may name another entity its Durable Object owns (the Change DO's verdicts). That entity gets its own gap-free `seq` and dedupe keys; the default is still `CommitSpec.entity`.
 
 - `CodeHost.hasCommit(repo, sha) => Effect<boolean, RepoNotFound>`: whether the repo holds a commit, in one object read. Submit's commit-in-workspace check uses it.
 

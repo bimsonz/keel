@@ -66,22 +66,24 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
       .toArray()
       .map((row) => row.subscriber);
 
+  /** The entity's last seq, or 0 before its first event. */
+  const lastSeq = (entity: EntityRef) =>
+    sql
+      .exec<{ seq: number | null }>(
+        "SELECT MAX(seq) AS seq FROM keel_events WHERE entity_kind = ? AND entity_id = ?",
+        entity.kind,
+        entity.id,
+      )
+      .one().seq ?? 0;
+
   return Layer.succeed(
     EventOutbox,
     EventOutbox.of({
       append: (spec, at, drafts) => {
-        const head =
-          sql
-            .exec<{ seq: number | null }>(
-              "SELECT MAX(seq) AS seq FROM keel_events WHERE entity_kind = ? AND entity_id = ?",
-              spec.entity.kind,
-              spec.entity.id,
-            )
-            .one().seq ?? 0;
         const envelopes = envelopesFor(
           spec,
           at,
-          head,
+          lastSeq,
           drafts,
           () => makeId("evt", nextUlid(at)),
           subscribers,

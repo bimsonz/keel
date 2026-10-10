@@ -93,6 +93,46 @@ export function describeEventOutboxContract(adapter: string, harness: () => Outb
     );
 
     it.effect(
+      "[b11.draft-entity] numbers a draft for another entity on that entity's own seq, in the same commit",
+      () =>
+        Effect.gen(function* () {
+          const h = harness();
+          const a = change();
+          const verdict: EntityRef = { kind: "verdict", id: `vrd_${randomUlid()}` };
+          const issued = (n: number): EventDraft => ({
+            entity: verdict,
+            payload: { _tag: "VerdictIssued", verdictId: verdict.id, n },
+          });
+          const logs = yield* h.run(
+            Effect.gen(function* () {
+              yield* emit(a, 2);
+              yield* commit({ entity: a, cause: cause() }, () =>
+                Result.succeed({ drafts: [issued(1), started(a, 3)], value: null }),
+              );
+              yield* commit({ entity: a, cause: cause() }, () =>
+                Result.succeed({ drafts: [started(a, 4), issued(2)], value: null }),
+              );
+              return [yield* log(a), yield* log(verdict)] as const;
+            }),
+          );
+          const [ofChange, ofVerdict] = logs;
+          expect(ofChange.map((event) => [event.type, event.seq])).toEqual([
+            ["PrecheckStarted", 1],
+            ["PrecheckStarted", 2],
+            ["PrecheckStarted", 3],
+            ["PrecheckStarted", 4],
+          ]);
+          expect(ofVerdict.map((event) => [event.entity, event.seq])).toEqual([
+            [verdict, 1],
+            [verdict, 2],
+          ]);
+          expect(
+            ofVerdict.every((event) => event.dedupeKey.startsWith(`verdict:${verdict.id}/`)),
+          ).toBe(true);
+        }),
+    );
+
+    it.effect(
       "[b1.seq-gap-free] writes nothing and consumes no seq when a transition is refused or throws",
       () =>
         Effect.gen(function* () {

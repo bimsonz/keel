@@ -103,6 +103,9 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
       ),
     ].toSorted();
 
+  /** The entity's last seq, or 0 before its first event. */
+  const previous = (entity: EntityRef) => eventsOf(entity).at(-1)?.envelope.seq ?? 0;
+
   const heads = () => {
     const seen = new Map<string, ReturnType<typeof deliveries>[number]>();
     for (const delivery of deliveries())
@@ -112,7 +115,6 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
 
   return EventOutbox.of({
     append: (spec, at, drafts) => {
-      const previous = eventsOf(spec.entity).at(-1)?.envelope.seq ?? 0;
       const envelopes = envelopesFor(
         spec,
         at,

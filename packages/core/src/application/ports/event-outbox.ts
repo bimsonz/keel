@@ -24,6 +24,12 @@ export interface EventDraft {
   readonly payload: { readonly _tag: string; readonly [field: string]: Stored };
   /** Entities, beyond the emitter, whose state this event changes or invalidates. */
   readonly affected?: readonly EntityRef[];
+  /**
+   * The entity whose state this event changes, when it is not the commit's own:
+   * another entity the same Durable Object owns (the Change DO's verdicts). It
+   * gets its own gap-free `seq`. Defaults to `CommitSpec.entity`.
+   */
+  readonly entity?: EntityRef;
 }
 
 /** What one transition commits for: its entity, and the cause that makes a retry a no-op. */
@@ -73,10 +79,10 @@ export class EventOutbox extends Context.Service<
   EventOutbox,
   {
     /**
-     * Numbers the drafts as the entity's next events (gap-free `seq`), mints
-     * their ids, and owes one delivery per subscriber of each event's type at
-     * this moment, recorded in its `notified[]`. Must run inside the
-     * transaction that writes the state.
+     * Numbers the drafts as their entities' next events (gap-free `seq` per
+     * entity), mints their ids, and owes one delivery per subscriber of each
+     * event's type at this moment, recorded in its `notified[]`. Must run
+     * inside the transaction that writes the state.
      */
     readonly append: (
       spec: CommitSpec,
@@ -167,31 +173,36 @@ export function dedupeKeyOf(
 }
 
 /**
- * The envelopes for one commit's drafts, numbered after `previousSeq`. Every
- * adapter builds its envelopes here, so they cannot disagree on numbering or
- * keys. Throws on a draft the envelope schema rejects, which rolls back the
- * transaction it runs in.
+ * The envelopes for one commit's drafts, each numbered after its entity's
+ * `previousSeq`. Every adapter builds its envelopes here, so they cannot
+ * disagree on numbering or keys. Throws on a draft the envelope schema
+ * rejects, which rolls back the transaction it runs in.
  */
 export function envelopesFor(
   spec: CommitSpec,
   at: Instant,
-  previousSeq: number,
+  previousSeq: (entity: EntityRef) => number,
   drafts: readonly EventDraft[],
   mintId: () => EventId,
   subscribers: (type: string) => readonly Subscriber[],
 ): readonly EventEnvelope[] {
+  const seqs = new Map<string, number>();
   const ordinals = new Map<string, number>();
-  return drafts.map((draft, index) => {
+  return drafts.map((draft) => {
+    const entity = draft.entity ?? spec.entity;
     const type = draft.payload._tag;
-    const ordinal = (ordinals.get(type) ?? 0) + 1;
-    ordinals.set(type, ordinal);
+    const entityKey = `${entity.kind}:${entity.id}`;
+    const seq = (seqs.get(entityKey) ?? previousSeq(entity)) + 1;
+    seqs.set(entityKey, seq);
+    const ordinal = (ordinals.get(`${entityKey}/${type}`) ?? 0) + 1;
+    ordinals.set(`${entityKey}/${type}`, ordinal);
     return Schema.decodeUnknownSync(EventEnvelope)({
       eventId: mintId(),
       type,
-      entity: spec.entity,
-      seq: previousSeq + index + 1,
+      entity,
+      seq,
       at,
-      dedupeKey: dedupeKeyOf(spec.entity, spec.cause, type, ordinal),
+      dedupeKey: dedupeKeyOf(entity, spec.cause, type, ordinal),
       ...(spec.causation === undefined ? {} : { causation: spec.causation }),
       affected: draft.affected ?? [],
       notified: subscribers(type),

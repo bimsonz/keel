@@ -2,7 +2,7 @@
 # kills: b1.seq-gap-free
 # why: the next seq comes from a counter kept outside the transaction, so a rolled-back append still advances it
 diff --git a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
-index d38119f..cf95888 100644
+index 7b2e288..3a4677b 100644
 --- a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
 +++ b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
 @@ -55,6 +55,7 @@ const encodeEnvelope = (envelope: EventEnvelope): string =>
@@ -13,23 +13,34 @@ index d38119f..cf95888 100644
  
    const subscribers = (type: string): readonly string[] =>
      sql
-@@ -70,14 +71,18 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
+@@ -67,14 +68,22 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
+       .map((row) => row.subscriber);
+ 
+   /** The entity's last seq, or 0 before its first event. */
+-  const lastSeq = (entity: EntityRef) =>
+-    sql
+-      .exec<{ seq: number | null }>(
+-        "SELECT MAX(seq) AS seq FROM keel_events WHERE entity_kind = ? AND entity_id = ?",
+-        entity.kind,
+-        entity.id,
+-      )
+-      .one().seq ?? 0;
++  const lastSeq = (entity: EntityRef) => {
++    const key = `${entity.kind}:${entity.id}`;
++    const seq =
++      heads.get(key) ??
++      sql
++        .exec<{ seq: number | null }>(
++          "SELECT MAX(seq) AS seq FROM keel_events WHERE entity_kind = ? AND entity_id = ?",
++          entity.kind,
++          entity.id,
++        )
++        .one().seq ??
++      0;
++    // Advanced as it is read, outside the transaction: a rolled-back append keeps the advance.
++    heads.set(key, seq + 1);
++    return seq;
++  };
+ 
+   return Layer.succeed(
      EventOutbox,
-     EventOutbox.of({
-       append: (spec, at, drafts) => {
-+        const key = `${spec.entity.kind}:${spec.entity.id}`;
-         const head =
-+          heads.get(key) ??
-           sql
-             .exec<{ seq: number | null }>(
-               "SELECT MAX(seq) AS seq FROM keel_events WHERE entity_kind = ? AND entity_id = ?",
-               spec.entity.kind,
-               spec.entity.id,
-             )
--            .one().seq ?? 0;
-+            .one().seq ??
-+          0;
-+        heads.set(key, head + drafts.length);
-         const envelopes = envelopesFor(
-           spec,
-           at,

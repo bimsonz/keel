@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: b11.draft-entity
+# why: every draft is numbered and keyed as the commit's own entity, so a verdict's events land in the change's log
+diff --git a/packages/core/src/application/ports/event-outbox.ts b/packages/core/src/application/ports/event-outbox.ts
+index c0e209f..bd34e55 100644
+--- a/packages/core/src/application/ports/event-outbox.ts
++++ b/packages/core/src/application/ports/event-outbox.ts
+@@ -189,7 +189,7 @@ export function envelopesFor(
+   const seqs = new Map<string, number>();
+   const ordinals = new Map<string, number>();
+   return drafts.map((draft) => {
+-    const entity = draft.entity ?? spec.entity;
++    const entity = spec.entity;
+     const type = draft.payload._tag;
+     const entityKey = `${entity.kind}:${entity.id}`;
+     const seq = (seqs.get(entityKey) ?? previousSeq(entity)) + 1;

@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: b11.draft-entity
+# why: one commit numbers all its drafts from the commit entity's head, so the verdict's seq skips
+diff --git a/packages/core/src/application/ports/event-outbox.ts b/packages/core/src/application/ports/event-outbox.ts
+index c0e209f..59d336a 100644
+--- a/packages/core/src/application/ports/event-outbox.ts
++++ b/packages/core/src/application/ports/event-outbox.ts
+@@ -192,8 +192,8 @@ export function envelopesFor(
+     const entity = draft.entity ?? spec.entity;
+     const type = draft.payload._tag;
+     const entityKey = `${entity.kind}:${entity.id}`;
+-    const seq = (seqs.get(entityKey) ?? previousSeq(entity)) + 1;
+-    seqs.set(entityKey, seq);
++    const seq = (seqs.get("all") ?? previousSeq(spec.entity)) + 1;
++    seqs.set("all", seq);
+     const ordinal = (ordinals.get(`${entityKey}/${type}`) ?? 0) + 1;
+     ordinals.set(`${entityKey}/${type}`, ordinal);
+     return Schema.decodeUnknownSync(EventEnvelope)({
