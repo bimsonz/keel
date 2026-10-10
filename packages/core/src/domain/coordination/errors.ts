@@ -33,3 +33,14 @@ export class CommitNotInWorkspace extends Schema.TaggedError<CommitNotInWorkspac
   changeId: ChangeId,
   commitSha: Schema.String,
 }) {}
+
+/**
+ * A proposition whose value does not read on its predicate's lattice (see the
+ * grammar on `Proposition.value`). It is compared as needs-probe, never as a
+ * verdict, and preflight tells the agent the grammar.
+ */
+export class UnreadableProposition extends Schema.TaggedError<UnreadableProposition>()("UnreadableProposition", {
+  subject: Schema.String,
+  predicate: Schema.String,
+  reason: Schema.String,
+}) {}
