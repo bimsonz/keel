@@ -1,6 +1,7 @@
 import { Change, ChangeNotFound, ChangeStateRefused, CommitNotInWorkspace, LeaseStale, Preflight, RevisionMismatch } from "@keeltown/core/domain/coordination";
 import { CommitSha } from "@keeltown/core/kernel";
 import { Schema } from "effect";
+import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
 
 /** A change's submission as it stands: the change, and the commit last submitted for it. */
@@ -23,7 +24,7 @@ export const ChangeCodecs = {
  * The Change DO (`change:<ULID>`): intent revisions, premises, effects and
  * verdicts. Arguments are the encoded forms of the matching use-case inputs.
  */
-export interface ChangeRpc {
+export interface ChangeRpc extends EventReceiverRpc {
   get(): Promise<ExitJson>;
   declare(command: unknown): Promise<ExitJson>;
   revise(command: unknown): Promise<ExitJson>;

@@ -1,15 +1,19 @@
 import {
   describeAgentDirectoryContract,
   describeClockContract,
+  describeEventOutboxContract,
   describeEntityStoreContract,
   describeIdsContract,
   describePendingContract,
   describeTokenIssuerContract,
+  memoryOutboxHarness,
+  type OutboxHarness,
 } from "./contracts/index.ts";
 import { describeCodeHostContract } from "./contracts/code-host.ts";
 import * as codeHost from "./memory/code-host.ts";
 import * as coordination from "./memory/coordination.ts";
 import * as delivery from "./memory/delivery.ts";
+import * as outbox from "./memory/event-outbox.ts";
 import * as identity from "./memory/identity.ts";
 import * as integration from "./memory/integration.ts";
 import * as storage from "./memory/storage.ts";
@@ -32,6 +36,16 @@ const pending =
   (adapter: string): void =>
     describePendingContract(name, adapter, methods);
 
+/**
+ * The outbox's suite needs more than a Layer (a scripted fan-out, a clock it can move, and a way into a
+ * Durable Object's context), so its real adapters register with a harness factory instead.
+ */
+const eventOutbox = {
+  memory: () => outbox.makeEventOutboxMemory().layer,
+  contract: (adapter: string, harness: () => OutboxHarness) => describeEventOutboxContract(adapter, harness),
+  verifyMemory: () => describeEventOutboxContract("in-memory", memoryOutboxHarness),
+};
+
 const GENESIS = Schema.decodeUnknownSync(CommitSha)("0".repeat(40));
 
 export const PORTS = {
@@ -50,7 +64,7 @@ export const PORTS = {
   Changes: port(() => coordination.makeChangesMemory().layer, pending("Changes", ["declare", "submit", "get", "awaitSubmission"])),
   Inbox: port(() => coordination.makeInboxMemory().layer, pending("Inbox", ["read"])),
   EntityStore: port(() => storage.makeEntityStoreMemory().layer, describeEntityStoreContract),
-  EventOutbox: port(() => storage.makeEventOutboxMemory().layer, pending("EventOutbox", ["append", "pending", "acknowledge"])),
+  EventOutbox: eventOutbox,
   EventLog: port(() => storage.makeEventLogMemory().layer, pending("EventLog", ["publish"])),
   WorkQueue: port(() => storage.makeWorkQueueMemory().layer, pending("WorkQueue", ["enqueue"])),
   DecisionModel: port(() => verification.makeDecisionModelMemory().layer, pending("DecisionModel", ["ask"])),

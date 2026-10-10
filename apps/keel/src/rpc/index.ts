@@ -6,6 +6,7 @@
  */
 export * from "./agent-session.ts";
 export * from "./change.ts";
+export * from "./events.ts";
 export * from "./exit.ts";
 export * from "./lane.ts";
 export * from "./project.ts";

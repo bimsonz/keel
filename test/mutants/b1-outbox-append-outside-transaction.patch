@@ -1,0 +1,38 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: b1.commit-atomic
+# why: the decision's writes commit in one transaction and its events are appended after it, so a failed append leaves state with no event
+diff --git a/packages/core/src/application/ports/commit.ts b/packages/core/src/application/ports/commit.ts
+index 55709f7..adf000a 100644
+--- a/packages/core/src/application/ports/commit.ts
++++ b/packages/core/src/application/ports/commit.ts
+@@ -3,6 +3,7 @@ import type { EventEnvelope } from "../../domain/kernel/index.ts";
+ import { Clock } from "./clock.ts";
+ import { EntityStore } from "./entity-store.ts";
+ import { type CommitSpec, type EventDraft, EventOutbox } from "./event-outbox.ts";
++// mutant
+ 
+ /** What a decision sees inside the transaction: the state and the outbox, both synchronous. */
+ export interface Transaction {
+@@ -46,7 +47,8 @@ export const commit = <A, E>(
+     const outbox = yield* EventOutbox;
+     let refusal: Result.Failure<Transition<A>, E> | undefined;
+     try {
+-      return store.transaction((): Committed<A> => {
++      let drafts: readonly EventDraft[] = [];
++      const committed = store.transaction((): Committed<A> => {
+         const prior = outbox.committed(spec.entity, spec.cause);
+         if (prior !== undefined) return { duplicate: true, sameCommand: prior.fingerprint === spec.fingerprint, events: prior.events };
+         const decided = decide({ store, outbox });
+@@ -54,9 +56,10 @@ export const commit = <A, E>(
+           refusal = decided;
+           throw new Rollback();
+         }
+-        const events = outbox.append(spec, at, decided.success.drafts);
+-        return { duplicate: false, value: decided.success.value, events };
++        drafts = decided.success.drafts;
++        return { duplicate: false, value: decided.success.value, events: [] };
+       });
++      return committed.duplicate ? committed : { ...committed, events: outbox.append(spec, at, drafts) };
+     } catch (thrown) {
+       if (thrown instanceof Rollback && refusal !== undefined) return yield* Effect.fail(refusal.failure);
+       throw thrown;

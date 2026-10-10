@@ -2,6 +2,7 @@ import { Proposition } from "@keeltown/core/domain/coordination";
 import { Conflict, ConflictNotFound, MoveRefused } from "@keeltown/core/domain/verification";
 import type { ChangeId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
+import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
 
 export const SubjectCodecs = {
@@ -11,7 +12,7 @@ export const SubjectCodecs = {
 };
 
 /** The Subject DO (`subj:<project>:<key>`): premises, tenets, decisions, fallout, semantic and precedent conflicts. */
-export interface SubjectRpc {
+export interface SubjectRpc extends EventReceiverRpc {
   rely(changeId: typeof ChangeId.Encoded, premise: typeof Proposition.Encoded): Promise<ExitJson>;
   conflict(conflictId: string): Promise<ExitJson>;
   resolve(command: unknown): Promise<ExitJson>;

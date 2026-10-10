@@ -1,6 +1,7 @@
 import { AgentNotAdmitted, AgentNotKnown, IdempotencyConflict, InboxPage } from "@keeltown/core/domain/identity";
 import { AgentId, ChangeId, InstantSchema, SessionId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
+import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
 
 /** What the AgentSession DO (`agent:<id>`) knows about its agent right now. */
@@ -29,7 +30,7 @@ export const AgentSessionCodecs = {
 };
 
 /** The AgentSession DO: inbox, cursor, leases, fidelity and the agent's live connections. */
-export interface AgentSessionRpc {
+export interface AgentSessionRpc extends EventReceiverRpc {
   describe(): Promise<ExitJson>;
   openSession(details: typeof OpenSession.Encoded): Promise<ExitJson>;
   /**

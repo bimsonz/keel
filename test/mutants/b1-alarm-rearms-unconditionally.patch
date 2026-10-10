@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "exactly once, through the real alarm"
+# kills: b1.alarm-quiet
+# why: every flush re-arms the redelivery deadline even with nothing owed, which is a polling loop
+diff --git a/apps/keel/src/adapters/driving/do/keel-object.ts b/apps/keel/src/adapters/driving/do/keel-object.ts
+index b3ef35d..660c065 100644
+--- a/apps/keel/src/adapters/driving/do/keel-object.ts
++++ b/apps/keel/src/adapters/driving/do/keel-object.ts
+@@ -110,8 +110,6 @@ export abstract class KeelObject extends DurableObject<Env> implements EventRece
+   private async flush(): Promise<void> {
+     const report = await this.runtime.runPromise(flushOutbox(this.fanOut));
+     if (report.stuck.length > 0) console.warn("outbox backlog stuck", JSON.stringify(report.stuck));
+-    if (report.nextAttemptAt !== undefined) {
+-      await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason: OUTBOX_REDELIVERY, at: report.nextAttemptAt });
+-    }
++    await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason: OUTBOX_REDELIVERY, at: report.nextAttemptAt ?? Date.now() + 60_000 });
+   }
+ }

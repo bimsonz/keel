@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "EventOutbox contract"
+# kills: b1.owed-stays-owed
+# why: unsubscribing also deletes the deliveries already owed, so an event committed while subscribed is lost
+diff --git a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
+index 1a59173..7a1cc76 100644
+--- a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
++++ b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
+@@ -98,6 +98,7 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
+       unsubscribe: (subscriber, types) => {
+         if (types === undefined || types === EVERY_TYPE) {
+           sql.exec("DELETE FROM keel_subscriptions WHERE subscriber = ?", subscriber);
++          sql.exec("DELETE FROM keel_deliveries WHERE subscriber = ?", subscriber);
+           return;
+         }
+         for (const type of types) sql.exec("DELETE FROM keel_subscriptions WHERE subscriber = ? AND type = ?", subscriber, type);

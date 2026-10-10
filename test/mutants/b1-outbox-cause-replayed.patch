@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: b1.cause-once
+# why: commit never asks what the cause already committed, so a retried command decides and commits again
+diff --git a/packages/core/src/application/ports/commit.ts b/packages/core/src/application/ports/commit.ts
+index 55709f7..9b98713 100644
+--- a/packages/core/src/application/ports/commit.ts
++++ b/packages/core/src/application/ports/commit.ts
+@@ -48,7 +48,7 @@ export const commit = <A, E>(
+     try {
+       return store.transaction((): Committed<A> => {
+         const prior = outbox.committed(spec.entity, spec.cause);
+-        if (prior !== undefined) return { duplicate: true, sameCommand: prior.fingerprint === spec.fingerprint, events: prior.events };
++        if (prior !== undefined && prior.events.length < 0) return { duplicate: true, sameCommand: prior.fingerprint === spec.fingerprint, events: prior.events };
+         const decided = decide({ store, outbox });
+         if (Result.isFailure(decided)) {
+           refusal = decided;

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "Workflow subscribers"
+# kills: b1.workflow-once
+# why: the instance id is random, so a redelivered ChangeSubmitted starts a second Precheck
+diff --git a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+index 9aea7c7..f5d08c6 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+@@ -52,7 +52,7 @@ function workflowFor(env: Env, name: string): Workflow | undefined {
+  * bounce, even at the same revision) starts its own.
+  */
+ export function workflowInstanceId(name: string, event: EventEnvelope): string {
+-  return `${name.toLowerCase()}-${event.eventId}`;
++  return `${name.toLowerCase()}-${event.eventId}-${crypto.randomUUID()}`;
+ }
+ 
+ const encodeEnvelope = Schema.encodeSync(EventEnvelope);

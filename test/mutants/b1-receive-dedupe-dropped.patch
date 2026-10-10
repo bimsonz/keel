@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "duplicate delivery"
+# kills: b1.duplicate-noop
+# why: the receiver records the dedupe key but reacts whatever it says, so a redelivered event is applied twice
+diff --git a/apps/keel/src/adapters/driving/do/keel-object.ts b/apps/keel/src/adapters/driving/do/keel-object.ts
+index b3ef35d..4e28700 100644
+--- a/apps/keel/src/adapters/driving/do/keel-object.ts
++++ b/apps/keel/src/adapters/driving/do/keel-object.ts
+@@ -69,7 +69,7 @@ export abstract class KeelObject extends DurableObject<Env> implements EventRece
+       const receipt = { accepted: 0, duplicates: 0, ignored: 0 };
+       for (const arrival of readDelivery(envelopes)) {
+         const outcome = store.transaction((): keyof DeliveryReceipt => {
+-          if (!outbox.receive(arrival.dedupeKey, at)) return "duplicates";
++          outbox.receive(arrival.dedupeKey, at);
+           if (arrival.envelope === undefined) return "ignored";
+           const reaction = react(arrival.envelope, { store, outbox });
+           if (reaction === undefined) return "ignored";

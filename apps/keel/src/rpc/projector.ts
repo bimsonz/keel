@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
 
 export const ProjectorCodecs = {
@@ -6,6 +7,6 @@ export const ProjectorCodecs = {
 };
 
 /** The Projector DO: drains the operation log into read models when nudged, then sleeps. */
-export interface ProjectorRpc {
+export interface ProjectorRpc extends EventReceiverRpc {
   nudge(): Promise<ExitJson>;
 }

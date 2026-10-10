@@ -7,7 +7,6 @@ import {
   BundleStore,
   EntityStore,
   EventLog,
-  EventOutbox,
   type Job,
   Metrics,
   type MfpRecord,
@@ -57,29 +56,6 @@ export function makeEntityStoreMemory() {
             throw error;
           }
         },
-      }),
-    ),
-  };
-}
-
-export function makeEventOutboxMemory() {
-  const pending: EventEnvelope[] = [];
-  return {
-    pending,
-    layer: Layer.succeed(
-      EventOutbox,
-      EventOutbox.of({
-        append: (events) => {
-          pending.push(...events);
-        },
-        pending: (limit) => pending.slice(0, limit),
-        acknowledge: (eventIds) =>
-          Effect.sync(() => {
-            for (let i = pending.length - 1; i >= 0; i -= 1) {
-              const event = pending[i];
-              if (event !== undefined && eventIds.includes(event.eventId)) pending.splice(i, 1);
-            }
-          }),
       }),
     ),
   };

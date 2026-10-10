@@ -1,15 +1,7 @@
-import { DurableObject } from "cloudflare:workers";
-import { durableObjectRuntime, type DurableObjectRuntime } from "../../../composition/do.ts";
+import { KeelObject } from "./keel-object.ts";
 
 /**
  * The WorkspacePool DO (`pool:<project>`): pre-forked workspaces and sketches. Keel builds its RPC methods here, against the contract in
- * src/rpc. The runtime is built once, in the constructor.
+ * src/rpc. It extends KeelObject, which builds its runtime and the event backbone.
  */
-export class WorkspacePoolDO extends DurableObject<Env> {
-  protected readonly runtime: DurableObjectRuntime;
-
-  constructor(ctx: DurableObjectState, env: Env) {
-    super(ctx, env);
-    this.runtime = durableObjectRuntime(ctx);
-  }
-}
+export class WorkspacePoolDO extends KeelObject {}

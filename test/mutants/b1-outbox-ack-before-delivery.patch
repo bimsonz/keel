@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: b1.ack-after-delivery
+# why: each batch is acknowledged before its delivery is attempted, so a failed delivery is never retried
+diff --git a/packages/core/src/application/ports/flush.ts b/packages/core/src/application/ports/flush.ts
+index ca6c5cd..012fe45 100644
+--- a/packages/core/src/application/ports/flush.ts
++++ b/packages/core/src/application/ports/flush.ts
+@@ -30,7 +30,10 @@ export const flushOutbox = (fanOut: FanOut): Effect.Effect<FlushReport, never, C
+     const outbox = yield* EventOutbox;
+     const outcomes = yield* Effect.forEach(
+       outbox.due(now, FLUSH_BATCH),
+-      (batch) => Effect.map(Effect.result(fanOut.deliver(batch.subscriber, batch.events)), (outcome) => ({ batch, outcome })),
++      (batch) => {
++        store.transaction(() => outbox.acknowledge(batch.subscriber, batch.events.map((event) => event.eventId)));
++        return Effect.map(Effect.result(fanOut.deliver(batch.subscriber, batch.events)), (outcome) => ({ batch, outcome }));
++      },
+       { concurrency: 8 },
+     );
+     let delivered = 0;

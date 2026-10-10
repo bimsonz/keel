@@ -208,3 +208,5 @@ export function describePendingContract(port: string, adapter: string, methods: 
     for (const method of methods) it.todo(`${port}.${method}`);
   });
 }
+
+export * from "./event-outbox.ts";

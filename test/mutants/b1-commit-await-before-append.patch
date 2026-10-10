@@ -1,0 +1,32 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t "ten concurrent"
+# kills: b1.racers
+# why: the decision reads and writes state, then awaits before its events append, so concurrent commits interleave between the two
+diff --git a/packages/core/src/application/ports/commit.ts b/packages/core/src/application/ports/commit.ts
+index 55709f7..7457813 100644
+--- a/packages/core/src/application/ports/commit.ts
++++ b/packages/core/src/application/ports/commit.ts
+@@ -46,7 +46,8 @@ export const commit = <A, E>(
+     const outbox = yield* EventOutbox;
+     let refusal: Result.Failure<Transition<A>, E> | undefined;
+     try {
+-      return store.transaction((): Committed<A> => {
++      let drafts: readonly EventDraft[] = [];
++      const decided = store.transaction((): Committed<A> => {
+         const prior = outbox.committed(spec.entity, spec.cause);
+         if (prior !== undefined) return { duplicate: true, sameCommand: prior.fingerprint === spec.fingerprint, events: prior.events };
+         const decided = decide({ store, outbox });
+@@ -54,9 +55,12 @@ export const commit = <A, E>(
+           refusal = decided;
+           throw new Rollback();
+         }
+-        const events = outbox.append(spec, at, decided.success.drafts);
+-        return { duplicate: false, value: decided.success.value, events };
++        drafts = decided.success.drafts;
++        return { duplicate: false, value: decided.success.value, events: [] };
+       });
++      if (decided.duplicate) return decided;
++      yield* Effect.sleep(Math.floor(Math.random() * 5));
++      return { ...decided, events: store.transaction(() => outbox.append(spec, at, drafts)) };
+     } catch (thrown) {
+       if (thrown instanceof Rollback && refusal !== undefined) return yield* Effect.fail(refusal.failure);
+       throw thrown;
