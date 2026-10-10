@@ -1,16 +1,53 @@
 import {
   Change,
   ChangeNotFound,
+  ChangeOrigin,
   ChangeStateRefused,
   CommitNotInWorkspace,
+  FootprintEntry,
   LeaseStale,
+  PoolExhausted,
   Preflight,
+  Proposition,
   RevisionMismatch,
+  SketchNotFound,
 } from "@keeltown/core/domain/coordination";
-import { CommitSha } from "@keeltown/core/kernel";
-import { Schema } from "effect";
+import { AgentId, ChangeId, CommitSha, LeaseId, ProjectId, SketchId } from "@keeltown/core/kernel";
+import { Effect, Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
+import { WorkspaceGrant } from "./workspace-pool.ts";
+
+/**
+ * Declare a change. `changeId` is the one the agent's AgentSession reserved for
+ * `idempotencyKey`; the DO checks it against its own name. The key is the
+ * commit's cause and `fingerprint` (a hash of the request body) tells a retry
+ * from a reused key. The DO takes its workspace with `WorkspacePool.grant(projectId, changeId)`.
+ */
+export const DeclareCommand = Schema.Struct({
+  changeId: ChangeId,
+  agentId: AgentId,
+  projectId: ProjectId,
+  /** Absent means `agent`; the Auditor's revert declares through a platform path. */
+  origin: ChangeOrigin.pipe(Schema.withDecodingDefaultKey(Effect.succeed("agent" as const))),
+  goal: Schema.NonEmptyString,
+  footprint: Schema.Array(FootprintEntry),
+  premises: Schema.Array(Proposition),
+  declaredEffects: Schema.optional(Schema.Array(Proposition)),
+  sketchId: Schema.optional(SketchId),
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
+export type DeclareCommand = typeof DeclareCommand.Type;
+
+/** Submit a commit for a change. The lease is authorised in the DO alone; the key is the commit's cause. */
+export const SubmitCommand = Schema.Struct({
+  agentId: AgentId,
+  leaseId: LeaseId,
+  commitSha: CommitSha,
+  idempotencyKey: Schema.String,
+});
+export type SubmitCommand = typeof SubmitCommand.Type;
 
 /** A change's submission as it stands: the change, and the commit last submitted for it. */
 export const SubmissionStatus = Schema.Struct({
@@ -22,7 +59,10 @@ const Mutation = Schema.Union([ChangeNotFound, LeaseStale, RevisionMismatch, Cha
 
 export const ChangeCodecs = {
   get: exitCodec(Change, ChangeNotFound),
-  declare: exitCodec(Schema.Struct({ change: Change, preflight: Preflight }), ChangeStateRefused),
+  declare: exitCodec(
+    Schema.Struct({ change: Change, preflight: Preflight, grant: WorkspaceGrant }),
+    Schema.Union([ChangeStateRefused, PoolExhausted, SketchNotFound]),
+  ),
   revise: exitCodec(Schema.Struct({ change: Change, preflight: Preflight }), Mutation),
   // Submit carries no revision: RevisionMismatch belongs to revise alone.
   submit: exitCodec(
@@ -40,9 +80,9 @@ export const ChangeCodecs = {
  */
 export interface ChangeRpc extends EventReceiverRpc {
   get(): Promise<ExitJson>;
-  declare(command: unknown): Promise<ExitJson>;
+  declare(command: typeof DeclareCommand.Encoded): Promise<ExitJson>;
   revise(command: unknown): Promise<ExitJson>;
-  submit(command: unknown): Promise<ExitJson>;
+  submit(command: typeof SubmitCommand.Encoded): Promise<ExitJson>;
   abandon(command: unknown): Promise<ExitJson>;
   adopt(command: unknown): Promise<ExitJson>;
   /**

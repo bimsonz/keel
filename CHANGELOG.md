@@ -6,7 +6,13 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 
 ## Unreleased
 
-Nothing yet.
+### Added
+
+- Change RPC commands `DeclareCommand` (`changeId`, checked by the DO against its own name; `agentId`, `projectId`, `origin` defaulting to `agent`, the intent, `sketchId?`, `idempotencyKey` as the commit's cause, and `fingerprint`) and `SubmitCommand` (`agentId`, `leaseId`, `commitSha`, `idempotencyKey`). `ChangeRpc.declare` and `submit` take their encoded forms instead of `unknown`.
+
+### Changed
+
+- `ChangeCodecs.declare` answers `{change, preflight, grant: WorkspaceGrant}` and fails with `ChangeStateRefused | PoolExhausted | SketchNotFound`, because the Change DO takes its workspace before it decides (unused since contracts-v0).
 
 ## contracts-v0 (10 Oct 2026)
 
