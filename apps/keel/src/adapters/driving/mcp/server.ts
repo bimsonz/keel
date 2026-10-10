@@ -10,22 +10,24 @@ import {
 } from "@modelcontextprotocol/server";
 import type { ToolDeps } from "../../../generated/mcp/mcp-runtime.gen.ts";
 import { registerTools } from "../../../generated/mcp/mcp.gen.ts";
-import { AgentId } from "@keeltown/core/kernel";
+import { AgentId, ProjectId } from "@keeltown/core/kernel";
 import { Scope } from "@keeltown/core/domain/identity";
 import { Option, Schema } from "effect";
 import { admitsAnonymous, type Caller, type Principal, satisfies, type TokenVerifier } from "../http/caller.ts";
 import type { Handlers } from "../http/handlers.ts";
 
 const decodeAgentId = Schema.decodeUnknownOption(AgentId);
+const decodeProjectId = Schema.decodeUnknownOption(ProjectId);
 const decodeScopes = Schema.decodeUnknownOption(Schema.Array(Scope));
 
 /** The principal travels from the bearer gate to the tool handlers inside AuthInfo, and is decoded back out. */
 function principalOf(auth: AuthInfo | undefined): Principal | null {
   const agentId = decodeAgentId(auth?.extra?.["agentId"]);
+  const projectId = decodeProjectId(auth?.extra?.["projectId"]);
   const scopes = decodeScopes(auth?.scopes ?? []);
   const epoch = auth?.extra?.["revocationEpoch"];
-  if (Option.isNone(agentId) || Option.isNone(scopes) || typeof epoch !== "number") return null;
-  return { agentId: agentId.value, scopes: scopes.value, revocationEpoch: epoch };
+  if (Option.isNone(agentId) || Option.isNone(projectId) || Option.isNone(scopes) || typeof epoch !== "number") return null;
+  return { agentId: agentId.value, projectId: projectId.value, scopes: scopes.value, revocationEpoch: epoch };
 }
 
 function toolDeps(principal: Principal | null): ToolDeps<Caller> {
@@ -60,7 +62,7 @@ export function makeMcpEndpoint(handlers: Handlers, verify: TokenVerifier, allow
           scopes: [...principal.scopes],
           // Keel's own expiry is enforced by `verify`; the SDK requires a value.
           expiresAt: Math.floor(Date.now() / 1000) + 60,
-          extra: { agentId: principal.agentId, revocationEpoch: principal.revocationEpoch },
+          extra: { agentId: principal.agentId, projectId: principal.projectId, revocationEpoch: principal.revocationEpoch },
         };
       },
     },

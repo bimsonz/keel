@@ -2,12 +2,13 @@ import { describe, expect, it } from "@effect/vitest";
 import { exchangeToken, TOKEN_TTL_SECONDS, type TokenRequest, whoami } from "@keeltown/core/application/identity";
 import type { Agent } from "@keeltown/core/domain/identity";
 import { AgentId, Instant } from "@keeltown/core/kernel";
-import { hashSecret, makeAgentDirectoryMemory, makeClockMemory, makeTokenIssuerMemory } from "@keeltown/testing";
+import { hashSecret, makeAgentDirectoryMemory, makeClockMemory, makeTokenIssuerMemory, sampleProjectId } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 
 const agentId = Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 const agent: Agent = {
   id: agentId,
+  projectId: sampleProjectId,
   name: "unit-agent",
   kind: "interactive",
   scopes: ["agent:read", "agent:work"],
@@ -29,7 +30,7 @@ function layers(override: Partial<Agent> = {}) {
 describe("identity/whoami", () => {
   it.effect("answers the agent behind a principal at its current epoch, with no session yet", () =>
     Effect.gen(function* () {
-      const identity = yield* whoami({ agentId, scopes: ["agent:read"], revocationEpoch: 2 });
+      const identity = yield* whoami({ agentId, projectId: sampleProjectId, scopes: ["agent:read"], revocationEpoch: 2 });
       expect(identity).toEqual({ agent, session: null });
     }).pipe(Effect.provide(layers())),
   );
@@ -37,7 +38,7 @@ describe("identity/whoami", () => {
   it.effect("fails AgentNotKnown for an agent the directory lacks", () =>
     Effect.gen(function* () {
       const other = Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V1");
-      const error = yield* Effect.flip(whoami({ agentId: other, scopes: [], revocationEpoch: 0 }));
+      const error = yield* Effect.flip(whoami({ agentId: other, projectId: sampleProjectId, scopes: [], revocationEpoch: 0 }));
       expect(error._tag).toBe("AgentNotKnown");
     }).pipe(Effect.provide(layers())),
   );
@@ -48,7 +49,7 @@ describe("identity/whoami", () => {
     { override: {}, epoch: 1, reason: "stale-epoch" },
   ])("fails AgentNotAdmitted as $reason", ({ override, epoch, reason }) =>
     Effect.gen(function* () {
-      const error = yield* Effect.flip(whoami({ agentId, scopes: [], revocationEpoch: epoch }));
+      const error = yield* Effect.flip(whoami({ agentId, projectId: sampleProjectId, scopes: [], revocationEpoch: epoch }));
       expect(error).toMatchObject({ _tag: "AgentNotAdmitted", reason });
     }).pipe(Effect.provide(layers(override))),
   );

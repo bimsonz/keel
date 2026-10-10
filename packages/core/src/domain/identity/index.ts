@@ -2,3 +2,4 @@
 export * from "./agent.ts";
 export * from "./errors.ts";
 export * from "./events.ts";
+export * from "./inbox.ts";

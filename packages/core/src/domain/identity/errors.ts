@@ -22,3 +22,8 @@ export class TokenRejected extends Schema.TaggedError<TokenRejected>()("TokenRej
 export class ScopeNotGranted extends Schema.TaggedError<ScopeNotGranted>()("ScopeNotGranted", {
   requested: Schema.Array(Schema.String),
 }) {}
+
+/** An Idempotency-Key the agent already used, sent again with a different request body. */
+export class IdempotencyConflict extends Schema.TaggedError<IdempotencyConflict>()("IdempotencyConflict", {
+  idempotencyKey: Schema.String,
+}) {}

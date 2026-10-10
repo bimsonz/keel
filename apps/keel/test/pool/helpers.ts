@@ -3,7 +3,7 @@ import { env } from "cloudflare:workers";
 import { type Agent, type Scope } from "@keeltown/core/domain/identity";
 import { Instant, makeId } from "@keeltown/core/kernel";
 import { ulid } from "ulid";
-import { hashSecret } from "@keeltown/testing";
+import { hashSecret, sampleProjectId } from "@keeltown/testing";
 import { Effect } from "effect";
 import { AgentDirectoryD1 } from "../../src/adapters/driven/d1/agent-directory.ts";
 import { AgentDirectory } from "@keeltown/core/ports";
@@ -20,6 +20,7 @@ export interface SeededAgent {
 export async function seedAgent(overrides: Partial<Agent> = {}, scopes: readonly Scope[] = ["agent:read", "agent:work"]): Promise<SeededAgent> {
   const agent: Agent = {
     id: makeId("agt", ulid()),
+    projectId: sampleProjectId,
     name: "pool-agent",
     kind: "interactive",
     scopes,

@@ -15,6 +15,10 @@ union AgentKind {
 
 model AgentProfile {
   id: AgentId;
+
+  /** The one project the agent is enrolled in. */
+  projectId: ProjectId;
+
   name: string;
   kind: AgentKind;
   scopes: Scope[];

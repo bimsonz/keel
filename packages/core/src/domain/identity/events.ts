@@ -1,9 +1,10 @@
 import { Schema } from "effect";
-import { AgentId } from "../kernel/index.ts";
+import { AgentId, ProjectId } from "../kernel/index.ts";
 import { AgentKind, Scope } from "./agent.ts";
 
 export const AgentEnrolled = Schema.TaggedStruct("AgentEnrolled", {
   agentId: AgentId,
+  projectId: ProjectId,
   name: Schema.NonEmptyString,
   kind: AgentKind,
   scopes: Schema.Array(Scope),

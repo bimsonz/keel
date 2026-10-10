@@ -9,7 +9,7 @@ import { whoami } from "@keeltown/core/application/identity";
 import type { Agent } from "@keeltown/core/domain/identity";
 import { Instant, makeId } from "@keeltown/core/kernel";
 import { TokenIssuer } from "@keeltown/core/ports";
-import { makeAgentDirectoryMemory } from "@keeltown/testing";
+import { makeAgentDirectoryMemory, sampleProjectId } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { TokenIssuerJose } from "../../src/adapters/driven/jose/token-issuer.ts";
 import { ClockLive } from "../../src/adapters/driven/system.ts";
@@ -20,6 +20,7 @@ const privateJwk = JSON.stringify(Object.assign(await crypto.subtle.exportKey("j
 
 const agent: Agent = {
   id: makeId("agt", "01J9ZQ3V7KX2M4N6P8R0S2T4V6"),
+  projectId: sampleProjectId,
   name: "bench",
   kind: "interactive",
   scopes: ["agent:read", "agent:work"],
@@ -32,10 +33,10 @@ directory.seed(agent, { clientId: "bench", agentId: agent.id, secretHash: "sha25
 
 const layer = Layer.mergeAll(directory.layer, TokenIssuerJose({ privateJwk, issuer: "keel.bench" }).pipe(Layer.provide(ClockLive)));
 const runtime = ManagedRuntime.make(layer);
-const { token } = await runtime.runPromise(TokenIssuer.use((issuer) => issuer.issue({ agentId: agent.id, scopes: agent.scopes, revocationEpoch: 0 }, 3600)));
+const { token } = await runtime.runPromise(TokenIssuer.use((issuer) => issuer.issue({ agentId: agent.id, projectId: agent.projectId, scopes: agent.scopes, revocationEpoch: 0 }, 3600)));
 
 const request = TokenIssuer.use((issuer) => issuer.verify(token)).pipe(Effect.flatMap(whoami));
-const bare = whoami({ agentId: agent.id, scopes: agent.scopes, revocationEpoch: 0 });
+const bare = whoami({ agentId: agent.id, projectId: agent.projectId, scopes: agent.scopes, revocationEpoch: 0 });
 
 async function measure(label: string, run: () => Promise<unknown>, iterations = 3000): Promise<void> {
   for (let i = 0; i < 300; i += 1) await run();

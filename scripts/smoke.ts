@@ -32,6 +32,9 @@ function d1(sql: string): void {
   wrangler(["d1", "execute", "DB", "--remote", "-c", "wrangler.deploy.jsonc", "--command", sql], { cwd: appDir, quiet: true });
 }
 
+/** The project smoke agents are enrolled in; nothing else lives there. */
+const SMOKE_PROJECT = "prj_0SM0KE0000000000000000000Z";
+
 interface Seeded {
   readonly id: string;
   readonly clientId: string;
@@ -44,7 +47,7 @@ async function seed(name: string): Promise<Seeded> {
   const clientSecret = crypto.randomUUID() + crypto.randomUUID();
   // Every value is generated here, never taken from input, so inlining is safe.
   d1(
-    `INSERT INTO agents (id, name, kind, scopes, state, revocation_epoch, created_at) VALUES ('${id}', '${name}', 'interactive', '["agent:read","agent:work"]', 'active', 0, ${Date.now()});` +
+    `INSERT INTO agents (id, project_id, name, kind, scopes, state, revocation_epoch, created_at) VALUES ('${id}', '${SMOKE_PROJECT}', '${name}', 'interactive', '["agent:read","agent:work"]', 'active', 0, ${Date.now()});` +
       ` INSERT INTO credentials (client_id, agent_id, secret_hash) VALUES ('${clientId}', '${id}', '${await sha256(clientSecret)}');`,
   );
   return { id, clientId, clientSecret };

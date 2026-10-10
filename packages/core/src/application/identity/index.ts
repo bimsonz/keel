@@ -73,7 +73,7 @@ export const exchangeToken: (
     const missing = scopes.filter((scope) => !held.has(scope));
     if (missing.length > 0) return yield* new ScopeNotGranted({ requested: missing });
     const issuer = yield* TokenIssuer;
-    const token = yield* issuer.issue({ agentId: agent.value.id, scopes, revocationEpoch: agent.value.revocationEpoch }, TOKEN_TTL_SECONDS);
+    const token = yield* issuer.issue({ agentId: agent.value.id, projectId: agent.value.projectId, scopes, revocationEpoch: agent.value.revocationEpoch }, TOKEN_TTL_SECONDS);
     return { ...token, scopes };
   });
 

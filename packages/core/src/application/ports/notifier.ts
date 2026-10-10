@@ -1,14 +1,8 @@
 import { Context, type Effect } from "effect";
-import type { AgentId, Instant } from "../../domain/kernel/index.ts";
+import type { AgentNotice } from "../../domain/identity/index.ts";
+import type { AgentId } from "../../domain/kernel/index.ts";
 
-export interface AgentNotice {
-  readonly id: string;
-  readonly at: Instant;
-  readonly kind: string;
-  readonly title: string;
-  readonly detail?: string;
-  readonly ref?: string;
-}
+export type { AgentNotice } from "../../domain/identity/index.ts";
 
 /** Delivers notices to an agent: on its next tool result, its stream, or a webhook. */
 export class Notifier extends Context.Service<Notifier, {

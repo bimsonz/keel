@@ -1,5 +1,5 @@
 import { type Principal, Scope, TokenRejected } from "@keeltown/core/domain/identity";
-import { AgentId, Instant } from "@keeltown/core/kernel";
+import { AgentId, Instant, ProjectId } from "@keeltown/core/kernel";
 import { Clock, TokenIssuer } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 import { errors, importJWK, type JWK, jwtVerify, SignJWT } from "jose";
@@ -13,6 +13,7 @@ export interface TokenIssuerOptions {
 
 const Claims = Schema.Struct({
   sub: AgentId,
+  prj: ProjectId,
   scope: Schema.String,
   epoch: Schema.Int,
 });
@@ -43,7 +44,7 @@ export function TokenIssuerJose(options: TokenIssuerOptions) {
             const issuedAt = Math.floor(now / 1000);
             const expiresAt = issuedAt + ttlSeconds;
             const token = yield* Effect.promise(() =>
-              new SignJWT({ scope: principal.scopes.join(" "), epoch: principal.revocationEpoch })
+              new SignJWT({ prj: principal.projectId, scope: principal.scopes.join(" "), epoch: principal.revocationEpoch })
                 .setProtectedHeader({ alg: "EdDSA", kid, typ: "JWT" })
                 .setSubject(principal.agentId)
                 .setIssuer(options.issuer)
@@ -77,7 +78,7 @@ export function TokenIssuerJose(options: TokenIssuerOptions) {
             const scopes = yield* Schema.decodeUnknownEffect(Schema.Array(Scope))(claims.scope.split(" ").filter(Boolean)).pipe(
               Effect.mapError(() => new TokenRejected({ reason: "claims" })),
             );
-            return { agentId: claims.sub, scopes, revocationEpoch: claims.epoch };
+            return { agentId: claims.sub, projectId: claims.prj, scopes, revocationEpoch: claims.epoch };
           }),
       });
     }),

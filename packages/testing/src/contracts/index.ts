@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { Agent } from "@keeltown/core/domain/identity";
-import { AgentId, idPattern, ID_PREFIXES, type IdPrefix, Instant } from "@keeltown/core/kernel";
+import { AgentId, idPattern, ID_PREFIXES, type IdPrefix, Instant, ProjectId } from "@keeltown/core/kernel";
 import { AgentDirectory, Clock, EntityStore, Ids, TokenIssuer } from "@keeltown/core/ports";
 import { Effect, type Layer, Option, Schema } from "effect";
 import { hashSecret } from "../memory/identity.ts";
@@ -64,8 +64,12 @@ export function describeIdsContract(adapter: string, make: LayerFactory<Ids>) {
   });
 }
 
+/** The project every contract fixture is enrolled in. */
+export const sampleProjectId = Schema.decodeUnknownSync(ProjectId)("prj_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+
 export const sampleAgent: Agent = {
   id: agentId,
+  projectId: sampleProjectId,
   name: "contract-agent",
   kind: "interactive",
   scopes: ["agent:read", "agent:work"],
@@ -122,7 +126,7 @@ export function describeAgentDirectoryContract(adapter: string, make: LayerFacto
 }
 
 export function describeTokenIssuerContract(adapter: string, make: LayerFactory<TokenIssuer>) {
-  const principal = { agentId, scopes: ["agent:read"] as const, revocationEpoch: 3 };
+  const principal = { agentId, projectId: sampleProjectId, scopes: ["agent:read"] as const, revocationEpoch: 3 };
   describe(`TokenIssuer contract: ${adapter}`, () => {
     it.effect("verifies the principal it issued", () =>
       Effect.gen(function* () {

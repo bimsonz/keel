@@ -6,6 +6,7 @@ import { Effect, Layer, Option, Schema } from "effect";
 /** A row of `agents`, decoded into the domain's Agent. `scopes` is stored as JSON text. */
 const AgentRow = Schema.Struct({
   id: Schema.String,
+  project_id: Schema.String,
   name: Schema.String,
   kind: Schema.String,
   scopes: Schema.String,
@@ -21,6 +22,7 @@ function toAgent(row: unknown): Agent {
   const r = Schema.decodeUnknownSync(AgentRow)(row);
   return decodeAgent({
     id: r.id,
+    projectId: r.project_id,
     name: r.name,
     kind: r.kind,
     scopes: JSON.parse(r.scopes),
@@ -83,11 +85,11 @@ export function AgentDirectoryD1(db: D1Database) {
           db.batch([
             db
               .prepare(
-                `INSERT INTO agents (id, name, kind, scopes, state, revocation_epoch, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT (id) DO UPDATE SET name = excluded.name, kind = excluded.kind, scopes = excluded.scopes,
+                `INSERT INTO agents (id, project_id, name, kind, scopes, state, revocation_epoch, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ON CONFLICT (id) DO UPDATE SET project_id = excluded.project_id, name = excluded.name, kind = excluded.kind, scopes = excluded.scopes,
                    state = excluded.state, revocation_epoch = excluded.revocation_epoch`,
               )
-              .bind(agent.id, agent.name, agent.kind, JSON.stringify(agent.scopes), agent.state, agent.revocationEpoch, agent.createdAt),
+              .bind(agent.id, agent.projectId, agent.name, agent.kind, JSON.stringify(agent.scopes), agent.state, agent.revocationEpoch, agent.createdAt),
             db
               .prepare(
                 `INSERT INTO credentials (client_id, agent_id, secret_hash) VALUES (?, ?, ?)

@@ -4569,6 +4569,7 @@
         "type": "object",
         "required": [
           "id",
+          "projectId",
           "name",
           "kind",
           "scopes",
@@ -4578,6 +4579,14 @@
         "properties": {
           "id": {
             "$ref": "#/components/schemas/AgentId"
+          },
+          "projectId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectId"
+              }
+            ],
+            "description": "The one project the agent is enrolled in."
           },
           "name": {
             "type": "string"

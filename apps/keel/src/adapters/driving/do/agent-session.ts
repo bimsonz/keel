@@ -5,7 +5,7 @@ import { AgentId } from "@keeltown/core/kernel";
 import { EntityStore } from "@keeltown/core/ports";
 import { Effect, Schema } from "effect";
 import { durableObjectRuntime, type DurableObjectRuntime } from "../../../composition/do.ts";
-import { AgentSessionCodecs, type AgentSessionRpc, encodeExit, type OpenSession, SessionSnapshot } from "../../../rpc/index.ts";
+import { AgentSessionCodecs, type AgentSessionRpc, encodeExit, type InboxRead, type OpenSession, type ReserveChange, SessionSnapshot } from "../../../rpc/index.ts";
 
 /** The AgentSession DO is named `agent:<agentId>`. */
 const agentIdOf = (name: string | undefined) => Schema.decodeUnknownSync(AgentId)(name?.replace(/^agent:/, ""));
@@ -40,5 +40,14 @@ export class AgentSessionDO extends DurableObject<Env> implements AgentSessionRp
 
   async openSession(_details: typeof OpenSession.Encoded) {
     return encodeExit(AgentSessionCodecs.openSession, await this.runtime.runPromiseExit(Effect.die(new NotImplemented("identity/openSession"))));
+  }
+
+  // Keel implements these two; until then they cross as a NotImplemented defect.
+  async reserveChange(_request: typeof ReserveChange.Encoded) {
+    return encodeExit(AgentSessionCodecs.reserveChange, await this.runtime.runPromiseExit(Effect.die(new NotImplemented("identity/reserveChange"))));
+  }
+
+  async inbox(_request: typeof InboxRead.Encoded) {
+    return encodeExit(AgentSessionCodecs.inbox, await this.runtime.runPromiseExit(Effect.die(new NotImplemented("identity/inbox"))));
   }
 }

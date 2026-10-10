@@ -1,14 +1,29 @@
-import { PoolExhausted, type SubjectKey } from "@keeltown/core/domain/coordination";
-import { type AgentId, type CommitSha, Instant, makeId, type ProjectId, type WorkspaceId } from "@keeltown/core/kernel";
+import {
+  AGENT_OWNED,
+  type Change,
+  ChangeNotFound,
+  ChangeStateRefused,
+  CommitNotInWorkspace,
+  LeaseStale,
+  PoolExhausted,
+  type Preflight,
+  SketchNotFound,
+  type SubjectKey,
+} from "@keeltown/core/domain/coordination";
+import { IdempotencyConflict } from "@keeltown/core/domain/identity";
+import { type AgentId, type ChangeId, type CommitSha, Instant, makeId, type ProjectId, type WorkspaceId } from "@keeltown/core/kernel";
 import {
   type AgentNotice,
+  Changes,
   CodeHost,
+  Inbox,
   Notifier,
   Recall,
   type RepoRef,
   SubjectRegistry,
   type SubjectEntry,
   type TreeEntry,
+  type WorkspaceGrant,
   WorkspacePool,
 } from "@keeltown/core/ports";
 import { Clock as EffectClock, Effect, Layer, Option } from "effect";
@@ -146,5 +161,124 @@ export function makeNotifierMemory() {
   return {
     delivered,
     layer: Layer.succeed(Notifier, Notifier.of({ notify: (agentId, notice) => Effect.sync(() => void delivered.push({ agentId, notice })) })),
+  };
+}
+
+const sequentialId = (n: number) => String(n).padStart(26, "0");
+
+/**
+ * Change DOs as a map, for the isolate's `Changes` port. `declare` opens a
+ * change in `declared` with an active lease and a workspace, idempotent by
+ * (agent, Idempotency-Key); `submit` checks the lease and the state, as the
+ * Change DO does; `awaitSubmission` answers at once. `capacity` bounds the
+ * workspaces it will grant; `foreignCommits` are commits no workspace holds.
+ */
+export function makeChangesMemory(options: { readonly capacity?: number; readonly foreignCommits?: ReadonlySet<string> } = {}) {
+  const changes = new Map<ChangeId, Change>();
+  const commits = new Map<ChangeId, CommitSha>();
+  const workspaces = new Map<ChangeId, WorkspaceId>();
+  const reservations = new Map<string, { readonly changeId: ChangeId; readonly fingerprint: string }>();
+  let sequence = 0;
+  let tokens = 0;
+  const grant = (changeId: ChangeId, now: Instant): WorkspaceGrant => {
+    const workspaceId = workspaces.get(changeId) ?? makeId("wsp", sequentialId((sequence += 1)));
+    workspaces.set(changeId, workspaceId);
+    tokens += 1;
+    return { workspaceId, remote: `https://artifacts.invalid/${workspaceId}.git`, token: `memory-token-${tokens}`, expiresAt: Instant(now + 3_600_000) };
+  };
+  return {
+    changes,
+    commits,
+    layer: Layer.succeed(
+      Changes,
+      Changes.of({
+        declare: (principal, input) =>
+          Effect.gen(function* () {
+            const now = Instant(yield* EffectClock.currentTimeMillis);
+            const key = `${principal.agentId} ${input.idempotencyKey}`;
+            const { idempotencyKey: _key, ...body } = input;
+            const fingerprint = JSON.stringify(body);
+            const reserved = reservations.get(key);
+            if (reserved !== undefined && reserved.fingerprint !== fingerprint) {
+              return yield* new IdempotencyConflict({ idempotencyKey: input.idempotencyKey });
+            }
+            if (input.fromSketch !== undefined) return yield* new SketchNotFound({ sketchId: input.fromSketch });
+            const existing = reserved === undefined ? undefined : changes.get(reserved.changeId);
+            if (existing === undefined && options.capacity !== undefined && changes.size >= options.capacity) {
+              return yield* new PoolExhausted({ retryAfterMs: 5_000 });
+            }
+            const change: Change = existing ?? {
+              id: makeId("chg", sequentialId((sequence += 1))),
+              agentId: principal.agentId,
+              origin: "agent",
+              state: "declared",
+              intent: {
+                revision: 1,
+                goal: input.goal,
+                footprint: input.footprint,
+                premises: input.premises,
+                ...(input.declaredEffects === undefined ? {} : { declaredEffects: input.declaredEffects }),
+              },
+              lease: { id: makeId("lse", sequentialId((sequence += 1))), agentId: principal.agentId, renewedAt: now, state: "active" },
+              createdAt: now,
+            };
+            const workspace = grant(change.id, now);
+            const stored: Change = { ...change, workspaceId: workspace.workspaceId };
+            changes.set(stored.id, stored);
+            reservations.set(key, { changeId: stored.id, fingerprint });
+            const preflight: Preflight = { neighbours: [], contradictions: [], precedents: [], suggestedMove: "proceed" };
+            return { change: stored, preflight, workspace };
+          }),
+        submit: (_principal, input) =>
+          Effect.gen(function* () {
+            const change = changes.get(input.changeId);
+            if (change === undefined) return yield* new ChangeNotFound({ changeId: input.changeId });
+            if (change.lease.id !== input.lease || change.lease.state !== "active") {
+              return yield* new LeaseStale({ changeId: input.changeId, leaseId: input.lease });
+            }
+            if (!AGENT_OWNED.has(change.state)) return yield* new ChangeStateRefused({ changeId: change.id, state: change.state, command: "submit" });
+            if (options.foreignCommits?.has(input.commitSha) === true) {
+              return yield* new CommitNotInWorkspace({ changeId: change.id, commitSha: input.commitSha });
+            }
+            const submitted: Change = { ...change, state: "submitted" };
+            changes.set(change.id, submitted);
+            commits.set(change.id, input.commitSha);
+            return submitted;
+          }),
+        get: (changeId) => Effect.suspend(() => {
+          const change = changes.get(changeId);
+          return change === undefined ? Effect.fail(new ChangeNotFound({ changeId })) : Effect.succeed(change);
+        }),
+        awaitSubmission: (changeId) => Effect.suspend(() => {
+          const change = changes.get(changeId);
+          return change === undefined
+            ? Effect.fail(new ChangeNotFound({ changeId }))
+            : Effect.succeed({ change, commitSha: commits.get(changeId) ?? null });
+        }),
+      }),
+    ),
+  };
+}
+
+/** Agents' inboxes as lists. `deliver` appends a notice; the cursor is the count already read. */
+export function makeInboxMemory() {
+  const inboxes = new Map<AgentId, AgentNotice[]>();
+  const deliver = (agentId: AgentId, notice: AgentNotice): void => {
+    inboxes.set(agentId, [...(inboxes.get(agentId) ?? []), notice]);
+  };
+  return {
+    inboxes,
+    deliver,
+    layer: Layer.succeed(
+      Inbox,
+      Inbox.of({
+        read: (agentId, cursor) =>
+          Effect.sync(() => {
+            const notices = inboxes.get(agentId) ?? [];
+            const from = cursor === undefined ? 0 : Math.max(0, Number.parseInt(cursor, 10) || 0);
+            return { notices: notices.slice(from), cursor: String(notices.length) };
+          }),
+      }),
+    ),
   };
 }

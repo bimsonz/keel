@@ -25,6 +25,7 @@ export function whoamiOk(identity: Identity): WhoamiResult {
       result: {
         agent: {
           id: agent.id,
+          projectId: agent.projectId,
           name: agent.name,
           kind: agent.kind,
           scopes: [...agent.scopes],

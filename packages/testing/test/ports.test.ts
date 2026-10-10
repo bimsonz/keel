@@ -5,7 +5,7 @@ import { PORTS } from "../src/ports.ts";
 /** The ports, one row each. */
 const CONTRACT_PORTS = [
   "Clock", "Ids", "AgentDirectory", "TokenIssuer", "CodeHost", "WorkspacePool", "SubjectRegistry", "Recall",
-  "Notifier", "EntityStore", "EventOutbox", "EventLog", "WorkQueue", "DecisionModel", "PlatformFunction",
+  "Notifier", "Changes", "Inbox", "EntityStore", "EventOutbox", "EventLog", "WorkQueue", "DecisionModel", "PlatformFunction",
   "VerifierRuntime", "FlowSpecSource", "BundleStore", "GuardRepo", "CandidateComposer", "TrunkWriter",
   "SessionStore", "MfpWriter", "HumanGate", "Deployer", "SecretsProvider", "Background", "Metrics",
 ];
