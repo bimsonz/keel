@@ -6,7 +6,11 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 
 ## Unreleased
 
-Changes since `contracts-v0-rc1` (`3e7c7f1`, 10 Oct 2026), all additive or fixes:
+Nothing yet.
+
+## contracts-v0 (10 Oct 2026)
+
+Changes since `contracts-v0-rc1` (`3e7c7f1`, 10 Oct 2026). Everything is additive or a fix except the `EventOutbox` reshape, which landed before the freeze.
 
 ### Added
 
@@ -22,6 +26,8 @@ Changes since `contracts-v0-rc1` (`3e7c7f1`, 10 Oct 2026), all additive or fixes
 - `CodeHost.info(repo)`: `{remote, defaultBranch}`. The remote's host carries the account id, so it goes only to a grant's holder and is never logged.
 - `WorkspaceGrant.baseSha` and `WorkspaceGranted.baseSha`: the workspace's head at grant time, which is the change's base. Precheck diffs against it, so a mirror that lags trunk can't leave the base missing.
 - WorkspacePool: `grant` is idempotent per holder; a retry returns the same workspace with a freshly minted token. `release(workspaceId, reason?)` takes the `WorkspaceCollected` reason (`landed`, `withdrawn` or `expired`; `withdrawn` when absent). The RPC gains `configure({source, target})` and `status()`.
+- `commit()` in the ports: read the clock, then in one `EntityStore` transaction either return what the cause already committed or run the decision and append its events (gap-free `seq` per entity, dedupe keys `<kind>:<id>/<cause>/<type>#<n>`, `notified[]` from the subscription table at commit time). A refusal rolls back every write.
+- `EventReceiverRpc.receive(envelopes)`: every Keel Durable Object receives events through this one method; `ChangeRpc`, `AgentSessionRpc` and the other DO contracts extend it. `DeliveryReceipt` and `EventCodecs` in `apps/keel/src/rpc/events.ts`.
 - `CodeHostFixture` in `@keeltown/testing`: `commit(repo, ref, files)` and `scratch()`, provided by `makeCodeHostMemory().layer`. Tests seed repos through it, because `CodeHost` never writes git content.
 
 ### Fixed
@@ -31,6 +37,7 @@ Changes since `contracts-v0-rc1` (`3e7c7f1`, 10 Oct 2026), all additive or fixes
 
 ### Changed
 
+- `EventOutbox` is reshaped around the outbox fan-out: `append(spec, at, drafts)`, `committed(entity, cause)`, `log(entity)`, `subscribe`, `unsubscribe`, `subscribers(type)` and `receive(dedupeKey, at)`, with its in-memory adapter on the in-memory `EntityStore` so one transaction covers both. It replaces rc1's `append`/`pending`/`acknowledge`.
 - The MFP library is pinned at `github:bimsonz/mfp#v0.1.0-pre.3`.
 - `CodeHost` reads fail with typed errors instead of dying: `RepoNotFound` (every read, `diffTrees`, `mintToken`, and `fork`'s source), `RefNotFound` (`head`), and `ObjectNotFound` (`readTree`, `readBlob`, and `diffTrees` when the repo lacks `base` or `head`). This narrows the error channels, but the port had no callers yet. Transport failures stay defects. `TreeEntry.type` gains `"commit"` for submodules, and `readTree` is documented as the commit's recursive listing.
 - The in-memory `CodeHost` stores real git objects through gitcore. It fails `RepoNotFound` for a repo it never created or has deleted; it used to create the repo on the first read. Its `seed()` is replaced by `CodeHostFixture`.
