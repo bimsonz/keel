@@ -2,39 +2,35 @@
 # kills: b1.commit-atomic
 # why: the decision's writes commit in one transaction and its events are appended after it, so a failed append leaves state with no event
 diff --git a/packages/core/src/application/ports/commit.ts b/packages/core/src/application/ports/commit.ts
-index cc3bdb7..b3a34e9 100644
+index a469d9f..b432bb5 100644
 --- a/packages/core/src/application/ports/commit.ts
 +++ b/packages/core/src/application/ports/commit.ts
-@@ -3,6 +3,7 @@ import type { EventEnvelope } from "../../domain/kernel/index.ts";
- import { Clock } from "./clock.ts";
- import { EntityStore } from "./entity-store.ts";
- import { type CommitSpec, type EventDraft, EventOutbox } from "./event-outbox.ts";
-+// mutant
- 
- /** What a decision sees inside the transaction: the state and the outbox, both synchronous. */
- export interface Transaction {
-@@ -50,7 +51,8 @@ export const commit = <A, E>(
+@@ -63,7 +63,9 @@ export const commit = <A, E>(
      const outbox = yield* EventOutbox;
      let refusal: Result.Failure<Transition<A>, E> | undefined;
      try {
 -      return store.transaction((): Committed<A> => {
 +      let drafts: readonly EventDraft[] = [];
++      let settle: (() => void) | undefined;
 +      const committed = store.transaction((): Committed<A> => {
          const prior = outbox.committed(spec.entity, spec.cause);
          if (prior !== undefined)
            return {
-@@ -63,9 +65,12 @@ export const commit = <A, E>(
+@@ -77,10 +79,14 @@ export const commit = <A, E>(
            refusal = decided;
            throw new Rollback();
          }
 -        const events = outbox.append(spec, at, decided.success.drafts);
+-        decided.success.after?.(tx);
 -        return { duplicate: false, value: decided.success.value, events };
 +        drafts = decided.success.drafts;
++        settle = () => decided.success.after?.(tx);
 +        return { duplicate: false, value: decided.success.value, events: [] };
        });
-+      return committed.duplicate
-+        ? committed
-+        : { ...committed, events: outbox.append(spec, at, drafts) };
++      if (committed.duplicate) return committed;
++      const events = outbox.append(spec, at, drafts);
++      settle?.();
++      return { ...committed, events };
      } catch (thrown) {
        if (thrown instanceof Rollback && refusal !== undefined)
          return yield* Effect.fail(refusal.failure);

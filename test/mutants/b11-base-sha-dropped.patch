@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts
+# kills: b11.base-sha
+# why: ChangeStarted carries no base, so Precheck has nothing to diff the submission against
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index abcae74..0ecbf01 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -362,7 +362,7 @@ export const declare: (
+             leaseId,
+             preflight: L1_PREFLIGHT,
+           },
+-          { _tag: "Start", workspaceId: grant.workspaceId, baseSha: grant.baseSha },
++          { _tag: "Start", workspaceId: grant.workspaceId },
+         ],
+       );
+       if (Result.isFailure(decided)) return Result.fail(decided.failure);

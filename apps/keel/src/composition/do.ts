@@ -29,11 +29,17 @@ export function backbone(storage: DurableObjectStorage): Layer.Layer<DurableObje
 }
 
 /** The Change DO's driven adapters beyond the backbone. */
-export type ChangeServices = WorkspacePool;
+export type ChangeServices = WorkspacePool | CodeHost;
 
-/** The Change DO takes its workspace from its project's WorkspacePool DO. */
+/**
+ * The Change DO takes its workspace from its project's WorkspacePool DO and
+ * asks the code host whether a submitted commit is in it.
+ */
 export function changeServices(env: Env): Layer.Layer<ChangeServices> {
-  return WorkspacePoolRpc(env.WORKSPACE_POOL, artifactsLocationHint(env));
+  return Layer.mergeAll(
+    WorkspacePoolRpc(env.WORKSPACE_POOL, artifactsLocationHint(env)),
+    codeHostLayer(env),
+  );
 }
 
 const LOCATION_HINTS: readonly DurableObjectLocationHint[] = [

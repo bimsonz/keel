@@ -39,7 +39,7 @@ export class Changes extends Context.Service<
       input: SubmitInput,
     ) => Effect.Effect<
       Change,
-      ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace
+      ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace | IdempotencyConflict
     >;
     readonly get: (changeId: ChangeId) => Effect.Effect<Change, ChangeNotFound>;
     /**

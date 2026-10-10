@@ -30,6 +30,7 @@
     "@cloudflare/vitest-plugin": "catalog:",
     "@effect/vitest": "catalog:",
     "@keeltown/testing": "workspace:*",
+    "fast-check": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"

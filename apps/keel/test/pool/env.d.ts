@@ -7,6 +7,8 @@ declare global {
       TEST_MIGRATIONS: D1Migration[];
       /** Test-only: the fake Artifacts namespace composition serves keel-ws-00 from (see composition/do.ts). */
       TEST_ARTIFACTS?: Artifacts;
+      /** Test-only: fast-check's seed, set by prove:red. */
+      FC_SEED?: string;
     }
   }
 }

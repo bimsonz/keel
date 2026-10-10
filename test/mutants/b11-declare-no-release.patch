@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts
+# kills: b11.declare-release
+# why: a refused declare keeps the workspace it was granted, so the workspace leaks to a change that never existed
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index abcae74..f9f4dfa 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -381,7 +381,7 @@ export const declare: (
+       tx.outbox.subscribe(`pool:${command.projectId}`, CHANGE_ENDS);
+       return Result.succeed(asTransition(decided.success));
+     },
+-  ).pipe(Effect.onError(() => releaseUnheld(changeId, command.projectId, grant)));
++  );
+   if (!committed.duplicate) return { change: committed.value, preflight: L1_PREFLIGHT, grant };
+   yield* releaseUnheld(changeId, command.projectId, grant);
+   if (!committed.sameCommand)

@@ -246,8 +246,12 @@ describe("WorkspacePool", () => {
           type: "ChangeLanded",
           payload: { _tag: "ChangeLanded", changeId: holder(4) },
         };
-        const first = store.transaction(() => collectOnChangeEnd({ store, outbox }, landed, 1));
-        const again = store.transaction(() => collectOnChangeEnd({ store, outbox }, landed, 2));
+        const first = store.transaction(() =>
+          collectOnChangeEnd({ store, outbox, at: Instant(1) }, landed, 1),
+        );
+        const again = store.transaction(() =>
+          collectOnChangeEnd({ store, outbox, at: Instant(2) }, landed, 2),
+        );
         expect(first).toEqual({
           workspaceId: grant.workspaceId,
           drafts: [
@@ -268,7 +272,7 @@ describe("WorkspacePool", () => {
           payload: { _tag: "ChangeQueued", changeId: holder(4) },
         };
         expect(
-          store.transaction(() => collectOnChangeEnd({ store, outbox }, queued, 3)),
+          store.transaction(() => collectOnChangeEnd({ store, outbox, at: Instant(3) }, queued, 3)),
         ).toBeUndefined();
       }).pipe(Effect.provide(pool())),
   );

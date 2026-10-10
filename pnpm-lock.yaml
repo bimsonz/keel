@@ -189,6 +189,9 @@ importers:
       '@keeltown/testing':
         specifier: workspace:*
         version: link:../../packages/testing
+      fast-check:
+        specifier: 'catalog:'
+        version: 4.10.2
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

@@ -2,31 +2,39 @@
 # kills: b1.racers
 # why: the decision reads and writes state, then awaits before its events append, so concurrent commits interleave between the two
 diff --git a/packages/core/src/application/ports/commit.ts b/packages/core/src/application/ports/commit.ts
-index cc3bdb7..aeb7ac0 100644
+index a469d9f..f548307 100644
 --- a/packages/core/src/application/ports/commit.ts
 +++ b/packages/core/src/application/ports/commit.ts
-@@ -50,7 +50,8 @@ export const commit = <A, E>(
+@@ -63,7 +63,9 @@ export const commit = <A, E>(
      const outbox = yield* EventOutbox;
      let refusal: Result.Failure<Transition<A>, E> | undefined;
      try {
 -      return store.transaction((): Committed<A> => {
 +      let drafts: readonly EventDraft[] = [];
++      let settle: (() => void) | undefined;
 +      const decided = store.transaction((): Committed<A> => {
          const prior = outbox.committed(spec.entity, spec.cause);
          if (prior !== undefined)
            return {
-@@ -63,9 +64,12 @@ export const commit = <A, E>(
+@@ -77,10 +79,18 @@ export const commit = <A, E>(
            refusal = decided;
            throw new Rollback();
          }
 -        const events = outbox.append(spec, at, decided.success.drafts);
+-        decided.success.after?.(tx);
 -        return { duplicate: false, value: decided.success.value, events };
 +        drafts = decided.success.drafts;
++        settle = () => decided.success.after?.(tx);
 +        return { duplicate: false, value: decided.success.value, events: [] };
        });
 +      if (decided.duplicate) return decided;
 +      yield* Effect.sleep(Math.floor(Math.random() * 5));
-+      return { ...decided, events: store.transaction(() => outbox.append(spec, at, drafts)) };
++      const events = store.transaction(() => {
++        const appended = outbox.append(spec, at, drafts);
++        settle?.();
++        return appended;
++      });
++      return { ...decided, events };
      } catch (thrown) {
        if (thrown instanceof Rollback && refusal !== undefined)
          return yield* Effect.fail(refusal.failure);

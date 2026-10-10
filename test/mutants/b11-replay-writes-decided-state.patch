@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/change.test.ts -t "over real RPC"
+# kills: b11.replay
+# why: the object writes the state the decision read, not the one evolve folds the events into, so state and log part ways
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index abcae74..783b5c6 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -256,7 +256,8 @@ const transition = <T extends Tag>(
+     renewing === undefined
+       ? decided
+       : Result.getOrElse(renew(decided, renewing, tx.at), () => decided);
+-  tx.store.put(CHANGE, changeId, asStored(encodeChange(renewed)));
++  const seen = storedChange(tx.store, changeId) ?? renewed;
++  tx.store.put(CHANGE, changeId, asStored(encodeChange(seen)));
+   return Result.succeed({ change: renewed, drafts });
+ };
+ 

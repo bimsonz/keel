@@ -1,19 +1,31 @@
 import { Effect, Result } from "effect";
-import type { EventEnvelope } from "../../domain/kernel/index.ts";
+import type { EventEnvelope, Instant } from "../../domain/kernel/index.ts";
 import { Clock } from "./clock.ts";
 import { EntityStore } from "./entity-store.ts";
 import { type CommitSpec, type EventDraft, EventOutbox } from "./event-outbox.ts";
 
-/** What a decision sees inside the transaction: the state and the outbox, both synchronous. */
+/** What a decision sees inside the transaction: the state and the outbox, both synchronous, and the time. */
 export interface Transaction {
   readonly store: (typeof EntityStore)["Service"];
   readonly outbox: (typeof EventOutbox)["Service"];
+  /**
+   * The one instant of this transaction: the events are stamped with it, so a
+   * decision and the `evolve` that writes its state read the time here, never
+   * from a clock of their own.
+   */
+  readonly at: Instant;
 }
 
 /** A decision's outcome: the events to commit, and what the caller gets back. */
 export interface Transition<A> {
   readonly drafts: readonly EventDraft[];
   readonly value: A;
+  /**
+   * Runs inside the same transaction once the events are appended: for a
+   * subscription change that must not alter these events' `notified[]` (the
+   * agent an adoption replaces still hears of it).
+   */
+  readonly after?: (tx: Transaction) => void;
 }
 
 export type Committed<A> =
@@ -36,9 +48,10 @@ class Rollback extends Error {
  * The one way a Durable Object changes state. Reads the time first, then in
  * one `EntityStore.transaction`: returns what `spec.cause` already committed
  * if it did; otherwise runs `decide` (which reads state, decides and writes
- * state, all synchronously) and appends its events to the outbox. A refusal
- * rolls back every write `decide` made. Nothing awaits between reading the
- * state and committing the events, so no other request can interleave.
+ * state, all synchronously, at `tx.at`) and appends its events to the outbox,
+ * stamped with that same instant. A refusal rolls back every write `decide`
+ * made. Nothing awaits between reading the state and committing the events,
+ * so no other request can interleave.
  */
 export const commit = <A, E>(
   spec: CommitSpec,
@@ -58,12 +71,14 @@ export const commit = <A, E>(
             sameCommand: prior.fingerprint === spec.fingerprint,
             events: prior.events,
           };
-        const decided = decide({ store, outbox });
+        const tx: Transaction = { store, outbox, at };
+        const decided = decide(tx);
         if (Result.isFailure(decided)) {
           refusal = decided;
           throw new Rollback();
         }
         const events = outbox.append(spec, at, decided.success.drafts);
+        decided.success.after?.(tx);
         return { duplicate: false, value: decided.success.value, events };
       });
     } catch (thrown) {

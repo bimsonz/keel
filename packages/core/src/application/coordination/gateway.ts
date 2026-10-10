@@ -38,7 +38,7 @@ export const submitChange: (
   input: SubmitInput,
 ) => Effect.Effect<
   Change,
-  ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace,
+  ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace | IdempotencyConflict,
   Changes
 > = (principal, input) => Changes.use((changes) => changes.submit(principal, input));
 

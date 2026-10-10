@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts
+# kills: b11.precheck-idem
+# why: Precheck's revision is not checked, so a Precheck of another revision moves the change
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index abcae74..adacbad 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -616,8 +616,6 @@ const precheckCommand = (
+       { entity: changeRef(changeId), cause: `${step.instanceId}:${method}` },
+       (tx) => {
+         const stored = storedChange(tx.store, changeId);
+-        if (stored !== undefined && stored.intent.revision !== step.revision)
+-          return Result.fail(refused(stored, method));
+         return Result.map(
+           transition(tx, changeId, ["ChangeNotFound", "ChangeStateRefused"], [command]),
+           asTransition,

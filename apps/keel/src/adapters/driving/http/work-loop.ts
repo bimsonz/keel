@@ -346,7 +346,12 @@ function changeNotFound(caller: Caller, error: ChangeNotFound) {
 
 export function submitError(
   caller: Caller,
-  error: ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace,
+  error:
+    | ChangeNotFound
+    | LeaseStale
+    | ChangeStateRefused
+    | CommitNotInWorkspace
+    | IdempotencyConflict,
 ): SubmitResult {
   switch (error._tag) {
     case "ChangeNotFound":
@@ -386,6 +391,16 @@ export function submitError(
               operationId: "submit",
               args: { changeId: error.changeId, commitSha: error.commitSha },
             },
+          ],
+        }),
+      };
+    case "IdempotencyConflict":
+      return {
+        status: 409,
+        body: problem(409, "request.idempotency_conflict", caller.requestId, {
+          detail: `Idempotency-Key ${error.idempotencyKey} was used for a different request.`,
+          nextActions: [
+            { kind: "call", title: "Submit with a fresh Idempotency-Key", operationId: "submit" },
           ],
         }),
       };

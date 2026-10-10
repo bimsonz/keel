@@ -26,6 +26,8 @@ export default defineProject({
           KEEL_ENV: "test",
           KEEL_SIGNING_KEY: await testSigningKey(),
           TEST_MIGRATIONS: await readD1Migrations(`${import.meta.dirname}/migrations`),
+          // prove:red pins fast-check's seed; workerd sees it only as a binding.
+          ...(process.env["FC_SEED"] === undefined ? {} : { FC_SEED: process.env["FC_SEED"] }),
         },
         // Artifacts has no local simulator, and miniflare binds WORKSPACES to the remote proxy
         // whatever is set here. Composition serves keel-ws-00 from TEST_ARTIFACTS when it is

@@ -3,14 +3,11 @@ import type {
   Change,
   ChangeNotFound,
   ChangeStateRefused,
-  CommitNotInWorkspace,
   FootprintEntry,
   LeaseStale,
   PoolExhausted,
   Preflight,
   Proposition,
-  RevisionMismatch,
-  SketchNotFound,
 } from "../../domain/coordination/index.ts";
 import type { Principal } from "../../domain/identity/index.ts";
 import type { ChangeId, CommitSha, Instant, LeaseId, SketchId } from "../../domain/kernel/index.ts";
@@ -25,7 +22,10 @@ import type {
   WorkspaceGrant,
 } from "../ports/index.ts";
 
-/** coordination use-cases. Signatures are fixed here. */
+/**
+ * coordination use-cases. The isolate reaches a change through the `Changes`
+ * port with the inputs below; the Change DO runs the use-cases in `change.ts`.
+ */
 
 export interface DeclareInput {
   readonly goal: string;
@@ -73,23 +73,7 @@ export interface SketchOpened {
   readonly expiresAt: Instant;
 }
 
-type DeclarePorts = Clock | Ids | EntityStore | EventOutbox | SubjectRegistry | WorkspacePool;
 type ChangePorts = Clock | EntityStore | EventOutbox;
-
-export const declare: (
-  principal: Principal,
-  input: DeclareInput,
-) => Effect.Effect<Declared, PoolExhausted | SketchNotFound, DeclarePorts> =
-  stub("coordination/declare");
-
-export const revise: (
-  principal: Principal,
-  input: ReviseInput,
-) => Effect.Effect<
-  Revised,
-  ChangeNotFound | LeaseStale | RevisionMismatch | ChangeStateRefused,
-  ChangePorts | SubjectRegistry
-> = stub("coordination/revise");
 
 export const rely: (
   principal: Principal,
@@ -106,37 +90,14 @@ export const nearby: (
 ) => Effect.Effect<Preflight, ChangeNotFound, EntityStore | SubjectRegistry> =
   stub("coordination/nearby");
 
-export const abandon: (
-  principal: Principal,
-  input: LeasedCall & { readonly reason?: string },
-) => Effect.Effect<Change, ChangeNotFound | LeaseStale | ChangeStateRefused, ChangePorts> =
-  stub("coordination/abandon");
-
-export const adopt: (
-  principal: Principal,
-  changeId: ChangeId,
-) => Effect.Effect<Change, ChangeNotFound | ChangeStateRefused, ChangePorts | Ids> =
-  stub("coordination/adopt");
-
-export const submit: (
-  principal: Principal,
-  input: SubmitInput,
-) => Effect.Effect<
-  Change,
-  ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace,
-  ChangePorts
-> = stub("coordination/submit");
-
-export const getChange: (
-  principal: Principal,
-  changeId: ChangeId,
-) => Effect.Effect<Change, ChangeNotFound, EntityStore> = stub("coordination/getChange");
-
 export const openSketch: (
   principal: Principal,
   purpose: string | undefined,
 ) => Effect.Effect<SketchOpened, PoolExhausted, Clock | Ids | WorkspacePool> =
   stub("coordination/openSketch");
+
+/** The Change DO's use-cases. */
+export * from "./change.ts";
 
 /** The WorkspacePool use-cases. */
 export * from "./workspace-pool/index.ts";

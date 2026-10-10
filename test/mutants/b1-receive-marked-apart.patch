@@ -2,10 +2,10 @@
 # kills: b1.receive-atomic
 # why: the receipt commits in its own transaction before the reaction, so a crash between them loses the reaction for good
 diff --git a/apps/keel/src/adapters/driving/do/keel-object.ts b/apps/keel/src/adapters/driving/do/keel-object.ts
-index b3ef35d..bcf6367 100644
+index ed50a4a..2870665 100644
 --- a/apps/keel/src/adapters/driving/do/keel-object.ts
 +++ b/apps/keel/src/adapters/driving/do/keel-object.ts
-@@ -68,8 +68,9 @@ export abstract class KeelObject extends DurableObject<Env> implements EventRece
+@@ -96,8 +96,9 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
        const outbox = yield* EventOutbox;
        const receipt = { accepted: 0, duplicates: 0, ignored: 0 };
        for (const arrival of readDelivery(envelopes)) {
@@ -14,5 +14,5 @@ index b3ef35d..bcf6367 100644
 -          if (!outbox.receive(arrival.dedupeKey, at)) return "duplicates";
 +          if (!fresh) return "duplicates";
            if (arrival.envelope === undefined) return "ignored";
-           const reaction = react(arrival.envelope, { store, outbox });
+           const reaction = react(arrival.envelope, { store, outbox, at });
            if (reaction === undefined) return "ignored";

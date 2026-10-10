@@ -99,7 +99,7 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
         const outcome = store.transaction((): keyof DeliveryReceipt => {
           if (!outbox.receive(arrival.dedupeKey, at)) return "duplicates";
           if (arrival.envelope === undefined) return "ignored";
-          const reaction = react(arrival.envelope, { store, outbox });
+          const reaction = react(arrival.envelope, { store, outbox, at });
           if (reaction === undefined) return "ignored";
           outbox.append(
             {

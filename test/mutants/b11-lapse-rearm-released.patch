@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/change.test.ts -t "deadline"
+# kills: b11.lapse
+# why: the lease deadline is armed whatever the lease's state, so a released or lapsed lease keeps an alarm
+diff --git a/apps/keel/src/adapters/driving/do/change.ts b/apps/keel/src/adapters/driving/do/change.ts
+index 800933e..e3387bb 100644
+--- a/apps/keel/src/adapters/driving/do/change.ts
++++ b/apps/keel/src/adapters/driving/do/change.ts
+@@ -213,7 +213,7 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
+   private async armLease(): Promise<void> {
+     const change = await this.runtime.runPromise(Effect.option(getChange(this.changeId)));
+     const lease = Option.isSome(change) ? change.value.lease : undefined;
+-    const active = lease?.state === "active" ? lease : undefined;
++    const active = lease;
+     const keep = active === undefined ? undefined : leaseDeadline(active.id);
+     for (const armed of armedAlarms(this.ctx.storage)) {
+       if (LEASE_DEADLINE.test(armed.reason) && armed.reason !== keep)

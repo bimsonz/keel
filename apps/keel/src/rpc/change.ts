@@ -5,6 +5,7 @@ import {
   ChangeStateRefused,
   CommitNotInWorkspace,
   FootprintEntry,
+  LeaseNotLapsed,
   LeaseStale,
   PoolExhausted,
   Preflight,
@@ -12,6 +13,7 @@ import {
   RevisionMismatch,
   SketchNotFound,
 } from "@keeltown/core/domain/coordination";
+import { IdempotencyConflict } from "@keeltown/core/domain/identity";
 import {
   AgentId,
   ChangeId,
@@ -154,22 +156,39 @@ export type PlanCompiledCommand = typeof PlanCompiledCommand.Type;
 
 const PrecheckRefusal = Schema.Union([ChangeNotFound, ChangeStateRefused]);
 
-const Mutation = Schema.Union([ChangeNotFound, LeaseStale, RevisionMismatch, ChangeStateRefused]);
+// A reused Idempotency-Key with another body is IdempotencyConflict on every keyed call.
+const Mutation = Schema.Union([
+  ChangeNotFound,
+  LeaseStale,
+  RevisionMismatch,
+  ChangeStateRefused,
+  IdempotencyConflict,
+]);
 
 export const ChangeCodecs = {
   get: exitCodec(Change, ChangeNotFound),
   declare: exitCodec(
     Schema.Struct({ change: Change, preflight: Preflight, grant: WorkspaceGrant }),
-    Schema.Union([ChangeStateRefused, PoolExhausted, SketchNotFound]),
+    Schema.Union([ChangeStateRefused, PoolExhausted, SketchNotFound, IdempotencyConflict]),
   ),
   revise: exitCodec(Schema.Struct({ change: Change, preflight: Preflight }), Mutation),
   // Submit carries no revision: RevisionMismatch belongs to revise alone.
   submit: exitCodec(
     Change,
-    Schema.Union([ChangeNotFound, LeaseStale, ChangeStateRefused, CommitNotInWorkspace]),
+    Schema.Union([
+      ChangeNotFound,
+      LeaseStale,
+      ChangeStateRefused,
+      CommitNotInWorkspace,
+      IdempotencyConflict,
+    ]),
   ),
   abandon: exitCodec(Change, Mutation),
-  adopt: exitCodec(Change, Schema.Union([ChangeNotFound, ChangeStateRefused])),
+  // LeaseNotLapsed: adoption needs a Lapsed lease.
+  adopt: exitCodec(
+    Change,
+    Schema.Union([ChangeNotFound, ChangeStateRefused, LeaseNotLapsed, IdempotencyConflict]),
+  ),
   submission: exitCodec(SubmissionStatus, ChangeNotFound),
   workspace: exitCodec(ChangeWorkspace, PrecheckRefusal),
   precheckStarted: exitCodec(Change, PrecheckRefusal),

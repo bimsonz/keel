@@ -2,12 +2,14 @@ import {
   AgentNotAdmitted,
   AgentNotKnown,
   CredentialRejected,
+  IdempotencyConflict,
   ScopeNotGranted,
 } from "@keeltown/core/domain/identity";
 import { AgentId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { tokenError, whoamiError } from "../../src/adapters/driving/http/mappers.ts";
+import { submitError } from "../../src/adapters/driving/http/work-loop.ts";
 import { makeHandlers } from "../../src/adapters/driving/http/handlers.ts";
 
 const agentId = Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
@@ -34,6 +36,15 @@ describe("mappers", () => {
       error: "invalid_scope",
     });
     expect(tokenError(new AgentNotAdmitted({ agentId, reason: "suspended" })).status).toBe(401);
+  });
+
+  it("maps a submit's reused Idempotency-Key to 409 with a way forward", () => {
+    const reused = submitError(caller, new IdempotencyConflict({ idempotencyKey: "submit-1" }));
+    expect(reused.status).toBe(409);
+    expect(reused.body).toMatchObject({
+      code: "request.idempotency_conflict",
+      nextActions: [{ kind: "call", operationId: "submit" }],
+    });
   });
 });
 
