@@ -13,8 +13,8 @@ import { historyArb, planCase } from "./gen.ts";
 import { CatFileReader, fastImport, gitMergeTree, tempRepo } from "./git-harness.ts";
 import { fc, PROPERTY_TIMEOUT } from "./support/fast-check.ts";
 
-/** Each history spawns git a few times; give every case a generous share of the deadline. */
-const DEADLINE_MS = 60_000 + Number(process.env["FC_NUM_RUNS"] ?? 300) * 250;
+/** Each history spawns git a few times: a second per case, so a machine at load ~230 still finishes 300 cases. */
+const DEADLINE_MS = 60_000 + Number(process.env["FC_NUM_RUNS"] ?? 300) * 1000;
 
 const repo = tempRepo();
 const reader = new CatFileReader(repo.dir);
