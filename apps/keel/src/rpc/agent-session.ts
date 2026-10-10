@@ -1,10 +1,13 @@
 import {
+  Agent,
+  AgentKind,
   AgentNotAdmitted,
   AgentNotKnown,
   IdempotencyConflict,
   InboxPage,
+  Scope,
 } from "@keeltown/core/domain/identity";
-import { AgentId, ChangeId, InstantSchema, SessionId } from "@keeltown/core/kernel";
+import { AgentId, ChangeId, InstantSchema, ProjectId, SessionId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
@@ -36,6 +39,27 @@ export const InboxRead = Schema.Struct({
   waitMs: Schema.Int,
 });
 
+/**
+ * Enrol the agent this DO is named for. The isolate derives the agent id from
+ * the operator and the Idempotency-Key and mints the client secret, sending only
+ * its hash. The DO commits AgentEnrolled and writes the D1 projection before it
+ * answers, so the credential exchanges for a token at once. A replay with the
+ * same key and body re-issues the credential: it replaces `secretHash`, because
+ * the first answer (the only place the secret was shown) was lost. Another body
+ * under the same key is an IdempotencyConflict.
+ */
+export const EnrolCommand = Schema.Struct({
+  projectId: ProjectId,
+  name: Schema.NonEmptyString,
+  kind: AgentKind,
+  scopes: Schema.Array(Scope),
+  clientId: Schema.NonEmptyString,
+  /** `sha256:` and the hex digest of the client secret. */
+  secretHash: Schema.String,
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
+
 export const AgentSessionCodecs = {
   describe: exitCodec(SessionSnapshot, AgentNotKnown),
   openSession: exitCodec(
@@ -44,6 +68,7 @@ export const AgentSessionCodecs = {
   ),
   reserveChange: exitCodec(ChangeId, IdempotencyConflict),
   inbox: exitCodec(InboxPage, AgentNotKnown),
+  enrol: exitCodec(Agent, IdempotencyConflict),
 };
 
 /** The AgentSession DO: inbox, cursor, leases, fidelity and the agent's live connections. */
@@ -58,4 +83,5 @@ export interface AgentSessionRpc extends EventReceiverRpc {
   reserveChange(request: typeof ReserveChange.Encoded): Promise<ExitJson>;
   /** Notices after `cursor`; with `waitMs` > 0, waits for the next one (an in-DO waiter with a deadline). */
   inbox(request: typeof InboxRead.Encoded): Promise<ExitJson>;
+  enrol(command: typeof EnrolCommand.Encoded): Promise<ExitJson>;
 }

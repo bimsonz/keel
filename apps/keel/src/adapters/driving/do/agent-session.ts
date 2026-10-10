@@ -7,6 +7,7 @@ import { Effect, Schema } from "effect";
 import {
   AgentSessionCodecs,
   type AgentSessionRpc,
+  type EnrolCommand,
   InboxRead,
   type OpenSession,
   ReserveChange,
@@ -71,5 +72,9 @@ export class AgentSessionDO extends KeelObject implements AgentSessionRpc {
       ),
     );
     return this.answer(AgentSessionCodecs.inbox, program);
+  }
+
+  async enrol(_command: typeof EnrolCommand.Encoded) {
+    return this.answer(AgentSessionCodecs.enrol, Effect.die(new NotImplemented("identity/enrol")));
   }
 }
