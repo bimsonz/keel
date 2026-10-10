@@ -42,6 +42,9 @@ describe("probe admission", () => {
       }),
     );
     expect(admitted).toBeGreaterThan(0);
+    // Red on trunk means the probe is not about the combination: never a guard, however it behaves elsewhere.
+    const redTrunk: RunCells = { trunk: "fail", A: "pass", B: "pass", AB: "fail" };
+    expect(admit(cellsOf([redTrunk, redTrunk, redTrunk]))._tag).toBe("rejected");
   });
 
   it("[probe.discriminating-runs-admitted] three or more complete runs that all discriminate admit the probe", () => {
