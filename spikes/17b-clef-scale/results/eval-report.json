@@ -1,0 +1,9216 @@
+{
+  "calls": 242,
+  "errors": 0,
+  "retries": 0,
+  "overall": {
+    "n": 242,
+    "contradictions": 101,
+    "decoys": 63,
+    "gate": {
+      "t": 0.5,
+      "recall": {
+        "k": 98,
+        "n": 101,
+        "p": 0.9703,
+        "lo": 0.9163,
+        "hi": 0.9898
+      },
+      "precision": {
+        "k": 98,
+        "n": 107,
+        "p": 0.9159,
+        "lo": 0.8478,
+        "hi": 0.9551
+      },
+      "decoyFpRate": {
+        "k": 9,
+        "n": 63,
+        "p": 0.1429,
+        "lo": 0.077,
+        "hi": 0.2497
+      },
+      "compatibleFpRate": {
+        "k": 0,
+        "n": 78,
+        "p": 0,
+        "lo": 0,
+        "hi": 0.0469
+      },
+      "coverage": {
+        "k": 219,
+        "n": 242,
+        "p": 0.905,
+        "lo": 0.8614,
+        "hi": 0.9358
+      },
+      "risk": {
+        "k": 10,
+        "n": 219,
+        "p": 0.0457,
+        "lo": 0.025,
+        "hi": 0.082
+      },
+      "misses": [
+        "F06",
+        "S035",
+        "S066"
+      ],
+      "falseFlags": [
+        "D02",
+        "F03",
+        "S021",
+        "S027",
+        "S059",
+        "S060",
+        "S146",
+        "S147",
+        "S148"
+      ],
+      "abstained": [
+        "F06",
+        "F07",
+        "S023",
+        "S024",
+        "S025",
+        "S035",
+        "S043",
+        "S047",
+        "S058",
+        "S062",
+        "S063",
+        "S069",
+        "S072",
+        "S075",
+        "S077",
+        "S078",
+        "S095",
+        "S127",
+        "S128",
+        "S129",
+        "S130",
+        "S170",
+        "S172"
+      ]
+    },
+    "topChoice": {
+      "t": 0.5,
+      "recall": {
+        "k": 98,
+        "n": 101,
+        "p": 0.9703,
+        "lo": 0.9163,
+        "hi": 0.9898
+      },
+      "precision": {
+        "k": 98,
+        "n": 107,
+        "p": 0.9159,
+        "lo": 0.8478,
+        "hi": 0.9551
+      },
+      "decoyFpRate": {
+        "k": 9,
+        "n": 63,
+        "p": 0.1429,
+        "lo": 0.077,
+        "hi": 0.2497
+      },
+      "compatibleFpRate": {
+        "k": 0,
+        "n": 78,
+        "p": 0,
+        "lo": 0,
+        "hi": 0.0469
+      },
+      "coverage": {
+        "k": 216,
+        "n": 242,
+        "p": 0.8926,
+        "lo": 0.8472,
+        "hi": 0.9256
+      },
+      "risk": {
+        "k": 9,
+        "n": 216,
+        "p": 0.0417,
+        "lo": 0.0221,
+        "hi": 0.0773
+      },
+      "misses": [
+        "F06",
+        "S035",
+        "S066"
+      ],
+      "falseFlags": [
+        "D02",
+        "F03",
+        "S021",
+        "S027",
+        "S059",
+        "S060",
+        "S146",
+        "S147",
+        "S148"
+      ],
+      "abstained": [
+        "C15",
+        "F06",
+        "F07",
+        "S023",
+        "S024",
+        "S025",
+        "S035",
+        "S043",
+        "S047",
+        "S052",
+        "S058",
+        "S062",
+        "S063",
+        "S066",
+        "S069",
+        "S072",
+        "S075",
+        "S077",
+        "S078",
+        "S095",
+        "S127",
+        "S128",
+        "S129",
+        "S130",
+        "S170",
+        "S172"
+      ]
+    },
+    "answered": 242,
+    "relabelledAgreement": {
+      "k": 220,
+      "n": 242,
+      "p": 0.9091,
+      "lo": 0.8662,
+      "hi": 0.9392
+    },
+    "pairwiseFlipRate": {
+      "k": 46,
+      "n": 726,
+      "p": 0.0634,
+      "lo": 0.0478,
+      "hi": 0.0835
+    },
+    "verdictAgreement": {
+      "k": 224,
+      "n": 242,
+      "p": 0.9256,
+      "lo": 0.8855,
+      "hi": 0.9524
+    },
+    "unclearShare": {
+      "k": 43,
+      "n": 726,
+      "p": 0.0592,
+      "lo": 0.0443,
+      "hi": 0.0788
+    },
+    "v0ValueAccuracy": {
+      "k": 206,
+      "n": 242,
+      "p": 0.8512,
+      "lo": 0.8009,
+      "hi": 0.8906
+    },
+    "allThreeCorrect": {
+      "k": 200,
+      "n": 242,
+      "p": 0.8264,
+      "lo": 0.7737,
+      "hi": 0.869
+    },
+    "disagreeing": [
+      {
+        "id": "C15",
+        "truth": "read-your-writes",
+        "chosen": [
+          "read-your-writes",
+          "eventual",
+          "eventual"
+        ],
+        "pViolate": [
+          0.191,
+          0.32,
+          0.346
+        ]
+      },
+      {
+        "id": "D09",
+        "truth": "at-most-one",
+        "chosen": [
+          "exactly-one",
+          "at-most-one",
+          "at-most-one"
+        ],
+        "pViolate": [
+          0.016,
+          0.023,
+          0.015
+        ]
+      },
+      {
+        "id": "F06",
+        "truth": "per-session",
+        "chosen": [
+          "ttl",
+          "unclear",
+          "unclear"
+        ],
+        "pViolate": [
+          0.759,
+          0.488,
+          0.431
+        ]
+      },
+      {
+        "id": "F07",
+        "truth": "per-call",
+        "chosen": [
+          "unclear",
+          "per-call",
+          "unclear"
+        ],
+        "pViolate": [
+          0.081,
+          0.077,
+          0.057
+        ]
+      },
+      {
+        "id": "S023",
+        "truth": "per-call",
+        "chosen": [
+          "per-session",
+          "per-call",
+          "per-call"
+        ],
+        "pViolate": [
+          0.735,
+          0.03,
+          0.024
+        ]
+      },
+      {
+        "id": "S024",
+        "truth": "per-call",
+        "chosen": [
+          "per-request",
+          "per-call",
+          "per-call"
+        ],
+        "pViolate": [
+          0.696,
+          0.126,
+          0.152
+        ]
+      },
+      {
+        "id": "S025",
+        "truth": "per-call",
+        "chosen": [
+          "ttl",
+          "unclear",
+          "unclear"
+        ],
+        "pViolate": [
+          0.527,
+          0.362,
+          0.191
+        ]
+      },
+      {
+        "id": "S035",
+        "truth": "many",
+        "chosen": [
+          "at-most-one",
+          "unclear",
+          "unclear"
+        ],
+        "pViolate": [
+          0.639,
+          0.472,
+          0.33
+        ]
+      },
+      {
+        "id": "S042",
+        "truth": "at-most-one",
+        "chosen": [
+          "exactly-one",
+          "exactly-one",
+          "at-most-one"
+        ],
+        "pViolate": [
+          0.059,
+          0.04,
+          0.037
+        ]
+      },
+      {
+        "id": "S047",
+        "truth": "fifo",
+        "chosen": [
+          "unordered",
+          "fifo",
+          "fifo"
+        ],
+        "pViolate": [
+          0.675,
+          0.096,
+          0.084
+        ]
+      },
+      {
+        "id": "S052",
+        "truth": "fifo",
+        "chosen": [
+          "unordered",
+          "fifo",
+          "fifo"
+        ],
+        "pViolate": [
+          0.403,
+          0.091,
+          0.039
+        ]
+      },
+      {
+        "id": "S058",
+        "truth": "fifo",
+        "chosen": [
+          "unordered",
+          "unordered",
+          "unclear"
+        ],
+        "pViolate": [
+          0.737,
+          0.565,
+          0.269
+        ]
+      },
+      {
+        "id": "S062",
+        "truth": "fifo",
+        "chosen": [
+          "per-key-fifo",
+          "per-key-fifo",
+          "fifo"
+        ],
+        "pViolate": [
+          0.541,
+          0.578,
+          0.359
+        ]
+      },
+      {
+        "id": "S063",
+        "truth": "strong",
+        "chosen": [
+          "eventual",
+          "unclear",
+          "unclear"
+        ],
+        "pViolate": [
+          0.555,
+          0.358,
+          0.31
+        ]
+      },
+      {
+        "id": "S066",
+        "truth": "read-your-writes",
+        "chosen": [
+          "read-your-writes",
+          "strong",
+          "eventual"
+        ],
+        "pViolate": [
+          0.47,
+          0.455,
+          0.47
+        ]
+      },
+      {
+        "id": "S072",
+        "truth": "read-your-writes",
+        "chosen": [
+          "read-your-writes",
+          "strong",
+          "unclear"
+        ],
+        "pViolate": [
+          0.156,
+          0.244,
+          0.239
+        ]
+      },
+      {
+        "id": "S079",
+        "truth": "read-your-writes",
+        "chosen": [
+          "read-your-writes",
+          "strong",
+          "strong"
+        ],
+        "pViolate": [
+          0.286,
+          0.195,
+          0.123
+        ]
+      },
+      {
+        "id": "S095",
+        "truth": "optional",
+        "chosen": [
+          "optional",
+          "unclear",
+          "unclear"
+        ],
+        "pViolate": [
+          0.029,
+          0.019,
+          0.01
+        ]
+      },
+      {
+        "id": "S116",
+        "truth": "admin",
+        "chosen": [
+          "admin",
+          "member",
+          "admin"
+        ],
+        "pViolate": [
+          0.036,
+          0.031,
+          0.022
+        ]
+      },
+      {
+        "id": "S129",
+        "truth": "member",
+        "chosen": [
+          "anyone",
+          "unclear",
+          "anyone"
+        ],
+        "pViolate": [
+          0.822,
+          0.453,
+          0.691
+        ]
+      },
+      {
+        "id": "S130",
+        "truth": "admin",
+        "chosen": [
+          "anyone",
+          "unclear",
+          "unclear"
+        ],
+        "pViolate": [
+          0.772,
+          0.11,
+          0.072
+        ]
+      },
+      {
+        "id": "S170",
+        "truth": "le-1k",
+        "chosen": [
+          "le-10k",
+          "unclear",
+          "unclear"
+        ],
+        "pViolate": [
+          0.664,
+          0.058,
+          0.053
+        ]
+      }
+    ]
+  },
+  "bySource": {
+    "s17": {
+      "n": 40,
+      "contradictions": 22,
+      "decoys": 10,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 22,
+          "n": 22,
+          "p": 1,
+          "lo": 0.8513,
+          "hi": 1
+        },
+        "precision": {
+          "k": 22,
+          "n": 23,
+          "p": 0.9565,
+          "lo": 0.7901,
+          "hi": 0.9923
+        },
+        "decoyFpRate": {
+          "k": 1,
+          "n": 10,
+          "p": 0.1,
+          "lo": 0.0179,
+          "hi": 0.4042
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 8,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3244
+        },
+        "coverage": {
+          "k": 40,
+          "n": 40,
+          "p": 1,
+          "lo": 0.9124,
+          "hi": 1
+        },
+        "risk": {
+          "k": 1,
+          "n": 40,
+          "p": 0.025,
+          "lo": 0.0044,
+          "hi": 0.1288
+        },
+        "misses": [],
+        "falseFlags": [
+          "D02"
+        ],
+        "abstained": []
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 22,
+          "n": 22,
+          "p": 1,
+          "lo": 0.8513,
+          "hi": 1
+        },
+        "precision": {
+          "k": 22,
+          "n": 23,
+          "p": 0.9565,
+          "lo": 0.7901,
+          "hi": 0.9923
+        },
+        "decoyFpRate": {
+          "k": 1,
+          "n": 10,
+          "p": 0.1,
+          "lo": 0.0179,
+          "hi": 0.4042
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 8,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3244
+        },
+        "coverage": {
+          "k": 39,
+          "n": 40,
+          "p": 0.975,
+          "lo": 0.8712,
+          "hi": 0.9956
+        },
+        "risk": {
+          "k": 1,
+          "n": 39,
+          "p": 0.0256,
+          "lo": 0.0045,
+          "hi": 0.1318
+        },
+        "misses": [],
+        "falseFlags": [
+          "D02"
+        ],
+        "abstained": [
+          "C15"
+        ]
+      },
+      "answered": 40,
+      "relabelledAgreement": {
+        "k": 38,
+        "n": 40,
+        "p": 0.95,
+        "lo": 0.835,
+        "hi": 0.9862
+      },
+      "pairwiseFlipRate": {
+        "k": 4,
+        "n": 120,
+        "p": 0.0333,
+        "lo": 0.013,
+        "hi": 0.0826
+      },
+      "verdictAgreement": {
+        "k": 39,
+        "n": 40,
+        "p": 0.975,
+        "lo": 0.8712,
+        "hi": 0.9956
+      },
+      "unclearShare": {
+        "k": 0,
+        "n": 120,
+        "p": 0,
+        "lo": 0,
+        "hi": 0.031
+      },
+      "v0ValueAccuracy": {
+        "k": 37,
+        "n": 40,
+        "p": 0.925,
+        "lo": 0.8014,
+        "hi": 0.9742
+      },
+      "allThreeCorrect": {
+        "k": 36,
+        "n": 40,
+        "p": 0.9,
+        "lo": 0.7695,
+        "hi": 0.9604
+      },
+      "disagreeing": [
+        {
+          "id": "C15",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "eventual",
+            "eventual"
+          ],
+          "pViolate": [
+            0.191,
+            0.32,
+            0.346
+          ]
+        },
+        {
+          "id": "D09",
+          "truth": "at-most-one",
+          "chosen": [
+            "exactly-one",
+            "at-most-one",
+            "at-most-one"
+          ],
+          "pViolate": [
+            0.016,
+            0.023,
+            0.015
+          ]
+        }
+      ]
+    },
+    "forge-lite": {
+      "n": 8,
+      "contradictions": 4,
+      "decoys": 4,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 3,
+          "n": 4,
+          "p": 0.75,
+          "lo": 0.3006,
+          "hi": 0.9544
+        },
+        "precision": {
+          "k": 3,
+          "n": 4,
+          "p": 0.75,
+          "lo": 0.3006,
+          "hi": 0.9544
+        },
+        "decoyFpRate": {
+          "k": 1,
+          "n": 4,
+          "p": 0.25,
+          "lo": 0.0456,
+          "hi": 0.6994
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "coverage": {
+          "k": 6,
+          "n": 8,
+          "p": 0.75,
+          "lo": 0.4093,
+          "hi": 0.9285
+        },
+        "risk": {
+          "k": 1,
+          "n": 6,
+          "p": 0.1667,
+          "lo": 0.0301,
+          "hi": 0.5635
+        },
+        "misses": [
+          "F06"
+        ],
+        "falseFlags": [
+          "F03"
+        ],
+        "abstained": [
+          "F06",
+          "F07"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 3,
+          "n": 4,
+          "p": 0.75,
+          "lo": 0.3006,
+          "hi": 0.9544
+        },
+        "precision": {
+          "k": 3,
+          "n": 4,
+          "p": 0.75,
+          "lo": 0.3006,
+          "hi": 0.9544
+        },
+        "decoyFpRate": {
+          "k": 1,
+          "n": 4,
+          "p": 0.25,
+          "lo": 0.0456,
+          "hi": 0.6994
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "coverage": {
+          "k": 6,
+          "n": 8,
+          "p": 0.75,
+          "lo": 0.4093,
+          "hi": 0.9285
+        },
+        "risk": {
+          "k": 1,
+          "n": 6,
+          "p": 0.1667,
+          "lo": 0.0301,
+          "hi": 0.5635
+        },
+        "misses": [
+          "F06"
+        ],
+        "falseFlags": [
+          "F03"
+        ],
+        "abstained": [
+          "F06",
+          "F07"
+        ]
+      },
+      "answered": 8,
+      "relabelledAgreement": {
+        "k": 6,
+        "n": 8,
+        "p": 0.75,
+        "lo": 0.4093,
+        "hi": 0.9285
+      },
+      "pairwiseFlipRate": {
+        "k": 4,
+        "n": 24,
+        "p": 0.1667,
+        "lo": 0.0668,
+        "hi": 0.3585
+      },
+      "verdictAgreement": {
+        "k": 6,
+        "n": 8,
+        "p": 0.75,
+        "lo": 0.4093,
+        "hi": 0.9285
+      },
+      "unclearShare": {
+        "k": 4,
+        "n": 24,
+        "p": 0.1667,
+        "lo": 0.0668,
+        "hi": 0.3585
+      },
+      "v0ValueAccuracy": {
+        "k": 5,
+        "n": 8,
+        "p": 0.625,
+        "lo": 0.3057,
+        "hi": 0.8632
+      },
+      "allThreeCorrect": {
+        "k": 5,
+        "n": 8,
+        "p": 0.625,
+        "lo": 0.3057,
+        "hi": 0.8632
+      },
+      "disagreeing": [
+        {
+          "id": "F06",
+          "truth": "per-session",
+          "chosen": [
+            "ttl",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.759,
+            0.488,
+            0.431
+          ]
+        },
+        {
+          "id": "F07",
+          "truth": "per-call",
+          "chosen": [
+            "unclear",
+            "per-call",
+            "unclear"
+          ],
+          "pViolate": [
+            0.081,
+            0.077,
+            0.057
+          ]
+        }
+      ]
+    },
+    "synthetic": {
+      "n": 194,
+      "contradictions": 75,
+      "decoys": 49,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 73,
+          "n": 75,
+          "p": 0.9733,
+          "lo": 0.9079,
+          "hi": 0.9927
+        },
+        "precision": {
+          "k": 73,
+          "n": 80,
+          "p": 0.9125,
+          "lo": 0.8302,
+          "hi": 0.957
+        },
+        "decoyFpRate": {
+          "k": 7,
+          "n": 49,
+          "p": 0.1429,
+          "lo": 0.071,
+          "hi": 0.2667
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 70,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.052
+        },
+        "coverage": {
+          "k": 173,
+          "n": 194,
+          "p": 0.8918,
+          "lo": 0.8402,
+          "hi": 0.9281
+        },
+        "risk": {
+          "k": 8,
+          "n": 173,
+          "p": 0.0462,
+          "lo": 0.0236,
+          "hi": 0.0886
+        },
+        "misses": [
+          "S035",
+          "S066"
+        ],
+        "falseFlags": [
+          "S021",
+          "S027",
+          "S059",
+          "S060",
+          "S146",
+          "S147",
+          "S148"
+        ],
+        "abstained": [
+          "S023",
+          "S024",
+          "S025",
+          "S035",
+          "S043",
+          "S047",
+          "S058",
+          "S062",
+          "S063",
+          "S069",
+          "S072",
+          "S075",
+          "S077",
+          "S078",
+          "S095",
+          "S127",
+          "S128",
+          "S129",
+          "S130",
+          "S170",
+          "S172"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 73,
+          "n": 75,
+          "p": 0.9733,
+          "lo": 0.9079,
+          "hi": 0.9927
+        },
+        "precision": {
+          "k": 73,
+          "n": 80,
+          "p": 0.9125,
+          "lo": 0.8302,
+          "hi": 0.957
+        },
+        "decoyFpRate": {
+          "k": 7,
+          "n": 49,
+          "p": 0.1429,
+          "lo": 0.071,
+          "hi": 0.2667
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 70,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.052
+        },
+        "coverage": {
+          "k": 171,
+          "n": 194,
+          "p": 0.8814,
+          "lo": 0.8284,
+          "hi": 0.9197
+        },
+        "risk": {
+          "k": 7,
+          "n": 171,
+          "p": 0.0409,
+          "lo": 0.02,
+          "hi": 0.0821
+        },
+        "misses": [
+          "S035",
+          "S066"
+        ],
+        "falseFlags": [
+          "S021",
+          "S027",
+          "S059",
+          "S060",
+          "S146",
+          "S147",
+          "S148"
+        ],
+        "abstained": [
+          "S023",
+          "S024",
+          "S025",
+          "S035",
+          "S043",
+          "S047",
+          "S052",
+          "S058",
+          "S062",
+          "S063",
+          "S066",
+          "S069",
+          "S072",
+          "S075",
+          "S077",
+          "S078",
+          "S095",
+          "S127",
+          "S128",
+          "S129",
+          "S130",
+          "S170",
+          "S172"
+        ]
+      },
+      "answered": 194,
+      "relabelledAgreement": {
+        "k": 176,
+        "n": 194,
+        "p": 0.9072,
+        "lo": 0.8581,
+        "hi": 0.9405
+      },
+      "pairwiseFlipRate": {
+        "k": 38,
+        "n": 582,
+        "p": 0.0653,
+        "lo": 0.0479,
+        "hi": 0.0883
+      },
+      "verdictAgreement": {
+        "k": 179,
+        "n": 194,
+        "p": 0.9227,
+        "lo": 0.8764,
+        "hi": 0.9526
+      },
+      "unclearShare": {
+        "k": 39,
+        "n": 582,
+        "p": 0.067,
+        "lo": 0.0494,
+        "hi": 0.0903
+      },
+      "v0ValueAccuracy": {
+        "k": 164,
+        "n": 194,
+        "p": 0.8454,
+        "lo": 0.7878,
+        "hi": 0.8895
+      },
+      "allThreeCorrect": {
+        "k": 159,
+        "n": 194,
+        "p": 0.8196,
+        "lo": 0.7594,
+        "hi": 0.8673
+      },
+      "disagreeing": [
+        {
+          "id": "S023",
+          "truth": "per-call",
+          "chosen": [
+            "per-session",
+            "per-call",
+            "per-call"
+          ],
+          "pViolate": [
+            0.735,
+            0.03,
+            0.024
+          ]
+        },
+        {
+          "id": "S024",
+          "truth": "per-call",
+          "chosen": [
+            "per-request",
+            "per-call",
+            "per-call"
+          ],
+          "pViolate": [
+            0.696,
+            0.126,
+            0.152
+          ]
+        },
+        {
+          "id": "S025",
+          "truth": "per-call",
+          "chosen": [
+            "ttl",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.527,
+            0.362,
+            0.191
+          ]
+        },
+        {
+          "id": "S035",
+          "truth": "many",
+          "chosen": [
+            "at-most-one",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.639,
+            0.472,
+            0.33
+          ]
+        },
+        {
+          "id": "S042",
+          "truth": "at-most-one",
+          "chosen": [
+            "exactly-one",
+            "exactly-one",
+            "at-most-one"
+          ],
+          "pViolate": [
+            0.059,
+            0.04,
+            0.037
+          ]
+        },
+        {
+          "id": "S047",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "fifo",
+            "fifo"
+          ],
+          "pViolate": [
+            0.675,
+            0.096,
+            0.084
+          ]
+        },
+        {
+          "id": "S052",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "fifo",
+            "fifo"
+          ],
+          "pViolate": [
+            0.403,
+            0.091,
+            0.039
+          ]
+        },
+        {
+          "id": "S058",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "unordered",
+            "unclear"
+          ],
+          "pViolate": [
+            0.737,
+            0.565,
+            0.269
+          ]
+        },
+        {
+          "id": "S062",
+          "truth": "fifo",
+          "chosen": [
+            "per-key-fifo",
+            "per-key-fifo",
+            "fifo"
+          ],
+          "pViolate": [
+            0.541,
+            0.578,
+            0.359
+          ]
+        },
+        {
+          "id": "S063",
+          "truth": "strong",
+          "chosen": [
+            "eventual",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.555,
+            0.358,
+            0.31
+          ]
+        },
+        {
+          "id": "S066",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "eventual"
+          ],
+          "pViolate": [
+            0.47,
+            0.455,
+            0.47
+          ]
+        },
+        {
+          "id": "S072",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "unclear"
+          ],
+          "pViolate": [
+            0.156,
+            0.244,
+            0.239
+          ]
+        },
+        {
+          "id": "S079",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "strong"
+          ],
+          "pViolate": [
+            0.286,
+            0.195,
+            0.123
+          ]
+        },
+        {
+          "id": "S095",
+          "truth": "optional",
+          "chosen": [
+            "optional",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.029,
+            0.019,
+            0.01
+          ]
+        },
+        {
+          "id": "S116",
+          "truth": "admin",
+          "chosen": [
+            "admin",
+            "member",
+            "admin"
+          ],
+          "pViolate": [
+            0.036,
+            0.031,
+            0.022
+          ]
+        },
+        {
+          "id": "S129",
+          "truth": "member",
+          "chosen": [
+            "anyone",
+            "unclear",
+            "anyone"
+          ],
+          "pViolate": [
+            0.822,
+            0.453,
+            0.691
+          ]
+        },
+        {
+          "id": "S130",
+          "truth": "admin",
+          "chosen": [
+            "anyone",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.772,
+            0.11,
+            0.072
+          ]
+        },
+        {
+          "id": "S170",
+          "truth": "le-1k",
+          "chosen": [
+            "le-10k",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.664,
+            0.058,
+            0.053
+          ]
+        }
+      ]
+    }
+  },
+  "byPredicate": {
+    "freshness": {
+      "n": 45,
+      "contradictions": 18,
+      "decoys": 16,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 17,
+          "n": 18,
+          "p": 0.9444,
+          "lo": 0.7424,
+          "hi": 0.9901
+        },
+        "precision": {
+          "k": 17,
+          "n": 20,
+          "p": 0.85,
+          "lo": 0.6396,
+          "hi": 0.9476
+        },
+        "decoyFpRate": {
+          "k": 3,
+          "n": 16,
+          "p": 0.1875,
+          "lo": 0.0659,
+          "hi": 0.4301
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 11,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.2588
+        },
+        "coverage": {
+          "k": 40,
+          "n": 45,
+          "p": 0.8889,
+          "lo": 0.765,
+          "hi": 0.9516
+        },
+        "risk": {
+          "k": 3,
+          "n": 40,
+          "p": 0.075,
+          "lo": 0.0258,
+          "hi": 0.1986
+        },
+        "misses": [
+          "F06"
+        ],
+        "falseFlags": [
+          "F03",
+          "S021",
+          "S027"
+        ],
+        "abstained": [
+          "F06",
+          "F07",
+          "S023",
+          "S024",
+          "S025"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 17,
+          "n": 18,
+          "p": 0.9444,
+          "lo": 0.7424,
+          "hi": 0.9901
+        },
+        "precision": {
+          "k": 17,
+          "n": 20,
+          "p": 0.85,
+          "lo": 0.6396,
+          "hi": 0.9476
+        },
+        "decoyFpRate": {
+          "k": 3,
+          "n": 16,
+          "p": 0.1875,
+          "lo": 0.0659,
+          "hi": 0.4301
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 11,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.2588
+        },
+        "coverage": {
+          "k": 40,
+          "n": 45,
+          "p": 0.8889,
+          "lo": 0.765,
+          "hi": 0.9516
+        },
+        "risk": {
+          "k": 3,
+          "n": 40,
+          "p": 0.075,
+          "lo": 0.0258,
+          "hi": 0.1986
+        },
+        "misses": [
+          "F06"
+        ],
+        "falseFlags": [
+          "F03",
+          "S021",
+          "S027"
+        ],
+        "abstained": [
+          "F06",
+          "F07",
+          "S023",
+          "S024",
+          "S025"
+        ]
+      },
+      "answered": 45,
+      "relabelledAgreement": {
+        "k": 40,
+        "n": 45,
+        "p": 0.8889,
+        "lo": 0.765,
+        "hi": 0.9516
+      },
+      "pairwiseFlipRate": {
+        "k": 10,
+        "n": 135,
+        "p": 0.0741,
+        "lo": 0.0407,
+        "hi": 0.131
+      },
+      "verdictAgreement": {
+        "k": 40,
+        "n": 45,
+        "p": 0.8889,
+        "lo": 0.765,
+        "hi": 0.9516
+      },
+      "unclearShare": {
+        "k": 6,
+        "n": 135,
+        "p": 0.0444,
+        "lo": 0.0205,
+        "hi": 0.0936
+      },
+      "v0ValueAccuracy": {
+        "k": 37,
+        "n": 45,
+        "p": 0.8222,
+        "lo": 0.6867,
+        "hi": 0.9071
+      },
+      "allThreeCorrect": {
+        "k": 37,
+        "n": 45,
+        "p": 0.8222,
+        "lo": 0.6867,
+        "hi": 0.9071
+      },
+      "disagreeing": [
+        {
+          "id": "F06",
+          "truth": "per-session",
+          "chosen": [
+            "ttl",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.759,
+            0.488,
+            0.431
+          ]
+        },
+        {
+          "id": "F07",
+          "truth": "per-call",
+          "chosen": [
+            "unclear",
+            "per-call",
+            "unclear"
+          ],
+          "pViolate": [
+            0.081,
+            0.077,
+            0.057
+          ]
+        },
+        {
+          "id": "S023",
+          "truth": "per-call",
+          "chosen": [
+            "per-session",
+            "per-call",
+            "per-call"
+          ],
+          "pViolate": [
+            0.735,
+            0.03,
+            0.024
+          ]
+        },
+        {
+          "id": "S024",
+          "truth": "per-call",
+          "chosen": [
+            "per-request",
+            "per-call",
+            "per-call"
+          ],
+          "pViolate": [
+            0.696,
+            0.126,
+            0.152
+          ]
+        },
+        {
+          "id": "S025",
+          "truth": "per-call",
+          "chosen": [
+            "ttl",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.527,
+            0.362,
+            0.191
+          ]
+        }
+      ]
+    },
+    "cardinality": {
+      "n": 21,
+      "contradictions": 8,
+      "decoys": 6,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 7,
+          "n": 8,
+          "p": 0.875,
+          "lo": 0.5291,
+          "hi": 0.9776
+        },
+        "precision": {
+          "k": 7,
+          "n": 7,
+          "p": 1,
+          "lo": 0.6457,
+          "hi": 1
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 6,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3903
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 7,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3543
+        },
+        "coverage": {
+          "k": 19,
+          "n": 21,
+          "p": 0.9048,
+          "lo": 0.7109,
+          "hi": 0.9735
+        },
+        "risk": {
+          "k": 0,
+          "n": 19,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1682
+        },
+        "misses": [
+          "S035"
+        ],
+        "falseFlags": [],
+        "abstained": [
+          "S035",
+          "S043"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 7,
+          "n": 8,
+          "p": 0.875,
+          "lo": 0.5291,
+          "hi": 0.9776
+        },
+        "precision": {
+          "k": 7,
+          "n": 7,
+          "p": 1,
+          "lo": 0.6457,
+          "hi": 1
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 6,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3903
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 7,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3543
+        },
+        "coverage": {
+          "k": 19,
+          "n": 21,
+          "p": 0.9048,
+          "lo": 0.7109,
+          "hi": 0.9735
+        },
+        "risk": {
+          "k": 0,
+          "n": 19,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1682
+        },
+        "misses": [
+          "S035"
+        ],
+        "falseFlags": [],
+        "abstained": [
+          "S035",
+          "S043"
+        ]
+      },
+      "answered": 21,
+      "relabelledAgreement": {
+        "k": 18,
+        "n": 21,
+        "p": 0.8571,
+        "lo": 0.6536,
+        "hi": 0.9502
+      },
+      "pairwiseFlipRate": {
+        "k": 6,
+        "n": 63,
+        "p": 0.0952,
+        "lo": 0.0444,
+        "hi": 0.1926
+      },
+      "verdictAgreement": {
+        "k": 20,
+        "n": 21,
+        "p": 0.9524,
+        "lo": 0.7733,
+        "hi": 0.9915
+      },
+      "unclearShare": {
+        "k": 5,
+        "n": 63,
+        "p": 0.0794,
+        "lo": 0.0344,
+        "hi": 0.1727
+      },
+      "v0ValueAccuracy": {
+        "k": 15,
+        "n": 21,
+        "p": 0.7143,
+        "lo": 0.5004,
+        "hi": 0.8619
+      },
+      "allThreeCorrect": {
+        "k": 15,
+        "n": 21,
+        "p": 0.7143,
+        "lo": 0.5004,
+        "hi": 0.8619
+      },
+      "disagreeing": [
+        {
+          "id": "D09",
+          "truth": "at-most-one",
+          "chosen": [
+            "exactly-one",
+            "at-most-one",
+            "at-most-one"
+          ],
+          "pViolate": [
+            0.016,
+            0.023,
+            0.015
+          ]
+        },
+        {
+          "id": "S035",
+          "truth": "many",
+          "chosen": [
+            "at-most-one",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.639,
+            0.472,
+            0.33
+          ]
+        },
+        {
+          "id": "S042",
+          "truth": "at-most-one",
+          "chosen": [
+            "exactly-one",
+            "exactly-one",
+            "at-most-one"
+          ],
+          "pViolate": [
+            0.059,
+            0.04,
+            0.037
+          ]
+        }
+      ]
+    },
+    "ordering": {
+      "n": 21,
+      "contradictions": 8,
+      "decoys": 6,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 8,
+          "n": 8,
+          "p": 1,
+          "lo": 0.6756,
+          "hi": 1
+        },
+        "precision": {
+          "k": 8,
+          "n": 10,
+          "p": 0.8,
+          "lo": 0.4902,
+          "hi": 0.9433
+        },
+        "decoyFpRate": {
+          "k": 2,
+          "n": 6,
+          "p": 0.3333,
+          "lo": 0.0968,
+          "hi": 0.7
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 7,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3543
+        },
+        "coverage": {
+          "k": 18,
+          "n": 21,
+          "p": 0.8571,
+          "lo": 0.6536,
+          "hi": 0.9502
+        },
+        "risk": {
+          "k": 2,
+          "n": 18,
+          "p": 0.1111,
+          "lo": 0.031,
+          "hi": 0.328
+        },
+        "misses": [],
+        "falseFlags": [
+          "S059",
+          "S060"
+        ],
+        "abstained": [
+          "S047",
+          "S058",
+          "S062"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 8,
+          "n": 8,
+          "p": 1,
+          "lo": 0.6756,
+          "hi": 1
+        },
+        "precision": {
+          "k": 8,
+          "n": 10,
+          "p": 0.8,
+          "lo": 0.4902,
+          "hi": 0.9433
+        },
+        "decoyFpRate": {
+          "k": 2,
+          "n": 6,
+          "p": 0.3333,
+          "lo": 0.0968,
+          "hi": 0.7
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 7,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3543
+        },
+        "coverage": {
+          "k": 17,
+          "n": 21,
+          "p": 0.8095,
+          "lo": 0.6,
+          "hi": 0.9233
+        },
+        "risk": {
+          "k": 2,
+          "n": 17,
+          "p": 0.1176,
+          "lo": 0.0329,
+          "hi": 0.3434
+        },
+        "misses": [],
+        "falseFlags": [
+          "S059",
+          "S060"
+        ],
+        "abstained": [
+          "S047",
+          "S052",
+          "S058",
+          "S062"
+        ]
+      },
+      "answered": 21,
+      "relabelledAgreement": {
+        "k": 17,
+        "n": 21,
+        "p": 0.8095,
+        "lo": 0.6,
+        "hi": 0.9233
+      },
+      "pairwiseFlipRate": {
+        "k": 8,
+        "n": 63,
+        "p": 0.127,
+        "lo": 0.0658,
+        "hi": 0.2311
+      },
+      "verdictAgreement": {
+        "k": 17,
+        "n": 21,
+        "p": 0.8095,
+        "lo": 0.6,
+        "hi": 0.9233
+      },
+      "unclearShare": {
+        "k": 1,
+        "n": 63,
+        "p": 0.0159,
+        "lo": 0.0028,
+        "hi": 0.0846
+      },
+      "v0ValueAccuracy": {
+        "k": 15,
+        "n": 21,
+        "p": 0.7143,
+        "lo": 0.5004,
+        "hi": 0.8619
+      },
+      "allThreeCorrect": {
+        "k": 15,
+        "n": 21,
+        "p": 0.7143,
+        "lo": 0.5004,
+        "hi": 0.8619
+      },
+      "disagreeing": [
+        {
+          "id": "S047",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "fifo",
+            "fifo"
+          ],
+          "pViolate": [
+            0.675,
+            0.096,
+            0.084
+          ]
+        },
+        {
+          "id": "S052",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "fifo",
+            "fifo"
+          ],
+          "pViolate": [
+            0.403,
+            0.091,
+            0.039
+          ]
+        },
+        {
+          "id": "S058",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "unordered",
+            "unclear"
+          ],
+          "pViolate": [
+            0.737,
+            0.565,
+            0.269
+          ]
+        },
+        {
+          "id": "S062",
+          "truth": "fifo",
+          "chosen": [
+            "per-key-fifo",
+            "per-key-fifo",
+            "fifo"
+          ],
+          "pViolate": [
+            0.541,
+            0.578,
+            0.359
+          ]
+        }
+      ]
+    },
+    "consistency": {
+      "n": 21,
+      "contradictions": 8,
+      "decoys": 6,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 7,
+          "n": 8,
+          "p": 0.875,
+          "lo": 0.5291,
+          "hi": 0.9776
+        },
+        "precision": {
+          "k": 7,
+          "n": 8,
+          "p": 0.875,
+          "lo": 0.5291,
+          "hi": 0.9776
+        },
+        "decoyFpRate": {
+          "k": 1,
+          "n": 6,
+          "p": 0.1667,
+          "lo": 0.0301,
+          "hi": 0.5635
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 7,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3543
+        },
+        "coverage": {
+          "k": 15,
+          "n": 21,
+          "p": 0.7143,
+          "lo": 0.5004,
+          "hi": 0.8619
+        },
+        "risk": {
+          "k": 2,
+          "n": 15,
+          "p": 0.1333,
+          "lo": 0.0374,
+          "hi": 0.3788
+        },
+        "misses": [
+          "S066"
+        ],
+        "falseFlags": [
+          "D02"
+        ],
+        "abstained": [
+          "S063",
+          "S069",
+          "S072",
+          "S075",
+          "S077",
+          "S078"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 7,
+          "n": 8,
+          "p": 0.875,
+          "lo": 0.5291,
+          "hi": 0.9776
+        },
+        "precision": {
+          "k": 7,
+          "n": 8,
+          "p": 0.875,
+          "lo": 0.5291,
+          "hi": 0.9776
+        },
+        "decoyFpRate": {
+          "k": 1,
+          "n": 6,
+          "p": 0.1667,
+          "lo": 0.0301,
+          "hi": 0.5635
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 7,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3543
+        },
+        "coverage": {
+          "k": 13,
+          "n": 21,
+          "p": 0.619,
+          "lo": 0.4088,
+          "hi": 0.7925
+        },
+        "risk": {
+          "k": 1,
+          "n": 13,
+          "p": 0.0769,
+          "lo": 0.0137,
+          "hi": 0.3331
+        },
+        "misses": [
+          "S066"
+        ],
+        "falseFlags": [
+          "D02"
+        ],
+        "abstained": [
+          "C15",
+          "S063",
+          "S066",
+          "S069",
+          "S072",
+          "S075",
+          "S077",
+          "S078"
+        ]
+      },
+      "answered": 21,
+      "relabelledAgreement": {
+        "k": 16,
+        "n": 21,
+        "p": 0.7619,
+        "lo": 0.5491,
+        "hi": 0.8937
+      },
+      "pairwiseFlipRate": {
+        "k": 12,
+        "n": 63,
+        "p": 0.1905,
+        "lo": 0.1125,
+        "hi": 0.3041
+      },
+      "verdictAgreement": {
+        "k": 17,
+        "n": 21,
+        "p": 0.8095,
+        "lo": 0.6,
+        "hi": 0.9233
+      },
+      "unclearShare": {
+        "k": 15,
+        "n": 63,
+        "p": 0.2381,
+        "lo": 0.1499,
+        "hi": 0.3564
+      },
+      "v0ValueAccuracy": {
+        "k": 15,
+        "n": 21,
+        "p": 0.7143,
+        "lo": 0.5004,
+        "hi": 0.8619
+      },
+      "allThreeCorrect": {
+        "k": 11,
+        "n": 21,
+        "p": 0.5238,
+        "lo": 0.3237,
+        "hi": 0.7166
+      },
+      "disagreeing": [
+        {
+          "id": "C15",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "eventual",
+            "eventual"
+          ],
+          "pViolate": [
+            0.191,
+            0.32,
+            0.346
+          ]
+        },
+        {
+          "id": "S063",
+          "truth": "strong",
+          "chosen": [
+            "eventual",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.555,
+            0.358,
+            0.31
+          ]
+        },
+        {
+          "id": "S066",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "eventual"
+          ],
+          "pViolate": [
+            0.47,
+            0.455,
+            0.47
+          ]
+        },
+        {
+          "id": "S072",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "unclear"
+          ],
+          "pViolate": [
+            0.156,
+            0.244,
+            0.239
+          ]
+        },
+        {
+          "id": "S079",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "strong"
+          ],
+          "pViolate": [
+            0.286,
+            0.195,
+            0.123
+          ]
+        }
+      ]
+    },
+    "presence": {
+      "n": 21,
+      "contradictions": 9,
+      "decoys": 5,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 9,
+          "n": 9,
+          "p": 1,
+          "lo": 0.7009,
+          "hi": 1
+        },
+        "precision": {
+          "k": 9,
+          "n": 9,
+          "p": 1,
+          "lo": 0.7009,
+          "hi": 1
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 5,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.4345
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 7,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3543
+        },
+        "coverage": {
+          "k": 20,
+          "n": 21,
+          "p": 0.9524,
+          "lo": 0.7733,
+          "hi": 0.9915
+        },
+        "risk": {
+          "k": 0,
+          "n": 20,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1611
+        },
+        "misses": [],
+        "falseFlags": [],
+        "abstained": [
+          "S095"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 9,
+          "n": 9,
+          "p": 1,
+          "lo": 0.7009,
+          "hi": 1
+        },
+        "precision": {
+          "k": 9,
+          "n": 9,
+          "p": 1,
+          "lo": 0.7009,
+          "hi": 1
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 5,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.4345
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 7,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3543
+        },
+        "coverage": {
+          "k": 20,
+          "n": 21,
+          "p": 0.9524,
+          "lo": 0.7733,
+          "hi": 0.9915
+        },
+        "risk": {
+          "k": 0,
+          "n": 20,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1611
+        },
+        "misses": [],
+        "falseFlags": [],
+        "abstained": [
+          "S095"
+        ]
+      },
+      "answered": 21,
+      "relabelledAgreement": {
+        "k": 20,
+        "n": 21,
+        "p": 0.9524,
+        "lo": 0.7733,
+        "hi": 0.9915
+      },
+      "pairwiseFlipRate": {
+        "k": 2,
+        "n": 63,
+        "p": 0.0317,
+        "lo": 0.0087,
+        "hi": 0.1086
+      },
+      "verdictAgreement": {
+        "k": 20,
+        "n": 21,
+        "p": 0.9524,
+        "lo": 0.7733,
+        "hi": 0.9915
+      },
+      "unclearShare": {
+        "k": 2,
+        "n": 63,
+        "p": 0.0317,
+        "lo": 0.0087,
+        "hi": 0.1086
+      },
+      "v0ValueAccuracy": {
+        "k": 21,
+        "n": 21,
+        "p": 1,
+        "lo": 0.8454,
+        "hi": 1
+      },
+      "allThreeCorrect": {
+        "k": 20,
+        "n": 21,
+        "p": 0.9524,
+        "lo": 0.7733,
+        "hi": 0.9915
+      },
+      "disagreeing": [
+        {
+          "id": "S095",
+          "truth": "optional",
+          "chosen": [
+            "optional",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.029,
+            0.019,
+            0.01
+          ]
+        }
+      ]
+    },
+    "authority": {
+      "n": 40,
+      "contradictions": 18,
+      "decoys": 6,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 18,
+          "n": 18,
+          "p": 1,
+          "lo": 0.8241,
+          "hi": 1
+        },
+        "precision": {
+          "k": 18,
+          "n": 18,
+          "p": 1,
+          "lo": 0.8241,
+          "hi": 1
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 6,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3903
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 16,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1936
+        },
+        "coverage": {
+          "k": 36,
+          "n": 40,
+          "p": 0.9,
+          "lo": 0.7695,
+          "hi": 0.9604
+        },
+        "risk": {
+          "k": 0,
+          "n": 36,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0964
+        },
+        "misses": [],
+        "falseFlags": [],
+        "abstained": [
+          "S127",
+          "S128",
+          "S129",
+          "S130"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 18,
+          "n": 18,
+          "p": 1,
+          "lo": 0.8241,
+          "hi": 1
+        },
+        "precision": {
+          "k": 18,
+          "n": 18,
+          "p": 1,
+          "lo": 0.8241,
+          "hi": 1
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 6,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3903
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 16,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1936
+        },
+        "coverage": {
+          "k": 36,
+          "n": 40,
+          "p": 0.9,
+          "lo": 0.7695,
+          "hi": 0.9604
+        },
+        "risk": {
+          "k": 0,
+          "n": 36,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0964
+        },
+        "misses": [],
+        "falseFlags": [],
+        "abstained": [
+          "S127",
+          "S128",
+          "S129",
+          "S130"
+        ]
+      },
+      "answered": 40,
+      "relabelledAgreement": {
+        "k": 37,
+        "n": 40,
+        "p": 0.925,
+        "lo": 0.8014,
+        "hi": 0.9742
+      },
+      "pairwiseFlipRate": {
+        "k": 6,
+        "n": 120,
+        "p": 0.05,
+        "lo": 0.0231,
+        "hi": 0.1048
+      },
+      "verdictAgreement": {
+        "k": 38,
+        "n": 40,
+        "p": 0.95,
+        "lo": 0.835,
+        "hi": 0.9862
+      },
+      "unclearShare": {
+        "k": 9,
+        "n": 120,
+        "p": 0.075,
+        "lo": 0.04,
+        "hi": 0.1364
+      },
+      "v0ValueAccuracy": {
+        "k": 36,
+        "n": 40,
+        "p": 0.9,
+        "lo": 0.7695,
+        "hi": 0.9604
+      },
+      "allThreeCorrect": {
+        "k": 35,
+        "n": 40,
+        "p": 0.875,
+        "lo": 0.7389,
+        "hi": 0.9454
+      },
+      "disagreeing": [
+        {
+          "id": "S116",
+          "truth": "admin",
+          "chosen": [
+            "admin",
+            "member",
+            "admin"
+          ],
+          "pViolate": [
+            0.036,
+            0.031,
+            0.022
+          ]
+        },
+        {
+          "id": "S129",
+          "truth": "member",
+          "chosen": [
+            "anyone",
+            "unclear",
+            "anyone"
+          ],
+          "pViolate": [
+            0.822,
+            0.453,
+            0.691
+          ]
+        },
+        {
+          "id": "S130",
+          "truth": "admin",
+          "chosen": [
+            "anyone",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.772,
+            0.11,
+            0.072
+          ]
+        }
+      ]
+    },
+    "purity": {
+      "n": 21,
+      "contradictions": 8,
+      "decoys": 6,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 8,
+          "n": 8,
+          "p": 1,
+          "lo": 0.6756,
+          "hi": 1
+        },
+        "precision": {
+          "k": 8,
+          "n": 11,
+          "p": 0.7273,
+          "lo": 0.4344,
+          "hi": 0.9025
+        },
+        "decoyFpRate": {
+          "k": 3,
+          "n": 6,
+          "p": 0.5,
+          "lo": 0.1876,
+          "hi": 0.8124
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 7,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3543
+        },
+        "coverage": {
+          "k": 21,
+          "n": 21,
+          "p": 1,
+          "lo": 0.8454,
+          "hi": 1
+        },
+        "risk": {
+          "k": 3,
+          "n": 21,
+          "p": 0.1429,
+          "lo": 0.0498,
+          "hi": 0.3464
+        },
+        "misses": [],
+        "falseFlags": [
+          "S146",
+          "S147",
+          "S148"
+        ],
+        "abstained": []
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 8,
+          "n": 8,
+          "p": 1,
+          "lo": 0.6756,
+          "hi": 1
+        },
+        "precision": {
+          "k": 8,
+          "n": 11,
+          "p": 0.7273,
+          "lo": 0.4344,
+          "hi": 0.9025
+        },
+        "decoyFpRate": {
+          "k": 3,
+          "n": 6,
+          "p": 0.5,
+          "lo": 0.1876,
+          "hi": 0.8124
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 7,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3543
+        },
+        "coverage": {
+          "k": 21,
+          "n": 21,
+          "p": 1,
+          "lo": 0.8454,
+          "hi": 1
+        },
+        "risk": {
+          "k": 3,
+          "n": 21,
+          "p": 0.1429,
+          "lo": 0.0498,
+          "hi": 0.3464
+        },
+        "misses": [],
+        "falseFlags": [
+          "S146",
+          "S147",
+          "S148"
+        ],
+        "abstained": []
+      },
+      "answered": 21,
+      "relabelledAgreement": {
+        "k": 21,
+        "n": 21,
+        "p": 1,
+        "lo": 0.8454,
+        "hi": 1
+      },
+      "pairwiseFlipRate": {
+        "k": 0,
+        "n": 63,
+        "p": 0,
+        "lo": 0,
+        "hi": 0.0575
+      },
+      "verdictAgreement": {
+        "k": 21,
+        "n": 21,
+        "p": 1,
+        "lo": 0.8454,
+        "hi": 1
+      },
+      "unclearShare": {
+        "k": 0,
+        "n": 63,
+        "p": 0,
+        "lo": 0,
+        "hi": 0.0575
+      },
+      "v0ValueAccuracy": {
+        "k": 18,
+        "n": 21,
+        "p": 0.8571,
+        "lo": 0.6536,
+        "hi": 0.9502
+      },
+      "allThreeCorrect": {
+        "k": 18,
+        "n": 21,
+        "p": 0.8571,
+        "lo": 0.6536,
+        "hi": 0.9502
+      },
+      "disagreeing": []
+    },
+    "bound": {
+      "n": 28,
+      "contradictions": 11,
+      "decoys": 6,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 11,
+          "n": 11,
+          "p": 1,
+          "lo": 0.7412,
+          "hi": 1
+        },
+        "precision": {
+          "k": 11,
+          "n": 11,
+          "p": 1,
+          "lo": 0.7412,
+          "hi": 1
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 6,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3903
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 11,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.2588
+        },
+        "coverage": {
+          "k": 26,
+          "n": 28,
+          "p": 0.9286,
+          "lo": 0.7735,
+          "hi": 0.9802
+        },
+        "risk": {
+          "k": 0,
+          "n": 26,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1287
+        },
+        "misses": [],
+        "falseFlags": [],
+        "abstained": [
+          "S170",
+          "S172"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 11,
+          "n": 11,
+          "p": 1,
+          "lo": 0.7412,
+          "hi": 1
+        },
+        "precision": {
+          "k": 11,
+          "n": 11,
+          "p": 1,
+          "lo": 0.7412,
+          "hi": 1
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 6,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3903
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 11,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.2588
+        },
+        "coverage": {
+          "k": 26,
+          "n": 28,
+          "p": 0.9286,
+          "lo": 0.7735,
+          "hi": 0.9802
+        },
+        "risk": {
+          "k": 0,
+          "n": 26,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1287
+        },
+        "misses": [],
+        "falseFlags": [],
+        "abstained": [
+          "S170",
+          "S172"
+        ]
+      },
+      "answered": 28,
+      "relabelledAgreement": {
+        "k": 27,
+        "n": 28,
+        "p": 0.9643,
+        "lo": 0.8229,
+        "hi": 0.9937
+      },
+      "pairwiseFlipRate": {
+        "k": 2,
+        "n": 84,
+        "p": 0.0238,
+        "lo": 0.0066,
+        "hi": 0.0827
+      },
+      "verdictAgreement": {
+        "k": 27,
+        "n": 28,
+        "p": 0.9643,
+        "lo": 0.8229,
+        "hi": 0.9937
+      },
+      "unclearShare": {
+        "k": 5,
+        "n": 84,
+        "p": 0.0595,
+        "lo": 0.0257,
+        "hi": 0.1319
+      },
+      "v0ValueAccuracy": {
+        "k": 25,
+        "n": 28,
+        "p": 0.8929,
+        "lo": 0.728,
+        "hi": 0.9629
+      },
+      "allThreeCorrect": {
+        "k": 25,
+        "n": 28,
+        "p": 0.8929,
+        "lo": 0.728,
+        "hi": 0.9629
+      },
+      "disagreeing": [
+        {
+          "id": "S170",
+          "truth": "le-1k",
+          "chosen": [
+            "le-10k",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.664,
+            0.058,
+            0.053
+          ]
+        }
+      ]
+    },
+    "shape": {
+      "n": 24,
+      "contradictions": 13,
+      "decoys": 6,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 13,
+          "n": 13,
+          "p": 1,
+          "lo": 0.7719,
+          "hi": 1
+        },
+        "precision": {
+          "k": 13,
+          "n": 13,
+          "p": 1,
+          "lo": 0.7719,
+          "hi": 1
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 6,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3903
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 5,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.4345
+        },
+        "coverage": {
+          "k": 24,
+          "n": 24,
+          "p": 1,
+          "lo": 0.862,
+          "hi": 1
+        },
+        "risk": {
+          "k": 0,
+          "n": 24,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.138
+        },
+        "misses": [],
+        "falseFlags": [],
+        "abstained": []
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 13,
+          "n": 13,
+          "p": 1,
+          "lo": 0.7719,
+          "hi": 1
+        },
+        "precision": {
+          "k": 13,
+          "n": 13,
+          "p": 1,
+          "lo": 0.7719,
+          "hi": 1
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 6,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3903
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 5,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.4345
+        },
+        "coverage": {
+          "k": 24,
+          "n": 24,
+          "p": 1,
+          "lo": 0.862,
+          "hi": 1
+        },
+        "risk": {
+          "k": 0,
+          "n": 24,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.138
+        },
+        "misses": [],
+        "falseFlags": [],
+        "abstained": []
+      },
+      "answered": 24,
+      "relabelledAgreement": {
+        "k": 24,
+        "n": 24,
+        "p": 1,
+        "lo": 0.862,
+        "hi": 1
+      },
+      "pairwiseFlipRate": {
+        "k": 0,
+        "n": 72,
+        "p": 0,
+        "lo": 0,
+        "hi": 0.0507
+      },
+      "verdictAgreement": {
+        "k": 24,
+        "n": 24,
+        "p": 1,
+        "lo": 0.862,
+        "hi": 1
+      },
+      "unclearShare": {
+        "k": 0,
+        "n": 72,
+        "p": 0,
+        "lo": 0,
+        "hi": 0.0507
+      },
+      "v0ValueAccuracy": {
+        "k": 24,
+        "n": 24,
+        "p": 1,
+        "lo": 0.862,
+        "hi": 1
+      },
+      "allThreeCorrect": {
+        "k": 24,
+        "n": 24,
+        "p": 1,
+        "lo": 0.862,
+        "hi": 1
+      },
+      "disagreeing": []
+    }
+  },
+  "byKind": {
+    "core-contradiction": {
+      "n": 101,
+      "contradictions": 101,
+      "decoys": 0,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 98,
+          "n": 101,
+          "p": 0.9703,
+          "lo": 0.9163,
+          "hi": 0.9898
+        },
+        "precision": {
+          "k": 98,
+          "n": 98,
+          "p": 1,
+          "lo": 0.9623,
+          "hi": 1
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "coverage": {
+          "k": 99,
+          "n": 101,
+          "p": 0.9802,
+          "lo": 0.9307,
+          "hi": 0.9946
+        },
+        "risk": {
+          "k": 1,
+          "n": 99,
+          "p": 0.0101,
+          "lo": 0.0018,
+          "hi": 0.055
+        },
+        "misses": [
+          "F06",
+          "S035",
+          "S066"
+        ],
+        "falseFlags": [],
+        "abstained": [
+          "F06",
+          "S035"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 98,
+          "n": 101,
+          "p": 0.9703,
+          "lo": 0.9163,
+          "hi": 0.9898
+        },
+        "precision": {
+          "k": 98,
+          "n": 98,
+          "p": 1,
+          "lo": 0.9623,
+          "hi": 1
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "coverage": {
+          "k": 98,
+          "n": 101,
+          "p": 0.9703,
+          "lo": 0.9163,
+          "hi": 0.9898
+        },
+        "risk": {
+          "k": 0,
+          "n": 98,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0377
+        },
+        "misses": [
+          "F06",
+          "S035",
+          "S066"
+        ],
+        "falseFlags": [],
+        "abstained": [
+          "F06",
+          "S035",
+          "S066"
+        ]
+      },
+      "answered": 101,
+      "relabelledAgreement": {
+        "k": 98,
+        "n": 101,
+        "p": 0.9703,
+        "lo": 0.9163,
+        "hi": 0.9898
+      },
+      "pairwiseFlipRate": {
+        "k": 7,
+        "n": 303,
+        "p": 0.0231,
+        "lo": 0.0112,
+        "hi": 0.0469
+      },
+      "verdictAgreement": {
+        "k": 98,
+        "n": 101,
+        "p": 0.9703,
+        "lo": 0.9163,
+        "hi": 0.9898
+      },
+      "unclearShare": {
+        "k": 4,
+        "n": 303,
+        "p": 0.0132,
+        "lo": 0.0051,
+        "hi": 0.0334
+      },
+      "v0ValueAccuracy": {
+        "k": 99,
+        "n": 101,
+        "p": 0.9802,
+        "lo": 0.9307,
+        "hi": 0.9946
+      },
+      "allThreeCorrect": {
+        "k": 98,
+        "n": 101,
+        "p": 0.9703,
+        "lo": 0.9163,
+        "hi": 0.9898
+      },
+      "disagreeing": [
+        {
+          "id": "F06",
+          "truth": "per-session",
+          "chosen": [
+            "ttl",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.759,
+            0.488,
+            0.431
+          ]
+        },
+        {
+          "id": "S035",
+          "truth": "many",
+          "chosen": [
+            "at-most-one",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.639,
+            0.472,
+            0.33
+          ]
+        },
+        {
+          "id": "S066",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "eventual"
+          ],
+          "pViolate": [
+            0.47,
+            0.455,
+            0.47
+          ]
+        }
+      ]
+    },
+    "core-compatible": {
+      "n": 78,
+      "contradictions": 0,
+      "decoys": 0,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "precision": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 78,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0469
+        },
+        "coverage": {
+          "k": 74,
+          "n": 78,
+          "p": 0.9487,
+          "lo": 0.8754,
+          "hi": 0.9799
+        },
+        "risk": {
+          "k": 0,
+          "n": 74,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0493
+        },
+        "misses": [],
+        "falseFlags": [],
+        "abstained": [
+          "S047",
+          "S063",
+          "S069",
+          "S072"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "precision": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 78,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0469
+        },
+        "coverage": {
+          "k": 72,
+          "n": 78,
+          "p": 0.9231,
+          "lo": 0.8422,
+          "hi": 0.9643
+        },
+        "risk": {
+          "k": 0,
+          "n": 72,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0507
+        },
+        "misses": [],
+        "falseFlags": [],
+        "abstained": [
+          "C15",
+          "S047",
+          "S052",
+          "S063",
+          "S069",
+          "S072"
+        ]
+      },
+      "answered": 78,
+      "relabelledAgreement": {
+        "k": 72,
+        "n": 78,
+        "p": 0.9231,
+        "lo": 0.8422,
+        "hi": 0.9643
+      },
+      "pairwiseFlipRate": {
+        "k": 13,
+        "n": 234,
+        "p": 0.0556,
+        "lo": 0.0328,
+        "hi": 0.0927
+      },
+      "verdictAgreement": {
+        "k": 73,
+        "n": 78,
+        "p": 0.9359,
+        "lo": 0.8586,
+        "hi": 0.9723
+      },
+      "unclearShare": {
+        "k": 6,
+        "n": 234,
+        "p": 0.0256,
+        "lo": 0.0118,
+        "hi": 0.0548
+      },
+      "v0ValueAccuracy": {
+        "k": 73,
+        "n": 78,
+        "p": 0.9359,
+        "lo": 0.8586,
+        "hi": 0.9723
+      },
+      "allThreeCorrect": {
+        "k": 70,
+        "n": 78,
+        "p": 0.8974,
+        "lo": 0.8105,
+        "hi": 0.9471
+      },
+      "disagreeing": [
+        {
+          "id": "C15",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "eventual",
+            "eventual"
+          ],
+          "pViolate": [
+            0.191,
+            0.32,
+            0.346
+          ]
+        },
+        {
+          "id": "S047",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "fifo",
+            "fifo"
+          ],
+          "pViolate": [
+            0.675,
+            0.096,
+            0.084
+          ]
+        },
+        {
+          "id": "S052",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "fifo",
+            "fifo"
+          ],
+          "pViolate": [
+            0.403,
+            0.091,
+            0.039
+          ]
+        },
+        {
+          "id": "S063",
+          "truth": "strong",
+          "chosen": [
+            "eventual",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.555,
+            0.358,
+            0.31
+          ]
+        },
+        {
+          "id": "S072",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "unclear"
+          ],
+          "pViolate": [
+            0.156,
+            0.244,
+            0.239
+          ]
+        },
+        {
+          "id": "S116",
+          "truth": "admin",
+          "chosen": [
+            "admin",
+            "member",
+            "admin"
+          ],
+          "pViolate": [
+            0.036,
+            0.031,
+            0.022
+          ]
+        }
+      ]
+    },
+    "decoy-same-subject-compatible": {
+      "n": 22,
+      "contradictions": 0,
+      "decoys": 22,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "precision": {
+          "k": 0,
+          "n": 3,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.5615
+        },
+        "decoyFpRate": {
+          "k": 3,
+          "n": 22,
+          "p": 0.1364,
+          "lo": 0.0475,
+          "hi": 0.3333
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "coverage": {
+          "k": 20,
+          "n": 22,
+          "p": 0.9091,
+          "lo": 0.7219,
+          "hi": 0.9747
+        },
+        "risk": {
+          "k": 3,
+          "n": 20,
+          "p": 0.15,
+          "lo": 0.0524,
+          "hi": 0.3604
+        },
+        "misses": [],
+        "falseFlags": [
+          "D02",
+          "F03",
+          "S027"
+        ],
+        "abstained": [
+          "S062",
+          "S078"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "precision": {
+          "k": 0,
+          "n": 3,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.5615
+        },
+        "decoyFpRate": {
+          "k": 3,
+          "n": 22,
+          "p": 0.1364,
+          "lo": 0.0475,
+          "hi": 0.3333
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "coverage": {
+          "k": 20,
+          "n": 22,
+          "p": 0.9091,
+          "lo": 0.7219,
+          "hi": 0.9747
+        },
+        "risk": {
+          "k": 3,
+          "n": 20,
+          "p": 0.15,
+          "lo": 0.0524,
+          "hi": 0.3604
+        },
+        "misses": [],
+        "falseFlags": [
+          "D02",
+          "F03",
+          "S027"
+        ],
+        "abstained": [
+          "S062",
+          "S078"
+        ]
+      },
+      "answered": 22,
+      "relabelledAgreement": {
+        "k": 20,
+        "n": 22,
+        "p": 0.9091,
+        "lo": 0.7219,
+        "hi": 0.9747
+      },
+      "pairwiseFlipRate": {
+        "k": 4,
+        "n": 66,
+        "p": 0.0606,
+        "lo": 0.0238,
+        "hi": 0.1457
+      },
+      "verdictAgreement": {
+        "k": 21,
+        "n": 22,
+        "p": 0.9545,
+        "lo": 0.782,
+        "hi": 0.9919
+      },
+      "unclearShare": {
+        "k": 3,
+        "n": 66,
+        "p": 0.0455,
+        "lo": 0.0156,
+        "hi": 0.1253
+      },
+      "v0ValueAccuracy": {
+        "k": 16,
+        "n": 22,
+        "p": 0.7273,
+        "lo": 0.5185,
+        "hi": 0.8685
+      },
+      "allThreeCorrect": {
+        "k": 15,
+        "n": 22,
+        "p": 0.6818,
+        "lo": 0.4732,
+        "hi": 0.8364
+      },
+      "disagreeing": [
+        {
+          "id": "S062",
+          "truth": "fifo",
+          "chosen": [
+            "per-key-fifo",
+            "per-key-fifo",
+            "fifo"
+          ],
+          "pViolate": [
+            0.541,
+            0.578,
+            0.359
+          ]
+        },
+        {
+          "id": "S079",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "strong"
+          ],
+          "pViolate": [
+            0.286,
+            0.195,
+            0.123
+          ]
+        }
+      ]
+    },
+    "decoy-different-subject": {
+      "n": 41,
+      "contradictions": 0,
+      "decoys": 41,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "precision": {
+          "k": 0,
+          "n": 6,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3903
+        },
+        "decoyFpRate": {
+          "k": 6,
+          "n": 41,
+          "p": 0.1463,
+          "lo": 0.0688,
+          "hi": 0.2844
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "coverage": {
+          "k": 26,
+          "n": 41,
+          "p": 0.6341,
+          "lo": 0.4812,
+          "hi": 0.7641
+        },
+        "risk": {
+          "k": 6,
+          "n": 26,
+          "p": 0.2308,
+          "lo": 0.1103,
+          "hi": 0.4205
+        },
+        "misses": [],
+        "falseFlags": [
+          "S021",
+          "S059",
+          "S060",
+          "S146",
+          "S147",
+          "S148"
+        ],
+        "abstained": [
+          "F07",
+          "S023",
+          "S024",
+          "S025",
+          "S043",
+          "S058",
+          "S075",
+          "S077",
+          "S095",
+          "S127",
+          "S128",
+          "S129",
+          "S130",
+          "S170",
+          "S172"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "precision": {
+          "k": 0,
+          "n": 6,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3903
+        },
+        "decoyFpRate": {
+          "k": 6,
+          "n": 41,
+          "p": 0.1463,
+          "lo": 0.0688,
+          "hi": 0.2844
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 0,
+          "p": null,
+          "lo": null,
+          "hi": null
+        },
+        "coverage": {
+          "k": 26,
+          "n": 41,
+          "p": 0.6341,
+          "lo": 0.4812,
+          "hi": 0.7641
+        },
+        "risk": {
+          "k": 6,
+          "n": 26,
+          "p": 0.2308,
+          "lo": 0.1103,
+          "hi": 0.4205
+        },
+        "misses": [],
+        "falseFlags": [
+          "S021",
+          "S059",
+          "S060",
+          "S146",
+          "S147",
+          "S148"
+        ],
+        "abstained": [
+          "F07",
+          "S023",
+          "S024",
+          "S025",
+          "S043",
+          "S058",
+          "S075",
+          "S077",
+          "S095",
+          "S127",
+          "S128",
+          "S129",
+          "S130",
+          "S170",
+          "S172"
+        ]
+      },
+      "answered": 41,
+      "relabelledAgreement": {
+        "k": 30,
+        "n": 41,
+        "p": 0.7317,
+        "lo": 0.5807,
+        "hi": 0.8431
+      },
+      "pairwiseFlipRate": {
+        "k": 22,
+        "n": 123,
+        "p": 0.1789,
+        "lo": 0.1212,
+        "hi": 0.256
+      },
+      "verdictAgreement": {
+        "k": 32,
+        "n": 41,
+        "p": 0.7805,
+        "lo": 0.6329,
+        "hi": 0.88
+      },
+      "unclearShare": {
+        "k": 30,
+        "n": 123,
+        "p": 0.2439,
+        "lo": 0.1765,
+        "hi": 0.3268
+      },
+      "v0ValueAccuracy": {
+        "k": 18,
+        "n": 41,
+        "p": 0.439,
+        "lo": 0.2989,
+        "hi": 0.5896
+      },
+      "allThreeCorrect": {
+        "k": 17,
+        "n": 41,
+        "p": 0.4146,
+        "lo": 0.2776,
+        "hi": 0.5663
+      },
+      "disagreeing": [
+        {
+          "id": "D09",
+          "truth": "at-most-one",
+          "chosen": [
+            "exactly-one",
+            "at-most-one",
+            "at-most-one"
+          ],
+          "pViolate": [
+            0.016,
+            0.023,
+            0.015
+          ]
+        },
+        {
+          "id": "F07",
+          "truth": "per-call",
+          "chosen": [
+            "unclear",
+            "per-call",
+            "unclear"
+          ],
+          "pViolate": [
+            0.081,
+            0.077,
+            0.057
+          ]
+        },
+        {
+          "id": "S023",
+          "truth": "per-call",
+          "chosen": [
+            "per-session",
+            "per-call",
+            "per-call"
+          ],
+          "pViolate": [
+            0.735,
+            0.03,
+            0.024
+          ]
+        },
+        {
+          "id": "S024",
+          "truth": "per-call",
+          "chosen": [
+            "per-request",
+            "per-call",
+            "per-call"
+          ],
+          "pViolate": [
+            0.696,
+            0.126,
+            0.152
+          ]
+        },
+        {
+          "id": "S025",
+          "truth": "per-call",
+          "chosen": [
+            "ttl",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.527,
+            0.362,
+            0.191
+          ]
+        },
+        {
+          "id": "S042",
+          "truth": "at-most-one",
+          "chosen": [
+            "exactly-one",
+            "exactly-one",
+            "at-most-one"
+          ],
+          "pViolate": [
+            0.059,
+            0.04,
+            0.037
+          ]
+        },
+        {
+          "id": "S058",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "unordered",
+            "unclear"
+          ],
+          "pViolate": [
+            0.737,
+            0.565,
+            0.269
+          ]
+        },
+        {
+          "id": "S095",
+          "truth": "optional",
+          "chosen": [
+            "optional",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.029,
+            0.019,
+            0.01
+          ]
+        },
+        {
+          "id": "S129",
+          "truth": "member",
+          "chosen": [
+            "anyone",
+            "unclear",
+            "anyone"
+          ],
+          "pViolate": [
+            0.822,
+            0.453,
+            0.691
+          ]
+        },
+        {
+          "id": "S130",
+          "truth": "admin",
+          "chosen": [
+            "anyone",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.772,
+            0.11,
+            0.072
+          ]
+        },
+        {
+          "id": "S170",
+          "truth": "le-1k",
+          "chosen": [
+            "le-10k",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.664,
+            0.058,
+            0.053
+          ]
+        }
+      ]
+    }
+  },
+  "byLanguage": {
+    "typescript": {
+      "n": 72,
+      "contradictions": 29,
+      "decoys": 21,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 27,
+          "n": 29,
+          "p": 0.931,
+          "lo": 0.7804,
+          "hi": 0.9809
+        },
+        "precision": {
+          "k": 27,
+          "n": 29,
+          "p": 0.931,
+          "lo": 0.7804,
+          "hi": 0.9809
+        },
+        "decoyFpRate": {
+          "k": 2,
+          "n": 21,
+          "p": 0.0952,
+          "lo": 0.0265,
+          "hi": 0.2891
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 22,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1487
+        },
+        "coverage": {
+          "k": 63,
+          "n": 72,
+          "p": 0.875,
+          "lo": 0.7792,
+          "hi": 0.9328
+        },
+        "risk": {
+          "k": 3,
+          "n": 63,
+          "p": 0.0476,
+          "lo": 0.0163,
+          "hi": 0.1309
+        },
+        "misses": [
+          "F06",
+          "S066"
+        ],
+        "falseFlags": [
+          "F03",
+          "S021"
+        ],
+        "abstained": [
+          "F06",
+          "F07",
+          "S058",
+          "S063",
+          "S069",
+          "S072",
+          "S075",
+          "S078",
+          "S127"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 27,
+          "n": 29,
+          "p": 0.931,
+          "lo": 0.7804,
+          "hi": 0.9809
+        },
+        "precision": {
+          "k": 27,
+          "n": 29,
+          "p": 0.931,
+          "lo": 0.7804,
+          "hi": 0.9809
+        },
+        "decoyFpRate": {
+          "k": 2,
+          "n": 21,
+          "p": 0.0952,
+          "lo": 0.0265,
+          "hi": 0.2891
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 22,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1487
+        },
+        "coverage": {
+          "k": 61,
+          "n": 72,
+          "p": 0.8472,
+          "lo": 0.7468,
+          "hi": 0.9125
+        },
+        "risk": {
+          "k": 2,
+          "n": 61,
+          "p": 0.0328,
+          "lo": 0.009,
+          "hi": 0.1119
+        },
+        "misses": [
+          "F06",
+          "S066"
+        ],
+        "falseFlags": [
+          "F03",
+          "S021"
+        ],
+        "abstained": [
+          "C15",
+          "F06",
+          "F07",
+          "S058",
+          "S063",
+          "S066",
+          "S069",
+          "S072",
+          "S075",
+          "S078",
+          "S127"
+        ]
+      },
+      "answered": 72,
+      "relabelledAgreement": {
+        "k": 64,
+        "n": 72,
+        "p": 0.8889,
+        "lo": 0.7958,
+        "hi": 0.9426
+      },
+      "pairwiseFlipRate": {
+        "k": 18,
+        "n": 216,
+        "p": 0.0833,
+        "lo": 0.0534,
+        "hi": 0.1279
+      },
+      "verdictAgreement": {
+        "k": 65,
+        "n": 72,
+        "p": 0.9028,
+        "lo": 0.8126,
+        "hi": 0.9521
+      },
+      "unclearShare": {
+        "k": 20,
+        "n": 216,
+        "p": 0.0926,
+        "lo": 0.0607,
+        "hi": 0.1387
+      },
+      "v0ValueAccuracy": {
+        "k": 60,
+        "n": 72,
+        "p": 0.8333,
+        "lo": 0.7309,
+        "hi": 0.902
+      },
+      "allThreeCorrect": {
+        "k": 57,
+        "n": 72,
+        "p": 0.7917,
+        "lo": 0.6843,
+        "hi": 0.8695
+      },
+      "disagreeing": [
+        {
+          "id": "C15",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "eventual",
+            "eventual"
+          ],
+          "pViolate": [
+            0.191,
+            0.32,
+            0.346
+          ]
+        },
+        {
+          "id": "F06",
+          "truth": "per-session",
+          "chosen": [
+            "ttl",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.759,
+            0.488,
+            0.431
+          ]
+        },
+        {
+          "id": "F07",
+          "truth": "per-call",
+          "chosen": [
+            "unclear",
+            "per-call",
+            "unclear"
+          ],
+          "pViolate": [
+            0.081,
+            0.077,
+            0.057
+          ]
+        },
+        {
+          "id": "S042",
+          "truth": "at-most-one",
+          "chosen": [
+            "exactly-one",
+            "exactly-one",
+            "at-most-one"
+          ],
+          "pViolate": [
+            0.059,
+            0.04,
+            0.037
+          ]
+        },
+        {
+          "id": "S058",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "unordered",
+            "unclear"
+          ],
+          "pViolate": [
+            0.737,
+            0.565,
+            0.269
+          ]
+        },
+        {
+          "id": "S063",
+          "truth": "strong",
+          "chosen": [
+            "eventual",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.555,
+            0.358,
+            0.31
+          ]
+        },
+        {
+          "id": "S066",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "eventual"
+          ],
+          "pViolate": [
+            0.47,
+            0.455,
+            0.47
+          ]
+        },
+        {
+          "id": "S072",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "unclear"
+          ],
+          "pViolate": [
+            0.156,
+            0.244,
+            0.239
+          ]
+        }
+      ]
+    },
+    "go": {
+      "n": 58,
+      "contradictions": 23,
+      "decoys": 15,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 23,
+          "n": 23,
+          "p": 1,
+          "lo": 0.8569,
+          "hi": 1
+        },
+        "precision": {
+          "k": 23,
+          "n": 25,
+          "p": 0.92,
+          "lo": 0.7503,
+          "hi": 0.9778
+        },
+        "decoyFpRate": {
+          "k": 2,
+          "n": 15,
+          "p": 0.1333,
+          "lo": 0.0374,
+          "hi": 0.3788
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 20,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1611
+        },
+        "coverage": {
+          "k": 53,
+          "n": 58,
+          "p": 0.9138,
+          "lo": 0.8136,
+          "hi": 0.9626
+        },
+        "risk": {
+          "k": 2,
+          "n": 53,
+          "p": 0.0377,
+          "lo": 0.0104,
+          "hi": 0.1275
+        },
+        "misses": [],
+        "falseFlags": [
+          "S059",
+          "S147"
+        ],
+        "abstained": [
+          "S023",
+          "S043",
+          "S047",
+          "S077",
+          "S129"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 23,
+          "n": 23,
+          "p": 1,
+          "lo": 0.8569,
+          "hi": 1
+        },
+        "precision": {
+          "k": 23,
+          "n": 25,
+          "p": 0.92,
+          "lo": 0.7503,
+          "hi": 0.9778
+        },
+        "decoyFpRate": {
+          "k": 2,
+          "n": 15,
+          "p": 0.1333,
+          "lo": 0.0374,
+          "hi": 0.3788
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 20,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1611
+        },
+        "coverage": {
+          "k": 53,
+          "n": 58,
+          "p": 0.9138,
+          "lo": 0.8136,
+          "hi": 0.9626
+        },
+        "risk": {
+          "k": 2,
+          "n": 53,
+          "p": 0.0377,
+          "lo": 0.0104,
+          "hi": 0.1275
+        },
+        "misses": [],
+        "falseFlags": [
+          "S059",
+          "S147"
+        ],
+        "abstained": [
+          "S023",
+          "S043",
+          "S047",
+          "S077",
+          "S129"
+        ]
+      },
+      "answered": 58,
+      "relabelledAgreement": {
+        "k": 55,
+        "n": 58,
+        "p": 0.9483,
+        "lo": 0.8586,
+        "hi": 0.9823
+      },
+      "pairwiseFlipRate": {
+        "k": 6,
+        "n": 174,
+        "p": 0.0345,
+        "lo": 0.0159,
+        "hi": 0.0732
+      },
+      "verdictAgreement": {
+        "k": 55,
+        "n": 58,
+        "p": 0.9483,
+        "lo": 0.8586,
+        "hi": 0.9823
+      },
+      "unclearShare": {
+        "k": 7,
+        "n": 174,
+        "p": 0.0402,
+        "lo": 0.0196,
+        "hi": 0.0807
+      },
+      "v0ValueAccuracy": {
+        "k": 51,
+        "n": 58,
+        "p": 0.8793,
+        "lo": 0.7712,
+        "hi": 0.9403
+      },
+      "allThreeCorrect": {
+        "k": 51,
+        "n": 58,
+        "p": 0.8793,
+        "lo": 0.7712,
+        "hi": 0.9403
+      },
+      "disagreeing": [
+        {
+          "id": "S023",
+          "truth": "per-call",
+          "chosen": [
+            "per-session",
+            "per-call",
+            "per-call"
+          ],
+          "pViolate": [
+            0.735,
+            0.03,
+            0.024
+          ]
+        },
+        {
+          "id": "S047",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "fifo",
+            "fifo"
+          ],
+          "pViolate": [
+            0.675,
+            0.096,
+            0.084
+          ]
+        },
+        {
+          "id": "S129",
+          "truth": "member",
+          "chosen": [
+            "anyone",
+            "unclear",
+            "anyone"
+          ],
+          "pViolate": [
+            0.822,
+            0.453,
+            0.691
+          ]
+        }
+      ]
+    },
+    "python": {
+      "n": 64,
+      "contradictions": 26,
+      "decoys": 17,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 25,
+          "n": 26,
+          "p": 0.9615,
+          "lo": 0.8111,
+          "hi": 0.9932
+        },
+        "precision": {
+          "k": 25,
+          "n": 29,
+          "p": 0.8621,
+          "lo": 0.6944,
+          "hi": 0.945
+        },
+        "decoyFpRate": {
+          "k": 4,
+          "n": 17,
+          "p": 0.2353,
+          "lo": 0.0956,
+          "hi": 0.4726
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 21,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1546
+        },
+        "coverage": {
+          "k": 60,
+          "n": 64,
+          "p": 0.9375,
+          "lo": 0.85,
+          "hi": 0.9754
+        },
+        "risk": {
+          "k": 4,
+          "n": 60,
+          "p": 0.0667,
+          "lo": 0.0262,
+          "hi": 0.1593
+        },
+        "misses": [
+          "S035"
+        ],
+        "falseFlags": [
+          "D02",
+          "S027",
+          "S060",
+          "S146"
+        ],
+        "abstained": [
+          "S035",
+          "S062",
+          "S128",
+          "S170"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 25,
+          "n": 26,
+          "p": 0.9615,
+          "lo": 0.8111,
+          "hi": 0.9932
+        },
+        "precision": {
+          "k": 25,
+          "n": 29,
+          "p": 0.8621,
+          "lo": 0.6944,
+          "hi": 0.945
+        },
+        "decoyFpRate": {
+          "k": 4,
+          "n": 17,
+          "p": 0.2353,
+          "lo": 0.0956,
+          "hi": 0.4726
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 21,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1546
+        },
+        "coverage": {
+          "k": 60,
+          "n": 64,
+          "p": 0.9375,
+          "lo": 0.85,
+          "hi": 0.9754
+        },
+        "risk": {
+          "k": 4,
+          "n": 60,
+          "p": 0.0667,
+          "lo": 0.0262,
+          "hi": 0.1593
+        },
+        "misses": [
+          "S035"
+        ],
+        "falseFlags": [
+          "D02",
+          "S027",
+          "S060",
+          "S146"
+        ],
+        "abstained": [
+          "S035",
+          "S062",
+          "S128",
+          "S170"
+        ]
+      },
+      "answered": 64,
+      "relabelledAgreement": {
+        "k": 59,
+        "n": 64,
+        "p": 0.9219,
+        "lo": 0.8298,
+        "hi": 0.9662
+      },
+      "pairwiseFlipRate": {
+        "k": 10,
+        "n": 192,
+        "p": 0.0521,
+        "lo": 0.0285,
+        "hi": 0.0932
+      },
+      "verdictAgreement": {
+        "k": 61,
+        "n": 64,
+        "p": 0.9531,
+        "lo": 0.871,
+        "hi": 0.9839
+      },
+      "unclearShare": {
+        "k": 7,
+        "n": 192,
+        "p": 0.0365,
+        "lo": 0.0178,
+        "hi": 0.0733
+      },
+      "v0ValueAccuracy": {
+        "k": 55,
+        "n": 64,
+        "p": 0.8594,
+        "lo": 0.7538,
+        "hi": 0.9242
+      },
+      "allThreeCorrect": {
+        "k": 54,
+        "n": 64,
+        "p": 0.8438,
+        "lo": 0.7357,
+        "hi": 0.9129
+      },
+      "disagreeing": [
+        {
+          "id": "D09",
+          "truth": "at-most-one",
+          "chosen": [
+            "exactly-one",
+            "at-most-one",
+            "at-most-one"
+          ],
+          "pViolate": [
+            0.016,
+            0.023,
+            0.015
+          ]
+        },
+        {
+          "id": "S035",
+          "truth": "many",
+          "chosen": [
+            "at-most-one",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.639,
+            0.472,
+            0.33
+          ]
+        },
+        {
+          "id": "S062",
+          "truth": "fifo",
+          "chosen": [
+            "per-key-fifo",
+            "per-key-fifo",
+            "fifo"
+          ],
+          "pViolate": [
+            0.541,
+            0.578,
+            0.359
+          ]
+        },
+        {
+          "id": "S079",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "strong"
+          ],
+          "pViolate": [
+            0.286,
+            0.195,
+            0.123
+          ]
+        },
+        {
+          "id": "S170",
+          "truth": "le-1k",
+          "chosen": [
+            "le-10k",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.664,
+            0.058,
+            0.053
+          ]
+        }
+      ]
+    },
+    "c": {
+      "n": 22,
+      "contradictions": 12,
+      "decoys": 3,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 12,
+          "n": 12,
+          "p": 1,
+          "lo": 0.7575,
+          "hi": 1
+        },
+        "precision": {
+          "k": 12,
+          "n": 13,
+          "p": 0.9231,
+          "lo": 0.6669,
+          "hi": 0.9863
+        },
+        "decoyFpRate": {
+          "k": 1,
+          "n": 3,
+          "p": 0.3333,
+          "lo": 0.0615,
+          "hi": 0.7923
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 7,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3543
+        },
+        "coverage": {
+          "k": 21,
+          "n": 22,
+          "p": 0.9545,
+          "lo": 0.782,
+          "hi": 0.9919
+        },
+        "risk": {
+          "k": 1,
+          "n": 21,
+          "p": 0.0476,
+          "lo": 0.0085,
+          "hi": 0.2267
+        },
+        "misses": [],
+        "falseFlags": [
+          "S148"
+        ],
+        "abstained": [
+          "S024"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 12,
+          "n": 12,
+          "p": 1,
+          "lo": 0.7575,
+          "hi": 1
+        },
+        "precision": {
+          "k": 12,
+          "n": 13,
+          "p": 0.9231,
+          "lo": 0.6669,
+          "hi": 0.9863
+        },
+        "decoyFpRate": {
+          "k": 1,
+          "n": 3,
+          "p": 0.3333,
+          "lo": 0.0615,
+          "hi": 0.7923
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 7,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3543
+        },
+        "coverage": {
+          "k": 20,
+          "n": 22,
+          "p": 0.9091,
+          "lo": 0.7219,
+          "hi": 0.9747
+        },
+        "risk": {
+          "k": 1,
+          "n": 20,
+          "p": 0.05,
+          "lo": 0.0089,
+          "hi": 0.2361
+        },
+        "misses": [],
+        "falseFlags": [
+          "S148"
+        ],
+        "abstained": [
+          "S024",
+          "S052"
+        ]
+      },
+      "answered": 22,
+      "relabelledAgreement": {
+        "k": 20,
+        "n": 22,
+        "p": 0.9091,
+        "lo": 0.7219,
+        "hi": 0.9747
+      },
+      "pairwiseFlipRate": {
+        "k": 4,
+        "n": 66,
+        "p": 0.0606,
+        "lo": 0.0238,
+        "hi": 0.1457
+      },
+      "verdictAgreement": {
+        "k": 20,
+        "n": 22,
+        "p": 0.9091,
+        "lo": 0.7219,
+        "hi": 0.9747
+      },
+      "unclearShare": {
+        "k": 0,
+        "n": 66,
+        "p": 0,
+        "lo": 0,
+        "hi": 0.055
+      },
+      "v0ValueAccuracy": {
+        "k": 19,
+        "n": 22,
+        "p": 0.8636,
+        "lo": 0.6667,
+        "hi": 0.9525
+      },
+      "allThreeCorrect": {
+        "k": 19,
+        "n": 22,
+        "p": 0.8636,
+        "lo": 0.6667,
+        "hi": 0.9525
+      },
+      "disagreeing": [
+        {
+          "id": "S024",
+          "truth": "per-call",
+          "chosen": [
+            "per-request",
+            "per-call",
+            "per-call"
+          ],
+          "pViolate": [
+            0.696,
+            0.126,
+            0.152
+          ]
+        },
+        {
+          "id": "S052",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "fifo",
+            "fifo"
+          ],
+          "pViolate": [
+            0.403,
+            0.091,
+            0.039
+          ]
+        }
+      ]
+    },
+    "hcl": {
+      "n": 26,
+      "contradictions": 11,
+      "decoys": 7,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 11,
+          "n": 11,
+          "p": 1,
+          "lo": 0.7412,
+          "hi": 1
+        },
+        "precision": {
+          "k": 11,
+          "n": 11,
+          "p": 1,
+          "lo": 0.7412,
+          "hi": 1
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 7,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3543
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 8,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3244
+        },
+        "coverage": {
+          "k": 22,
+          "n": 26,
+          "p": 0.8462,
+          "lo": 0.6647,
+          "hi": 0.9385
+        },
+        "risk": {
+          "k": 0,
+          "n": 22,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1487
+        },
+        "misses": [],
+        "falseFlags": [],
+        "abstained": [
+          "S025",
+          "S095",
+          "S130",
+          "S172"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 11,
+          "n": 11,
+          "p": 1,
+          "lo": 0.7412,
+          "hi": 1
+        },
+        "precision": {
+          "k": 11,
+          "n": 11,
+          "p": 1,
+          "lo": 0.7412,
+          "hi": 1
+        },
+        "decoyFpRate": {
+          "k": 0,
+          "n": 7,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3543
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 8,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.3244
+        },
+        "coverage": {
+          "k": 22,
+          "n": 26,
+          "p": 0.8462,
+          "lo": 0.6647,
+          "hi": 0.9385
+        },
+        "risk": {
+          "k": 0,
+          "n": 22,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.1487
+        },
+        "misses": [],
+        "falseFlags": [],
+        "abstained": [
+          "S025",
+          "S095",
+          "S130",
+          "S172"
+        ]
+      },
+      "answered": 26,
+      "relabelledAgreement": {
+        "k": 22,
+        "n": 26,
+        "p": 0.8462,
+        "lo": 0.6647,
+        "hi": 0.9385
+      },
+      "pairwiseFlipRate": {
+        "k": 8,
+        "n": 78,
+        "p": 0.1026,
+        "lo": 0.0529,
+        "hi": 0.1895
+      },
+      "verdictAgreement": {
+        "k": 23,
+        "n": 26,
+        "p": 0.8846,
+        "lo": 0.7102,
+        "hi": 0.96
+      },
+      "unclearShare": {
+        "k": 9,
+        "n": 78,
+        "p": 0.1154,
+        "lo": 0.0619,
+        "hi": 0.205
+      },
+      "v0ValueAccuracy": {
+        "k": 21,
+        "n": 26,
+        "p": 0.8077,
+        "lo": 0.6212,
+        "hi": 0.9149
+      },
+      "allThreeCorrect": {
+        "k": 19,
+        "n": 26,
+        "p": 0.7308,
+        "lo": 0.5392,
+        "hi": 0.863
+      },
+      "disagreeing": [
+        {
+          "id": "S025",
+          "truth": "per-call",
+          "chosen": [
+            "ttl",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.527,
+            0.362,
+            0.191
+          ]
+        },
+        {
+          "id": "S095",
+          "truth": "optional",
+          "chosen": [
+            "optional",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.029,
+            0.019,
+            0.01
+          ]
+        },
+        {
+          "id": "S116",
+          "truth": "admin",
+          "chosen": [
+            "admin",
+            "member",
+            "admin"
+          ],
+          "pViolate": [
+            0.036,
+            0.031,
+            0.022
+          ]
+        },
+        {
+          "id": "S130",
+          "truth": "admin",
+          "chosen": [
+            "anyone",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.772,
+            0.11,
+            0.072
+          ]
+        }
+      ]
+    }
+  },
+  "forgeLite": [
+    {
+      "id": "F01",
+      "label": "contradiction",
+      "truth": "per-session",
+      "tags": [
+        "forge-lite-S-1",
+        "real-hunks"
+      ],
+      "chosen": [
+        "per-session",
+        "per-session",
+        "per-session"
+      ],
+      "pViolate": [
+        0.75,
+        0.801,
+        0.912
+      ],
+      "verdict": "contradiction"
+    },
+    {
+      "id": "F02",
+      "label": "contradiction",
+      "truth": "per-session",
+      "tags": [
+        "forge-lite-S-2",
+        "real-hunks"
+      ],
+      "chosen": [
+        "per-session",
+        "per-session",
+        "per-session"
+      ],
+      "pViolate": [
+        0.764,
+        0.831,
+        0.857
+      ],
+      "verdict": "contradiction"
+    },
+    {
+      "id": "F03",
+      "label": "compatible",
+      "truth": "per-call",
+      "tags": [
+        "forge-lite-S-1",
+        "real-hunks",
+        "invalidated-on-revoke"
+      ],
+      "chosen": [
+        "per-session",
+        "per-session",
+        "per-session"
+      ],
+      "pViolate": [
+        0.801,
+        0.793,
+        0.845
+      ],
+      "verdict": "contradiction"
+    },
+    {
+      "id": "F04",
+      "label": "contradiction",
+      "truth": "ttl",
+      "tags": [
+        "forge-lite-S-1",
+        "ttl-cache"
+      ],
+      "chosen": [
+        "ttl",
+        "ttl",
+        "ttl"
+      ],
+      "pViolate": [
+        0.967,
+        0.979,
+        0.98
+      ],
+      "verdict": "contradiction"
+    },
+    {
+      "id": "F05",
+      "label": "compatible",
+      "truth": "per-request",
+      "tags": [
+        "forge-lite-S-1",
+        "per-request-memo"
+      ],
+      "chosen": [
+        "per-request",
+        "per-request",
+        "per-request"
+      ],
+      "pViolate": [
+        0.011,
+        0.018,
+        0.013
+      ],
+      "verdict": "compatible"
+    },
+    {
+      "id": "F06",
+      "label": "contradiction",
+      "truth": "per-session",
+      "tags": [
+        "forge-lite-S-2",
+        "invalidation-stripped"
+      ],
+      "chosen": [
+        "ttl",
+        "unclear",
+        "unclear"
+      ],
+      "pViolate": [
+        0.759,
+        0.488,
+        0.431
+      ],
+      "verdict": "abstain"
+    },
+    {
+      "id": "F07",
+      "label": "compatible",
+      "truth": "per-call",
+      "tags": [
+        "forge-lite-S-1",
+        "real-hunks"
+      ],
+      "chosen": [
+        "unclear",
+        "per-call",
+        "unclear"
+      ],
+      "pViolate": [
+        0.081,
+        0.077,
+        0.057
+      ],
+      "verdict": "abstain"
+    },
+    {
+      "id": "F08",
+      "label": "compatible",
+      "truth": "per-call",
+      "tags": [
+        "forge-lite-S-1"
+      ],
+      "chosen": [
+        "per-call",
+        "per-call",
+        "per-call"
+      ],
+      "pViolate": [
+        0.285,
+        0.237,
+        0.08
+      ],
+      "verdict": "compatible"
+    }
+  ],
+  "thresholds": {
+    "keel-mass": [
+      {
+        "t": 0.3,
+        "recall": {
+          "k": 99,
+          "n": 101,
+          "p": 0.9802,
+          "lo": 0.9307,
+          "hi": 0.9946
+        },
+        "precision": {
+          "k": 99,
+          "n": 109,
+          "p": 0.9083,
+          "lo": 0.8393,
+          "hi": 0.9494
+        },
+        "decoyFpRate": {
+          "k": 10,
+          "n": 63,
+          "p": 0.1587,
+          "lo": 0.0886,
+          "hi": 0.2681
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 78,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0469
+        },
+        "coverage": {
+          "k": 220,
+          "n": 242,
+          "p": 0.9091,
+          "lo": 0.8662,
+          "hi": 0.9392
+        },
+        "risk": {
+          "k": 10,
+          "n": 220,
+          "p": 0.0455,
+          "lo": 0.0249,
+          "hi": 0.0816
+        },
+        "misses": [
+          "F06",
+          "S035"
+        ],
+        "falseFlags": [
+          "D02",
+          "F03",
+          "S021",
+          "S027",
+          "S059",
+          "S060",
+          "S062",
+          "S146",
+          "S147",
+          "S148"
+        ],
+        "abstained": [
+          "F06",
+          "F07",
+          "S023",
+          "S024",
+          "S025",
+          "S035",
+          "S043",
+          "S047",
+          "S058",
+          "S063",
+          "S069",
+          "S072",
+          "S075",
+          "S077",
+          "S078",
+          "S095",
+          "S127",
+          "S128",
+          "S129",
+          "S130",
+          "S170",
+          "S172"
+        ]
+      },
+      {
+        "t": 0.4,
+        "recall": {
+          "k": 99,
+          "n": 101,
+          "p": 0.9802,
+          "lo": 0.9307,
+          "hi": 0.9946
+        },
+        "precision": {
+          "k": 99,
+          "n": 108,
+          "p": 0.9167,
+          "lo": 0.8492,
+          "hi": 0.9555
+        },
+        "decoyFpRate": {
+          "k": 9,
+          "n": 63,
+          "p": 0.1429,
+          "lo": 0.077,
+          "hi": 0.2497
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 78,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0469
+        },
+        "coverage": {
+          "k": 219,
+          "n": 242,
+          "p": 0.905,
+          "lo": 0.8614,
+          "hi": 0.9358
+        },
+        "risk": {
+          "k": 9,
+          "n": 219,
+          "p": 0.0411,
+          "lo": 0.0218,
+          "hi": 0.0762
+        },
+        "misses": [
+          "F06",
+          "S035"
+        ],
+        "falseFlags": [
+          "D02",
+          "F03",
+          "S021",
+          "S027",
+          "S059",
+          "S060",
+          "S146",
+          "S147",
+          "S148"
+        ],
+        "abstained": [
+          "F06",
+          "F07",
+          "S023",
+          "S024",
+          "S025",
+          "S035",
+          "S043",
+          "S047",
+          "S058",
+          "S062",
+          "S063",
+          "S069",
+          "S072",
+          "S075",
+          "S077",
+          "S078",
+          "S095",
+          "S127",
+          "S128",
+          "S129",
+          "S130",
+          "S170",
+          "S172"
+        ]
+      },
+      {
+        "t": 0.5,
+        "recall": {
+          "k": 98,
+          "n": 101,
+          "p": 0.9703,
+          "lo": 0.9163,
+          "hi": 0.9898
+        },
+        "precision": {
+          "k": 98,
+          "n": 107,
+          "p": 0.9159,
+          "lo": 0.8478,
+          "hi": 0.9551
+        },
+        "decoyFpRate": {
+          "k": 9,
+          "n": 63,
+          "p": 0.1429,
+          "lo": 0.077,
+          "hi": 0.2497
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 78,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0469
+        },
+        "coverage": {
+          "k": 219,
+          "n": 242,
+          "p": 0.905,
+          "lo": 0.8614,
+          "hi": 0.9358
+        },
+        "risk": {
+          "k": 10,
+          "n": 219,
+          "p": 0.0457,
+          "lo": 0.025,
+          "hi": 0.082
+        },
+        "misses": [
+          "F06",
+          "S035",
+          "S066"
+        ],
+        "falseFlags": [
+          "D02",
+          "F03",
+          "S021",
+          "S027",
+          "S059",
+          "S060",
+          "S146",
+          "S147",
+          "S148"
+        ],
+        "abstained": [
+          "F06",
+          "F07",
+          "S023",
+          "S024",
+          "S025",
+          "S035",
+          "S043",
+          "S047",
+          "S058",
+          "S062",
+          "S063",
+          "S069",
+          "S072",
+          "S075",
+          "S077",
+          "S078",
+          "S095",
+          "S127",
+          "S128",
+          "S129",
+          "S130",
+          "S170",
+          "S172"
+        ]
+      },
+      {
+        "t": 0.6,
+        "recall": {
+          "k": 93,
+          "n": 101,
+          "p": 0.9208,
+          "lo": 0.8514,
+          "hi": 0.9593
+        },
+        "precision": {
+          "k": 93,
+          "n": 101,
+          "p": 0.9208,
+          "lo": 0.8514,
+          "hi": 0.9593
+        },
+        "decoyFpRate": {
+          "k": 8,
+          "n": 63,
+          "p": 0.127,
+          "lo": 0.0658,
+          "hi": 0.2311
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 78,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0469
+        },
+        "coverage": {
+          "k": 209,
+          "n": 242,
+          "p": 0.8636,
+          "lo": 0.8147,
+          "hi": 0.9012
+        },
+        "risk": {
+          "k": 8,
+          "n": 209,
+          "p": 0.0383,
+          "lo": 0.0195,
+          "hi": 0.0737
+        },
+        "misses": [
+          "C06",
+          "F06",
+          "S032",
+          "S033",
+          "S034",
+          "S035",
+          "S066",
+          "S143"
+        ],
+        "falseFlags": [
+          "D02",
+          "F03",
+          "S021",
+          "S027",
+          "S059",
+          "S146",
+          "S147",
+          "S148"
+        ],
+        "abstained": [
+          "C06",
+          "F06",
+          "F07",
+          "S023",
+          "S024",
+          "S025",
+          "S032",
+          "S033",
+          "S034",
+          "S035",
+          "S043",
+          "S047",
+          "S052",
+          "S058",
+          "S060",
+          "S062",
+          "S063",
+          "S066",
+          "S069",
+          "S072",
+          "S075",
+          "S076",
+          "S077",
+          "S078",
+          "S095",
+          "S127",
+          "S128",
+          "S129",
+          "S130",
+          "S131",
+          "S143",
+          "S170",
+          "S172"
+        ]
+      },
+      {
+        "t": 0.7,
+        "recall": {
+          "k": 90,
+          "n": 101,
+          "p": 0.8911,
+          "lo": 0.8154,
+          "hi": 0.9381
+        },
+        "precision": {
+          "k": 90,
+          "n": 97,
+          "p": 0.9278,
+          "lo": 0.8585,
+          "hi": 0.9646
+        },
+        "decoyFpRate": {
+          "k": 7,
+          "n": 63,
+          "p": 0.1111,
+          "lo": 0.0549,
+          "hi": 0.212
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 78,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0469
+        },
+        "coverage": {
+          "k": 202,
+          "n": 242,
+          "p": 0.8347,
+          "lo": 0.7828,
+          "hi": 0.8762
+        },
+        "risk": {
+          "k": 7,
+          "n": 202,
+          "p": 0.0347,
+          "lo": 0.0169,
+          "hi": 0.0698
+        },
+        "misses": [
+          "C06",
+          "C24",
+          "F06",
+          "S032",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S066",
+          "S136",
+          "S143"
+        ],
+        "falseFlags": [
+          "F03",
+          "S021",
+          "S027",
+          "S059",
+          "S146",
+          "S147",
+          "S148"
+        ],
+        "abstained": [
+          "C06",
+          "C15",
+          "C24",
+          "D02",
+          "F06",
+          "F07",
+          "S023",
+          "S024",
+          "S025",
+          "S032",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S043",
+          "S047",
+          "S052",
+          "S058",
+          "S060",
+          "S061",
+          "S062",
+          "S063",
+          "S066",
+          "S069",
+          "S072",
+          "S075",
+          "S076",
+          "S077",
+          "S078",
+          "S095",
+          "S096",
+          "S127",
+          "S128",
+          "S129",
+          "S130",
+          "S131",
+          "S136",
+          "S143",
+          "S170",
+          "S172"
+        ]
+      },
+      {
+        "t": 0.8,
+        "recall": {
+          "k": 82,
+          "n": 101,
+          "p": 0.8119,
+          "lo": 0.7248,
+          "hi": 0.8761
+        },
+        "precision": {
+          "k": 82,
+          "n": 84,
+          "p": 0.9762,
+          "lo": 0.9173,
+          "hi": 0.9934
+        },
+        "decoyFpRate": {
+          "k": 2,
+          "n": 63,
+          "p": 0.0317,
+          "lo": 0.0087,
+          "hi": 0.1086
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 78,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0469
+        },
+        "coverage": {
+          "k": 181,
+          "n": 242,
+          "p": 0.7479,
+          "lo": 0.6896,
+          "hi": 0.7985
+        },
+        "risk": {
+          "k": 2,
+          "n": 181,
+          "p": 0.011,
+          "lo": 0.003,
+          "hi": 0.0394
+        },
+        "misses": [
+          "C06",
+          "C07",
+          "C24",
+          "C28",
+          "F01",
+          "F02",
+          "F06",
+          "S032",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S041",
+          "S057",
+          "S066",
+          "S073",
+          "S136",
+          "S143",
+          "S144"
+        ],
+        "falseFlags": [
+          "S021",
+          "S059"
+        ],
+        "abstained": [
+          "C06",
+          "C07",
+          "C15",
+          "C24",
+          "C28",
+          "D02",
+          "F01",
+          "F02",
+          "F03",
+          "F06",
+          "F07",
+          "F08",
+          "S023",
+          "S024",
+          "S025",
+          "S026",
+          "S027",
+          "S031",
+          "S032",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S041",
+          "S043",
+          "S047",
+          "S052",
+          "S055",
+          "S057",
+          "S058",
+          "S060",
+          "S061",
+          "S062",
+          "S063",
+          "S066",
+          "S069",
+          "S072",
+          "S073",
+          "S075",
+          "S076",
+          "S077",
+          "S078",
+          "S079",
+          "S095",
+          "S096",
+          "S127",
+          "S128",
+          "S129",
+          "S130",
+          "S131",
+          "S134",
+          "S136",
+          "S143",
+          "S144",
+          "S145",
+          "S146",
+          "S147",
+          "S148",
+          "S170",
+          "S171",
+          "S172"
+        ]
+      },
+      {
+        "t": 0.9,
+        "recall": {
+          "k": 62,
+          "n": 101,
+          "p": 0.6139,
+          "lo": 0.5164,
+          "hi": 0.703
+        },
+        "precision": {
+          "k": 62,
+          "n": 64,
+          "p": 0.9688,
+          "lo": 0.893,
+          "hi": 0.9914
+        },
+        "decoyFpRate": {
+          "k": 2,
+          "n": 63,
+          "p": 0.0317,
+          "lo": 0.0087,
+          "hi": 0.1086
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 78,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0469
+        },
+        "coverage": {
+          "k": 148,
+          "n": 242,
+          "p": 0.6116,
+          "lo": 0.5489,
+          "hi": 0.6708
+        },
+        "risk": {
+          "k": 2,
+          "n": 148,
+          "p": 0.0135,
+          "lo": 0.0037,
+          "hi": 0.0479
+        },
+        "misses": [
+          "C05",
+          "C06",
+          "C07",
+          "C09",
+          "C12",
+          "C13",
+          "C20",
+          "C24",
+          "C28",
+          "F01",
+          "F02",
+          "F06",
+          "S020",
+          "S032",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S041",
+          "S048",
+          "S050",
+          "S051",
+          "S057",
+          "S065",
+          "S066",
+          "S067",
+          "S068",
+          "S073",
+          "S074",
+          "S083",
+          "S101",
+          "S113",
+          "S136",
+          "S143",
+          "S144",
+          "S158",
+          "S162",
+          "S166",
+          "S168"
+        ],
+        "falseFlags": [
+          "S021",
+          "S059"
+        ],
+        "abstained": [
+          "C05",
+          "C06",
+          "C07",
+          "C09",
+          "C12",
+          "C13",
+          "C15",
+          "C20",
+          "C24",
+          "C28",
+          "D02",
+          "D06",
+          "F01",
+          "F02",
+          "F03",
+          "F06",
+          "F07",
+          "F08",
+          "S020",
+          "S023",
+          "S024",
+          "S025",
+          "S026",
+          "S027",
+          "S029",
+          "S030",
+          "S031",
+          "S032",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S041",
+          "S043",
+          "S044",
+          "S046",
+          "S047",
+          "S048",
+          "S050",
+          "S051",
+          "S052",
+          "S055",
+          "S057",
+          "S058",
+          "S060",
+          "S061",
+          "S062",
+          "S063",
+          "S064",
+          "S065",
+          "S066",
+          "S067",
+          "S068",
+          "S069",
+          "S070",
+          "S071",
+          "S072",
+          "S073",
+          "S074",
+          "S075",
+          "S076",
+          "S077",
+          "S078",
+          "S079",
+          "S083",
+          "S095",
+          "S096",
+          "S101",
+          "S104",
+          "S113",
+          "S127",
+          "S128",
+          "S129",
+          "S130",
+          "S131",
+          "S132",
+          "S134",
+          "S136",
+          "S143",
+          "S144",
+          "S145",
+          "S146",
+          "S147",
+          "S148",
+          "S156",
+          "S158",
+          "S162",
+          "S166",
+          "S168",
+          "S169",
+          "S170",
+          "S171",
+          "S172",
+          "S194"
+        ]
+      }
+    ],
+    "single-mass": [
+      {
+        "t": 0.3,
+        "recall": {
+          "k": 101,
+          "n": 101,
+          "p": 1,
+          "lo": 0.9634,
+          "hi": 1
+        },
+        "precision": {
+          "k": 101,
+          "n": 125,
+          "p": 0.808,
+          "lo": 0.7302,
+          "hi": 0.8674
+        },
+        "decoyFpRate": {
+          "k": 21,
+          "n": 63,
+          "p": 0.3333,
+          "lo": 0.2295,
+          "hi": 0.4563
+        },
+        "compatibleFpRate": {
+          "k": 3,
+          "n": 78,
+          "p": 0.0385,
+          "lo": 0.0132,
+          "hi": 0.1071
+        },
+        "coverage": {
+          "k": 233,
+          "n": 242,
+          "p": 0.9628,
+          "lo": 0.9308,
+          "hi": 0.9803
+        },
+        "risk": {
+          "k": 24,
+          "n": 233,
+          "p": 0.103,
+          "lo": 0.0702,
+          "hi": 0.1487
+        },
+        "misses": [],
+        "falseFlags": [
+          "D02",
+          "F03",
+          "S021",
+          "S023",
+          "S024",
+          "S025",
+          "S027",
+          "S047",
+          "S052",
+          "S058",
+          "S059",
+          "S060",
+          "S061",
+          "S062",
+          "S063",
+          "S076",
+          "S096",
+          "S129",
+          "S130",
+          "S131",
+          "S146",
+          "S147",
+          "S148",
+          "S170"
+        ],
+        "abstained": [
+          "F07",
+          "S043",
+          "S069",
+          "S075",
+          "S077",
+          "S078",
+          "S127",
+          "S128",
+          "S172"
+        ]
+      },
+      {
+        "t": 0.4,
+        "recall": {
+          "k": 101,
+          "n": 101,
+          "p": 1,
+          "lo": 0.9634,
+          "hi": 1
+        },
+        "precision": {
+          "k": 101,
+          "n": 123,
+          "p": 0.8211,
+          "lo": 0.744,
+          "hi": 0.8788
+        },
+        "decoyFpRate": {
+          "k": 19,
+          "n": 63,
+          "p": 0.3016,
+          "lo": 0.2024,
+          "hi": 0.4236
+        },
+        "compatibleFpRate": {
+          "k": 3,
+          "n": 78,
+          "p": 0.0385,
+          "lo": 0.0132,
+          "hi": 0.1071
+        },
+        "coverage": {
+          "k": 233,
+          "n": 242,
+          "p": 0.9628,
+          "lo": 0.9308,
+          "hi": 0.9803
+        },
+        "risk": {
+          "k": 22,
+          "n": 233,
+          "p": 0.0944,
+          "lo": 0.0632,
+          "hi": 0.1388
+        },
+        "misses": [],
+        "falseFlags": [
+          "D02",
+          "F03",
+          "S021",
+          "S023",
+          "S024",
+          "S025",
+          "S027",
+          "S047",
+          "S052",
+          "S058",
+          "S059",
+          "S060",
+          "S062",
+          "S063",
+          "S076",
+          "S129",
+          "S130",
+          "S131",
+          "S146",
+          "S147",
+          "S148",
+          "S170"
+        ],
+        "abstained": [
+          "F07",
+          "S043",
+          "S069",
+          "S075",
+          "S077",
+          "S078",
+          "S127",
+          "S128",
+          "S172"
+        ]
+      },
+      {
+        "t": 0.5,
+        "recall": {
+          "k": 100,
+          "n": 101,
+          "p": 0.9901,
+          "lo": 0.946,
+          "hi": 0.9983
+        },
+        "precision": {
+          "k": 100,
+          "n": 119,
+          "p": 0.8403,
+          "lo": 0.7641,
+          "hi": 0.8953
+        },
+        "decoyFpRate": {
+          "k": 17,
+          "n": 63,
+          "p": 0.2698,
+          "lo": 0.1758,
+          "hi": 0.3903
+        },
+        "compatibleFpRate": {
+          "k": 2,
+          "n": 78,
+          "p": 0.0256,
+          "lo": 0.0071,
+          "hi": 0.0888
+        },
+        "coverage": {
+          "k": 233,
+          "n": 242,
+          "p": 0.9628,
+          "lo": 0.9308,
+          "hi": 0.9803
+        },
+        "risk": {
+          "k": 20,
+          "n": 233,
+          "p": 0.0858,
+          "lo": 0.0563,
+          "hi": 0.1289
+        },
+        "misses": [
+          "S066"
+        ],
+        "falseFlags": [
+          "D02",
+          "F03",
+          "S021",
+          "S023",
+          "S024",
+          "S025",
+          "S027",
+          "S047",
+          "S058",
+          "S059",
+          "S060",
+          "S062",
+          "S063",
+          "S129",
+          "S130",
+          "S146",
+          "S147",
+          "S148",
+          "S170"
+        ],
+        "abstained": [
+          "F07",
+          "S043",
+          "S069",
+          "S075",
+          "S077",
+          "S078",
+          "S127",
+          "S128",
+          "S172"
+        ]
+      },
+      {
+        "t": 0.6,
+        "recall": {
+          "k": 97,
+          "n": 101,
+          "p": 0.9604,
+          "lo": 0.9026,
+          "hi": 0.9845
+        },
+        "precision": {
+          "k": 97,
+          "n": 113,
+          "p": 0.8584,
+          "lo": 0.7823,
+          "hi": 0.9109
+        },
+        "decoyFpRate": {
+          "k": 15,
+          "n": 63,
+          "p": 0.2381,
+          "lo": 0.1499,
+          "hi": 0.3564
+        },
+        "compatibleFpRate": {
+          "k": 1,
+          "n": 78,
+          "p": 0.0128,
+          "lo": 0.0023,
+          "hi": 0.0691
+        },
+        "coverage": {
+          "k": 223,
+          "n": 242,
+          "p": 0.9215,
+          "lo": 0.8806,
+          "hi": 0.9492
+        },
+        "risk": {
+          "k": 16,
+          "n": 223,
+          "p": 0.0717,
+          "lo": 0.0446,
+          "hi": 0.1134
+        },
+        "misses": [
+          "S032",
+          "S033",
+          "S066",
+          "S143"
+        ],
+        "falseFlags": [
+          "D02",
+          "F03",
+          "S021",
+          "S023",
+          "S024",
+          "S027",
+          "S047",
+          "S058",
+          "S059",
+          "S060",
+          "S129",
+          "S130",
+          "S146",
+          "S147",
+          "S148",
+          "S170"
+        ],
+        "abstained": [
+          "F07",
+          "S025",
+          "S032",
+          "S033",
+          "S043",
+          "S052",
+          "S062",
+          "S063",
+          "S066",
+          "S069",
+          "S075",
+          "S076",
+          "S077",
+          "S078",
+          "S127",
+          "S128",
+          "S131",
+          "S143",
+          "S172"
+        ]
+      },
+      {
+        "t": 0.7,
+        "recall": {
+          "k": 93,
+          "n": 101,
+          "p": 0.9208,
+          "lo": 0.8514,
+          "hi": 0.9593
+        },
+        "precision": {
+          "k": 93,
+          "n": 105,
+          "p": 0.8857,
+          "lo": 0.8108,
+          "hi": 0.9334
+        },
+        "decoyFpRate": {
+          "k": 12,
+          "n": 63,
+          "p": 0.1905,
+          "lo": 0.1125,
+          "hi": 0.3041
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 78,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0469
+        },
+        "coverage": {
+          "k": 213,
+          "n": 242,
+          "p": 0.8802,
+          "lo": 0.8332,
+          "hi": 0.9153
+        },
+        "risk": {
+          "k": 12,
+          "n": 213,
+          "p": 0.0563,
+          "lo": 0.0325,
+          "hi": 0.0959
+        },
+        "misses": [
+          "C24",
+          "S032",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S066",
+          "S143"
+        ],
+        "falseFlags": [
+          "F03",
+          "S021",
+          "S023",
+          "S027",
+          "S058",
+          "S059",
+          "S060",
+          "S129",
+          "S130",
+          "S146",
+          "S147",
+          "S148"
+        ],
+        "abstained": [
+          "C24",
+          "D02",
+          "F07",
+          "S024",
+          "S025",
+          "S032",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S043",
+          "S047",
+          "S052",
+          "S061",
+          "S062",
+          "S063",
+          "S066",
+          "S069",
+          "S075",
+          "S076",
+          "S077",
+          "S078",
+          "S096",
+          "S127",
+          "S128",
+          "S131",
+          "S143",
+          "S170",
+          "S172"
+        ]
+      },
+      {
+        "t": 0.8,
+        "recall": {
+          "k": 83,
+          "n": 101,
+          "p": 0.8218,
+          "lo": 0.7358,
+          "hi": 0.8842
+        },
+        "precision": {
+          "k": 83,
+          "n": 90,
+          "p": 0.9222,
+          "lo": 0.8481,
+          "hi": 0.9618
+        },
+        "decoyFpRate": {
+          "k": 7,
+          "n": 63,
+          "p": 0.1111,
+          "lo": 0.0549,
+          "hi": 0.212
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 78,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0469
+        },
+        "coverage": {
+          "k": 191,
+          "n": 242,
+          "p": 0.7893,
+          "lo": 0.7336,
+          "hi": 0.8359
+        },
+        "risk": {
+          "k": 7,
+          "n": 191,
+          "p": 0.0366,
+          "lo": 0.0179,
+          "hi": 0.0737
+        },
+        "misses": [
+          "C07",
+          "C24",
+          "C28",
+          "F01",
+          "F02",
+          "F06",
+          "S032",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S041",
+          "S057",
+          "S066",
+          "S073",
+          "S136",
+          "S143",
+          "S144"
+        ],
+        "falseFlags": [
+          "F03",
+          "S021",
+          "S059",
+          "S060",
+          "S129",
+          "S147",
+          "S148"
+        ],
+        "abstained": [
+          "C07",
+          "C24",
+          "C28",
+          "D02",
+          "F01",
+          "F02",
+          "F06",
+          "F07",
+          "F08",
+          "S023",
+          "S024",
+          "S025",
+          "S026",
+          "S027",
+          "S031",
+          "S032",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S041",
+          "S043",
+          "S047",
+          "S052",
+          "S057",
+          "S058",
+          "S061",
+          "S062",
+          "S063",
+          "S066",
+          "S069",
+          "S073",
+          "S075",
+          "S076",
+          "S077",
+          "S078",
+          "S079",
+          "S096",
+          "S127",
+          "S128",
+          "S130",
+          "S131",
+          "S134",
+          "S136",
+          "S143",
+          "S144",
+          "S145",
+          "S146",
+          "S170",
+          "S171",
+          "S172"
+        ]
+      },
+      {
+        "t": 0.9,
+        "recall": {
+          "k": 71,
+          "n": 101,
+          "p": 0.703,
+          "lo": 0.6077,
+          "hi": 0.7833
+        },
+        "precision": {
+          "k": 71,
+          "n": 73,
+          "p": 0.9726,
+          "lo": 0.9055,
+          "hi": 0.9925
+        },
+        "decoyFpRate": {
+          "k": 2,
+          "n": 63,
+          "p": 0.0317,
+          "lo": 0.0087,
+          "hi": 0.1086
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 78,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0469
+        },
+        "coverage": {
+          "k": 160,
+          "n": 242,
+          "p": 0.6612,
+          "lo": 0.5994,
+          "hi": 0.7179
+        },
+        "risk": {
+          "k": 2,
+          "n": 160,
+          "p": 0.0125,
+          "lo": 0.0034,
+          "hi": 0.0444
+        },
+        "misses": [
+          "C06",
+          "C07",
+          "C09",
+          "C12",
+          "C24",
+          "C28",
+          "F01",
+          "F02",
+          "F06",
+          "S032",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S041",
+          "S050",
+          "S051",
+          "S057",
+          "S065",
+          "S066",
+          "S067",
+          "S068",
+          "S073",
+          "S074",
+          "S136",
+          "S143",
+          "S144",
+          "S158",
+          "S162",
+          "S168"
+        ],
+        "falseFlags": [
+          "S021",
+          "S059"
+        ],
+        "abstained": [
+          "C06",
+          "C07",
+          "C09",
+          "C12",
+          "C15",
+          "C24",
+          "C28",
+          "D02",
+          "D06",
+          "F01",
+          "F02",
+          "F03",
+          "F06",
+          "F07",
+          "F08",
+          "S023",
+          "S024",
+          "S025",
+          "S026",
+          "S027",
+          "S029",
+          "S030",
+          "S031",
+          "S032",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S041",
+          "S043",
+          "S046",
+          "S047",
+          "S050",
+          "S051",
+          "S052",
+          "S057",
+          "S058",
+          "S060",
+          "S061",
+          "S062",
+          "S063",
+          "S064",
+          "S065",
+          "S066",
+          "S067",
+          "S068",
+          "S069",
+          "S070",
+          "S071",
+          "S072",
+          "S073",
+          "S074",
+          "S075",
+          "S076",
+          "S077",
+          "S078",
+          "S079",
+          "S096",
+          "S104",
+          "S127",
+          "S128",
+          "S129",
+          "S130",
+          "S131",
+          "S132",
+          "S134",
+          "S136",
+          "S143",
+          "S144",
+          "S145",
+          "S146",
+          "S147",
+          "S148",
+          "S156",
+          "S158",
+          "S162",
+          "S168",
+          "S169",
+          "S170",
+          "S171",
+          "S172",
+          "S194"
+        ]
+      }
+    ]
+  },
+  "latency": {
+    "callP50": 235,
+    "callP95": 445,
+    "callMax": 725,
+    "perQuestionP50": 78.3,
+    "perQuestionP95": 148.3,
+    "clientP50": 277,
+    "inputTokensP50": 1074,
+    "inputTokensMax": 2361
+  },
+  "truncation": {
+    "cap": 64000,
+    "estimatorMaxTokens": 3602,
+    "estimatorOversize": [],
+    "postCallAtCap": [],
+    "minBytesPerToken": 3.149
+  },
+  "controls": {
+    "reorderOnly": {
+      "answered": 242,
+      "relabelledAgreement": {
+        "k": 223,
+        "n": 242,
+        "p": 0.9215,
+        "lo": 0.8806,
+        "hi": 0.9492
+      },
+      "pairwiseFlipRate": {
+        "k": 38,
+        "n": 726,
+        "p": 0.0523,
+        "lo": 0.0384,
+        "hi": 0.071
+      },
+      "verdictAgreement": {
+        "k": 227,
+        "n": 242,
+        "p": 0.938,
+        "lo": 0.9003,
+        "hi": 0.9621
+      },
+      "unclearShare": {
+        "k": 36,
+        "n": 726,
+        "p": 0.0496,
+        "lo": 0.036,
+        "hi": 0.0679
+      },
+      "v0ValueAccuracy": {
+        "k": 208,
+        "n": 242,
+        "p": 0.8595,
+        "lo": 0.8101,
+        "hi": 0.8977
+      },
+      "allThreeCorrect": {
+        "k": 201,
+        "n": 242,
+        "p": 0.8306,
+        "lo": 0.7782,
+        "hi": 0.8726
+      },
+      "disagreeing": [
+        {
+          "id": "C06",
+          "truth": "many",
+          "chosen": [
+            "many",
+            "exactly-one",
+            "exactly-one"
+          ],
+          "pViolate": [
+            0.799,
+            0.228,
+            0.364
+          ]
+        },
+        {
+          "id": "C15",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "eventual",
+            "eventual"
+          ],
+          "pViolate": [
+            0.178,
+            0.41,
+            0.383
+          ]
+        },
+        {
+          "id": "D09",
+          "truth": "at-most-one",
+          "chosen": [
+            "exactly-one",
+            "at-most-one",
+            "at-most-one"
+          ],
+          "pViolate": [
+            0.013,
+            0.016,
+            0.018
+          ]
+        },
+        {
+          "id": "F06",
+          "truth": "per-session",
+          "chosen": [
+            "ttl",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.745,
+            0.535,
+            0.623
+          ]
+        },
+        {
+          "id": "S023",
+          "truth": "per-call",
+          "chosen": [
+            "per-session",
+            "per-call",
+            "per-call"
+          ],
+          "pViolate": [
+            0.643,
+            0.022,
+            0.025
+          ]
+        },
+        {
+          "id": "S024",
+          "truth": "per-call",
+          "chosen": [
+            "per-request",
+            "per-call",
+            "per-call"
+          ],
+          "pViolate": [
+            0.692,
+            0.16,
+            0.214
+          ]
+        },
+        {
+          "id": "S027",
+          "truth": "per-request",
+          "chosen": [
+            "ttl",
+            "per-request",
+            "per-request"
+          ],
+          "pViolate": [
+            0.543,
+            0.408,
+            0.176
+          ]
+        },
+        {
+          "id": "S035",
+          "truth": "many",
+          "chosen": [
+            "at-most-one",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.681,
+            0.453,
+            0.404
+          ]
+        },
+        {
+          "id": "S043",
+          "truth": "at-most-one",
+          "chosen": [
+            "exactly-one",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.126,
+            0.052,
+            0.058
+          ]
+        },
+        {
+          "id": "S052",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "fifo",
+            "fifo"
+          ],
+          "pViolate": [
+            0.333,
+            0.149,
+            0.118
+          ]
+        },
+        {
+          "id": "S066",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "strong"
+          ],
+          "pViolate": [
+            0.5,
+            0.445,
+            0.464
+          ]
+        },
+        {
+          "id": "S072",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "strong"
+          ],
+          "pViolate": [
+            0.141,
+            0.159,
+            0.172
+          ]
+        },
+        {
+          "id": "S077",
+          "truth": "read-your-writes",
+          "chosen": [
+            "unclear",
+            "unclear",
+            "strong"
+          ],
+          "pViolate": [
+            0.135,
+            0.022,
+            0.026
+          ]
+        },
+        {
+          "id": "S079",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "strong"
+          ],
+          "pViolate": [
+            0.252,
+            0.139,
+            0.115
+          ]
+        },
+        {
+          "id": "S095",
+          "truth": "optional",
+          "chosen": [
+            "optional",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.023,
+            0.013,
+            0.018
+          ]
+        },
+        {
+          "id": "S116",
+          "truth": "admin",
+          "chosen": [
+            "admin",
+            "admin",
+            "member"
+          ],
+          "pViolate": [
+            0.038,
+            0.026,
+            0.034
+          ]
+        },
+        {
+          "id": "S129",
+          "truth": "member",
+          "chosen": [
+            "anyone",
+            "unclear",
+            "anyone"
+          ],
+          "pViolate": [
+            0.816,
+            0.344,
+            0.615
+          ]
+        },
+        {
+          "id": "S130",
+          "truth": "admin",
+          "chosen": [
+            "anyone",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.732,
+            0.096,
+            0.139
+          ]
+        },
+        {
+          "id": "S170",
+          "truth": "le-1k",
+          "chosen": [
+            "le-10k",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.621,
+            0.064,
+            0.086
+          ]
+        }
+      ],
+      "bitIdenticalProbabilitiesAcrossAsks": {
+        "k": 0,
+        "n": 242,
+        "p": 0,
+        "lo": 0,
+        "hi": 0.0156
+      },
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 97,
+          "n": 101,
+          "p": 0.9604,
+          "lo": 0.9026,
+          "hi": 0.9845
+        },
+        "precision": {
+          "k": 97,
+          "n": 107,
+          "p": 0.9065,
+          "lo": 0.8365,
+          "hi": 0.9484
+        },
+        "decoyFpRate": {
+          "k": 10,
+          "n": 63,
+          "p": 0.1587,
+          "lo": 0.0886,
+          "hi": 0.2681
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 78,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0469
+        },
+        "coverage": {
+          "k": 220,
+          "n": 242,
+          "p": 0.9091,
+          "lo": 0.8662,
+          "hi": 0.9392
+        },
+        "risk": {
+          "k": 10,
+          "n": 220,
+          "p": 0.0455,
+          "lo": 0.0249,
+          "hi": 0.0816
+        },
+        "misses": [
+          "C06",
+          "F06",
+          "S035",
+          "S066"
+        ],
+        "falseFlags": [
+          "D02",
+          "F03",
+          "S021",
+          "S058",
+          "S059",
+          "S060",
+          "S062",
+          "S146",
+          "S147",
+          "S148"
+        ],
+        "abstained": [
+          "C06",
+          "F06",
+          "F08",
+          "S023",
+          "S024",
+          "S027",
+          "S035",
+          "S043",
+          "S047",
+          "S063",
+          "S066",
+          "S069",
+          "S075",
+          "S077",
+          "S078",
+          "S095",
+          "S127",
+          "S128",
+          "S129",
+          "S130",
+          "S170",
+          "S172"
+        ]
+      }
+    },
+    "s17Original": {
+      "original": {
+        "gate": {
+          "t": 0.5,
+          "recall": {
+            "k": 22,
+            "n": 22,
+            "p": 1,
+            "lo": 0.8513,
+            "hi": 1
+          },
+          "precision": {
+            "k": 22,
+            "n": 22,
+            "p": 1,
+            "lo": 0.8513,
+            "hi": 1
+          },
+          "decoyFpRate": {
+            "k": 0,
+            "n": 10,
+            "p": 0,
+            "lo": 0,
+            "hi": 0.2775
+          },
+          "compatibleFpRate": {
+            "k": 0,
+            "n": 8,
+            "p": 0,
+            "lo": 0,
+            "hi": 0.3244
+          },
+          "coverage": {
+            "k": 39,
+            "n": 40,
+            "p": 0.975,
+            "lo": 0.8712,
+            "hi": 0.9956
+          },
+          "risk": {
+            "k": 0,
+            "n": 39,
+            "p": 0,
+            "lo": 0,
+            "hi": 0.0897
+          },
+          "misses": [],
+          "falseFlags": [],
+          "abstained": [
+            "D02"
+          ]
+        },
+        "answered": 40,
+        "relabelledAgreement": {
+          "k": 38,
+          "n": 40,
+          "p": 0.95,
+          "lo": 0.835,
+          "hi": 0.9862
+        },
+        "pairwiseFlipRate": {
+          "k": 4,
+          "n": 120,
+          "p": 0.0333,
+          "lo": 0.013,
+          "hi": 0.0826
+        },
+        "verdictAgreement": {
+          "k": 39,
+          "n": 40,
+          "p": 0.975,
+          "lo": 0.8712,
+          "hi": 0.9956
+        },
+        "unclearShare": {
+          "k": 0,
+          "n": 120,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.031
+        },
+        "v0ValueAccuracy": {
+          "k": 38,
+          "n": 40,
+          "p": 0.95,
+          "lo": 0.835,
+          "hi": 0.9862
+        },
+        "allThreeCorrect": {
+          "k": 37,
+          "n": 40,
+          "p": 0.925,
+          "lo": 0.8014,
+          "hi": 0.9742
+        },
+        "disagreeing": [
+          {
+            "id": "D02",
+            "truth": "strong",
+            "chosen": [
+              "strong",
+              "strong",
+              "read-your-writes"
+            ],
+            "pViolate": [
+              0.393,
+              0.338,
+              0.569
+            ]
+          },
+          {
+            "id": "D09",
+            "truth": "at-most-one",
+            "chosen": [
+              "exactly-one",
+              "at-most-one",
+              "at-most-one"
+            ],
+            "pViolate": [
+              0.016,
+              0.023,
+              0.015
+            ]
+          }
+        ]
+      },
+      "sanitised": {
+        "gate": {
+          "t": 0.5,
+          "recall": {
+            "k": 22,
+            "n": 22,
+            "p": 1,
+            "lo": 0.8513,
+            "hi": 1
+          },
+          "precision": {
+            "k": 22,
+            "n": 23,
+            "p": 0.9565,
+            "lo": 0.7901,
+            "hi": 0.9923
+          },
+          "decoyFpRate": {
+            "k": 1,
+            "n": 10,
+            "p": 0.1,
+            "lo": 0.0179,
+            "hi": 0.4042
+          },
+          "compatibleFpRate": {
+            "k": 0,
+            "n": 8,
+            "p": 0,
+            "lo": 0,
+            "hi": 0.3244
+          },
+          "coverage": {
+            "k": 40,
+            "n": 40,
+            "p": 1,
+            "lo": 0.9124,
+            "hi": 1
+          },
+          "risk": {
+            "k": 1,
+            "n": 40,
+            "p": 0.025,
+            "lo": 0.0044,
+            "hi": 0.1288
+          },
+          "misses": [],
+          "falseFlags": [
+            "D02"
+          ],
+          "abstained": []
+        },
+        "answered": 40,
+        "relabelledAgreement": {
+          "k": 38,
+          "n": 40,
+          "p": 0.95,
+          "lo": 0.835,
+          "hi": 0.9862
+        },
+        "pairwiseFlipRate": {
+          "k": 4,
+          "n": 120,
+          "p": 0.0333,
+          "lo": 0.013,
+          "hi": 0.0826
+        },
+        "verdictAgreement": {
+          "k": 39,
+          "n": 40,
+          "p": 0.975,
+          "lo": 0.8712,
+          "hi": 0.9956
+        },
+        "unclearShare": {
+          "k": 0,
+          "n": 120,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.031
+        },
+        "v0ValueAccuracy": {
+          "k": 37,
+          "n": 40,
+          "p": 0.925,
+          "lo": 0.8014,
+          "hi": 0.9742
+        },
+        "allThreeCorrect": {
+          "k": 36,
+          "n": 40,
+          "p": 0.9,
+          "lo": 0.7695,
+          "hi": 0.9604
+        },
+        "disagreeing": [
+          {
+            "id": "C15",
+            "truth": "read-your-writes",
+            "chosen": [
+              "read-your-writes",
+              "eventual",
+              "eventual"
+            ],
+            "pViolate": [
+              0.191,
+              0.32,
+              0.346
+            ]
+          },
+          {
+            "id": "D09",
+            "truth": "at-most-one",
+            "chosen": [
+              "exactly-one",
+              "at-most-one",
+              "at-most-one"
+            ],
+            "pViolate": [
+              0.016,
+              0.023,
+              0.015
+            ]
+          }
+        ]
+      },
+      "changedAnswers": [
+        {
+          "id": "C15",
+          "truth": "read-your-writes",
+          "original": [
+            "read-your-writes",
+            "read-your-writes",
+            "read-your-writes"
+          ],
+          "sanitised": [
+            "read-your-writes",
+            "eventual",
+            "eventual"
+          ]
+        },
+        {
+          "id": "D02",
+          "truth": "strong",
+          "original": [
+            "strong",
+            "strong",
+            "read-your-writes"
+          ],
+          "sanitised": [
+            "read-your-writes",
+            "read-your-writes",
+            "read-your-writes"
+          ]
+        }
+      ]
+    },
+    "warmupSlot": {
+      "n": 242,
+      "contradictions": 101,
+      "decoys": 63,
+      "gate": {
+        "t": 0.5,
+        "recall": {
+          "k": 93,
+          "n": 101,
+          "p": 0.9208,
+          "lo": 0.8514,
+          "hi": 0.9593
+        },
+        "precision": {
+          "k": 93,
+          "n": 101,
+          "p": 0.9208,
+          "lo": 0.8514,
+          "hi": 0.9593
+        },
+        "decoyFpRate": {
+          "k": 8,
+          "n": 63,
+          "p": 0.127,
+          "lo": 0.0658,
+          "hi": 0.2311
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 78,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0469
+        },
+        "coverage": {
+          "k": 207,
+          "n": 242,
+          "p": 0.8554,
+          "lo": 0.8055,
+          "hi": 0.8941
+        },
+        "risk": {
+          "k": 9,
+          "n": 207,
+          "p": 0.0435,
+          "lo": 0.023,
+          "hi": 0.0806
+        },
+        "misses": [
+          "C06",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S066",
+          "S083",
+          "S143"
+        ],
+        "falseFlags": [
+          "F03",
+          "S021",
+          "S059",
+          "S060",
+          "S062",
+          "S146",
+          "S147",
+          "S148"
+        ],
+        "abstained": [
+          "C15",
+          "D02",
+          "F07",
+          "S023",
+          "S024",
+          "S025",
+          "S027",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S042",
+          "S043",
+          "S047",
+          "S052",
+          "S058",
+          "S063",
+          "S066",
+          "S069",
+          "S072",
+          "S075",
+          "S076",
+          "S077",
+          "S078",
+          "S083",
+          "S095",
+          "S096",
+          "S127",
+          "S128",
+          "S129",
+          "S130",
+          "S134",
+          "S143",
+          "S170",
+          "S172"
+        ]
+      },
+      "topChoice": {
+        "t": 0.5,
+        "recall": {
+          "k": 95,
+          "n": 101,
+          "p": 0.9406,
+          "lo": 0.8764,
+          "hi": 0.9725
+        },
+        "precision": {
+          "k": 95,
+          "n": 104,
+          "p": 0.9135,
+          "lo": 0.8437,
+          "hi": 0.9538
+        },
+        "decoyFpRate": {
+          "k": 9,
+          "n": 63,
+          "p": 0.1429,
+          "lo": 0.077,
+          "hi": 0.2497
+        },
+        "compatibleFpRate": {
+          "k": 0,
+          "n": 78,
+          "p": 0,
+          "lo": 0,
+          "hi": 0.0469
+        },
+        "coverage": {
+          "k": 209,
+          "n": 242,
+          "p": 0.8636,
+          "lo": 0.8147,
+          "hi": 0.9012
+        },
+        "risk": {
+          "k": 9,
+          "n": 209,
+          "p": 0.0431,
+          "lo": 0.0228,
+          "hi": 0.0798
+        },
+        "misses": [
+          "C06",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S066"
+        ],
+        "falseFlags": [
+          "D02",
+          "F03",
+          "S021",
+          "S059",
+          "S060",
+          "S062",
+          "S146",
+          "S147",
+          "S148"
+        ],
+        "abstained": [
+          "C06",
+          "C15",
+          "F07",
+          "S023",
+          "S024",
+          "S025",
+          "S027",
+          "S033",
+          "S034",
+          "S035",
+          "S040",
+          "S042",
+          "S043",
+          "S047",
+          "S052",
+          "S058",
+          "S063",
+          "S066",
+          "S069",
+          "S072",
+          "S075",
+          "S076",
+          "S077",
+          "S078",
+          "S095",
+          "S096",
+          "S127",
+          "S128",
+          "S129",
+          "S130",
+          "S134",
+          "S170",
+          "S172"
+        ]
+      },
+      "answered": 242,
+      "relabelledAgreement": {
+        "k": 213,
+        "n": 242,
+        "p": 0.8802,
+        "lo": 0.8332,
+        "hi": 0.9153
+      },
+      "pairwiseFlipRate": {
+        "k": 59,
+        "n": 726,
+        "p": 0.0813,
+        "lo": 0.0635,
+        "hi": 0.1034
+      },
+      "verdictAgreement": {
+        "k": 216,
+        "n": 242,
+        "p": 0.8926,
+        "lo": 0.8472,
+        "hi": 0.9256
+      },
+      "unclearShare": {
+        "k": 52,
+        "n": 726,
+        "p": 0.0716,
+        "lo": 0.055,
+        "hi": 0.0927
+      },
+      "v0ValueAccuracy": {
+        "k": 204,
+        "n": 242,
+        "p": 0.843,
+        "lo": 0.7918,
+        "hi": 0.8834
+      },
+      "allThreeCorrect": {
+        "k": 195,
+        "n": 242,
+        "p": 0.8058,
+        "lo": 0.7513,
+        "hi": 0.8507
+      },
+      "disagreeing": [
+        {
+          "id": "C06",
+          "truth": "many",
+          "chosen": [
+            "many",
+            "many",
+            "exactly-one"
+          ],
+          "pViolate": [
+            0.477,
+            0.458,
+            0.249
+          ]
+        },
+        {
+          "id": "C15",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "unclear",
+            "read-your-writes"
+          ],
+          "pViolate": [
+            0.18,
+            0.228,
+            0.161
+          ]
+        },
+        {
+          "id": "D09",
+          "truth": "at-most-one",
+          "chosen": [
+            "exactly-one",
+            "at-most-one",
+            "at-most-one"
+          ],
+          "pViolate": [
+            0.015,
+            0.016,
+            0.016
+          ]
+        },
+        {
+          "id": "F07",
+          "truth": "per-call",
+          "chosen": [
+            "per-call",
+            "per-call",
+            "unclear"
+          ],
+          "pViolate": [
+            0.181,
+            0.117,
+            0.114
+          ]
+        },
+        {
+          "id": "S023",
+          "truth": "per-call",
+          "chosen": [
+            "per-session",
+            "per-call",
+            "per-call"
+          ],
+          "pViolate": [
+            0.684,
+            0.041,
+            0.034
+          ]
+        },
+        {
+          "id": "S024",
+          "truth": "per-call",
+          "chosen": [
+            "per-request",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.749,
+            0.177,
+            0.209
+          ]
+        },
+        {
+          "id": "S025",
+          "truth": "per-call",
+          "chosen": [
+            "ttl",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.824,
+            0.267,
+            0.303
+          ]
+        },
+        {
+          "id": "S027",
+          "truth": "per-request",
+          "chosen": [
+            "ttl",
+            "ttl",
+            "per-request"
+          ],
+          "pViolate": [
+            0.661,
+            0.782,
+            0.454
+          ]
+        },
+        {
+          "id": "S033",
+          "truth": "at-most-one",
+          "chosen": [
+            "at-most-one",
+            "exactly-one",
+            "at-most-one"
+          ],
+          "pViolate": [
+            0.548,
+            0.444,
+            0.774
+          ]
+        },
+        {
+          "id": "S034",
+          "truth": "many",
+          "chosen": [
+            "many",
+            "many",
+            "unclear"
+          ],
+          "pViolate": [
+            0.548,
+            0.508,
+            0.425
+          ]
+        },
+        {
+          "id": "S035",
+          "truth": "many",
+          "chosen": [
+            "at-most-one",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.647,
+            0.593,
+            0.438
+          ]
+        },
+        {
+          "id": "S040",
+          "truth": "many",
+          "chosen": [
+            "unclear",
+            "unclear",
+            "many"
+          ],
+          "pViolate": [
+            0.311,
+            0.443,
+            0.492
+          ]
+        },
+        {
+          "id": "S042",
+          "truth": "at-most-one",
+          "chosen": [
+            "exactly-one",
+            "exactly-one",
+            "unclear"
+          ],
+          "pViolate": [
+            0.074,
+            0.041,
+            0.037
+          ]
+        },
+        {
+          "id": "S047",
+          "truth": "fifo",
+          "chosen": [
+            "per-key-fifo",
+            "fifo",
+            "fifo"
+          ],
+          "pViolate": [
+            0.564,
+            0.138,
+            0.072
+          ]
+        },
+        {
+          "id": "S052",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "unclear",
+            "fifo"
+          ],
+          "pViolate": [
+            0.48,
+            0.222,
+            0.082
+          ]
+        },
+        {
+          "id": "S058",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "unordered",
+            "unclear"
+          ],
+          "pViolate": [
+            0.742,
+            0.586,
+            0.33
+          ]
+        },
+        {
+          "id": "S060",
+          "truth": "fifo",
+          "chosen": [
+            "unordered",
+            "per-key-fifo",
+            "unordered"
+          ],
+          "pViolate": [
+            0.827,
+            0.771,
+            0.783
+          ]
+        },
+        {
+          "id": "S066",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.49,
+            0.44,
+            0.342
+          ]
+        },
+        {
+          "id": "S072",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "unclear",
+            "read-your-writes"
+          ],
+          "pViolate": [
+            0.138,
+            0.15,
+            0.102
+          ]
+        },
+        {
+          "id": "S076",
+          "truth": "strong",
+          "chosen": [
+            "unclear",
+            "strong",
+            "strong"
+          ],
+          "pViolate": [
+            0.433,
+            0.081,
+            0.074
+          ]
+        },
+        {
+          "id": "S079",
+          "truth": "read-your-writes",
+          "chosen": [
+            "read-your-writes",
+            "strong",
+            "strong"
+          ],
+          "pViolate": [
+            0.175,
+            0.099,
+            0.076
+          ]
+        },
+        {
+          "id": "S095",
+          "truth": "optional",
+          "chosen": [
+            "optional",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.034,
+            0.012,
+            0.012
+          ]
+        },
+        {
+          "id": "S096",
+          "truth": "required",
+          "chosen": [
+            "absent",
+            "required",
+            "required"
+          ],
+          "pViolate": [
+            0.634,
+            0.289,
+            0.127
+          ]
+        },
+        {
+          "id": "S128",
+          "truth": "owner",
+          "chosen": [
+            "anyone",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.675,
+            0.221,
+            0.215
+          ]
+        },
+        {
+          "id": "S129",
+          "truth": "member",
+          "chosen": [
+            "anyone",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.667,
+            0.133,
+            0.151
+          ]
+        },
+        {
+          "id": "S130",
+          "truth": "admin",
+          "chosen": [
+            "anyone",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.846,
+            0.228,
+            0.179
+          ]
+        },
+        {
+          "id": "S134",
+          "truth": "pure",
+          "chosen": [
+            "unclear",
+            "pure",
+            "pure"
+          ],
+          "pViolate": [
+            0.392,
+            0.046,
+            0.054
+          ]
+        },
+        {
+          "id": "S170",
+          "truth": "le-1k",
+          "chosen": [
+            "le-100",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.264,
+            0.067,
+            0.081
+          ]
+        },
+        {
+          "id": "S172",
+          "truth": "le-1k",
+          "chosen": [
+            "le-1m",
+            "unclear",
+            "unclear"
+          ],
+          "pViolate": [
+            0.592,
+            0.243,
+            0.465
+          ]
+        }
+      ]
+    },
+    "warmupSlotBySource": {
+      "s17": {
+        "n": 40,
+        "contradictions": 22,
+        "decoys": 10,
+        "gate": {
+          "t": 0.5,
+          "recall": {
+            "k": 21,
+            "n": 22,
+            "p": 0.9545,
+            "lo": 0.782,
+            "hi": 0.9919
+          },
+          "precision": {
+            "k": 21,
+            "n": 21,
+            "p": 1,
+            "lo": 0.8454,
+            "hi": 1
+          },
+          "decoyFpRate": {
+            "k": 0,
+            "n": 10,
+            "p": 0,
+            "lo": 0,
+            "hi": 0.2775
+          },
+          "compatibleFpRate": {
+            "k": 0,
+            "n": 8,
+            "p": 0,
+            "lo": 0,
+            "hi": 0.3244
+          },
+          "coverage": {
+            "k": 38,
+            "n": 40,
+            "p": 0.95,
+            "lo": 0.835,
+            "hi": 0.9862
+          },
+          "risk": {
+            "k": 1,
+            "n": 38,
+            "p": 0.0263,
+            "lo": 0.0047,
+            "hi": 0.1349
+          },
+          "misses": [
+            "C06"
+          ],
+          "falseFlags": [],
+          "abstained": [
+            "C15",
+            "D02"
+          ]
+        },
+        "topChoice": {
+          "t": 0.5,
+          "recall": {
+            "k": 21,
+            "n": 22,
+            "p": 0.9545,
+            "lo": 0.782,
+            "hi": 0.9919
+          },
+          "precision": {
+            "k": 21,
+            "n": 22,
+            "p": 0.9545,
+            "lo": 0.782,
+            "hi": 0.9919
+          },
+          "decoyFpRate": {
+            "k": 1,
+            "n": 10,
+            "p": 0.1,
+            "lo": 0.0179,
+            "hi": 0.4042
+          },
+          "compatibleFpRate": {
+            "k": 0,
+            "n": 8,
+            "p": 0,
+            "lo": 0,
+            "hi": 0.3244
+          },
+          "coverage": {
+            "k": 38,
+            "n": 40,
+            "p": 0.95,
+            "lo": 0.835,
+            "hi": 0.9862
+          },
+          "risk": {
+            "k": 1,
+            "n": 38,
+            "p": 0.0263,
+            "lo": 0.0047,
+            "hi": 0.1349
+          },
+          "misses": [
+            "C06"
+          ],
+          "falseFlags": [
+            "D02"
+          ],
+          "abstained": [
+            "C06",
+            "C15"
+          ]
+        },
+        "answered": 40,
+        "relabelledAgreement": {
+          "k": 37,
+          "n": 40,
+          "p": 0.925,
+          "lo": 0.8014,
+          "hi": 0.9742
+        },
+        "pairwiseFlipRate": {
+          "k": 6,
+          "n": 120,
+          "p": 0.05,
+          "lo": 0.0231,
+          "hi": 0.1048
+        },
+        "verdictAgreement": {
+          "k": 38,
+          "n": 40,
+          "p": 0.95,
+          "lo": 0.835,
+          "hi": 0.9862
+        },
+        "unclearShare": {
+          "k": 1,
+          "n": 120,
+          "p": 0.0083,
+          "lo": 0.0015,
+          "hi": 0.0457
+        },
+        "v0ValueAccuracy": {
+          "k": 37,
+          "n": 40,
+          "p": 0.925,
+          "lo": 0.8014,
+          "hi": 0.9742
+        },
+        "allThreeCorrect": {
+          "k": 35,
+          "n": 40,
+          "p": 0.875,
+          "lo": 0.7389,
+          "hi": 0.9454
+        },
+        "disagreeing": [
+          {
+            "id": "C06",
+            "truth": "many",
+            "chosen": [
+              "many",
+              "many",
+              "exactly-one"
+            ],
+            "pViolate": [
+              0.477,
+              0.458,
+              0.249
+            ]
+          },
+          {
+            "id": "C15",
+            "truth": "read-your-writes",
+            "chosen": [
+              "read-your-writes",
+              "unclear",
+              "read-your-writes"
+            ],
+            "pViolate": [
+              0.18,
+              0.228,
+              0.161
+            ]
+          },
+          {
+            "id": "D09",
+            "truth": "at-most-one",
+            "chosen": [
+              "exactly-one",
+              "at-most-one",
+              "at-most-one"
+            ],
+            "pViolate": [
+              0.015,
+              0.016,
+              0.016
+            ]
+          }
+        ]
+      },
+      "forge-lite": {
+        "n": 8,
+        "contradictions": 4,
+        "decoys": 4,
+        "gate": {
+          "t": 0.5,
+          "recall": {
+            "k": 4,
+            "n": 4,
+            "p": 1,
+            "lo": 0.5101,
+            "hi": 1
+          },
+          "precision": {
+            "k": 4,
+            "n": 5,
+            "p": 0.8,
+            "lo": 0.3755,
+            "hi": 0.9638
+          },
+          "decoyFpRate": {
+            "k": 1,
+            "n": 4,
+            "p": 0.25,
+            "lo": 0.0456,
+            "hi": 0.6994
+          },
+          "compatibleFpRate": {
+            "k": 0,
+            "n": 0,
+            "p": null,
+            "lo": null,
+            "hi": null
+          },
+          "coverage": {
+            "k": 7,
+            "n": 8,
+            "p": 0.875,
+            "lo": 0.5291,
+            "hi": 0.9776
+          },
+          "risk": {
+            "k": 1,
+            "n": 7,
+            "p": 0.1429,
+            "lo": 0.0257,
+            "hi": 0.5131
+          },
+          "misses": [],
+          "falseFlags": [
+            "F03"
+          ],
+          "abstained": [
+            "F07"
+          ]
+        },
+        "topChoice": {
+          "t": 0.5,
+          "recall": {
+            "k": 4,
+            "n": 4,
+            "p": 1,
+            "lo": 0.5101,
+            "hi": 1
+          },
+          "precision": {
+            "k": 4,
+            "n": 5,
+            "p": 0.8,
+            "lo": 0.3755,
+            "hi": 0.9638
+          },
+          "decoyFpRate": {
+            "k": 1,
+            "n": 4,
+            "p": 0.25,
+            "lo": 0.0456,
+            "hi": 0.6994
+          },
+          "compatibleFpRate": {
+            "k": 0,
+            "n": 0,
+            "p": null,
+            "lo": null,
+            "hi": null
+          },
+          "coverage": {
+            "k": 7,
+            "n": 8,
+            "p": 0.875,
+            "lo": 0.5291,
+            "hi": 0.9776
+          },
+          "risk": {
+            "k": 1,
+            "n": 7,
+            "p": 0.1429,
+            "lo": 0.0257,
+            "hi": 0.5131
+          },
+          "misses": [],
+          "falseFlags": [
+            "F03"
+          ],
+          "abstained": [
+            "F07"
+          ]
+        },
+        "answered": 8,
+        "relabelledAgreement": {
+          "k": 7,
+          "n": 8,
+          "p": 0.875,
+          "lo": 0.5291,
+          "hi": 0.9776
+        },
+        "pairwiseFlipRate": {
+          "k": 2,
+          "n": 24,
+          "p": 0.0833,
+          "lo": 0.0232,
+          "hi": 0.2585
+        },
+        "verdictAgreement": {
+          "k": 7,
+          "n": 8,
+          "p": 0.875,
+          "lo": 0.5291,
+          "hi": 0.9776
+        },
+        "unclearShare": {
+          "k": 1,
+          "n": 24,
+          "p": 0.0417,
+          "lo": 0.0074,
+          "hi": 0.2024
+        },
+        "v0ValueAccuracy": {
+          "k": 7,
+          "n": 8,
+          "p": 0.875,
+          "lo": 0.5291,
+          "hi": 0.9776
+        },
+        "allThreeCorrect": {
+          "k": 6,
+          "n": 8,
+          "p": 0.75,
+          "lo": 0.4093,
+          "hi": 0.9285
+        },
+        "disagreeing": [
+          {
+            "id": "F07",
+            "truth": "per-call",
+            "chosen": [
+              "per-call",
+              "per-call",
+              "unclear"
+            ],
+            "pViolate": [
+              0.181,
+              0.117,
+              0.114
+            ]
+          }
+        ]
+      },
+      "synthetic": {
+        "n": 194,
+        "contradictions": 75,
+        "decoys": 49,
+        "gate": {
+          "t": 0.5,
+          "recall": {
+            "k": 68,
+            "n": 75,
+            "p": 0.9067,
+            "lo": 0.8197,
+            "hi": 0.9541
+          },
+          "precision": {
+            "k": 68,
+            "n": 75,
+            "p": 0.9067,
+            "lo": 0.8197,
+            "hi": 0.9541
+          },
+          "decoyFpRate": {
+            "k": 7,
+            "n": 49,
+            "p": 0.1429,
+            "lo": 0.071,
+            "hi": 0.2667
+          },
+          "compatibleFpRate": {
+            "k": 0,
+            "n": 70,
+            "p": 0,
+            "lo": 0,
+            "hi": 0.052
+          },
+          "coverage": {
+            "k": 162,
+            "n": 194,
+            "p": 0.8351,
+            "lo": 0.7764,
+            "hi": 0.8807
+          },
+          "risk": {
+            "k": 7,
+            "n": 162,
+            "p": 0.0432,
+            "lo": 0.0211,
+            "hi": 0.0865
+          },
+          "misses": [
+            "S033",
+            "S034",
+            "S035",
+            "S040",
+            "S066",
+            "S083",
+            "S143"
+          ],
+          "falseFlags": [
+            "S021",
+            "S059",
+            "S060",
+            "S062",
+            "S146",
+            "S147",
+            "S148"
+          ],
+          "abstained": [
+            "S023",
+            "S024",
+            "S025",
+            "S027",
+            "S033",
+            "S034",
+            "S035",
+            "S040",
+            "S042",
+            "S043",
+            "S047",
+            "S052",
+            "S058",
+            "S063",
+            "S066",
+            "S069",
+            "S072",
+            "S075",
+            "S076",
+            "S077",
+            "S078",
+            "S083",
+            "S095",
+            "S096",
+            "S127",
+            "S128",
+            "S129",
+            "S130",
+            "S134",
+            "S143",
+            "S170",
+            "S172"
+          ]
+        },
+        "topChoice": {
+          "t": 0.5,
+          "recall": {
+            "k": 70,
+            "n": 75,
+            "p": 0.9333,
+            "lo": 0.8532,
+            "hi": 0.9712
+          },
+          "precision": {
+            "k": 70,
+            "n": 77,
+            "p": 0.9091,
+            "lo": 0.824,
+            "hi": 0.9553
+          },
+          "decoyFpRate": {
+            "k": 7,
+            "n": 49,
+            "p": 0.1429,
+            "lo": 0.071,
+            "hi": 0.2667
+          },
+          "compatibleFpRate": {
+            "k": 0,
+            "n": 70,
+            "p": 0,
+            "lo": 0,
+            "hi": 0.052
+          },
+          "coverage": {
+            "k": 164,
+            "n": 194,
+            "p": 0.8454,
+            "lo": 0.7878,
+            "hi": 0.8895
+          },
+          "risk": {
+            "k": 7,
+            "n": 164,
+            "p": 0.0427,
+            "lo": 0.0208,
+            "hi": 0.0855
+          },
+          "misses": [
+            "S033",
+            "S034",
+            "S035",
+            "S040",
+            "S066"
+          ],
+          "falseFlags": [
+            "S021",
+            "S059",
+            "S060",
+            "S062",
+            "S146",
+            "S147",
+            "S148"
+          ],
+          "abstained": [
+            "S023",
+            "S024",
+            "S025",
+            "S027",
+            "S033",
+            "S034",
+            "S035",
+            "S040",
+            "S042",
+            "S043",
+            "S047",
+            "S052",
+            "S058",
+            "S063",
+            "S066",
+            "S069",
+            "S072",
+            "S075",
+            "S076",
+            "S077",
+            "S078",
+            "S095",
+            "S096",
+            "S127",
+            "S128",
+            "S129",
+            "S130",
+            "S134",
+            "S170",
+            "S172"
+          ]
+        },
+        "answered": 194,
+        "relabelledAgreement": {
+          "k": 169,
+          "n": 194,
+          "p": 0.8711,
+          "lo": 0.8167,
+          "hi": 0.9112
+        },
+        "pairwiseFlipRate": {
+          "k": 51,
+          "n": 582,
+          "p": 0.0876,
+          "lo": 0.0673,
+          "hi": 0.1134
+        },
+        "verdictAgreement": {
+          "k": 171,
+          "n": 194,
+          "p": 0.8814,
+          "lo": 0.8284,
+          "hi": 0.9197
+        },
+        "unclearShare": {
+          "k": 50,
+          "n": 582,
+          "p": 0.0859,
+          "lo": 0.0658,
+          "hi": 0.1115
+        },
+        "v0ValueAccuracy": {
+          "k": 160,
+          "n": 194,
+          "p": 0.8247,
+          "lo": 0.7651,
+          "hi": 0.8718
+        },
+        "allThreeCorrect": {
+          "k": 154,
+          "n": 194,
+          "p": 0.7938,
+          "lo": 0.7314,
+          "hi": 0.8448
+        },
+        "disagreeing": [
+          {
+            "id": "S023",
+            "truth": "per-call",
+            "chosen": [
+              "per-session",
+              "per-call",
+              "per-call"
+            ],
+            "pViolate": [
+              0.684,
+              0.041,
+              0.034
+            ]
+          },
+          {
+            "id": "S024",
+            "truth": "per-call",
+            "chosen": [
+              "per-request",
+              "unclear",
+              "unclear"
+            ],
+            "pViolate": [
+              0.749,
+              0.177,
+              0.209
+            ]
+          },
+          {
+            "id": "S025",
+            "truth": "per-call",
+            "chosen": [
+              "ttl",
+              "unclear",
+              "unclear"
+            ],
+            "pViolate": [
+              0.824,
+              0.267,
+              0.303
+            ]
+          },
+          {
+            "id": "S027",
+            "truth": "per-request",
+            "chosen": [
+              "ttl",
+              "ttl",
+              "per-request"
+            ],
+            "pViolate": [
+              0.661,
+              0.782,
+              0.454
+            ]
+          },
+          {
+            "id": "S033",
+            "truth": "at-most-one",
+            "chosen": [
+              "at-most-one",
+              "exactly-one",
+              "at-most-one"
+            ],
+            "pViolate": [
+              0.548,
+              0.444,
+              0.774
+            ]
+          },
+          {
+            "id": "S034",
+            "truth": "many",
+            "chosen": [
+              "many",
+              "many",
+              "unclear"
+            ],
+            "pViolate": [
+              0.548,
+              0.508,
+              0.425
+            ]
+          },
+          {
+            "id": "S035",
+            "truth": "many",
+            "chosen": [
+              "at-most-one",
+              "unclear",
+              "unclear"
+            ],
+            "pViolate": [
+              0.647,
+              0.593,
+              0.438
+            ]
+          },
+          {
+            "id": "S040",
+            "truth": "many",
+            "chosen": [
+              "unclear",
+              "unclear",
+              "many"
+            ],
+            "pViolate": [
+              0.311,
+              0.443,
+              0.492
+            ]
+          },
+          {
+            "id": "S042",
+            "truth": "at-most-one",
+            "chosen": [
+              "exactly-one",
+              "exactly-one",
+              "unclear"
+            ],
+            "pViolate": [
+              0.074,
+              0.041,
+              0.037
+            ]
+          },
+          {
+            "id": "S047",
+            "truth": "fifo",
+            "chosen": [
+              "per-key-fifo",
+              "fifo",
+              "fifo"
+            ],
+            "pViolate": [
+              0.564,
+              0.138,
+              0.072
+            ]
+          },
+          {
+            "id": "S052",
+            "truth": "fifo",
+            "chosen": [
+              "unordered",
+              "unclear",
+              "fifo"
+            ],
+            "pViolate": [
+              0.48,
+              0.222,
+              0.082
+            ]
+          },
+          {
+            "id": "S058",
+            "truth": "fifo",
+            "chosen": [
+              "unordered",
+              "unordered",
+              "unclear"
+            ],
+            "pViolate": [
+              0.742,
+              0.586,
+              0.33
+            ]
+          },
+          {
+            "id": "S060",
+            "truth": "fifo",
+            "chosen": [
+              "unordered",
+              "per-key-fifo",
+              "unordered"
+            ],
+            "pViolate": [
+              0.827,
+              0.771,
+              0.783
+            ]
+          },
+          {
+            "id": "S066",
+            "truth": "read-your-writes",
+            "chosen": [
+              "read-your-writes",
+              "unclear",
+              "unclear"
+            ],
+            "pViolate": [
+              0.49,
+              0.44,
+              0.342
+            ]
+          },
+          {
+            "id": "S072",
+            "truth": "read-your-writes",
+            "chosen": [
+              "read-your-writes",
+              "unclear",
+              "read-your-writes"
+            ],
+            "pViolate": [
+              0.138,
+              0.15,
+              0.102
+            ]
+          },
+          {
+            "id": "S076",
+            "truth": "strong",
+            "chosen": [
+              "unclear",
+              "strong",
+              "strong"
+            ],
+            "pViolate": [
+              0.433,
+              0.081,
+              0.074
+            ]
+          },
+          {
+            "id": "S079",
+            "truth": "read-your-writes",
+            "chosen": [
+              "read-your-writes",
+              "strong",
+              "strong"
+            ],
+            "pViolate": [
+              0.175,
+              0.099,
+              0.076
+            ]
+          },
+          {
+            "id": "S095",
+            "truth": "optional",
+            "chosen": [
+              "optional",
+              "unclear",
+              "unclear"
+            ],
+            "pViolate": [
+              0.034,
+              0.012,
+              0.012
+            ]
+          },
+          {
+            "id": "S096",
+            "truth": "required",
+            "chosen": [
+              "absent",
+              "required",
+              "required"
+            ],
+            "pViolate": [
+              0.634,
+              0.289,
+              0.127
+            ]
+          },
+          {
+            "id": "S128",
+            "truth": "owner",
+            "chosen": [
+              "anyone",
+              "unclear",
+              "unclear"
+            ],
+            "pViolate": [
+              0.675,
+              0.221,
+              0.215
+            ]
+          },
+          {
+            "id": "S129",
+            "truth": "member",
+            "chosen": [
+              "anyone",
+              "unclear",
+              "unclear"
+            ],
+            "pViolate": [
+              0.667,
+              0.133,
+              0.151
+            ]
+          },
+          {
+            "id": "S130",
+            "truth": "admin",
+            "chosen": [
+              "anyone",
+              "unclear",
+              "unclear"
+            ],
+            "pViolate": [
+              0.846,
+              0.228,
+              0.179
+            ]
+          },
+          {
+            "id": "S134",
+            "truth": "pure",
+            "chosen": [
+              "unclear",
+              "pure",
+              "pure"
+            ],
+            "pViolate": [
+              0.392,
+              0.046,
+              0.054
+            ]
+          },
+          {
+            "id": "S170",
+            "truth": "le-1k",
+            "chosen": [
+              "le-100",
+              "unclear",
+              "unclear"
+            ],
+            "pViolate": [
+              0.264,
+              0.067,
+              0.081
+            ]
+          },
+          {
+            "id": "S172",
+            "truth": "le-1k",
+            "chosen": [
+              "le-1m",
+              "unclear",
+              "unclear"
+            ],
+            "pViolate": [
+              0.592,
+              0.243,
+              0.465
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

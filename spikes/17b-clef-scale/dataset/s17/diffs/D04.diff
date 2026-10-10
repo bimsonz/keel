@@ -1,0 +1,26 @@
+--- /dev/null
++++ b/src/api/pagination.ts
+@@ -0,0 +1 @@
++export const DEFAULT_PAGE_SIZE = 30;
++export const MAX_PAGE_SIZE = 100;
++export const MAX_EXPORT_ROWS = 50_000;
++
++export function pageParams(query: (name: string) => string | undefined) {
++  const perPage = Math.min(Math.max(Number(query("per_page") ?? DEFAULT_PAGE_SIZE), 1), MAX_PAGE_SIZE);
++  const page = Math.max(Number(query("page") ?? 1), 1);
++  return { perPage, offset: (page - 1) * perPage };
++}
+--- a/src/api/commits.ts
++++ b/src/api/commits.ts
+@@ -18 +18 @@ export async function listCommits(c: Context<AppEnv>) {
+-  const perPage = Math.min(Number(c.req.query("per_page") ?? 30), 100);
+-  const page = Math.max(Number(c.req.query("page") ?? 1), 1);
+-  const commits = await c.var.git.log(c.req.param("repo"), { offset: (page - 1) * perPage, limit: perPage });
++  const { perPage, offset } = pageParams((n) => c.req.query(n));
++  const commits = await c.var.git.log(c.req.param("repo"), { offset, limit: perPage });
+   return c.json(commits);
+ }
+@@ -40 +39 @@ export async function exportCommits(c: Context<AppEnv>) {
+-  const rows = await c.var.git.log(c.req.param("repo"), { offset: 0, limit: 10_000 });
++  const rows = await c.var.git.log(c.req.param("repo"), { offset: 0, limit: MAX_EXPORT_ROWS });
+   return streamCsv(c, rows);

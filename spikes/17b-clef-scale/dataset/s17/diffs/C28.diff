@@ -1,0 +1,31 @@
+--- a/src/http_parser.h
++++ b/src/http_parser.h
+@@ -8 +8 @@
+-#define MAX_HEADERS 64
++#define INITIAL_HEADER_CAPACITY 16
+
+ struct http_request {
+     char method[16];
+     char path[2048];
+-    struct header headers[MAX_HEADERS];
++    struct header *headers;
++    size_t header_cap;
+     size_t header_count;
+ };
+--- a/src/http_parser.c
++++ b/src/http_parser.c
+@@ -120 +120 @@ static int add_header(struct http_request *req, const char *name, const char *value)
+ {
+-    if (req->header_count >= MAX_HEADERS)
+-        return HTTP_ERR_TOO_MANY_HEADERS;
++    if (req->header_count == req->header_cap) {
++        size_t cap = req->header_cap ? req->header_cap * 2 : INITIAL_HEADER_CAPACITY;
++        struct header *grown = realloc(req->headers, cap * sizeof *grown);
++        if (grown == NULL)
++            return HTTP_ERR_NOMEM;
++        req->headers = grown;
++        req->header_cap = cap;
++    }
+     copy_header(&req->headers[req->header_count++], name, value);
+     return 0;
+ }

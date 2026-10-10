@@ -1,0 +1,32 @@
+--- a/outbox/relay.py
++++ b/outbox/relay.py
+@@ -1 +1 @@
++import zlib
++
+ from outbox import db
+ from outbox.bus import publish
+
++PARTITIONS = 16
++
+
+-def relay(batch_size: int = 100) -> None:
+-    rows = db.fetch_unsent(limit=batch_size)  # ORDER BY id
+-    for row in rows:
+-        publish(row.topic, row.payload)
+-        db.mark_sent(row.id)
++def partition_of(aggregate_id: str) -> int:
++    return zlib.crc32(aggregate_id.encode()) % PARTITIONS
++
++
++def relay_partition(partition: int, batch_size: int = 100) -> None:
++    rows = db.fetch_unsent(partition=partition, limit=batch_size)  # ORDER BY id
++    for row in rows:
++        publish(row.topic, row.payload, key=row.aggregate_id)
++        db.mark_sent(row.id)
+--- a/outbox/worker.py
++++ b/outbox/worker.py
+@@ -8 +8 @@ def main() -> None:
+-    run_forever(relay)
++    with ThreadPoolExecutor(max_workers=PARTITIONS) as pool:
++        for p in range(PARTITIONS):
++            pool.submit(run_forever, relay_partition, p)

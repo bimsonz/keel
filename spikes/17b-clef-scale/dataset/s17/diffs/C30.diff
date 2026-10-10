@@ -1,0 +1,21 @@
+--- a/events/schemas.py
++++ b/events/schemas.py
+@@ -1 +1 @@
++from datetime import datetime
+ from typing import Any
+
+ from pydantic import BaseModel, ConfigDict
+@@ -9 +10 @@ class EventOut(BaseModel):
+     id: int
+     kind: str
+-    created_at: int  # unix seconds
++    created_at: datetime
+     payload: dict[str, Any]
+
+     model_config = ConfigDict(from_attributes=True)
+--- a/events/routes.py
++++ b/events/routes.py
+@@ -22 +22 @@ async def get_event(event_id: int) -> JSONResponse:
+     ev = await store.get(event_id)
+-    return JSONResponse(EventOut.model_validate(ev).model_dump())
++    return JSONResponse(EventOut.model_validate(ev).model_dump(mode="json"))

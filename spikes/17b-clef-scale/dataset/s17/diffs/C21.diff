@@ -1,0 +1,9 @@
+--- a/orgs/views.py
++++ b/orgs/views.py
+@@ -55 +55 @@ class InvitationViewSet(viewsets.ModelViewSet):
+     serializer_class = InvitationSerializer
+-    permission_classes = [IsAuthenticated, IsOrgAdmin]
++    permission_classes = [IsAuthenticated, IsOrgMember]
+
+     def perform_create(self, serializer):
+         serializer.save(org=self.get_org(), invited_by=self.request.user)

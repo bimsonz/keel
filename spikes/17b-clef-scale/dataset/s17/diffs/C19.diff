@@ -1,0 +1,24 @@
+--- a/src/config.h
++++ b/src/config.h
+@@ -12 +12 @@ struct server_config {
+     char listen_addr[64];
+     int port;
+-    int max_conns;
+     int idle_timeout_sec;
+     char log_path[256];
+ };
+--- a/src/config.c
++++ b/src/config.c
+@@ -48 +48 @@ static int apply_option(struct server_config *cfg, const char *key, const char *val)
+     if (strcmp(key, "port") == 0) {
+         cfg->port = atoi(val);
+         return 0;
+     }
+-    if (strcmp(key, "max_conns") == 0) {
+-        cfg->max_conns = atoi(val);
+-        return 0;
+-    }
+     if (strcmp(key, "idle_timeout_sec") == 0) {
+         cfg->idle_timeout_sec = atoi(val);
+         return 0;
+     }

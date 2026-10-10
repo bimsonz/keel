@@ -1,0 +1,23 @@
+--- a/infra/scheduler.tf
++++ b/infra/scheduler.tf
+@@ -18 +18 @@ resource "aws_ecs_service" "scheduler" {
+   name            = "scheduler"
+   cluster         = aws_ecs_cluster.main.id
+   task_definition = aws_ecs_task_definition.scheduler.arn
+   desired_count   = 1
+   launch_type     = "FARGATE"
+
+-  deployment_minimum_healthy_percent = 50
+-  deployment_maximum_percent         = 200
++  # Never run the old and new scheduler side by side during a deploy.
++  deployment_minimum_healthy_percent = 0
++  deployment_maximum_percent         = 100
+ }
++
++resource "aws_appautoscaling_target" "api" {
++  service_namespace  = "ecs"
++  resource_id        = "service/main/api"
++  scalable_dimension = "ecs:service:DesiredCount"
++  min_capacity       = 3
++  max_capacity       = 12
++}

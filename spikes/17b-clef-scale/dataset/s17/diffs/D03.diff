@@ -1,0 +1,20 @@
+--- a/internal/payments/capture.go
++++ b/internal/payments/capture.go
+@@ -20 +20 @@ func (h *Handler) Capture(ctx context.Context, req CaptureRequest) (*Result, error) {
+     if res, ok := h.results.Get(ctx, req.IdempotencyKey); ok {
+         return res, nil
+     }
+-    charge, err := h.psp.Capture(ctx, req.PaymentIntentID, req.AmountMinor, req.IdempotencyKey)
++    var charge *psp.Charge
++    err := retry.Do(ctx, retry.Exponential(100*time.Millisecond, 5), func() error {
++        var err error
++        charge, err = h.psp.Capture(ctx, req.PaymentIntentID, req.AmountMinor, req.IdempotencyKey)
++        return err
++    })
+     if err != nil {
+         return nil, err
+     }
+     res := &Result{ChargeID: charge.ID, Status: charge.Status}
+     h.results.Put(ctx, req.IdempotencyKey, res)
+     return res, nil
+ }

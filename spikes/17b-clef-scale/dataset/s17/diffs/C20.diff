@@ -1,0 +1,10 @@
+--- a/src/routes/repos.ts
++++ b/src/routes/repos.ts
+@@ -40 +40 @@ export function registerRepoRoutes(app: Hono<AppEnv>) {
+   app.delete("/repos/:owner/:name", async (c) => {
+     const repo = await loadRepo(c);
+-    requireOwner(c.var.principal, repo);
++    requireRole(c.var.principal, repo, "admin");
+     await c.var.repos.delete(repo.id);
+     return c.body(null, 204);
+   });

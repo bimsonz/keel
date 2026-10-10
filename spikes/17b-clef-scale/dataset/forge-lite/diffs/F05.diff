@@ -1,0 +1,27 @@
+--- a/src/http/env.ts
++++ b/src/http/env.ts
+@@ -11,4 +11,5 @@ export interface AppVariables {
+   /** Set by requirePermission, so only present on routes it guards. */
+   repo: RepoRecord;
+   role: Role | null;
++  roleMemo: Map<string, Role | null> | undefined;
+ }
+--- a/src/authz/require-permission.ts
++++ b/src/authz/require-permission.ts
+@@ -32,7 +32,16 @@ export function requirePermission(action: Action): MiddlewareHandler<AppEnv> {
+ 
+ function callerRole(c: Context<AppEnv>, repo: RepoRecord): Role | null {
+   const { user } = c.var;
+   if (user === undefined) return null;
+-  return evaluateRole(c.var.deps.store, repo, user.id);
++  let memo = c.get("roleMemo");
++  if (memo === undefined) {
++    memo = new Map();
++    c.set("roleMemo", memo);
++  }
++  const known = memo.get(repo.id);
++  if (known !== undefined) return known;
++  const role = evaluateRole(c.var.deps.store, repo, user.id);
++  memo.set(repo.id, role);
++  return role;
+ }

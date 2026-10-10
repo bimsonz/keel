@@ -1,0 +1,9 @@
+--- a/src/api/commits.ts
++++ b/src/api/commits.ts
+@@ -18 +18 @@ export async function listCommits(c: Context<AppEnv>) {
+-  const perPage = Math.min(Number(c.req.query("per_page") ?? 30), 100);
++  // Mirror clients asked for bigger pages to cut round trips.
++  const perPage = Math.min(Number(c.req.query("per_page") ?? 30), 1000);
+   const page = Math.max(Number(c.req.query("page") ?? 1), 1);
+   const commits = await c.var.git.log(c.req.param("repo"), { offset: (page - 1) * perPage, limit: perPage });
+   return c.json(commits);

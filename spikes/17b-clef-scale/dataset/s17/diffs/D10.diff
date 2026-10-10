@@ -1,0 +1,11 @@
+--- a/internal/api/issue.go
++++ b/internal/api/issue.go
+@@ -7 +7 @@ package api
+ type Issue struct {
+     ID     int64  `json:"id"`
+-    NodeID int64  `json:"node_id"`
++    NodeID string `json:"node_id"` // global relay-style id, e.g. "I_kwDOAB"
+     Number int    `json:"number"`
+     Title  string `json:"title"`
+     State  string `json:"state"`
+ }

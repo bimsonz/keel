@@ -1,0 +1,67 @@
+--- a/src/authz/cache.ts
++++ b/src/authz/cache.ts
+@@ -3,31 +3,19 @@ import type { Store } from "../store/types.ts";
+ 
+ export class RoleCache {
+-  readonly #entries = new Map<string, Entry>();
++  readonly #roles = new Map<string, CollaboratorRole>();
+ 
+   get(sessionId: string, repoId: string): CollaboratorRole | undefined {
+-    return this.#entries.get(key(sessionId, repoId))?.role;
++    return this.#roles.get(`${sessionId}:${repoId}`);
+   }
+ 
+-  set(sessionId: string, userId: string, repoId: string, role: CollaboratorRole): void {
+-    this.#entries.set(key(sessionId, repoId), { userId, repoId, role });
+-  }
+-
+-  /** Forgets `userId`'s role on `repoId` in every one of their sessions. */
+-  evict(userId: string, repoId: string): void {
+-    for (const [entryKey, entry] of this.#entries) {
+-      if (entry.userId === userId && entry.repoId === repoId) this.#entries.delete(entryKey);
+-    }
++  set(sessionId: string, repoId: string, role: CollaboratorRole): void {
++    this.#roles.set(`${sessionId}:${repoId}`, role);
+   }
+ }
+ 
+@@ -37,21 +25,8 @@ const caches = new WeakMap<Store, RoleCache>();
+ export function roleCacheFor(store: Store): RoleCache {
+   let cache = caches.get(store);
+   if (cache === undefined) {
+-    const created = new RoleCache();
+-    store.events.subscribe("collaborator.removed", (event) => created.evict(event.userId, event.repoId));
+-    caches.set(store, created);
+-    cache = created;
++    cache = new RoleCache();
++    caches.set(store, cache);
+   }
+   return cache;
+ }
+-
+-interface Entry {
+-  readonly userId: string;
+-  readonly repoId: string;
+-  readonly role: CollaboratorRole;
+-}
+-
+-function key(sessionId: string, repoId: string): string {
+-  return `${sessionId}:${repoId}`;
+-}
+--- a/src/authz/require-permission.ts
++++ b/src/authz/require-permission.ts
+@@ -40,12 +40,11 @@ function callerRole(c: Context<AppEnv>, repo: RepoRecord, action: Action): Role
+   const { store } = c.var.deps;
+   const cache = roleCacheFor(store);
+   const cached = cache.get(session.id, repo.id);
+-  // Enough is enough. A cached role that falls short is looked up again, in
+-  // case the caller has been promoted since it was cached.
++  // A cached role that falls short is looked up again (promotions).
+   if (cached !== undefined && allows(cached, action, repo.visibility)) return cached;
+ 
+   const role = evaluateRole(store, repo, session.userId);
+-  if (role !== null && role !== "owner") cache.set(session.id, session.userId, repo.id, role);
++  if (role !== null && role !== "owner") cache.set(session.id, repo.id, role);
+   return role;
+ }
+ 

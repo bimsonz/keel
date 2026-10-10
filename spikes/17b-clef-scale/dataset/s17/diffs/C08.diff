@@ -1,0 +1,31 @@
+--- a/internal/queue/claim.go
++++ b/internal/queue/claim.go
+@@ -22 +22 @@ func (q *Queue) Claim(ctx context.Context, worker string) (*Job, error) {
+     tx, err := q.db.BeginTx(ctx, nil)
+     if err != nil {
+         return nil, err
+     }
+     defer tx.Rollback()
+
+     var id int64
+-    err = tx.QueryRowContext(ctx,
+-        `SELECT id FROM jobs WHERE status = 'queued' ORDER BY id LIMIT 1`).Scan(&id)
++    err = tx.QueryRowContext(ctx, `
++        SELECT id FROM jobs
++        WHERE status = 'queued'
++        ORDER BY id
++        LIMIT 1
++        FOR UPDATE SKIP LOCKED`).Scan(&id)
+     if err != nil {
+         return nil, err
+     }
+-    _, err = tx.ExecContext(ctx, `INSERT INTO job_leases (job_id, worker) VALUES ($1, $2)`, id, worker)
++    _, err = tx.ExecContext(ctx,
++        `INSERT INTO job_leases (job_id, worker) VALUES ($1, $2) ON CONFLICT (job_id) DO NOTHING`, id, worker)
+     if err != nil {
+         return nil, err
+     }
+--- a/migrations/0019_job_leases_unique.sql
++++ b/migrations/0019_job_leases_unique.sql
+@@ -0,0 +1 @@
++ALTER TABLE job_leases ADD CONSTRAINT job_leases_job_id_key UNIQUE (job_id);

@@ -1,0 +1,3762 @@
+[
+  {
+    "kind": "single-lattice-keys",
+    "item": "C06",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 470,
+    "clientMs": 670.913583,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "c-many",
+          "probabilities": {
+            "a-exactly-one": 0.0277,
+            "b-at-most-one": 0.0303,
+            "c-many": 0.8165,
+            "d-unclear": 0.1255
+          },
+          "confidence": 0.5789
+        }
+      },
+      "usage": {
+        "input_tokens": 541,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "C06",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 346,
+    "clientMs": 568.5686660000001,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "c-many",
+          "probabilities": {
+            "d-unclear": 0.1255,
+            "c-many": 0.8165,
+            "b-at-most-one": 0.0303,
+            "a-exactly-one": 0.0277
+          },
+          "confidence": 0.5789
+        }
+      },
+      "usage": {
+        "input_tokens": 541,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "C06",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 122,
+    "clientMs": 220.5384170000001,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "c-many",
+          "probabilities": {
+            "a-exactly-one": 0.0286,
+            "b-at-most-one": 0.0344,
+            "c-many": 0.7824,
+            "d-unclear": 0.1546
+          },
+          "confidence": 0.5174
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "c-many",
+          "probabilities": {
+            "a-exactly-one": 0.1948,
+            "b-at-most-one": 0.0496,
+            "c-many": 0.5787,
+            "d-unclear": 0.1769
+          },
+          "confidence": 0.2088
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "c-many",
+          "probabilities": {
+            "a-exactly-one": 0.3077,
+            "b-at-most-one": 0.0733,
+            "c-many": 0.4052,
+            "d-unclear": 0.2138
+          },
+          "confidence": 0.0799
+        }
+      },
+      "usage": {
+        "input_tokens": 960,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "C06",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 296,
+    "clientMs": 392.56608299999994,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "c-many",
+          "probabilities": {
+            "a-exactly-one": 0.0451,
+            "b-at-most-one": 0.0408,
+            "c-many": 0.7701,
+            "d-unclear": 0.144
+          },
+          "confidence": 0.49
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "a-exactly-one",
+          "probabilities": {
+            "a-exactly-one": 0.5143,
+            "b-at-most-one": 0.0468,
+            "c-many": 0.3259,
+            "d-unclear": 0.113
+          },
+          "confidence": 0.1809
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "a-exactly-one",
+          "probabilities": {
+            "a-exactly-one": 0.48,
+            "b-at-most-one": 0.0704,
+            "c-many": 0.3173,
+            "d-unclear": 0.1323
+          },
+          "confidence": 0.138
+        }
+      },
+      "usage": {
+        "input_tokens": 960,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "C15",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 413,
+    "clientMs": 508.1912090000001,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "a-strong": 0.1898,
+            "b-read-your-writes": 0.3582,
+            "c-eventual": 0.2231,
+            "d-unclear": 0.2289
+          },
+          "confidence": 0.022
+        }
+      },
+      "usage": {
+        "input_tokens": 623,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "C15",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 276,
+    "clientMs": 302.573167,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "d-unclear": 0.2289,
+            "c-eventual": 0.2231,
+            "b-read-your-writes": 0.3582,
+            "a-strong": 0.1898
+          },
+          "confidence": 0.022
+        }
+      },
+      "usage": {
+        "input_tokens": 623,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "C15",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 228,
+    "clientMs": 326.10850000000005,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "a-strong": 0.2518,
+            "b-read-your-writes": 0.3269,
+            "c-eventual": 0.2128,
+            "d-unclear": 0.2085
+          },
+          "confidence": 0.012
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-strong": 0.1965,
+            "b-read-your-writes": 0.2618,
+            "c-eventual": 0.2637,
+            "d-unclear": 0.278
+          },
+          "confidence": 0.0053
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "c-eventual",
+          "probabilities": {
+            "a-strong": 0.1957,
+            "b-read-your-writes": 0.2138,
+            "c-eventual": 0.327,
+            "d-unclear": 0.2635
+          },
+          "confidence": 0.0138
+        }
+      },
+      "usage": {
+        "input_tokens": 1054,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "C15",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 166,
+    "clientMs": 259.81041600000026,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "a-strong": 0.2483,
+            "b-read-your-writes": 0.2855,
+            "c-eventual": 0.2311,
+            "d-unclear": 0.2351
+          },
+          "confidence": 0.0025
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "c-eventual",
+          "probabilities": {
+            "a-strong": 0.1926,
+            "b-read-your-writes": 0.2156,
+            "c-eventual": 0.3098,
+            "d-unclear": 0.282
+          },
+          "confidence": 0.0121
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "a-strong",
+          "probabilities": {
+            "a-strong": 0.3135,
+            "b-read-your-writes": 0.1764,
+            "c-eventual": 0.2672,
+            "d-unclear": 0.2429
+          },
+          "confidence": 0.0131
+        }
+      },
+      "usage": {
+        "input_tokens": 1054,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "D09",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 299,
+    "clientMs": 390.0233750000002,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "a-exactly-one",
+          "probabilities": {
+            "a-exactly-one": 0.7675,
+            "b-at-most-one": 0.2175,
+            "c-many": 0.0071,
+            "d-unclear": 0.0079
+          },
+          "confidence": 0.5153
+        }
+      },
+      "usage": {
+        "input_tokens": 748,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "D09",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 130,
+    "clientMs": 234.58449999999993,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "a-exactly-one",
+          "probabilities": {
+            "d-unclear": 0.0079,
+            "c-many": 0.0071,
+            "b-at-most-one": 0.2175,
+            "a-exactly-one": 0.7675
+          },
+          "confidence": 0.5153
+        }
+      },
+      "usage": {
+        "input_tokens": 748,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "D09",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 334,
+    "clientMs": 422.96600000000035,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "a-exactly-one",
+          "probabilities": {
+            "a-exactly-one": 0.6755,
+            "b-at-most-one": 0.289,
+            "c-many": 0.0183,
+            "d-unclear": 0.0172
+          },
+          "confidence": 0.3873
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "b-at-most-one",
+          "probabilities": {
+            "a-exactly-one": 0.0514,
+            "b-at-most-one": 0.8806,
+            "c-many": 0.0165,
+            "d-unclear": 0.0515
+          },
+          "confidence": 0.708
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "b-at-most-one",
+          "probabilities": {
+            "a-exactly-one": 0.0412,
+            "b-at-most-one": 0.8924,
+            "c-many": 0.0203,
+            "d-unclear": 0.0461
+          },
+          "confidence": 0.7342
+        }
+      },
+      "usage": {
+        "input_tokens": 1173,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "D09",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 317,
+    "clientMs": 435.0836250000002,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "a-exactly-one",
+          "probabilities": {
+            "a-exactly-one": 0.5998,
+            "b-at-most-one": 0.3597,
+            "c-many": 0.0184,
+            "d-unclear": 0.0221
+          },
+          "confidence": 0.3199
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "b-at-most-one",
+          "probabilities": {
+            "a-exactly-one": 0.0277,
+            "b-at-most-one": 0.926,
+            "c-many": 0.012,
+            "d-unclear": 0.0343
+          },
+          "confidence": 0.8128
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "b-at-most-one",
+          "probabilities": {
+            "a-exactly-one": 0.0182,
+            "b-at-most-one": 0.9209,
+            "c-many": 0.0107,
+            "d-unclear": 0.0502
+          },
+          "confidence": 0.8014
+        }
+      },
+      "usage": {
+        "input_tokens": 1173,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "F06",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 312,
+    "clientMs": 326.53783299999986,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "c-per-session",
+          "probabilities": {
+            "a-per-call": 0.0721,
+            "b-per-request": 0.0726,
+            "c-per-session": 0.48,
+            "d-ttl": 0.2799,
+            "e-static": 0.0129,
+            "f-unclear": 0.0825
+          },
+          "confidence": 0.1915
+        }
+      },
+      "usage": {
+        "input_tokens": 896,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "F06",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 223,
+    "clientMs": 244.8404169999999,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "c-per-session",
+          "probabilities": {
+            "f-unclear": 0.0825,
+            "e-static": 0.0129,
+            "d-ttl": 0.2799,
+            "c-per-session": 0.48,
+            "b-per-request": 0.0726,
+            "a-per-call": 0.0721
+          },
+          "confidence": 0.1915
+        }
+      },
+      "usage": {
+        "input_tokens": 896,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "F06",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 256,
+    "clientMs": 363.7770420000006,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "c-per-session",
+          "probabilities": {
+            "a-per-call": 0.0482,
+            "b-per-request": 0.0901,
+            "c-per-session": 0.5082,
+            "d-ttl": 0.2453,
+            "e-static": 0.0128,
+            "f-unclear": 0.0954
+          },
+          "confidence": 0.2058
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "c-per-session",
+          "probabilities": {
+            "a-per-call": 0.0302,
+            "b-per-request": 0.0209,
+            "c-per-session": 0.7216,
+            "d-ttl": 0.0875,
+            "e-static": 0.0151,
+            "f-unclear": 0.1247
+          },
+          "confidence": 0.4546
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "c-per-session",
+          "probabilities": {
+            "a-per-call": 0.0295,
+            "b-per-request": 0.0222,
+            "c-per-session": 0.6664,
+            "d-ttl": 0.1193,
+            "e-static": 0.0249,
+            "f-unclear": 0.1377
+          },
+          "confidence": 0.3752
+        }
+      },
+      "usage": {
+        "input_tokens": 1467,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "F06",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 389,
+    "clientMs": 404.97433399999954,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "c-per-session",
+          "probabilities": {
+            "a-per-call": 0.0518,
+            "b-per-request": 0.0801,
+            "c-per-session": 0.4024,
+            "d-ttl": 0.3598,
+            "e-static": 0.0163,
+            "f-unclear": 0.0896
+          },
+          "confidence": 0.1705
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "c-per-session",
+          "probabilities": {
+            "a-per-call": 0.0455,
+            "b-per-request": 0.0274,
+            "c-per-session": 0.5334,
+            "d-ttl": 0.1562,
+            "e-static": 0.0242,
+            "f-unclear": 0.2133
+          },
+          "confidence": 0.2294
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "c-per-session",
+          "probabilities": {
+            "a-per-call": 0.0347,
+            "b-per-request": 0.0367,
+            "c-per-session": 0.5026,
+            "d-ttl": 0.209,
+            "e-static": 0.0423,
+            "f-unclear": 0.1747
+          },
+          "confidence": 0.1974
+        }
+      },
+      "usage": {
+        "input_tokens": 1467,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "S023",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 199,
+    "clientMs": 215.25758399999995,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "c-per-session",
+          "probabilities": {
+            "a-per-call": 0.2099,
+            "b-per-request": 0.0683,
+            "c-per-session": 0.615,
+            "d-ttl": 0.0258,
+            "e-static": 0.022,
+            "f-unclear": 0.059
+          },
+          "confidence": 0.3179
+        }
+      },
+      "usage": {
+        "input_tokens": 746,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "S023",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 295,
+    "clientMs": 310.00058399999944,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "c-per-session",
+          "probabilities": {
+            "f-unclear": 0.059,
+            "e-static": 0.022,
+            "d-ttl": 0.0258,
+            "c-per-session": 0.615,
+            "b-per-request": 0.0683,
+            "a-per-call": 0.2099
+          },
+          "confidence": 0.3179
+        }
+      },
+      "usage": {
+        "input_tokens": 746,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "S023",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 242,
+    "clientMs": 258.2375000000002,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "c-per-session",
+          "probabilities": {
+            "a-per-call": 0.3821,
+            "b-per-request": 0.0474,
+            "c-per-session": 0.5026,
+            "d-ttl": 0.0202,
+            "e-static": 0.015,
+            "f-unclear": 0.0327
+          },
+          "confidence": 0.2831
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "a-per-call",
+          "probabilities": {
+            "a-per-call": 0.9648,
+            "b-per-request": 0.0097,
+            "c-per-session": 0.0069,
+            "d-ttl": 0.005,
+            "e-static": 0.0044,
+            "f-unclear": 0.0092
+          },
+          "confidence": 0.9172
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "a-per-call",
+          "probabilities": {
+            "a-per-call": 0.9574,
+            "b-per-request": 0.0151,
+            "c-per-session": 0.0079,
+            "d-ttl": 0.0059,
+            "e-static": 0.0051,
+            "f-unclear": 0.0086
+          },
+          "confidence": 0.9004
+        }
+      },
+      "usage": {
+        "input_tokens": 1315,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "S023",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 234,
+    "clientMs": 250.14087500000005,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "c-per-session",
+          "probabilities": {
+            "a-per-call": 0.2361,
+            "b-per-request": 0.0478,
+            "c-per-session": 0.6482,
+            "d-ttl": 0.0196,
+            "e-static": 0.0172,
+            "f-unclear": 0.0311
+          },
+          "confidence": 0.3758
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "a-per-call",
+          "probabilities": {
+            "a-per-call": 0.9606,
+            "b-per-request": 0.0101,
+            "c-per-session": 0.0072,
+            "d-ttl": 0.0047,
+            "e-static": 0.0044,
+            "f-unclear": 0.013
+          },
+          "confidence": 0.9078
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "a-per-call",
+          "probabilities": {
+            "a-per-call": 0.9637,
+            "b-per-request": 0.0099,
+            "c-per-session": 0.0075,
+            "d-ttl": 0.0049,
+            "e-static": 0.005,
+            "f-unclear": 0.009
+          },
+          "confidence": 0.9149
+        }
+      },
+      "usage": {
+        "input_tokens": 1315,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "S024",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 372,
+    "clientMs": 386.408958,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "b-per-request",
+          "probabilities": {
+            "a-per-call": 0.1762,
+            "b-per-request": 0.5311,
+            "c-per-session": 0.0298,
+            "d-ttl": 0.0294,
+            "e-static": 0.0869,
+            "f-unclear": 0.1466
+          },
+          "confidence": 0.2127
+        }
+      },
+      "usage": {
+        "input_tokens": 508,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "S024",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 103,
+    "clientMs": 366.4200000000001,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "b-per-request",
+          "probabilities": {
+            "f-unclear": 0.1466,
+            "e-static": 0.0869,
+            "d-ttl": 0.0294,
+            "c-per-session": 0.0298,
+            "b-per-request": 0.5311,
+            "a-per-call": 0.1762
+          },
+          "confidence": 0.2127
+        }
+      },
+      "usage": {
+        "input_tokens": 508,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "S024",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 223,
+    "clientMs": 318.2671249999994,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "b-per-request",
+          "probabilities": {
+            "a-per-call": 0.2624,
+            "b-per-request": 0.4571,
+            "c-per-session": 0.0404,
+            "d-ttl": 0.0341,
+            "e-static": 0.0848,
+            "f-unclear": 0.1212
+          },
+          "confidence": 0.1629
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "a-per-call",
+          "probabilities": {
+            "a-per-call": 0.6102,
+            "b-per-request": 0.0227,
+            "c-per-session": 0.017,
+            "d-ttl": 0.0133,
+            "e-static": 0.0494,
+            "f-unclear": 0.2874
+          },
+          "confidence": 0.3501
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "a-per-call",
+          "probabilities": {
+            "a-per-call": 0.7227,
+            "b-per-request": 0.023,
+            "c-per-session": 0.0156,
+            "d-ttl": 0.0124,
+            "e-static": 0.0367,
+            "f-unclear": 0.1896
+          },
+          "confidence": 0.4726
+        }
+      },
+      "usage": {
+        "input_tokens": 1075,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "S024",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 631,
+    "clientMs": 649.7006670000001,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "b-per-request",
+          "probabilities": {
+            "a-per-call": 0.2522,
+            "b-per-request": 0.4823,
+            "c-per-session": 0.0399,
+            "d-ttl": 0.036,
+            "e-static": 0.0612,
+            "f-unclear": 0.1284
+          },
+          "confidence": 0.1832
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "a-per-call",
+          "probabilities": {
+            "a-per-call": 0.6072,
+            "b-per-request": 0.0212,
+            "c-per-session": 0.0145,
+            "d-ttl": 0.0163,
+            "e-static": 0.0726,
+            "f-unclear": 0.2682
+          },
+          "confidence": 0.3361
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "a-per-call",
+          "probabilities": {
+            "a-per-call": 0.6925,
+            "b-per-request": 0.0284,
+            "c-per-session": 0.0194,
+            "d-ttl": 0.0196,
+            "e-static": 0.0755,
+            "f-unclear": 0.1646
+          },
+          "confidence": 0.4167
+        }
+      },
+      "usage": {
+        "input_tokens": 1075,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "S027",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 355,
+    "clientMs": 370.4894169999998,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "d-ttl",
+          "probabilities": {
+            "a-per-call": 0.0194,
+            "b-per-request": 0.4574,
+            "c-per-session": 0.0235,
+            "d-ttl": 0.4638,
+            "e-static": 0.0108,
+            "f-unclear": 0.0251
+          },
+          "confidence": 0.3111
+        }
+      },
+      "usage": {
+        "input_tokens": 644,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "S027",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 350,
+    "clientMs": 441.52545800000007,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "d-ttl",
+          "probabilities": {
+            "f-unclear": 0.0251,
+            "e-static": 0.0108,
+            "d-ttl": 0.4638,
+            "c-per-session": 0.0235,
+            "b-per-request": 0.4574,
+            "a-per-call": 0.0194
+          },
+          "confidence": 0.3111
+        }
+      },
+      "usage": {
+        "input_tokens": 644,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "S027",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 323,
+    "clientMs": 341.16020899999876,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "b-per-request",
+          "probabilities": {
+            "a-per-call": 0.0174,
+            "b-per-request": 0.4958,
+            "c-per-session": 0.0233,
+            "d-ttl": 0.4292,
+            "e-static": 0.0105,
+            "f-unclear": 0.0238
+          },
+          "confidence": 0.318
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "d-ttl",
+          "probabilities": {
+            "a-per-call": 0.0217,
+            "b-per-request": 0.413,
+            "c-per-session": 0.0329,
+            "d-ttl": 0.4411,
+            "e-static": 0.0162,
+            "f-unclear": 0.0751
+          },
+          "confidence": 0.2471
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "b-per-request",
+          "probabilities": {
+            "a-per-call": 0.0199,
+            "b-per-request": 0.78,
+            "c-per-session": 0.03,
+            "d-ttl": 0.0931,
+            "e-static": 0.012,
+            "f-unclear": 0.065
+          },
+          "confidence": 0.5472
+        }
+      },
+      "usage": {
+        "input_tokens": 1209,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "S027",
+    "valueOf": {
+      "a-per-call": "per-call",
+      "b-per-request": "per-request",
+      "c-per-session": "per-session",
+      "d-ttl": "ttl",
+      "e-static": "static",
+      "f-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 306,
+    "clientMs": 393.4400000000005,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "b-per-request",
+          "probabilities": {
+            "a-per-call": 0.0176,
+            "b-per-request": 0.5236,
+            "c-per-session": 0.0209,
+            "d-ttl": 0.4061,
+            "e-static": 0.0099,
+            "f-unclear": 0.0219
+          },
+          "confidence": 0.3285
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "b-per-request",
+          "probabilities": {
+            "a-per-call": 0.0167,
+            "b-per-request": 0.5943,
+            "c-per-session": 0.0225,
+            "d-ttl": 0.3085,
+            "e-static": 0.0119,
+            "f-unclear": 0.0461
+          },
+          "confidence": 0.3417
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "b-per-request",
+          "probabilities": {
+            "a-per-call": 0.0245,
+            "b-per-request": 0.6702,
+            "c-per-session": 0.0273,
+            "d-ttl": 0.201,
+            "e-static": 0.015,
+            "f-unclear": 0.062
+          },
+          "confidence": 0.394
+        }
+      },
+      "usage": {
+        "input_tokens": 1209,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "S035",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 101,
+    "clientMs": 113.98662499999955,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "b-at-most-one",
+          "probabilities": {
+            "a-exactly-one": 0.1262,
+            "b-at-most-one": 0.5775,
+            "c-many": 0.183,
+            "d-unclear": 0.1133
+          },
+          "confidence": 0.1943
+        }
+      },
+      "usage": {
+        "input_tokens": 541,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "S035",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 371,
+    "clientMs": 388.80354199999965,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "b-at-most-one",
+          "probabilities": {
+            "d-unclear": 0.1133,
+            "c-many": 0.183,
+            "b-at-most-one": 0.5775,
+            "a-exactly-one": 0.1262
+          },
+          "confidence": 0.1943
+        }
+      },
+      "usage": {
+        "input_tokens": 541,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "S035",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 332,
+    "clientMs": 425.49583299999904,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "b-at-most-one",
+          "probabilities": {
+            "a-exactly-one": 0.0923,
+            "b-at-most-one": 0.3671,
+            "c-many": 0.2216,
+            "d-unclear": 0.319
+          },
+          "confidence": 0.0589
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-exactly-one": 0.0247,
+            "b-at-most-one": 0.2325,
+            "c-many": 0.1724,
+            "d-unclear": 0.5704
+          },
+          "confidence": 0.213
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-exactly-one": 0.0197,
+            "b-at-most-one": 0.1526,
+            "c-many": 0.202,
+            "d-unclear": 0.6257
+          },
+          "confidence": 0.2746
+        }
+      },
+      "usage": {
+        "input_tokens": 966,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "S035",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 389,
+    "clientMs": 401.59491700000035,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-exactly-one": 0.1688,
+            "b-at-most-one": 0.276,
+            "c-many": 0.204,
+            "d-unclear": 0.3512
+          },
+          "confidence": 0.0262
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-exactly-one": 0.0236,
+            "b-at-most-one": 0.2398,
+            "c-many": 0.1789,
+            "d-unclear": 0.5577
+          },
+          "confidence": 0.2014
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-exactly-one": 0.0157,
+            "b-at-most-one": 0.1722,
+            "c-many": 0.1454,
+            "d-unclear": 0.6667
+          },
+          "confidence": 0.3274
+        }
+      },
+      "usage": {
+        "input_tokens": 966,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "S043",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 174,
+    "clientMs": 187.7957920000008,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-exactly-one": 0.1798,
+            "b-at-most-one": 0.1697,
+            "c-many": 0.288,
+            "d-unclear": 0.3625
+          },
+          "confidence": 0.034
+        }
+      },
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "S043",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 285,
+    "clientMs": 368.70837500000016,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "d-unclear": 0.3625,
+            "c-many": 0.288,
+            "b-at-most-one": 0.1697,
+            "a-exactly-one": 0.1798
+          },
+          "confidence": 0.034
+        }
+      },
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "S043",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 154,
+    "clientMs": 170.36620799999946,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-exactly-one": 0.2676,
+            "b-at-most-one": 0.227,
+            "c-many": 0.2316,
+            "d-unclear": 0.2738
+          },
+          "confidence": 0.0023
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-exactly-one": 0.2659,
+            "b-at-most-one": 0.1582,
+            "c-many": 0.272,
+            "d-unclear": 0.3039
+          },
+          "confidence": 0.0161
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "a-exactly-one",
+          "probabilities": {
+            "a-exactly-one": 0.3272,
+            "b-at-most-one": 0.1581,
+            "c-many": 0.2224,
+            "d-unclear": 0.2923
+          },
+          "confidence": 0.0226
+        }
+      },
+      "usage": {
+        "input_tokens": 872,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "S043",
+    "valueOf": {
+      "a-exactly-one": "exactly-one",
+      "b-at-most-one": "at-most-one",
+      "c-many": "many",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 119,
+    "clientMs": 136.5248330000013,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-exactly-one": 0.2674,
+            "b-at-most-one": 0.1626,
+            "c-many": 0.087,
+            "d-unclear": 0.483
+          },
+          "confidence": 0.1184
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-exactly-one": 0.1944,
+            "b-at-most-one": 0.0913,
+            "c-many": 0.058,
+            "d-unclear": 0.6563
+          },
+          "confidence": 0.3069
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-exactly-one": 0.1383,
+            "b-at-most-one": 0.0842,
+            "c-many": 0.0275,
+            "d-unclear": 0.75
+          },
+          "confidence": 0.4527
+        }
+      },
+      "usage": {
+        "input_tokens": 872,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "S052",
+    "valueOf": {
+      "a-fifo": "fifo",
+      "b-per-key-fifo": "per-key-fifo",
+      "c-unordered": "unordered",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 172,
+    "clientMs": 184.49174999999923,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "c-unordered",
+          "probabilities": {
+            "a-fifo": 0.1017,
+            "b-per-key-fifo": 0.1635,
+            "c-unordered": 0.5766,
+            "d-unclear": 0.1582
+          },
+          "confidence": 0.1928
+        }
+      },
+      "usage": {
+        "input_tokens": 455,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "S052",
+    "valueOf": {
+      "a-fifo": "fifo",
+      "b-per-key-fifo": "per-key-fifo",
+      "c-unordered": "unordered",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 231,
+    "clientMs": 324.3009999999995,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "c-unordered",
+          "probabilities": {
+            "d-unclear": 0.1582,
+            "c-unordered": 0.5766,
+            "b-per-key-fifo": 0.1635,
+            "a-fifo": 0.1017
+          },
+          "confidence": 0.1928
+        }
+      },
+      "usage": {
+        "input_tokens": 455,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "S052",
+    "valueOf": {
+      "a-fifo": "fifo",
+      "b-per-key-fifo": "per-key-fifo",
+      "c-unordered": "unordered",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 219,
+    "clientMs": 232.5147909999996,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "b-per-key-fifo",
+          "probabilities": {
+            "a-fifo": 0.268,
+            "b-per-key-fifo": 0.2981,
+            "c-unordered": 0.2209,
+            "d-unclear": 0.213
+          },
+          "confidence": 0.0065
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "a-fifo",
+          "probabilities": {
+            "a-fifo": 0.8432,
+            "b-per-key-fifo": 0.0458,
+            "c-unordered": 0.0352,
+            "d-unclear": 0.0758
+          },
+          "confidence": 0.6268
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "a-fifo",
+          "probabilities": {
+            "a-fifo": 0.651,
+            "b-per-key-fifo": 0.0614,
+            "c-unordered": 0.1207,
+            "d-unclear": 0.1669
+          },
+          "confidence": 0.2934
+        }
+      },
+      "usage": {
+        "input_tokens": 904,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "S052",
+    "valueOf": {
+      "a-fifo": "fifo",
+      "b-per-key-fifo": "per-key-fifo",
+      "c-unordered": "unordered",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 117,
+    "clientMs": 147.53720900000008,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "b-per-key-fifo",
+          "probabilities": {
+            "a-fifo": 0.2569,
+            "b-per-key-fifo": 0.3125,
+            "c-unordered": 0.286,
+            "d-unclear": 0.1446
+          },
+          "confidence": 0.0218
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "a-fifo",
+          "probabilities": {
+            "a-fifo": 0.709,
+            "b-per-key-fifo": 0.0645,
+            "c-unordered": 0.0566,
+            "d-unclear": 0.1699
+          },
+          "confidence": 0.3852
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "a-fifo",
+          "probabilities": {
+            "a-fifo": 0.8502,
+            "b-per-key-fifo": 0.0343,
+            "c-unordered": 0.029,
+            "d-unclear": 0.0865
+          },
+          "confidence": 0.643
+        }
+      },
+      "usage": {
+        "input_tokens": 904,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "S066",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 116,
+    "clientMs": 144.9475829999992,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "a-strong": 0.2438,
+            "b-read-your-writes": 0.3797,
+            "c-eventual": 0.1983,
+            "d-unclear": 0.1782
+          },
+          "confidence": 0.0329
+        }
+      },
+      "usage": {
+        "input_tokens": 645,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "S066",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 122,
+    "clientMs": 136.90554200000042,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "d-unclear": 0.1782,
+            "c-eventual": 0.1983,
+            "b-read-your-writes": 0.3797,
+            "a-strong": 0.2438
+          },
+          "confidence": 0.0329
+        }
+      },
+      "usage": {
+        "input_tokens": 645,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "S066",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 141,
+    "clientMs": 155.91591599999992,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "a-strong": 0.242,
+            "b-read-your-writes": 0.3266,
+            "c-eventual": 0.2741,
+            "d-unclear": 0.1573
+          },
+          "confidence": 0.0201
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "a-strong",
+          "probabilities": {
+            "a-strong": 0.3639,
+            "b-read-your-writes": 0.1772,
+            "c-eventual": 0.211,
+            "d-unclear": 0.2479
+          },
+          "confidence": 0.0264
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "a-strong",
+          "probabilities": {
+            "a-strong": 0.3332,
+            "b-read-your-writes": 0.1986,
+            "c-eventual": 0.2428,
+            "d-unclear": 0.2254
+          },
+          "confidence": 0.0136
+        }
+      },
+      "usage": {
+        "input_tokens": 1078,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "S066",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 338,
+    "clientMs": 357.43462499999987,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "a-strong": 0.2801,
+            "b-read-your-writes": 0.3358,
+            "c-eventual": 0.1564,
+            "d-unclear": 0.2277
+          },
+          "confidence": 0.0234
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-strong": 0.2863,
+            "b-read-your-writes": 0.21,
+            "c-eventual": 0.2172,
+            "d-unclear": 0.2865
+          },
+          "confidence": 0.0071
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-strong": 0.2915,
+            "b-read-your-writes": 0.1971,
+            "c-eventual": 0.2161,
+            "d-unclear": 0.2953
+          },
+          "confidence": 0.0103
+        }
+      },
+      "usage": {
+        "input_tokens": 1078,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "S072",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 591,
+    "clientMs": 626.6656249999996,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "a-strong": 0.2406,
+            "b-read-your-writes": 0.3792,
+            "c-eventual": 0.1755,
+            "d-unclear": 0.2047
+          },
+          "confidence": 0.0325
+        }
+      },
+      "usage": {
+        "input_tokens": 622,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "S072",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 121,
+    "clientMs": 136.16454200000044,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "d-unclear": 0.2047,
+            "c-eventual": 0.1755,
+            "b-read-your-writes": 0.3792,
+            "a-strong": 0.2406
+          },
+          "confidence": 0.0325
+        }
+      },
+      "usage": {
+        "input_tokens": 622,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "S072",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 138,
+    "clientMs": 152.48091699999895,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "a-strong": 0.2504,
+            "b-read-your-writes": 0.3612,
+            "c-eventual": 0.1502,
+            "d-unclear": 0.2382
+          },
+          "confidence": 0.0299
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "a-strong",
+          "probabilities": {
+            "a-strong": 0.383,
+            "b-read-your-writes": 0.1905,
+            "c-eventual": 0.1839,
+            "d-unclear": 0.2426
+          },
+          "confidence": 0.0342
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "a-strong",
+          "probabilities": {
+            "a-strong": 0.4096,
+            "b-read-your-writes": 0.1335,
+            "c-eventual": 0.2338,
+            "d-unclear": 0.2231
+          },
+          "confidence": 0.0533
+        }
+      },
+      "usage": {
+        "input_tokens": 1055,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "S072",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 219,
+    "clientMs": 241.69137500000033,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "a-strong": 0.3039,
+            "b-read-your-writes": 0.3718,
+            "c-eventual": 0.1421,
+            "d-unclear": 0.1822
+          },
+          "confidence": 0.0453
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "a-strong",
+          "probabilities": {
+            "a-strong": 0.4315,
+            "b-read-your-writes": 0.2059,
+            "c-eventual": 0.1608,
+            "d-unclear": 0.2018
+          },
+          "confidence": 0.0602
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "a-strong",
+          "probabilities": {
+            "a-strong": 0.4025,
+            "b-read-your-writes": 0.2048,
+            "c-eventual": 0.1788,
+            "d-unclear": 0.2139
+          },
+          "confidence": 0.0422
+        }
+      },
+      "usage": {
+        "input_tokens": 1055,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "S077",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 227,
+    "clientMs": 243.32025000000067,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "c-eventual",
+          "probabilities": {
+            "a-strong": 0.0655,
+            "b-read-your-writes": 0.1576,
+            "c-eventual": 0.5139,
+            "d-unclear": 0.263
+          },
+          "confidence": 0.1498
+        }
+      },
+      "usage": {
+        "input_tokens": 479,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "S077",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 165,
+    "clientMs": 270.1692920000005,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "c-eventual",
+          "probabilities": {
+            "d-unclear": 0.263,
+            "c-eventual": 0.5139,
+            "b-read-your-writes": 0.1576,
+            "a-strong": 0.0655
+          },
+          "confidence": 0.1498
+        }
+      },
+      "usage": {
+        "input_tokens": 479,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "S077",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 423,
+    "clientMs": 526.8429589999996,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-strong": 0.1779,
+            "b-read-your-writes": 0.1386,
+            "c-eventual": 0.1586,
+            "d-unclear": 0.5249
+          },
+          "confidence": 0.1354
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-strong": 0.3829,
+            "b-read-your-writes": 0.059,
+            "c-eventual": 0.0189,
+            "d-unclear": 0.5392
+          },
+          "confidence": 0.2549
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "a-strong",
+          "probabilities": {
+            "a-strong": 0.5884,
+            "b-read-your-writes": 0.0628,
+            "c-eventual": 0.0253,
+            "d-unclear": 0.3235
+          },
+          "confidence": 0.2739
+        }
+      },
+      "usage": {
+        "input_tokens": 916,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "S077",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 187,
+    "clientMs": 204.51083299999846,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-strong": 0.1122,
+            "b-read-your-writes": 0.1908,
+            "c-eventual": 0.1334,
+            "d-unclear": 0.5636
+          },
+          "confidence": 0.1793
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-strong": 0.3035,
+            "b-read-your-writes": 0.0522,
+            "c-eventual": 0.0189,
+            "d-unclear": 0.6254
+          },
+          "confidence": 0.3151
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-strong": 0.3336,
+            "b-read-your-writes": 0.0467,
+            "c-eventual": 0.0242,
+            "d-unclear": 0.5955
+          },
+          "confidence": 0.2915
+        }
+      },
+      "usage": {
+        "input_tokens": 916,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "S079",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 447,
+    "clientMs": 459.6436250000006,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "c-eventual",
+          "probabilities": {
+            "a-strong": 0.2354,
+            "b-read-your-writes": 0.3083,
+            "c-eventual": 0.3083,
+            "d-unclear": 0.148
+          },
+          "confidence": 0.0232
+        }
+      },
+      "usage": {
+        "input_tokens": 560,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "S079",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 234,
+    "clientMs": 249.76795800000036,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "c-eventual",
+          "probabilities": {
+            "d-unclear": 0.148,
+            "c-eventual": 0.3083,
+            "b-read-your-writes": 0.3083,
+            "a-strong": 0.2354
+          },
+          "confidence": 0.0232
+        }
+      },
+      "usage": {
+        "input_tokens": 560,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "S079",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 150,
+    "clientMs": 165.4048330000005,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "a-strong": 0.2048,
+            "b-read-your-writes": 0.4692,
+            "c-eventual": 0.2212,
+            "d-unclear": 0.1048
+          },
+          "confidence": 0.096
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "a-strong": 0.256,
+            "b-read-your-writes": 0.4535,
+            "c-eventual": 0.1922,
+            "d-unclear": 0.0983
+          },
+          "confidence": 0.0904
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "a-strong": 0.3066,
+            "b-read-your-writes": 0.3485,
+            "c-eventual": 0.2134,
+            "d-unclear": 0.1315
+          },
+          "confidence": 0.0377
+        }
+      },
+      "usage": {
+        "input_tokens": 993,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "S079",
+    "valueOf": {
+      "a-strong": "strong",
+      "b-read-your-writes": "read-your-writes",
+      "c-eventual": "eventual",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 372,
+    "clientMs": 390.869708000002,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "a-strong": 0.2382,
+            "b-read-your-writes": 0.3852,
+            "c-eventual": 0.2494,
+            "d-unclear": 0.1272
+          },
+          "confidence": 0.0447
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "a-strong",
+          "probabilities": {
+            "a-strong": 0.3806,
+            "b-read-your-writes": 0.36,
+            "c-eventual": 0.1355,
+            "d-unclear": 0.1239
+          },
+          "confidence": 0.0775
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "a-strong",
+          "probabilities": {
+            "a-strong": 0.5706,
+            "b-read-your-writes": 0.1703,
+            "c-eventual": 0.1466,
+            "d-unclear": 0.1125
+          },
+          "confidence": 0.185
+        }
+      },
+      "usage": {
+        "input_tokens": 993,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "S095",
+    "valueOf": {
+      "a-required": "required",
+      "b-optional": "optional",
+      "c-absent": "absent",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 86,
+    "clientMs": 101.40437499999825,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "b-optional",
+          "probabilities": {
+            "a-required": 0.0782,
+            "b-optional": 0.8553,
+            "c-absent": 0.0197,
+            "d-unclear": 0.0468
+          },
+          "confidence": 0.6537
+        }
+      },
+      "usage": {
+        "input_tokens": 422,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "S095",
+    "valueOf": {
+      "a-required": "required",
+      "b-optional": "optional",
+      "c-absent": "absent",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 125,
+    "clientMs": 137.41991599999892,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "b-optional",
+          "probabilities": {
+            "d-unclear": 0.0468,
+            "c-absent": 0.0197,
+            "b-optional": 0.8553,
+            "a-required": 0.0782
+          },
+          "confidence": 0.6537
+        }
+      },
+      "usage": {
+        "input_tokens": 422,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "S095",
+    "valueOf": {
+      "a-required": "required",
+      "b-optional": "optional",
+      "c-absent": "absent",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 127,
+    "clientMs": 140.82337499999994,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "b-optional",
+          "probabilities": {
+            "a-required": 0.1075,
+            "b-optional": 0.6444,
+            "c-absent": 0.02,
+            "d-unclear": 0.2281
+          },
+          "confidence": 0.3057
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-required": 0.0717,
+            "b-optional": 0.3186,
+            "c-absent": 0.0097,
+            "d-unclear": 0.6
+          },
+          "confidence": 0.289
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-required": 0.0584,
+            "b-optional": 0.225,
+            "c-absent": 0.0124,
+            "d-unclear": 0.7042
+          },
+          "confidence": 0.4001
+        }
+      },
+      "usage": {
+        "input_tokens": 831,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "S095",
+    "valueOf": {
+      "a-required": "required",
+      "b-optional": "optional",
+      "c-absent": "absent",
+      "d-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 286,
+    "clientMs": 300.58570800000234,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "b-optional",
+          "probabilities": {
+            "a-required": 0.079,
+            "b-optional": 0.7493,
+            "c-absent": 0.0215,
+            "d-unclear": 0.1502
+          },
+          "confidence": 0.4543
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "b-optional",
+          "probabilities": {
+            "a-required": 0.0937,
+            "b-optional": 0.5392,
+            "c-absent": 0.0139,
+            "d-unclear": 0.3532
+          },
+          "confidence": 0.2327
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "d-unclear",
+          "probabilities": {
+            "a-required": 0.0537,
+            "b-optional": 0.3445,
+            "c-absent": 0.0145,
+            "d-unclear": 0.5873
+          },
+          "confidence": 0.2889
+        }
+      },
+      "usage": {
+        "input_tokens": 831,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "S116",
+    "valueOf": {
+      "a-owner": "owner",
+      "b-admin": "admin",
+      "c-maintainer": "maintainer",
+      "d-member": "member",
+      "e-authenticated": "authenticated",
+      "f-anyone": "anyone",
+      "g-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 128,
+    "clientMs": 228.42866700000013,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "b-admin",
+          "probabilities": {
+            "a-owner": 0.0357,
+            "b-admin": 0.7303,
+            "c-maintainer": 0.0706,
+            "d-member": 0.0979,
+            "e-authenticated": 0.0249,
+            "f-anyone": 0.0082,
+            "g-unclear": 0.0324
+          },
+          "confidence": 0.4761
+        }
+      },
+      "usage": {
+        "input_tokens": 519,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "S116",
+    "valueOf": {
+      "a-owner": "owner",
+      "b-admin": "admin",
+      "c-maintainer": "maintainer",
+      "d-member": "member",
+      "e-authenticated": "authenticated",
+      "f-anyone": "anyone",
+      "g-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 166,
+    "clientMs": 182.73591699999815,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "b-admin",
+          "probabilities": {
+            "g-unclear": 0.0324,
+            "f-anyone": 0.0082,
+            "e-authenticated": 0.0249,
+            "d-member": 0.0979,
+            "c-maintainer": 0.0706,
+            "b-admin": 0.7303,
+            "a-owner": 0.0357
+          },
+          "confidence": 0.4761
+        }
+      },
+      "usage": {
+        "input_tokens": 519,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "S116",
+    "valueOf": {
+      "a-owner": "owner",
+      "b-admin": "admin",
+      "c-maintainer": "maintainer",
+      "d-member": "member",
+      "e-authenticated": "authenticated",
+      "f-anyone": "anyone",
+      "g-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 336,
+    "clientMs": 349.0510420000028,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "b-admin",
+          "probabilities": {
+            "a-owner": 0.0415,
+            "b-admin": 0.6287,
+            "c-maintainer": 0.0676,
+            "d-member": 0.1956,
+            "e-authenticated": 0.027,
+            "f-anyone": 0.0068,
+            "g-unclear": 0.0328
+          },
+          "confidence": 0.3487
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "b-admin",
+          "probabilities": {
+            "a-owner": 0.0185,
+            "b-admin": 0.3839,
+            "c-maintainer": 0.0798,
+            "d-member": 0.3515,
+            "e-authenticated": 0.02,
+            "f-anyone": 0.0059,
+            "g-unclear": 0.1404
+          },
+          "confidence": 0.1808
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "d-member",
+          "probabilities": {
+            "a-owner": 0.0392,
+            "b-admin": 0.2545,
+            "c-maintainer": 0.0684,
+            "d-member": 0.4067,
+            "e-authenticated": 0.0259,
+            "f-anyone": 0.0126,
+            "g-unclear": 0.1927
+          },
+          "confidence": 0.1534
+        }
+      },
+      "usage": {
+        "input_tokens": 1090,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "S116",
+    "valueOf": {
+      "a-owner": "owner",
+      "b-admin": "admin",
+      "c-maintainer": "maintainer",
+      "d-member": "member",
+      "e-authenticated": "authenticated",
+      "f-anyone": "anyone",
+      "g-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 276,
+    "clientMs": 369.5584999999992,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "b-admin",
+          "probabilities": {
+            "a-owner": 0.0381,
+            "b-admin": 0.4666,
+            "c-maintainer": 0.0611,
+            "d-member": 0.351,
+            "e-authenticated": 0.0271,
+            "f-anyone": 0.0081,
+            "g-unclear": 0.048
+          },
+          "confidence": 0.2407
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "d-member",
+          "probabilities": {
+            "a-owner": 0.0172,
+            "b-admin": 0.1145,
+            "c-maintainer": 0.0595,
+            "d-member": 0.5828,
+            "e-authenticated": 0.0175,
+            "f-anyone": 0.005,
+            "g-unclear": 0.2035
+          },
+          "confidence": 0.2981
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "d-member",
+          "probabilities": {
+            "a-owner": 0.0192,
+            "b-admin": 0.185,
+            "c-maintainer": 0.0656,
+            "d-member": 0.58,
+            "e-authenticated": 0.025,
+            "f-anyone": 0.0082,
+            "g-unclear": 0.117
+          },
+          "confidence": 0.288
+        }
+      },
+      "usage": {
+        "input_tokens": 1090,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "S129",
+    "valueOf": {
+      "a-owner": "owner",
+      "b-admin": "admin",
+      "c-maintainer": "maintainer",
+      "d-member": "member",
+      "e-authenticated": "authenticated",
+      "f-anyone": "anyone",
+      "g-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 385,
+    "clientMs": 399.05033399999957,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "f-anyone",
+          "probabilities": {
+            "a-owner": 0.006,
+            "b-admin": 0.007,
+            "c-maintainer": 0.005,
+            "d-member": 0.0264,
+            "e-authenticated": 0.1832,
+            "f-anyone": 0.7467,
+            "g-unclear": 0.0257
+          },
+          "confidence": 0.5248
+        }
+      },
+      "usage": {
+        "input_tokens": 484,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "S129",
+    "valueOf": {
+      "a-owner": "owner",
+      "b-admin": "admin",
+      "c-maintainer": "maintainer",
+      "d-member": "member",
+      "e-authenticated": "authenticated",
+      "f-anyone": "anyone",
+      "g-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 395,
+    "clientMs": 409.73554199999853,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "f-anyone",
+          "probabilities": {
+            "g-unclear": 0.0257,
+            "f-anyone": 0.7467,
+            "e-authenticated": 0.1832,
+            "d-member": 0.0264,
+            "c-maintainer": 0.005,
+            "b-admin": 0.007,
+            "a-owner": 0.006
+          },
+          "confidence": 0.5248
+        }
+      },
+      "usage": {
+        "input_tokens": 484,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "S129",
+    "valueOf": {
+      "a-owner": "owner",
+      "b-admin": "admin",
+      "c-maintainer": "maintainer",
+      "d-member": "member",
+      "e-authenticated": "authenticated",
+      "f-anyone": "anyone",
+      "g-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 141,
+    "clientMs": 154.63991700000042,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "f-anyone",
+          "probabilities": {
+            "a-owner": 0.0069,
+            "b-admin": 0.0081,
+            "c-maintainer": 0.0044,
+            "d-member": 0.0551,
+            "e-authenticated": 0.275,
+            "f-anyone": 0.6112,
+            "g-unclear": 0.0393
+          },
+          "confidence": 0.363
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "f-anyone",
+          "probabilities": {
+            "a-owner": 0.0265,
+            "b-admin": 0.0413,
+            "c-maintainer": 0.0376,
+            "d-member": 0.0514,
+            "e-authenticated": 0.0546,
+            "f-anyone": 0.5426,
+            "g-unclear": 0.246
+          },
+          "confidence": 0.2584
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "f-anyone",
+          "probabilities": {
+            "a-owner": 0.0271,
+            "b-admin": 0.0341,
+            "c-maintainer": 0.0294,
+            "d-member": 0.0772,
+            "e-authenticated": 0.1037,
+            "f-anyone": 0.5124,
+            "g-unclear": 0.2161
+          },
+          "confidence": 0.2169
+        }
+      },
+      "usage": {
+        "input_tokens": 1053,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "S129",
+    "valueOf": {
+      "a-owner": "owner",
+      "b-admin": "admin",
+      "c-maintainer": "maintainer",
+      "d-member": "member",
+      "e-authenticated": "authenticated",
+      "f-anyone": "anyone",
+      "g-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 221,
+    "clientMs": 235.61108299999978,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "f-anyone",
+          "probabilities": {
+            "a-owner": 0.0088,
+            "b-admin": 0.0109,
+            "c-maintainer": 0.0083,
+            "d-member": 0.1478,
+            "e-authenticated": 0.2348,
+            "f-anyone": 0.5407,
+            "g-unclear": 0.0487
+          },
+          "confidence": 0.2673
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "f-anyone",
+          "probabilities": {
+            "a-owner": 0.0181,
+            "b-admin": 0.0353,
+            "c-maintainer": 0.0261,
+            "d-member": 0.0847,
+            "e-authenticated": 0.1017,
+            "f-anyone": 0.4897,
+            "g-unclear": 0.2444
+          },
+          "confidence": 0.2058
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "f-anyone",
+          "probabilities": {
+            "a-owner": 0.0241,
+            "b-admin": 0.0223,
+            "c-maintainer": 0.0243,
+            "d-member": 0.0753,
+            "e-authenticated": 0.1175,
+            "f-anyone": 0.5513,
+            "g-unclear": 0.1852
+          },
+          "confidence": 0.2526
+        }
+      },
+      "usage": {
+        "input_tokens": 1053,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "S130",
+    "valueOf": {
+      "a-owner": "owner",
+      "b-admin": "admin",
+      "c-maintainer": "maintainer",
+      "d-member": "member",
+      "e-authenticated": "authenticated",
+      "f-anyone": "anyone",
+      "g-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 102,
+    "clientMs": 117.80420799999774,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "f-anyone",
+          "probabilities": {
+            "a-owner": 0.0519,
+            "b-admin": 0.0288,
+            "c-maintainer": 0.0296,
+            "d-member": 0.059,
+            "e-authenticated": 0.0279,
+            "f-anyone": 0.7418,
+            "g-unclear": 0.061
+          },
+          "confidence": 0.4897
+        }
+      },
+      "usage": {
+        "input_tokens": 505,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "S130",
+    "valueOf": {
+      "a-owner": "owner",
+      "b-admin": "admin",
+      "c-maintainer": "maintainer",
+      "d-member": "member",
+      "e-authenticated": "authenticated",
+      "f-anyone": "anyone",
+      "g-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 243,
+    "clientMs": 257.19079200000124,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "f-anyone",
+          "probabilities": {
+            "g-unclear": 0.061,
+            "f-anyone": 0.7418,
+            "e-authenticated": 0.0279,
+            "d-member": 0.059,
+            "c-maintainer": 0.0296,
+            "b-admin": 0.0288,
+            "a-owner": 0.0519
+          },
+          "confidence": 0.4897
+        }
+      },
+      "usage": {
+        "input_tokens": 505,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "S130",
+    "valueOf": {
+      "a-owner": "owner",
+      "b-admin": "admin",
+      "c-maintainer": "maintainer",
+      "d-member": "member",
+      "e-authenticated": "authenticated",
+      "f-anyone": "anyone",
+      "g-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 216,
+    "clientMs": 229.70937500000218,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "f-anyone",
+          "probabilities": {
+            "a-owner": 0.0629,
+            "b-admin": 0.0426,
+            "c-maintainer": 0.0555,
+            "d-member": 0.1229,
+            "e-authenticated": 0.0265,
+            "f-anyone": 0.5475,
+            "g-unclear": 0.1421
+          },
+          "confidence": 0.2353
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "g-unclear",
+          "probabilities": {
+            "a-owner": 0.0501,
+            "b-admin": 0.0212,
+            "c-maintainer": 0.0438,
+            "d-member": 0.1519,
+            "e-authenticated": 0.0183,
+            "f-anyone": 0.0155,
+            "g-unclear": 0.6992
+          },
+          "confidence": 0.437
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "g-unclear",
+          "probabilities": {
+            "a-owner": 0.0538,
+            "b-admin": 0.0228,
+            "c-maintainer": 0.0504,
+            "d-member": 0.1769,
+            "e-authenticated": 0.0465,
+            "f-anyone": 0.0241,
+            "g-unclear": 0.6255
+          },
+          "confidence": 0.3364
+        }
+      },
+      "usage": {
+        "input_tokens": 1076,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "S130",
+    "valueOf": {
+      "a-owner": "owner",
+      "b-admin": "admin",
+      "c-maintainer": "maintainer",
+      "d-member": "member",
+      "e-authenticated": "authenticated",
+      "f-anyone": "anyone",
+      "g-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 451,
+    "clientMs": 552.0641250000008,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "f-anyone",
+          "probabilities": {
+            "a-owner": 0.0492,
+            "b-admin": 0.0315,
+            "c-maintainer": 0.0463,
+            "d-member": 0.077,
+            "e-authenticated": 0.0281,
+            "f-anyone": 0.6146,
+            "g-unclear": 0.1533
+          },
+          "confidence": 0.3158
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "g-unclear",
+          "probabilities": {
+            "a-owner": 0.0817,
+            "b-admin": 0.0271,
+            "c-maintainer": 0.0425,
+            "d-member": 0.1492,
+            "e-authenticated": 0.0337,
+            "f-anyone": 0.021,
+            "g-unclear": 0.6448
+          },
+          "confidence": 0.3569
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "g-unclear",
+          "probabilities": {
+            "a-owner": 0.0829,
+            "b-admin": 0.0267,
+            "c-maintainer": 0.0554,
+            "d-member": 0.162,
+            "e-authenticated": 0.1172,
+            "f-anyone": 0.0591,
+            "g-unclear": 0.4967
+          },
+          "confidence": 0.1844
+        }
+      },
+      "usage": {
+        "input_tokens": 1076,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-lattice-keys",
+    "item": "S170",
+    "valueOf": {
+      "a-le-1": "le-1",
+      "b-le-10": "le-10",
+      "c-le-100": "le-100",
+      "d-le-1k": "le-1k",
+      "e-le-10k": "le-10k",
+      "f-le-100k": "le-100k",
+      "g-le-1m": "le-1m",
+      "h-unbounded": "unbounded",
+      "i-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 213,
+    "clientMs": 227.83870899999965,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "e-le-10k",
+          "probabilities": {
+            "a-le-1": 0.0147,
+            "b-le-10": 0.0189,
+            "c-le-100": 0.044,
+            "d-le-1k": 0.0168,
+            "e-le-10k": 0.8272,
+            "f-le-100k": 0.0233,
+            "g-le-1m": 0.0065,
+            "h-unbounded": 0.0141,
+            "i-unclear": 0.0345
+          },
+          "confidence": 0.6502
+        }
+      },
+      "usage": {
+        "input_tokens": 641,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "single-reversed-keys",
+    "item": "S170",
+    "valueOf": {
+      "a-le-1": "le-1",
+      "b-le-10": "le-10",
+      "c-le-100": "le-100",
+      "d-le-1k": "le-1k",
+      "e-le-10k": "le-10k",
+      "f-le-100k": "le-100k",
+      "g-le-1m": "le-1m",
+      "h-unbounded": "unbounded",
+      "i-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 422,
+    "clientMs": 436.1389999999992,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q": {
+          "type": "choice",
+          "choice": "e-le-10k",
+          "probabilities": {
+            "i-unclear": 0.0345,
+            "h-unbounded": 0.0141,
+            "g-le-1m": 0.0065,
+            "f-le-100k": 0.0233,
+            "e-le-10k": 0.8272,
+            "d-le-1k": 0.0168,
+            "c-le-100": 0.044,
+            "b-le-10": 0.0189,
+            "a-le-1": 0.0147
+          },
+          "confidence": 0.6502
+        }
+      },
+      "usage": {
+        "input_tokens": 641,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "identical",
+    "item": "S170",
+    "valueOf": {
+      "a-le-1": "le-1",
+      "b-le-10": "le-10",
+      "c-le-100": "le-100",
+      "d-le-1k": "le-1k",
+      "e-le-10k": "le-10k",
+      "f-le-100k": "le-100k",
+      "g-le-1m": "le-1m",
+      "h-unbounded": "unbounded",
+      "i-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 222,
+    "clientMs": 237.39895800000158,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q0": {
+          "type": "choice",
+          "choice": "e-le-10k",
+          "probabilities": {
+            "a-le-1": 0.0197,
+            "b-le-10": 0.0209,
+            "c-le-100": 0.0551,
+            "d-le-1k": 0.0181,
+            "e-le-10k": 0.6078,
+            "f-le-100k": 0.0304,
+            "g-le-1m": 0.0082,
+            "h-unbounded": 0.022,
+            "i-unclear": 0.2178
+          },
+          "confidence": 0.3504
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "i-unclear",
+          "probabilities": {
+            "a-le-1": 0.0072,
+            "b-le-10": 0.0096,
+            "c-le-100": 0.1271,
+            "d-le-1k": 0.0127,
+            "e-le-10k": 0.0218,
+            "f-le-100k": 0.006,
+            "g-le-1m": 0.0035,
+            "h-unbounded": 0.0371,
+            "i-unclear": 0.775
+          },
+          "confidence": 0.5714
+        },
+        "q2": {
+          "type": "choice",
+          "choice": "i-unclear",
+          "probabilities": {
+            "a-le-1": 0.011,
+            "b-le-10": 0.0155,
+            "c-le-100": 0.1898,
+            "d-le-1k": 0.0267,
+            "e-le-10k": 0.023,
+            "f-le-100k": 0.0083,
+            "g-le-1m": 0.0038,
+            "h-unbounded": 0.0489,
+            "i-unclear": 0.673
+          },
+          "confidence": 0.4298
+        }
+      },
+      "usage": {
+        "input_tokens": 1450,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "kind": "reversed-insertion",
+    "item": "S170",
+    "valueOf": {
+      "a-le-1": "le-1",
+      "b-le-10": "le-10",
+      "c-le-100": "le-100",
+      "d-le-1k": "le-1k",
+      "e-le-10k": "le-10k",
+      "f-le-100k": "le-100k",
+      "g-le-1m": "le-1m",
+      "h-unbounded": "unbounded",
+      "i-unclear": "unclear"
+    },
+    "status": 200,
+    "ok": true,
+    "ms": 150,
+    "clientMs": 161.50495899999805,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "q2": {
+          "type": "choice",
+          "choice": "e-le-10k",
+          "probabilities": {
+            "a-le-1": 0.0134,
+            "b-le-10": 0.0193,
+            "c-le-100": 0.0772,
+            "d-le-1k": 0.0166,
+            "e-le-10k": 0.6858,
+            "f-le-100k": 0.0456,
+            "g-le-1m": 0.0074,
+            "h-unbounded": 0.0228,
+            "i-unclear": 0.1119
+          },
+          "confidence": 0.4289
+        },
+        "q1": {
+          "type": "choice",
+          "choice": "i-unclear",
+          "probabilities": {
+            "a-le-1": 0.0111,
+            "b-le-10": 0.013,
+            "c-le-100": 0.1394,
+            "d-le-1k": 0.0187,
+            "e-le-10k": 0.0473,
+            "f-le-100k": 0.0115,
+            "g-le-1m": 0.0064,
+            "h-unbounded": 0.0486,
+            "i-unclear": 0.704
+          },
+          "confidence": 0.4605
+        },
+        "q0": {
+          "type": "choice",
+          "choice": "i-unclear",
+          "probabilities": {
+            "a-le-1": 0.0157,
+            "b-le-10": 0.0212,
+            "c-le-100": 0.2402,
+            "d-le-1k": 0.0288,
+            "e-le-10k": 0.0381,
+            "f-le-100k": 0.0155,
+            "g-le-1m": 0.008,
+            "h-unbounded": 0.0991,
+            "i-unclear": 0.5334
+          },
+          "confidence": 0.2747
+        }
+      },
+      "usage": {
+        "input_tokens": 1450,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  }
+]

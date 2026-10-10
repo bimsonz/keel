@@ -1,0 +1,18 @@
+--- a/src/webhooks/dispatcher.ts
++++ b/src/webhooks/dispatcher.ts
+@@ -30 +30 @@ export class Dispatcher {
+   async drain(repoId: string): Promise<void> {
+-    const pending = await this.store.pendingFor(repoId); // ordered by sequence
+-    for (const delivery of pending) {
+-      await this.deliver(delivery);
+-      await this.store.markDelivered(delivery.id);
+-    }
++    const pending = await this.store.pendingFor(repoId); // ordered by sequence
++    // Deliver in parallel; one slow receiver was holding up the whole repo.
++    await Promise.all(
++      pending.map(async (delivery) => {
++        await this.deliver(delivery);
++        await this.store.markDelivered(delivery.id);
++      }),
++    );
+   }

@@ -1,0 +1,5606 @@
+[
+  {
+    "mode": "s17orig",
+    "item": "C01",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "per-call",
+          "per-request",
+          "per-session",
+          "ttl",
+          "static",
+          "unclear"
+        ],
+        "idOf": {
+          "per-call": "a-per-call",
+          "per-request": "b-per-request",
+          "per-session": "c-per-session",
+          "ttl": "d-ttl",
+          "static": "e-static",
+          "unclear": "f-unclear"
+        },
+        "valueOf": {
+          "a-per-call": "per-call",
+          "b-per-request": "per-request",
+          "c-per-session": "per-session",
+          "d-ttl": "ttl",
+          "e-static": "static",
+          "f-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "static",
+          "per-call",
+          "per-request",
+          "ttl",
+          "per-session",
+          "unclear"
+        ],
+        "idOf": {
+          "static": "a-static",
+          "per-call": "b-per-call",
+          "per-request": "c-per-request",
+          "ttl": "d-ttl",
+          "per-session": "e-per-session",
+          "unclear": "f-unclear"
+        },
+        "valueOf": {
+          "a-static": "static",
+          "b-per-call": "per-call",
+          "c-per-request": "per-request",
+          "d-ttl": "ttl",
+          "e-per-session": "per-session",
+          "f-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "static",
+          "per-call",
+          "per-request",
+          "per-session",
+          "ttl",
+          "unclear"
+        ],
+        "idOf": {
+          "static": "a-static",
+          "per-call": "b-per-call",
+          "per-request": "c-per-request",
+          "per-session": "d-per-session",
+          "ttl": "e-ttl",
+          "unclear": "f-unclear"
+        },
+        "valueOf": {
+          "a-static": "static",
+          "b-per-call": "per-call",
+          "c-per-request": "per-request",
+          "d-per-session": "per-session",
+          "e-ttl": "ttl",
+          "f-unclear": "unclear"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 5938,
+      "estimatedTokens": 2376,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 223,
+    "clientMs": 251.30995900000562,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "c-per-session",
+          "probabilities": {
+            "a-per-call": 0.0174,
+            "b-per-request": 0.0156,
+            "c-per-session": 0.933,
+            "d-ttl": 0.02,
+            "e-static": 0.005,
+            "f-unclear": 0.009
+          },
+          "confidence": 0.8459
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "e-per-session",
+          "probabilities": {
+            "a-static": 0.0026,
+            "b-per-call": 0.0047,
+            "c-per-request": 0.0042,
+            "d-ttl": 0.0061,
+            "e-per-session": 0.9756,
+            "f-unclear": 0.0068
+          },
+          "confidence": 0.9422
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "d-per-session",
+          "probabilities": {
+            "a-static": 0.0026,
+            "b-per-call": 0.0045,
+            "c-per-request": 0.0041,
+            "d-per-session": 0.976,
+            "e-ttl": 0.0051,
+            "f-unclear": 0.0077
+          },
+          "confidence": 0.9432
+        }
+      },
+      "usage": {
+        "input_tokens": 1489,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C02",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "per-call",
+          "per-request",
+          "per-session",
+          "ttl",
+          "static",
+          "unclear"
+        ],
+        "idOf": {
+          "per-call": "a-per-call",
+          "per-request": "b-per-request",
+          "per-session": "c-per-session",
+          "ttl": "d-ttl",
+          "static": "e-static",
+          "unclear": "f-unclear"
+        },
+        "valueOf": {
+          "a-per-call": "per-call",
+          "b-per-request": "per-request",
+          "c-per-session": "per-session",
+          "d-ttl": "ttl",
+          "e-static": "static",
+          "f-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "per-call",
+          "unclear",
+          "per-session",
+          "per-request",
+          "ttl",
+          "static"
+        ],
+        "idOf": {
+          "per-call": "a-per-call",
+          "unclear": "b-unclear",
+          "per-session": "c-per-session",
+          "per-request": "d-per-request",
+          "ttl": "e-ttl",
+          "static": "f-static"
+        },
+        "valueOf": {
+          "a-per-call": "per-call",
+          "b-unclear": "unclear",
+          "c-per-session": "per-session",
+          "d-per-request": "per-request",
+          "e-ttl": "ttl",
+          "f-static": "static"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "per-request",
+          "unclear",
+          "ttl",
+          "per-session",
+          "static",
+          "per-call"
+        ],
+        "idOf": {
+          "per-request": "a-per-request",
+          "unclear": "b-unclear",
+          "ttl": "c-ttl",
+          "per-session": "d-per-session",
+          "static": "e-static",
+          "per-call": "f-per-call"
+        },
+        "valueOf": {
+          "a-per-request": "per-request",
+          "b-unclear": "unclear",
+          "c-ttl": "ttl",
+          "d-per-session": "per-session",
+          "e-static": "static",
+          "f-per-call": "per-call"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 5352,
+      "estimatedTokens": 2141,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 149,
+    "clientMs": 182.03737499998533,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "e-static",
+          "probabilities": {
+            "a-per-call": 0.0106,
+            "b-per-request": 0.0081,
+            "c-per-session": 0.0071,
+            "d-ttl": 0.0175,
+            "e-static": 0.9457,
+            "f-unclear": 0.011
+          },
+          "confidence": 0.8741
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "f-static",
+          "probabilities": {
+            "a-per-call": 0.0043,
+            "b-unclear": 0.0067,
+            "c-per-session": 0.0053,
+            "d-per-request": 0.003,
+            "e-ttl": 0.0045,
+            "f-static": 0.9762
+          },
+          "confidence": 0.9438
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "e-static",
+          "probabilities": {
+            "a-per-request": 0.0032,
+            "b-unclear": 0.0086,
+            "c-ttl": 0.0036,
+            "d-per-session": 0.0048,
+            "e-static": 0.9744,
+            "f-per-call": 0.0054
+          },
+          "confidence": 0.9395
+        }
+      },
+      "usage": {
+        "input_tokens": 1366,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C03",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "per-call",
+          "per-request",
+          "per-session",
+          "ttl",
+          "static",
+          "unclear"
+        ],
+        "idOf": {
+          "per-call": "a-per-call",
+          "per-request": "b-per-request",
+          "per-session": "c-per-session",
+          "ttl": "d-ttl",
+          "static": "e-static",
+          "unclear": "f-unclear"
+        },
+        "valueOf": {
+          "a-per-call": "per-call",
+          "b-per-request": "per-request",
+          "c-per-session": "per-session",
+          "d-ttl": "ttl",
+          "e-static": "static",
+          "f-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "per-call",
+          "static",
+          "per-session",
+          "per-request",
+          "unclear",
+          "ttl"
+        ],
+        "idOf": {
+          "per-call": "a-per-call",
+          "static": "b-static",
+          "per-session": "c-per-session",
+          "per-request": "d-per-request",
+          "unclear": "e-unclear",
+          "ttl": "f-ttl"
+        },
+        "valueOf": {
+          "a-per-call": "per-call",
+          "b-static": "static",
+          "c-per-session": "per-session",
+          "d-per-request": "per-request",
+          "e-unclear": "unclear",
+          "f-ttl": "ttl"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "static",
+          "unclear",
+          "per-call",
+          "per-session",
+          "per-request",
+          "ttl"
+        ],
+        "idOf": {
+          "static": "a-static",
+          "unclear": "b-unclear",
+          "per-call": "c-per-call",
+          "per-session": "d-per-session",
+          "per-request": "e-per-request",
+          "ttl": "f-ttl"
+        },
+        "valueOf": {
+          "a-static": "static",
+          "b-unclear": "unclear",
+          "c-per-call": "per-call",
+          "d-per-session": "per-session",
+          "e-per-request": "per-request",
+          "f-ttl": "ttl"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4774,
+      "estimatedTokens": 1910,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 228,
+    "clientMs": 264.6247919999878,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "d-ttl",
+          "probabilities": {
+            "a-per-call": 0.0048,
+            "b-per-request": 0.0056,
+            "c-per-session": 0.0036,
+            "d-ttl": 0.9734,
+            "e-static": 0.006,
+            "f-unclear": 0.0066
+          },
+          "confidence": 0.9372
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "f-ttl",
+          "probabilities": {
+            "a-per-call": 0.0021,
+            "b-static": 0.002,
+            "c-per-session": 0.0019,
+            "d-per-request": 0.0021,
+            "e-unclear": 0.004,
+            "f-ttl": 0.9879
+          },
+          "confidence": 0.9712
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "f-ttl",
+          "probabilities": {
+            "a-static": 0.0024,
+            "b-unclear": 0.0052,
+            "c-per-call": 0.0028,
+            "d-per-session": 0.0027,
+            "e-per-request": 0.0022,
+            "f-ttl": 0.9847
+          },
+          "confidence": 0.9637
+        }
+      },
+      "usage": {
+        "input_tokens": 1197,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C04",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "per-call",
+          "per-request",
+          "per-session",
+          "ttl",
+          "static",
+          "unclear"
+        ],
+        "idOf": {
+          "per-call": "a-per-call",
+          "per-request": "b-per-request",
+          "per-session": "c-per-session",
+          "ttl": "d-ttl",
+          "static": "e-static",
+          "unclear": "f-unclear"
+        },
+        "valueOf": {
+          "a-per-call": "per-call",
+          "b-per-request": "per-request",
+          "c-per-session": "per-session",
+          "d-ttl": "ttl",
+          "e-static": "static",
+          "f-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "static",
+          "ttl",
+          "per-session",
+          "per-request",
+          "unclear",
+          "per-call"
+        ],
+        "idOf": {
+          "static": "a-static",
+          "ttl": "b-ttl",
+          "per-session": "c-per-session",
+          "per-request": "d-per-request",
+          "unclear": "e-unclear",
+          "per-call": "f-per-call"
+        },
+        "valueOf": {
+          "a-static": "static",
+          "b-ttl": "ttl",
+          "c-per-session": "per-session",
+          "d-per-request": "per-request",
+          "e-unclear": "unclear",
+          "f-per-call": "per-call"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "per-request",
+          "static",
+          "ttl",
+          "per-session",
+          "per-call",
+          "unclear"
+        ],
+        "idOf": {
+          "per-request": "a-per-request",
+          "static": "b-static",
+          "ttl": "c-ttl",
+          "per-session": "d-per-session",
+          "per-call": "e-per-call",
+          "unclear": "f-unclear"
+        },
+        "valueOf": {
+          "a-per-request": "per-request",
+          "b-static": "static",
+          "c-ttl": "ttl",
+          "d-per-session": "per-session",
+          "e-per-call": "per-call",
+          "f-unclear": "unclear"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4572,
+      "estimatedTokens": 1829,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 211,
+    "clientMs": 241.5498329999973,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "d-ttl",
+          "probabilities": {
+            "a-per-call": 0.0082,
+            "b-per-request": 0.0068,
+            "c-per-session": 0.0046,
+            "d-ttl": 0.971,
+            "e-static": 0.003,
+            "f-unclear": 0.0064
+          },
+          "confidence": 0.9317
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "b-ttl",
+          "probabilities": {
+            "a-static": 0.0026,
+            "b-ttl": 0.9801,
+            "c-per-session": 0.0043,
+            "d-per-request": 0.003,
+            "e-unclear": 0.0056,
+            "f-per-call": 0.0044
+          },
+          "confidence": 0.9529
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "c-ttl",
+          "probabilities": {
+            "a-per-request": 0.0022,
+            "b-static": 0.0023,
+            "c-ttl": 0.9812,
+            "d-per-session": 0.0047,
+            "e-per-call": 0.0041,
+            "f-unclear": 0.0055
+          },
+          "confidence": 0.9555
+        }
+      },
+      "usage": {
+        "input_tokens": 1126,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C05",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "per-call",
+          "per-request",
+          "per-session",
+          "ttl",
+          "static",
+          "unclear"
+        ],
+        "idOf": {
+          "per-call": "a-per-call",
+          "per-request": "b-per-request",
+          "per-session": "c-per-session",
+          "ttl": "d-ttl",
+          "static": "e-static",
+          "unclear": "f-unclear"
+        },
+        "valueOf": {
+          "a-per-call": "per-call",
+          "b-per-request": "per-request",
+          "c-per-session": "per-session",
+          "d-ttl": "ttl",
+          "e-static": "static",
+          "f-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "ttl",
+          "per-call",
+          "unclear",
+          "static",
+          "per-session",
+          "per-request"
+        ],
+        "idOf": {
+          "ttl": "a-ttl",
+          "per-call": "b-per-call",
+          "unclear": "c-unclear",
+          "static": "d-static",
+          "per-session": "e-per-session",
+          "per-request": "f-per-request"
+        },
+        "valueOf": {
+          "a-ttl": "ttl",
+          "b-per-call": "per-call",
+          "c-unclear": "unclear",
+          "d-static": "static",
+          "e-per-session": "per-session",
+          "f-per-request": "per-request"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "ttl",
+          "static",
+          "per-request",
+          "unclear",
+          "per-call",
+          "per-session"
+        ],
+        "idOf": {
+          "ttl": "a-ttl",
+          "static": "b-static",
+          "per-request": "c-per-request",
+          "unclear": "d-unclear",
+          "per-call": "e-per-call",
+          "per-session": "f-per-session"
+        },
+        "valueOf": {
+          "a-ttl": "ttl",
+          "b-static": "static",
+          "c-per-request": "per-request",
+          "d-unclear": "unclear",
+          "e-per-call": "per-call",
+          "f-per-session": "per-session"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4896,
+      "estimatedTokens": 1959,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 284,
+    "clientMs": 319.5278330000001,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "e-static",
+          "probabilities": {
+            "a-per-call": 0.016,
+            "b-per-request": 0.0244,
+            "c-per-session": 0.0329,
+            "d-ttl": 0.0189,
+            "e-static": 0.8818,
+            "f-unclear": 0.026
+          },
+          "confidence": 0.7366
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "d-static",
+          "probabilities": {
+            "a-ttl": 0.0077,
+            "b-per-call": 0.0191,
+            "c-unclear": 0.0313,
+            "d-static": 0.8991,
+            "e-per-session": 0.0296,
+            "f-per-request": 0.0132
+          },
+          "confidence": 0.7731
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "b-static",
+          "probabilities": {
+            "a-ttl": 0.011,
+            "b-static": 0.7739,
+            "c-per-request": 0.0293,
+            "d-unclear": 0.1175,
+            "e-per-call": 0.03,
+            "f-per-session": 0.0383
+          },
+          "confidence": 0.5392
+        }
+      },
+      "usage": {
+        "input_tokens": 1274,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C06",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "exactly-one",
+          "at-most-one",
+          "many",
+          "unclear"
+        ],
+        "idOf": {
+          "exactly-one": "a-exactly-one",
+          "at-most-one": "b-at-most-one",
+          "many": "c-many",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-exactly-one": "exactly-one",
+          "b-at-most-one": "at-most-one",
+          "c-many": "many",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "exactly-one",
+          "many",
+          "at-most-one",
+          "unclear"
+        ],
+        "idOf": {
+          "exactly-one": "a-exactly-one",
+          "many": "b-many",
+          "at-most-one": "c-at-most-one",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-exactly-one": "exactly-one",
+          "b-many": "many",
+          "c-at-most-one": "at-most-one",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "exactly-one",
+          "unclear",
+          "at-most-one",
+          "many"
+        ],
+        "idOf": {
+          "exactly-one": "a-exactly-one",
+          "unclear": "b-unclear",
+          "at-most-one": "c-at-most-one",
+          "many": "d-many"
+        },
+        "valueOf": {
+          "a-exactly-one": "exactly-one",
+          "b-unclear": "unclear",
+          "c-at-most-one": "at-most-one",
+          "d-many": "many"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 3850,
+      "estimatedTokens": 1540,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 186,
+    "clientMs": 203.8549580000108,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "c-many",
+          "probabilities": {
+            "a-exactly-one": 0.0225,
+            "b-at-most-one": 0.021,
+            "c-many": 0.8709,
+            "d-unclear": 0.0856
+          },
+          "confidence": 0.6891
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "b-many",
+          "probabilities": {
+            "a-exactly-one": 0.3649,
+            "b-many": 0.5182,
+            "c-at-most-one": 0.0237,
+            "d-unclear": 0.0932
+          },
+          "confidence": 0.2146
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "d-many",
+          "probabilities": {
+            "a-exactly-one": 0.1036,
+            "b-unclear": 0.2101,
+            "c-at-most-one": 0.0264,
+            "d-many": 0.6599
+          },
+          "confidence": 0.3213
+        }
+      },
+      "usage": {
+        "input_tokens": 960,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C07",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "exactly-one",
+          "at-most-one",
+          "many",
+          "unclear"
+        ],
+        "idOf": {
+          "exactly-one": "a-exactly-one",
+          "at-most-one": "b-at-most-one",
+          "many": "c-many",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-exactly-one": "exactly-one",
+          "b-at-most-one": "at-most-one",
+          "c-many": "many",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "many",
+          "exactly-one",
+          "at-most-one",
+          "unclear"
+        ],
+        "idOf": {
+          "many": "a-many",
+          "exactly-one": "b-exactly-one",
+          "at-most-one": "c-at-most-one",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-many": "many",
+          "b-exactly-one": "exactly-one",
+          "c-at-most-one": "at-most-one",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "exactly-one",
+          "unclear",
+          "at-most-one",
+          "many"
+        ],
+        "idOf": {
+          "exactly-one": "a-exactly-one",
+          "unclear": "b-unclear",
+          "at-most-one": "c-at-most-one",
+          "many": "d-many"
+        },
+        "valueOf": {
+          "a-exactly-one": "exactly-one",
+          "b-unclear": "unclear",
+          "c-at-most-one": "at-most-one",
+          "d-many": "many"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4274,
+      "estimatedTokens": 1710,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 235,
+    "clientMs": 262.5883330000215,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "c-many",
+          "probabilities": {
+            "a-exactly-one": 0.0295,
+            "b-at-most-one": 0.0797,
+            "c-many": 0.7811,
+            "d-unclear": 0.1097
+          },
+          "confidence": 0.5058
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "a-many",
+          "probabilities": {
+            "a-many": 0.8946,
+            "b-exactly-one": 0.0158,
+            "c-at-most-one": 0.0257,
+            "d-unclear": 0.0639
+          },
+          "confidence": 0.7405
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "d-many",
+          "probabilities": {
+            "a-exactly-one": 0.0113,
+            "b-unclear": 0.1023,
+            "c-at-most-one": 0.018,
+            "d-many": 0.8684
+          },
+          "confidence": 0.6867
+        }
+      },
+      "usage": {
+        "input_tokens": 1099,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C08",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "exactly-one",
+          "at-most-one",
+          "many",
+          "unclear"
+        ],
+        "idOf": {
+          "exactly-one": "a-exactly-one",
+          "at-most-one": "b-at-most-one",
+          "many": "c-many",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-exactly-one": "exactly-one",
+          "b-at-most-one": "at-most-one",
+          "c-many": "many",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "exactly-one",
+          "unclear",
+          "at-most-one",
+          "many"
+        ],
+        "idOf": {
+          "exactly-one": "a-exactly-one",
+          "unclear": "b-unclear",
+          "at-most-one": "c-at-most-one",
+          "many": "d-many"
+        },
+        "valueOf": {
+          "a-exactly-one": "exactly-one",
+          "b-unclear": "unclear",
+          "c-at-most-one": "at-most-one",
+          "d-many": "many"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "exactly-one",
+          "at-most-one",
+          "unclear",
+          "many"
+        ],
+        "idOf": {
+          "exactly-one": "a-exactly-one",
+          "at-most-one": "b-at-most-one",
+          "unclear": "c-unclear",
+          "many": "d-many"
+        },
+        "valueOf": {
+          "a-exactly-one": "exactly-one",
+          "b-at-most-one": "at-most-one",
+          "c-unclear": "unclear",
+          "d-many": "many"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4330,
+      "estimatedTokens": 1732,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 152,
+    "clientMs": 182.80758300001617,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "b-at-most-one",
+          "probabilities": {
+            "a-exactly-one": 0.3858,
+            "b-at-most-one": 0.5395,
+            "c-many": 0.0438,
+            "d-unclear": 0.0309
+          },
+          "confidence": 0.2571
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "c-at-most-one",
+          "probabilities": {
+            "a-exactly-one": 0.0218,
+            "b-unclear": 0.0505,
+            "c-at-most-one": 0.9093,
+            "d-many": 0.0184
+          },
+          "confidence": 0.7736
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "b-at-most-one",
+          "probabilities": {
+            "a-exactly-one": 0.0278,
+            "b-at-most-one": 0.8817,
+            "c-unclear": 0.0683,
+            "d-many": 0.0222
+          },
+          "confidence": 0.711
+        }
+      },
+      "usage": {
+        "input_tokens": 1178,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C09",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "fifo",
+          "per-key-fifo",
+          "unordered",
+          "unclear"
+        ],
+        "idOf": {
+          "fifo": "a-fifo",
+          "per-key-fifo": "b-per-key-fifo",
+          "unordered": "c-unordered",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-fifo": "fifo",
+          "b-per-key-fifo": "per-key-fifo",
+          "c-unordered": "unordered",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "unordered",
+          "unclear",
+          "fifo",
+          "per-key-fifo"
+        ],
+        "idOf": {
+          "unordered": "a-unordered",
+          "unclear": "b-unclear",
+          "fifo": "c-fifo",
+          "per-key-fifo": "d-per-key-fifo"
+        },
+        "valueOf": {
+          "a-unordered": "unordered",
+          "b-unclear": "unclear",
+          "c-fifo": "fifo",
+          "d-per-key-fifo": "per-key-fifo"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "unordered",
+          "fifo",
+          "unclear",
+          "per-key-fifo"
+        ],
+        "idOf": {
+          "unordered": "a-unordered",
+          "fifo": "b-fifo",
+          "unclear": "c-unclear",
+          "per-key-fifo": "d-per-key-fifo"
+        },
+        "valueOf": {
+          "a-unordered": "unordered",
+          "b-fifo": "fifo",
+          "c-unclear": "unclear",
+          "d-per-key-fifo": "per-key-fifo"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4000,
+      "estimatedTokens": 1600,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 124,
+    "clientMs": 151.91320800001267,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "c-unordered",
+          "probabilities": {
+            "a-fifo": 0.0357,
+            "b-per-key-fifo": 0.0612,
+            "c-unordered": 0.8366,
+            "d-unclear": 0.0665
+          },
+          "confidence": 0.6125
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "a-unordered",
+          "probabilities": {
+            "a-unordered": 0.8838,
+            "b-unclear": 0.0636,
+            "c-fifo": 0.0161,
+            "d-per-key-fifo": 0.0365
+          },
+          "confidence": 0.7157
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "a-unordered",
+          "probabilities": {
+            "a-unordered": 0.9102,
+            "b-fifo": 0.0128,
+            "c-unclear": 0.0387,
+            "d-per-key-fifo": 0.0383
+          },
+          "confidence": 0.7755
+        }
+      },
+      "usage": {
+        "input_tokens": 985,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C10",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "fifo",
+          "per-key-fifo",
+          "unordered",
+          "unclear"
+        ],
+        "idOf": {
+          "fifo": "a-fifo",
+          "per-key-fifo": "b-per-key-fifo",
+          "unordered": "c-unordered",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-fifo": "fifo",
+          "b-per-key-fifo": "per-key-fifo",
+          "c-unordered": "unordered",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "fifo",
+          "unclear",
+          "per-key-fifo",
+          "unordered"
+        ],
+        "idOf": {
+          "fifo": "a-fifo",
+          "unclear": "b-unclear",
+          "per-key-fifo": "c-per-key-fifo",
+          "unordered": "d-unordered"
+        },
+        "valueOf": {
+          "a-fifo": "fifo",
+          "b-unclear": "unclear",
+          "c-per-key-fifo": "per-key-fifo",
+          "d-unordered": "unordered"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "unordered",
+          "fifo",
+          "per-key-fifo",
+          "unclear"
+        ],
+        "idOf": {
+          "unordered": "a-unordered",
+          "fifo": "b-fifo",
+          "per-key-fifo": "c-per-key-fifo",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-unordered": "unordered",
+          "b-fifo": "fifo",
+          "c-per-key-fifo": "per-key-fifo",
+          "d-unclear": "unclear"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4029,
+      "estimatedTokens": 1612,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 154,
+    "clientMs": 179.8837910000002,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "c-unordered",
+          "probabilities": {
+            "a-fifo": 0.0428,
+            "b-per-key-fifo": 0.0454,
+            "c-unordered": 0.8612,
+            "d-unclear": 0.0506
+          },
+          "confidence": 0.6642
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "d-unordered",
+          "probabilities": {
+            "a-fifo": 0.0155,
+            "b-unclear": 0.024,
+            "c-per-key-fifo": 0.008,
+            "d-unordered": 0.9525
+          },
+          "confidence": 0.8775
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "a-unordered",
+          "probabilities": {
+            "a-unordered": 0.9557,
+            "b-fifo": 0.0108,
+            "c-per-key-fifo": 0.0088,
+            "d-unclear": 0.0247
+          },
+          "confidence": 0.8856
+        }
+      },
+      "usage": {
+        "input_tokens": 1056,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C11",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "fifo",
+          "per-key-fifo",
+          "unordered",
+          "unclear"
+        ],
+        "idOf": {
+          "fifo": "a-fifo",
+          "per-key-fifo": "b-per-key-fifo",
+          "unordered": "c-unordered",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-fifo": "fifo",
+          "b-per-key-fifo": "per-key-fifo",
+          "c-unordered": "unordered",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "per-key-fifo",
+          "unclear",
+          "fifo",
+          "unordered"
+        ],
+        "idOf": {
+          "per-key-fifo": "a-per-key-fifo",
+          "unclear": "b-unclear",
+          "fifo": "c-fifo",
+          "unordered": "d-unordered"
+        },
+        "valueOf": {
+          "a-per-key-fifo": "per-key-fifo",
+          "b-unclear": "unclear",
+          "c-fifo": "fifo",
+          "d-unordered": "unordered"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "unordered",
+          "fifo",
+          "per-key-fifo",
+          "unclear"
+        ],
+        "idOf": {
+          "unordered": "a-unordered",
+          "fifo": "b-fifo",
+          "per-key-fifo": "c-per-key-fifo",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-unordered": "unordered",
+          "b-fifo": "fifo",
+          "c-per-key-fifo": "per-key-fifo",
+          "d-unclear": "unclear"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4698,
+      "estimatedTokens": 1880,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 133,
+    "clientMs": 161.4553330000199,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "b-per-key-fifo",
+          "probabilities": {
+            "a-fifo": 0.0311,
+            "b-per-key-fifo": 0.9282,
+            "c-unordered": 0.0213,
+            "d-unclear": 0.0194
+          },
+          "confidence": 0.8177
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "a-per-key-fifo",
+          "probabilities": {
+            "a-per-key-fifo": 0.9305,
+            "b-unclear": 0.0337,
+            "c-fifo": 0.0137,
+            "d-unordered": 0.0221
+          },
+          "confidence": 0.8237
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "c-per-key-fifo",
+          "probabilities": {
+            "a-unordered": 0.0119,
+            "b-fifo": 0.008,
+            "c-per-key-fifo": 0.9499,
+            "d-unclear": 0.0302
+          },
+          "confidence": 0.8713
+        }
+      },
+      "usage": {
+        "input_tokens": 1216,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C12",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "strong",
+          "read-your-writes",
+          "eventual",
+          "unclear"
+        ],
+        "idOf": {
+          "strong": "a-strong",
+          "read-your-writes": "b-read-your-writes",
+          "eventual": "c-eventual",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-strong": "strong",
+          "b-read-your-writes": "read-your-writes",
+          "c-eventual": "eventual",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "eventual",
+          "read-your-writes",
+          "strong",
+          "unclear"
+        ],
+        "idOf": {
+          "eventual": "a-eventual",
+          "read-your-writes": "b-read-your-writes",
+          "strong": "c-strong",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-eventual": "eventual",
+          "b-read-your-writes": "read-your-writes",
+          "c-strong": "strong",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "strong",
+          "unclear",
+          "read-your-writes",
+          "eventual"
+        ],
+        "idOf": {
+          "strong": "a-strong",
+          "unclear": "b-unclear",
+          "read-your-writes": "c-read-your-writes",
+          "eventual": "d-eventual"
+        },
+        "valueOf": {
+          "a-strong": "strong",
+          "b-unclear": "unclear",
+          "c-read-your-writes": "read-your-writes",
+          "d-eventual": "eventual"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4290,
+      "estimatedTokens": 1716,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 136,
+    "clientMs": 165.91649999999208,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "c-eventual",
+          "probabilities": {
+            "a-strong": 0.053,
+            "b-read-your-writes": 0.3947,
+            "c-eventual": 0.4197,
+            "d-unclear": 0.1326
+          },
+          "confidence": 0.1364
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "a-eventual",
+          "probabilities": {
+            "a-eventual": 0.6532,
+            "b-read-your-writes": 0.1997,
+            "c-strong": 0.0184,
+            "d-unclear": 0.1287
+          },
+          "confidence": 0.3112
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "d-eventual",
+          "probabilities": {
+            "a-strong": 0.0161,
+            "b-unclear": 0.1392,
+            "c-read-your-writes": 0.1145,
+            "d-eventual": 0.7302
+          },
+          "confidence": 0.4212
+        }
+      },
+      "usage": {
+        "input_tokens": 1071,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C13",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "strong",
+          "read-your-writes",
+          "eventual",
+          "unclear"
+        ],
+        "idOf": {
+          "strong": "a-strong",
+          "read-your-writes": "b-read-your-writes",
+          "eventual": "c-eventual",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-strong": "strong",
+          "b-read-your-writes": "read-your-writes",
+          "c-eventual": "eventual",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "strong",
+          "unclear",
+          "read-your-writes",
+          "eventual"
+        ],
+        "idOf": {
+          "strong": "a-strong",
+          "unclear": "b-unclear",
+          "read-your-writes": "c-read-your-writes",
+          "eventual": "d-eventual"
+        },
+        "valueOf": {
+          "a-strong": "strong",
+          "b-unclear": "unclear",
+          "c-read-your-writes": "read-your-writes",
+          "d-eventual": "eventual"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "eventual",
+          "strong",
+          "read-your-writes",
+          "unclear"
+        ],
+        "idOf": {
+          "eventual": "a-eventual",
+          "strong": "b-strong",
+          "read-your-writes": "c-read-your-writes",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-eventual": "eventual",
+          "b-strong": "strong",
+          "c-read-your-writes": "read-your-writes",
+          "d-unclear": "unclear"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4076,
+      "estimatedTokens": 1631,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 193,
+    "clientMs": 224.80716699999175,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "c-eventual",
+          "probabilities": {
+            "a-strong": 0.023,
+            "b-read-your-writes": 0.158,
+            "c-eventual": 0.7433,
+            "d-unclear": 0.0757
+          },
+          "confidence": 0.445
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "d-eventual",
+          "probabilities": {
+            "a-strong": 0.0126,
+            "b-unclear": 0.0676,
+            "c-read-your-writes": 0.0486,
+            "d-eventual": 0.8712
+          },
+          "confidence": 0.6882
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "a-eventual",
+          "probabilities": {
+            "a-eventual": 0.8318,
+            "b-strong": 0.0171,
+            "c-read-your-writes": 0.0401,
+            "d-unclear": 0.111
+          },
+          "confidence": 0.6082
+        }
+      },
+      "usage": {
+        "input_tokens": 997,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C14",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "integer",
+          "number",
+          "string",
+          "boolean",
+          "array",
+          "object",
+          "unclear"
+        ],
+        "idOf": {
+          "integer": "a-integer",
+          "number": "b-number",
+          "string": "c-string",
+          "boolean": "d-boolean",
+          "array": "e-array",
+          "object": "f-object",
+          "unclear": "g-unclear"
+        },
+        "valueOf": {
+          "a-integer": "integer",
+          "b-number": "number",
+          "c-string": "string",
+          "d-boolean": "boolean",
+          "e-array": "array",
+          "f-object": "object",
+          "g-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "array",
+          "unclear",
+          "object",
+          "number",
+          "integer",
+          "string",
+          "boolean"
+        ],
+        "idOf": {
+          "array": "a-array",
+          "unclear": "b-unclear",
+          "object": "c-object",
+          "number": "d-number",
+          "integer": "e-integer",
+          "string": "f-string",
+          "boolean": "g-boolean"
+        },
+        "valueOf": {
+          "a-array": "array",
+          "b-unclear": "unclear",
+          "c-object": "object",
+          "d-number": "number",
+          "e-integer": "integer",
+          "f-string": "string",
+          "g-boolean": "boolean"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "integer",
+          "number",
+          "object",
+          "boolean",
+          "string",
+          "unclear",
+          "array"
+        ],
+        "idOf": {
+          "integer": "a-integer",
+          "number": "b-number",
+          "object": "c-object",
+          "boolean": "d-boolean",
+          "string": "e-string",
+          "unclear": "f-unclear",
+          "array": "g-array"
+        },
+        "valueOf": {
+          "a-integer": "integer",
+          "b-number": "number",
+          "c-object": "object",
+          "d-boolean": "boolean",
+          "e-string": "string",
+          "f-unclear": "unclear",
+          "g-array": "array"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4342,
+      "estimatedTokens": 1737,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 161,
+    "clientMs": 191.1075000000128,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "c-string",
+          "probabilities": {
+            "a-integer": 0.0054,
+            "b-number": 0.004,
+            "c-string": 0.967,
+            "d-boolean": 0.0045,
+            "e-array": 0.0059,
+            "f-object": 0.006,
+            "g-unclear": 0.0072
+          },
+          "confidence": 0.9245
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "f-string",
+          "probabilities": {
+            "a-array": 0.0028,
+            "b-unclear": 0.0049,
+            "c-object": 0.003,
+            "d-number": 0.0028,
+            "e-integer": 0.0042,
+            "f-string": 0.9799,
+            "g-boolean": 0.0024
+          },
+          "confidence": 0.9538
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "e-string",
+          "probabilities": {
+            "a-integer": 0.0036,
+            "b-number": 0.0024,
+            "c-object": 0.0025,
+            "d-boolean": 0.0022,
+            "e-string": 0.9777,
+            "f-unclear": 0.0091,
+            "g-array": 0.0025
+          },
+          "confidence": 0.9488
+        }
+      },
+      "usage": {
+        "input_tokens": 1172,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C15",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "strong",
+          "read-your-writes",
+          "eventual",
+          "unclear"
+        ],
+        "idOf": {
+          "strong": "a-strong",
+          "read-your-writes": "b-read-your-writes",
+          "eventual": "c-eventual",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-strong": "strong",
+          "b-read-your-writes": "read-your-writes",
+          "c-eventual": "eventual",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "eventual",
+          "strong",
+          "unclear",
+          "read-your-writes"
+        ],
+        "idOf": {
+          "eventual": "a-eventual",
+          "strong": "b-strong",
+          "unclear": "c-unclear",
+          "read-your-writes": "d-read-your-writes"
+        },
+        "valueOf": {
+          "a-eventual": "eventual",
+          "b-strong": "strong",
+          "c-unclear": "unclear",
+          "d-read-your-writes": "read-your-writes"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "read-your-writes",
+          "strong",
+          "eventual",
+          "unclear"
+        ],
+        "idOf": {
+          "read-your-writes": "a-read-your-writes",
+          "strong": "b-strong",
+          "eventual": "c-eventual",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-read-your-writes": "read-your-writes",
+          "b-strong": "strong",
+          "c-eventual": "eventual",
+          "d-unclear": "unclear"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4254,
+      "estimatedTokens": 1702,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 141,
+    "clientMs": 171.2840000000142,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "a-strong": 0.1188,
+            "b-read-your-writes": 0.6272,
+            "c-eventual": 0.1496,
+            "d-unclear": 0.1044
+          },
+          "confidence": 0.2543
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "d-read-your-writes",
+          "probabilities": {
+            "a-eventual": 0.0882,
+            "b-strong": 0.1424,
+            "c-unclear": 0.1345,
+            "d-read-your-writes": 0.6349
+          },
+          "confidence": 0.2657
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "a-read-your-writes",
+          "probabilities": {
+            "a-read-your-writes": 0.4012,
+            "b-strong": 0.3188,
+            "c-eventual": 0.1099,
+            "d-unclear": 0.1701
+          },
+          "confidence": 0.0715
+        }
+      },
+      "usage": {
+        "input_tokens": 1084,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C16",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "required",
+          "optional",
+          "absent",
+          "unclear"
+        ],
+        "idOf": {
+          "required": "a-required",
+          "optional": "b-optional",
+          "absent": "c-absent",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-required": "required",
+          "b-optional": "optional",
+          "c-absent": "absent",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "absent",
+          "unclear",
+          "optional",
+          "required"
+        ],
+        "idOf": {
+          "absent": "a-absent",
+          "unclear": "b-unclear",
+          "optional": "c-optional",
+          "required": "d-required"
+        },
+        "valueOf": {
+          "a-absent": "absent",
+          "b-unclear": "unclear",
+          "c-optional": "optional",
+          "d-required": "required"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "optional",
+          "absent",
+          "required",
+          "unclear"
+        ],
+        "idOf": {
+          "optional": "a-optional",
+          "absent": "b-absent",
+          "required": "c-required",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-optional": "optional",
+          "b-absent": "absent",
+          "c-required": "required",
+          "d-unclear": "unclear"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 3644,
+      "estimatedTokens": 1458,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 268,
+    "clientMs": 317.19912500001374,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "b-optional",
+          "probabilities": {
+            "a-required": 0.0142,
+            "b-optional": 0.963,
+            "c-absent": 0.0105,
+            "d-unclear": 0.0123
+          },
+          "confidence": 0.9037
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "c-optional",
+          "probabilities": {
+            "a-absent": 0.0147,
+            "b-unclear": 0.0177,
+            "c-optional": 0.9546,
+            "d-required": 0.013
+          },
+          "confidence": 0.8826
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "a-optional",
+          "probabilities": {
+            "a-optional": 0.9651,
+            "b-absent": 0.01,
+            "c-required": 0.0116,
+            "d-unclear": 0.0133
+          },
+          "confidence": 0.9092
+        }
+      },
+      "usage": {
+        "input_tokens": 967,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C17",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "required",
+          "optional",
+          "absent",
+          "unclear"
+        ],
+        "idOf": {
+          "required": "a-required",
+          "optional": "b-optional",
+          "absent": "c-absent",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-required": "required",
+          "b-optional": "optional",
+          "c-absent": "absent",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "absent",
+          "required",
+          "unclear",
+          "optional"
+        ],
+        "idOf": {
+          "absent": "a-absent",
+          "required": "b-required",
+          "unclear": "c-unclear",
+          "optional": "d-optional"
+        },
+        "valueOf": {
+          "a-absent": "absent",
+          "b-required": "required",
+          "c-unclear": "unclear",
+          "d-optional": "optional"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "required",
+          "optional",
+          "unclear",
+          "absent"
+        ],
+        "idOf": {
+          "required": "a-required",
+          "optional": "b-optional",
+          "unclear": "c-unclear",
+          "absent": "d-absent"
+        },
+        "valueOf": {
+          "a-required": "required",
+          "b-optional": "optional",
+          "c-unclear": "unclear",
+          "d-absent": "absent"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 3679,
+      "estimatedTokens": 1472,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 292,
+    "clientMs": 320.5026669999934,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "b-optional",
+          "probabilities": {
+            "a-required": 0.005,
+            "b-optional": 0.9813,
+            "c-absent": 0.0041,
+            "d-unclear": 0.0096
+          },
+          "confidence": 0.9509
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "d-optional",
+          "probabilities": {
+            "a-absent": 0.006,
+            "b-required": 0.0081,
+            "c-unclear": 0.0151,
+            "d-optional": 0.9708
+          },
+          "confidence": 0.9237
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "b-optional",
+          "probabilities": {
+            "a-required": 0.0062,
+            "b-optional": 0.958,
+            "c-unclear": 0.0266,
+            "d-absent": 0.0092
+          },
+          "confidence": 0.8915
+        }
+      },
+      "usage": {
+        "input_tokens": 934,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C18",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "required",
+          "optional",
+          "absent",
+          "unclear"
+        ],
+        "idOf": {
+          "required": "a-required",
+          "optional": "b-optional",
+          "absent": "c-absent",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-required": "required",
+          "b-optional": "optional",
+          "c-absent": "absent",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "optional",
+          "absent",
+          "required",
+          "unclear"
+        ],
+        "idOf": {
+          "optional": "a-optional",
+          "absent": "b-absent",
+          "required": "c-required",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-optional": "optional",
+          "b-absent": "absent",
+          "c-required": "required",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "required",
+          "unclear",
+          "optional",
+          "absent"
+        ],
+        "idOf": {
+          "required": "a-required",
+          "unclear": "b-unclear",
+          "optional": "c-optional",
+          "absent": "d-absent"
+        },
+        "valueOf": {
+          "a-required": "required",
+          "b-unclear": "unclear",
+          "c-optional": "optional",
+          "d-absent": "absent"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4015,
+      "estimatedTokens": 1606,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 136,
+    "clientMs": 162.08862500000396,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "a-required",
+          "probabilities": {
+            "a-required": 0.9588,
+            "b-optional": 0.0156,
+            "c-absent": 0.011,
+            "d-unclear": 0.0146
+          },
+          "confidence": 0.8932
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "c-required",
+          "probabilities": {
+            "a-optional": 0.015,
+            "b-absent": 0.0083,
+            "c-required": 0.9593,
+            "d-unclear": 0.0174
+          },
+          "confidence": 0.8943
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "a-required",
+          "probabilities": {
+            "a-required": 0.9552,
+            "b-unclear": 0.0219,
+            "c-optional": 0.0151,
+            "d-absent": 0.0078
+          },
+          "confidence": 0.8843
+        }
+      },
+      "usage": {
+        "input_tokens": 996,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C19",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "required",
+          "optional",
+          "absent",
+          "unclear"
+        ],
+        "idOf": {
+          "required": "a-required",
+          "optional": "b-optional",
+          "absent": "c-absent",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-required": "required",
+          "b-optional": "optional",
+          "c-absent": "absent",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "unclear",
+          "optional",
+          "absent",
+          "required"
+        ],
+        "idOf": {
+          "unclear": "a-unclear",
+          "optional": "b-optional",
+          "absent": "c-absent",
+          "required": "d-required"
+        },
+        "valueOf": {
+          "a-unclear": "unclear",
+          "b-optional": "optional",
+          "c-absent": "absent",
+          "d-required": "required"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "required",
+          "unclear",
+          "absent",
+          "optional"
+        ],
+        "idOf": {
+          "required": "a-required",
+          "unclear": "b-unclear",
+          "absent": "c-absent",
+          "optional": "d-optional"
+        },
+        "valueOf": {
+          "a-required": "required",
+          "b-unclear": "unclear",
+          "c-absent": "absent",
+          "d-optional": "optional"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 3677,
+      "estimatedTokens": 1471,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 187,
+    "clientMs": 223.42933300000732,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "c-absent",
+          "probabilities": {
+            "a-required": 0.0045,
+            "b-optional": 0.0065,
+            "c-absent": 0.982,
+            "d-unclear": 0.007
+          },
+          "confidence": 0.9527
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "c-absent",
+          "probabilities": {
+            "a-unclear": 0.006,
+            "b-optional": 0.004,
+            "c-absent": 0.9852,
+            "d-required": 0.0048
+          },
+          "confidence": 0.9608
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "c-absent",
+          "probabilities": {
+            "a-required": 0.0033,
+            "b-unclear": 0.0046,
+            "c-absent": 0.9881,
+            "d-optional": 0.004
+          },
+          "confidence": 0.9684
+        }
+      },
+      "usage": {
+        "input_tokens": 966,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C20",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "owner",
+          "admin",
+          "maintainer",
+          "member",
+          "authenticated",
+          "anyone",
+          "unclear"
+        ],
+        "idOf": {
+          "owner": "a-owner",
+          "admin": "b-admin",
+          "maintainer": "c-maintainer",
+          "member": "d-member",
+          "authenticated": "e-authenticated",
+          "anyone": "f-anyone",
+          "unclear": "g-unclear"
+        },
+        "valueOf": {
+          "a-owner": "owner",
+          "b-admin": "admin",
+          "c-maintainer": "maintainer",
+          "d-member": "member",
+          "e-authenticated": "authenticated",
+          "f-anyone": "anyone",
+          "g-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "admin",
+          "member",
+          "authenticated",
+          "anyone",
+          "unclear",
+          "maintainer",
+          "owner"
+        ],
+        "idOf": {
+          "admin": "a-admin",
+          "member": "b-member",
+          "authenticated": "c-authenticated",
+          "anyone": "d-anyone",
+          "unclear": "e-unclear",
+          "maintainer": "f-maintainer",
+          "owner": "g-owner"
+        },
+        "valueOf": {
+          "a-admin": "admin",
+          "b-member": "member",
+          "c-authenticated": "authenticated",
+          "d-anyone": "anyone",
+          "e-unclear": "unclear",
+          "f-maintainer": "maintainer",
+          "g-owner": "owner"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "owner",
+          "member",
+          "admin",
+          "maintainer",
+          "anyone",
+          "unclear",
+          "authenticated"
+        ],
+        "idOf": {
+          "owner": "a-owner",
+          "member": "b-member",
+          "admin": "c-admin",
+          "maintainer": "d-maintainer",
+          "anyone": "e-anyone",
+          "unclear": "f-unclear",
+          "authenticated": "g-authenticated"
+        },
+        "valueOf": {
+          "a-owner": "owner",
+          "b-member": "member",
+          "c-admin": "admin",
+          "d-maintainer": "maintainer",
+          "e-anyone": "anyone",
+          "f-unclear": "unclear",
+          "g-authenticated": "authenticated"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4555,
+      "estimatedTokens": 1822,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 177,
+    "clientMs": 214.51433400000678,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "b-admin",
+          "probabilities": {
+            "a-owner": 0.0079,
+            "b-admin": 0.9474,
+            "c-maintainer": 0.0221,
+            "d-member": 0.006,
+            "e-authenticated": 0.004,
+            "f-anyone": 0.0027,
+            "g-unclear": 0.0099
+          },
+          "confidence": 0.8814
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "a-admin",
+          "probabilities": {
+            "a-admin": 0.8527,
+            "b-member": 0.0198,
+            "c-authenticated": 0.0099,
+            "d-anyone": 0.0046,
+            "e-unclear": 0.0758,
+            "f-maintainer": 0.0275,
+            "g-owner": 0.0097
+          },
+          "confidence": 0.6899
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "c-admin",
+          "probabilities": {
+            "a-owner": 0.0069,
+            "b-member": 0.0103,
+            "c-admin": 0.9084,
+            "d-maintainer": 0.0198,
+            "e-anyone": 0.0032,
+            "f-unclear": 0.0466,
+            "g-authenticated": 0.0048
+          },
+          "confidence": 0.7993
+        }
+      },
+      "usage": {
+        "input_tokens": 1115,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C21",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "owner",
+          "admin",
+          "maintainer",
+          "member",
+          "authenticated",
+          "anyone",
+          "unclear"
+        ],
+        "idOf": {
+          "owner": "a-owner",
+          "admin": "b-admin",
+          "maintainer": "c-maintainer",
+          "member": "d-member",
+          "authenticated": "e-authenticated",
+          "anyone": "f-anyone",
+          "unclear": "g-unclear"
+        },
+        "valueOf": {
+          "a-owner": "owner",
+          "b-admin": "admin",
+          "c-maintainer": "maintainer",
+          "d-member": "member",
+          "e-authenticated": "authenticated",
+          "f-anyone": "anyone",
+          "g-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "authenticated",
+          "admin",
+          "unclear",
+          "owner",
+          "anyone",
+          "member",
+          "maintainer"
+        ],
+        "idOf": {
+          "authenticated": "a-authenticated",
+          "admin": "b-admin",
+          "unclear": "c-unclear",
+          "owner": "d-owner",
+          "anyone": "e-anyone",
+          "member": "f-member",
+          "maintainer": "g-maintainer"
+        },
+        "valueOf": {
+          "a-authenticated": "authenticated",
+          "b-admin": "admin",
+          "c-unclear": "unclear",
+          "d-owner": "owner",
+          "e-anyone": "anyone",
+          "f-member": "member",
+          "g-maintainer": "maintainer"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "member",
+          "anyone",
+          "unclear",
+          "owner",
+          "maintainer",
+          "authenticated",
+          "admin"
+        ],
+        "idOf": {
+          "member": "a-member",
+          "anyone": "b-anyone",
+          "unclear": "c-unclear",
+          "owner": "d-owner",
+          "maintainer": "e-maintainer",
+          "authenticated": "f-authenticated",
+          "admin": "g-admin"
+        },
+        "valueOf": {
+          "a-member": "member",
+          "b-anyone": "anyone",
+          "c-unclear": "unclear",
+          "d-owner": "owner",
+          "e-maintainer": "maintainer",
+          "f-authenticated": "authenticated",
+          "g-admin": "admin"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4420,
+      "estimatedTokens": 1768,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 150,
+    "clientMs": 180.29120800000965,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "d-member",
+          "probabilities": {
+            "a-owner": 0.0074,
+            "b-admin": 0.0135,
+            "c-maintainer": 0.015,
+            "d-member": 0.928,
+            "e-authenticated": 0.0202,
+            "f-anyone": 0.0054,
+            "g-unclear": 0.0105
+          },
+          "confidence": 0.8391
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "f-member",
+          "probabilities": {
+            "a-authenticated": 0.0249,
+            "b-admin": 0.0097,
+            "c-unclear": 0.0182,
+            "d-owner": 0.0048,
+            "e-anyone": 0.0052,
+            "f-member": 0.9258,
+            "g-maintainer": 0.0114
+          },
+          "confidence": 0.8347
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "a-member",
+          "probabilities": {
+            "a-member": 0.9332,
+            "b-anyone": 0.0053,
+            "c-unclear": 0.0227,
+            "d-owner": 0.0058,
+            "e-maintainer": 0.0071,
+            "f-authenticated": 0.0154,
+            "g-admin": 0.0105
+          },
+          "confidence": 0.8505
+        }
+      },
+      "usage": {
+        "input_tokens": 1057,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C22",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "owner",
+          "admin",
+          "maintainer",
+          "member",
+          "authenticated",
+          "anyone",
+          "unclear"
+        ],
+        "idOf": {
+          "owner": "a-owner",
+          "admin": "b-admin",
+          "maintainer": "c-maintainer",
+          "member": "d-member",
+          "authenticated": "e-authenticated",
+          "anyone": "f-anyone",
+          "unclear": "g-unclear"
+        },
+        "valueOf": {
+          "a-owner": "owner",
+          "b-admin": "admin",
+          "c-maintainer": "maintainer",
+          "d-member": "member",
+          "e-authenticated": "authenticated",
+          "f-anyone": "anyone",
+          "g-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "admin",
+          "authenticated",
+          "owner",
+          "unclear",
+          "maintainer",
+          "member",
+          "anyone"
+        ],
+        "idOf": {
+          "admin": "a-admin",
+          "authenticated": "b-authenticated",
+          "owner": "c-owner",
+          "unclear": "d-unclear",
+          "maintainer": "e-maintainer",
+          "member": "f-member",
+          "anyone": "g-anyone"
+        },
+        "valueOf": {
+          "a-admin": "admin",
+          "b-authenticated": "authenticated",
+          "c-owner": "owner",
+          "d-unclear": "unclear",
+          "e-maintainer": "maintainer",
+          "f-member": "member",
+          "g-anyone": "anyone"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "anyone",
+          "member",
+          "maintainer",
+          "unclear",
+          "admin",
+          "owner",
+          "authenticated"
+        ],
+        "idOf": {
+          "anyone": "a-anyone",
+          "member": "b-member",
+          "maintainer": "c-maintainer",
+          "unclear": "d-unclear",
+          "admin": "e-admin",
+          "owner": "f-owner",
+          "authenticated": "g-authenticated"
+        },
+        "valueOf": {
+          "a-anyone": "anyone",
+          "b-member": "member",
+          "c-maintainer": "maintainer",
+          "d-unclear": "unclear",
+          "e-admin": "admin",
+          "f-owner": "owner",
+          "g-authenticated": "authenticated"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4903,
+      "estimatedTokens": 1962,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 381,
+    "clientMs": 408.7805000000226,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "e-authenticated",
+          "probabilities": {
+            "a-owner": 0.0024,
+            "b-admin": 0.0031,
+            "c-maintainer": 0.0036,
+            "d-member": 0.0209,
+            "e-authenticated": 0.9526,
+            "f-anyone": 0.0136,
+            "g-unclear": 0.0038
+          },
+          "confidence": 0.8928
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "b-authenticated",
+          "probabilities": {
+            "a-admin": 0.0014,
+            "b-authenticated": 0.9822,
+            "c-owner": 0.0015,
+            "d-unclear": 0.0037,
+            "e-maintainer": 0.0022,
+            "f-member": 0.0025,
+            "g-anyone": 0.0065
+          },
+          "confidence": 0.959
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "g-authenticated",
+          "probabilities": {
+            "a-anyone": 0.0047,
+            "b-member": 0.0025,
+            "c-maintainer": 0.0017,
+            "d-unclear": 0.0038,
+            "e-admin": 0.0016,
+            "f-owner": 0.0011,
+            "g-authenticated": 0.9846
+          },
+          "confidence": 0.9643
+        }
+      },
+      "usage": {
+        "input_tokens": 1169,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C23",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "owner",
+          "admin",
+          "maintainer",
+          "member",
+          "authenticated",
+          "anyone",
+          "unclear"
+        ],
+        "idOf": {
+          "owner": "a-owner",
+          "admin": "b-admin",
+          "maintainer": "c-maintainer",
+          "member": "d-member",
+          "authenticated": "e-authenticated",
+          "anyone": "f-anyone",
+          "unclear": "g-unclear"
+        },
+        "valueOf": {
+          "a-owner": "owner",
+          "b-admin": "admin",
+          "c-maintainer": "maintainer",
+          "d-member": "member",
+          "e-authenticated": "authenticated",
+          "f-anyone": "anyone",
+          "g-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "anyone",
+          "maintainer",
+          "member",
+          "authenticated",
+          "owner",
+          "unclear",
+          "admin"
+        ],
+        "idOf": {
+          "anyone": "a-anyone",
+          "maintainer": "b-maintainer",
+          "member": "c-member",
+          "authenticated": "d-authenticated",
+          "owner": "e-owner",
+          "unclear": "f-unclear",
+          "admin": "g-admin"
+        },
+        "valueOf": {
+          "a-anyone": "anyone",
+          "b-maintainer": "maintainer",
+          "c-member": "member",
+          "d-authenticated": "authenticated",
+          "e-owner": "owner",
+          "f-unclear": "unclear",
+          "g-admin": "admin"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "anyone",
+          "admin",
+          "member",
+          "maintainer",
+          "authenticated",
+          "unclear",
+          "owner"
+        ],
+        "idOf": {
+          "anyone": "a-anyone",
+          "admin": "b-admin",
+          "member": "c-member",
+          "maintainer": "d-maintainer",
+          "authenticated": "e-authenticated",
+          "unclear": "f-unclear",
+          "owner": "g-owner"
+        },
+        "valueOf": {
+          "a-anyone": "anyone",
+          "b-admin": "admin",
+          "c-member": "member",
+          "d-maintainer": "maintainer",
+          "e-authenticated": "authenticated",
+          "f-unclear": "unclear",
+          "g-owner": "owner"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4486,
+      "estimatedTokens": 1795,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 197,
+    "clientMs": 218.22004200000083,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "b-admin",
+          "probabilities": {
+            "a-owner": 0.0075,
+            "b-admin": 0.9658,
+            "c-maintainer": 0.0079,
+            "d-member": 0.0031,
+            "e-authenticated": 0.0033,
+            "f-anyone": 0.0029,
+            "g-unclear": 0.0095
+          },
+          "confidence": 0.9218
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "g-admin",
+          "probabilities": {
+            "a-anyone": 0.0026,
+            "b-maintainer": 0.0122,
+            "c-member": 0.0033,
+            "d-authenticated": 0.0037,
+            "e-owner": 0.0074,
+            "f-unclear": 0.0155,
+            "g-admin": 0.9553
+          },
+          "confidence": 0.8986
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "b-admin",
+          "probabilities": {
+            "a-anyone": 0.0025,
+            "b-admin": 0.9569,
+            "c-member": 0.0039,
+            "d-maintainer": 0.0101,
+            "e-authenticated": 0.0038,
+            "f-unclear": 0.0125,
+            "g-owner": 0.0103
+          },
+          "confidence": 0.902
+        }
+      },
+      "usage": {
+        "input_tokens": 1091,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C24",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "pure",
+          "idempotent",
+          "non-idempotent",
+          "unclear"
+        ],
+        "idOf": {
+          "pure": "a-pure",
+          "idempotent": "b-idempotent",
+          "non-idempotent": "c-non-idempotent",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-pure": "pure",
+          "b-idempotent": "idempotent",
+          "c-non-idempotent": "non-idempotent",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "unclear",
+          "idempotent",
+          "pure",
+          "non-idempotent"
+        ],
+        "idOf": {
+          "unclear": "a-unclear",
+          "idempotent": "b-idempotent",
+          "pure": "c-pure",
+          "non-idempotent": "d-non-idempotent"
+        },
+        "valueOf": {
+          "a-unclear": "unclear",
+          "b-idempotent": "idempotent",
+          "c-pure": "pure",
+          "d-non-idempotent": "non-idempotent"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "pure",
+          "unclear",
+          "non-idempotent",
+          "idempotent"
+        ],
+        "idOf": {
+          "pure": "a-pure",
+          "unclear": "b-unclear",
+          "non-idempotent": "c-non-idempotent",
+          "idempotent": "d-idempotent"
+        },
+        "valueOf": {
+          "a-pure": "pure",
+          "b-unclear": "unclear",
+          "c-non-idempotent": "non-idempotent",
+          "d-idempotent": "idempotent"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 3950,
+      "estimatedTokens": 1580,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 303,
+    "clientMs": 338.3125,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "c-non-idempotent",
+          "probabilities": {
+            "a-pure": 0.0235,
+            "b-idempotent": 0.1991,
+            "c-non-idempotent": 0.6524,
+            "d-unclear": 0.125
+          },
+          "confidence": 0.3086
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "d-non-idempotent",
+          "probabilities": {
+            "a-unclear": 0.1125,
+            "b-idempotent": 0.0671,
+            "c-pure": 0.0145,
+            "d-non-idempotent": 0.8059
+          },
+          "confidence": 0.5557
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "c-non-idempotent",
+          "probabilities": {
+            "a-pure": 0.0096,
+            "b-unclear": 0.1193,
+            "c-non-idempotent": 0.8157,
+            "d-idempotent": 0.0554
+          },
+          "confidence": 0.577
+        }
+      },
+      "usage": {
+        "input_tokens": 995,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C25",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "pure",
+          "idempotent",
+          "non-idempotent",
+          "unclear"
+        ],
+        "idOf": {
+          "pure": "a-pure",
+          "idempotent": "b-idempotent",
+          "non-idempotent": "c-non-idempotent",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-pure": "pure",
+          "b-idempotent": "idempotent",
+          "c-non-idempotent": "non-idempotent",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "idempotent",
+          "non-idempotent",
+          "unclear",
+          "pure"
+        ],
+        "idOf": {
+          "idempotent": "a-idempotent",
+          "non-idempotent": "b-non-idempotent",
+          "unclear": "c-unclear",
+          "pure": "d-pure"
+        },
+        "valueOf": {
+          "a-idempotent": "idempotent",
+          "b-non-idempotent": "non-idempotent",
+          "c-unclear": "unclear",
+          "d-pure": "pure"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "unclear",
+          "idempotent",
+          "non-idempotent",
+          "pure"
+        ],
+        "idOf": {
+          "unclear": "a-unclear",
+          "idempotent": "b-idempotent",
+          "non-idempotent": "c-non-idempotent",
+          "pure": "d-pure"
+        },
+        "valueOf": {
+          "a-unclear": "unclear",
+          "b-idempotent": "idempotent",
+          "c-non-idempotent": "non-idempotent",
+          "d-pure": "pure"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 3731,
+      "estimatedTokens": 1493,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 256,
+    "clientMs": 275.79716700001154,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "b-idempotent",
+          "probabilities": {
+            "a-pure": 0.0274,
+            "b-idempotent": 0.9203,
+            "c-non-idempotent": 0.0223,
+            "d-unclear": 0.03
+          },
+          "confidence": 0.7989
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "a-idempotent",
+          "probabilities": {
+            "a-idempotent": 0.9613,
+            "b-non-idempotent": 0.0137,
+            "c-unclear": 0.0175,
+            "d-pure": 0.0075
+          },
+          "confidence": 0.8996
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "b-idempotent",
+          "probabilities": {
+            "a-unclear": 0.0104,
+            "b-idempotent": 0.9772,
+            "c-non-idempotent": 0.0074,
+            "d-pure": 0.005
+          },
+          "confidence": 0.9401
+        }
+      },
+      "usage": {
+        "input_tokens": 940,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C26",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "pure",
+          "idempotent",
+          "non-idempotent",
+          "unclear"
+        ],
+        "idOf": {
+          "pure": "a-pure",
+          "idempotent": "b-idempotent",
+          "non-idempotent": "c-non-idempotent",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-pure": "pure",
+          "b-idempotent": "idempotent",
+          "c-non-idempotent": "non-idempotent",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "pure",
+          "idempotent",
+          "unclear",
+          "non-idempotent"
+        ],
+        "idOf": {
+          "pure": "a-pure",
+          "idempotent": "b-idempotent",
+          "unclear": "c-unclear",
+          "non-idempotent": "d-non-idempotent"
+        },
+        "valueOf": {
+          "a-pure": "pure",
+          "b-idempotent": "idempotent",
+          "c-unclear": "unclear",
+          "d-non-idempotent": "non-idempotent"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "pure",
+          "unclear",
+          "non-idempotent",
+          "idempotent"
+        ],
+        "idOf": {
+          "pure": "a-pure",
+          "unclear": "b-unclear",
+          "non-idempotent": "c-non-idempotent",
+          "idempotent": "d-idempotent"
+        },
+        "valueOf": {
+          "a-pure": "pure",
+          "b-unclear": "unclear",
+          "c-non-idempotent": "non-idempotent",
+          "d-idempotent": "idempotent"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 3796,
+      "estimatedTokens": 1519,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 180,
+    "clientMs": 211.8612499999872,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "b-idempotent",
+          "probabilities": {
+            "a-pure": 0.0059,
+            "b-idempotent": 0.9621,
+            "c-non-idempotent": 0.0135,
+            "d-unclear": 0.0185
+          },
+          "confidence": 0.9015
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "b-idempotent",
+          "probabilities": {
+            "a-pure": 0.0022,
+            "b-idempotent": 0.983,
+            "c-unclear": 0.0076,
+            "d-non-idempotent": 0.0072
+          },
+          "confidence": 0.9552
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "d-idempotent",
+          "probabilities": {
+            "a-pure": 0.0019,
+            "b-unclear": 0.0083,
+            "c-non-idempotent": 0.0048,
+            "d-idempotent": 0.985
+          },
+          "confidence": 0.9605
+        }
+      },
+      "usage": {
+        "input_tokens": 967,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C27",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "le-1",
+          "le-10",
+          "le-100",
+          "le-1k",
+          "le-10k",
+          "le-100k",
+          "le-1m",
+          "unbounded",
+          "unclear"
+        ],
+        "idOf": {
+          "le-1": "a-le-1",
+          "le-10": "b-le-10",
+          "le-100": "c-le-100",
+          "le-1k": "d-le-1k",
+          "le-10k": "e-le-10k",
+          "le-100k": "f-le-100k",
+          "le-1m": "g-le-1m",
+          "unbounded": "h-unbounded",
+          "unclear": "i-unclear"
+        },
+        "valueOf": {
+          "a-le-1": "le-1",
+          "b-le-10": "le-10",
+          "c-le-100": "le-100",
+          "d-le-1k": "le-1k",
+          "e-le-10k": "le-10k",
+          "f-le-100k": "le-100k",
+          "g-le-1m": "le-1m",
+          "h-unbounded": "unbounded",
+          "i-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "le-10k",
+          "unbounded",
+          "le-10",
+          "unclear",
+          "le-100",
+          "le-100k",
+          "le-1k",
+          "le-1m",
+          "le-1"
+        ],
+        "idOf": {
+          "le-10k": "a-le-10k",
+          "unbounded": "b-unbounded",
+          "le-10": "c-le-10",
+          "unclear": "d-unclear",
+          "le-100": "e-le-100",
+          "le-100k": "f-le-100k",
+          "le-1k": "g-le-1k",
+          "le-1m": "h-le-1m",
+          "le-1": "i-le-1"
+        },
+        "valueOf": {
+          "a-le-10k": "le-10k",
+          "b-unbounded": "unbounded",
+          "c-le-10": "le-10",
+          "d-unclear": "unclear",
+          "e-le-100": "le-100",
+          "f-le-100k": "le-100k",
+          "g-le-1k": "le-1k",
+          "h-le-1m": "le-1m",
+          "i-le-1": "le-1"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "le-10k",
+          "le-100",
+          "le-1k",
+          "le-100k",
+          "le-1m",
+          "le-1",
+          "unclear",
+          "le-10",
+          "unbounded"
+        ],
+        "idOf": {
+          "le-10k": "a-le-10k",
+          "le-100": "b-le-100",
+          "le-1k": "c-le-1k",
+          "le-100k": "d-le-100k",
+          "le-1m": "e-le-1m",
+          "le-1": "f-le-1",
+          "unclear": "g-unclear",
+          "le-10": "h-le-10",
+          "unbounded": "i-unbounded"
+        },
+        "valueOf": {
+          "a-le-10k": "le-10k",
+          "b-le-100": "le-100",
+          "c-le-1k": "le-1k",
+          "d-le-100k": "le-100k",
+          "e-le-1m": "le-1m",
+          "f-le-1": "le-1",
+          "g-unclear": "unclear",
+          "h-le-10": "le-10",
+          "i-unbounded": "unbounded"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4760,
+      "estimatedTokens": 1904,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 566,
+    "clientMs": 594.3677500000049,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "d-le-1k",
+          "probabilities": {
+            "a-le-1": 0.0045,
+            "b-le-10": 0.0047,
+            "c-le-100": 0.0158,
+            "d-le-1k": 0.9511,
+            "e-le-10k": 0.0073,
+            "f-le-100k": 0.0041,
+            "g-le-1m": 0.0036,
+            "h-unbounded": 0.0046,
+            "i-unclear": 0.0043
+          },
+          "confidence": 0.8932
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "g-le-1k",
+          "probabilities": {
+            "a-le-10k": 0.0049,
+            "b-unbounded": 0.002,
+            "c-le-10": 0.0023,
+            "d-unclear": 0.0024,
+            "e-le-100": 0.0038,
+            "f-le-100k": 0.0025,
+            "g-le-1k": 0.9774,
+            "h-le-1m": 0.0021,
+            "i-le-1": 0.0026
+          },
+          "confidence": 0.9497
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "c-le-1k",
+          "probabilities": {
+            "a-le-10k": 0.0041,
+            "b-le-100": 0.0049,
+            "c-le-1k": 0.9724,
+            "d-le-100k": 0.0032,
+            "e-le-1m": 0.0026,
+            "f-le-1": 0.0028,
+            "g-unclear": 0.0037,
+            "h-le-10": 0.0028,
+            "i-unbounded": 0.0035
+          },
+          "confidence": 0.9389
+        }
+      },
+      "usage": {
+        "input_tokens": 1505,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C28",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "le-1",
+          "le-10",
+          "le-100",
+          "le-1k",
+          "le-10k",
+          "le-100k",
+          "le-1m",
+          "unbounded",
+          "unclear"
+        ],
+        "idOf": {
+          "le-1": "a-le-1",
+          "le-10": "b-le-10",
+          "le-100": "c-le-100",
+          "le-1k": "d-le-1k",
+          "le-10k": "e-le-10k",
+          "le-100k": "f-le-100k",
+          "le-1m": "g-le-1m",
+          "unbounded": "h-unbounded",
+          "unclear": "i-unclear"
+        },
+        "valueOf": {
+          "a-le-1": "le-1",
+          "b-le-10": "le-10",
+          "c-le-100": "le-100",
+          "d-le-1k": "le-1k",
+          "e-le-10k": "le-10k",
+          "f-le-100k": "le-100k",
+          "g-le-1m": "le-1m",
+          "h-unbounded": "unbounded",
+          "i-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "unbounded",
+          "le-1m",
+          "le-1",
+          "le-100",
+          "le-10k",
+          "le-100k",
+          "le-10",
+          "le-1k",
+          "unclear"
+        ],
+        "idOf": {
+          "unbounded": "a-unbounded",
+          "le-1m": "b-le-1m",
+          "le-1": "c-le-1",
+          "le-100": "d-le-100",
+          "le-10k": "e-le-10k",
+          "le-100k": "f-le-100k",
+          "le-10": "g-le-10",
+          "le-1k": "h-le-1k",
+          "unclear": "i-unclear"
+        },
+        "valueOf": {
+          "a-unbounded": "unbounded",
+          "b-le-1m": "le-1m",
+          "c-le-1": "le-1",
+          "d-le-100": "le-100",
+          "e-le-10k": "le-10k",
+          "f-le-100k": "le-100k",
+          "g-le-10": "le-10",
+          "h-le-1k": "le-1k",
+          "i-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "unclear",
+          "le-1m",
+          "le-100k",
+          "unbounded",
+          "le-10k",
+          "le-10",
+          "le-1k",
+          "le-100",
+          "le-1"
+        ],
+        "idOf": {
+          "unclear": "a-unclear",
+          "le-1m": "b-le-1m",
+          "le-100k": "c-le-100k",
+          "unbounded": "d-unbounded",
+          "le-10k": "e-le-10k",
+          "le-10": "f-le-10",
+          "le-1k": "g-le-1k",
+          "le-100": "h-le-100",
+          "le-1": "i-le-1"
+        },
+        "valueOf": {
+          "a-unclear": "unclear",
+          "b-le-1m": "le-1m",
+          "c-le-100k": "le-100k",
+          "d-unbounded": "unbounded",
+          "e-le-10k": "le-10k",
+          "f-le-10": "le-10",
+          "g-le-1k": "le-1k",
+          "h-le-100": "le-100",
+          "i-le-1": "le-1"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 5452,
+      "estimatedTokens": 2181,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 325,
+    "clientMs": 349.0639580000134,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "h-unbounded",
+          "probabilities": {
+            "a-le-1": 0.0066,
+            "b-le-10": 0.0062,
+            "c-le-100": 0.0144,
+            "d-le-1k": 0.0102,
+            "e-le-10k": 0.0094,
+            "f-le-100k": 0.0054,
+            "g-le-1m": 0.0048,
+            "h-unbounded": 0.7672,
+            "i-unclear": 0.1758
+          },
+          "confidence": 0.5725
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "a-unbounded",
+          "probabilities": {
+            "a-unbounded": 0.6863,
+            "b-le-1m": 0.0138,
+            "c-le-1": 0.0057,
+            "d-le-100": 0.0181,
+            "e-le-10k": 0.0119,
+            "f-le-100k": 0.0072,
+            "g-le-10": 0.0067,
+            "h-le-1k": 0.0158,
+            "i-unclear": 0.2345
+          },
+          "confidence": 0.468
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "d-unbounded",
+          "probabilities": {
+            "a-unclear": 0.1952,
+            "b-le-1m": 0.0116,
+            "c-le-100k": 0.0092,
+            "d-unbounded": 0.7221,
+            "e-le-10k": 0.0145,
+            "f-le-10": 0.0066,
+            "g-le-1k": 0.0166,
+            "h-le-100": 0.0185,
+            "i-le-1": 0.0057
+          },
+          "confidence": 0.5058
+        }
+      },
+      "usage": {
+        "input_tokens": 1679,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C29",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "le-1",
+          "le-10",
+          "le-100",
+          "le-1k",
+          "le-10k",
+          "le-100k",
+          "le-1m",
+          "unbounded",
+          "unclear"
+        ],
+        "idOf": {
+          "le-1": "a-le-1",
+          "le-10": "b-le-10",
+          "le-100": "c-le-100",
+          "le-1k": "d-le-1k",
+          "le-10k": "e-le-10k",
+          "le-100k": "f-le-100k",
+          "le-1m": "g-le-1m",
+          "unbounded": "h-unbounded",
+          "unclear": "i-unclear"
+        },
+        "valueOf": {
+          "a-le-1": "le-1",
+          "b-le-10": "le-10",
+          "c-le-100": "le-100",
+          "d-le-1k": "le-1k",
+          "e-le-10k": "le-10k",
+          "f-le-100k": "le-100k",
+          "g-le-1m": "le-1m",
+          "h-unbounded": "unbounded",
+          "i-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "unclear",
+          "le-10",
+          "le-100",
+          "le-1k",
+          "unbounded",
+          "le-10k",
+          "le-1m",
+          "le-100k",
+          "le-1"
+        ],
+        "idOf": {
+          "unclear": "a-unclear",
+          "le-10": "b-le-10",
+          "le-100": "c-le-100",
+          "le-1k": "d-le-1k",
+          "unbounded": "e-unbounded",
+          "le-10k": "f-le-10k",
+          "le-1m": "g-le-1m",
+          "le-100k": "h-le-100k",
+          "le-1": "i-le-1"
+        },
+        "valueOf": {
+          "a-unclear": "unclear",
+          "b-le-10": "le-10",
+          "c-le-100": "le-100",
+          "d-le-1k": "le-1k",
+          "e-unbounded": "unbounded",
+          "f-le-10k": "le-10k",
+          "g-le-1m": "le-1m",
+          "h-le-100k": "le-100k",
+          "i-le-1": "le-1"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "le-10k",
+          "le-100",
+          "le-10",
+          "le-1",
+          "le-1m",
+          "unclear",
+          "le-100k",
+          "unbounded",
+          "le-1k"
+        ],
+        "idOf": {
+          "le-10k": "a-le-10k",
+          "le-100": "b-le-100",
+          "le-10": "c-le-10",
+          "le-1": "d-le-1",
+          "le-1m": "e-le-1m",
+          "unclear": "f-unclear",
+          "le-100k": "g-le-100k",
+          "unbounded": "h-unbounded",
+          "le-1k": "i-le-1k"
+        },
+        "valueOf": {
+          "a-le-10k": "le-10k",
+          "b-le-100": "le-100",
+          "c-le-10": "le-10",
+          "d-le-1": "le-1",
+          "e-le-1m": "le-1m",
+          "f-unclear": "unclear",
+          "g-le-100k": "le-100k",
+          "h-unbounded": "unbounded",
+          "i-le-1k": "le-1k"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4492,
+      "estimatedTokens": 1797,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 161,
+    "clientMs": 191.25037500000326,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "c-le-100",
+          "probabilities": {
+            "a-le-1": 0.0043,
+            "b-le-10": 0.0075,
+            "c-le-100": 0.9592,
+            "d-le-1k": 0.0084,
+            "e-le-10k": 0.0044,
+            "f-le-100k": 0.004,
+            "g-le-1m": 0.0038,
+            "h-unbounded": 0.0033,
+            "i-unclear": 0.0051
+          },
+          "confidence": 0.9103
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "c-le-100",
+          "probabilities": {
+            "a-unclear": 0.0028,
+            "b-le-10": 0.0078,
+            "c-le-100": 0.9639,
+            "d-le-1k": 0.0122,
+            "e-unbounded": 0.0024,
+            "f-le-10k": 0.0032,
+            "g-le-1m": 0.0027,
+            "h-le-100k": 0.0026,
+            "i-le-1": 0.0024
+          },
+          "confidence": 0.9206
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "b-le-100",
+          "probabilities": {
+            "a-le-10k": 0.0022,
+            "b-le-100": 0.9793,
+            "c-le-10": 0.0038,
+            "d-le-1": 0.0015,
+            "e-le-1m": 0.0021,
+            "f-unclear": 0.0018,
+            "g-le-100k": 0.0021,
+            "h-unbounded": 0.0015,
+            "i-le-1k": 0.0057
+          },
+          "confidence": 0.9539
+        }
+      },
+      "usage": {
+        "input_tokens": 1419,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "C30",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "integer",
+          "number",
+          "string",
+          "boolean",
+          "array",
+          "object",
+          "unclear"
+        ],
+        "idOf": {
+          "integer": "a-integer",
+          "number": "b-number",
+          "string": "c-string",
+          "boolean": "d-boolean",
+          "array": "e-array",
+          "object": "f-object",
+          "unclear": "g-unclear"
+        },
+        "valueOf": {
+          "a-integer": "integer",
+          "b-number": "number",
+          "c-string": "string",
+          "d-boolean": "boolean",
+          "e-array": "array",
+          "f-object": "object",
+          "g-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "number",
+          "string",
+          "object",
+          "array",
+          "unclear",
+          "integer",
+          "boolean"
+        ],
+        "idOf": {
+          "number": "a-number",
+          "string": "b-string",
+          "object": "c-object",
+          "array": "d-array",
+          "unclear": "e-unclear",
+          "integer": "f-integer",
+          "boolean": "g-boolean"
+        },
+        "valueOf": {
+          "a-number": "number",
+          "b-string": "string",
+          "c-object": "object",
+          "d-array": "array",
+          "e-unclear": "unclear",
+          "f-integer": "integer",
+          "g-boolean": "boolean"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "boolean",
+          "integer",
+          "object",
+          "unclear",
+          "number",
+          "array",
+          "string"
+        ],
+        "idOf": {
+          "boolean": "a-boolean",
+          "integer": "b-integer",
+          "object": "c-object",
+          "unclear": "d-unclear",
+          "number": "e-number",
+          "array": "f-array",
+          "string": "g-string"
+        },
+        "valueOf": {
+          "a-boolean": "boolean",
+          "b-integer": "integer",
+          "c-object": "object",
+          "d-unclear": "unclear",
+          "e-number": "number",
+          "f-array": "array",
+          "g-string": "string"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4366,
+      "estimatedTokens": 1747,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 212,
+    "clientMs": 242.44904200002202,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "c-string",
+          "probabilities": {
+            "a-integer": 0.0135,
+            "b-number": 0.0074,
+            "c-string": 0.9496,
+            "d-boolean": 0.0039,
+            "e-array": 0.0038,
+            "f-object": 0.0053,
+            "g-unclear": 0.0165
+          },
+          "confidence": 0.886
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "b-string",
+          "probabilities": {
+            "a-number": 0.0035,
+            "b-string": 0.9728,
+            "c-object": 0.0034,
+            "d-array": 0.0025,
+            "e-unclear": 0.009,
+            "f-integer": 0.0059,
+            "g-boolean": 0.0029
+          },
+          "confidence": 0.9376
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "g-string",
+          "probabilities": {
+            "a-boolean": 0.0019,
+            "b-integer": 0.006,
+            "c-object": 0.0025,
+            "d-unclear": 0.0123,
+            "e-number": 0.003,
+            "f-array": 0.002,
+            "g-string": 0.9723
+          },
+          "confidence": 0.9364
+        }
+      },
+      "usage": {
+        "input_tokens": 1154,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "D01",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "per-call",
+          "per-request",
+          "per-session",
+          "ttl",
+          "static",
+          "unclear"
+        ],
+        "idOf": {
+          "per-call": "a-per-call",
+          "per-request": "b-per-request",
+          "per-session": "c-per-session",
+          "ttl": "d-ttl",
+          "static": "e-static",
+          "unclear": "f-unclear"
+        },
+        "valueOf": {
+          "a-per-call": "per-call",
+          "b-per-request": "per-request",
+          "c-per-session": "per-session",
+          "d-ttl": "ttl",
+          "e-static": "static",
+          "f-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "unclear",
+          "static",
+          "per-call",
+          "ttl",
+          "per-request",
+          "per-session"
+        ],
+        "idOf": {
+          "unclear": "a-unclear",
+          "static": "b-static",
+          "per-call": "c-per-call",
+          "ttl": "d-ttl",
+          "per-request": "e-per-request",
+          "per-session": "f-per-session"
+        },
+        "valueOf": {
+          "a-unclear": "unclear",
+          "b-static": "static",
+          "c-per-call": "per-call",
+          "d-ttl": "ttl",
+          "e-per-request": "per-request",
+          "f-per-session": "per-session"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "ttl",
+          "per-request",
+          "unclear",
+          "per-session",
+          "static",
+          "per-call"
+        ],
+        "idOf": {
+          "ttl": "a-ttl",
+          "per-request": "b-per-request",
+          "unclear": "c-unclear",
+          "per-session": "d-per-session",
+          "static": "e-static",
+          "per-call": "f-per-call"
+        },
+        "valueOf": {
+          "a-ttl": "ttl",
+          "b-per-request": "per-request",
+          "c-unclear": "unclear",
+          "d-per-session": "per-session",
+          "e-static": "static",
+          "f-per-call": "per-call"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 5471,
+      "estimatedTokens": 2189,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 250,
+    "clientMs": 278.28529200001503,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "b-per-request",
+          "probabilities": {
+            "a-per-call": 0.0145,
+            "b-per-request": 0.9721,
+            "c-per-session": 0.0042,
+            "d-ttl": 0.0034,
+            "e-static": 0.0018,
+            "f-unclear": 0.004
+          },
+          "confidence": 0.9342
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "e-per-request",
+          "probabilities": {
+            "a-unclear": 0.0081,
+            "b-static": 0.0026,
+            "c-per-call": 0.0114,
+            "d-ttl": 0.0031,
+            "e-per-request": 0.97,
+            "f-per-session": 0.0048
+          },
+          "confidence": 0.9293
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "b-per-request",
+          "probabilities": {
+            "a-ttl": 0.0022,
+            "b-per-request": 0.9798,
+            "c-unclear": 0.0064,
+            "d-per-session": 0.004,
+            "e-static": 0.0021,
+            "f-per-call": 0.0055
+          },
+          "confidence": 0.952
+        }
+      },
+      "usage": {
+        "input_tokens": 1384,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "D02",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "strong",
+          "read-your-writes",
+          "eventual",
+          "unclear"
+        ],
+        "idOf": {
+          "strong": "a-strong",
+          "read-your-writes": "b-read-your-writes",
+          "eventual": "c-eventual",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-strong": "strong",
+          "b-read-your-writes": "read-your-writes",
+          "c-eventual": "eventual",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "unclear",
+          "strong",
+          "read-your-writes",
+          "eventual"
+        ],
+        "idOf": {
+          "unclear": "a-unclear",
+          "strong": "b-strong",
+          "read-your-writes": "c-read-your-writes",
+          "eventual": "d-eventual"
+        },
+        "valueOf": {
+          "a-unclear": "unclear",
+          "b-strong": "strong",
+          "c-read-your-writes": "read-your-writes",
+          "d-eventual": "eventual"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "eventual",
+          "read-your-writes",
+          "unclear",
+          "strong"
+        ],
+        "idOf": {
+          "eventual": "a-eventual",
+          "read-your-writes": "b-read-your-writes",
+          "unclear": "c-unclear",
+          "strong": "d-strong"
+        },
+        "valueOf": {
+          "a-eventual": "eventual",
+          "b-read-your-writes": "read-your-writes",
+          "c-unclear": "unclear",
+          "d-strong": "strong"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4218,
+      "estimatedTokens": 1688,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 238,
+    "clientMs": 273.2713750000112,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "a-strong",
+          "probabilities": {
+            "a-strong": 0.5154,
+            "b-read-your-writes": 0.3111,
+            "c-eventual": 0.0818,
+            "d-unclear": 0.0917
+          },
+          "confidence": 0.17
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "b-strong",
+          "probabilities": {
+            "a-unclear": 0.0641,
+            "b-strong": 0.5979,
+            "c-read-your-writes": 0.2655,
+            "d-eventual": 0.0725
+          },
+          "confidence": 0.2497
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "b-read-your-writes",
+          "probabilities": {
+            "a-eventual": 0.0891,
+            "b-read-your-writes": 0.48,
+            "c-unclear": 0.1475,
+            "d-strong": 0.2834
+          },
+          "confidence": 0.1205
+        }
+      },
+      "usage": {
+        "input_tokens": 1044,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "D03",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "pure",
+          "idempotent",
+          "non-idempotent",
+          "unclear"
+        ],
+        "idOf": {
+          "pure": "a-pure",
+          "idempotent": "b-idempotent",
+          "non-idempotent": "c-non-idempotent",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-pure": "pure",
+          "b-idempotent": "idempotent",
+          "c-non-idempotent": "non-idempotent",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "unclear",
+          "pure",
+          "idempotent",
+          "non-idempotent"
+        ],
+        "idOf": {
+          "unclear": "a-unclear",
+          "pure": "b-pure",
+          "idempotent": "c-idempotent",
+          "non-idempotent": "d-non-idempotent"
+        },
+        "valueOf": {
+          "a-unclear": "unclear",
+          "b-pure": "pure",
+          "c-idempotent": "idempotent",
+          "d-non-idempotent": "non-idempotent"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "idempotent",
+          "non-idempotent",
+          "pure",
+          "unclear"
+        ],
+        "idOf": {
+          "idempotent": "a-idempotent",
+          "non-idempotent": "b-non-idempotent",
+          "pure": "c-pure",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-idempotent": "idempotent",
+          "b-non-idempotent": "non-idempotent",
+          "c-pure": "pure",
+          "d-unclear": "unclear"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4096,
+      "estimatedTokens": 1639,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 337,
+    "clientMs": 364.09974999999395,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "b-idempotent",
+          "probabilities": {
+            "a-pure": 0.0352,
+            "b-idempotent": 0.8616,
+            "c-non-idempotent": 0.0525,
+            "d-unclear": 0.0507
+          },
+          "confidence": 0.6653
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "c-idempotent",
+          "probabilities": {
+            "a-unclear": 0.0451,
+            "b-pure": 0.0168,
+            "c-idempotent": 0.9005,
+            "d-non-idempotent": 0.0376
+          },
+          "confidence": 0.7529
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "a-idempotent",
+          "probabilities": {
+            "a-idempotent": 0.8954,
+            "b-non-idempotent": 0.0499,
+            "c-pure": 0.0142,
+            "d-unclear": 0.0405
+          },
+          "confidence": 0.7415
+        }
+      },
+      "usage": {
+        "input_tokens": 1064,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "D04",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "le-1",
+          "le-10",
+          "le-100",
+          "le-1k",
+          "le-10k",
+          "le-100k",
+          "le-1m",
+          "unbounded",
+          "unclear"
+        ],
+        "idOf": {
+          "le-1": "a-le-1",
+          "le-10": "b-le-10",
+          "le-100": "c-le-100",
+          "le-1k": "d-le-1k",
+          "le-10k": "e-le-10k",
+          "le-100k": "f-le-100k",
+          "le-1m": "g-le-1m",
+          "unbounded": "h-unbounded",
+          "unclear": "i-unclear"
+        },
+        "valueOf": {
+          "a-le-1": "le-1",
+          "b-le-10": "le-10",
+          "c-le-100": "le-100",
+          "d-le-1k": "le-1k",
+          "e-le-10k": "le-10k",
+          "f-le-100k": "le-100k",
+          "g-le-1m": "le-1m",
+          "h-unbounded": "unbounded",
+          "i-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "le-10",
+          "le-1k",
+          "le-1",
+          "unbounded",
+          "le-100",
+          "le-100k",
+          "le-1m",
+          "le-10k",
+          "unclear"
+        ],
+        "idOf": {
+          "le-10": "a-le-10",
+          "le-1k": "b-le-1k",
+          "le-1": "c-le-1",
+          "unbounded": "d-unbounded",
+          "le-100": "e-le-100",
+          "le-100k": "f-le-100k",
+          "le-1m": "g-le-1m",
+          "le-10k": "h-le-10k",
+          "unclear": "i-unclear"
+        },
+        "valueOf": {
+          "a-le-10": "le-10",
+          "b-le-1k": "le-1k",
+          "c-le-1": "le-1",
+          "d-unbounded": "unbounded",
+          "e-le-100": "le-100",
+          "f-le-100k": "le-100k",
+          "g-le-1m": "le-1m",
+          "h-le-10k": "le-10k",
+          "i-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "unclear",
+          "le-100k",
+          "le-100",
+          "le-10k",
+          "le-1",
+          "le-1k",
+          "le-10",
+          "le-1m",
+          "unbounded"
+        ],
+        "idOf": {
+          "unclear": "a-unclear",
+          "le-100k": "b-le-100k",
+          "le-100": "c-le-100",
+          "le-10k": "d-le-10k",
+          "le-1": "e-le-1",
+          "le-1k": "f-le-1k",
+          "le-10": "g-le-10",
+          "le-1m": "h-le-1m",
+          "unbounded": "i-unbounded"
+        },
+        "valueOf": {
+          "a-unclear": "unclear",
+          "b-le-100k": "le-100k",
+          "c-le-100": "le-100",
+          "d-le-10k": "le-10k",
+          "e-le-1": "le-1",
+          "f-le-1k": "le-1k",
+          "g-le-10": "le-10",
+          "h-le-1m": "le-1m",
+          "i-unbounded": "unbounded"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 5986,
+      "estimatedTokens": 2395,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 325,
+    "clientMs": 343.97487500001444,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "c-le-100",
+          "probabilities": {
+            "a-le-1": 0.0072,
+            "b-le-10": 0.01,
+            "c-le-100": 0.924,
+            "d-le-1k": 0.0101,
+            "e-le-10k": 0.0091,
+            "f-le-100k": 0.0141,
+            "g-le-1m": 0.0063,
+            "h-unbounded": 0.0078,
+            "i-unclear": 0.0114
+          },
+          "confidence": 0.8364
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "e-le-100",
+          "probabilities": {
+            "a-le-10": 0.0036,
+            "b-le-1k": 0.0046,
+            "c-le-1": 0.003,
+            "d-unbounded": 0.0026,
+            "e-le-100": 0.9732,
+            "f-le-100k": 0.0034,
+            "g-le-1m": 0.003,
+            "h-le-10k": 0.0036,
+            "i-unclear": 0.003
+          },
+          "confidence": 0.9405
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "c-le-100",
+          "probabilities": {
+            "a-unclear": 0.0028,
+            "b-le-100k": 0.0033,
+            "c-le-100": 0.9718,
+            "d-le-10k": 0.0037,
+            "e-le-1": 0.0027,
+            "f-le-1k": 0.0058,
+            "g-le-10": 0.0038,
+            "h-le-1m": 0.0029,
+            "i-unbounded": 0.0032
+          },
+          "confidence": 0.9375
+        }
+      },
+      "usage": {
+        "input_tokens": 1880,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "D05",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "exactly-one",
+          "at-most-one",
+          "many",
+          "unclear"
+        ],
+        "idOf": {
+          "exactly-one": "a-exactly-one",
+          "at-most-one": "b-at-most-one",
+          "many": "c-many",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-exactly-one": "exactly-one",
+          "b-at-most-one": "at-most-one",
+          "c-many": "many",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "at-most-one",
+          "exactly-one",
+          "unclear",
+          "many"
+        ],
+        "idOf": {
+          "at-most-one": "a-at-most-one",
+          "exactly-one": "b-exactly-one",
+          "unclear": "c-unclear",
+          "many": "d-many"
+        },
+        "valueOf": {
+          "a-at-most-one": "at-most-one",
+          "b-exactly-one": "exactly-one",
+          "c-unclear": "unclear",
+          "d-many": "many"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "at-most-one",
+          "many",
+          "unclear",
+          "exactly-one"
+        ],
+        "idOf": {
+          "at-most-one": "a-at-most-one",
+          "many": "b-many",
+          "unclear": "c-unclear",
+          "exactly-one": "d-exactly-one"
+        },
+        "valueOf": {
+          "a-at-most-one": "at-most-one",
+          "b-many": "many",
+          "c-unclear": "unclear",
+          "d-exactly-one": "exactly-one"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 3970,
+      "estimatedTokens": 1588,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 431,
+    "clientMs": 457.0263339999947,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "a-exactly-one",
+          "probabilities": {
+            "a-exactly-one": 0.7833,
+            "b-at-most-one": 0.1596,
+            "c-many": 0.0247,
+            "d-unclear": 0.0324
+          },
+          "confidence": 0.5209
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "b-exactly-one",
+          "probabilities": {
+            "a-at-most-one": 0.0605,
+            "b-exactly-one": 0.8369,
+            "c-unclear": 0.0549,
+            "d-many": 0.0477
+          },
+          "confidence": 0.6125
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "d-exactly-one",
+          "probabilities": {
+            "a-at-most-one": 0.0651,
+            "b-many": 0.042,
+            "c-unclear": 0.0638,
+            "d-exactly-one": 0.8291
+          },
+          "confidence": 0.5967
+        }
+      },
+      "usage": {
+        "input_tokens": 994,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "D06",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "per-call",
+          "per-request",
+          "per-session",
+          "ttl",
+          "static",
+          "unclear"
+        ],
+        "idOf": {
+          "per-call": "a-per-call",
+          "per-request": "b-per-request",
+          "per-session": "c-per-session",
+          "ttl": "d-ttl",
+          "static": "e-static",
+          "unclear": "f-unclear"
+        },
+        "valueOf": {
+          "a-per-call": "per-call",
+          "b-per-request": "per-request",
+          "c-per-session": "per-session",
+          "d-ttl": "ttl",
+          "e-static": "static",
+          "f-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "unclear",
+          "static",
+          "per-call",
+          "per-session",
+          "ttl",
+          "per-request"
+        ],
+        "idOf": {
+          "unclear": "a-unclear",
+          "static": "b-static",
+          "per-call": "c-per-call",
+          "per-session": "d-per-session",
+          "ttl": "e-ttl",
+          "per-request": "f-per-request"
+        },
+        "valueOf": {
+          "a-unclear": "unclear",
+          "b-static": "static",
+          "c-per-call": "per-call",
+          "d-per-session": "per-session",
+          "e-ttl": "ttl",
+          "f-per-request": "per-request"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "ttl",
+          "per-request",
+          "unclear",
+          "static",
+          "per-session",
+          "per-call"
+        ],
+        "idOf": {
+          "ttl": "a-ttl",
+          "per-request": "b-per-request",
+          "unclear": "c-unclear",
+          "static": "d-static",
+          "per-session": "e-per-session",
+          "per-call": "f-per-call"
+        },
+        "valueOf": {
+          "a-ttl": "ttl",
+          "b-per-request": "per-request",
+          "c-unclear": "unclear",
+          "d-static": "static",
+          "e-per-session": "per-session",
+          "f-per-call": "per-call"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 5509,
+      "estimatedTokens": 2204,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 313,
+    "clientMs": 332.4798750000191,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "a-per-call",
+          "probabilities": {
+            "a-per-call": 0.5852,
+            "b-per-request": 0.1362,
+            "c-per-session": 0.0768,
+            "d-ttl": 0.0351,
+            "e-static": 0.0243,
+            "f-unclear": 0.1424
+          },
+          "confidence": 0.2668
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "c-per-call",
+          "probabilities": {
+            "a-unclear": 0.0434,
+            "b-static": 0.0049,
+            "c-per-call": 0.9156,
+            "d-per-session": 0.0092,
+            "e-ttl": 0.0046,
+            "f-per-request": 0.0223
+          },
+          "confidence": 0.8089
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "f-per-call",
+          "probabilities": {
+            "a-ttl": 0.0039,
+            "b-per-request": 0.018,
+            "c-unclear": 0.1707,
+            "d-static": 0.0042,
+            "e-per-session": 0.0073,
+            "f-per-call": 0.7959
+          },
+          "confidence": 0.5957
+        }
+      },
+      "usage": {
+        "input_tokens": 1373,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "D07",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "per-call",
+          "per-request",
+          "per-session",
+          "ttl",
+          "static",
+          "unclear"
+        ],
+        "idOf": {
+          "per-call": "a-per-call",
+          "per-request": "b-per-request",
+          "per-session": "c-per-session",
+          "ttl": "d-ttl",
+          "static": "e-static",
+          "unclear": "f-unclear"
+        },
+        "valueOf": {
+          "a-per-call": "per-call",
+          "b-per-request": "per-request",
+          "c-per-session": "per-session",
+          "d-ttl": "ttl",
+          "e-static": "static",
+          "f-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "per-call",
+          "per-session",
+          "ttl",
+          "static",
+          "unclear",
+          "per-request"
+        ],
+        "idOf": {
+          "per-call": "a-per-call",
+          "per-session": "b-per-session",
+          "ttl": "c-ttl",
+          "static": "d-static",
+          "unclear": "e-unclear",
+          "per-request": "f-per-request"
+        },
+        "valueOf": {
+          "a-per-call": "per-call",
+          "b-per-session": "per-session",
+          "c-ttl": "ttl",
+          "d-static": "static",
+          "e-unclear": "unclear",
+          "f-per-request": "per-request"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "static",
+          "per-call",
+          "ttl",
+          "unclear",
+          "per-request",
+          "per-session"
+        ],
+        "idOf": {
+          "static": "a-static",
+          "per-call": "b-per-call",
+          "ttl": "c-ttl",
+          "unclear": "d-unclear",
+          "per-request": "e-per-request",
+          "per-session": "f-per-session"
+        },
+        "valueOf": {
+          "a-static": "static",
+          "b-per-call": "per-call",
+          "c-ttl": "ttl",
+          "d-unclear": "unclear",
+          "e-per-request": "per-request",
+          "f-per-session": "per-session"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4976,
+      "estimatedTokens": 1991,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 218,
+    "clientMs": 256.3176669999957,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "a-per-call",
+          "probabilities": {
+            "a-per-call": 0.9104,
+            "b-per-request": 0.0264,
+            "c-per-session": 0.0106,
+            "d-ttl": 0.0178,
+            "e-static": 0.0069,
+            "f-unclear": 0.0279
+          },
+          "confidence": 0.7969
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "a-per-call",
+          "probabilities": {
+            "a-per-call": 0.9769,
+            "b-per-session": 0.0049,
+            "c-ttl": 0.003,
+            "d-static": 0.0024,
+            "e-unclear": 0.0081,
+            "f-per-request": 0.0047
+          },
+          "confidence": 0.9455
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "b-per-call",
+          "probabilities": {
+            "a-static": 0.0025,
+            "b-per-call": 0.9711,
+            "c-ttl": 0.004,
+            "d-unclear": 0.0125,
+            "e-per-request": 0.0058,
+            "f-per-session": 0.0041
+          },
+          "confidence": 0.9319
+        }
+      },
+      "usage": {
+        "input_tokens": 1227,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "D08",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "fifo",
+          "per-key-fifo",
+          "unordered",
+          "unclear"
+        ],
+        "idOf": {
+          "fifo": "a-fifo",
+          "per-key-fifo": "b-per-key-fifo",
+          "unordered": "c-unordered",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-fifo": "fifo",
+          "b-per-key-fifo": "per-key-fifo",
+          "c-unordered": "unordered",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "fifo",
+          "unclear",
+          "per-key-fifo",
+          "unordered"
+        ],
+        "idOf": {
+          "fifo": "a-fifo",
+          "unclear": "b-unclear",
+          "per-key-fifo": "c-per-key-fifo",
+          "unordered": "d-unordered"
+        },
+        "valueOf": {
+          "a-fifo": "fifo",
+          "b-unclear": "unclear",
+          "c-per-key-fifo": "per-key-fifo",
+          "d-unordered": "unordered"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "unclear",
+          "per-key-fifo",
+          "unordered",
+          "fifo"
+        ],
+        "idOf": {
+          "unclear": "a-unclear",
+          "per-key-fifo": "b-per-key-fifo",
+          "unordered": "c-unordered",
+          "fifo": "d-fifo"
+        },
+        "valueOf": {
+          "a-unclear": "unclear",
+          "b-per-key-fifo": "per-key-fifo",
+          "c-unordered": "unordered",
+          "d-fifo": "fifo"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4317,
+      "estimatedTokens": 1727,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 275,
+    "clientMs": 307.66854199999943,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "a-fifo",
+          "probabilities": {
+            "a-fifo": 0.8888,
+            "b-per-key-fifo": 0.0464,
+            "c-unordered": 0.0154,
+            "d-unclear": 0.0494
+          },
+          "confidence": 0.7263
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "a-fifo",
+          "probabilities": {
+            "a-fifo": 0.9717,
+            "b-unclear": 0.0153,
+            "c-per-key-fifo": 0.0074,
+            "d-unordered": 0.0056
+          },
+          "confidence": 0.9261
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "d-fifo",
+          "probabilities": {
+            "a-unclear": 0.012,
+            "b-per-key-fifo": 0.0072,
+            "c-unordered": 0.0038,
+            "d-fifo": 0.977
+          },
+          "confidence": 0.9396
+        }
+      },
+      "usage": {
+        "input_tokens": 1078,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "D09",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "exactly-one",
+          "at-most-one",
+          "many",
+          "unclear"
+        ],
+        "idOf": {
+          "exactly-one": "a-exactly-one",
+          "at-most-one": "b-at-most-one",
+          "many": "c-many",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-exactly-one": "exactly-one",
+          "b-at-most-one": "at-most-one",
+          "c-many": "many",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "many",
+          "at-most-one",
+          "exactly-one",
+          "unclear"
+        ],
+        "idOf": {
+          "many": "a-many",
+          "at-most-one": "b-at-most-one",
+          "exactly-one": "c-exactly-one",
+          "unclear": "d-unclear"
+        },
+        "valueOf": {
+          "a-many": "many",
+          "b-at-most-one": "at-most-one",
+          "c-exactly-one": "exactly-one",
+          "d-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "many",
+          "at-most-one",
+          "unclear",
+          "exactly-one"
+        ],
+        "idOf": {
+          "many": "a-many",
+          "at-most-one": "b-at-most-one",
+          "unclear": "c-unclear",
+          "exactly-one": "d-exactly-one"
+        },
+        "valueOf": {
+          "a-many": "many",
+          "b-at-most-one": "at-most-one",
+          "c-unclear": "unclear",
+          "d-exactly-one": "exactly-one"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 4644,
+      "estimatedTokens": 1858,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 270,
+    "clientMs": 293.31145900001866,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "a-exactly-one",
+          "probabilities": {
+            "a-exactly-one": 0.661,
+            "b-at-most-one": 0.3084,
+            "c-many": 0.0157,
+            "d-unclear": 0.0149
+          },
+          "confidence": 0.3767
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "b-at-most-one",
+          "probabilities": {
+            "a-many": 0.0229,
+            "b-at-most-one": 0.8176,
+            "c-exactly-one": 0.0809,
+            "d-unclear": 0.0786
+          },
+          "confidence": 0.5755
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "b-at-most-one",
+          "probabilities": {
+            "a-many": 0.015,
+            "b-at-most-one": 0.8521,
+            "c-unclear": 0.0628,
+            "d-exactly-one": 0.0701
+          },
+          "confidence": 0.6469
+        }
+      },
+      "usage": {
+        "input_tokens": 1173,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  },
+  {
+    "mode": "s17orig",
+    "item": "D10",
+    "variants": [
+      {
+        "name": "v0",
+        "order": [
+          "integer",
+          "number",
+          "string",
+          "boolean",
+          "array",
+          "object",
+          "unclear"
+        ],
+        "idOf": {
+          "integer": "a-integer",
+          "number": "b-number",
+          "string": "c-string",
+          "boolean": "d-boolean",
+          "array": "e-array",
+          "object": "f-object",
+          "unclear": "g-unclear"
+        },
+        "valueOf": {
+          "a-integer": "integer",
+          "b-number": "number",
+          "c-string": "string",
+          "d-boolean": "boolean",
+          "e-array": "array",
+          "f-object": "object",
+          "g-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v1",
+        "order": [
+          "number",
+          "array",
+          "string",
+          "object",
+          "integer",
+          "boolean",
+          "unclear"
+        ],
+        "idOf": {
+          "number": "a-number",
+          "array": "b-array",
+          "string": "c-string",
+          "object": "d-object",
+          "integer": "e-integer",
+          "boolean": "f-boolean",
+          "unclear": "g-unclear"
+        },
+        "valueOf": {
+          "a-number": "number",
+          "b-array": "array",
+          "c-string": "string",
+          "d-object": "object",
+          "e-integer": "integer",
+          "f-boolean": "boolean",
+          "g-unclear": "unclear"
+        }
+      },
+      {
+        "name": "v2",
+        "order": [
+          "number",
+          "boolean",
+          "object",
+          "integer",
+          "array",
+          "string",
+          "unclear"
+        ],
+        "idOf": {
+          "number": "a-number",
+          "boolean": "b-boolean",
+          "object": "c-object",
+          "integer": "d-integer",
+          "array": "e-array",
+          "string": "f-string",
+          "unclear": "g-unclear"
+        },
+        "valueOf": {
+          "a-number": "number",
+          "b-boolean": "boolean",
+          "c-object": "object",
+          "d-integer": "integer",
+          "e-array": "array",
+          "f-string": "string",
+          "g-unclear": "unclear"
+        }
+      }
+    ],
+    "estimate": {
+      "bytes": 3948,
+      "estimatedTokens": 1580,
+      "limit": 64000,
+      "oversize": false
+    },
+    "truncated": false,
+    "status": 200,
+    "ok": true,
+    "ms": 302,
+    "clientMs": 335.45799999998417,
+    "output": {
+      "model": "clef",
+      "answers": {
+        "v0": {
+          "type": "choice",
+          "choice": "a-integer",
+          "probabilities": {
+            "a-integer": 0.9432,
+            "b-number": 0.0081,
+            "c-string": 0.0199,
+            "d-boolean": 0.0049,
+            "e-array": 0.0054,
+            "f-object": 0.0073,
+            "g-unclear": 0.0112
+          },
+          "confidence": 0.8721
+        },
+        "v1": {
+          "type": "choice",
+          "choice": "e-integer",
+          "probabilities": {
+            "a-number": 0.005,
+            "b-array": 0.0032,
+            "c-string": 0.0056,
+            "d-object": 0.0034,
+            "e-integer": 0.9732,
+            "f-boolean": 0.0028,
+            "g-unclear": 0.0068
+          },
+          "confidence": 0.9385
+        },
+        "v2": {
+          "type": "choice",
+          "choice": "d-integer",
+          "probabilities": {
+            "a-number": 0.005,
+            "b-boolean": 0.0022,
+            "c-object": 0.0031,
+            "d-integer": 0.9686,
+            "e-array": 0.0038,
+            "f-string": 0.0082,
+            "g-unclear": 0.0091
+          },
+          "confidence": 0.9281
+        }
+      },
+      "usage": {
+        "input_tokens": 1072,
+        "output_tokens": 0
+      }
+    },
+    "retries": 0
+  }
+]

@@ -1,0 +1,19 @@
+--- a/internal/api/types.go
++++ b/internal/api/types.go
+@@ -5 +5 @@ package api
+ type Repository struct {
+-    ID        int64     `json:"id"`
++    ID        string    `json:"id"` // ULID; numeric ids are being retired
+     Name      string    `json:"name"`
+     FullName  string    `json:"full_name"`
+     Private   bool      `json:"private"`
+     CreatedAt time.Time `json:"created_at"`
+ }
+--- a/internal/api/convert.go
++++ b/internal/api/convert.go
+@@ -11 +11 @@ func toAPIRepository(r store.Repo) Repository {
+     return Repository{
+-        ID:        r.ID,
++        ID:        r.ULID,
+         Name:      r.Name,
+         FullName:  r.Owner + "/" + r.Name,

@@ -1,0 +1,16 @@
+--- a/pricing/quote.py
++++ b/pricing/quote.py
+@@ -1 +1 @@
++import json
++
++from pricing.cache import redis_client
+ from pricing.tax import TAX_RATES
+
+
+ def compute_quote(items: list[LineItem], region: str) -> Quote:
+     subtotal = sum(i.unit_price * i.qty for i in items)
+     tax = subtotal * TAX_RATES[region]
+-    return Quote(subtotal=subtotal, tax=tax, total=subtotal + tax)
++    quote = Quote(subtotal=subtotal, tax=tax, total=subtotal + tax)
++    redis_client.set("quote:" + quote_key(items, region), json.dumps(quote.as_dict()), ex=3600)
++    return quote
