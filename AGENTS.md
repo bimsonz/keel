@@ -9,6 +9,7 @@ Keel is an agent-first Git platform on Cloudflare Workers and Artifacts. Use the
 | `pnpm install` | Install. CI uses `--frozen-lockfile` |
 | `pnpm gen` | Regenerate everything gitignored: TypeSpec output (`*.gen.ts`, `packages/contracts/openapi.json`) and each Worker's `worker-configuration.d.ts`. Run it after any change to `packages/spec` or a `wrangler.jsonc` |
 | `pnpm lint` | oxlint, type-aware, over the workspace paths only. Type-aware rules find files through every tsconfig they meet, so `spikes/` and `fixtures/` (which lint themselves) are excluded by path rather than by `ignorePatterns` |
+| `pnpm format` / `pnpm format:check` | oxfmt: write, or check (CI runs the check after lint). Run `pnpm format` on your changes before every push |
 | `pnpm typecheck` | `tsc --noEmit` in every package (TypeScript 7) |
 | `pnpm guards` | Workspace guards: nothing private in a public file |
 | `pnpm test` | vitest projects `unit` and `arch` (Node) |
@@ -102,7 +103,7 @@ Seeded wrong implementations live in `test/mutants/*.patch`. Line 1 is `# expect
 - a tagged patch runs under `FC_SEED` 42, 1337 and 20261014 plus N unseeded runs (default 5), with vitest's JSON reporter, and is red only if **every claimed tag** fails in **every** run. An exit code is not enough: one tag failing can hide another that passes;
 - an untagged patch is red when its command exits non-zero.
 
-The runner's own control is `node scripts/prove-red.ts --dir test/controls/prove-red`, which must report its two-tag patch as a survivor. Generate a patch with `git diff -- <paths>` so it carries nothing else, and regenerate it when it reports `STALE`.
+The runner's own control is `node scripts/prove-red.ts --dir test/controls/prove-red`, which must report its two-tag patch as a survivor. Generate a patch with `git diff -- <paths>` so it carries nothing else, and regenerate it when it reports `STALE`. When code was only reformatted, `node scripts/rebase-mutants.ts <ref before the format>` rebuilds the stale patches mechanically.
 
 ## Git
 
