@@ -1,0 +1,14 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe.test.ts
+# kills: probe.discriminating-runs-admitted
+# why: Three discriminating runs are never enough
+diff --git a/packages/core/src/domain/verification/probe.ts b/packages/core/src/domain/verification/probe.ts
+index 1fcbe74..bc53ef8 100644
+--- a/packages/core/src/domain/verification/probe.ts
++++ b/packages/core/src/domain/verification/probe.ts
+@@ -44,5 +44,5 @@ export const admit = (cells: readonly ProbeCell[]): Admission => {
+   const done = [...runs.values()].filter(complete);
+   const good = done.filter(discriminates).length;
+   if (good < done.length) return { _tag: "rejected", reason: good === 0 ? "non-discriminating" : "unstable" };
+-  return done.length >= ADMISSION_RUNS ? { _tag: "admitted", runs: done.length } : { _tag: "pending", complete: done.length };
++  return done.length > ADMISSION_RUNS ? { _tag: "admitted", runs: done.length } : { _tag: "pending", complete: done.length };
+ };

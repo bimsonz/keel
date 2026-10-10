@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe.test.ts
+# kills: probe.admitted-means-discriminating, probe.passing-everywhere-never-admitted
+# why: A probe that fails on trunk is still admitted
+diff --git a/packages/core/src/domain/verification/probe.ts b/packages/core/src/domain/verification/probe.ts
+index 1fcbe74..b5ca306 100644
+--- a/packages/core/src/domain/verification/probe.ts
++++ b/packages/core/src/domain/verification/probe.ts
+@@ -22,7 +22,7 @@ type Run = { readonly trunk?: ProbeOutcome; readonly holder?: ProbeOutcome; read
+  * combined world (AB). World B is recorded but does not decide.
+  */
+ const discriminates = (r: Required<Run>): boolean =>
+-  (r.trunk === "pass" || r.trunk === "n/a") && r.holder === "pass" && r.combined === "fail";
++  r.trunk !== undefined && r.holder === "pass" && r.combined === "fail";
+ 
+ const complete = (r: Run): r is Required<Run> => r.trunk !== undefined && r.holder !== undefined && r.combined !== undefined;
+ 

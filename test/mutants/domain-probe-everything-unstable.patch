@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe.test.ts
+# kills: probe.one-bad-run-rejects, probe.passing-everywhere-never-admitted
+# why: A probe that never discriminates is escalated as unstable instead of dismissing the conflict
+diff --git a/packages/core/src/domain/verification/probe.ts b/packages/core/src/domain/verification/probe.ts
+index 1fcbe74..c98d17d 100644
+--- a/packages/core/src/domain/verification/probe.ts
++++ b/packages/core/src/domain/verification/probe.ts
+@@ -43,6 +43,6 @@ export const admit = (cells: readonly ProbeCell[]): Admission => {
+   }
+   const done = [...runs.values()].filter(complete);
+   const good = done.filter(discriminates).length;
+-  if (good < done.length) return { _tag: "rejected", reason: good === 0 ? "non-discriminating" : "unstable" };
++  if (good < done.length) return { _tag: "rejected", reason: "unstable" };
+   return done.length >= ADMISSION_RUNS ? { _tag: "admitted", runs: done.length } : { _tag: "pending", complete: done.length };
+ };
