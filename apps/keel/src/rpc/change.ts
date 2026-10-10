@@ -18,6 +18,7 @@ import {
   CommitSha,
   ContentHash,
   LeaseId,
+  NextAction,
   ProjectId,
   SketchId,
   VerdictId,
@@ -93,12 +94,14 @@ export type PrecheckStartedCommand = typeof PrecheckStartedCommand.Type;
 /**
  * Precheck refused the submission. Commits, in one transaction, VerdictIssued
  * (outcome `bounce`, evidence class `ruling`, citing the refused paths) on the
- * verdict entity and ChangeBounced naming that verdict.
+ * verdict entity and ChangeBounced naming that verdict, with these next actions.
  */
 export const PrecheckRefusedCommand = Schema.Struct({
   revision: Schema.Int,
   instanceId: Schema.NonEmptyString,
   reasons: Schema.NonEmptyArray(Schema.String),
+  /** What the agent can do about it; ChangeBounced carries them, never empty. */
+  nextActions: Schema.NonEmptyArray(NextAction),
 });
 export type PrecheckRefusedCommand = typeof PrecheckRefusedCommand.Type;
 
