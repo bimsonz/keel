@@ -85,6 +85,8 @@ export const Change = Schema.Struct({
   workspaceId: Schema.optional(WorkspaceId),
   fromSketch: Schema.optional(SketchId),
   createdAt: InstantSchema,
+  /** The change's base: its workspace's head when granted. Precheck diffs against it. */
+  baseSha: Schema.optional(CommitSha),
   /** The commit last submitted; it is the commit that lands. */
   commitSha: Schema.optional(CommitSha),
   /** The lane it was queued on, while Queued or Integrating. */

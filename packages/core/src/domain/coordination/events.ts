@@ -58,6 +58,8 @@ export const IntentRevised = Schema.TaggedStruct("IntentRevised", {
 export const ChangeStarted = Schema.TaggedStruct("ChangeStarted", {
   changeId: ChangeId,
   workspaceId: WorkspaceId,
+  /** The workspace's head when granted: the change's base, which Precheck diffs against. Always set; optional only so older events still decode. */
+  baseSha: Schema.optional(CommitSha),
 });
 export const PremiseRelied = Schema.TaggedStruct("PremiseRelied", {
   subjectId: SubjectId,

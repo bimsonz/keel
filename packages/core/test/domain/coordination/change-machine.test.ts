@@ -35,6 +35,7 @@ const CHANGE = makeId("chg", ulid(1));
 const AGENT = makeId("agt", ulid(1));
 const NEVER_ISSUED = makeId("lse", "Z".repeat(26));
 const SHA = CommitSha.make("c".repeat(40));
+const BASE = CommitSha.make("b".repeat(40));
 const preflight: Preflight = {
   neighbours: [],
   contradictions: [],
@@ -253,7 +254,7 @@ const build = (
         preflight,
       };
     case "Start":
-      return { _tag: "Start", workspaceId: mint.next("wsp") };
+      return { _tag: "Start", workspaceId: mint.next("wsp"), baseSha: BASE };
     case "Revise":
       return {
         _tag: "Revise",
@@ -601,7 +602,7 @@ const declare: ChangeCommand = {
   leaseId: LEASE,
   preflight,
 };
-const start: ChangeCommand = { _tag: "Start", workspaceId: makeId("wsp", ulid(3)) };
+const start: ChangeCommand = { _tag: "Start", workspaceId: makeId("wsp", ulid(3)), baseSha: BASE };
 const submit: ChangeCommand = { _tag: "Submit", leaseId: LEASE, commitSha: SHA, inWorkspace: true };
 const precheck: ChangeCommand = { _tag: "StartPrecheck", instanceId: "precheck-1" };
 const compile: ChangeCommand = {
@@ -693,6 +694,8 @@ describe("the Change machine", () => {
       "integrating",
       "landed",
     ]);
+    // Precheck diffs against the base the workspace was granted at.
+    expect(s0.state).toMatchObject({ baseSha: BASE, commitSha: SHA });
     expect(tags(s0.log)).toEqual([
       "IntentDeclared",
       "PreflightIssued",

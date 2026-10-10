@@ -122,7 +122,7 @@ export type ChangeCommand =
       readonly leaseId: LeaseId;
       readonly preflight: Preflight;
     }
-  | { readonly _tag: "Start"; readonly workspaceId: WorkspaceId }
+  | { readonly _tag: "Start"; readonly workspaceId: WorkspaceId; readonly baseSha: CommitSha }
   | {
       readonly _tag: "Revise";
       readonly leaseId: LeaseId;
@@ -349,7 +349,13 @@ export const decideChange = (
   switch (command._tag) {
     case "Start":
       return at("declared")
-        ? Result.succeed([ChangeStarted.make({ changeId: id, workspaceId: command.workspaceId })])
+        ? Result.succeed([
+            ChangeStarted.make({
+              changeId: id,
+              workspaceId: command.workspaceId,
+              baseSha: command.baseSha,
+            }),
+          ])
         : refuse(change, command);
 
     case "Revise": {
@@ -700,7 +706,11 @@ export const evolveChange = (
     }
     case "ChangeStarted":
       return from("declared")
-        ? { ...moveTo(change, "working"), workspaceId: event.workspaceId }
+        ? {
+            ...moveTo(change, "working"),
+            workspaceId: event.workspaceId,
+            ...(event.baseSha === undefined ? {} : { baseSha: event.baseSha }),
+          }
         : illegal(change, event);
     case "ChangeSubmitted":
       return from("working", "bounced")

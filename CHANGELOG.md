@@ -16,6 +16,7 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 - The Candidate and trunk Promotion state machines: `decideCandidate`/`evolveCandidate`/`replayCandidate` with `CandidateCommand`, `CandidateEvent`, `isBisectable`, `isCandidateTerminal`; `decidePromotion`/`evolvePromotion`/`replayPromotion` with `PromotionCommand`, `TrunkEvent`, `CommutationFacts`, `pushTarget`; schemas `Trunk`, `QueuedBatch`, `PendingGroup`.
 - Entity kind `trunk` (`trunk:<projectId>`). Events `TrunkInitialized {projectId, head, by}`, `PromotionStarted` (the WAL entry) and `PromotionComposed {projectId, groupId, sha}`. `BatchFailed.attribution` gains `unattributed`; `PromotionDeclined.reason` gains `frozen`. Optional `projectId` and `predecessors` on `BatchFormed`, `members`, `base` and `predecessors` on `BatchVerified`, `head` on `PromotionResumed`, `predecessors` and `attribution` on `Batch`.
 - Errors `CandidateStateRefused`, `ResultFenced` (terminal: a fenced result is never retried), `InvalidBatch`, `TrunkNotInitialized`, `PromotionStateRefused`.
+- `ChangeStarted.baseSha?` and `Change.baseSha?`: the workspace's head at grant, which Precheck diffs against (the `Start` command requires it).
 
 ### Changed
 
