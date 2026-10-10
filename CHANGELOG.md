@@ -21,7 +21,6 @@ Changes since `contracts-v0-rc1` (`3e7c7f1`, 10 Oct 2026), all additive or fixes
 ### Fixed
 
 - Scopes are per operation. Each operation now demands only its own scope; the OAuth flow model used to list all four, which overrode the operations and made every operation demand all of them.
-
 - The Change RPC `submit` codec now carries submit's own errors, `ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace`. It had `RevisionMismatch`, which belongs to revise alone.
 
 ### Changed
