@@ -1,0 +1,351 @@
+{
+  "real": {
+    "boot": {
+      "clientMs": 881,
+      "ok": true,
+      "wallMs": 802,
+      "result": {
+        "from": "image",
+        "instance": "standard-2",
+        "egress": "locked",
+        "startCallMs": 0,
+        "tokenMintMs": 199,
+        "interceptRegisterMs": 192,
+        "firstExecAtMs": 414,
+        "execAttempts": 1,
+        "trustMs": 45,
+        "readyAtMs": 459
+      }
+    },
+    "verify": {
+      "clientMs": 9271,
+      "ok": true,
+      "wallMs": 9252,
+      "result": {
+        "totalMs": 9288,
+        "tokenMintMs": 33,
+        "interceptRegisterMs": 21,
+        "execMs": 9234,
+        "exitCode": 0,
+        "result": {
+          "phase": "done",
+          "clone": 0,
+          "mergeTreeExit": 0,
+          "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+          "checkout": 0,
+          "deps": "prebaked",
+          "testExit": 0,
+          "passed": 214,
+          "failed": 0,
+          "total": 214,
+          "success": "true",
+          "cloneMs": 938,
+          "mergeTreeMs": 5,
+          "checkoutMs": 15,
+          "depsMs": 11,
+          "testMs": 8075,
+          "totalMs": 9044
+        },
+        "stderrTail": ""
+      }
+    },
+    "trace": {
+      "clientMs": 447,
+      "ok": true,
+      "wallMs": 363,
+      "result": {
+        "exitCode": 0,
+        "out": "19:11:23.858723 http.c:684              => Send header: GET /git/keel-spike-04/forge.git/info/refs?service=git-upload-pack HTTP/1.1\n19:11:23.858730 http.c:684              => Send header: Host: <acct>.artifacts.cloudflare.net\n19:11:23.918558 http.c:684              <= Recv header: HTTP/1.1 200 OK\n19:11:23.918651 http.c:684              <= Recv header: X-Keel-Egress: injected\n19:11:23.978947 http.c:684              => Send header: POST /git/keel-spike-04/forge.git/git-upload-pack HTTP/1.1\n19:11:23.978953 http.c:684              => Send header: Host: <acct>.artifacts.cloudflare.net\n19:11:24.060846 http.c:684              <= Recv header: HTTP/1.1 200 OK\n19:11:24.061016 http.c:684              <= Recv header: X-Keel-Egress: injected\nls-remote exit=0 refs=4\n94161388cbc3394bd27f0d6d2ab567d5805a8ee8\tHEAD\nce1f0aad4581bc42e1661a0f3ff2058ed9ec2ff6\trefs/heads/agent-a\n0f0f23db784c7077f44f6b0db6dfd84a0c8fd754\trefs/heads/agent-b\n94161388cbc3394bd27f0d6d2ab567d5805a8ee8\trefs/heads/main\n"
+      }
+    },
+    "checks": {
+      "clientMs": 3399,
+      "ok": true,
+      "wallMs": 3384,
+      "result": {
+        "mode": "real-token",
+        "secretsCompared": 3,
+        "plantExit": null,
+        "checkExit": 0,
+        "checkMs": 3393,
+        "sections": {
+          "env": {
+            "hits": 0,
+            "containsSecret": false,
+            "lines": []
+          },
+          "proc-environ": {
+            "hits": 0,
+            "containsSecret": false,
+            "lines": []
+          },
+          "git-config": {
+            "hits": 0,
+            "containsSecret": false,
+            "lines": []
+          },
+          "git-credentials": {
+            "hits": 0,
+            "containsSecret": false,
+            "lines": []
+          },
+          "tmp": {
+            "hits": 0,
+            "containsSecret": false,
+            "lines": []
+          },
+          "fs": {
+            "hits": 1,
+            "containsSecret": false,
+            "lines": [
+              "/usr/local/bin/node:<token>"
+            ]
+          },
+          "end": {
+            "hits": 0,
+            "containsSecret": false,
+            "lines": []
+          }
+        },
+        "stderrTail": ""
+      }
+    },
+    "egress": {
+      "clientMs": 40537,
+      "ok": true,
+      "wallMs": 40445,
+      "result": {
+        "egress": "locked",
+        "exitCode": 0,
+        "out": "https://example.com      rc=28  ms=10013  curl: (28) Resolving timed out after 10000 milliseconds 000\nhttp://example.com       rc=28  ms=10014  curl: (28) Resolving timed out after 10000 milliseconds 000\nhttps://registry.npmjs.org rc=28  ms=10013  curl: (28) Resolving timed out after 10000 milliseconds 000\nhttps://1.1.1.1          rc=35  ms=66     curl: (35) Recv failure: Connection reset by peer 000\ndns:example.com          rc=124 ms=10005  \nartifacts:this-repo      rc=0   ms=145    200\nartifacts:other-repo     rc=0   ms=82     403\n"
+      }
+    }
+  },
+  "canary": {
+    "boot": {
+      "clientMs": 659,
+      "ok": true,
+      "wallMs": 646,
+      "result": {
+        "from": "image",
+        "instance": "standard-2",
+        "egress": "locked",
+        "startCallMs": 0,
+        "tokenMintMs": 57,
+        "interceptRegisterMs": 190,
+        "firstExecAtMs": 266,
+        "execAttempts": 1,
+        "trustMs": 44,
+        "readyAtMs": 310
+      }
+    },
+    "verify": {
+      "clientMs": 9921,
+      "ok": true,
+      "wallMs": 9828,
+      "result": {
+        "totalMs": 9863,
+        "tokenMintMs": 42,
+        "interceptRegisterMs": 7,
+        "execMs": 9814,
+        "exitCode": 0,
+        "result": {
+          "phase": "done",
+          "clone": 0,
+          "mergeTreeExit": 0,
+          "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+          "checkout": 0,
+          "deps": "prebaked",
+          "testExit": 0,
+          "passed": 214,
+          "failed": 0,
+          "total": 214,
+          "success": "true",
+          "cloneMs": 699,
+          "mergeTreeMs": 5,
+          "checkoutMs": 13,
+          "depsMs": 13,
+          "testMs": 8875,
+          "totalMs": 9605
+        },
+        "stderrTail": ""
+      }
+    },
+    "checks": {
+      "clientMs": 3626,
+      "ok": true,
+      "wallMs": 3612,
+      "result": {
+        "mode": "canary",
+        "secretsCompared": 1,
+        "plantExit": 0,
+        "checkExit": 0,
+        "checkMs": 3587,
+        "sections": {
+          "env": {
+            "hits": 1,
+            "containsSecret": true,
+            "lines": [
+              "ARTIFACTS_TOKEN=<token>?expires=1999999999"
+            ]
+          },
+          "proc-environ": {
+            "hits": 2,
+            "containsSecret": true,
+            "lines": [
+              "/proc/1/environ: ARTIFACTS_TOKEN=<token>?expires=1999999999",
+              "/proc/215/environ: ARTIFACTS_TOKEN=<token>?expires=1999999999"
+            ]
+          },
+          "git-config": {
+            "hits": 1,
+            "containsSecret": true,
+            "lines": [
+              "13:\textraHeader = Authorization: Bearer <token>?expires=1999999999"
+            ]
+          },
+          "git-credentials": {
+            "hits": 1,
+            "containsSecret": true,
+            "lines": [
+              "1:https://x:<token>?expires=1999999999@example.invalid"
+            ]
+          },
+          "tmp": {
+            "hits": 1,
+            "containsSecret": true,
+            "lines": [
+              "/tmp/canary-token:<token>"
+            ]
+          },
+          "fs": {
+            "hits": 6,
+            "containsSecret": true,
+            "lines": [
+              "/opt/planted/app.env:<token>",
+              "/root/.git-credentials:<token>",
+              "/run/crun/cloudchamber/config.json:<token>",
+              "/tmp/canary-token:<token>",
+              "/usr/local/bin/node:<token>",
+              "/work/c/.git/config:<token>"
+            ]
+          },
+          "end": {
+            "hits": 0,
+            "containsSecret": false,
+            "lines": []
+          }
+        },
+        "stderrTail": ""
+      }
+    }
+  },
+  "noInject": {
+    "boot": {
+      "clientMs": 1057,
+      "ok": true,
+      "wallMs": 849,
+      "result": {
+        "from": "image",
+        "instance": "standard-2",
+        "egress": "no-inject",
+        "startCallMs": 0,
+        "tokenMintMs": 218,
+        "interceptRegisterMs": 102,
+        "firstExecAtMs": 421,
+        "execAttempts": 1,
+        "trustMs": 82,
+        "readyAtMs": 503
+      }
+    },
+    "verify": {
+      "clientMs": 836,
+      "ok": true,
+      "wallMs": 823,
+      "result": {
+        "totalMs": 827,
+        "tokenMintMs": 39,
+        "interceptRegisterMs": 5,
+        "execMs": 783,
+        "exitCode": 1,
+        "result": {
+          "phase": "clone",
+          "clone": 128,
+          "cloneMs": 399
+        },
+        "stderrTail": "fatal: could not read Username for 'https://<acct>.artifacts.cloudflare.net': terminal prompts disabled\n"
+      }
+    },
+    "trace": {
+      "clientMs": 294,
+      "ok": true,
+      "wallMs": 213,
+      "result": {
+        "exitCode": 0,
+        "out": "19:12:25.055822 http.c:684              => Send header: GET /git/keel-spike-04/forge.git/info/refs?service=git-upload-pack HTTP/1.1\n19:12:25.055827 http.c:684              => Send header: Host: <acct>.artifacts.cloudflare.net\n19:12:25.071645 http.c:684              <= Recv header: HTTP/1.1 401 Unauthorized\n19:12:25.071779 http.c:684              <= Recv header: Www-Authenticate: Basic realm=\"artifacts\"\n19:12:25.071907 http.c:684              <= Recv header: X-Keel-Egress: no-token\nls-remote exit=128 refs=0\n"
+      }
+    }
+  },
+  "open-internet": {
+    "boot": {
+      "clientMs": 892,
+      "ok": true,
+      "wallMs": 879,
+      "result": {
+        "from": "image",
+        "instance": "standard-2",
+        "egress": "open-internet",
+        "startCallMs": 0,
+        "tokenMintMs": 268,
+        "interceptRegisterMs": 164,
+        "firstExecAtMs": 494,
+        "execAttempts": 1,
+        "trustMs": 109,
+        "readyAtMs": 603
+      }
+    },
+    "egress": {
+      "clientMs": 747,
+      "ok": true,
+      "wallMs": 734,
+      "result": {
+        "egress": "open-internet",
+        "exitCode": 0,
+        "out": "https://example.com      rc=0   ms=166    200\nhttp://example.com       rc=0   ms=28     200\nhttps://registry.npmjs.org rc=0   ms=74     200\nhttps://1.1.1.1          rc=35  ms=75     curl: (35) Recv failure: Connection reset by peer 000\ndns:example.com          rc=0   ms=10     2606:4700:10::6814:179a example.com 2606:4700:10::ac42:93f3 example.com\nartifacts:this-repo      rc=0   ms=137    200\nartifacts:other-repo     rc=0   ms=68     403\n"
+      }
+    }
+  },
+  "open-intercept": {
+    "boot": {
+      "clientMs": 5940,
+      "ok": true,
+      "wallMs": 5926,
+      "result": {
+        "from": "image",
+        "instance": "standard-2",
+        "egress": "open-intercept",
+        "startCallMs": 0,
+        "tokenMintMs": 757,
+        "interceptRegisterMs": 4834,
+        "firstExecAtMs": 5621,
+        "execAttempts": 1,
+        "trustMs": 42,
+        "readyAtMs": 5663
+      }
+    },
+    "egress": {
+      "clientMs": 11311,
+      "ok": true,
+      "wallMs": 11228,
+      "result": {
+        "egress": "open-intercept",
+        "exitCode": 0,
+        "out": "https://example.com      rc=0   ms=228    200\nhttp://example.com       rc=28  ms=10014  curl: (28) Connection timed out after 10001 milliseconds 000\nhttps://registry.npmjs.org rc=0   ms=66     200\nhttps://1.1.1.1          rc=35  ms=53     curl: (35) Recv failure: Connection reset by peer 000\ndns:example.com          rc=0   ms=7      fd00::119:1     example.com\nartifacts:this-repo      rc=0   ms=618    200\nartifacts:other-repo     rc=0   ms=56     403\n"
+      }
+    }
+  }
+}

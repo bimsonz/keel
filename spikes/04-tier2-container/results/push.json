@@ -1,0 +1,10 @@
+{
+  "clientMs": 1254,
+  "ok": true,
+  "wallMs": 1124,
+  "result": {
+    "exitCode": 1,
+    "ms": 1112,
+    "out": "remote: Processing objects: 50% (2/4)        \nremote: Processing objects: 100% (4/4)        \nTo https://<acct>.artifacts.cloudflare.net/git/keel-spike-04/forge.git\n * [new branch]      HEAD -> keel/merged-a-b\npush-exit=0 ms=563\n94161388cbc3394bd27f0d6d2ab567d5805a8ee8\tHEAD\nce1f0aad4581bc42e1661a0f3ff2058ed9ec2ff6\trefs/heads/agent-a\n0f0f23db784c7077f44f6b0db6dfd84a0c8fd754\trefs/heads/agent-b\naec869cc5b5a1085706cb1f64e440358b731ce96\trefs/heads/keel/merged-a-b\n94161388cbc3394bd27f0d6d2ab567d5805a8ee8\trefs/heads/main\n0\n0\n"
+  }
+}

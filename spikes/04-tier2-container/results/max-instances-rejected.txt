@@ -1,0 +1,2 @@
+✘ [ERROR] Processing <scratch>/wrangler.jsonc configuration:
+    - Unsupported fields for Durable Object-managed Containers in containers: "max_instances". Only "name", "class_name", "scheduling_policy", "images", "observability", "ssh", "authorized_keys", and restricted "unsafe" settings are supported.

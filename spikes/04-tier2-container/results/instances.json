@@ -1,0 +1,626 @@
+{
+  "standard-1": {
+    "summary": {
+      "readyAtMs": 689,
+      "coldVerifyMs": 8038,
+      "coldTestMs": 7064,
+      "coldPassed": 214,
+      "warmVerifyMs": {
+        "n": 3,
+        "p50": 13281,
+        "min": 13151,
+        "max": 16824
+      },
+      "warmTestMs": {
+        "n": 3,
+        "p50": 12265,
+        "min": 12176,
+        "max": 16051
+      },
+      "plainVitestMs": {
+        "n": 3,
+        "p50": 13700,
+        "min": 10771,
+        "max": 13703
+      },
+      "failures": 0,
+      "cpu": "1\nmodel name\t: AMD EPYC"
+    },
+    "boot": {
+      "clientMs": 1362,
+      "ok": true,
+      "wallMs": 1128,
+      "result": {
+        "from": "image",
+        "instance": "standard-1",
+        "egress": "locked",
+        "startCallMs": 0,
+        "tokenMintMs": 323,
+        "interceptRegisterMs": 261,
+        "firstExecAtMs": 627,
+        "execAttempts": 1,
+        "trustMs": 62,
+        "readyAtMs": 689
+      }
+    },
+    "coldVerify": {
+      "clientMs": 8191,
+      "ok": true,
+      "wallMs": 8046,
+      "result": {
+        "totalMs": 8038,
+        "tokenMintMs": 66,
+        "interceptRegisterMs": 6,
+        "execMs": 7966,
+        "exitCode": 0,
+        "result": {
+          "phase": "done",
+          "clone": 0,
+          "mergeTreeExit": 0,
+          "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+          "checkout": 0,
+          "deps": "prebaked",
+          "testExit": 0,
+          "passed": 214,
+          "failed": 0,
+          "total": 214,
+          "success": "true",
+          "cloneMs": 728,
+          "mergeTreeMs": 4,
+          "checkoutMs": 11,
+          "depsMs": 11,
+          "testMs": 7064,
+          "totalMs": 7818
+        },
+        "stderrTail": ""
+      }
+    },
+    "warmVerifies": [
+      {
+        "clientMs": 13458,
+        "ok": true,
+        "wallMs": 13313,
+        "result": {
+          "totalMs": 13281,
+          "tokenMintMs": 66,
+          "interceptRegisterMs": 8,
+          "execMs": 13207,
+          "exitCode": 0,
+          "result": {
+            "phase": "done",
+            "clone": 0,
+            "mergeTreeExit": 0,
+            "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+            "checkout": 0,
+            "deps": "prebaked",
+            "testExit": 0,
+            "passed": 214,
+            "failed": 0,
+            "total": 214,
+            "success": "true",
+            "cloneMs": 764,
+            "mergeTreeMs": 4,
+            "checkoutMs": 10,
+            "depsMs": 5,
+            "testMs": 12265,
+            "totalMs": 13048
+          },
+          "stderrTail": ""
+        }
+      },
+      {
+        "clientMs": 16888,
+        "ok": true,
+        "wallMs": 16846,
+        "result": {
+          "totalMs": 16824,
+          "tokenMintMs": 61,
+          "interceptRegisterMs": 4,
+          "execMs": 16759,
+          "exitCode": 0,
+          "result": {
+            "phase": "done",
+            "clone": 0,
+            "mergeTreeExit": 0,
+            "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+            "checkout": 0,
+            "deps": "prebaked",
+            "testExit": 0,
+            "passed": 214,
+            "failed": 0,
+            "total": 214,
+            "success": "true",
+            "cloneMs": 455,
+            "mergeTreeMs": 4,
+            "checkoutMs": 10,
+            "depsMs": 5,
+            "testMs": 16051,
+            "totalMs": 16525
+          },
+          "stderrTail": ""
+        }
+      },
+      {
+        "clientMs": 13201,
+        "ok": true,
+        "wallMs": 13171,
+        "result": {
+          "totalMs": 13151,
+          "tokenMintMs": 77,
+          "interceptRegisterMs": 4,
+          "execMs": 13070,
+          "exitCode": 0,
+          "result": {
+            "phase": "done",
+            "clone": 0,
+            "mergeTreeExit": 0,
+            "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+            "checkout": 0,
+            "deps": "prebaked",
+            "testExit": 0,
+            "passed": 214,
+            "failed": 0,
+            "total": 214,
+            "success": "true",
+            "cloneMs": 719,
+            "mergeTreeMs": 4,
+            "checkoutMs": 10,
+            "depsMs": 5,
+            "testMs": 12176,
+            "totalMs": 12914
+          },
+          "stderrTail": ""
+        }
+      }
+    ],
+    "vitest": {
+      "clientMs": 38395,
+      "ok": true,
+      "wallMs": 38219,
+      "result": {
+        "samples": [
+          {
+            "ms": 13700,
+            "exitCode": 0,
+            "tail": "\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m10 passed\u001b[39m\u001b[22m\u001b[90m (10)\u001b[39m | \u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m214 passed\u001b[39m\u001b[22m\u001b[90m (214)\u001b[39m | \u001b[2m   Duration \u001b[22m 12.90s\u001b[2m (tests 77%, import 14%, transform 7%, worker 1%, environment 1%)\u001b[22m"
+          },
+          {
+            "ms": 13703,
+            "exitCode": 0,
+            "tail": "\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m10 passed\u001b[39m\u001b[22m\u001b[90m (10)\u001b[39m | \u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m214 passed\u001b[39m\u001b[22m\u001b[90m (214)\u001b[39m | \u001b[2m   Duration \u001b[22m 12.50s\u001b[2m (tests 74%, import 12%, transform 12%, worker 2%)\u001b[22m"
+          },
+          {
+            "ms": 10771,
+            "exitCode": 0,
+            "tail": "\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m10 passed\u001b[39m\u001b[22m\u001b[90m (10)\u001b[39m | \u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m214 passed\u001b[39m\u001b[22m\u001b[90m (214)\u001b[39m | \u001b[2m   Duration \u001b[22m 9.71s\u001b[2m (tests 75%, import 16%, transform 9%, worker 1%)\u001b[22m"
+          }
+        ],
+        "cpu": "1\nmodel name\t: AMD EPYC"
+      }
+    }
+  },
+  "standard-2": {
+    "summary": {
+      "readyAtMs": 557,
+      "coldVerifyMs": 6237,
+      "coldTestMs": 5412,
+      "coldPassed": 214,
+      "warmVerifyMs": {
+        "n": 3,
+        "p50": 5356,
+        "min": 5154,
+        "max": 5557
+      },
+      "warmTestMs": {
+        "n": 3,
+        "p50": 4636,
+        "min": 4587,
+        "max": 4768
+      },
+      "plainVitestMs": {
+        "n": 3,
+        "p50": 4271,
+        "min": 4191,
+        "max": 4290
+      },
+      "failures": 0,
+      "cpu": "1\nmodel name\t: AMD EPYC"
+    },
+    "boot": {
+      "clientMs": 973,
+      "ok": true,
+      "wallMs": 839,
+      "result": {
+        "from": "image",
+        "instance": "standard-2",
+        "egress": "locked",
+        "startCallMs": 0,
+        "tokenMintMs": 215,
+        "interceptRegisterMs": 124,
+        "firstExecAtMs": 435,
+        "execAttempts": 1,
+        "trustMs": 122,
+        "readyAtMs": 557
+      }
+    },
+    "coldVerify": {
+      "clientMs": 6376,
+      "ok": true,
+      "wallMs": 6182,
+      "result": {
+        "totalMs": 6237,
+        "tokenMintMs": 41,
+        "interceptRegisterMs": 2,
+        "execMs": 6194,
+        "exitCode": 0,
+        "result": {
+          "phase": "done",
+          "clone": 0,
+          "mergeTreeExit": 0,
+          "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+          "checkout": 0,
+          "deps": "prebaked",
+          "testExit": 0,
+          "passed": 214,
+          "failed": 0,
+          "total": 214,
+          "success": "true",
+          "cloneMs": 605,
+          "mergeTreeMs": 4,
+          "checkoutMs": 9,
+          "depsMs": 7,
+          "testMs": 5412,
+          "totalMs": 6037
+        },
+        "stderrTail": ""
+      }
+    },
+    "warmVerifies": [
+      {
+        "clientMs": 5906,
+        "ok": true,
+        "wallMs": 5568,
+        "result": {
+          "totalMs": 5557,
+          "tokenMintMs": 33,
+          "interceptRegisterMs": 7,
+          "execMs": 5517,
+          "exitCode": 0,
+          "result": {
+            "phase": "done",
+            "clone": 0,
+            "mergeTreeExit": 0,
+            "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+            "checkout": 0,
+            "deps": "prebaked",
+            "testExit": 0,
+            "passed": 214,
+            "failed": 0,
+            "total": 214,
+            "success": "true",
+            "cloneMs": 641,
+            "mergeTreeMs": 3,
+            "checkoutMs": 9,
+            "depsMs": 4,
+            "testMs": 4768,
+            "totalMs": 5425
+          },
+          "stderrTail": ""
+        }
+      },
+      {
+        "clientMs": 5314,
+        "ok": true,
+        "wallMs": 5167,
+        "result": {
+          "totalMs": 5154,
+          "tokenMintMs": 33,
+          "interceptRegisterMs": 4,
+          "execMs": 5117,
+          "exitCode": 0,
+          "result": {
+            "phase": "done",
+            "clone": 0,
+            "mergeTreeExit": 0,
+            "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+            "checkout": 0,
+            "deps": "prebaked",
+            "testExit": 0,
+            "passed": 214,
+            "failed": 0,
+            "total": 214,
+            "success": "true",
+            "cloneMs": 407,
+            "mergeTreeMs": 3,
+            "checkoutMs": 9,
+            "depsMs": 4,
+            "testMs": 4587,
+            "totalMs": 5010
+          },
+          "stderrTail": ""
+        }
+      },
+      {
+        "clientMs": 5539,
+        "ok": true,
+        "wallMs": 5372,
+        "result": {
+          "totalMs": 5356,
+          "tokenMintMs": 37,
+          "interceptRegisterMs": 4,
+          "execMs": 5315,
+          "exitCode": 0,
+          "result": {
+            "phase": "done",
+            "clone": 0,
+            "mergeTreeExit": 0,
+            "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+            "checkout": 0,
+            "deps": "prebaked",
+            "testExit": 0,
+            "passed": 214,
+            "failed": 0,
+            "total": 214,
+            "success": "true",
+            "cloneMs": 572,
+            "mergeTreeMs": 4,
+            "checkoutMs": 10,
+            "depsMs": 5,
+            "testMs": 4636,
+            "totalMs": 5227
+          },
+          "stderrTail": ""
+        }
+      }
+    ],
+    "vitest": {
+      "clientMs": 12795,
+      "ok": true,
+      "wallMs": 12773,
+      "result": {
+        "samples": [
+          {
+            "ms": 4290,
+            "exitCode": 0,
+            "tail": "\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m10 passed\u001b[39m\u001b[22m\u001b[90m (10)\u001b[39m | \u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m214 passed\u001b[39m\u001b[22m\u001b[90m (214)\u001b[39m | \u001b[2m   Duration \u001b[22m 3.87s\u001b[2m (tests 76%, import 14%, transform 8%, worker 2%)\u001b[22m"
+          },
+          {
+            "ms": 4191,
+            "exitCode": 0,
+            "tail": "\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m10 passed\u001b[39m\u001b[22m\u001b[90m (10)\u001b[39m | \u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m214 passed\u001b[39m\u001b[22m\u001b[90m (214)\u001b[39m | \u001b[2m   Duration \u001b[22m 3.77s\u001b[2m (tests 75%, import 15%, transform 9%, worker 2%)\u001b[22m"
+          },
+          {
+            "ms": 4271,
+            "exitCode": 0,
+            "tail": "\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m10 passed\u001b[39m\u001b[22m\u001b[90m (10)\u001b[39m | \u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m214 passed\u001b[39m\u001b[22m\u001b[90m (214)\u001b[39m | \u001b[2m   Duration \u001b[22m 3.89s\u001b[2m (tests 75%, import 15%, transform 9%, worker 2%)\u001b[22m"
+          }
+        ],
+        "cpu": "1\nmodel name\t: AMD EPYC"
+      }
+    }
+  },
+  "standard-3": {
+    "summary": {
+      "readyAtMs": 530,
+      "coldVerifyMs": 5897,
+      "coldTestMs": 5095,
+      "coldPassed": 214,
+      "warmVerifyMs": {
+        "n": 3,
+        "p50": 5144,
+        "min": 5103,
+        "max": 5197
+      },
+      "warmTestMs": {
+        "n": 3,
+        "p50": 4582,
+        "min": 4510,
+        "max": 4629
+      },
+      "plainVitestMs": {
+        "n": 3,
+        "p50": 4116,
+        "min": 4097,
+        "max": 4117
+      },
+      "failures": 0,
+      "cpu": "2\nmodel name\t: AMD EPYC"
+    },
+    "boot": {
+      "clientMs": 971,
+      "ok": true,
+      "wallMs": 947,
+      "result": {
+        "from": "image",
+        "instance": "standard-3",
+        "egress": "locked",
+        "startCallMs": 0,
+        "tokenMintMs": 210,
+        "interceptRegisterMs": 177,
+        "firstExecAtMs": 447,
+        "execAttempts": 1,
+        "trustMs": 83,
+        "readyAtMs": 530
+      }
+    },
+    "coldVerify": {
+      "clientMs": 6019,
+      "ok": true,
+      "wallMs": 5853,
+      "result": {
+        "totalMs": 5897,
+        "tokenMintMs": 38,
+        "interceptRegisterMs": 3,
+        "execMs": 5856,
+        "exitCode": 0,
+        "result": {
+          "phase": "done",
+          "clone": 0,
+          "mergeTreeExit": 0,
+          "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+          "checkout": 0,
+          "deps": "prebaked",
+          "testExit": 0,
+          "passed": 214,
+          "failed": 0,
+          "total": 214,
+          "success": "true",
+          "cloneMs": 594,
+          "mergeTreeMs": 4,
+          "checkoutMs": 10,
+          "depsMs": 7,
+          "testMs": 5095,
+          "totalMs": 5710
+        },
+        "stderrTail": ""
+      }
+    },
+    "warmVerifies": [
+      {
+        "clientMs": 5238,
+        "ok": true,
+        "wallMs": 5211,
+        "result": {
+          "totalMs": 5197,
+          "tokenMintMs": 36,
+          "interceptRegisterMs": 8,
+          "execMs": 5153,
+          "exitCode": 0,
+          "result": {
+            "phase": "done",
+            "clone": 0,
+            "mergeTreeExit": 0,
+            "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+            "checkout": 0,
+            "deps": "prebaked",
+            "testExit": 0,
+            "passed": 214,
+            "failed": 0,
+            "total": 214,
+            "success": "true",
+            "cloneMs": 416,
+            "mergeTreeMs": 4,
+            "checkoutMs": 9,
+            "depsMs": 5,
+            "testMs": 4629,
+            "totalMs": 5063
+          },
+          "stderrTail": ""
+        }
+      },
+      {
+        "clientMs": 5137,
+        "ok": true,
+        "wallMs": 5115,
+        "result": {
+          "totalMs": 5103,
+          "tokenMintMs": 39,
+          "interceptRegisterMs": 3,
+          "execMs": 5061,
+          "exitCode": 0,
+          "result": {
+            "phase": "done",
+            "clone": 0,
+            "mergeTreeExit": 0,
+            "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+            "checkout": 0,
+            "deps": "prebaked",
+            "testExit": 0,
+            "passed": 214,
+            "failed": 0,
+            "total": 214,
+            "success": "true",
+            "cloneMs": 445,
+            "mergeTreeMs": 4,
+            "checkoutMs": 10,
+            "depsMs": 5,
+            "testMs": 4510,
+            "totalMs": 4974
+          },
+          "stderrTail": ""
+        }
+      },
+      {
+        "clientMs": 5181,
+        "ok": true,
+        "wallMs": 5159,
+        "result": {
+          "totalMs": 5144,
+          "tokenMintMs": 42,
+          "interceptRegisterMs": 3,
+          "execMs": 5099,
+          "exitCode": 0,
+          "result": {
+            "phase": "done",
+            "clone": 0,
+            "mergeTreeExit": 0,
+            "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+            "checkout": 0,
+            "deps": "prebaked",
+            "testExit": 0,
+            "passed": 214,
+            "failed": 0,
+            "total": 214,
+            "success": "true",
+            "cloneMs": 411,
+            "mergeTreeMs": 4,
+            "checkoutMs": 11,
+            "depsMs": 5,
+            "testMs": 4582,
+            "totalMs": 5013
+          },
+          "stderrTail": ""
+        }
+      }
+    ],
+    "vitest": {
+      "clientMs": 12381,
+      "ok": true,
+      "wallMs": 12355,
+      "result": {
+        "samples": [
+          {
+            "ms": 4097,
+            "exitCode": 0,
+            "tail": "\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m10 passed\u001b[39m\u001b[22m\u001b[90m (10)\u001b[39m | \u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m214 passed\u001b[39m\u001b[22m\u001b[90m (214)\u001b[39m | \u001b[2m   Duration \u001b[22m 3.72s\u001b[2m (tests 75%, import 15%, transform 9%, worker 2%)\u001b[22m"
+          },
+          {
+            "ms": 4116,
+            "exitCode": 0,
+            "tail": "\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m10 passed\u001b[39m\u001b[22m\u001b[90m (10)\u001b[39m | \u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m214 passed\u001b[39m\u001b[22m\u001b[90m (214)\u001b[39m | \u001b[2m   Duration \u001b[22m 3.73s\u001b[2m (tests 75%, import 14%, transform 9%, worker 2%)\u001b[22m"
+          },
+          {
+            "ms": 4117,
+            "exitCode": 0,
+            "tail": "\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m10 passed\u001b[39m\u001b[22m\u001b[90m (10)\u001b[39m | \u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m214 passed\u001b[39m\u001b[22m\u001b[90m (214)\u001b[39m | \u001b[2m   Duration \u001b[22m 3.71s\u001b[2m (tests 75%, import 14%, transform 9%, worker 2%)\u001b[22m"
+          }
+        ],
+        "cpu": "2\nmodel name\t: AMD EPYC"
+      }
+    }
+  }
+}

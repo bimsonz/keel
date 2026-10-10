@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "keel-spike-04-tier2",
+  "main": "src/index.ts",
+  // ctx.exports (the intercept entrypoint) needs 2025-11-17 or later.
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "artifacts": [{ "binding": "ARTIFACTS", "namespace": "keel-spike-04" }],
+  "containers": [
+    {
+      "class_name": "Tier2Box",
+      // Image and instance size are chosen by the Durable Object in ctx.container.start().
+      // This policy rejects max_instances; the cap is enforced by the driver instead.
+      "scheduling_policy": "durable_object",
+      "images": { "base": { "dockerfile": "./container/Dockerfile" } }
+    }
+  ],
+  "durable_objects": { "bindings": [{ "name": "BOX", "class_name": "Tier2Box" }] },
+  "exports": { "Tier2Box": { "type": "durable-object", "storage": "sqlite" } }
+}

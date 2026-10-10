@@ -1,0 +1,302 @@
+{
+  "box": "warm-mv2rv6jh",
+  "boot": {
+    "clientMs": 1067,
+    "ok": true,
+    "wallMs": 856,
+    "result": {
+      "from": "image",
+      "instance": "standard-2",
+      "egress": "locked",
+      "startCallMs": 0,
+      "tokenMintMs": 333,
+      "interceptRegisterMs": 66,
+      "firstExecAtMs": 417,
+      "execAttempts": 1,
+      "trustMs": 56,
+      "readyAtMs": 473
+    }
+  },
+  "exec": {
+    "clientMs": 92,
+    "ok": true,
+    "wallMs": 63,
+    "result": {
+      "samples": [
+        6,
+        5,
+        5,
+        5,
+        5,
+        6,
+        5,
+        6,
+        5,
+        4
+      ]
+    }
+  },
+  "summary": {
+    "execLatencyMs": {
+      "n": 10,
+      "p50": 5,
+      "min": 4,
+      "max": 6
+    },
+    "verifyTotalMs": {
+      "n": 6,
+      "p50": 6232,
+      "min": 5555,
+      "max": 8323
+    },
+    "verifyClientMs": {
+      "n": 6,
+      "p50": 6273,
+      "min": 5596,
+      "max": 8309
+    },
+    "cloneMs": {
+      "n": 6,
+      "p50": 523,
+      "min": 432,
+      "max": 779
+    },
+    "mergeTreeMs": {
+      "n": 6,
+      "p50": 4,
+      "min": 3,
+      "max": 5
+    },
+    "checkoutMs": {
+      "n": 6,
+      "p50": 10,
+      "min": 9,
+      "max": 16
+    },
+    "depsMs": {
+      "n": 6,
+      "p50": 6,
+      "min": 5,
+      "max": 11
+    },
+    "testMs": {
+      "n": 6,
+      "p50": 5532,
+      "min": 4935,
+      "max": 7283
+    },
+    "trees": [
+      "1b3d035527a235d807f9fe5f4bf08265872e4739"
+    ],
+    "passed": [
+      214
+    ],
+    "failures": 0
+  },
+  "runs": [
+    {
+      "clientMs": 8309,
+      "ok": true,
+      "wallMs": 8279,
+      "result": {
+        "totalMs": 8323,
+        "tokenMintMs": 66,
+        "interceptRegisterMs": 6,
+        "execMs": 8251,
+        "exitCode": 0,
+        "result": {
+          "phase": "done",
+          "clone": 0,
+          "mergeTreeExit": 0,
+          "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+          "checkout": 0,
+          "deps": "prebaked",
+          "testExit": 0,
+          "passed": 214,
+          "failed": 0,
+          "total": 214,
+          "success": "true",
+          "cloneMs": 779,
+          "mergeTreeMs": 4,
+          "checkoutMs": 11,
+          "depsMs": 11,
+          "testMs": 7283,
+          "totalMs": 8088
+        },
+        "stderrTail": ""
+      }
+    },
+    {
+      "clientMs": 6497,
+      "ok": true,
+      "wallMs": 6464,
+      "result": {
+        "totalMs": 6452,
+        "tokenMintMs": 60,
+        "interceptRegisterMs": 9,
+        "execMs": 6383,
+        "exitCode": 0,
+        "result": {
+          "phase": "done",
+          "clone": 0,
+          "mergeTreeExit": 0,
+          "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+          "checkout": 0,
+          "deps": "prebaked",
+          "testExit": 0,
+          "passed": 214,
+          "failed": 0,
+          "total": 214,
+          "success": "true",
+          "cloneMs": 537,
+          "mergeTreeMs": 5,
+          "checkoutMs": 16,
+          "depsMs": 7,
+          "testMs": 5711,
+          "totalMs": 6276
+        },
+        "stderrTail": ""
+      }
+    },
+    {
+      "clientMs": 6911,
+      "ok": true,
+      "wallMs": 6879,
+      "result": {
+        "totalMs": 6868,
+        "tokenMintMs": 54,
+        "interceptRegisterMs": 7,
+        "execMs": 6807,
+        "exitCode": 0,
+        "result": {
+          "phase": "done",
+          "clone": 0,
+          "mergeTreeExit": 0,
+          "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+          "checkout": 0,
+          "deps": "prebaked",
+          "testExit": 0,
+          "passed": 214,
+          "failed": 0,
+          "total": 214,
+          "success": "true",
+          "cloneMs": 509,
+          "mergeTreeMs": 4,
+          "checkoutMs": 12,
+          "depsMs": 6,
+          "testMs": 6154,
+          "totalMs": 6685
+        },
+        "stderrTail": ""
+      }
+    },
+    {
+      "clientMs": 6048,
+      "ok": true,
+      "wallMs": 6020,
+      "result": {
+        "totalMs": 6011,
+        "tokenMintMs": 58,
+        "interceptRegisterMs": 4,
+        "execMs": 5949,
+        "exitCode": 0,
+        "result": {
+          "phase": "done",
+          "clone": 0,
+          "mergeTreeExit": 0,
+          "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+          "checkout": 0,
+          "deps": "prebaked",
+          "testExit": 0,
+          "passed": 214,
+          "failed": 0,
+          "total": 214,
+          "success": "true",
+          "cloneMs": 479,
+          "mergeTreeMs": 4,
+          "checkoutMs": 9,
+          "depsMs": 5,
+          "testMs": 5352,
+          "totalMs": 5849
+        },
+        "stderrTail": ""
+      }
+    },
+    {
+      "clientMs": 5925,
+      "ok": true,
+      "wallMs": 5898,
+      "result": {
+        "totalMs": 5891,
+        "tokenMintMs": 56,
+        "interceptRegisterMs": 5,
+        "execMs": 5830,
+        "exitCode": 0,
+        "result": {
+          "phase": "done",
+          "clone": 0,
+          "mergeTreeExit": 0,
+          "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+          "checkout": 0,
+          "deps": "prebaked",
+          "testExit": 0,
+          "passed": 214,
+          "failed": 0,
+          "total": 214,
+          "success": "true",
+          "cloneMs": 743,
+          "mergeTreeMs": 3,
+          "checkoutMs": 9,
+          "depsMs": 5,
+          "testMs": 4976,
+          "totalMs": 5736
+        },
+        "stderrTail": ""
+      }
+    },
+    {
+      "clientMs": 5596,
+      "ok": true,
+      "wallMs": 5564,
+      "result": {
+        "totalMs": 5555,
+        "tokenMintMs": 64,
+        "interceptRegisterMs": 6,
+        "execMs": 5485,
+        "exitCode": 0,
+        "result": {
+          "phase": "done",
+          "clone": 0,
+          "mergeTreeExit": 0,
+          "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+          "checkout": 0,
+          "deps": "prebaked",
+          "testExit": 0,
+          "passed": 214,
+          "failed": 0,
+          "total": 214,
+          "success": "true",
+          "cloneMs": 432,
+          "mergeTreeMs": 4,
+          "checkoutMs": 9,
+          "depsMs": 5,
+          "testMs": 4935,
+          "totalMs": 5385
+        },
+        "stderrTail": ""
+      }
+    }
+  ]
+}

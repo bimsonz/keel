@@ -1,0 +1,177 @@
+{
+  "box": "restart-mv2rv2fq",
+  "first": {
+    "clientMs": 1235,
+    "ok": true,
+    "wallMs": 1056,
+    "result": {
+      "from": "image",
+      "instance": "standard-2",
+      "egress": "locked",
+      "startCallMs": 0,
+      "tokenMintMs": 565,
+      "interceptRegisterMs": 8,
+      "firstExecAtMs": 673,
+      "execAttempts": 1,
+      "trustMs": 32,
+      "readyAtMs": 705
+    }
+  },
+  "summary": {
+    "readyAtMs": {
+      "n": 5,
+      "p50": 464,
+      "min": 326,
+      "max": 793
+    },
+    "destroyMs": {
+      "n": 5,
+      "p50": 86,
+      "min": 68,
+      "max": 261
+    },
+    "failures": 0
+  },
+  "samples": [
+    {
+      "destroy": {
+        "clientMs": 108,
+        "ok": true,
+        "wallMs": 80,
+        "result": {
+          "wasRunning": true,
+          "ms": 68
+        }
+      },
+      "boot": {
+        "clientMs": 511,
+        "ok": true,
+        "wallMs": 486,
+        "result": {
+          "from": "image",
+          "instance": "standard-2",
+          "egress": "locked",
+          "startCallMs": 0,
+          "tokenMintMs": 51,
+          "interceptRegisterMs": 344,
+          "firstExecAtMs": 418,
+          "execAttempts": 1,
+          "trustMs": 46,
+          "readyAtMs": 464
+        }
+      }
+    },
+    {
+      "destroy": {
+        "clientMs": 115,
+        "ok": true,
+        "wallMs": 91,
+        "result": {
+          "wasRunning": true,
+          "ms": 72
+        }
+      },
+      "boot": {
+        "clientMs": 790,
+        "ok": true,
+        "wallMs": 763,
+        "result": {
+          "from": "image",
+          "instance": "standard-2",
+          "egress": "locked",
+          "startCallMs": 0,
+          "tokenMintMs": 47,
+          "interceptRegisterMs": 627,
+          "firstExecAtMs": 695,
+          "execAttempts": 1,
+          "trustMs": 42,
+          "readyAtMs": 737
+        }
+      }
+    },
+    {
+      "destroy": {
+        "clientMs": 262,
+        "ok": true,
+        "wallMs": 238,
+        "result": {
+          "wasRunning": true,
+          "ms": 235
+        }
+      },
+      "boot": {
+        "clientMs": 391,
+        "ok": true,
+        "wallMs": 364,
+        "result": {
+          "from": "image",
+          "instance": "standard-2",
+          "egress": "locked",
+          "startCallMs": 0,
+          "tokenMintMs": 44,
+          "interceptRegisterMs": 206,
+          "firstExecAtMs": 274,
+          "execAttempts": 1,
+          "trustMs": 52,
+          "readyAtMs": 326
+        }
+      }
+    },
+    {
+      "destroy": {
+        "clientMs": 122,
+        "ok": true,
+        "wallMs": 98,
+        "result": {
+          "wasRunning": true,
+          "ms": 86
+        }
+      },
+      "boot": {
+        "clientMs": 837,
+        "ok": true,
+        "wallMs": 807,
+        "result": {
+          "from": "image",
+          "instance": "standard-2",
+          "egress": "locked",
+          "startCallMs": 0,
+          "tokenMintMs": 45,
+          "interceptRegisterMs": 687,
+          "firstExecAtMs": 750,
+          "execAttempts": 1,
+          "trustMs": 43,
+          "readyAtMs": 793
+        }
+      }
+    },
+    {
+      "destroy": {
+        "clientMs": 295,
+        "ok": true,
+        "wallMs": 266,
+        "result": {
+          "wasRunning": true,
+          "ms": 261
+        }
+      },
+      "boot": {
+        "clientMs": 492,
+        "ok": true,
+        "wallMs": 466,
+        "result": {
+          "from": "image",
+          "instance": "standard-2",
+          "egress": "locked",
+          "startCallMs": 0,
+          "tokenMintMs": 46,
+          "interceptRegisterMs": 306,
+          "firstExecAtMs": 374,
+          "execAttempts": 1,
+          "trustMs": 51,
+          "readyAtMs": 425
+        }
+      }
+    }
+  ]
+}

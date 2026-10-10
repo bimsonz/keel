@@ -1,0 +1,24 @@
+{
+  "name": "forge-lite",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A small Worker-native repo-hosting API used as a test fixture for Keel.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "probe": "node scenarios/run-probe.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint -c oxlint.config.json --deny-warnings",
+    "worlds": "bash scenarios/worlds.sh",
+    "cold-open": "bash scenarios/cold-open.sh"
+  },
+  "dependencies": {
+    "hono": "4.13.13"
+  },
+  "devDependencies": {
+    "oxlint": "1.87.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}

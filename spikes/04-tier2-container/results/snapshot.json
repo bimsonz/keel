@@ -1,0 +1,289 @@
+{
+  "source": {
+    "boot": {
+      "clientMs": 1305,
+      "ok": true,
+      "wallMs": 1046,
+      "result": {
+        "from": "image",
+        "instance": "standard-2",
+        "egress": "locked",
+        "startCallMs": 0,
+        "tokenMintMs": 394,
+        "interceptRegisterMs": 113,
+        "firstExecAtMs": 519,
+        "execAttempts": 1,
+        "trustMs": 50,
+        "readyAtMs": 569
+      }
+    },
+    "seedVerify": {
+      "clientMs": 11518,
+      "ok": true,
+      "wallMs": 11488,
+      "result": {
+        "totalMs": 11562,
+        "tokenMintMs": 39,
+        "interceptRegisterMs": 10,
+        "execMs": 11513,
+        "exitCode": 0,
+        "result": {
+          "phase": "done",
+          "clone": 0,
+          "mergeTreeExit": 0,
+          "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+          "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+          "checkout": 0,
+          "deps": "prebaked",
+          "testExit": 0,
+          "passed": 214,
+          "failed": 0,
+          "total": 214,
+          "success": "true",
+          "cloneMs": 777,
+          "mergeTreeMs": 7,
+          "checkoutMs": 17,
+          "depsMs": 14,
+          "testMs": 10461,
+          "totalMs": 11276
+        },
+        "stderrTail": ""
+      }
+    }
+  },
+  "snap": {
+    "clientMs": 5674,
+    "ok": true,
+    "wallMs": 5644,
+    "result": {
+      "ms": 5629,
+      "id": "d681a1e9-7b42-44c2-9817-2a40bf002378",
+      "size": 1145345,
+      "name": "keel-spike-04-mv2rwezp"
+    }
+  },
+  "summary": {
+    "snapshotMs": 5629,
+    "snapshotBytes": 1145345,
+    "readyAtMs": {
+      "n": 5,
+      "p50": 828,
+      "min": 497,
+      "max": 7635
+    },
+    "verifyTotalMs": {
+      "n": 3,
+      "p50": 11113,
+      "min": 8605,
+      "max": 13835
+    },
+    "failures": 0
+  },
+  "samples": [
+    {
+      "box": "fromsnap-mv2rwjik-0",
+      "boot": {
+        "clientMs": 8046,
+        "ok": true,
+        "wallMs": 8016,
+        "result": {
+          "from": "snapshot",
+          "instance": "standard-2",
+          "egress": "locked",
+          "startCallMs": 0,
+          "tokenMintMs": 376,
+          "interceptRegisterMs": 7178,
+          "firstExecAtMs": 7579,
+          "execAttempts": 1,
+          "trustMs": 56,
+          "readyAtMs": 7635
+        }
+      },
+      "verify": {
+        "clientMs": 13875,
+        "ok": true,
+        "wallMs": 13846,
+        "result": {
+          "totalMs": 13835,
+          "tokenMintMs": 65,
+          "interceptRegisterMs": 7,
+          "execMs": 13763,
+          "exitCode": 0,
+          "result": {
+            "phase": "done",
+            "clone": 0,
+            "mergeTreeExit": 0,
+            "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+            "checkout": 0,
+            "deps": "prebaked",
+            "testExit": 0,
+            "passed": 214,
+            "failed": 0,
+            "total": 214,
+            "success": "true",
+            "cloneMs": 1192,
+            "mergeTreeMs": 6,
+            "checkoutMs": 15,
+            "depsMs": 13,
+            "testMs": 12370,
+            "totalMs": 13596
+          },
+          "stderrTail": ""
+        }
+      }
+    },
+    {
+      "box": "fromsnap-mv2rx0lj-1",
+      "boot": {
+        "clientMs": 940,
+        "ok": true,
+        "wallMs": 911,
+        "result": {
+          "from": "snapshot",
+          "instance": "standard-2",
+          "egress": "locked",
+          "startCallMs": 0,
+          "tokenMintMs": 330,
+          "interceptRegisterMs": 108,
+          "firstExecAtMs": 457,
+          "execAttempts": 1,
+          "trustMs": 40,
+          "readyAtMs": 497
+        }
+      },
+      "verify": {
+        "clientMs": 8565,
+        "ok": true,
+        "wallMs": 8535,
+        "result": {
+          "totalMs": 8605,
+          "tokenMintMs": 39,
+          "interceptRegisterMs": 8,
+          "execMs": 8558,
+          "exitCode": 0,
+          "result": {
+            "phase": "done",
+            "clone": 0,
+            "mergeTreeExit": 0,
+            "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+            "checkout": 0,
+            "deps": "prebaked",
+            "testExit": 0,
+            "passed": 214,
+            "failed": 0,
+            "total": 214,
+            "success": "true",
+            "cloneMs": 758,
+            "mergeTreeMs": 5,
+            "checkoutMs": 14,
+            "depsMs": 10,
+            "testMs": 7504,
+            "totalMs": 8291
+          },
+          "stderrTail": ""
+        }
+      }
+    },
+    {
+      "box": "fromsnap-mv2rx826-2",
+      "boot": {
+        "clientMs": 1052,
+        "ok": true,
+        "wallMs": 1025,
+        "result": {
+          "from": "snapshot",
+          "instance": "standard-2",
+          "egress": "locked",
+          "startCallMs": 0,
+          "tokenMintMs": 242,
+          "interceptRegisterMs": 313,
+          "firstExecAtMs": 576,
+          "execAttempts": 1,
+          "trustMs": 39,
+          "readyAtMs": 615
+        }
+      },
+      "verify": {
+        "clientMs": 11099,
+        "ok": true,
+        "wallMs": 11071,
+        "result": {
+          "totalMs": 11113,
+          "tokenMintMs": 61,
+          "interceptRegisterMs": 8,
+          "execMs": 11044,
+          "exitCode": 0,
+          "result": {
+            "phase": "done",
+            "clone": 0,
+            "mergeTreeExit": 0,
+            "tree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "headTree": "1b3d035527a235d807f9fe5f4bf08265872e4739",
+            "commit": "aec869cc5b5a1085706cb1f64e440358b731ce96",
+            "checkout": 0,
+            "deps": "prebaked",
+            "testExit": 0,
+            "passed": 214,
+            "failed": 0,
+            "total": 214,
+            "success": "true",
+            "cloneMs": 872,
+            "mergeTreeMs": 8,
+            "checkoutMs": 22,
+            "depsMs": 17,
+            "testMs": 9933,
+            "totalMs": 10852
+          },
+          "stderrTail": ""
+        }
+      }
+    },
+    {
+      "box": "fromsnap-mv2rxhkt-3",
+      "boot": {
+        "clientMs": 1319,
+        "ok": true,
+        "wallMs": 1293,
+        "result": {
+          "from": "snapshot",
+          "instance": "standard-2",
+          "egress": "locked",
+          "startCallMs": 0,
+          "tokenMintMs": 364,
+          "interceptRegisterMs": 413,
+          "firstExecAtMs": 800,
+          "execAttempts": 1,
+          "trustMs": 41,
+          "readyAtMs": 841
+        }
+      },
+      "verify": null
+    },
+    {
+      "box": "fromsnap-mv2rxioo-4",
+      "boot": {
+        "clientMs": 1263,
+        "ok": true,
+        "wallMs": 1235,
+        "result": {
+          "from": "snapshot",
+          "instance": "standard-2",
+          "egress": "locked",
+          "startCallMs": 0,
+          "tokenMintMs": 407,
+          "interceptRegisterMs": 107,
+          "firstExecAtMs": 623,
+          "execAttempts": 1,
+          "trustMs": 205,
+          "readyAtMs": 828
+        }
+      },
+      "verify": null
+    }
+  ]
+}
