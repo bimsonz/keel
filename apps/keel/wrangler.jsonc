@@ -17,6 +17,8 @@
     "BACKUP_BUCKET_NAME": "keel-staging-sandbox-backups",
     // Container classes under the durable_object scheduling policy, which BoxGate counts (rule R13).
     "BOXGATE_CLASSES": "",
+    // The region of this deployment's Artifacts namespaces. Repo-touching DOs are placed near it.
+    "ARTIFACTS_LOCATION_HINT": "wnam",
   },
   "secrets": {
     // KEEL_SIGNING_KEY: an Ed25519 private key, as a JWK, that signs agents' bearer tokens.
