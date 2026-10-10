@@ -1,0 +1,30 @@
+{"instance":"5e206d8e-b6ad-413d-9c8d-2a0531901493","served":1}
+{"instance":"2b1215e8-2d6e-4240-926a-f78264bae6c5","served":1}
+{"instance":"acb1c279-c62a-47ec-81ae-5fb396489c86","served":1}
+{"instance":"45404fd8-7584-44c5-aefc-1429f6232fbd","served":1}
+{"instance":"a8c17449-b4e4-4ef5-878b-02a97fd83530","served":1}
+{"instance":"ec7fda4b-f814-4009-9d81-f5bb9e3567a8","served":1}
+{"instance":"4506c8fc-9105-4c79-93ab-076d9f7b5b53","served":1}
+{"error":"Error: Disallowed operation called within global scope. Asynchronous I/O (ex: fetch() or connect()), setting a timeout, and generating random values are not allowed within global scope. To fix this error, perform this operation within a handler. https://developers.cloudflare.com/workers/runtime-apis/handlers/"}
+{"instance":"a8c17449-b4e4-4ef5-878b-02a97fd83530","served":2}
+{"instance":"2b1215e8-2d6e-4240-926a-f78264bae6c5","served":2}
+{"instance":"d8244927-f738-4af9-b40c-87fee354f54f","served":1}
+{"instance":"5cc8aaec-5b13-4d94-98cf-3578a120fad9","served":1}
+{"instance":"acb1c279-c62a-47ec-81ae-5fb396489c86","served":2}
+{"instance":"4506c8fc-9105-4c79-93ab-076d9f7b5b53","served":2}
+{"error":"Error: Disallowed operation called within global scope. Asynchronous I/O (ex: fetch() or connect()), setting a timeout, and generating random values are not allowed within global scope. To fix this error, perform this operation within a handler. https://developers.cloudflare.com/workers/runtime-apis/handlers/"}
+{"error":"Error: Disallowed operation called within global scope. Asynchronous I/O (ex: fetch() or connect()), setting a timeout, and generating random values are not allowed within global scope. To fix this error, perform this operation within a handler. https://developers.cloudflare.com/workers/runtime-apis/handlers/"}
+{"instance":"d101d65b-2fe8-4a78-916d-1c4d5ef480d7","served":1}
+{"instance":"9a0e0f44-6c98-4c45-a046-7746e0022c20","served":1}
+{"instance":"4506c8fc-9105-4c79-93ab-076d9f7b5b53","served":3}
+{"error":"Error: Disallowed operation called within global scope. Asynchronous I/O (ex: fetch() or connect()), setting a timeout, and generating random values are not allowed within global scope. To fix this error, perform this operation within a handler. https://developers.cloudflare.com/workers/runtime-apis/handlers/"}
+{"instance":"89c9b390-8bf3-441d-afac-57d52ad32b35","served":1}
+{"instance":"5cc8aaec-5b13-4d94-98cf-3578a120fad9","served":2}
+{"instance":"a8c17449-b4e4-4ef5-878b-02a97fd83530","served":3}
+{"instance":"9a0e0f44-6c98-4c45-a046-7746e0022c20","served":2}
+{"instance":"52ab682b-7e19-47cf-99de-d7a094c9db6e","served":1}
+{"instance":"5e206d8e-b6ad-413d-9c8d-2a0531901493","served":2}
+{"instance":"52ab682b-7e19-47cf-99de-d7a094c9db6e","served":2}
+{"instance":"5e206d8e-b6ad-413d-9c8d-2a0531901493","served":3}
+{"instance":"acb1c279-c62a-47ec-81ae-5fb396489c86","served":3}
+{"instance":"5cc8aaec-5b13-4d94-98cf-3578a120fad9","served":3}

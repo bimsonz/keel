@@ -1,0 +1,34 @@
+{
+  "doName": "par-w2-1",
+  "bundleSource": "r2",
+  "bundleLoadMs": 204,
+  "calls": [
+    {
+      "i": 0,
+      "tag": "c96b930a-0",
+      "ms": 401,
+      "ok": true,
+      "digest": "7eb53d6bbbdf3a70",
+      "counts": {
+        "pass": 200,
+        "fail": 0,
+        "skip": 0
+      },
+      "instance": "89ca1491-0c8f-445c-aa54-fac3465fb9c9",
+      "served": 1
+    }
+  ],
+  "distinctDigests": 1,
+  "wallMs": 629,
+  "summary": {
+    "n": 1,
+    "min": 401,
+    "p50": 401,
+    "p95": 401,
+    "max": 401,
+    "mean": 401
+  },
+  "httpStatus": 200,
+  "clientMs": 1905,
+  "resultCount": 200
+}

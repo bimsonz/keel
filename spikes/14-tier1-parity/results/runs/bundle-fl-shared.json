@@ -1,0 +1,27 @@
+{
+  "key": "fl-shared",
+  "tests": [
+    "test/collaborators.test.ts",
+    "test/domain.test.ts",
+    "test/events.test.ts",
+    "test/permission-matrix.test.ts",
+    "test/problems.test.ts",
+    "test/repos.test.ts",
+    "test/sessions.test.ts",
+    "test/users.test.ts"
+  ],
+  "isolate": false,
+  "installMs": 397,
+  "bundleMs": 1480,
+  "totalMs": 1877,
+  "bytes": 500594,
+  "moduleBytes": {
+    "f0.js": 500207,
+    "main.js": 387
+  },
+  "installedPackages": 12,
+  "warnings": [],
+  "r2PutMs": 684,
+  "httpStatus": 200,
+  "clientMs": 3866
+}

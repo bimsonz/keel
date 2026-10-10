@@ -1,0 +1,3 @@
+alice DELETE /repos/alice/forge/collaborators/bob -> 404 Not Found (no such route)
+{"outcome":"n/a","reason":"revoke route absent"}
+exit=3

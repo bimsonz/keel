@@ -1,0 +1,30 @@
+{
+  "tag": "hog-55a8866f",
+  "mb": 50,
+  "ok": true,
+  "status": 200,
+  "body": "{\"mb\":50,\"chunks\":50,\"sum\":6554800}",
+  "ms": 24,
+  "httpStatus": 200,
+  "clientMs": 1298
+}
+{
+  "tag": "hog-c6d462ee",
+  "mb": 200,
+  "ok": true,
+  "status": 200,
+  "body": "{\"mb\":200,\"chunks\":200,\"sum\":26234200}",
+  "ms": 29,
+  "httpStatus": 200,
+  "clientMs": 4903
+}
+{
+  "tag": "hog-7f849334",
+  "mb": 200,
+  "ok": true,
+  "status": 200,
+  "body": "{\"mb\":200,\"chunks\":200,\"sum\":26234200}",
+  "ms": 7485,
+  "httpStatus": 200,
+  "clientMs": 7740
+}

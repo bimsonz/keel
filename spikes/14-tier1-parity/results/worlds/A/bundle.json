@@ -1,0 +1,36 @@
+{
+  "key": "w2-2",
+  "tests": [
+    "test/collaborators.test.ts",
+    "test/domain.test.ts",
+    "test/events.test.ts",
+    "test/permission-matrix.test.ts",
+    "test/problems.test.ts",
+    "test/repos.test.ts",
+    "test/revoke-collaborator.test.ts",
+    "test/sessions.test.ts",
+    "test/users.test.ts"
+  ],
+  "isolate": true,
+  "installMs": 233,
+  "bundleMs": 3064,
+  "totalMs": 3297,
+  "bytes": 4125861,
+  "moduleBytes": {
+    "f0.js": 470375,
+    "f1.js": 362073,
+    "f2.js": 470149,
+    "f3.js": 470715,
+    "f4.js": 467839,
+    "f5.js": 474491,
+    "f6.js": 469382,
+    "f7.js": 469949,
+    "f8.js": 469762,
+    "main.js": 1126
+  },
+  "installedPackages": 12,
+  "warnings": [],
+  "r2PutMs": 849,
+  "httpStatus": 200,
+  "clientMs": 5101
+}

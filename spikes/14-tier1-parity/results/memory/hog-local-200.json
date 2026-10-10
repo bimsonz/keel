@@ -1,0 +1,10 @@
+{
+  "tag": "hog-f0ac7d17",
+  "mb": 200,
+  "ok": true,
+  "status": 200,
+  "body": "{\"mb\":200,\"chunks\":200,\"sum\":26234200}",
+  "ms": 832,
+  "httpStatus": 200,
+  "clientMs": 867
+}

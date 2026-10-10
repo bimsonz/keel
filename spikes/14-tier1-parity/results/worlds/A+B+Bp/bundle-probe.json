@@ -1,0 +1,20 @@
+{
+  "key": "w2-5-probe",
+  "tests": [
+    "scenarios/s1/probe.test.ts"
+  ],
+  "isolate": true,
+  "installMs": 256,
+  "bundleMs": 54,
+  "totalMs": 310,
+  "bytes": 468038,
+  "moduleBytes": {
+    "f0.js": 467354,
+    "main.js": 684
+  },
+  "installedPackages": 12,
+  "warnings": [],
+  "r2PutMs": 573,
+  "httpStatus": 200,
+  "clientMs": 1658
+}

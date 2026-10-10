@@ -1,0 +1,909 @@
+{
+  "nodeTests": 200,
+  "tier1Tests": 200,
+  "node": {
+    "pass": 200
+  },
+  "tier1": {
+    "fail": 179,
+    "pass": 21
+  },
+  "identical": false,
+  "mismatches": [
+    {
+      "test": "test/collaborators.test.ts :: collaborators > adds a collaborator, who then appears in the list",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/collaborators.test.ts :: collaborators > refuses to add the same collaborator twice",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/collaborators.test.ts :: collaborators > answers 404 when adding a user who does not exist",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/collaborators.test.ts :: collaborators > refuses to add the owner as a collaborator",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/collaborators.test.ts :: collaborators > rejects the role 'owner'",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/collaborators.test.ts :: collaborators > rejects the role 'superuser'",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/collaborators.test.ts :: collaborators > gives a new collaborator access on their very next request",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/collaborators.test.ts :: collaborators > promotes a collaborator, effective on their next request",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/collaborators.test.ts :: collaborators > refuses to lower a collaborator's role",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/collaborators.test.ts :: collaborators > answers 404 when changing the role of someone who is not a collaborator",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/domain.test.ts :: role lattice > puts owner above every collaborator role",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/domain.test.ts :: role lattice > treats owner as a role that cannot be granted",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/domain.test.ts :: permissions > lets only admins and the owner change visibility",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/domain.test.ts :: permissions > lets anyone read a public repository but nothing more",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/domain.test.ts :: permissions > hides private repositories from callers without a role",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/events.test.ts :: events > emits nothing for a request that is refused",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: read on a public repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: read on a public repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: read on a public repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: read on a private repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: read on a public repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: read on a private repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: manage-issues on a public repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: manage-issues on a private repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: read on a public repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: read on a private repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: manage-issues on a public repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: manage-issues on a private repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: push on a public repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: push on a private repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: read on a public repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: read on a private repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: manage-issues on a public repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: manage-issues on a private repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: push on a public repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: push on a private repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: manage-settings on a public repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: manage-settings on a private repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: read on a public repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: read on a private repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: manage-issues on a public repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: manage-issues on a private repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: push on a public repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: push on a private repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: manage-settings on a public repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: manage-settings on a private repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: add-collaborator on a public repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: add-collaborator on a private repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: change-role on a public repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: change-role on a private repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: delete-repo on a public repo answers 204",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: delete-repo on a private repo answers 204",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: read on a public repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: read on a private repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: manage-issues on a public repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: manage-issues on a private repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: push on a public repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: push on a private repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: manage-settings on a public repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: manage-settings on a private repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: add-collaborator on a public repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: add-collaborator on a private repo answers 201",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: change-role on a public repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: change-role on a private repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: delete-repo on a public repo answers 204",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: delete-repo on a private repo answers 204",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: transfer on a public repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > owner: transfer on a private repo answers 200",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: read on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: manage-issues on a public repo answers 401 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: manage-issues on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: push on a public repo answers 401 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: push on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: manage-settings on a public repo answers 401 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: manage-settings on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: add-collaborator on a public repo answers 401 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: add-collaborator on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: change-role on a public repo answers 401 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: change-role on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: delete-repo on a public repo answers 401 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: delete-repo on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: transfer on a public repo answers 401 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > anonymous: transfer on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: read on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: manage-issues on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: manage-issues on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: push on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: push on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: manage-settings on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: manage-settings on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: add-collaborator on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: add-collaborator on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: change-role on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: change-role on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: delete-repo on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: delete-repo on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: transfer on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > stranger: transfer on a private repo answers 404 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: manage-issues on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: manage-issues on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: push on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: push on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: manage-settings on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: manage-settings on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: add-collaborator on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: add-collaborator on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: change-role on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: change-role on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: delete-repo on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: delete-repo on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: transfer on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > read: transfer on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: push on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: push on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: manage-settings on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: manage-settings on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: add-collaborator on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: add-collaborator on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: change-role on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: change-role on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: delete-repo on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: delete-repo on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: transfer on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > triage: transfer on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: manage-settings on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: manage-settings on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: add-collaborator on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: add-collaborator on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: change-role on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: change-role on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: delete-repo on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: delete-repo on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: transfer on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > write: transfer on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: add-collaborator on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: add-collaborator on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: change-role on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: change-role on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: delete-repo on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: delete-repo on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: transfer on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > maintain: transfer on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: transfer on a public repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/permission-matrix.test.ts :: permission matrix > admin: transfer on a private repo answers 403 and changes nothing",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/problems.test.ts :: error responses > are problem+json documents with type, title, status and detail",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/problems.test.ts :: error responses > leave unknown routes to Hono's plain-text 404, unlike a missing resource",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/repos.test.ts :: repositories > creates a private repository by default",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/repos.test.ts :: repositories > requires a signed-in user to create a repository",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/repos.test.ts :: repositories > refuses a second repository with the same name for the same owner",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/repos.test.ts :: repositories > allows the same name under different owners",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/repos.test.ts :: repositories > rejects an unknown visibility",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/repos.test.ts :: repositories > answers 404 for a repository that does not exist",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/repos.test.ts :: repositories > opens a private repository to anonymous readers once it is made public",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/repos.test.ts :: repositories > transfers a repository to a new owner",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/repos.test.ts :: repositories > takes all access away from the previous owner of a transferred private repository",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/repos.test.ts :: repositories > refuses to transfer to a user who does not exist",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/repos.test.ts :: repositories > refuses to transfer onto a repository the new owner already has",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/repos.test.ts :: repositories > deletes a repository",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/repos.test.ts :: repositories > creates and then fast-forwards a branch",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/repos.test.ts :: repositories > rejects a ref update whose sha is not a full object id",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/repos.test.ts :: repositories > saves labels with a default colour",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/sessions.test.ts :: sessions > logs in with a bearer token that expires after the session lifetime",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/sessions.test.ts :: sessions > refuses a wrong password and an unknown user with the same answer",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/sessions.test.ts :: sessions > logs out, after which the token no longer works",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/sessions.test.ts :: sessions > keeps other sessions alive when one logs out",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/sessions.test.ts :: sessions > still accepts a session one millisecond before it expires",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/sessions.test.ts :: sessions > rejects a session once its lifetime has passed",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/sessions.test.ts :: sessions > rejects an expired session even on routes that allow anonymous callers",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/sessions.test.ts :: sessions > rejects an unknown token",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/sessions.test.ts :: sessions > rejects an authorization header that is not a bearer token",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/users.test.ts :: users > signs up a user without echoing the password",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/users.test.ts :: users > refuses a username that is already taken",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/users.test.ts :: users > rejects a password shorter than ten characters",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/users.test.ts :: users > requires a password",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/users.test.ts :: users > rejects a body that is not JSON",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/users.test.ts :: users > rejects a JSON body that is not an object",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/users.test.ts :: users > shows a public profile",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/users.test.ts :: users > answers 404 for an unknown user",
+      "node": "pass",
+      "tier1": "fail"
+    },
+    {
+      "test": "test/users.test.ts :: users > asks anonymous callers of /user to authenticate",
+      "node": "pass",
+      "tier1": "fail"
+    }
+  ]
+}

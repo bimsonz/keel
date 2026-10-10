@@ -1,0 +1,34 @@
+{
+  "key": "fl-b2",
+  "tests": [
+    "test/collaborators.test.ts",
+    "test/domain.test.ts",
+    "test/events.test.ts",
+    "test/permission-matrix.test.ts",
+    "test/problems.test.ts",
+    "test/repos.test.ts",
+    "test/sessions.test.ts",
+    "test/users.test.ts"
+  ],
+  "isolate": true,
+  "installMs": 321,
+  "bundleMs": 12417,
+  "totalMs": 12738,
+  "bytes": 3648216,
+  "moduleBytes": {
+    "f0.js": 469271,
+    "f1.js": 361875,
+    "f2.js": 469045,
+    "f3.js": 469611,
+    "f4.js": 466735,
+    "f5.js": 473387,
+    "f6.js": 468845,
+    "f7.js": 468658,
+    "main.js": 789
+  },
+  "installedPackages": 12,
+  "warnings": [],
+  "r2PutMs": 763,
+  "httpStatus": 200,
+  "clientMs": 14467
+}

@@ -1,0 +1,38 @@
+{
+  "rows": [
+    {
+      "tag": "hog-55a8866f",
+      "outcome": "ok",
+      "cpuMs": 675,
+      "wallMs": 680,
+      "exceptions": ""
+    },
+    {
+      "tag": "hog-c6d462ee",
+      "outcome": "ok",
+      "cpuMs": 3501,
+      "wallMs": 4067,
+      "exceptions": ""
+    },
+    {
+      "tag": "hog-7f849334",
+      "outcome": "ok",
+      "cpuMs": 4143,
+      "wallMs": 7451,
+      "exceptions": ""
+    }
+  ],
+  "cpu": {
+    "n": 3,
+    "min": 675,
+    "p50": 3501,
+    "p95": 4143,
+    "max": 4143,
+    "mean": 2773
+  },
+  "outcomes": {
+    "ok": 3
+  },
+  "httpStatus": 200,
+  "clientMs": 187
+}

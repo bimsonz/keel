@@ -1,0 +1,3 @@
+{"key":"toy-e1","isolate":true,"installMs":296,"bundleMs":1872,"totalMs":2168,"bytes":1529793,"installedPackages":12,"warnings":[],"r2PutMs":927,"httpStatus":200,"clientMs":4057}
+{"key":"toy-e2","isolate":true,"installMs":277,"bundleMs":5344,"totalMs":5621,"bytes":1529793,"installedPackages":12,"warnings":[],"r2PutMs":746,"httpStatus":200,"clientMs":7517}
+{"key":"toy-e3","isolate":true,"installMs":366,"bundleMs":4515,"totalMs":4881,"bytes":1529793,"installedPackages":12,"warnings":[],"r2PutMs":1491,"httpStatus":200,"clientMs":7690}

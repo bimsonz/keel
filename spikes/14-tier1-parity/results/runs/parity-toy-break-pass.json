@@ -1,0 +1,22 @@
+{
+  "nodeTests": 27,
+  "tier1Tests": 27,
+  "node": {
+    "pass": 21,
+    "fail": 3,
+    "skip": 3
+  },
+  "tier1": {
+    "pass": 22,
+    "fail": 2,
+    "skip": 3
+  },
+  "identical": false,
+  "mismatches": [
+    {
+      "test": "test/app.test.ts :: items api > returns 410 for deleted items",
+      "node": "fail",
+      "tier1": "pass"
+    }
+  ]
+}

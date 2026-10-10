@@ -1,0 +1,7 @@
+world            tests   node-vs-tier1          docker-vs-tier1        node-vs-docker         run-probe p.node   p.docker p.tier1 
+base             200     identical 200/200 m=0  identical 200/200 m=0  identical 200/200 m=0  n/a      n/a      n/a      n/a     
+A                207     identical 207/207 m=0  identical 207/207 m=0  identical 207/207 m=0  pass     pass     pass     pass    
+B                207     identical 207/207 m=0  identical 207/207 m=0  identical 207/207 m=0  n/a      n/a      n/a      n/a     
+A+B              214     identical 214/214 m=0  identical 214/214 m=0  identical 214/214 m=0  fail     fail     fail     fail    
+A+B+Bp           214     identical 214/214 m=0  identical 214/214 m=0  identical 214/214 m=0  pass     pass     pass     pass    
+A+B+Bp+careless  214     identical 214/214 m=0  identical 214/214 m=0  identical 214/214 m=0  fail     fail     fail     fail    

@@ -1,0 +1,1 @@
+{"tag":"tc-9f07218c","ok":true,"status":200,"prepMs":440,"childMs":6362,"typeFiles":192,"result":{"roots":26,"sourceFiles":277,"errorCount":1,"diagnostics":[{"file":"/src/ids.ts","line":38,"code":2322,"message":"Type 'string' is not assignable to type 'number'."}]}}

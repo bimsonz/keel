@@ -1,0 +1,34 @@
+{
+  "doName": "par-w2-3-probe",
+  "bundleSource": "r2",
+  "bundleLoadMs": 86,
+  "calls": [
+    {
+      "i": 0,
+      "tag": "55f90c30-0",
+      "ms": 40,
+      "ok": true,
+      "digest": "af33eb866ca4bf7d",
+      "counts": {
+        "pass": 0,
+        "fail": 1,
+        "skip": 0
+      },
+      "instance": "b9928783-9560-4f49-96ff-9ec7731eeabc",
+      "served": 1
+    }
+  ],
+  "distinctDigests": 1,
+  "wallMs": 143,
+  "summary": {
+    "n": 1,
+    "min": 40,
+    "p50": 40,
+    "p95": 40,
+    "max": 40,
+    "mean": 40
+  },
+  "httpStatus": 200,
+  "clientMs": 693,
+  "resultCount": 1
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "keel-spike-14-verify",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "limits": { "cpu_ms": 300000 },
+  "observability": { "enabled": true },
+  "worker_loaders": [{ "binding": "LOADER" }],
+  "durable_objects": {
+    "bindings": [{ "name": "VERIFIER", "class_name": "VerifierDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["VerifierDO"] }],
+  "r2_buckets": [{ "binding": "BUNDLES", "bucket_name": "keel-spike-14-bundles" }],
+  "rules": [{ "type": "Text", "globs": ["**/child/*.js"], "fallthrough": true }]
+}

@@ -1,0 +1,5 @@
+alice DELETE /repos/alice/forge/collaborators/bob -> 204 (expected 204)
+bob DELETE /repos/alice/forge -> 403 (expected 403)
+alice GET /repos/alice/forge -> 200 (expected 200)
+{"outcome":"pass","reason":"bob DELETE /repos/alice/forge -> 403 (expected 403); alice/forge still exists"}
+exit=0

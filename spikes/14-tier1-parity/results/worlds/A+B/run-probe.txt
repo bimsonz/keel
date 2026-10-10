@@ -1,0 +1,4 @@
+alice DELETE /repos/alice/forge/collaborators/bob -> 204 (expected 204)
+bob DELETE /repos/alice/forge -> 204 (expected 403)
+{"outcome":"fail","reason":"bob DELETE /repos/alice/forge -> 204 (expected 403)"}
+exit=1

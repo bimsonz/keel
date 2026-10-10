@@ -1,0 +1,8 @@
+[
+  {
+    "file": "scenarios/s1/probe.test.ts",
+    "name": "revoking a collaborator > denies the revoked collaborator on a session that was already warm",
+    "status": "fail",
+    "error": "Error: probe not applicable: revoke route absent"
+  }
+]

@@ -1,0 +1,27 @@
+{
+  "name": "keel-spike-14-tier1-parity",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint -c oxlint.config.json src scripts child-src",
+    "types": "wrangler types",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "dependencies": {
+    "@cloudflare/worker-bundler": "0.2.6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261008.1",
+    "@types/node": "^26.6.4",
+    "hono": "^4.13.13",
+    "oxlint": "^1.87.0",
+    "typescript": "^6.0.3",
+    "vitest": "5.0.3",
+    "@vitest/expect": "5.0.3",
+    "esbuild": "0.28.2",
+    "wrangler": "4.149.0"
+  }
+}
