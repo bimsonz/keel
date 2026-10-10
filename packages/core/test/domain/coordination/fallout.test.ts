@@ -13,7 +13,7 @@ import {
   subjectsRelated,
   subjectsSiblings,
 } from "../../../src/domain/coordination/index.ts";
-import { CommitSha } from "../../../src/domain/kernel/index.ts";
+import { CommitSha, makeId } from "../../../src/domain/kernel/index.ts";
 import { key } from "../../arbitraries/coordination.ts";
 import {
   changeIdArb,
@@ -118,6 +118,14 @@ describe("fallout", () => {
     );
     const out = fallout(changeIds[1]!, cacheEffect("per-session", false), [premiseA], []);
     expect(out.map((f) => f._tag)).toEqual(["conflict"]);
+    // A contradicted tenet binds like a must premise; generated graphs rarely contradict one, so pin it.
+    const tenet = {
+      id: makeId("tnt", "0".repeat(26)),
+      proposition: premiseA.proposition,
+      guards: [],
+    };
+    const onTenet = fallout(changeIds[1]!, cacheEffect("per-session", false), [], [tenet]);
+    expect(onTenet.map((f) => `${f._tag}:${f.target._tag}`)).toEqual(["conflict:tenet"]);
   });
 
   it("[fallout.suspect-when-clause-touched] suspect exactly when the effect speaks to the clause without breaking a must", () => {
