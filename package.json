@@ -9,7 +9,7 @@
   },
   "scripts": {
     "gen": "pnpm -r --if-present run gen",
-    "lint": "oxlint",
+    "lint": "oxlint apps packages examples e2e",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r --if-present run typecheck",
     "test": "vitest run --project unit --project arch",
     "test:pool": "vitest run --project 'pool:*'",

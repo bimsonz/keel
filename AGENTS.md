@@ -8,7 +8,7 @@ Keel is an agent-first Git platform on Cloudflare Workers and Artifacts. Use the
 |---|---|
 | `pnpm install` | Install. CI uses `--frozen-lockfile` |
 | `pnpm gen` | Regenerate everything gitignored: TypeSpec output (`*.gen.ts`, `packages/contracts/openapi.json`) and each Worker's `worker-configuration.d.ts`. Run it after any change to `packages/spec` or a `wrangler.jsonc` |
-| `pnpm lint` | oxlint, type-aware |
+| `pnpm lint` | oxlint, type-aware, over the workspace paths only. Type-aware rules find files through every tsconfig they meet, so `spikes/` and `fixtures/` (which lint themselves) are excluded by path rather than by `ignorePatterns` |
 | `pnpm typecheck` | `tsc --noEmit` in every package (TypeScript 7) |
 | `pnpm guards` | Workspace guards: nothing private in a public file |
 | `pnpm test` | vitest projects `unit` and `arch` (Node) |
