@@ -1,9 +1,9 @@
 import { whoami } from "@keeltown/core/application/identity";
-import type { AgentId } from "@keeltown/core/kernel";
-import { stub } from "@keeltown/core/not-implemented";
-import { Changes, type Inbox, TokenIssuer } from "@keeltown/core/ports";
+import type { AgentId, ChangeId } from "@keeltown/core/kernel";
+import { type Changes, type Inbox, TokenIssuer } from "@keeltown/core/ports";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
+import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { InboxRpc } from "../adapters/driven/do-rpc/inbox.ts";
 import { TokenIssuerJose } from "../adapters/driven/jose/token-issuer.ts";
 import { ClockLive, SystemLive } from "../adapters/driven/system.ts";
@@ -24,8 +24,10 @@ export function isolateLayer(
 ): Layer.Layer<IsolateServices> {
   const agentSession = (agentId: AgentId) =>
     env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`));
+  const change = (changeId: ChangeId) =>
+    env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`));
   return Layer.mergeAll(
-    overrides.changes ?? ChangesPending,
+    overrides.changes ?? ChangesRpc({ change, agentSession }),
     overrides.inbox ?? InboxRpc(agentSession),
     AgentDirectoryD1(env.DB),
     TokenIssuerJose({ privateJwk: env.KEEL_SIGNING_KEY, issuer: env.KEEL_HOST }).pipe(
@@ -34,21 +36,6 @@ export function isolateLayer(
     SystemLive,
   );
 }
-
-/**
- * The Change DO does not implement ChangeRpc yet, so its stub
- * has no methods to call. Until it does, the work loop answers the declared
- * 503; then this becomes `ChangesRpc({ change, agentSession })`.
- */
-const ChangesPending = Layer.succeed(
-  Changes,
-  Changes.of({
-    declare: stub("coordination/declare"),
-    submit: stub("coordination/submit"),
-    get: stub("coordination/getChange"),
-    awaitSubmission: stub("coordination/awaitSubmission"),
-  }),
-);
 
 /** Pool tests swap the work loop's DO-backed ports for in-memory ones; production passes none. */
 export interface IsolateOverrides {
