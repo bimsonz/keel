@@ -1,0 +1,14 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.revocation-fences-tokens
+# why: A suspended agent's tokens are still admitted
+diff --git a/packages/core/src/domain/identity/agent.ts b/packages/core/src/domain/identity/agent.ts
+index 5e57977..c360818 100644
+--- a/packages/core/src/domain/identity/agent.ts
++++ b/packages/core/src/domain/identity/agent.ts
+@@ -46,5 +46,5 @@ export interface Identity {
+ 
+ /** A principal may act only while its agent is active and its epoch is current. */
+ export function admits(agent: Agent, principal: Principal): boolean {
+-  return agent.state === "active" && principal.revocationEpoch === agent.revocationEpoch;
++  return agent.state !== "revoked" && principal.revocationEpoch === agent.revocationEpoch;
+ }

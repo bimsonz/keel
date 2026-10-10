@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/pool-machine.test.ts
+# kills: workspace.transitions, workspace.decide-evolvable
+# why: A push is recorded on a workspace nobody holds
+diff --git a/packages/core/src/domain/coordination/workspace-machine.ts b/packages/core/src/domain/coordination/workspace-machine.ts
+index e777af2..904e0b1 100644
+--- a/packages/core/src/domain/coordination/workspace-machine.ts
++++ b/packages/core/src/domain/coordination/workspace-machine.ts
+@@ -113,7 +113,7 @@ export const decideWorkspace = (
+           ])
+         : refuse(workspace, command);
+     case "Pushed":
+-      return workspace.state === "granted"
++      return workspace.state === "granted" || workspace.state === "ready"
+         ? Result.succeed([
+             WorkspacePushed.make({ workspaceId, ref: command.ref, sha: command.sha }),
+           ])

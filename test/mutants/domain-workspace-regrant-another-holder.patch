@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/pool-machine.test.ts
+# kills: workspace.granted-once
+# why: A grant to another holder of a granted workspace passes as a retry
+diff --git a/packages/core/src/domain/coordination/workspace-machine.ts b/packages/core/src/domain/coordination/workspace-machine.ts
+index e777af2..d28b2ad 100644
+--- a/packages/core/src/domain/coordination/workspace-machine.ts
++++ b/packages/core/src/domain/coordination/workspace-machine.ts
+@@ -90,7 +90,7 @@ export const decideWorkspace = (
+     case "Fork":
+       return refuse(workspace, command);
+     case "Grant":
+-      if (workspace.state === "granted" && workspace.holder === command.holder)
++      if (workspace.state === "granted")
+         return Result.succeed([]);
+       return workspace.state === "ready"
+         ? Result.succeed([

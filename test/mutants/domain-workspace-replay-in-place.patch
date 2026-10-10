@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/pool-machine.test.ts
+# kills: workspace.replay
+# why: evolve grants by mutating the state it was handed, so an earlier snapshot changes under it
+diff --git a/packages/core/src/domain/coordination/workspace-machine.ts b/packages/core/src/domain/coordination/workspace-machine.ts
+index e777af2..e2b3ac3 100644
+--- a/packages/core/src/domain/coordination/workspace-machine.ts
++++ b/packages/core/src/domain/coordination/workspace-machine.ts
+@@ -154,7 +154,7 @@ export const evolveWorkspace = (
+     case "WorkspaceGranted":
+       return workspace.state === "ready"
+         ? {
+-            ...workspace,
++            ...Object.assign(workspace, { state: "granted" }),
+             state: "granted",
+             holder: event.holder,
+             expiresAt: event.expiresAt,

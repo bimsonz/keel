@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/pool-machine.test.ts
+# kills: workspace.granted-once
+# why: A workspace already passed to a change is reassigned again
+diff --git a/packages/core/src/domain/coordination/workspace-machine.ts b/packages/core/src/domain/coordination/workspace-machine.ts
+index e777af2..b7b718b 100644
+--- a/packages/core/src/domain/coordination/workspace-machine.ts
++++ b/packages/core/src/domain/coordination/workspace-machine.ts
+@@ -103,7 +103,7 @@ export const decideWorkspace = (
+           ])
+         : refuse(workspace, command);
+     case "Reassign":
+-      return workspace.state === "granted" && workspace.holder === command.sketchId
++      return workspace.state === "granted"
+         ? Result.succeed([
+             WorkspaceReassigned.make({
+               workspaceId,

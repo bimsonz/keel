@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.transitions, agent.decide-evolvable
+# why: A revoked agent is reinstated
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index d26327b..2377a4b 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -81,7 +81,7 @@ export const decideAgent = (
+           ])
+         : refuse();
+     case "Reinstate":
+-      return agent.state === "suspended"
++      return agent.state !== "active"
+         ? Result.succeed([AgentReinstated.make({ agentId: agent.id, by: command.by })])
+         : refuse();
+     case "Revoke":

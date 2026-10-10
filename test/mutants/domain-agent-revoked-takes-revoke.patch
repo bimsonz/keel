@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.one-terminal
+# why: A revoked agent is revoked again
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index d26327b..ca7a975 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -85,7 +85,7 @@ export const decideAgent = (
+         ? Result.succeed([AgentReinstated.make({ agentId: agent.id, by: command.by })])
+         : refuse();
+     case "Revoke":
+-      return agent.state === "revoked"
++      return agent.state === "revoked" && false
+         ? refuse()
+         : Result.succeed([
+             AgentRevoked.make({

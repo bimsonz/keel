@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.revocation-fences-tokens
+# why: Revocation leaves the epoch where it was, so tokens minted before it still verify
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index d26327b..c00853f 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -90,7 +90,7 @@ export const decideAgent = (
+         : Result.succeed([
+             AgentRevoked.make({
+               agentId: agent.id,
+-              revocationEpoch: agent.revocationEpoch + 1,
++              revocationEpoch: agent.revocationEpoch,
+               by: command.by,
+             }),
+           ]);
