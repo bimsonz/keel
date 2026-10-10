@@ -14,6 +14,12 @@ export interface RepoToken {
   readonly expiresAt: Instant;
 }
 
+/** What the host says about a repo. `remote` is its HTTPS git URL; its host carries the account id, so it is never logged. */
+export interface RepoInfo {
+  readonly remote: string;
+  readonly defaultBranch: string;
+}
+
 /**
  * One entry of a commit's tree, as `git ls-tree -r -t` lists it: `path` is
  * repo-relative and `/`-separated; a symlink is a `blob` (mode `120000`) and a
@@ -64,6 +70,7 @@ export class CodeHost extends Context.Service<CodeHost, {
   readonly create: (repo: RepoRef) => Effect.Effect<RepoRef>;
   readonly fork: (source: RepoRef, target: RepoRef) => Effect.Effect<RepoRef, RepoNotFound>;
   readonly mintToken: (repo: RepoRef, access: "read" | "write", ttlSeconds: number) => Effect.Effect<RepoToken, RepoNotFound>;
+  readonly info: (repo: RepoRef) => Effect.Effect<RepoInfo, RepoNotFound>;
   /** The commit a full ref name (`refs/heads/main`) points at. */
   readonly head: (repo: RepoRef, ref: string) => Effect.Effect<CommitSha, RepoNotFound | RefNotFound>;
   /** The commit's whole tree, recursively, in git order (a tree before what it holds). */

@@ -11,7 +11,7 @@ import {
   type SubjectKey,
 } from "@keeltown/core/domain/coordination";
 import { IdempotencyConflict } from "@keeltown/core/domain/identity";
-import { type AgentId, type ChangeId, type CommitSha, Instant, makeId, type ProjectId, type WorkspaceId } from "@keeltown/core/kernel";
+import { type AgentId, type ChangeId, CommitSha, Instant, makeId, type ProjectId, type WorkspaceId } from "@keeltown/core/kernel";
 import {
   type AgentNotice,
   Changes,
@@ -25,26 +25,40 @@ import {
 } from "@keeltown/core/ports";
 import { Clock as EffectClock, Effect, Layer, Option } from "effect";
 
-/** Grants workspaces up to `capacity`, then refuses with PoolExhausted. */
-export function makeWorkspacePoolMemory(options: { readonly capacity?: number } = {}) {
+const MEMORY_BASE = CommitSha.make("0".repeat(40));
+
+/**
+ * Grants workspaces up to `capacity`, then refuses with PoolExhausted. A
+ * holder's second grant returns its workspace again with a new token, as the
+ * real pool does; every grant's base is `baseSha`.
+ */
+export function makeWorkspacePoolMemory(options: { readonly capacity?: number; readonly baseSha?: CommitSha } = {}) {
   const capacity = options.capacity ?? Number.POSITIVE_INFINITY;
+  const baseSha = options.baseSha ?? MEMORY_BASE;
   const granted = new Map<WorkspaceId, string>();
+  const released = new Map<WorkspaceId, string>();
   let counter = 0;
+  let tokens = 0;
   return {
     granted,
+    released,
     layer: Layer.succeed(
       WorkspacePool,
       WorkspacePool.of({
         grant: (_projectId, holder) =>
           Effect.gen(function* () {
-            if (granted.size >= capacity) return yield* new PoolExhausted({ retryAfterMs: 1000 });
-            counter += 1;
-            const workspaceId = makeId("wsp", counter.toString().padStart(26, "0"));
+            const held = [...granted].find(([, h]) => h === holder)?.[0];
+            if (held === undefined && granted.size >= capacity) return yield* new PoolExhausted({ retryAfterMs: 1000 });
+            const workspaceId = held ?? makeId("wsp", (counter += 1).toString().padStart(26, "0"));
             granted.set(workspaceId, holder);
+            tokens += 1;
             const now = yield* EffectClock.currentTimeMillis;
-            return { workspaceId, remote: `memory://workspaces/${workspaceId}`, token: `memws_${workspaceId}`, expiresAt: Instant(now + 7_200_000) };
+            return { workspaceId, remote: `memory://workspaces/${workspaceId}`, token: `memws_${tokens}`, expiresAt: Instant(now + 7_200_000), baseSha };
           }),
-        release: (workspaceId) => Effect.sync(() => void granted.delete(workspaceId)),
+        release: (workspaceId, reason = "withdrawn") =>
+          Effect.sync(() => {
+            if (granted.delete(workspaceId)) released.set(workspaceId, reason);
+          }),
       }),
     ),
   };
@@ -128,7 +142,7 @@ export function makeChangesMemory(options: { readonly capacity?: number; readonl
     const workspaceId = workspaces.get(changeId) ?? makeId("wsp", sequentialId((sequence += 1)));
     workspaces.set(changeId, workspaceId);
     tokens += 1;
-    return { workspaceId, remote: `https://artifacts.invalid/${workspaceId}.git`, token: `memory-token-${tokens}`, expiresAt: Instant(now + 3_600_000) };
+    return { workspaceId, remote: `https://artifacts.invalid/${workspaceId}.git`, token: `memory-token-${tokens}`, expiresAt: Instant(now + 3_600_000), baseSha: MEMORY_BASE };
   };
   return {
     changes,

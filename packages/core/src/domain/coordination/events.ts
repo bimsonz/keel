@@ -149,6 +149,8 @@ export const WorkspaceGranted = Schema.TaggedStruct("WorkspaceGranted", {
   workspaceId: WorkspaceId,
   holder: Schema.Union([ChangeId, SketchId]),
   expiresAt: InstantSchema,
+  /** The workspace's head when granted: the change's base. */
+  baseSha: CommitSha,
 });
 export const WorkspacePushed = Schema.TaggedStruct("WorkspacePushed", { workspaceId: WorkspaceId, ref: Schema.String, sha: CommitSha });
 export const WorkspaceCollected = Schema.TaggedStruct("WorkspaceCollected", {

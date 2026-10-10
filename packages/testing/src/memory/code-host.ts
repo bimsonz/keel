@@ -75,6 +75,7 @@ export function makeCodeHostMemory() {
         const now = yield* EffectClock.currentTimeMillis;
         return { token: `memrepo_${access}_${repoKey(repo)}`, access, expiresAt: Instant(now + ttlSeconds * 1000) };
       }),
+    info: (repo) => Effect.map(find(repo), () => ({ remote: `memory://${repoKey(repo)}.git`, defaultBranch: "main" })),
     head: (repo, ref) =>
       Effect.flatMap(find(repo), (found) => {
         const sha = found.refs.get(ref);

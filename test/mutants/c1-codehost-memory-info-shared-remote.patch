@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts
+# kills: codehost.info
+# why: Every repo reports the same remote, so a grant could hand one holder another workspace's URL
+diff --git a/packages/testing/src/memory/code-host.ts b/packages/testing/src/memory/code-host.ts
+index 56475ad..3380969 100644
+--- a/packages/testing/src/memory/code-host.ts
++++ b/packages/testing/src/memory/code-host.ts
+@@ -75,7 +75,7 @@ export function makeCodeHostMemory() {
+         const now = yield* EffectClock.currentTimeMillis;
+         return { token: `memrepo_${access}_${repoKey(repo)}`, access, expiresAt: Instant(now + ttlSeconds * 1000) };
+       }),
+-    info: (repo) => Effect.map(find(repo), () => ({ remote: `memory://${repoKey(repo)}.git`, defaultBranch: "main" })),
++    info: (repo) => Effect.map(find(repo), () => ({ remote: "memory://repos.git", defaultBranch: "main" })),
+     head: (repo, ref) =>
+       Effect.flatMap(find(repo), (found) => {
+         const sha = found.refs.get(ref);

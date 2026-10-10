@@ -97,9 +97,10 @@ export function describeCodeHostContract(adapter: string, make: LayerFactory<Cod
           yield* tagOf(host.readBlob(ghost, sha)),
           yield* tagOf(host.diffTrees(ghost, sha, sha)),
           yield* tagOf(host.mintToken(ghost, "read", 60)),
+          yield* tagOf(host.info(ghost)),
           yield* tagOf(host.fork(ghost, fixture.scratch())),
         ];
-        expect(tags).toEqual(Array.from({ length: 6 }, () => "RepoNotFound"));
+        expect(tags).toEqual(Array.from({ length: 7 }, () => "RepoNotFound"));
         expect(yield* Effect.flip(host.head(ghost, MAIN))).toMatchObject({ repo: { namespace: ghost.namespace, name: ghost.name } });
       }).pipe(Effect.provide(make())),
     );
@@ -135,6 +136,21 @@ export function describeCodeHostContract(adapter: string, make: LayerFactory<Cod
         yield* host.delete(source);
         expect(yield* host.head(target, MAIN)).toBe(moved);
         expect((yield* host.diffTrees(target, base, moved)).length).toBeGreaterThan(0);
+      }).pipe(Effect.provide(make())),
+    );
+
+    it.live("[codehost.info] info gives each repo its own git remote and the default branch", () =>
+      Effect.gen(function* () {
+        const host = yield* CodeHost;
+        const fixture = yield* CodeHostFixture;
+        const repo = yield* freshRepo;
+        yield* fixture.commit(repo, MAIN, BASE);
+        const fork = yield* host.fork(repo, fixture.scratch());
+        const [mine, theirs] = [yield* host.info(repo), yield* host.info(fork)];
+        expect(mine.defaultBranch).toBe("main");
+        expect(mine.remote).toMatch(/^[a-z]+:\/\/.+/);
+        expect(mine.remote).toContain(repo.name);
+        expect(theirs.remote).not.toBe(mine.remote);
       }).pipe(Effect.provide(make())),
     );
 
