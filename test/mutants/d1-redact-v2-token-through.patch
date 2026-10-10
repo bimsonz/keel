@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/redact.test.ts
+# kills: redact.tokens
+# why: Redaction matches only art_v1_ tokens, so an art_v2_x_ token reaches the logs
+diff --git a/packages/core/src/application/verification/redact.ts b/packages/core/src/application/verification/redact.ts
+index a7ec5e3..2a968cd 100644
+--- a/packages/core/src/application/verification/redact.ts
++++ b/packages/core/src/application/verification/redact.ts
+@@ -10,7 +10,7 @@
+  * not the first.
+  */
+ 
+-const TOKEN = /art_v\d+_[A-Za-z0-9_.~+/=-]+/g;
++const TOKEN = /art_v1_[A-Za-z0-9_.~+/=-]+/g;
+ const EXPIRES = /([?&])expires=[^&\s"'<>]*/g;
+ const REMOTE = /[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]*artifacts\.cloudflare\.net[^\s"'<>]*/gi;
+ const HOST = /[A-Za-z0-9-]+\.artifacts\.cloudflare\.net/gi;

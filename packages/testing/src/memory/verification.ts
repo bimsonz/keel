@@ -1,4 +1,12 @@
-import { CommitSha, type EscalationId, type GuardId, makeId } from "@keeltown/core/kernel";
+import {
+  type CandidateId,
+  type ChangeId,
+  CommitSha,
+  type EscalationId,
+  type GuardId,
+  makeId,
+} from "@keeltown/core/kernel";
+import { CandidateNotFound, ResultFenced } from "@keeltown/core/domain/integration";
 import {
   FlowSpecInvalid,
   ModelAbstained,
@@ -7,7 +15,11 @@ import {
   type VerificationJob,
 } from "@keeltown/core/domain/verification";
 import {
+  type BatchVerdict,
+  BatchVerdicts,
+  commit,
   type DecisionRequest,
+  type Transition,
   type DecisionResponse,
   DecisionModel,
   FlowSpecSource,
@@ -19,7 +31,9 @@ import {
   type Ruling,
   VerifierRuntime,
 } from "@keeltown/core/ports";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer, Result, Schema } from "effect";
+import { makeEventOutboxMemory } from "./event-outbox.ts";
+import { makeClockMemory } from "./identity.ts";
 
 /**
  * A scripted decision model. Without a script every question is answered
@@ -173,5 +187,77 @@ export function makeHumanGateMemory() {
           }),
       }),
     ),
+  };
+}
+
+/** A batch as the in-memory lane knows it: its members, its candidate, and the attempt and epoch results are fenced on. */
+export interface LaneBatch {
+  readonly members: readonly ChangeId[];
+  readonly candidateId: CandidateId;
+  readonly attempt: number;
+  readonly chainEpoch: number;
+}
+
+/**
+ * The lane side of `BatchVerdicts`, in memory: what the Lane DO's
+ * `recordVerdict` does, so KeelVerify can be driven before it exists. One
+ * commit per instance (cause `<instanceId>:recordVerdict`) appends
+ * VerdictIssued and BatchVerified for a land, or BatchFailed otherwise. A
+ * failure is attributed as the lane does at L1: a batch of one to its change,
+ * a larger one `unattributed`; a verdict that is not a bounce (an abstaining
+ * runner parks) is `infra`, which requeues without blame.
+ */
+export function makeBatchVerdictsMemory(batches: ReadonlyMap<string, LaneBatch> = new Map()) {
+  const outbox = makeEventOutboxMemory();
+  const clock = makeClockMemory();
+  const recorded: { laneId: string; verdict: BatchVerdict }[] = [];
+  const record = (laneId: string, v: BatchVerdict) =>
+    commit(
+      { entity: { kind: "batch", id: v.fence.batchId }, cause: `${v.instanceId}:recordVerdict` },
+      (): Result.Result<Transition<undefined>, CandidateNotFound | ResultFenced> => {
+        const batch = batches.get(v.fence.batchId);
+        if (batch === undefined || batch.candidateId !== v.candidateId)
+          return Result.fail(new CandidateNotFound({ candidateId: v.candidateId }));
+        if (batch.attempt !== v.fence.attempt || batch.chainEpoch !== v.fence.chainEpoch)
+          return Result.fail(new ResultFenced(v.fence));
+        recorded.push({ laneId, verdict: v });
+        const issued = {
+          _tag: "VerdictIssued",
+          verdictId: v.verdictId,
+          subject: v.fence.batchId,
+          outcome: v.outcome,
+          evidence: [...v.evidence],
+          planHash: v.planHash,
+        };
+        const settled =
+          v.outcome === "land"
+            ? {
+                _tag: "BatchVerified",
+                batchId: v.fence.batchId,
+                candidateId: v.candidateId,
+                verdictId: v.verdictId,
+              }
+            : {
+                _tag: "BatchFailed",
+                batchId: v.fence.batchId,
+                candidateId: v.candidateId,
+                verdictId: v.verdictId,
+                attribution:
+                  v.outcome !== "bounce"
+                    ? "infra"
+                    : batch.members.length === 1 && batch.members[0] !== undefined
+                      ? batch.members[0]
+                      : "unattributed",
+              };
+        return Result.succeed({
+          drafts: [{ payload: issued }, { payload: settled }],
+          value: undefined,
+        });
+      },
+    ).pipe(Effect.asVoid, Effect.provide(outbox.layer), Effect.provide(clock.layer));
+  return {
+    recorded,
+    outbox,
+    layer: Layer.succeed(BatchVerdicts, BatchVerdicts.of({ record })),
   };
 }

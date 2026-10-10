@@ -5,6 +5,7 @@
  */
 export * from "./agent-directory.ts";
 export * from "./background.ts";
+export * from "./batch-verdicts.ts";
 export * from "./bundle-store.ts";
 export * from "./candidate-composer.ts";
 export * from "./changes.ts";
@@ -14,6 +15,7 @@ export * from "./code-host.ts";
 export * from "./decision-model.ts";
 export * from "./deployer.ts";
 export * from "./entity-store.ts";
+export * from "./evidence-store.ts";
 export * from "./event-log.ts";
 export * from "./event-outbox.ts";
 export * from "./flush.ts";

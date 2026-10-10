@@ -19,6 +19,7 @@
     "@keeltown/contracts": "workspace:*",
     "@keeltown/core": "workspace:*",
     "@keeltown/gitcore": "workspace:*",
+    "@keeltown/runner-protocol": "workspace:*",
     "@modelcontextprotocol/server": "catalog:",
     "effect": "catalog:",
     "hono": "catalog:",

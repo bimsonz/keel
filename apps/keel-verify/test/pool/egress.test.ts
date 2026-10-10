@@ -72,6 +72,17 @@ describe("KeelSandbox egress", () => {
     expect((await egress(`https://bundles.keel.internal/${"b".repeat(64)}`)).status).toBe(404);
   });
 
+  it("serves nothing outside bundles/, whatever else the bucket holds", async () => {
+    // Evidence lives in ARCHIVE, never here; but whatever sits beside the
+    // bundles must stay out of reach of a sandbox that learns its key.
+    const other = "c".repeat(64);
+    await env.BUNDLES.put(`evidence/${other}`, "someone else's evidence");
+    await env.BUNDLES.put(other, "a bare key");
+    expect((await egress(`https://bundles.keel.internal/${other}`)).status).toBe(404);
+    expect((await egress(`https://bundles.keel.internal/evidence/${other}`)).status).toBe(400);
+    expect((await egress(`https://bundles.keel.internal/bundles/${other}`)).status).toBe(400);
+  });
+
   it("denies every other host at once, over HTTP and HTTPS", async () => {
     for (const url of [
       "https://registry.npmjs.org/hono",

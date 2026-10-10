@@ -161,6 +161,9 @@ importers:
       '@keeltown/gitcore':
         specifier: workspace:*
         version: link:../../packages/gitcore
+      '@keeltown/runner-protocol':
+        specifier: workspace:*
+        version: link:../../packages/runner-protocol
       '@modelcontextprotocol/server':
         specifier: 'catalog:'
         version: 2.3.1
@@ -223,6 +226,9 @@ importers:
       '@cloudflare/vitest-plugin':
         specifier: 'catalog:'
         version: 1.4.0(@types/node@22.20.5)(vitest@5.0.3(@types/node@22.20.5)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(yaml@2.9.1)))
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.20.5
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

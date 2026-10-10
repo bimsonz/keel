@@ -13,6 +13,14 @@ import { describeChangesContract, type ChangesHarness } from "./contracts/change
 import { describeCodeHostContract } from "./contracts/code-host.ts";
 import { describeInboxContract, type InboxHarness } from "./contracts/inbox.ts";
 import { describeWorkspacePoolContract, type StockedPool } from "./contracts/workspace-pool.ts";
+import {
+  type BatchVerdictsHarness,
+  describeBatchVerdictsContract,
+  describeBundleStoreContract,
+  describeEvidenceStoreContract,
+  describeVerifierRuntimeContract,
+  freshId,
+} from "./contracts/verification.ts";
 import * as codeHost from "./memory/code-host.ts";
 import * as coordination from "./memory/coordination.ts";
 import * as delivery from "./memory/delivery.ts";
@@ -22,7 +30,7 @@ import * as integration from "./memory/integration.ts";
 import * as storage from "./memory/storage.ts";
 import * as verification from "./memory/verification.ts";
 import { CommitSha } from "@keeltown/core/kernel";
-import type { Changes, Inbox } from "@keeltown/core/ports";
+import type { BatchVerdicts, Changes, Inbox } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 
 /**
@@ -101,6 +109,18 @@ const workspacePool = {
     ),
 };
 
+/** The lane's suite needs a formed batch of one change to record against. */
+function memoryBatchVerdictsHarness(): BatchVerdictsHarness {
+  const fence = { batchId: freshId("bat"), attempt: 1, chainEpoch: 0 };
+  const candidateId = freshId("cnd");
+  const lane = verification.makeBatchVerdictsMemory(
+    new Map([
+      [fence.batchId, { members: [freshId("chg")], candidateId, attempt: 1, chainEpoch: 0 }],
+    ]),
+  );
+  return { layer: lane.layer, laneId: "lane:prj:default", fence, candidateId };
+}
+
 const GENESIS = Schema.decodeUnknownSync(CommitSha)("0".repeat(40));
 
 export const PORTS = {
@@ -142,15 +162,17 @@ export const PORTS = {
   ),
   VerifierRuntime: port(
     () => verification.makeVerifierRuntimeMemory().layer,
-    pending("VerifierRuntime", ["run"]),
+    describeVerifierRuntimeContract,
   ),
   FlowSpecSource: port(
     () => verification.makeFlowSpecSourceMemory().layer,
     pending("FlowSpecSource", ["read"]),
   ),
-  BundleStore: port(
-    () => storage.makeBundleStoreMemory().layer,
-    pending("BundleStore", ["put", "get"]),
+  BundleStore: port(() => storage.makeBundleStoreMemory().layer, describeBundleStoreContract),
+  EvidenceStore: port(() => storage.makeEvidenceStoreMemory().layer, describeEvidenceStoreContract),
+  BatchVerdicts: harnessed<BatchVerdicts, BatchVerdictsHarness>(
+    memoryBatchVerdictsHarness,
+    describeBatchVerdictsContract,
   ),
   GuardRepo: port(
     () => verification.makeGuardRepoMemory().layer,

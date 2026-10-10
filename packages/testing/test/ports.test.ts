@@ -24,6 +24,8 @@ const CONTRACT_PORTS = [
   "VerifierRuntime",
   "FlowSpecSource",
   "BundleStore",
+  "EvidenceStore",
+  "BatchVerdicts",
   "GuardRepo",
   "CandidateComposer",
   "TrunkWriter",

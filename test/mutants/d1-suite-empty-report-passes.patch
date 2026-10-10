@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/suite.test.ts
+# kills: suite.vacuous-abstains
+# why: A missing or unreadable test report counts as a pass
+diff --git a/packages/core/src/application/verification/suite.ts b/packages/core/src/application/verification/suite.ts
+index 418d12d..bacc46e 100644
+--- a/packages/core/src/application/verification/suite.ts
++++ b/packages/core/src/application/verification/suite.ts
+@@ -194,6 +194,11 @@ export const judgeSuite = (
+   const { report, tail } = decoded;
+   const parsed =
+     report === undefined ? Option.none() : Schema.decodeUnknownOption(VitestReport)(report);
++  if (Option.isNone(parsed))
++    return {
++      report: { ...base, outcome: "pass", durationMs: output.durationMs },
++      evidence: { stepId: step.id, outcome: "pass", why: "no report", failing: [], tail },
++    };
+   if (Option.isNone(parsed))
+     return abstain(
+       "schema",

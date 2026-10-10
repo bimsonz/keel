@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/suite.test.ts
+# kills: suite.exit-agrees
+# why: A clean-looking report passes whatever the test runner's exit code says
+diff --git a/packages/core/src/application/verification/suite.ts b/packages/core/src/application/verification/suite.ts
+index 418d12d..7d7d539 100644
+--- a/packages/core/src/application/verification/suite.ts
++++ b/packages/core/src/application/verification/suite.ts
+@@ -218,7 +218,7 @@ export const judgeSuite = (
+   if (r.numTotalTests === 0 || r.testResults.length === 0)
+     return abstain("schema", "the suite ran no tests", output.durationMs, tail);
+   const clean = r.success && r.numFailedTests === 0 && failing.length === 0 && r.numPassedTests > 0;
+-  if (output.exit === 0 && clean) return decide("pass", `${r.numPassedTests} tests passed`);
++  if (clean) return decide("pass", `${r.numPassedTests} tests passed`);
+   if (output.exit !== 0 && !r.success && failing.length > 0)
+     return decide(
+       "fail",

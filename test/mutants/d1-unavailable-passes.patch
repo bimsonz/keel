@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-candidate.test.ts
+# kills: verify.unavailable-parks
+# why: An unavailable verifier passes every step instead of abstaining
+diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
+index 6e1cc4b..42291cc 100644
+--- a/packages/core/src/application/verification/verify-candidate.ts
++++ b/packages/core/src/application/verification/verify-candidate.ts
+@@ -32,8 +32,7 @@ export const runJob = Effect.fn("verification/runJob")(function* (job: Verificat
+       Effect.succeed(
+         job.steps.map((step): StepReport => ({
+           stepId: step.id,
+-          outcome: "abstain",
+-          failure: "unavailable",
++          outcome: "pass",
+           evidenceClass: step.evidenceCeiling,
+           tier: step.tier,
+           durationMs: 0,

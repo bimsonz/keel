@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "gen": "wrangler types --include-runtime=true --strict-vars=false",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p test/live/tsconfig.json",
     "deploy:dry": "wrangler deploy --dry-run --outdir .wrangler/dry-run"
   },
   "dependencies": {
@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "catalog:",
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"

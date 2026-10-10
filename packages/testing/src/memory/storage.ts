@@ -1,12 +1,19 @@
 import { BundleMissing } from "@keeltown/core/domain/verification";
 import { SecretMissing } from "@keeltown/core/domain/delivery";
 import type { ContentHash, EventEnvelope, SessionId } from "@keeltown/core/kernel";
-import { ContentHash as ContentHashSchema } from "@keeltown/core/kernel";
+import {
+  canonicalJson,
+  ContentHash as ContentHashSchema,
+  contentHashOf,
+  type Json,
+} from "@keeltown/core/kernel";
 import {
   Background,
   BundleStore,
   EntityStore,
   EventLog,
+  EvidenceMissing,
+  EvidenceStore,
   type Job,
   Metrics,
   type MfpRecord,
@@ -193,6 +200,31 @@ export function makeSecretsProviderMemory(secrets: Readonly<Record<string, strin
           return value === undefined
             ? Effect.fail(new SecretMissing({ name }))
             : Effect.succeed(value);
+        },
+      }),
+    ),
+  };
+}
+
+/** Evidence documents in a Map, keyed by the hash of their canonical JSON; each read is a fresh copy. */
+export function makeEvidenceStoreMemory() {
+  const documents = new Map<ContentHash, string>();
+  return {
+    documents,
+    layer: Layer.succeed(
+      EvidenceStore,
+      EvidenceStore.of({
+        put: (document) =>
+          Effect.sync(() => {
+            const hash = contentHashOf(document);
+            documents.set(hash, canonicalJson(document));
+            return hash;
+          }),
+        get: (hash) => {
+          const stored = documents.get(hash);
+          return stored === undefined
+            ? Effect.fail(new EvidenceMissing({ hash }))
+            : Effect.sync((): Json => JSON.parse(stored));
         },
       }),
     ),
