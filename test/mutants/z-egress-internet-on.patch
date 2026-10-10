@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/egress.test.ts
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+index ea062b1..a2b241f 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+@@ -43,7 +43,7 @@ export function refuseEgress(request: Request): Response {
+  * baked into the image, so no registry is reachable.
+  */
+ export class KeelSandbox extends CiSandbox {
+-  override enableInternet = false;
++  override enableInternet = true;
+   override interceptHttps = true;
+   override allowedHosts = [BUNDLE_HOSTS];
+ 
