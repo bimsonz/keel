@@ -3,6 +3,7 @@ export * from "./change.ts";
 export * from "./claim.ts";
 export * from "./compare.ts";
 export * from "./derivation.ts";
+export * from "./drift.ts";
 export * from "./errors.ts";
 export * from "./events.ts";
 export * from "./exposure.ts";
