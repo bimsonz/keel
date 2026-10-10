@@ -13,6 +13,7 @@ import {
   subjectsRelated,
   subjectsSiblings,
 } from "../../../src/domain/coordination/index.ts";
+import { CommitSha } from "../../../src/domain/kernel/index.ts";
 import { key } from "../../arbitraries/coordination.ts";
 import {
   changeIdArb,
@@ -194,6 +195,24 @@ describe("exposure", () => {
     const b: Intent = { revision: 1, goal: "speed up permission checks", footprint: [], premises: [], declaredEffects: [cacheEffect("per-session", true).proposition] };
     const a = { id: premiseA.holder, intent: { revision: 1, goal: "revoke collaborators", footprint: [], premises: [premiseA.proposition] }, derived: [] };
     expect(exposure(changeIds[1]!, b, [a]).neighbours.map((n) => n.changeId)).toEqual([premiseA.holder]);
+
+    // Overlap through a shared anchor alone: unrelated subjects, no footprint.
+    const anchor = { path: "src/authz/cache.ts", commit: CommitSha.make("a".repeat(40)) };
+    const viaAnchor: Intent = {
+      revision: 1,
+      goal: "cache billing lookups",
+      footprint: [],
+      premises: [],
+      declaredEffects: [{ subject: key("billing.cache"), predicate: "freshness", relation: "is", value: "per-session", anchors: [anchor] }],
+    };
+    const anchored = { ...a, intent: { ...a.intent, premises: [{ ...premiseA.proposition, anchors: [anchor] }] } };
+    const reached = fallout(changeIds[1]!, { proposition: viaAnchor.declaredEffects![0]!, method: "extractor", evidenceClass: "proof", anchors: [], declared: true }, [{ holder: premiseA.holder, proposition: anchored.intent.premises[0]! }], []);
+    expect(reached.map((f) => (f._tag === "notify" ? f.reason : f._tag))).toEqual(["shared-anchor"]);
+    expect(exposure(changeIds[1]!, viaAnchor, [anchored]).neighbours.map((n) => n.changeId)).toEqual([premiseA.holder]);
+
+    // Overlap through a sibling subject alone.
+    const viaSibling: Intent = { ...viaAnchor, declaredEffects: [{ subject: key("authz.audit-log"), predicate: "freshness", relation: "is", value: "per-session" }] };
+    expect(exposure(changeIds[1]!, viaSibling, [a]).neighbours.map((n) => n.changeId)).toEqual([premiseA.holder]);
   });
 
   it("[exposure.precision-floor] a change with nothing near and no overlapping footprint is never a neighbour", () => {
