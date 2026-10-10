@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/work-loop.test.ts -t "a11.invariant"
+# kills: a11.invariant
+# why: an agent its AgentSession does not know reads an empty inbox, hiding a broken projection
+diff --git a/apps/keel/src/adapters/driven/do-rpc/inbox.ts b/apps/keel/src/adapters/driven/do-rpc/inbox.ts
+index 3ae9d11..2981ab8 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/inbox.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/inbox.ts
+@@ -28,7 +28,7 @@ export function InboxRpc(
+           }),
+         ).pipe(
+           Effect.catchTag("AgentNotKnown", (error) =>
+-            Effect.die(
++            Effect.succeed({ notices: [], cursor: error.agentId }) ?? Effect.die(
+               new Error(
+                 `Agent ${error.agentId} holds a valid token, but its AgentSession does not know it: the directory and the DO disagree`,
+               ),

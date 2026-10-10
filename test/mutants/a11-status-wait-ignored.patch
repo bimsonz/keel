@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/work-loop.test.ts -t "a11.status"
+# kills: a11.status
+# why: status never waits, so an agent polls instead of being answered when its change moves
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 20ce376..0043696 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -129,7 +129,7 @@ export function makeHandlers(run: Runner) {
+       if (Result.isFailure(changeId)) return invalid(caller, changeId.failure);
+       return run(
+         caller,
+-        submissionOf(changeId.success, input.wait).pipe(
++        submissionOf(changeId.success, 0).pipe(
+           Effect.match({
+             onSuccess: (status) => statusOk(caller, status),
+             onFailure: (error) => statusError(caller, error),

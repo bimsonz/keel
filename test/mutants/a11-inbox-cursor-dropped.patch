@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/work-loop.test.ts -t "a11.inbox"
+# kills: a11.inbox
+# why: the inbox ignores the cursor, so every read repeats every notice
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 20ce376..e97deec 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -147,7 +147,7 @@ export function makeHandlers(run: Runner) {
+       run(
+         caller,
+         principalOf(caller).pipe(
+-          Effect.flatMap((principal) => readInbox(principal, input.cursor, input.wait)),
++          Effect.flatMap((principal) => readInbox(principal, undefined, input.wait)),
+           Effect.map(inboxOk),
+         ),
+       ),

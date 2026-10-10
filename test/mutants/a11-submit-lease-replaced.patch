@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/work-loop.test.ts -t "a11.submit"
+# kills: a11.submit
+# why: the isolate sends a lease of its own instead of passing Keel-Lease through
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index 93b133e..bd07b74 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -173,7 +173,7 @@ export function submitInput(input: Input<"submit">): Result.Result<SubmitInput,
+   return Result.map(
+     decodeWith(SubmitFields, {
+       changeId: input.changeId,
+-      lease: input["keel-lease"],
++      lease: "lse_00000000000000000000000000",
+       commitSha: input.commitSha,
+     }),
+     (fields) => ({ ...fields, idempotencyKey: input["idempotency-key"] }),
