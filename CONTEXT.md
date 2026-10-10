@@ -126,6 +126,10 @@ _Avoid_: deviation, mismatch
 Drift where an effect the Change didn't declare contradicts a live premise or a tenet.
 _Avoid_: regression (that is the observed failure, not the cause)
 
+**Batch**:
+A set of Changes from one Lane, composed into one Candidate and verified together before trunk advances.
+_Avoid_: train, group (a group is several verified batches promoted in one trunk commit)
+
 **Lane**:
 A queue of Changes whose footprints fall in one partition. Batching and fairness happen per lane.
 _Avoid_: branch, pipeline, merge queue (the whole system is not one queue)
