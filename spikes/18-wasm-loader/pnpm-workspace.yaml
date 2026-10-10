@@ -1,0 +1,5 @@
+allowBuilds:
+  esbuild: false
+  tree-sitter-javascript: false
+  tree-sitter-typescript: false
+  workerd: false

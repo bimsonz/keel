@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "keel-spike-18-host",
+  "main": "src/host.ts",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "worker_loaders": [{ "binding": "LOADER" }],
+  "r2_buckets": [{ "binding": "WASM", "bucket_name": "keel-spike-18-wasm" }],
+  "services": [{ "binding": "TOOLS", "service": "keel-spike-18-tools" }],
+  "durable_objects": { "bindings": [{ "name": "LOADER_HOST", "class_name": "LoaderHost" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LoaderHost"] }],
+  "observability": { "enabled": true }
+}

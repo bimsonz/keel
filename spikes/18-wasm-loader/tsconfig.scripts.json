@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "lib": ["es2023", "dom"]
+  },
+  "include": ["scripts", "src/shape.ts"]
+}

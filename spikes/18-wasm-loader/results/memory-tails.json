@@ -1,0 +1,344 @@
+{
+  "m2": [
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=4&targetMb=1024&id=m2-ceiling",
+      "outcome": "ok",
+      "cpuTime": 380,
+      "wallTime": 384,
+      "scriptName": null,
+      "eventTimestamp": 1791656937800,
+      "exceptions": [],
+      "logs": [],
+      "run": "m2-ceiling"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=1&targetMb=1024&id=m2-ceiling1",
+      "outcome": "ok",
+      "cpuTime": 272,
+      "wallTime": 272,
+      "scriptName": null,
+      "eventTimestamp": 1791656938602,
+      "exceptions": [],
+      "logs": [],
+      "run": "m2-ceiling1"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=200&keep=1&id=m2-hold",
+      "outcome": "ok",
+      "cpuTime": 200,
+      "wallTime": 287,
+      "scriptName": null,
+      "eventTimestamp": 1791656939201,
+      "exceptions": [],
+      "logs": [],
+      "run": "m2-hold"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=200&keep=1&id=m2-hold",
+      "outcome": "ok",
+      "cpuTime": 272,
+      "wallTime": 276,
+      "scriptName": null,
+      "eventTimestamp": 1791656939811,
+      "exceptions": [],
+      "logs": [],
+      "run": "m2-hold"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=200&keep=1&id=m2-hold",
+      "outcome": "ok",
+      "cpuTime": 127,
+      "wallTime": 128,
+      "scriptName": null,
+      "eventTimestamp": 1791656940262,
+      "exceptions": [],
+      "logs": [],
+      "run": "m2-hold"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=200&keep=1&id=m2-hold",
+      "outcome": "ok",
+      "cpuTime": 168,
+      "wallTime": 169,
+      "scriptName": null,
+      "eventTimestamp": 1791656940646,
+      "exceptions": [],
+      "logs": [],
+      "run": "m2-hold"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=64&keep=1&id=m2-hold64",
+      "outcome": "ok",
+      "cpuTime": 42,
+      "wallTime": 43,
+      "scriptName": null,
+      "eventTimestamp": 1791656941097,
+      "exceptions": [],
+      "logs": [],
+      "run": "m2-hold64"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=64&keep=1&id=m2-hold64",
+      "outcome": "ok",
+      "cpuTime": 55,
+      "wallTime": 75,
+      "scriptName": null,
+      "eventTimestamp": 1791656941397,
+      "exceptions": [],
+      "logs": [],
+      "run": "m2-hold64"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=64&keep=1&id=m2-hold64",
+      "outcome": "ok",
+      "cpuTime": 73,
+      "wallTime": 76,
+      "scriptName": null,
+      "eventTimestamp": 1791656941817,
+      "exceptions": [],
+      "logs": [],
+      "run": "m2-hold64"
+    }
+  ],
+  "m4": [
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=200&keep=1&id=m4-do200",
+      "outcome": "ok",
+      "cpuTime": 144,
+      "wallTime": 145,
+      "scriptName": null,
+      "eventTimestamp": 1791657036460,
+      "exceptions": [],
+      "logs": [],
+      "run": "m4-do200"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=200&keep=1&id=m4-do200",
+      "outcome": "ok",
+      "cpuTime": 149,
+      "wallTime": 176,
+      "scriptName": null,
+      "eventTimestamp": 1791657038933,
+      "exceptions": [],
+      "logs": [],
+      "run": "m4-do200"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=200&keep=1&id=m4-do200",
+      "outcome": "ok",
+      "cpuTime": 151,
+      "wallTime": 153,
+      "scriptName": null,
+      "eventTimestamp": 1791657041263,
+      "exceptions": [],
+      "logs": [],
+      "run": "m4-do200"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=200&keep=1&id=m4-do200",
+      "outcome": "ok",
+      "cpuTime": 123,
+      "wallTime": 124,
+      "scriptName": null,
+      "eventTimestamp": 1791657043647,
+      "exceptions": [],
+      "logs": [],
+      "run": "m4-do200"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=200&keep=1&id=m4-do200",
+      "outcome": "ok",
+      "cpuTime": 129,
+      "wallTime": 151,
+      "scriptName": null,
+      "eventTimestamp": 1791657046087,
+      "exceptions": [],
+      "logs": [],
+      "run": "m4-do200"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=32&keep=1&id=m4-do32",
+      "outcome": "ok",
+      "cpuTime": 21,
+      "wallTime": 21,
+      "scriptName": null,
+      "eventTimestamp": 1791657035499,
+      "exceptions": [],
+      "logs": [],
+      "run": "m4-do32"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=32&keep=1&id=m4-do32",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 0,
+      "scriptName": null,
+      "eventTimestamp": 1791657035736,
+      "exceptions": [],
+      "logs": [],
+      "run": "m4-do32"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=32&keep=1&id=m4-do32",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 0,
+      "scriptName": null,
+      "eventTimestamp": 1791657035898,
+      "exceptions": [],
+      "logs": [],
+      "run": "m4-do32"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=32&keep=1&id=m4-do32",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 0,
+      "scriptName": null,
+      "eventTimestamp": 1791657036066,
+      "exceptions": [],
+      "logs": [],
+      "run": "m4-do32"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=32&keep=1&id=m4-do32",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 0,
+      "scriptName": null,
+      "eventTimestamp": 1791657036228,
+      "exceptions": [],
+      "logs": [],
+      "run": "m4-do32"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=96&keep=1&id=m4-do96",
+      "outcome": "ok",
+      "cpuTime": 60,
+      "wallTime": 60,
+      "scriptName": null,
+      "eventTimestamp": 1791657048596,
+      "exceptions": [],
+      "logs": [],
+      "run": "m4-do96"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=96&keep=1&id=m4-do96",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 0,
+      "scriptName": null,
+      "eventTimestamp": 1791657050851,
+      "exceptions": [],
+      "logs": [],
+      "run": "m4-do96"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=96&keep=1&id=m4-do96",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 0,
+      "scriptName": null,
+      "eventTimestamp": 1791657053019,
+      "exceptions": [],
+      "logs": [],
+      "run": "m4-do96"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=96&keep=1&id=m4-do96",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 0,
+      "scriptName": null,
+      "eventTimestamp": 1791657055252,
+      "exceptions": [],
+      "logs": [],
+      "run": "m4-do96"
+    }
+  ],
+  "m6": [
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=200&instances=4&id=m6-inst4",
+      "outcome": "exceededMemory",
+      "cpuTime": 160,
+      "wallTime": 194,
+      "scriptName": null,
+      "eventTimestamp": 1791657124581,
+      "exceptions": [
+        {
+          "name": "Error",
+          "message": "Worker exceeded memory limit."
+        }
+      ],
+      "logs": [],
+      "run": "m6-inst4"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=1&targetMb=1&jsMb=400&id=m6-js400",
+      "outcome": "ok",
+      "cpuTime": 3002,
+      "wallTime": 3649,
+      "scriptName": null,
+      "eventTimestamp": 1791657125411,
+      "exceptions": [],
+      "logs": [],
+      "run": "m6-js400"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=1&targetMb=1&jsMb=64&id=m6-js64",
+      "outcome": "ok",
+      "cpuTime": 371,
+      "wallTime": 428,
+      "scriptName": null,
+      "eventTimestamp": 1791657124849,
+      "exceptions": [],
+      "logs": [],
+      "run": "m6-js64"
+    }
+  ],
+  "m7": [
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=200&instances=2&id=m7-inst2",
+      "outcome": "exceededMemory",
+      "cpuTime": 159,
+      "wallTime": 168,
+      "scriptName": null,
+      "eventTimestamp": 1791657154603,
+      "exceptions": [
+        {
+          "name": "Error",
+          "message": "Worker exceeded memory limit."
+        }
+      ],
+      "logs": [],
+      "run": "m7-inst2"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=8&targetMb=120&instances=2&id=m7-inst2x120",
+      "outcome": "ok",
+      "cpuTime": 164,
+      "wallTime": 184,
+      "scriptName": null,
+      "eventTimestamp": 1791657155159,
+      "exceptions": [],
+      "logs": [],
+      "run": "m7-inst2x120"
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=200&instances=3&id=m7-inst3",
+      "outcome": "exceededMemory",
+      "cpuTime": 156,
+      "wallTime": 159,
+      "scriptName": null,
+      "eventTimestamp": 1791657154766,
+      "exceptions": [
+        {
+          "name": "Error",
+          "message": "Worker exceeded memory limit."
+        }
+      ],
+      "logs": [],
+      "run": "m7-inst3"
+    }
+  ]
+}

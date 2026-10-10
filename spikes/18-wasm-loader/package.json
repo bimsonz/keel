@@ -1,0 +1,28 @@
+{
+  "name": "keel-spike-18-wasm-loader",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "prepare-wasm": "node scripts/prepare-wasm.ts",
+    "build-children": "node scripts/build-children.ts",
+    "reference": "node scripts/reference.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.scripts.json",
+    "lint": "oxlint -c .oxlintrc.json src scripts"
+  },
+  "dependencies": {
+    "@astral-sh/ruff-wasm-web": "0.16.10",
+    "@cdktf/hcl2json": "0.21.0",
+    "@wasm-fmt/clang-format": "23.1.1",
+    "tree-sitter-typescript": "0.23.2",
+    "web-tree-sitter": "0.27.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261008.1",
+    "@types/node": "22.20.5",
+    "esbuild": "0.28.2",
+    "oxlint": "1.87.0",
+    "typescript": "6.0.3",
+    "wrangler": "4.149.0"
+  }
+}

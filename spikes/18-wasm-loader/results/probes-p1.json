@@ -1,0 +1,334 @@
+{
+  "runs": {
+    "memgrow512": {
+      "status": 200,
+      "rttMs": 626,
+      "colo": "LHR",
+      "json": {
+        "tool": "memgrow",
+        "id": "p1-memgrow512",
+        "cold": true,
+        "r2Ms": 110,
+        "r2Bytes": 110,
+        "totalMs": 561,
+        "loadAndRunMs": 451,
+        "status": 200,
+        "child": {
+          "ok": true,
+          "tool": "memgrow",
+          "result": {
+            "finalMb": 240.0625,
+            "steps": [
+              {
+                "mb": 16.0625,
+                "ok": true
+              },
+              {
+                "mb": 32.0625,
+                "ok": true
+              },
+              {
+                "mb": 48.0625,
+                "ok": true
+              },
+              {
+                "mb": 64.0625,
+                "ok": true
+              },
+              {
+                "mb": 80.0625,
+                "ok": true
+              },
+              {
+                "mb": 96.0625,
+                "ok": true
+              },
+              {
+                "mb": 112.0625,
+                "ok": true
+              },
+              {
+                "mb": 128.0625,
+                "ok": true
+              },
+              {
+                "mb": 144.0625,
+                "ok": true
+              },
+              {
+                "mb": 160.0625,
+                "ok": true
+              },
+              {
+                "mb": 176.0625,
+                "ok": true
+              },
+              {
+                "mb": 192.0625,
+                "ok": true
+              },
+              {
+                "mb": 208.0625,
+                "ok": true
+              },
+              {
+                "mb": 224.0625,
+                "ok": true
+              },
+              {
+                "mb": 240.0625,
+                "ok": true
+              },
+              {
+                "mb": 256.0625,
+                "ok": false
+              }
+            ]
+          },
+          "wasmMemoryBytes": null
+        }
+      }
+    },
+    "memgrow64": {
+      "status": 200,
+      "rttMs": 127,
+      "colo": "LHR",
+      "json": {
+        "tool": "memgrow",
+        "id": "p1-memgrow64",
+        "cold": true,
+        "r2Ms": 57,
+        "r2Bytes": 110,
+        "totalMs": 111,
+        "loadAndRunMs": 54,
+        "status": 200,
+        "child": {
+          "ok": true,
+          "tool": "memgrow",
+          "result": {
+            "finalMb": 64.0625,
+            "steps": [
+              {
+                "mb": 16.0625,
+                "ok": true
+              },
+              {
+                "mb": 32.0625,
+                "ok": true
+              },
+              {
+                "mb": 48.0625,
+                "ok": true
+              },
+              {
+                "mb": 64.0625,
+                "ok": true
+              }
+            ]
+          },
+          "wasmMemoryBytes": null
+        }
+      }
+    },
+    "fetchNull": {
+      "status": 200,
+      "rttMs": 115,
+      "colo": "LHR",
+      "json": {
+        "tool": "fetchprobe",
+        "id": "p1-fetchnull",
+        "cold": true,
+        "r2Ms": 0,
+        "r2Bytes": 0,
+        "totalMs": 22,
+        "loadAndRunMs": 22,
+        "status": 200,
+        "child": {
+          "ok": true,
+          "tool": "fetchprobe",
+          "result": {
+            "fetched": false,
+            "error": "Error: This worker is not permitted to access the internet via global functions like fetch(). It must use capabilities (such as bindings in 'env') to talk to the outside world."
+          },
+          "wasmMemoryBytes": null
+        }
+      }
+    },
+    "fetchIntercept": {
+      "status": 200,
+      "rttMs": 118,
+      "colo": "LHR",
+      "json": {
+        "tool": "fetchprobe",
+        "id": "p1-fetchintercept",
+        "cold": true,
+        "r2Ms": 0,
+        "r2Bytes": 0,
+        "totalMs": 21,
+        "loadAndRunMs": 21,
+        "status": 200,
+        "child": {
+          "ok": true,
+          "tool": "fetchprobe",
+          "result": {
+            "fetched": true,
+            "status": 200,
+            "body": "intercepted example.com"
+          },
+          "wasmMemoryBytes": null
+        }
+      }
+    },
+    "compileDynamic": {
+      "status": 200,
+      "rttMs": 209,
+      "colo": "LHR",
+      "json": {
+        "tool": "compileprobe",
+        "id": "p1-compile",
+        "cold": true,
+        "r2Ms": 89,
+        "r2Bytes": 78,
+        "totalMs": 112,
+        "loadAndRunMs": 23,
+        "status": 200,
+        "child": {
+          "ok": true,
+          "tool": "compileprobe",
+          "result": {
+            "runtime": {
+              "processType": "object",
+              "processVersionsNode": "22.19.0"
+            },
+            "byteLength": 39,
+            "attempts": [
+              {
+                "name": "WebAssembly.validate(bytes)",
+                "ok": true,
+                "detail": "true"
+              },
+              {
+                "name": "new WebAssembly.Module(bytes)",
+                "ok": false,
+                "detail": "CompileError: WebAssembly.Module(): Wasm code generation disallowed by embedder"
+              },
+              {
+                "name": "WebAssembly.compile(bytes)",
+                "ok": false,
+                "detail": "CompileError: WebAssembly.compile(): Wasm code generation disallowed by embedder"
+              },
+              {
+                "name": "WebAssembly.instantiate(bytes)",
+                "ok": false,
+                "detail": "CompileError: WebAssembly.instantiate(): Wasm code generation disallowed by embedder"
+              },
+              {
+                "name": "control: new WebAssembly.Instance(module).answer()",
+                "ok": true,
+                "detail": "42"
+              }
+            ]
+          },
+          "wasmMemoryBytes": null
+        }
+      }
+    },
+    "compileStatic": {
+      "status": 200,
+      "rttMs": 264,
+      "colo": "LHR",
+      "json": {
+        "tool": "compileprobe",
+        "totalMs": 243,
+        "status": 200,
+        "child": {
+          "ok": true,
+          "tool": "compileprobe",
+          "result": {
+            "byteLength": 39,
+            "attempts": [
+              {
+                "name": "WebAssembly.validate(bytes)",
+                "ok": true,
+                "detail": "true"
+              },
+              {
+                "name": "new WebAssembly.Module(bytes)",
+                "ok": false,
+                "detail": "CompileError: WebAssembly.Module(): Wasm code generation disallowed by embedder"
+              },
+              {
+                "name": "WebAssembly.compile(bytes)",
+                "ok": false,
+                "detail": "CompileError: WebAssembly.compile(): Wasm code generation disallowed by embedder"
+              },
+              {
+                "name": "WebAssembly.instantiate(bytes)",
+                "ok": false,
+                "detail": "CompileError: WebAssembly.instantiate(): Wasm code generation disallowed by embedder"
+              },
+              {
+                "name": "control: new WebAssembly.Instance(module).answer()",
+                "ok": true,
+                "detail": "42"
+              }
+            ]
+          },
+          "wasmMemoryBytes": null
+        }
+      }
+    }
+  },
+  "tails": [
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=512&id=p1-memgrow512",
+      "outcome": "ok",
+      "cpuTime": 184,
+      "wallTime": 437,
+      "scriptName": null,
+      "eventTimestamp": 1791656893205,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://child/memgrow?tool=memgrow&stepMb=16&targetMb=64&id=p1-memgrow64",
+      "outcome": "ok",
+      "cpuTime": 42,
+      "wallTime": 42,
+      "scriptName": null,
+      "eventTimestamp": 1791656893784,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://child/fetchprobe?tool=fetchprobe&egress=null&id=p1-fetchnull",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": null,
+      "eventTimestamp": 1791656893990,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://child/fetchprobe?tool=fetchprobe&egress=intercept&id=p1-fetchintercept",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 5,
+      "scriptName": null,
+      "eventTimestamp": 1791656894109,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://child/compileprobe?tool=compileprobe&id=p1-compile",
+      "outcome": "ok",
+      "cpuTime": 8,
+      "wallTime": 9,
+      "scriptName": null,
+      "eventTimestamp": 1791656894223,
+      "exceptions": [],
+      "logs": []
+    }
+  ]
+}

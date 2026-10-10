@@ -1,0 +1,6 @@
+node_modules/
+.wrangler/
+# Generated: copied/decompressed tool wasm, padded modules, bundled children.
+build/
+*.wasm
+*.wasm.gz

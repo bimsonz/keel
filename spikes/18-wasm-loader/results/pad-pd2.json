@@ -1,0 +1,467 @@
+{
+  "pad100active": {
+    "cold": [
+      {
+        "status": 502,
+        "rttMs": 4122,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad100active-c0",
+          "cold": true,
+          "r2Ms": 3763,
+          "r2Bytes": 104857545,
+          "totalMs": 3840,
+          "status": 0,
+          "hostError": "Error: Dynamic Worker code size (104858622 bytes) exceeds the maximum allowed size of 67108864 bytes."
+        }
+      },
+      {
+        "status": 502,
+        "rttMs": 4115,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad100active-c1",
+          "cold": true,
+          "r2Ms": 3457,
+          "r2Bytes": 104857545,
+          "totalMs": 3664,
+          "status": 0,
+          "hostError": "Error: Dynamic Worker code size (104858622 bytes) exceeds the maximum allowed size of 67108864 bytes."
+        }
+      }
+    ],
+    "warm": [
+      {
+        "status": 502,
+        "rttMs": 1455,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad100active-c0",
+          "cold": true,
+          "r2Ms": 1129,
+          "r2Bytes": 104857545,
+          "totalMs": 1207,
+          "status": 0,
+          "hostError": "Error: Dynamic Worker code size (104858622 bytes) exceeds the maximum allowed size of 67108864 bytes."
+        }
+      },
+      {
+        "status": 502,
+        "rttMs": 2379,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad100active-c0",
+          "cold": true,
+          "r2Ms": 1686,
+          "r2Bytes": 104857545,
+          "totalMs": 1970,
+          "status": 0,
+          "hostError": "Error: Dynamic Worker code size (104858622 bytes) exceeds the maximum allowed size of 67108864 bytes."
+        }
+      },
+      {
+        "status": 502,
+        "rttMs": 1421,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad100active-c0",
+          "cold": true,
+          "r2Ms": 1156,
+          "r2Bytes": 104857545,
+          "totalMs": 1231,
+          "status": 0,
+          "hostError": "Error: Dynamic Worker code size (104858622 bytes) exceeds the maximum allowed size of 67108864 bytes."
+        }
+      }
+    ],
+    "summary": {
+      "bytes": 104857545,
+      "coldTotalMs": [
+        3840,
+        3664
+      ],
+      "coldR2Ms": [
+        3763,
+        3457
+      ],
+      "coldLoadAndRunMs": [
+        null,
+        null
+      ],
+      "warmMs": [
+        1207,
+        1970,
+        1231
+      ],
+      "warmHits": 0,
+      "probeOk": "0/5",
+      "wasmMemoryBytes": null,
+      "outcomes": [],
+      "cpuMs": [],
+      "httpStatus": [
+        502,
+        502,
+        502,
+        502,
+        502
+      ],
+      "errors": [
+        "Error: Dynamic Worker code size (104858622 bytes) exceeds the maximum allowed size of 67108864 bytes."
+      ]
+    }
+  },
+  "pad100passive": {
+    "cold": [
+      {
+        "status": 502,
+        "rttMs": 3402,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad100passive-c0",
+          "cold": true,
+          "r2Ms": 2706,
+          "r2Bytes": 104857535,
+          "totalMs": 3084,
+          "status": 0,
+          "hostError": "Error: Dynamic Worker code size (104858612 bytes) exceeds the maximum allowed size of 67108864 bytes."
+        }
+      },
+      {
+        "status": 502,
+        "rttMs": 2030,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad100passive-c1",
+          "cold": true,
+          "r2Ms": 1444,
+          "r2Bytes": 104857535,
+          "totalMs": 1655,
+          "status": 0,
+          "hostError": "Error: Dynamic Worker code size (104858612 bytes) exceeds the maximum allowed size of 67108864 bytes."
+        }
+      }
+    ],
+    "warm": [
+      {
+        "status": 502,
+        "rttMs": 2754,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad100passive-c0",
+          "cold": true,
+          "r2Ms": 2137,
+          "r2Bytes": 104857535,
+          "totalMs": 2448,
+          "status": 0,
+          "hostError": "Error: Dynamic Worker code size (104858612 bytes) exceeds the maximum allowed size of 67108864 bytes."
+        }
+      },
+      {
+        "status": 502,
+        "rttMs": 1548,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad100passive-c0",
+          "cold": true,
+          "r2Ms": 1305,
+          "r2Bytes": 104857535,
+          "totalMs": 1391,
+          "status": 0,
+          "hostError": "Error: Dynamic Worker code size (104858612 bytes) exceeds the maximum allowed size of 67108864 bytes."
+        }
+      },
+      {
+        "status": 502,
+        "rttMs": 4962,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad100passive-c0",
+          "cold": true,
+          "r2Ms": 4648,
+          "r2Bytes": 104857535,
+          "totalMs": 4789,
+          "status": 0,
+          "hostError": "Error: Dynamic Worker code size (104858612 bytes) exceeds the maximum allowed size of 67108864 bytes."
+        }
+      }
+    ],
+    "summary": {
+      "bytes": 104857535,
+      "coldTotalMs": [
+        3084,
+        1655
+      ],
+      "coldR2Ms": [
+        2706,
+        1444
+      ],
+      "coldLoadAndRunMs": [
+        null,
+        null
+      ],
+      "warmMs": [
+        2448,
+        1391,
+        4789
+      ],
+      "warmHits": 0,
+      "probeOk": "0/5",
+      "wasmMemoryBytes": null,
+      "outcomes": [],
+      "cpuMs": [],
+      "httpStatus": [
+        502,
+        502,
+        502,
+        502,
+        502
+      ],
+      "errors": [
+        "Error: Dynamic Worker code size (104858612 bytes) exceeds the maximum allowed size of 67108864 bytes."
+      ]
+    }
+  },
+  "pad200active": {
+    "cold": [
+      {
+        "status": 502,
+        "rttMs": 437,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad200active-c0",
+          "cold": true,
+          "r2Ms": 0,
+          "r2Bytes": 0,
+          "totalMs": 222,
+          "status": 0,
+          "hostError": "TypeError: Memory limit would be exceeded before EOF."
+        }
+      },
+      {
+        "status": 502,
+        "rttMs": 289,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad200active-c1",
+          "cold": true,
+          "r2Ms": 0,
+          "r2Bytes": 0,
+          "totalMs": 108,
+          "status": 0,
+          "hostError": "TypeError: Memory limit would be exceeded before EOF."
+        }
+      }
+    ],
+    "warm": [
+      {
+        "status": 502,
+        "rttMs": 279,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad200active-c0",
+          "cold": true,
+          "r2Ms": 0,
+          "r2Bytes": 0,
+          "totalMs": 107,
+          "status": 0,
+          "hostError": "TypeError: Memory limit would be exceeded before EOF."
+        }
+      },
+      {
+        "status": 502,
+        "rttMs": 91,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad200active-c0",
+          "cold": true,
+          "r2Ms": 0,
+          "r2Bytes": 0,
+          "totalMs": 69,
+          "status": 0,
+          "hostError": "TypeError: Memory limit would be exceeded before EOF."
+        }
+      },
+      {
+        "status": 502,
+        "rttMs": 248,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad200active-c0",
+          "cold": true,
+          "r2Ms": 0,
+          "r2Bytes": 0,
+          "totalMs": 76,
+          "status": 0,
+          "hostError": "TypeError: Memory limit would be exceeded before EOF."
+        }
+      }
+    ],
+    "summary": {
+      "bytes": 209715146,
+      "coldTotalMs": [
+        222,
+        108
+      ],
+      "coldR2Ms": [
+        0,
+        0
+      ],
+      "coldLoadAndRunMs": [
+        null,
+        null
+      ],
+      "warmMs": [
+        107,
+        69,
+        76
+      ],
+      "warmHits": 0,
+      "probeOk": "0/5",
+      "wasmMemoryBytes": null,
+      "outcomes": [],
+      "cpuMs": [],
+      "httpStatus": [
+        502,
+        502,
+        502,
+        502,
+        502
+      ],
+      "errors": [
+        "TypeError: Memory limit would be exceeded before EOF."
+      ]
+    }
+  },
+  "pad200passive": {
+    "cold": [
+      {
+        "status": 502,
+        "rttMs": 172,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad200passive-c0",
+          "cold": true,
+          "r2Ms": 0,
+          "r2Bytes": 0,
+          "totalMs": 145,
+          "status": 0,
+          "hostError": "TypeError: Memory limit would be exceeded before EOF."
+        }
+      },
+      {
+        "status": 502,
+        "rttMs": 111,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad200passive-c1",
+          "cold": true,
+          "r2Ms": 0,
+          "r2Bytes": 0,
+          "totalMs": 85,
+          "status": 0,
+          "hostError": "TypeError: Memory limit would be exceeded before EOF."
+        }
+      }
+    ],
+    "warm": [
+      {
+        "status": 502,
+        "rttMs": 268,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad200passive-c0",
+          "cold": true,
+          "r2Ms": 0,
+          "r2Bytes": 0,
+          "totalMs": 86,
+          "status": 0,
+          "hostError": "TypeError: Memory limit would be exceeded before EOF."
+        }
+      },
+      {
+        "status": 502,
+        "rttMs": 166,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad200passive-c0",
+          "cold": true,
+          "r2Ms": 0,
+          "r2Bytes": 0,
+          "totalMs": 145,
+          "status": 0,
+          "hostError": "TypeError: Memory limit would be exceeded before EOF."
+        }
+      },
+      {
+        "status": 502,
+        "rttMs": 101,
+        "colo": "LHR",
+        "json": {
+          "tool": "pad",
+          "id": "pd2-pad200passive-c0",
+          "cold": true,
+          "r2Ms": 0,
+          "r2Bytes": 0,
+          "totalMs": 78,
+          "status": 0,
+          "hostError": "TypeError: Memory limit would be exceeded before EOF."
+        }
+      }
+    ],
+    "summary": {
+      "bytes": 209715135,
+      "coldTotalMs": [
+        145,
+        85
+      ],
+      "coldR2Ms": [
+        0,
+        0
+      ],
+      "coldLoadAndRunMs": [
+        null,
+        null
+      ],
+      "warmMs": [
+        86,
+        145,
+        78
+      ],
+      "warmHits": 0,
+      "probeOk": "0/5",
+      "wasmMemoryBytes": null,
+      "outcomes": [],
+      "cpuMs": [],
+      "httpStatus": [
+        502,
+        502,
+        502,
+        502,
+        502
+      ],
+      "errors": [
+        "TypeError: Memory limit would be exceeded before EOF."
+      ]
+    }
+  },
+  "tails": []
+}

@@ -1,0 +1,2774 @@
+{
+  "deploys": [
+    "ruff r0: Total Upload: 21413.12 KiB / gzip: 6895.13 KiB | Worker Startup Time: 10 ms | Current Version ID: a143ff1d-63bd-40fc-93ed-0c895e633ecf",
+    "clang r0: Total Upload: 21413.12 KiB / gzip: 6896.73 KiB | Worker Startup Time: 8 ms | Current Version ID: 13a074ba-fe2d-4ef4-95db-ed2bede61905",
+    "hcl r0: Total Upload: 21413.12 KiB / gzip: 6893.25 KiB | Worker Startup Time: 8 ms | Current Version ID: d4be3c49-0711-4772-b1aa-cf2d49d7361a",
+    "treesitter r0: Total Upload: 21413.12 KiB / gzip: 6896.09 KiB | Worker Startup Time: 15 ms | Current Version ID: 475b1fc8-3272-41a5-bef4-8b6042a5ca4d",
+    "ruff r1: Total Upload: 21413.12 KiB / gzip: 6897.25 KiB | Worker Startup Time: 8 ms | Current Version ID: 91963265-299a-4732-bacf-f7fe60d7ad5a",
+    "clang r1: Total Upload: 21413.12 KiB / gzip: 6893.65 KiB | Worker Startup Time: 10 ms | Current Version ID: 3c792e4e-3a48-4cb4-b31c-2fa55fdf6244",
+    "hcl r1: Total Upload: 21413.12 KiB / gzip: 6895.58 KiB | Worker Startup Time: 11 ms | Current Version ID: 82b6469a-1108-4bbc-9605-707da71ca6a5",
+    "treesitter r1: Total Upload: 21413.12 KiB / gzip: 6893.65 KiB | Worker Startup Time: 8 ms | Current Version ID: ef81522f-a058-4d99-aec4-4f9f7ce333cb"
+  ],
+  "ruff-r0": {
+    "cold": {
+      "status": 200,
+      "rttMs": 623,
+      "colo": "LHR",
+      "json": {
+        "tool": "ruff",
+        "totalMs": 453,
+        "status": 200,
+        "child": {
+          "ok": true,
+          "tool": "ruff",
+          "result": {
+            "diagnostics": [
+              {
+                "code": "UP035",
+                "message": "`typing.List` is deprecated, use `list` instead",
+                "row": 2,
+                "column": 1
+              },
+              {
+                "code": "UP006",
+                "message": "Use `list` instead of `List` for type annotation",
+                "row": 5,
+                "column": 16
+              },
+              {
+                "code": "F401",
+                "message": "`sys` imported but unused",
+                "row": 1,
+                "column": 12
+              },
+              {
+                "code": "F401",
+                "message": "`os` imported but unused",
+                "row": 1,
+                "column": 8
+              },
+              {
+                "code": "F841",
+                "message": "Local variable `unused` is assigned to but never used",
+                "row": 17,
+                "column": 9
+              },
+              {
+                "code": "I001",
+                "message": "Import block is un-sorted or un-formatted",
+                "row": 1,
+                "column": 1
+              }
+            ],
+            "formatted": "import os, sys\nfrom typing import List\n\n\ndef total(xs: List[int]) -> int:\n    acc = 0\n    for x in xs:\n        if x == None:\n            continue\n        acc += x\n    return acc\n\n\nclass Greeter:\n    def __init__(self, name):\n        self.name = name\n\n    def greet(self):\n        unused = 1\n        return f\"hello {self.name}\"\n"
+          },
+          "wasmMemoryBytes": 5439488
+        }
+      }
+    },
+    "series": {
+      "status": 200,
+      "rttMs": 323,
+      "colo": "LHR",
+      "json": {
+        "tool": "ruff",
+        "totalMs": 6,
+        "status": 200,
+        "repeatMs": [
+          6,
+          7,
+          5,
+          10,
+          6,
+          5,
+          7,
+          5,
+          6,
+          5,
+          4,
+          14,
+          6,
+          5,
+          5,
+          4,
+          4,
+          5,
+          3,
+          5
+        ],
+        "repeatStatus200": 20,
+        "repeatSameResult": 20,
+        "child": {
+          "ok": true,
+          "tool": "ruff",
+          "result": {
+            "diagnostics": [
+              {
+                "code": "UP035",
+                "message": "`typing.List` is deprecated, use `list` instead",
+                "row": 2,
+                "column": 1
+              },
+              {
+                "code": "UP006",
+                "message": "Use `list` instead of `List` for type annotation",
+                "row": 5,
+                "column": 16
+              },
+              {
+                "code": "F401",
+                "message": "`sys` imported but unused",
+                "row": 1,
+                "column": 12
+              },
+              {
+                "code": "F401",
+                "message": "`os` imported but unused",
+                "row": 1,
+                "column": 8
+              },
+              {
+                "code": "F841",
+                "message": "Local variable `unused` is assigned to but never used",
+                "row": 17,
+                "column": 9
+              },
+              {
+                "code": "I001",
+                "message": "Import block is un-sorted or un-formatted",
+                "row": 1,
+                "column": 1
+              }
+            ],
+            "formatted": "import os, sys\nfrom typing import List\n\n\ndef total(xs: List[int]) -> int:\n    acc = 0\n    for x in xs:\n        if x == None:\n            continue\n        acc += x\n    return acc\n\n\nclass Greeter:\n    def __init__(self, name):\n        self.name = name\n\n    def greet(self):\n        unused = 1\n        return f\"hello {self.name}\"\n"
+          },
+          "wasmMemoryBytes": 5439488
+        }
+      }
+    }
+  },
+  "clang-r0": {
+    "cold": {
+      "status": 200,
+      "rttMs": 342,
+      "colo": "LHR",
+      "json": {
+        "tool": "clang",
+        "totalMs": 323,
+        "status": 200,
+        "child": {
+          "ok": true,
+          "tool": "clang-format",
+          "result": {
+            "formatted": "#include <stdio.h>\n#include <stdlib.h>\nstruct point {\n  int x;\n  int y;\n};\nstatic int dist2(struct point a, struct point b) {\n  int dx = a.x - b.x;\n  int dy = a.y - b.y;\n  return dx * dx + dy * dy;\n}\nint main(int argc, char **argv) {\n  struct point p = {1, 2}, q = {4, 6};\n  if (argc > 1) {\n    printf(\"%s\\n\", argv[1]);\n  } else {\n    printf(\"%d\\n\", dist2(p, q));\n  }\n  for (int i = 0; i < 3; i++) {\n    if (i % 2 == 0)\n      continue;\n    printf(\"odd %d\\n\", i);\n  }\n  return 0;\n}\n"
+          },
+          "wasmMemoryBytes": null
+        }
+      }
+    },
+    "series": {
+      "status": 200,
+      "rttMs": 229,
+      "colo": "LHR",
+      "json": {
+        "tool": "clang",
+        "totalMs": 15,
+        "status": 200,
+        "repeatMs": [
+          8,
+          7,
+          7,
+          16,
+          9,
+          10,
+          8,
+          12,
+          12,
+          10,
+          8,
+          7,
+          8,
+          8,
+          7,
+          9,
+          14,
+          13,
+          8,
+          12
+        ],
+        "repeatStatus200": 20,
+        "repeatSameResult": 20,
+        "child": {
+          "ok": true,
+          "tool": "clang-format",
+          "result": {
+            "formatted": "#include <stdio.h>\n#include <stdlib.h>\nstruct point {\n  int x;\n  int y;\n};\nstatic int dist2(struct point a, struct point b) {\n  int dx = a.x - b.x;\n  int dy = a.y - b.y;\n  return dx * dx + dy * dy;\n}\nint main(int argc, char **argv) {\n  struct point p = {1, 2}, q = {4, 6};\n  if (argc > 1) {\n    printf(\"%s\\n\", argv[1]);\n  } else {\n    printf(\"%d\\n\", dist2(p, q));\n  }\n  for (int i = 0; i < 3; i++) {\n    if (i % 2 == 0)\n      continue;\n    printf(\"odd %d\\n\", i);\n  }\n  return 0;\n}\n"
+          },
+          "wasmMemoryBytes": null
+        }
+      }
+    }
+  },
+  "hcl-r0": {
+    "cold": {
+      "status": 200,
+      "rttMs": 525,
+      "colo": "LHR",
+      "json": {
+        "tool": "hcl",
+        "totalMs": 426,
+        "status": 200,
+        "child": {
+          "ok": true,
+          "tool": "hcl2json",
+          "result": {
+            "json": {
+              "locals": [
+                {
+                  "copies": 3,
+                  "name": "keel-spike",
+                  "tags": [
+                    "spike",
+                    "wasm"
+                  ]
+                }
+              ],
+              "output": {
+                "script": [
+                  {
+                    "value": "${cloudflare_workers_script.tool.script_name}"
+                  }
+                ]
+              },
+              "resource": {
+                "cloudflare_workers_script": {
+                  "tool": [
+                    {
+                      "account_id": "${var.account_id}",
+                      "bindings": [
+                        {
+                          "name": "MODE",
+                          "text": "verify",
+                          "type": "plain_text"
+                        }
+                      ],
+                      "content": "${file(\"${path.module}/dist/index.js\")}",
+                      "script_name": "${local.name}-tool"
+                    }
+                  ]
+                }
+              },
+              "terraform": [
+                {
+                  "required_providers": [
+                    {
+                      "cloudflare": {
+                        "source": "cloudflare/cloudflare",
+                        "version": "~> 5.0"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "variable": {
+                "zone_id": [
+                  {
+                    "description": "Zone to attach the route to",
+                    "type": "${string}"
+                  }
+                ]
+              }
+            }
+          },
+          "wasmMemoryBytes": 19398656
+        }
+      }
+    },
+    "series": {
+      "status": 200,
+      "rttMs": 694,
+      "colo": "LHR",
+      "json": {
+        "tool": "hcl",
+        "totalMs": 299,
+        "status": 200,
+        "repeatMs": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "repeatStatus200": 20,
+        "repeatSameResult": 20,
+        "child": {
+          "ok": true,
+          "tool": "hcl2json",
+          "result": {
+            "json": {
+              "locals": [
+                {
+                  "copies": 3,
+                  "name": "keel-spike",
+                  "tags": [
+                    "spike",
+                    "wasm"
+                  ]
+                }
+              ],
+              "output": {
+                "script": [
+                  {
+                    "value": "${cloudflare_workers_script.tool.script_name}"
+                  }
+                ]
+              },
+              "resource": {
+                "cloudflare_workers_script": {
+                  "tool": [
+                    {
+                      "account_id": "${var.account_id}",
+                      "bindings": [
+                        {
+                          "name": "MODE",
+                          "text": "verify",
+                          "type": "plain_text"
+                        }
+                      ],
+                      "content": "${file(\"${path.module}/dist/index.js\")}",
+                      "script_name": "${local.name}-tool"
+                    }
+                  ]
+                }
+              },
+              "terraform": [
+                {
+                  "required_providers": [
+                    {
+                      "cloudflare": {
+                        "source": "cloudflare/cloudflare",
+                        "version": "~> 5.0"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "variable": {
+                "zone_id": [
+                  {
+                    "description": "Zone to attach the route to",
+                    "type": "${string}"
+                  }
+                ]
+              }
+            }
+          },
+          "wasmMemoryBytes": 19398656
+        }
+      }
+    }
+  },
+  "treesitter-r0": {
+    "cold": {
+      "status": 200,
+      "rttMs": 512,
+      "colo": "LHR",
+      "json": {
+        "tool": "treesitter",
+        "totalMs": 340,
+        "status": 200,
+        "child": {
+          "ok": true,
+          "tool": "tree-sitter",
+          "result": {
+            "rootType": "program",
+            "hasError": false,
+            "namedNodes": 296,
+            "functionCount": 10,
+            "functionsByType": {
+              "function_declaration": 2,
+              "arrow_function": 3,
+              "method_definition": 3,
+              "function_expression": 1,
+              "generator_function_declaration": 1
+            }
+          },
+          "wasmMemoryBytes": null
+        }
+      }
+    },
+    "series": {
+      "status": 200,
+      "rttMs": 165,
+      "colo": "LHR",
+      "json": {
+        "tool": "treesitter",
+        "totalMs": 0,
+        "status": 200,
+        "repeatMs": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "repeatStatus200": 20,
+        "repeatSameResult": 20,
+        "child": {
+          "ok": true,
+          "tool": "tree-sitter",
+          "result": {
+            "rootType": "program",
+            "hasError": false,
+            "namedNodes": 296,
+            "functionCount": 10,
+            "functionsByType": {
+              "function_declaration": 2,
+              "arrow_function": 3,
+              "method_definition": 3,
+              "function_expression": 1,
+              "generator_function_declaration": 1
+            }
+          },
+          "wasmMemoryBytes": null
+        }
+      }
+    }
+  },
+  "ruff-r1": {
+    "cold": {
+      "status": 200,
+      "rttMs": 538,
+      "colo": "LHR",
+      "json": {
+        "tool": "ruff",
+        "totalMs": 266,
+        "status": 200,
+        "child": {
+          "ok": true,
+          "tool": "ruff",
+          "result": {
+            "diagnostics": [
+              {
+                "code": "UP035",
+                "message": "`typing.List` is deprecated, use `list` instead",
+                "row": 2,
+                "column": 1
+              },
+              {
+                "code": "UP006",
+                "message": "Use `list` instead of `List` for type annotation",
+                "row": 5,
+                "column": 16
+              },
+              {
+                "code": "F401",
+                "message": "`sys` imported but unused",
+                "row": 1,
+                "column": 12
+              },
+              {
+                "code": "F401",
+                "message": "`os` imported but unused",
+                "row": 1,
+                "column": 8
+              },
+              {
+                "code": "F841",
+                "message": "Local variable `unused` is assigned to but never used",
+                "row": 17,
+                "column": 9
+              },
+              {
+                "code": "I001",
+                "message": "Import block is un-sorted or un-formatted",
+                "row": 1,
+                "column": 1
+              }
+            ],
+            "formatted": "import os, sys\nfrom typing import List\n\n\ndef total(xs: List[int]) -> int:\n    acc = 0\n    for x in xs:\n        if x == None:\n            continue\n        acc += x\n    return acc\n\n\nclass Greeter:\n    def __init__(self, name):\n        self.name = name\n\n    def greet(self):\n        unused = 1\n        return f\"hello {self.name}\"\n"
+          },
+          "wasmMemoryBytes": 5439488
+        }
+      }
+    },
+    "series": {
+      "status": 200,
+      "rttMs": 150,
+      "colo": "LHR",
+      "json": {
+        "tool": "ruff",
+        "totalMs": 0,
+        "status": 200,
+        "repeatMs": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "repeatStatus200": 20,
+        "repeatSameResult": 20,
+        "child": {
+          "ok": true,
+          "tool": "ruff",
+          "result": {
+            "diagnostics": [
+              {
+                "code": "UP035",
+                "message": "`typing.List` is deprecated, use `list` instead",
+                "row": 2,
+                "column": 1
+              },
+              {
+                "code": "UP006",
+                "message": "Use `list` instead of `List` for type annotation",
+                "row": 5,
+                "column": 16
+              },
+              {
+                "code": "F401",
+                "message": "`sys` imported but unused",
+                "row": 1,
+                "column": 12
+              },
+              {
+                "code": "F401",
+                "message": "`os` imported but unused",
+                "row": 1,
+                "column": 8
+              },
+              {
+                "code": "F841",
+                "message": "Local variable `unused` is assigned to but never used",
+                "row": 17,
+                "column": 9
+              },
+              {
+                "code": "I001",
+                "message": "Import block is un-sorted or un-formatted",
+                "row": 1,
+                "column": 1
+              }
+            ],
+            "formatted": "import os, sys\nfrom typing import List\n\n\ndef total(xs: List[int]) -> int:\n    acc = 0\n    for x in xs:\n        if x == None:\n            continue\n        acc += x\n    return acc\n\n\nclass Greeter:\n    def __init__(self, name):\n        self.name = name\n\n    def greet(self):\n        unused = 1\n        return f\"hello {self.name}\"\n"
+          },
+          "wasmMemoryBytes": 5439488
+        }
+      }
+    }
+  },
+  "clang-r1": {
+    "cold": {
+      "status": 200,
+      "rttMs": 296,
+      "colo": "LHR",
+      "json": {
+        "tool": "clang",
+        "totalMs": 236,
+        "status": 200,
+        "child": {
+          "ok": true,
+          "tool": "clang-format",
+          "result": {
+            "formatted": "#include <stdio.h>\n#include <stdlib.h>\nstruct point {\n  int x;\n  int y;\n};\nstatic int dist2(struct point a, struct point b) {\n  int dx = a.x - b.x;\n  int dy = a.y - b.y;\n  return dx * dx + dy * dy;\n}\nint main(int argc, char **argv) {\n  struct point p = {1, 2}, q = {4, 6};\n  if (argc > 1) {\n    printf(\"%s\\n\", argv[1]);\n  } else {\n    printf(\"%d\\n\", dist2(p, q));\n  }\n  for (int i = 0; i < 3; i++) {\n    if (i % 2 == 0)\n      continue;\n    printf(\"odd %d\\n\", i);\n  }\n  return 0;\n}\n"
+          },
+          "wasmMemoryBytes": null
+        }
+      }
+    },
+    "series": {
+      "status": 200,
+      "rttMs": 440,
+      "colo": "LHR",
+      "json": {
+        "tool": "clang",
+        "totalMs": 222,
+        "status": 200,
+        "repeatMs": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "repeatStatus200": 20,
+        "repeatSameResult": 20,
+        "child": {
+          "ok": true,
+          "tool": "clang-format",
+          "result": {
+            "formatted": "#include <stdio.h>\n#include <stdlib.h>\nstruct point {\n  int x;\n  int y;\n};\nstatic int dist2(struct point a, struct point b) {\n  int dx = a.x - b.x;\n  int dy = a.y - b.y;\n  return dx * dx + dy * dy;\n}\nint main(int argc, char **argv) {\n  struct point p = {1, 2}, q = {4, 6};\n  if (argc > 1) {\n    printf(\"%s\\n\", argv[1]);\n  } else {\n    printf(\"%d\\n\", dist2(p, q));\n  }\n  for (int i = 0; i < 3; i++) {\n    if (i % 2 == 0)\n      continue;\n    printf(\"odd %d\\n\", i);\n  }\n  return 0;\n}\n"
+          },
+          "wasmMemoryBytes": null
+        }
+      }
+    }
+  },
+  "hcl-r1": {
+    "cold": {
+      "status": 200,
+      "rttMs": 320,
+      "colo": "LHR",
+      "json": {
+        "tool": "hcl",
+        "totalMs": 305,
+        "status": 200,
+        "child": {
+          "ok": true,
+          "tool": "hcl2json",
+          "result": {
+            "json": {
+              "locals": [
+                {
+                  "copies": 3,
+                  "name": "keel-spike",
+                  "tags": [
+                    "spike",
+                    "wasm"
+                  ]
+                }
+              ],
+              "output": {
+                "script": [
+                  {
+                    "value": "${cloudflare_workers_script.tool.script_name}"
+                  }
+                ]
+              },
+              "resource": {
+                "cloudflare_workers_script": {
+                  "tool": [
+                    {
+                      "account_id": "${var.account_id}",
+                      "bindings": [
+                        {
+                          "name": "MODE",
+                          "text": "verify",
+                          "type": "plain_text"
+                        }
+                      ],
+                      "content": "${file(\"${path.module}/dist/index.js\")}",
+                      "script_name": "${local.name}-tool"
+                    }
+                  ]
+                }
+              },
+              "terraform": [
+                {
+                  "required_providers": [
+                    {
+                      "cloudflare": {
+                        "source": "cloudflare/cloudflare",
+                        "version": "~> 5.0"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "variable": {
+                "zone_id": [
+                  {
+                    "description": "Zone to attach the route to",
+                    "type": "${string}"
+                  }
+                ]
+              }
+            }
+          },
+          "wasmMemoryBytes": 19398656
+        }
+      }
+    },
+    "series": {
+      "status": 200,
+      "rttMs": 439,
+      "colo": "LHR",
+      "json": {
+        "tool": "hcl",
+        "totalMs": 256,
+        "status": 200,
+        "repeatMs": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "repeatStatus200": 20,
+        "repeatSameResult": 20,
+        "child": {
+          "ok": true,
+          "tool": "hcl2json",
+          "result": {
+            "json": {
+              "locals": [
+                {
+                  "copies": 3,
+                  "name": "keel-spike",
+                  "tags": [
+                    "spike",
+                    "wasm"
+                  ]
+                }
+              ],
+              "output": {
+                "script": [
+                  {
+                    "value": "${cloudflare_workers_script.tool.script_name}"
+                  }
+                ]
+              },
+              "resource": {
+                "cloudflare_workers_script": {
+                  "tool": [
+                    {
+                      "account_id": "${var.account_id}",
+                      "bindings": [
+                        {
+                          "name": "MODE",
+                          "text": "verify",
+                          "type": "plain_text"
+                        }
+                      ],
+                      "content": "${file(\"${path.module}/dist/index.js\")}",
+                      "script_name": "${local.name}-tool"
+                    }
+                  ]
+                }
+              },
+              "terraform": [
+                {
+                  "required_providers": [
+                    {
+                      "cloudflare": {
+                        "source": "cloudflare/cloudflare",
+                        "version": "~> 5.0"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "variable": {
+                "zone_id": [
+                  {
+                    "description": "Zone to attach the route to",
+                    "type": "${string}"
+                  }
+                ]
+              }
+            }
+          },
+          "wasmMemoryBytes": 19398656
+        }
+      }
+    }
+  },
+  "treesitter-r1": {
+    "cold": {
+      "status": 200,
+      "rttMs": 404,
+      "colo": "LHR",
+      "json": {
+        "tool": "treesitter",
+        "totalMs": 268,
+        "status": 200,
+        "child": {
+          "ok": true,
+          "tool": "tree-sitter",
+          "result": {
+            "rootType": "program",
+            "hasError": false,
+            "namedNodes": 296,
+            "functionCount": 10,
+            "functionsByType": {
+              "function_declaration": 2,
+              "arrow_function": 3,
+              "method_definition": 3,
+              "function_expression": 1,
+              "generator_function_declaration": 1
+            }
+          },
+          "wasmMemoryBytes": null
+        }
+      }
+    },
+    "series": {
+      "status": 200,
+      "rttMs": 398,
+      "colo": "LHR",
+      "json": {
+        "tool": "treesitter",
+        "totalMs": 271,
+        "status": 200,
+        "repeatMs": [
+          8,
+          6,
+          8,
+          5,
+          5,
+          6,
+          6,
+          4,
+          5,
+          5,
+          6,
+          7,
+          5,
+          5,
+          5,
+          4,
+          5,
+          8,
+          5,
+          4
+        ],
+        "repeatStatus200": 20,
+        "repeatSameResult": 20,
+        "child": {
+          "ok": true,
+          "tool": "tree-sitter",
+          "result": {
+            "rootType": "program",
+            "hasError": false,
+            "namedNodes": 296,
+            "functionCount": 10,
+            "functionsByType": {
+              "function_declaration": 2,
+              "arrow_function": 3,
+              "method_definition": 3,
+              "function_expression": 1,
+              "generator_function_declaration": 1
+            }
+          },
+          "wasmMemoryBytes": null
+        }
+      }
+    }
+  },
+  "ruff-summary": {
+    "coldMs": [
+      453,
+      266
+    ],
+    "coldCpuMs": [
+      205,
+      238
+    ],
+    "warmP50Ms": 0,
+    "warmP95Ms": 7,
+    "warmCpuP50Ms": 1,
+    "warmCpuP95Ms": 2,
+    "outcomes": [
+      "ok"
+    ],
+    "correct": "4/4",
+    "warmSameResult": [
+      "20/20",
+      "20/20"
+    ]
+  },
+  "clang-summary": {
+    "coldMs": [
+      323,
+      236
+    ],
+    "coldCpuMs": [
+      44,
+      43
+    ],
+    "warmP50Ms": 0,
+    "warmP95Ms": 13,
+    "warmCpuP50Ms": 3,
+    "warmCpuP95Ms": 8,
+    "outcomes": [
+      "ok"
+    ],
+    "correct": "4/4",
+    "warmSameResult": [
+      "20/20",
+      "20/20"
+    ]
+  },
+  "hcl-summary": {
+    "coldMs": [
+      426,
+      305
+    ],
+    "coldCpuMs": [
+      139,
+      69
+    ],
+    "warmP50Ms": 0,
+    "warmP95Ms": 0,
+    "warmCpuP50Ms": 4,
+    "warmCpuP95Ms": 8,
+    "outcomes": [
+      "ok"
+    ],
+    "correct": "4/4",
+    "warmSameResult": [
+      "20/20",
+      "20/20"
+    ]
+  },
+  "treesitter-summary": {
+    "coldMs": [
+      340,
+      268
+    ],
+    "coldCpuMs": [
+      56,
+      18
+    ],
+    "warmP50Ms": 0,
+    "warmP95Ms": 8,
+    "warmCpuP50Ms": 2,
+    "warmCpuP95Ms": 5,
+    "outcomes": [
+      "ok"
+    ],
+    "correct": "4/4",
+    "warmSameResult": [
+      "20/20",
+      "20/20"
+    ]
+  },
+  "tails": [
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-cold",
+      "outcome": "ok",
+      "cpuTime": 205,
+      "wallTime": 207,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657323920,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324569,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324577,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324582,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324589,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324595,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324606,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324611,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324617,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324624,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324629,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324636,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324640,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 5,
+      "wallTime": 7,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324645,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324659,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324670,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324675,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324679,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324685,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324689,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s0-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657324693,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-cold",
+      "outcome": "ok",
+      "cpuTime": 44,
+      "wallTime": 45,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341123,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 10,
+      "wallTime": 11,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341461,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 5,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341477,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 4,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341486,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341493,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 8,
+      "wallTime": 10,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341500,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 5,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341516,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 5,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341525,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 4,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341535,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 6,
+      "wallTime": 6,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341544,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 5,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341555,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 4,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341570,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 4,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341579,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341587,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 4,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341594,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 4,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341603,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 4,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341611,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 4,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341618,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 6,
+      "wallTime": 7,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341627,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 7,
+      "wallTime": 8,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341641,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 4,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341655,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s0-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 7,
+      "wallTime": 8,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657341662,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-cold",
+      "outcome": "ok",
+      "cpuTime": 139,
+      "wallTime": 142,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657358525,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 187,
+      "wallTime": 194,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657358961,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 5,
+      "wallTime": 6,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 6,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 6,
+      "wallTime": 8,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 5,
+      "wallTime": 7,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 7,
+      "wallTime": 9,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 5,
+      "wallTime": 6,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 6,
+      "wallTime": 10,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 5,
+      "wallTime": 7,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 5,
+      "wallTime": 6,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 6,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 5,
+      "wallTime": 6,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 7,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 5,
+      "wallTime": 7,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 6,
+      "wallTime": 7,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 5,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 6,
+      "wallTime": 7,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 5,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 6,
+      "wallTime": 8,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 8,
+      "wallTime": 9,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s0-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 6,
+      "wallTime": 8,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657359260,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-cold",
+      "outcome": "ok",
+      "cpuTime": 56,
+      "wallTime": 60,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375166,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 4,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 5,
+      "wallTime": 5,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 5,
+      "wallTime": 5,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s0-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657375665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-cold",
+      "outcome": "ok",
+      "cpuTime": 238,
+      "wallTime": 244,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391091,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 0,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/ruff?tool=ruff&run=st1-s1-ruff-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 0,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657391715,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-cold",
+      "outcome": "ok",
+      "cpuTime": 43,
+      "wallTime": 43,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408004,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 39,
+      "wallTime": 39,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408386,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 4,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/clang?tool=clang&run=st1-s1-clang-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657408608,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-cold",
+      "outcome": "ok",
+      "cpuTime": 69,
+      "wallTime": 70,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657425818,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 16,
+      "wallTime": 17,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426233,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/hcl?tool=hcl&run=st1-s1-hcl-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 1,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657426489,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-cold",
+      "outcome": "ok",
+      "cpuTime": 18,
+      "wallTime": 25,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657442665,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 26,
+      "wallTime": 35,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657442974,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 5,
+      "wallTime": 5,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443244,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 4,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443252,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 5,
+      "wallTime": 6,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443258,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443266,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443272,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443277,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443284,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443289,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443293,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443299,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 4,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443304,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 4,
+      "wallTime": 5,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443310,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443318,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443323,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443329,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 1,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443333,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443338,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 3,
+      "wallTime": 4,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443343,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 3,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443350,
+      "exceptions": [],
+      "logs": []
+    },
+    {
+      "url": "https://tools/treesitter?tool=treesitter&run=st1-s1-treesitter-w&repeat=21",
+      "outcome": "ok",
+      "cpuTime": 2,
+      "wallTime": 2,
+      "scriptName": "keel-spike-18-tools",
+      "eventTimestamp": 1791657443356,
+      "exceptions": [],
+      "logs": []
+    }
+  ]
+}

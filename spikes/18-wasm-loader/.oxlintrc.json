@@ -1,0 +1,10 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "import", "promise"],
+  "categories": { "correctness": "error", "suspicious": "error", "perf": "warn" },
+  "rules": {
+    "no-console": "off",
+    "no-await-in-loop": "off"
+  },
+  "ignorePatterns": ["node_modules/**", "build/**", ".wrangler/**"]
+}
