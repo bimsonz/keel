@@ -1,0 +1,194 @@
+{
+  "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+  "settings": {
+    "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+    "api": "legacy",
+    "temperature": 0.6,
+    "maxTokens": 4096
+  },
+  "startedAt": "2026-10-10T20:36:31.602Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 30908,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\n\\nconst TOKEN = \\\"abcdef123456\\\";\\nconst HASHED_TOKEN = \\\"8d969eef6ecad3c29a3a629280e686cff8cae5f87895252e583ddc7d32ec57c4\\\";\\nconst NOW = 1672531199000;\\n\\nconst setup = () => {\\n  const deps = memoryDeps();\\n  deps.store.createUser({ id: \\\"usr_1\\\", username: \\\"alice\\\", name: \\\"Alice\\\", passwordSalt: \\\"salt\\\", passwordHash: \\\"hash\\\", createdAt: NOW });\\n  deps.store.createSession({ id: \\\"ses_1\\\", userId: \\\"usr_1\\\", tokenHash: HASHED_TOKEN, createdAt: NOW, expiresAt: NOW + 86400000 });\\n  deps.store.createRepo({ id: \\\"repo_1\\\", ownerId: \\\"usr_1\\\", name: \\\"project\\\", description: \\\"\\\", visibility: \\\"private\\\", defaultBranch: \\\"main\\\", createdAt: NOW, updatedAt: NOW });\\n  deps.store.addCollaborator({ repoId: \\\"repo_1\\\", userId: \\\"usr_1\\\", role: \\\"admin\\\", addedBy: \\\"usr_1\\\", addedAt: NOW });\\n  return { app: createApp(deps), deps };\\n};\\n\\nconst revokeCollaborator = async (app: Hono, token: string) => {\\n  return app.request(\\\"DELETE\\\", \\\"/repos/alice/project/collaborators/alice\\\", {\\n    headers: { authorization: `Bearer ${token}` }\\n  });\\n};\\n\\nconst fetchRepo = async (app: Hono, token: string) => {\\n  return app.request(\\\"GET\\\", \\\"/repos/alice/project\\\", {\\n    headers: { authorization: `Bearer ${token}` }\\n  });\\n};\\n\\ndescribe(\\\"authz.permission-evaluation\\\", () => {\\n  it(\\\"should enforce permission freshness\\\", async () => {\\n    const { app, deps } = setup();\\n    deps.clock.advance(1);\\n    const revokeResponse = await revokeCollaborator(app, TOKEN);\\n    console.log(`[probe] admin DELETE /repos/alice/project/collaborators/alice -> ${revokeResponse.status} (expected 204)`);\\n    if (revokeResponse.status !== 204) {\\n      throw new Error(`probe not applicable: revoke route failed (${revokeResponse.status})`);\\n    }\\n    deps.clock.advance(1);\\n    const fetchResponse = await fetchRepo(app, TOKEN);\\n    console.log(`[probe] admin GET /repos/alice/project -> ${fetchResponse.status} (expected 403)`);\\n    expect(fetchResponse.status).toBe(403);\\n  });\\n});\"},\"rationale\":\"The probe sets up a scenario where Alice is an admin of a private repository. It then revokes her collaborator status using the newly added DELETE route (specific to patch A) and attempts to access the repository again. In the presence of patch A, this should fail with a 403 Forbidden status due to the fresh permission evaluation. If patch B is applied, the permission evaluation might be cached, causing the test to pass unexpectedly. The probe ensures that the permission evaluation is indeed fresh by checking for a 403 status after revocation.\"}",
+        "usage": {
+          "promptTokens": 16875,
+          "completionTokens": 834
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\n\nconst TOKEN = \"abcdef123456\";\nconst HASHED_TOKEN = \"8d969eef6ecad3c29a3a629280e686cff8cae5f87895252e583ddc7d32ec57c4\";\nconst NOW = 1672531199000;\n\nconst setup = () => {\n  const deps = memoryDeps();\n  deps.store.createUser({ id: \"usr_1\", username: \"alice\", name: \"Alice\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: NOW });\n  deps.store.createSession({ id: \"ses_1\", userId: \"usr_1\", tokenHash: HASHED_TOKEN, createdAt: NOW, expiresAt: NOW + 86400000 });\n  deps.store.createRepo({ id: \"repo_1\", ownerId: \"usr_1\", name: \"project\", description: \"\", visibility: \"private\", defaultBranch: \"main\", createdAt: NOW, updatedAt: NOW });\n  deps.store.addCollaborator({ repoId: \"repo_1\", userId: \"usr_1\", role: \"admin\", addedBy: \"usr_1\", addedAt: NOW });\n  return { app: createApp(deps), deps };\n};\n\nconst revokeCollaborator = async (app: Hono, token: string) => {\n  return app.request(\"DELETE\", \"/repos/alice/project/collaborators/alice\", {\n    headers: { authorization: `Bearer ${token}` }\n  });\n};\n\nconst fetchRepo = async (app: Hono, token: string) => {\n  return app.request(\"GET\", \"/repos/alice/project\", {\n    headers: { authorization: `Bearer ${token}` }\n  });\n};\n\ndescribe(\"authz.permission-evaluation\", () => {\n  it(\"should enforce permission freshness\", async () => {\n    const { app, deps } = setup();\n    deps.clock.advance(1);\n    const revokeResponse = await revokeCollaborator(app, TOKEN);\n    console.log(`[probe] admin DELETE /repos/alice/project/collaborators/alice -> ${revokeResponse.status} (expected 204)`);\n    if (revokeResponse.status !== 204) {\n      throw new Error(`probe not applicable: revoke route failed (${revokeResponse.status})`);\n    }\n    deps.clock.advance(1);\n    const fetchResponse = await fetchRepo(app, TOKEN);\n    console.log(`[probe] admin GET /repos/alice/project -> ${fetchResponse.status} (expected 403)`);\n    expect(fetchResponse.status).toBe(403);\n  });\n});",
+      "rationale": "The probe sets up a scenario where Alice is an admin of a private repository. It then revokes her collaborator status using the newly added DELETE route (specific to patch A) and attempts to access the repository again. In the presence of patch A, this should fail with a 403 Forbidden status due to the fresh permission evaluation. If patch B is applied, the permission evaluation might be cached, causing the test to pass unexpectedly. The probe ensures that the permission evaluation is indeed fresh by checking for a 403 status after revocation.",
+      "evalMs": 4822,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\n\nconst TOKEN = \"abcdef123456\";\nconst HASHED_TOKEN = \"8d969eef6ecad3c29a3a629280e686cff8cae5f87895252e583ddc7d32ec57c4\";\nconst NOW = 1672531199000;\n\nconst setup = () => {\n  const deps = memoryDeps();\n  deps.store.createUser({ id: \"usr_1\", username: \"alice\", name: \"Alice\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: NOW });\n  deps.store.createSession({ id: \"ses_1\", userId: \"usr_1\", tokenHash: HASHED_TOKEN, createdAt: NOW, expiresAt: NOW + 86400000 });\n  deps.store.createRepo({ id: \"repo_1\", ownerId: \"usr_1\", name: \"project\", description: \"\", visibility: \"private\", defaultBranch: \"main\", createdAt: NOW, updatedAt: NOW });\n  deps.store.addCollaborator({ repoId: \"repo_1\", userId: \"usr_1\", role: \"admin\", addedBy: \"usr_1\", addedAt: NOW });\n  return { app: createApp(deps), deps };\n};\n\nconst revokeCollaborator = async (app: Hono, token: string) => {\n  return app.request(\"DELETE\", \"/repos/alice/project/collaborators/alice\", {\n    headers: { authorization: `Bearer ${token}` }\n  });\n};\n\nconst fetchRepo = async (app: Hono, token: string) => {\n  return app.request(\"GET\", \"/repos/alice/project\", {\n    headers: { authorization: `Bearer ${token}` }\n  });\n};\n\ndescribe(\"authz.permission-evaluation\", () => {\n  it(\"should enforce permission freshness\", async () => {\n    const { app, deps } = setup();\n    deps.clock.advance(1);\n    const revokeResponse = await revokeCollaborator(app, TOKEN);\n    console.log(`[probe] admin DELETE /repos/alice/project/collaborators/alice -> ${revokeResponse.status} (expected 204)`);\n    if (revokeResponse.status !== 204) {\n      throw new Error(`probe not applicable: revoke route failed (${revokeResponse.status})`);\n    }\n    deps.clock.advance(1);\n    const fetchResponse = await fetchRepo(app, TOKEN);\n    console.log(`[probe] admin GET /repos/alice/project -> ${fetchResponse.status} (expected 403)`);\n    expect(fetchResponse.status).toBe(403);\n  });\n});",
+    "rationale": "The probe sets up a scenario where Alice is an admin of a private repository. It then revokes her collaborator status using the newly added DELETE route (specific to patch A) and attempts to access the repository again. In the presence of patch A, this should fail with a 403 Forbidden status due to the fresh permission evaluation. If patch B is applied, the permission evaluation might be cached, causing the test to pass unexpectedly. The probe ensures that the permission evaluation is indeed fresh by checking for a 403 status after revocation.",
+    "admission": {
+      "admitted": false,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [
+        "n/a-mishandled",
+        "wrong-world-behaviour"
+      ],
+      "detail": [
+        "base: expected n/a, observed fail/fail/fail",
+        "A: expected pass, observed fail/fail/fail",
+        "B: expected n/a, observed fail/fail/fail"
+      ]
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: deps.clock.advance is not a function",
+          "observations": [],
+          "ms": 199,
+          "id": "qwen-1-1791664591449-1:mutantA:0:949c7887-c0b1-44de-bd27-a47c6cd31aaf",
+          "testError": "TypeError: deps.clock.advance is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: deps.clock.advance is not a function",
+          "observations": [],
+          "ms": 199,
+          "id": "qwen-1-1791664591449-1:mutantA:1:c9ef5e13-4026-4776-a191-3caaa4df09c9",
+          "testError": "TypeError: deps.clock.advance is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: deps.clock.advance is not a function",
+          "observations": [],
+          "ms": 199,
+          "id": "qwen-1-1791664591449-1:mutantA:2:562a772e-5165-496b-b915-f8b95c7a85ab",
+          "testError": "TypeError: deps.clock.advance is not a function"
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [
+        {
+          "line": 35,
+          "text": "revokeCollaborator(app, TOKEN)",
+          "boundTo": "revokeResponse",
+          "asserted": false
+        }
+      ],
+      "unasserted": [
+        {
+          "line": 35,
+          "text": "revokeCollaborator(app, TOKEN)"
+        }
+      ],
+      "expectCalls": 1
+    }
+  },
+  "outcome": "rejected",
+  "totals": {
+    "modelMs": 30908,
+    "evalMs": 5096,
+    "promptTokens": 16875,
+    "completionTokens": 834,
+    "wallMs": 37335
+  }
+}

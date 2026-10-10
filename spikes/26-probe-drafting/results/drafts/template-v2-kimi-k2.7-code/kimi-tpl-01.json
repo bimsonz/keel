@@ -1,0 +1,234 @@
+{
+  "model": "@cf/moonshotai/kimi-k2.7-code",
+  "mode": "template",
+  "settings": {
+    "model": "@cf/moonshotai/kimi-k2.7-code",
+    "api": "openai",
+    "temperature": 0.6,
+    "maxTokens": 32000
+  },
+  "startedAt": "2026-10-10T20:52:32.850Z",
+  "promptChars": 66771,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 98684,
+        "content": "{\"owner\": \"owner\", \"subject\": \"subject\", \"setup\": [{\"actor\": \"owner\", \"method\": \"POST\", \"path\": \"/repos\", \"body\": \"{\\\"name\\\":\\\"probe-repo\\\",\\\"visibility\\\":\\\"private\\\"}\", \"expectedStatus\": 201}, {\"actor\": \"owner\", \"method\": \"PUT\", \"path\": \"/repos/owner/probe-repo/collaborators/subject\", \"body\": \"{\\\"role\\\":\\\"admin\\\"}\", \"expectedStatus\": 201}], \"call\": {\"actor\": \"subject\", \"method\": \"GET\", \"path\": \"/repos/owner/probe-repo\", \"body\": \"\", \"expectedStatus\": 200}, \"revoke\": {\"actor\": \"owner\", \"method\": \"DELETE\", \"path\": \"/repos/owner/probe-repo/collaborators/subject\", \"body\": \"\", \"expectedStatus\": 204}, \"callAgain\": {\"actor\": \"subject\", \"method\": \"GET\", \"path\": \"/repos/owner/probe-repo\", \"body\": \"\", \"expectedStatus\": 404}, \"rationale\": \"The subject is added as an admin collaborator on a private repo, so the first read succeeds. After the owner revokes the subject via DELETE /repos/:owner/:repo/collaborators/:username, permission evaluation must be fresh per request: the second read should see the removed collaborator record and return 404. Patch A satisfies this. Patch B caches the subject's admin role per session, so the second read still uses the cached role and returns 200, breaking the premise. In base and B-only worlds the revoke route is absent, producing Hono's default text/plain 404, which reports n/a. If A's revoke did nothing, the subject would still be a collaborator and the second read would also return 200, so the probe fails as required.\"}",
+        "usage": {
+          "promptTokens": 16641,
+          "completionTokens": 3907,
+          "cachedTokens": 576
+        },
+        "finishReason": "stop",
+        "reasoningChars": 14237,
+        "modelReported": "@cf/moonshotai/kimi-k2.7-code",
+        "infraRetries": 0
+      },
+      "probe": "import { describe, expect, it } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\n// Rendered from the freshness template. Slots filled by the model:\n// owner, subject, setup, call, revoke, callAgain.\ntype Step = { actor: \"owner\" | \"subject\"; method: string; path: string; body: string; expectedStatus: number };\nconst OWNER = \"owner\";\nconst SUBJECT = \"subject\";\nconst SETUP: Step[] = [{\"actor\":\"owner\",\"method\":\"POST\",\"path\":\"/repos\",\"body\":\"{\\\"name\\\":\\\"probe-repo\\\",\\\"visibility\\\":\\\"private\\\"}\",\"expectedStatus\":201},{\"actor\":\"owner\",\"method\":\"PUT\",\"path\":\"/repos/owner/probe-repo/collaborators/subject\",\"body\":\"{\\\"role\\\":\\\"admin\\\"}\",\"expectedStatus\":201}];\nconst CALL: Step = {\"actor\":\"subject\",\"method\":\"GET\",\"path\":\"/repos/owner/probe-repo\",\"body\":\"\",\"expectedStatus\":200};\nconst REVOKE: Step = {\"actor\":\"owner\",\"method\":\"DELETE\",\"path\":\"/repos/owner/probe-repo/collaborators/subject\",\"body\":\"\",\"expectedStatus\":204};\nconst CALL_AGAIN: Step = {\"actor\":\"subject\",\"method\":\"GET\",\"path\":\"/repos/owner/probe-repo\",\"body\":\"\",\"expectedStatus\":404};\nconst PASSWORD = \"template password 0001\";\n\ndescribe(\"freshness\", () => {\n  it(\"call, revoke, call again on the same session\", async () => {\n    const app = createApp({ store: new MemoryStore(), clock: new ManualClock(Date.UTC(2026, 0, 1)), ids: sequentialIds() });\n    const send = (method: string, path: string, token: string | undefined, body: string) =>\n      app.request(path, {\n        method,\n        headers: {\n          ...(token === undefined ? {} : { authorization: `Bearer ${token}` }),\n          ...(body === \"\" ? {} : { \"content-type\": \"application/json\" }),\n        },\n        body: body === \"\" ? null : body,\n      });\n    const signIn = async (username: string): Promise<string> => {\n      expect((await send(\"POST\", \"/users\", undefined, JSON.stringify({ username, password: PASSWORD }))).status).toBe(201);\n      const res = await send(\"POST\", \"/sessions\", undefined, JSON.stringify({ username, password: PASSWORD }));\n      expect(res.status).toBe(201);\n      return ((await res.json()) as { token: string }).token;\n    };\n    const tokens = { owner: await signIn(OWNER), subject: await signIn(SUBJECT) };\n    const name = (s: Step) => (s.actor === \"owner\" ? OWNER : SUBJECT);\n    const run = async (s: Step, observe: boolean) => {\n      const res = await send(s.method, s.path, tokens[s.actor], s.body);\n      if (observe) console.log(`[probe] ${name(s)} ${s.method} ${s.path} -> ${res.status} (expected ${s.expectedStatus})`);\n      return res;\n    };\n\n    for (const s of SETUP) expect((await run(s, false)).status).toBe(s.expectedStatus);\n    expect((await run(CALL, true)).status).toBe(CALL.expectedStatus);\n\n    const revoke = await run(REVOKE, true);\n    const absent =\n      revoke.status === 404 &&\n      (revoke.headers.get(\"content-type\") ?? \"\").startsWith(\"text/plain\") &&\n      (await revoke.clone().text()) === \"404 Not Found\";\n    if (absent) throw new Error(\"probe not applicable: revoke route absent\");\n    expect(revoke.status).toBe(REVOKE.expectedStatus);\n\n    expect((await run(CALL_AGAIN, true)).status).toBe(CALL_AGAIN.expectedStatus);\n  });\n});\n",
+      "rationale": "The subject is added as an admin collaborator on a private repo, so the first read succeeds. After the owner revokes the subject via DELETE /repos/:owner/:repo/collaborators/:username, permission evaluation must be fresh per request: the second read should see the removed collaborator record and return 404. Patch A satisfies this. Patch B caches the subject's admin role per session, so the second read still uses the cached role and returns 200, breaking the premise. In base and B-only worlds the revoke route is absent, producing Hono's default text/plain 404, which reports n/a. If A's revoke did nothing, the subject would still be a collaborator and the second read would also return 200, so the probe fails as required.",
+      "slots": {
+        "owner": "owner",
+        "subject": "subject",
+        "setup": [
+          {
+            "actor": "owner",
+            "method": "POST",
+            "path": "/repos",
+            "body": "{\"name\":\"probe-repo\",\"visibility\":\"private\"}",
+            "expectedStatus": 201
+          },
+          {
+            "actor": "owner",
+            "method": "PUT",
+            "path": "/repos/owner/probe-repo/collaborators/subject",
+            "body": "{\"role\":\"admin\"}",
+            "expectedStatus": 201
+          }
+        ],
+        "call": {
+          "actor": "subject",
+          "method": "GET",
+          "path": "/repos/owner/probe-repo",
+          "body": "",
+          "expectedStatus": 200
+        },
+        "revoke": {
+          "actor": "owner",
+          "method": "DELETE",
+          "path": "/repos/owner/probe-repo/collaborators/subject",
+          "body": "",
+          "expectedStatus": 204
+        },
+        "callAgain": {
+          "actor": "subject",
+          "method": "GET",
+          "path": "/repos/owner/probe-repo",
+          "body": "",
+          "expectedStatus": 404
+        },
+        "rationale": "The subject is added as an admin collaborator on a private repo, so the first read succeeds. After the owner revokes the subject via DELETE /repos/:owner/:repo/collaborators/:username, permission evaluation must be fresh per request: the second read should see the removed collaborator record and return 404. Patch A satisfies this. Patch B caches the subject's admin role per session, so the second read still uses the cached role and returns 200, breaking the premise. In base and B-only worlds the revoke route is absent, producing Hono's default text/plain 404, which reports n/a. If A's revoke did nothing, the subject would still be a collaborator and the second read would also return 200, so the probe fails as required."
+      },
+      "evalMs": 3197,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "final": {
+    "probe": "import { describe, expect, it } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\n// Rendered from the freshness template. Slots filled by the model:\n// owner, subject, setup, call, revoke, callAgain.\ntype Step = { actor: \"owner\" | \"subject\"; method: string; path: string; body: string; expectedStatus: number };\nconst OWNER = \"owner\";\nconst SUBJECT = \"subject\";\nconst SETUP: Step[] = [{\"actor\":\"owner\",\"method\":\"POST\",\"path\":\"/repos\",\"body\":\"{\\\"name\\\":\\\"probe-repo\\\",\\\"visibility\\\":\\\"private\\\"}\",\"expectedStatus\":201},{\"actor\":\"owner\",\"method\":\"PUT\",\"path\":\"/repos/owner/probe-repo/collaborators/subject\",\"body\":\"{\\\"role\\\":\\\"admin\\\"}\",\"expectedStatus\":201}];\nconst CALL: Step = {\"actor\":\"subject\",\"method\":\"GET\",\"path\":\"/repos/owner/probe-repo\",\"body\":\"\",\"expectedStatus\":200};\nconst REVOKE: Step = {\"actor\":\"owner\",\"method\":\"DELETE\",\"path\":\"/repos/owner/probe-repo/collaborators/subject\",\"body\":\"\",\"expectedStatus\":204};\nconst CALL_AGAIN: Step = {\"actor\":\"subject\",\"method\":\"GET\",\"path\":\"/repos/owner/probe-repo\",\"body\":\"\",\"expectedStatus\":404};\nconst PASSWORD = \"template password 0001\";\n\ndescribe(\"freshness\", () => {\n  it(\"call, revoke, call again on the same session\", async () => {\n    const app = createApp({ store: new MemoryStore(), clock: new ManualClock(Date.UTC(2026, 0, 1)), ids: sequentialIds() });\n    const send = (method: string, path: string, token: string | undefined, body: string) =>\n      app.request(path, {\n        method,\n        headers: {\n          ...(token === undefined ? {} : { authorization: `Bearer ${token}` }),\n          ...(body === \"\" ? {} : { \"content-type\": \"application/json\" }),\n        },\n        body: body === \"\" ? null : body,\n      });\n    const signIn = async (username: string): Promise<string> => {\n      expect((await send(\"POST\", \"/users\", undefined, JSON.stringify({ username, password: PASSWORD }))).status).toBe(201);\n      const res = await send(\"POST\", \"/sessions\", undefined, JSON.stringify({ username, password: PASSWORD }));\n      expect(res.status).toBe(201);\n      return ((await res.json()) as { token: string }).token;\n    };\n    const tokens = { owner: await signIn(OWNER), subject: await signIn(SUBJECT) };\n    const name = (s: Step) => (s.actor === \"owner\" ? OWNER : SUBJECT);\n    const run = async (s: Step, observe: boolean) => {\n      const res = await send(s.method, s.path, tokens[s.actor], s.body);\n      if (observe) console.log(`[probe] ${name(s)} ${s.method} ${s.path} -> ${res.status} (expected ${s.expectedStatus})`);\n      return res;\n    };\n\n    for (const s of SETUP) expect((await run(s, false)).status).toBe(s.expectedStatus);\n    expect((await run(CALL, true)).status).toBe(CALL.expectedStatus);\n\n    const revoke = await run(REVOKE, true);\n    const absent =\n      revoke.status === 404 &&\n      (revoke.headers.get(\"content-type\") ?? \"\").startsWith(\"text/plain\") &&\n      (await revoke.clone().text()) === \"404 Not Found\";\n    if (absent) throw new Error(\"probe not applicable: revoke route absent\");\n    expect(revoke.status).toBe(REVOKE.expectedStatus);\n\n    expect((await run(CALL_AGAIN, true)).status).toBe(CALL_AGAIN.expectedStatus);\n  });\n});\n",
+    "rationale": "The subject is added as an admin collaborator on a private repo, so the first read succeeds. After the owner revokes the subject via DELETE /repos/:owner/:repo/collaborators/:username, permission evaluation must be fresh per request: the second read should see the removed collaborator record and return 404. Patch A satisfies this. Patch B caches the subject's admin role per session, so the second read still uses the cached role and returns 200, breaking the premise. In base and B-only worlds the revoke route is absent, producing Hono's default text/plain 404, which reports n/a. If A's revoke did nothing, the subject would still be a collaborator and the second read would also return 200, so the probe fails as required.",
+    "admission": {
+      "admitted": true,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [],
+      "detail": []
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "subject GET /repos/owner/probe-repo -> 200 (expected 404)",
+          "observations": [
+            "subject GET /repos/owner/probe-repo -> 200 (expected 200)",
+            "owner DELETE /repos/owner/probe-repo/collaborators/subject -> 204 (expected 204)",
+            "subject GET /repos/owner/probe-repo -> 200 (expected 404)"
+          ],
+          "ms": 277,
+          "id": "kimi-tpl-1-1791665552410-1:mutantA:0:88e5789a-8b62-48eb-a396-8f4d6b20209f",
+          "testError": "AssertionError: expected 200 to be 404 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "subject GET /repos/owner/probe-repo -> 200 (expected 404)",
+          "observations": [
+            "subject GET /repos/owner/probe-repo -> 200 (expected 200)",
+            "owner DELETE /repos/owner/probe-repo/collaborators/subject -> 204 (expected 204)",
+            "subject GET /repos/owner/probe-repo -> 200 (expected 404)"
+          ],
+          "ms": 275,
+          "id": "kimi-tpl-1-1791665552410-1:mutantA:1:0195b76d-0bb4-4e0a-a9ea-a68f9054eb6b",
+          "testError": "AssertionError: expected 200 to be 404 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "subject GET /repos/owner/probe-repo -> 200 (expected 404)",
+          "observations": [
+            "subject GET /repos/owner/probe-repo -> 200 (expected 200)",
+            "owner DELETE /repos/owner/probe-repo/collaborators/subject -> 204 (expected 204)",
+            "subject GET /repos/owner/probe-repo -> 200 (expected 404)"
+          ],
+          "ms": 278,
+          "id": "kimi-tpl-1-1791665552410-1:mutantA:2:c0c62e29-a772-4f36-8fe0-9bafb5731709",
+          "testError": "AssertionError: expected 200 to be 404 // Object.is equality"
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [],
+      "unasserted": [],
+      "expectCalls": 6
+    }
+  },
+  "outcome": "admitted",
+  "totals": {
+    "modelMs": 98684,
+    "evalMs": 3575,
+    "promptTokens": 16641,
+    "completionTokens": 3907,
+    "wallMs": 104264
+  }
+}

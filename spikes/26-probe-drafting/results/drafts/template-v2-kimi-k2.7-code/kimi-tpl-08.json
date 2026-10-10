@@ -1,0 +1,234 @@
+{
+  "model": "@cf/moonshotai/kimi-k2.7-code",
+  "mode": "template",
+  "settings": {
+    "model": "@cf/moonshotai/kimi-k2.7-code",
+    "api": "openai",
+    "temperature": 0.6,
+    "maxTokens": 32000
+  },
+  "startedAt": "2026-10-10T20:53:41.777Z",
+  "promptChars": 66771,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 105304,
+        "content": "{\n  \"owner\": \"owner\",\n  \"subject\": \"subject\",\n  \"setup\": [\n    {\n      \"actor\": \"owner\",\n      \"method\": \"POST\",\n      \"path\": \"/repos\",\n      \"body\": \"{\\\"name\\\":\\\"probe-repo\\\",\\\"visibility\\\":\\\"private\\\"}\",\n      \"expectedStatus\": 201\n    },\n    {\n      \"actor\": \"owner\",\n      \"method\": \"PUT\",\n      \"path\": \"/repos/owner/probe-repo/collaborators/subject\",\n      \"body\": \"{\\\"role\\\":\\\"read\\\"}\",\n      \"expectedStatus\": 201\n    }\n  ],\n  \"call\": {\n    \"actor\": \"subject\",\n    \"method\": \"GET\",\n    \"path\": \"/repos/owner/probe-repo\",\n    \"body\": \"\",\n    \"expectedStatus\": 200\n  },\n  \"revoke\": {\n    \"actor\": \"owner\",\n    \"method\": \"DELETE\",\n    \"path\": \"/repos/owner/probe-repo/collaborators/subject\",\n    \"body\": \"\",\n    \"expectedStatus\": 204\n  },\n  \"callAgain\": {\n    \"actor\": \"subject\",\n    \"method\": \"GET\",\n    \"path\": \"/repos/owner/probe-repo\",\n    \"body\": \"\",\n    \"expectedStatus\": 404\n  },\n  \"rationale\": \"With fresh per-request evaluation (world A), revoking the subject's read role makes the next GET on the private repo return 404. With B's per-session role cache (world A+B), the subject's read role from the first GET is reused, so the same call returns 200, exposing the stale-permission bug. The DELETE route is absent in base and B, so the probe reports n/a there. If the revoke did nothing, the subject would still see the repo and callAgain would get 200, causing the probe to fail.\"\n}",
+        "usage": {
+          "promptTokens": 16641,
+          "completionTokens": 3575,
+          "cachedTokens": 16640
+        },
+        "finishReason": "stop",
+        "reasoningChars": 14161,
+        "modelReported": "@cf/moonshotai/kimi-k2.7-code",
+        "infraRetries": 0
+      },
+      "probe": "import { describe, expect, it } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\n// Rendered from the freshness template. Slots filled by the model:\n// owner, subject, setup, call, revoke, callAgain.\ntype Step = { actor: \"owner\" | \"subject\"; method: string; path: string; body: string; expectedStatus: number };\nconst OWNER = \"owner\";\nconst SUBJECT = \"subject\";\nconst SETUP: Step[] = [{\"actor\":\"owner\",\"method\":\"POST\",\"path\":\"/repos\",\"body\":\"{\\\"name\\\":\\\"probe-repo\\\",\\\"visibility\\\":\\\"private\\\"}\",\"expectedStatus\":201},{\"actor\":\"owner\",\"method\":\"PUT\",\"path\":\"/repos/owner/probe-repo/collaborators/subject\",\"body\":\"{\\\"role\\\":\\\"read\\\"}\",\"expectedStatus\":201}];\nconst CALL: Step = {\"actor\":\"subject\",\"method\":\"GET\",\"path\":\"/repos/owner/probe-repo\",\"body\":\"\",\"expectedStatus\":200};\nconst REVOKE: Step = {\"actor\":\"owner\",\"method\":\"DELETE\",\"path\":\"/repos/owner/probe-repo/collaborators/subject\",\"body\":\"\",\"expectedStatus\":204};\nconst CALL_AGAIN: Step = {\"actor\":\"subject\",\"method\":\"GET\",\"path\":\"/repos/owner/probe-repo\",\"body\":\"\",\"expectedStatus\":404};\nconst PASSWORD = \"template password 0001\";\n\ndescribe(\"freshness\", () => {\n  it(\"call, revoke, call again on the same session\", async () => {\n    const app = createApp({ store: new MemoryStore(), clock: new ManualClock(Date.UTC(2026, 0, 1)), ids: sequentialIds() });\n    const send = (method: string, path: string, token: string | undefined, body: string) =>\n      app.request(path, {\n        method,\n        headers: {\n          ...(token === undefined ? {} : { authorization: `Bearer ${token}` }),\n          ...(body === \"\" ? {} : { \"content-type\": \"application/json\" }),\n        },\n        body: body === \"\" ? null : body,\n      });\n    const signIn = async (username: string): Promise<string> => {\n      expect((await send(\"POST\", \"/users\", undefined, JSON.stringify({ username, password: PASSWORD }))).status).toBe(201);\n      const res = await send(\"POST\", \"/sessions\", undefined, JSON.stringify({ username, password: PASSWORD }));\n      expect(res.status).toBe(201);\n      return ((await res.json()) as { token: string }).token;\n    };\n    const tokens = { owner: await signIn(OWNER), subject: await signIn(SUBJECT) };\n    const name = (s: Step) => (s.actor === \"owner\" ? OWNER : SUBJECT);\n    const run = async (s: Step, observe: boolean) => {\n      const res = await send(s.method, s.path, tokens[s.actor], s.body);\n      if (observe) console.log(`[probe] ${name(s)} ${s.method} ${s.path} -> ${res.status} (expected ${s.expectedStatus})`);\n      return res;\n    };\n\n    for (const s of SETUP) expect((await run(s, false)).status).toBe(s.expectedStatus);\n    expect((await run(CALL, true)).status).toBe(CALL.expectedStatus);\n\n    const revoke = await run(REVOKE, true);\n    const absent =\n      revoke.status === 404 &&\n      (revoke.headers.get(\"content-type\") ?? \"\").startsWith(\"text/plain\") &&\n      (await revoke.clone().text()) === \"404 Not Found\";\n    if (absent) throw new Error(\"probe not applicable: revoke route absent\");\n    expect(revoke.status).toBe(REVOKE.expectedStatus);\n\n    expect((await run(CALL_AGAIN, true)).status).toBe(CALL_AGAIN.expectedStatus);\n  });\n});\n",
+      "rationale": "With fresh per-request evaluation (world A), revoking the subject's read role makes the next GET on the private repo return 404. With B's per-session role cache (world A+B), the subject's read role from the first GET is reused, so the same call returns 200, exposing the stale-permission bug. The DELETE route is absent in base and B, so the probe reports n/a there. If the revoke did nothing, the subject would still see the repo and callAgain would get 200, causing the probe to fail.",
+      "slots": {
+        "owner": "owner",
+        "subject": "subject",
+        "setup": [
+          {
+            "actor": "owner",
+            "method": "POST",
+            "path": "/repos",
+            "body": "{\"name\":\"probe-repo\",\"visibility\":\"private\"}",
+            "expectedStatus": 201
+          },
+          {
+            "actor": "owner",
+            "method": "PUT",
+            "path": "/repos/owner/probe-repo/collaborators/subject",
+            "body": "{\"role\":\"read\"}",
+            "expectedStatus": 201
+          }
+        ],
+        "call": {
+          "actor": "subject",
+          "method": "GET",
+          "path": "/repos/owner/probe-repo",
+          "body": "",
+          "expectedStatus": 200
+        },
+        "revoke": {
+          "actor": "owner",
+          "method": "DELETE",
+          "path": "/repos/owner/probe-repo/collaborators/subject",
+          "body": "",
+          "expectedStatus": 204
+        },
+        "callAgain": {
+          "actor": "subject",
+          "method": "GET",
+          "path": "/repos/owner/probe-repo",
+          "body": "",
+          "expectedStatus": 404
+        },
+        "rationale": "With fresh per-request evaluation (world A), revoking the subject's read role makes the next GET on the private repo return 404. With B's per-session role cache (world A+B), the subject's read role from the first GET is reused, so the same call returns 200, exposing the stale-permission bug. The DELETE route is absent in base and B, so the probe reports n/a there. If the revoke did nothing, the subject would still see the repo and callAgain would get 200, causing the probe to fail."
+      },
+      "evalMs": 7272,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "final": {
+    "probe": "import { describe, expect, it } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\n// Rendered from the freshness template. Slots filled by the model:\n// owner, subject, setup, call, revoke, callAgain.\ntype Step = { actor: \"owner\" | \"subject\"; method: string; path: string; body: string; expectedStatus: number };\nconst OWNER = \"owner\";\nconst SUBJECT = \"subject\";\nconst SETUP: Step[] = [{\"actor\":\"owner\",\"method\":\"POST\",\"path\":\"/repos\",\"body\":\"{\\\"name\\\":\\\"probe-repo\\\",\\\"visibility\\\":\\\"private\\\"}\",\"expectedStatus\":201},{\"actor\":\"owner\",\"method\":\"PUT\",\"path\":\"/repos/owner/probe-repo/collaborators/subject\",\"body\":\"{\\\"role\\\":\\\"read\\\"}\",\"expectedStatus\":201}];\nconst CALL: Step = {\"actor\":\"subject\",\"method\":\"GET\",\"path\":\"/repos/owner/probe-repo\",\"body\":\"\",\"expectedStatus\":200};\nconst REVOKE: Step = {\"actor\":\"owner\",\"method\":\"DELETE\",\"path\":\"/repos/owner/probe-repo/collaborators/subject\",\"body\":\"\",\"expectedStatus\":204};\nconst CALL_AGAIN: Step = {\"actor\":\"subject\",\"method\":\"GET\",\"path\":\"/repos/owner/probe-repo\",\"body\":\"\",\"expectedStatus\":404};\nconst PASSWORD = \"template password 0001\";\n\ndescribe(\"freshness\", () => {\n  it(\"call, revoke, call again on the same session\", async () => {\n    const app = createApp({ store: new MemoryStore(), clock: new ManualClock(Date.UTC(2026, 0, 1)), ids: sequentialIds() });\n    const send = (method: string, path: string, token: string | undefined, body: string) =>\n      app.request(path, {\n        method,\n        headers: {\n          ...(token === undefined ? {} : { authorization: `Bearer ${token}` }),\n          ...(body === \"\" ? {} : { \"content-type\": \"application/json\" }),\n        },\n        body: body === \"\" ? null : body,\n      });\n    const signIn = async (username: string): Promise<string> => {\n      expect((await send(\"POST\", \"/users\", undefined, JSON.stringify({ username, password: PASSWORD }))).status).toBe(201);\n      const res = await send(\"POST\", \"/sessions\", undefined, JSON.stringify({ username, password: PASSWORD }));\n      expect(res.status).toBe(201);\n      return ((await res.json()) as { token: string }).token;\n    };\n    const tokens = { owner: await signIn(OWNER), subject: await signIn(SUBJECT) };\n    const name = (s: Step) => (s.actor === \"owner\" ? OWNER : SUBJECT);\n    const run = async (s: Step, observe: boolean) => {\n      const res = await send(s.method, s.path, tokens[s.actor], s.body);\n      if (observe) console.log(`[probe] ${name(s)} ${s.method} ${s.path} -> ${res.status} (expected ${s.expectedStatus})`);\n      return res;\n    };\n\n    for (const s of SETUP) expect((await run(s, false)).status).toBe(s.expectedStatus);\n    expect((await run(CALL, true)).status).toBe(CALL.expectedStatus);\n\n    const revoke = await run(REVOKE, true);\n    const absent =\n      revoke.status === 404 &&\n      (revoke.headers.get(\"content-type\") ?? \"\").startsWith(\"text/plain\") &&\n      (await revoke.clone().text()) === \"404 Not Found\";\n    if (absent) throw new Error(\"probe not applicable: revoke route absent\");\n    expect(revoke.status).toBe(REVOKE.expectedStatus);\n\n    expect((await run(CALL_AGAIN, true)).status).toBe(CALL_AGAIN.expectedStatus);\n  });\n});\n",
+    "rationale": "With fresh per-request evaluation (world A), revoking the subject's read role makes the next GET on the private repo return 404. With B's per-session role cache (world A+B), the subject's read role from the first GET is reused, so the same call returns 200, exposing the stale-permission bug. The DELETE route is absent in base and B, so the probe reports n/a there. If the revoke did nothing, the subject would still see the repo and callAgain would get 200, causing the probe to fail.",
+    "admission": {
+      "admitted": true,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [],
+      "detail": []
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "subject GET /repos/owner/probe-repo -> 200 (expected 404)",
+          "observations": [
+            "subject GET /repos/owner/probe-repo -> 200 (expected 200)",
+            "owner DELETE /repos/owner/probe-repo/collaborators/subject -> 204 (expected 204)",
+            "subject GET /repos/owner/probe-repo -> 200 (expected 404)"
+          ],
+          "ms": 357,
+          "id": "kimi-tpl-8-1791665621603-1:mutantA:0:cff52616-e7c1-49b7-b507-540ff5cb5d5c",
+          "testError": "AssertionError: expected 200 to be 404 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "subject GET /repos/owner/probe-repo -> 200 (expected 404)",
+          "observations": [
+            "subject GET /repos/owner/probe-repo -> 200 (expected 200)",
+            "owner DELETE /repos/owner/probe-repo/collaborators/subject -> 204 (expected 204)",
+            "subject GET /repos/owner/probe-repo -> 200 (expected 404)"
+          ],
+          "ms": 359,
+          "id": "kimi-tpl-8-1791665621603-1:mutantA:1:03f7e366-634a-48a2-ba51-fa65574dd56d",
+          "testError": "AssertionError: expected 200 to be 404 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "subject GET /repos/owner/probe-repo -> 200 (expected 404)",
+          "observations": [
+            "subject GET /repos/owner/probe-repo -> 200 (expected 200)",
+            "owner DELETE /repos/owner/probe-repo/collaborators/subject -> 204 (expected 204)",
+            "subject GET /repos/owner/probe-repo -> 200 (expected 404)"
+          ],
+          "ms": 350,
+          "id": "kimi-tpl-8-1791665621603-1:mutantA:2:7d1da161-8448-473b-870b-1e52c84ec72f",
+          "testError": "AssertionError: expected 200 to be 404 // Object.is equality"
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [],
+      "unasserted": [],
+      "expectCalls": 6
+    }
+  },
+  "outcome": "admitted",
+  "totals": {
+    "modelMs": 105304,
+    "evalMs": 7730,
+    "promptTokens": 16641,
+    "completionTokens": 3575,
+    "wallMs": 114956
+  }
+}

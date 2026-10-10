@@ -1,0 +1,198 @@
+{
+  "model": "@cf/moonshotai/kimi-k2.7-code",
+  "settings": {
+    "model": "@cf/moonshotai/kimi-k2.7-code",
+    "api": "openai",
+    "temperature": 0.6,
+    "maxTokens": 16000
+  },
+  "startedAt": "2026-10-10T20:25:33.697Z",
+  "promptChars": 55001,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 233868,
+        "content": "{\"files\": {\"probe.test.ts\": \"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { MemoryStore } from \\\"../src/store/memory.ts\\\";\\nimport { ManualClock } from \\\"../src/clock.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\n\\nit(\\\"permission evaluation stays fresh per request\\\", async () => {\\n  const app = createApp({\\n    store: new MemoryStore(),\\n    clock: new ManualClock(1000),\\n    ids: sequentialIds(),\\n  });\\n\\n  async function request(\\n    actor: string,\\n    method: string,\\n    path: string,\\n    body?: unknown,\\n    token?: string,\\n    expected?: number,\\n  ): Promise<Response> {\\n    const headers: Record<string, string> = {};\\n    if (token !== undefined) {\\n      headers.authorization = `Bearer ${token}`;\\n    }\\n    if (body !== undefined) {\\n      headers[\\\"content-type\\\"] = \\\"application/json\\\";\\n    }\\n    const init: RequestInit = { method, headers };\\n    if (body !== undefined) {\\n      init.body = JSON.stringify(body);\\n    }\\n    const res = await app.request(path, init);\\n    console.log(`[probe] ${actor} ${method} ${path} -> ${res.status} (expected ${expected})`);\\n    return res;\\n  }\\n\\n  // Create the actors.\\n  expect((await request(\\\"owner\\\", \\\"POST\\\", \\\"/users\\\", { username: \\\"owner\\\", password: \\\"ownerpass\\\" }, undefined, 201)).status).toBe(201);\\n  expect((await request(\\\"collab\\\", \\\"POST\\\", \\\"/users\\\", { username: \\\"collab\\\", password: \\\"collabpass\\\" }, undefined, 201)).status).toBe(201);\\n  expect((await request(\\\"victim\\\", \\\"POST\\\", \\\"/users\\\", { username: \\\"victim\\\", password: \\\"victimpass\\\" }, undefined, 201)).status).toBe(201);\\n\\n  const ownerAuth = await (await request(\\\"owner\\\", \\\"POST\\\", \\\"/sessions\\\", { username: \\\"owner\\\", password: \\\"ownerpass\\\" }, undefined, 201)).json() as { token: string };\\n  const collabAuth = await (await request(\\\"collab\\\", \\\"POST\\\", \\\"/sessions\\\", { username: \\\"collab\\\", password: \\\"collabpass\\\" }, undefined, 201)).json() as { token: string };\\n\\n  // Create a public repo so visibility never hides the repository.\\n  expect((await request(\\\"owner\\\", \\\"POST\\\", \\\"/repos\\\", { name: \\\"repo\\\", visibility: \\\"public\\\" }, ownerAuth.token, 201)).status).toBe(201);\\n\\n  // Make collab an admin; this route exists in all worlds.\\n  expect((await request(\\\"owner\\\", \\\"PUT\\\", \\\"/repos/owner/repo/collaborators/collab\\\", { role: \\\"admin\\\" }, ownerAuth.token, 201)).status).toBe(201);\\n\\n  // Warm any per-session role cache.\\n  expect((await request(\\\"collab\\\", \\\"GET\\\", \\\"/repos/owner/repo\\\", undefined, collabAuth.token, 200)).status).toBe(200);\\n\\n  // A's revoke route: DELETE /repos/:owner/:repo/collaborators/:username\\n  const revokeRes = await request(\\\"owner\\\", \\\"DELETE\\\", \\\"/repos/owner/repo/collaborators/collab\\\", undefined, ownerAuth.token, 204);\\n\\n  if (revokeRes.status === 404) {\\n    const ct = revokeRes.headers.get(\\\"content-type\\\") ?? \\\"\\\";\\n    const body = await revokeRes.text();\\n    if (ct.includes(\\\"text/plain\\\") && body === \\\"404 Not Found\\\") {\\n      throw new Error(\\\"probe not applicable: DELETE revoke route is absent\\\");\\n    }\\n  }\\n\\n  expect(revokeRes.status).toBe(204);\\n\\n  // With per-request evaluation the revoked session must be denied.\\n  const afterRes = await request(\\\"collab\\\", \\\"PUT\\\", \\\"/repos/owner/repo/collaborators/victim\\\", { role: \\\"read\\\" }, collabAuth.token, 403);\\n  expect(afterRes.status).toBe(403);\\n});\\n\"}, \"rationale\": \"The probe sets up a public repository, grants a collaborator admin access, and performs a repo read with that collaborator to warm any per-session role cache. It then uses A's DELETE revoke route to remove the collaborator and, in the same session, has the revoked collaborator attempt an admin-only action. In world A, requirePermission evaluates roles fresh on every request, so the post-revoke request is denied with 403. In world A+B, B's per-session role cache still holds the stale admin role, so the same request is allowed with 201, causing the 403 assertion to fail. The probe reports n/a when the revoke route is absent by checking for Hono's default text/plain 404 Not Found response, and it also fails if A's revoke does nothing because the collaborator would then still be authorized in world A.\"}",
+        "usage": {
+          "promptTokens": 13801,
+          "completionTokens": 14741
+        },
+        "finishReason": "stop",
+        "reasoningChars": 56862,
+        "modelReported": "@cf/moonshotai/kimi-k2.7-code",
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\n\nit(\"permission evaluation stays fresh per request\", async () => {\n  const app = createApp({\n    store: new MemoryStore(),\n    clock: new ManualClock(1000),\n    ids: sequentialIds(),\n  });\n\n  async function request(\n    actor: string,\n    method: string,\n    path: string,\n    body?: unknown,\n    token?: string,\n    expected?: number,\n  ): Promise<Response> {\n    const headers: Record<string, string> = {};\n    if (token !== undefined) {\n      headers.authorization = `Bearer ${token}`;\n    }\n    if (body !== undefined) {\n      headers[\"content-type\"] = \"application/json\";\n    }\n    const init: RequestInit = { method, headers };\n    if (body !== undefined) {\n      init.body = JSON.stringify(body);\n    }\n    const res = await app.request(path, init);\n    console.log(`[probe] ${actor} ${method} ${path} -> ${res.status} (expected ${expected})`);\n    return res;\n  }\n\n  // Create the actors.\n  expect((await request(\"owner\", \"POST\", \"/users\", { username: \"owner\", password: \"ownerpass\" }, undefined, 201)).status).toBe(201);\n  expect((await request(\"collab\", \"POST\", \"/users\", { username: \"collab\", password: \"collabpass\" }, undefined, 201)).status).toBe(201);\n  expect((await request(\"victim\", \"POST\", \"/users\", { username: \"victim\", password: \"victimpass\" }, undefined, 201)).status).toBe(201);\n\n  const ownerAuth = await (await request(\"owner\", \"POST\", \"/sessions\", { username: \"owner\", password: \"ownerpass\" }, undefined, 201)).json() as { token: string };\n  const collabAuth = await (await request(\"collab\", \"POST\", \"/sessions\", { username: \"collab\", password: \"collabpass\" }, undefined, 201)).json() as { token: string };\n\n  // Create a public repo so visibility never hides the repository.\n  expect((await request(\"owner\", \"POST\", \"/repos\", { name: \"repo\", visibility: \"public\" }, ownerAuth.token, 201)).status).toBe(201);\n\n  // Make collab an admin; this route exists in all worlds.\n  expect((await request(\"owner\", \"PUT\", \"/repos/owner/repo/collaborators/collab\", { role: \"admin\" }, ownerAuth.token, 201)).status).toBe(201);\n\n  // Warm any per-session role cache.\n  expect((await request(\"collab\", \"GET\", \"/repos/owner/repo\", undefined, collabAuth.token, 200)).status).toBe(200);\n\n  // A's revoke route: DELETE /repos/:owner/:repo/collaborators/:username\n  const revokeRes = await request(\"owner\", \"DELETE\", \"/repos/owner/repo/collaborators/collab\", undefined, ownerAuth.token, 204);\n\n  if (revokeRes.status === 404) {\n    const ct = revokeRes.headers.get(\"content-type\") ?? \"\";\n    const body = await revokeRes.text();\n    if (ct.includes(\"text/plain\") && body === \"404 Not Found\") {\n      throw new Error(\"probe not applicable: DELETE revoke route is absent\");\n    }\n  }\n\n  expect(revokeRes.status).toBe(204);\n\n  // With per-request evaluation the revoked session must be denied.\n  const afterRes = await request(\"collab\", \"PUT\", \"/repos/owner/repo/collaborators/victim\", { role: \"read\" }, collabAuth.token, 403);\n  expect(afterRes.status).toBe(403);\n});\n",
+      "rationale": "The probe sets up a public repository, grants a collaborator admin access, and performs a repo read with that collaborator to warm any per-session role cache. It then uses A's DELETE revoke route to remove the collaborator and, in the same session, has the revoked collaborator attempt an admin-only action. In world A, requirePermission evaluates roles fresh on every request, so the post-revoke request is denied with 403. In world A+B, B's per-session role cache still holds the stale admin role, so the same request is allowed with 201, causing the 403 assertion to fail. The probe reports n/a when the revoke route is absent by checking for Hono's default text/plain 404 Not Found response, and it also fails if A's revoke does nothing because the collaborator would then still be authorized in world A.",
+      "evalMs": 4804,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\n\nit(\"permission evaluation stays fresh per request\", async () => {\n  const app = createApp({\n    store: new MemoryStore(),\n    clock: new ManualClock(1000),\n    ids: sequentialIds(),\n  });\n\n  async function request(\n    actor: string,\n    method: string,\n    path: string,\n    body?: unknown,\n    token?: string,\n    expected?: number,\n  ): Promise<Response> {\n    const headers: Record<string, string> = {};\n    if (token !== undefined) {\n      headers.authorization = `Bearer ${token}`;\n    }\n    if (body !== undefined) {\n      headers[\"content-type\"] = \"application/json\";\n    }\n    const init: RequestInit = { method, headers };\n    if (body !== undefined) {\n      init.body = JSON.stringify(body);\n    }\n    const res = await app.request(path, init);\n    console.log(`[probe] ${actor} ${method} ${path} -> ${res.status} (expected ${expected})`);\n    return res;\n  }\n\n  // Create the actors.\n  expect((await request(\"owner\", \"POST\", \"/users\", { username: \"owner\", password: \"ownerpass\" }, undefined, 201)).status).toBe(201);\n  expect((await request(\"collab\", \"POST\", \"/users\", { username: \"collab\", password: \"collabpass\" }, undefined, 201)).status).toBe(201);\n  expect((await request(\"victim\", \"POST\", \"/users\", { username: \"victim\", password: \"victimpass\" }, undefined, 201)).status).toBe(201);\n\n  const ownerAuth = await (await request(\"owner\", \"POST\", \"/sessions\", { username: \"owner\", password: \"ownerpass\" }, undefined, 201)).json() as { token: string };\n  const collabAuth = await (await request(\"collab\", \"POST\", \"/sessions\", { username: \"collab\", password: \"collabpass\" }, undefined, 201)).json() as { token: string };\n\n  // Create a public repo so visibility never hides the repository.\n  expect((await request(\"owner\", \"POST\", \"/repos\", { name: \"repo\", visibility: \"public\" }, ownerAuth.token, 201)).status).toBe(201);\n\n  // Make collab an admin; this route exists in all worlds.\n  expect((await request(\"owner\", \"PUT\", \"/repos/owner/repo/collaborators/collab\", { role: \"admin\" }, ownerAuth.token, 201)).status).toBe(201);\n\n  // Warm any per-session role cache.\n  expect((await request(\"collab\", \"GET\", \"/repos/owner/repo\", undefined, collabAuth.token, 200)).status).toBe(200);\n\n  // A's revoke route: DELETE /repos/:owner/:repo/collaborators/:username\n  const revokeRes = await request(\"owner\", \"DELETE\", \"/repos/owner/repo/collaborators/collab\", undefined, ownerAuth.token, 204);\n\n  if (revokeRes.status === 404) {\n    const ct = revokeRes.headers.get(\"content-type\") ?? \"\";\n    const body = await revokeRes.text();\n    if (ct.includes(\"text/plain\") && body === \"404 Not Found\") {\n      throw new Error(\"probe not applicable: DELETE revoke route is absent\");\n    }\n  }\n\n  expect(revokeRes.status).toBe(204);\n\n  // With per-request evaluation the revoked session must be denied.\n  const afterRes = await request(\"collab\", \"PUT\", \"/repos/owner/repo/collaborators/victim\", { role: \"read\" }, collabAuth.token, 403);\n  expect(afterRes.status).toBe(403);\n});\n",
+    "rationale": "The probe sets up a public repository, grants a collaborator admin access, and performs a repo read with that collaborator to warm any per-session role cache. It then uses A's DELETE revoke route to remove the collaborator and, in the same session, has the revoked collaborator attempt an admin-only action. In world A, requirePermission evaluates roles fresh on every request, so the post-revoke request is denied with 403. In world A+B, B's per-session role cache still holds the stale admin role, so the same request is allowed with 201, causing the 403 assertion to fail. The probe reports n/a when the revoke route is absent by checking for Hono's default text/plain 404 Not Found response, and it also fails if A's revoke does nothing because the collaborator would then still be authorized in world A.",
+    "admission": {
+      "admitted": false,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [
+        "n/a-mishandled",
+        "wrong-world-behaviour"
+      ],
+      "detail": [
+        "base: expected n/a, observed fail/fail/fail",
+        "A: expected pass, observed fail/fail/fail",
+        "B: expected n/a, observed fail/fail/fail"
+      ]
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "owner POST /users -> 422 (expected 201)",
+          "observations": [
+            "owner POST /users -> 422 (expected 201)"
+          ],
+          "ms": 136,
+          "id": "smoke-kimi-1-1791663933317-1:mutantA:0:4479c267-1459-40bb-8edf-cc3e8548ca06",
+          "testError": "AssertionError: expected 422 to be 201 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "owner POST /users -> 422 (expected 201)",
+          "observations": [
+            "owner POST /users -> 422 (expected 201)"
+          ],
+          "ms": 129,
+          "id": "smoke-kimi-1-1791663933317-1:mutantA:1:7bb131bf-f042-4bdb-a594-7a9aa2604abe",
+          "testError": "AssertionError: expected 422 to be 201 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "owner POST /users -> 422 (expected 201)",
+          "observations": [
+            "owner POST /users -> 422 (expected 201)"
+          ],
+          "ms": 130,
+          "id": "smoke-kimi-1-1791663933317-1:mutantA:2:2b122cb4-cebf-4ce2-a854-3db0bcaf9dab",
+          "testError": "AssertionError: expected 422 to be 201 // Object.is equality"
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [
+        {
+          "line": 56,
+          "text": "request(\"owner\", \"DELETE\", \"/repos/owner/repo/collaborators/collab\", undefined, ownerAuth.token, 204",
+          "boundTo": "revokeRes",
+          "asserted": true
+        }
+      ],
+      "unasserted": [],
+      "expectCalls": 8
+    }
+  },
+  "outcome": "rejected",
+  "totals": {
+    "modelMs": 233868,
+    "evalMs": 5075,
+    "promptTokens": 13801,
+    "completionTokens": 14741,
+    "wallMs": 240196
+  }
+}

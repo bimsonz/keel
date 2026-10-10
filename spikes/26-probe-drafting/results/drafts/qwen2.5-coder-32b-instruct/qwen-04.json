@@ -1,0 +1,303 @@
+{
+  "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+  "settings": {
+    "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+    "api": "legacy",
+    "temperature": 0.6,
+    "maxTokens": 4096
+  },
+  "startedAt": "2026-10-10T20:36:31.662Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 45132,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { login, resolveToken } from \\\"../src/auth/sessions.ts\\\";\\nimport { RepoVisibility } from \\\"../src/domain/visibility.ts\\\";\\n\\nconst deps = memoryDeps();\\ndeps.ids = sequentialIds();\\ndeps.clock.advance(1672531200000); // 2023-01-01T00:00:00Z\\n\\nconst app = createApp(deps);\\n\\nconst createUser = async (username: string, password: string) => {\\n  const response = await app.request(\\\"/users\\\", {\\n    method: \\\"POST\\\",\\n    headers: { \\\"Content-Type\\\": \\\"application/json\\\" },\\n    body: JSON.stringify({ username, password }),\\n  });\\n  const user = await response.json();\\n  return user;\\n};\\n\\nconst createRepo = async (ownerToken: string, name: string) => {\\n  const response = await app.request(\\\"/repos\\\", {\\n    method: \\\"POST\\\",\\n    headers: { \\\"Authorization\\\": `Bearer ${ownerToken}`, \\\"Content-Type\\\": \\\"application/json\\\" },\\n    body: JSON.stringify({ name, visibility: RepoVisibility.Private }),\\n  });\\n  const repo = await response.json();\\n  return repo;\\n};\\n\\nconst addCollaborator = async (ownerToken: string, repoId: string, username: string, role: string) => {\\n  const response = await app.request(`/repos/${repoId}/collaborators/${username}`, {\\n    method: \\\"PUT\\\",\\n    headers: { \\\"Authorization\\\": `Bearer ${ownerToken}`, \\\"Content-Type\\\": \\\"application/json\\\" },\\n    body: JSON.stringify({ role }),\\n  });\\n  return response;\\n};\\n\\nconst deleteCollaborator = async (ownerToken: string, repoId: string, username: string) => {\\n  const response = await app.request(`/repos/${repoId}/collaborators/${username}`, {\\n    method: \\\"DELETE\\\",\\n    headers: { \\\"Authorization\\\": `Bearer ${ownerToken}` },\\n  });\\n  return response;\\n};\\n\\nconst evaluatePermission = async (token: string, repoId: string, action: string) => {\\n  const response = await app.request(`/repos/${repoId}/${action}`, {\\n    method: \\\"GET\\\",\\n    headers: { \\\"Authorization\\\": `Bearer ${token}` },\\n  });\\n  return response;\\n};\\n\\ndescribe(\\\"permission evaluation freshness\\\", () => {\\n  it(\\\"should enforce fresh permissions after revoking\\\", async () => {\\n    const owner = await createUser(\\\"owner\\\", \\\"securepassword\\\");\\n    const collaborator = await createUser(\\\"collaborator\\\", \\\"securepassword\\\");\\n    const ownerSession = await login(deps, owner.username, \\\"securepassword\\\");\\n    const collaboratorSession = await login(deps, collaborator.username, \\\"securepassword\\\");\\n    const repo = await createRepo(ownerSession?.token ?? \\\"\\\", \\\"testrepo\\\");\\n    await addCollaborator(ownerSession?.token ?? \\\"\\\", repo.id, collaborator.username, \\\"write\\\");\\n\\n    // Collaborator can initially read the repo\\n    let response = await evaluatePermission(collaboratorSession?.token ?? \\\"\\\", repo.id, \\\"read\\\");\\n    console.log(`[probe] collaborator GET /repos/${repo.id}/read -> ${response.status} (expected 200)`);\\n    expect(response.status).toBe(200);\\n\\n    // Revoke the collaborator's access\\n    response = await deleteCollaborator(ownerSession?.token ?? \\\"\\\", repo.id, collaborator.username);\\n    console.log(`[probe] owner DELETE /repos/${repo.id}/collaborators/${collaborator.username} -> ${response.status} (expected 204)`);\\n    expect(response.status).toBe(204);\\n\\n    // Collaborator should no longer be able to read the repo\\n    response = await evaluatePermission(collaboratorSession?.token ?? \\\"\\\", repo.id, \\\"read\\\");\\n    console.log(`[probe] collaborator GET /repos/${repo.id}/read -> ${response.status} (expected 404)`);\\n    if (response.status === 404 && response.headers.get(\\\"content-type\\\") === \\\"text/plain\\\" && response.text() === \\\"404 Not Found\\\") {\\n      throw new Error(\\\"probe not applicable: precondition absent\\\");\\n    }\\n    expect(response.status).toBe(404);\\n  });\\n});\\n\"},\"rationale\":\"This probe tests the freshness of permission evaluations by creating a user, a repository, and a collaborator with write access. It then revokes the collaborator's access and verifies that the collaborator can no longer read the repository, ensuring that permission evaluations are not cached across requests.\"}",
+        "usage": {
+          "promptTokens": 16875,
+          "completionTokens": 1150
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login, resolveToken } from \"../src/auth/sessions.ts\";\nimport { RepoVisibility } from \"../src/domain/visibility.ts\";\n\nconst deps = memoryDeps();\ndeps.ids = sequentialIds();\ndeps.clock.advance(1672531200000); // 2023-01-01T00:00:00Z\n\nconst app = createApp(deps);\n\nconst createUser = async (username: string, password: string) => {\n  const response = await app.request(\"/users\", {\n    method: \"POST\",\n    headers: { \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ username, password }),\n  });\n  const user = await response.json();\n  return user;\n};\n\nconst createRepo = async (ownerToken: string, name: string) => {\n  const response = await app.request(\"/repos\", {\n    method: \"POST\",\n    headers: { \"Authorization\": `Bearer ${ownerToken}`, \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ name, visibility: RepoVisibility.Private }),\n  });\n  const repo = await response.json();\n  return repo;\n};\n\nconst addCollaborator = async (ownerToken: string, repoId: string, username: string, role: string) => {\n  const response = await app.request(`/repos/${repoId}/collaborators/${username}`, {\n    method: \"PUT\",\n    headers: { \"Authorization\": `Bearer ${ownerToken}`, \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ role }),\n  });\n  return response;\n};\n\nconst deleteCollaborator = async (ownerToken: string, repoId: string, username: string) => {\n  const response = await app.request(`/repos/${repoId}/collaborators/${username}`, {\n    method: \"DELETE\",\n    headers: { \"Authorization\": `Bearer ${ownerToken}` },\n  });\n  return response;\n};\n\nconst evaluatePermission = async (token: string, repoId: string, action: string) => {\n  const response = await app.request(`/repos/${repoId}/${action}`, {\n    method: \"GET\",\n    headers: { \"Authorization\": `Bearer ${token}` },\n  });\n  return response;\n};\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"should enforce fresh permissions after revoking\", async () => {\n    const owner = await createUser(\"owner\", \"securepassword\");\n    const collaborator = await createUser(\"collaborator\", \"securepassword\");\n    const ownerSession = await login(deps, owner.username, \"securepassword\");\n    const collaboratorSession = await login(deps, collaborator.username, \"securepassword\");\n    const repo = await createRepo(ownerSession?.token ?? \"\", \"testrepo\");\n    await addCollaborator(ownerSession?.token ?? \"\", repo.id, collaborator.username, \"write\");\n\n    // Collaborator can initially read the repo\n    let response = await evaluatePermission(collaboratorSession?.token ?? \"\", repo.id, \"read\");\n    console.log(`[probe] collaborator GET /repos/${repo.id}/read -> ${response.status} (expected 200)`);\n    expect(response.status).toBe(200);\n\n    // Revoke the collaborator's access\n    response = await deleteCollaborator(ownerSession?.token ?? \"\", repo.id, collaborator.username);\n    console.log(`[probe] owner DELETE /repos/${repo.id}/collaborators/${collaborator.username} -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Collaborator should no longer be able to read the repo\n    response = await evaluatePermission(collaboratorSession?.token ?? \"\", repo.id, \"read\");\n    console.log(`[probe] collaborator GET /repos/${repo.id}/read -> ${response.status} (expected 404)`);\n    if (response.status === 404 && response.headers.get(\"content-type\") === \"text/plain\" && response.text() === \"404 Not Found\") {\n      throw new Error(\"probe not applicable: precondition absent\");\n    }\n    expect(response.status).toBe(404);\n  });\n});\n",
+      "rationale": "This probe tests the freshness of permission evaluations by creating a user, a repository, and a collaborator with write access. It then revokes the collaborator's access and verifies that the collaborator can no longer read the repository, ensuring that permission evaluations are not cached across requests.",
+      "evalMs": 1929,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        }
+      },
+      "errors": "bundling probe/probe.test.ts failed:\nBuild failed with 1 error:\nvirtual:probe/probe.test.ts:6:9: ERROR: No matching export in \"virtual:src/domain/visibility.ts\" for import \"RepoVisibility\""
+    },
+    {
+      "n": 2,
+      "call": {
+        "ms": 40488,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { login, resolveToken } from \\\"../src/auth/sessions.ts\\\";\\nimport { VISIBILITIES } from \\\"../src/domain/visibility.ts\\\";\\n\\nconst deps = memoryDeps();\\ndeps.ids = sequentialIds();\\ndeps.clock.advance(1672531200000); // 2023-01-01T00:00:00Z\\n\\nconst app = createApp(deps);\\n\\nconst createUser = async (username: string, password: string) => {\\n  const response = await app.request(\\\"/users\\\", {\\n    method: \\\"POST\\\",\\n    headers: { \\\"Content-Type\\\": \\\"application/json\\\" },\\n    body: JSON.stringify({ username, password }),\\n  });\\n  const user = await response.json();\\n  return user;\\n};\\n\\nconst createRepo = async (ownerToken: string, name: string) => {\\n  const response = await app.request(\\\"/repos\\\", {\\n    method: \\\"POST\\\",\\n    headers: { \\\"Authorization\\\": `Bearer ${ownerToken}`, \\\"Content-Type\\\": \\\"application/json\\\" },\\n    body: JSON.stringify({ name, visibility: VISIBILITIES[1] }),\\n  });\\n  const repo = await response.json();\\n  return repo;\\n};\\n\\nconst addCollaborator = async (ownerToken: string, repoId: string, username: string, role: string) => {\\n  const response = await app.request(`/repos/${repoId}/collaborators/${username}`, {\\n    method: \\\"PUT\\\",\\n    headers: { \\\"Authorization\\\": `Bearer ${ownerToken}`, \\\"Content-Type\\\": \\\"application/json\\\" },\\n    body: JSON.stringify({ role }),\\n  });\\n  return response;\\n};\\n\\nconst deleteCollaborator = async (ownerToken: string, repoId: string, username: string) => {\\n  const response = await app.request(`/repos/${repoId}/collaborators/${username}`, {\\n    method: \\\"DELETE\\\",\\n    headers: { \\\"Authorization\\\": `Bearer ${ownerToken}` },\\n  });\\n  return response;\\n};\\n\\nconst evaluatePermission = async (token: string, repoId: string, action: string) => {\\n  const response = await app.request(`/repos/${repoId}/${action}`, {\\n    method: \\\"GET\\\",\\n    headers: { \\\"Authorization\\\": `Bearer ${token}` },\\n  });\\n  return response;\\n};\\n\\ndescribe(\\\"permission evaluation freshness\\\", () => {\\n  it(\\\"should enforce fresh permissions after revoking\\\", async () => {\\n    const owner = await createUser(\\\"owner\\\", \\\"securepassword\\\");\\n    const collaborator = await createUser(\\\"collaborator\\\", \\\"securepassword\\\");\\n    const ownerSession = await login(deps, owner.username, \\\"securepassword\\\");\\n    const collaboratorSession = await login(deps, collaborator.username, \\\"securepassword\\\");\\n    const repo = await createRepo(ownerSession?.token ?? \\\"\\\", \\\"testrepo\\\");\\n    await addCollaborator(ownerSession?.token ?? \\\"\\\", repo.id, collaborator.username, \\\"write\\\");\\n\\n    // Collaborator can initially read the repo\\n    let response = await evaluatePermission(collaboratorSession?.token ?? \\\"\\\", repo.id, \\\"read\\\");\\n    console.log(`[probe] collaborator GET /repos/${repo.id}/read -> ${response.status} (expected 200)`);\\n    expect(response.status).toBe(200);\\n\\n    // Revoke the collaborator's access\\n    response = await deleteCollaborator(ownerSession?.token ?? \\\"\\\", repo.id, collaborator.username);\\n    console.log(`[probe] owner DELETE /repos/${repo.id}/collaborators/${collaborator.username} -> ${response.status} (expected 204)`);\\n    expect(response.status).toBe(204);\\n\\n    // Collaborator should no longer be able to read the repo\\n    response = await evaluatePermission(collaboratorSession?.token ?? \\\"\\\", repo.id, \\\"read\\\");\\n    console.log(`[probe] collaborator GET /repos/${repo.id}/read -> ${response.status} (expected 404)`);\\n    if (response.status === 404 && response.headers.get(\\\"content-type\\\") === \\\"text/plain\\\" && (await response.text()) === \\\"404 Not Found\\\") {\\n      throw new Error(\\\"probe not applicable: precondition absent\\\");\\n    }\\n    expect(response.status).toBe(404);\\n  });\\n});\\n\"},\"rationale\":\"This probe tests the freshness of permission evaluations by creating a user, a repository, and a collaborator with write access. It then revokes the collaborator's access and verifies that the collaborator can no longer read the repository, ensuring that permission evaluations are not cached across requests. The fix addresses the import error by using the correct export from the visibility module.\"}",
+        "usage": {
+          "promptTokens": 18112,
+          "completionTokens": 1161
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login, resolveToken } from \"../src/auth/sessions.ts\";\nimport { VISIBILITIES } from \"../src/domain/visibility.ts\";\n\nconst deps = memoryDeps();\ndeps.ids = sequentialIds();\ndeps.clock.advance(1672531200000); // 2023-01-01T00:00:00Z\n\nconst app = createApp(deps);\n\nconst createUser = async (username: string, password: string) => {\n  const response = await app.request(\"/users\", {\n    method: \"POST\",\n    headers: { \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ username, password }),\n  });\n  const user = await response.json();\n  return user;\n};\n\nconst createRepo = async (ownerToken: string, name: string) => {\n  const response = await app.request(\"/repos\", {\n    method: \"POST\",\n    headers: { \"Authorization\": `Bearer ${ownerToken}`, \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ name, visibility: VISIBILITIES[1] }),\n  });\n  const repo = await response.json();\n  return repo;\n};\n\nconst addCollaborator = async (ownerToken: string, repoId: string, username: string, role: string) => {\n  const response = await app.request(`/repos/${repoId}/collaborators/${username}`, {\n    method: \"PUT\",\n    headers: { \"Authorization\": `Bearer ${ownerToken}`, \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ role }),\n  });\n  return response;\n};\n\nconst deleteCollaborator = async (ownerToken: string, repoId: string, username: string) => {\n  const response = await app.request(`/repos/${repoId}/collaborators/${username}`, {\n    method: \"DELETE\",\n    headers: { \"Authorization\": `Bearer ${ownerToken}` },\n  });\n  return response;\n};\n\nconst evaluatePermission = async (token: string, repoId: string, action: string) => {\n  const response = await app.request(`/repos/${repoId}/${action}`, {\n    method: \"GET\",\n    headers: { \"Authorization\": `Bearer ${token}` },\n  });\n  return response;\n};\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"should enforce fresh permissions after revoking\", async () => {\n    const owner = await createUser(\"owner\", \"securepassword\");\n    const collaborator = await createUser(\"collaborator\", \"securepassword\");\n    const ownerSession = await login(deps, owner.username, \"securepassword\");\n    const collaboratorSession = await login(deps, collaborator.username, \"securepassword\");\n    const repo = await createRepo(ownerSession?.token ?? \"\", \"testrepo\");\n    await addCollaborator(ownerSession?.token ?? \"\", repo.id, collaborator.username, \"write\");\n\n    // Collaborator can initially read the repo\n    let response = await evaluatePermission(collaboratorSession?.token ?? \"\", repo.id, \"read\");\n    console.log(`[probe] collaborator GET /repos/${repo.id}/read -> ${response.status} (expected 200)`);\n    expect(response.status).toBe(200);\n\n    // Revoke the collaborator's access\n    response = await deleteCollaborator(ownerSession?.token ?? \"\", repo.id, collaborator.username);\n    console.log(`[probe] owner DELETE /repos/${repo.id}/collaborators/${collaborator.username} -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Collaborator should no longer be able to read the repo\n    response = await evaluatePermission(collaboratorSession?.token ?? \"\", repo.id, \"read\");\n    console.log(`[probe] collaborator GET /repos/${repo.id}/read -> ${response.status} (expected 404)`);\n    if (response.status === 404 && response.headers.get(\"content-type\") === \"text/plain\" && (await response.text()) === \"404 Not Found\") {\n      throw new Error(\"probe not applicable: precondition absent\");\n    }\n    expect(response.status).toBe(404);\n  });\n});\n",
+      "rationale": "This probe tests the freshness of permission evaluations by creating a user, a repository, and a collaborator with write access. It then revokes the collaborator's access and verifies that the collaborator can no longer read the repository, ensuring that permission evaluations are not cached across requests. The fix addresses the import error by using the correct export from the visibility module.",
+      "evalMs": 2586,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        }
+      },
+      "errors": "{\"outcome\":\"fail\",\"reason\":\"probe harness error: expected exactly one probe test, found 0: TypeError: deps.clock.advance is not a function\"}"
+    },
+    {
+      "n": 3,
+      "call": {
+        "ms": 43280,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { login } from \\\"../src/auth/sessions.ts\\\";\\nimport { VISIBILITIES } from \\\"../src/domain/visibility.ts\\\";\\n\\nconst deps = memoryDeps();\\ndeps.ids = sequentialIds();\\ndeps.clock = new (class extends deps.clock.constructor {})();\\ndeps.clock.now = () => 1672531200000; // 2023-01-01T00:00:00Z\\n\\nconst app = createApp(deps);\\n\\nconst createUser = async (username: string, password: string) => {\\n  const response = await app.request(\\\"/users\\\", {\\n    method: \\\"POST\\\",\\n    headers: { \\\"Content-Type\\\": \\\"application/json\\\" },\\n    body: JSON.stringify({ username, password }),\\n  });\\n  const user = await response.json();\\n  return user;\\n};\\n\\nconst createRepo = async (ownerToken: string, name: string) => {\\n  const response = await app.request(\\\"/repos\\\", {\\n    method: \\\"POST\\\",\\n    headers: { \\\"Authorization\\\": `Bearer ${ownerToken}`, \\\"Content-Type\\\": \\\"application/json\\\" },\\n    body: JSON.stringify({ name, visibility: VISIBILITIES[1] }),\\n  });\\n  const repo = await response.json();\\n  return repo;\\n};\\n\\nconst addCollaborator = async (ownerToken: string, repoId: string, username: string, role: string) => {\\n  const response = await app.request(`/repos/${repoId}/collaborators/${username}`, {\\n    method: \\\"PUT\\\",\\n    headers: { \\\"Authorization\\\": `Bearer ${ownerToken}`, \\\"Content-Type\\\": \\\"application/json\\\" },\\n    body: JSON.stringify({ role }),\\n  });\\n  return response;\\n};\\n\\nconst deleteCollaborator = async (ownerToken: string, repoId: string, username: string) => {\\n  const response = await app.request(`/repos/${repoId}/collaborators/${username}`, {\\n    method: \\\"DELETE\\\",\\n    headers: { \\\"Authorization\\\": `Bearer ${ownerToken}` },\\n  });\\n  return response;\\n};\\n\\nconst evaluatePermission = async (token: string, repoId: string, action: string) => {\\n  const response = await app.request(`/repos/${repoId}/${action}`, {\\n    method: \\\"GET\\\",\\n    headers: { \\\"Authorization\\\": `Bearer ${token}` },\\n  });\\n  return response;\\n};\\n\\ndescribe(\\\"permission evaluation freshness\\\", () => {\\n  it(\\\"should enforce fresh permissions after revoking\\\", async () => {\\n    const owner = await createUser(\\\"owner\\\", \\\"securepassword\\\");\\n    const collaborator = await createUser(\\\"collaborator\\\", \\\"securepassword\\\");\\n    const ownerSession = await login(deps, owner.username, \\\"securepassword\\\");\\n    const collaboratorSession = await login(deps, collaborator.username, \\\"securepassword\\\");\\n    const repo = await createRepo(ownerSession?.token ?? \\\"\\\", \\\"testrepo\\\");\\n    await addCollaborator(ownerSession?.token ?? \\\"\\\", repo.id, collaborator.username, \\\"write\\\");\\n\\n    // Collaborator can initially read the repo\\n    let response = await evaluatePermission(collaboratorSession?.token ?? \\\"\\\", repo.id, \\\"read\\\");\\n    console.log(`[probe] collaborator GET /repos/${repo.id}/read -> ${response.status} (expected 200)`);\\n    expect(response.status).toBe(200);\\n\\n    // Revoke the collaborator's access\\n    response = await deleteCollaborator(ownerSession?.token ?? \\\"\\\", repo.id, collaborator.username);\\n    console.log(`[probe] owner DELETE /repos/${repo.id}/collaborators/${collaborator.username} -> ${response.status} (expected 204)`);\\n    expect(response.status).toBe(204);\\n\\n    // Collaborator should no longer be able to read the repo\\n    response = await evaluatePermission(collaboratorSession?.token ?? \\\"\\\", repo.id, \\\"read\\\");\\n    console.log(`[probe] collaborator GET /repos/${repo.id}/read -> ${response.status} (expected 404)`);\\n    if (response.status === 404 && response.headers.get(\\\"content-type\\\") === \\\"text/plain\\\" && (await response.text()) === \\\"404 Not Found\\\") {\\n      throw new Error(\\\"probe not applicable: precondition absent\\\");\\n    }\\n    expect(response.status).toBe(404);\\n  });\\n});\\n\"},\"rationale\":\"This probe tests the freshness of permission evaluations by creating a user, a repository, and a collaborator with write access. It then revokes the collaborator's access and verifies that the collaborator can no longer read the repository, ensuring that permission evaluations are not cached across requests. The fix addresses the issue by properly setting up the clock to simulate a fixed time, as the original clock object did not have an `advance` method.\"}",
+        "usage": {
+          "promptTokens": 19352,
+          "completionTokens": 1190
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login } from \"../src/auth/sessions.ts\";\nimport { VISIBILITIES } from \"../src/domain/visibility.ts\";\n\nconst deps = memoryDeps();\ndeps.ids = sequentialIds();\ndeps.clock = new (class extends deps.clock.constructor {})();\ndeps.clock.now = () => 1672531200000; // 2023-01-01T00:00:00Z\n\nconst app = createApp(deps);\n\nconst createUser = async (username: string, password: string) => {\n  const response = await app.request(\"/users\", {\n    method: \"POST\",\n    headers: { \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ username, password }),\n  });\n  const user = await response.json();\n  return user;\n};\n\nconst createRepo = async (ownerToken: string, name: string) => {\n  const response = await app.request(\"/repos\", {\n    method: \"POST\",\n    headers: { \"Authorization\": `Bearer ${ownerToken}`, \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ name, visibility: VISIBILITIES[1] }),\n  });\n  const repo = await response.json();\n  return repo;\n};\n\nconst addCollaborator = async (ownerToken: string, repoId: string, username: string, role: string) => {\n  const response = await app.request(`/repos/${repoId}/collaborators/${username}`, {\n    method: \"PUT\",\n    headers: { \"Authorization\": `Bearer ${ownerToken}`, \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ role }),\n  });\n  return response;\n};\n\nconst deleteCollaborator = async (ownerToken: string, repoId: string, username: string) => {\n  const response = await app.request(`/repos/${repoId}/collaborators/${username}`, {\n    method: \"DELETE\",\n    headers: { \"Authorization\": `Bearer ${ownerToken}` },\n  });\n  return response;\n};\n\nconst evaluatePermission = async (token: string, repoId: string, action: string) => {\n  const response = await app.request(`/repos/${repoId}/${action}`, {\n    method: \"GET\",\n    headers: { \"Authorization\": `Bearer ${token}` },\n  });\n  return response;\n};\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"should enforce fresh permissions after revoking\", async () => {\n    const owner = await createUser(\"owner\", \"securepassword\");\n    const collaborator = await createUser(\"collaborator\", \"securepassword\");\n    const ownerSession = await login(deps, owner.username, \"securepassword\");\n    const collaboratorSession = await login(deps, collaborator.username, \"securepassword\");\n    const repo = await createRepo(ownerSession?.token ?? \"\", \"testrepo\");\n    await addCollaborator(ownerSession?.token ?? \"\", repo.id, collaborator.username, \"write\");\n\n    // Collaborator can initially read the repo\n    let response = await evaluatePermission(collaboratorSession?.token ?? \"\", repo.id, \"read\");\n    console.log(`[probe] collaborator GET /repos/${repo.id}/read -> ${response.status} (expected 200)`);\n    expect(response.status).toBe(200);\n\n    // Revoke the collaborator's access\n    response = await deleteCollaborator(ownerSession?.token ?? \"\", repo.id, collaborator.username);\n    console.log(`[probe] owner DELETE /repos/${repo.id}/collaborators/${collaborator.username} -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Collaborator should no longer be able to read the repo\n    response = await evaluatePermission(collaboratorSession?.token ?? \"\", repo.id, \"read\");\n    console.log(`[probe] collaborator GET /repos/${repo.id}/read -> ${response.status} (expected 404)`);\n    if (response.status === 404 && response.headers.get(\"content-type\") === \"text/plain\" && (await response.text()) === \"404 Not Found\") {\n      throw new Error(\"probe not applicable: precondition absent\");\n    }\n    expect(response.status).toBe(404);\n  });\n});\n",
+      "rationale": "This probe tests the freshness of permission evaluations by creating a user, a repository, and a collaborator with write access. It then revokes the collaborator's access and verifies that the collaborator can no longer read the repository, ensuring that permission evaluations are not cached across requests. The fix addresses the issue by properly setting up the clock to simulate a fixed time, as the original clock object did not have an `advance` method.",
+      "evalMs": 2292,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 3,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login } from \"../src/auth/sessions.ts\";\nimport { VISIBILITIES } from \"../src/domain/visibility.ts\";\n\nconst deps = memoryDeps();\ndeps.ids = sequentialIds();\ndeps.clock = new (class extends deps.clock.constructor {})();\ndeps.clock.now = () => 1672531200000; // 2023-01-01T00:00:00Z\n\nconst app = createApp(deps);\n\nconst createUser = async (username: string, password: string) => {\n  const response = await app.request(\"/users\", {\n    method: \"POST\",\n    headers: { \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ username, password }),\n  });\n  const user = await response.json();\n  return user;\n};\n\nconst createRepo = async (ownerToken: string, name: string) => {\n  const response = await app.request(\"/repos\", {\n    method: \"POST\",\n    headers: { \"Authorization\": `Bearer ${ownerToken}`, \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ name, visibility: VISIBILITIES[1] }),\n  });\n  const repo = await response.json();\n  return repo;\n};\n\nconst addCollaborator = async (ownerToken: string, repoId: string, username: string, role: string) => {\n  const response = await app.request(`/repos/${repoId}/collaborators/${username}`, {\n    method: \"PUT\",\n    headers: { \"Authorization\": `Bearer ${ownerToken}`, \"Content-Type\": \"application/json\" },\n    body: JSON.stringify({ role }),\n  });\n  return response;\n};\n\nconst deleteCollaborator = async (ownerToken: string, repoId: string, username: string) => {\n  const response = await app.request(`/repos/${repoId}/collaborators/${username}`, {\n    method: \"DELETE\",\n    headers: { \"Authorization\": `Bearer ${ownerToken}` },\n  });\n  return response;\n};\n\nconst evaluatePermission = async (token: string, repoId: string, action: string) => {\n  const response = await app.request(`/repos/${repoId}/${action}`, {\n    method: \"GET\",\n    headers: { \"Authorization\": `Bearer ${token}` },\n  });\n  return response;\n};\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"should enforce fresh permissions after revoking\", async () => {\n    const owner = await createUser(\"owner\", \"securepassword\");\n    const collaborator = await createUser(\"collaborator\", \"securepassword\");\n    const ownerSession = await login(deps, owner.username, \"securepassword\");\n    const collaboratorSession = await login(deps, collaborator.username, \"securepassword\");\n    const repo = await createRepo(ownerSession?.token ?? \"\", \"testrepo\");\n    await addCollaborator(ownerSession?.token ?? \"\", repo.id, collaborator.username, \"write\");\n\n    // Collaborator can initially read the repo\n    let response = await evaluatePermission(collaboratorSession?.token ?? \"\", repo.id, \"read\");\n    console.log(`[probe] collaborator GET /repos/${repo.id}/read -> ${response.status} (expected 200)`);\n    expect(response.status).toBe(200);\n\n    // Revoke the collaborator's access\n    response = await deleteCollaborator(ownerSession?.token ?? \"\", repo.id, collaborator.username);\n    console.log(`[probe] owner DELETE /repos/${repo.id}/collaborators/${collaborator.username} -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Collaborator should no longer be able to read the repo\n    response = await evaluatePermission(collaboratorSession?.token ?? \"\", repo.id, \"read\");\n    console.log(`[probe] collaborator GET /repos/${repo.id}/read -> ${response.status} (expected 404)`);\n    if (response.status === 404 && response.headers.get(\"content-type\") === \"text/plain\" && (await response.text()) === \"404 Not Found\") {\n      throw new Error(\"probe not applicable: precondition absent\");\n    }\n    expect(response.status).toBe(404);\n  });\n});\n",
+    "rationale": "This probe tests the freshness of permission evaluations by creating a user, a repository, and a collaborator with write access. It then revokes the collaborator's access and verifies that the collaborator can no longer read the repository, ensuring that permission evaluations are not cached across requests. The fix addresses the issue by properly setting up the clock to simulate a fixed time, as the original clock object did not have an `advance` method.",
+    "admission": {
+      "admitted": false,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [
+        "n/a-mishandled",
+        "wrong-world-behaviour"
+      ],
+      "detail": [
+        "base: expected n/a, observed fail/fail/fail",
+        "A: expected pass, observed fail/fail/fail",
+        "B: expected n/a, observed fail/fail/fail"
+      ]
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collaborator GET /repos/repo_1/read -> 404 (expected 200)",
+          "observations": [
+            "collaborator GET /repos/repo_1/read -> 404 (expected 200)"
+          ],
+          "ms": 172,
+          "id": "qwen-4-1791664591463-3:mutantA:0:9bbaa81e-1c81-4727-b543-b4ea9512c337",
+          "testError": "AssertionError: expected 404 to be 200 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collaborator GET /repos/repo_1/read -> 404 (expected 200)",
+          "observations": [
+            "collaborator GET /repos/repo_1/read -> 404 (expected 200)"
+          ],
+          "ms": 182,
+          "id": "qwen-4-1791664591463-3:mutantA:1:2e6108c1-ada4-430f-ab02-dfdf303c12b1",
+          "testError": "AssertionError: expected 404 to be 200 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collaborator GET /repos/repo_1/read -> 404 (expected 200)",
+          "observations": [
+            "collaborator GET /repos/repo_1/read -> 404 (expected 200)"
+          ],
+          "ms": 183,
+          "id": "qwen-4-1791664591463-3:mutantA:2:fcf7d4e9-a7c8-49ac-a776-204fab77b722",
+          "testError": "AssertionError: expected 404 to be 200 // Object.is equality"
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [
+        {
+          "line": 75,
+          "text": "deleteCollaborator(ownerSession?.token ?? \"\", repo.id, collaborator.username)",
+          "boundTo": "response",
+          "asserted": true
+        }
+      ],
+      "unasserted": [],
+      "expectCalls": 3
+    }
+  },
+  "outcome": "rejected",
+  "totals": {
+    "modelMs": 128900,
+    "evalMs": 7063,
+    "promptTokens": 54339,
+    "completionTokens": 3501,
+    "wallMs": 138332
+  }
+}

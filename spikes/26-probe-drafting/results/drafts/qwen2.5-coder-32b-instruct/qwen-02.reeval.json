@@ -1,0 +1,200 @@
+{
+  "tag": "d03ba41b",
+  "evals": [
+    {
+      "world": "base",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "Error: login failed",
+          "observations": [],
+          "ms": 218,
+          "id": "d03ba41b-0:base:0:86e78f24-c1e0-4904-ad1a-0f03371dd3b5",
+          "testError": "Error: login failed"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "Error: login failed",
+          "observations": [],
+          "ms": 228,
+          "id": "d03ba41b-0:base:1:dabb2722-c2f5-4aa1-8fe4-2838eadfbd90",
+          "testError": "Error: login failed"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "Error: login failed",
+          "observations": [],
+          "ms": 223,
+          "id": "d03ba41b-0:base:2:e36eb86c-2f48-46b5-be2f-dc47a4285f03",
+          "testError": "Error: login failed"
+        }
+      ]
+    },
+    {
+      "world": "A",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "Error: login failed",
+          "observations": [],
+          "ms": 218,
+          "id": "d03ba41b-0:A:0:9e603331-ab7e-433a-99f7-e95be47fa78e",
+          "testError": "Error: login failed"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "Error: login failed",
+          "observations": [],
+          "ms": 223,
+          "id": "d03ba41b-0:A:1:1337a418-a5a1-4438-8560-f6777708b5de",
+          "testError": "Error: login failed"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "Error: login failed",
+          "observations": [],
+          "ms": 223,
+          "id": "d03ba41b-0:A:2:e08c9356-9c47-4640-8853-d245368ffa8c",
+          "testError": "Error: login failed"
+        }
+      ]
+    },
+    {
+      "world": "B",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "Error: login failed",
+          "observations": [],
+          "ms": 217,
+          "id": "d03ba41b-0:B:0:d0020793-4dd8-4287-bdd1-dc14c94d653b",
+          "testError": "Error: login failed"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "Error: login failed",
+          "observations": [],
+          "ms": 71,
+          "id": "d03ba41b-0:B:1:368c235f-303b-4a38-b169-847251b15205",
+          "testError": "Error: login failed"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "Error: login failed",
+          "observations": [],
+          "ms": 219,
+          "id": "d03ba41b-0:B:2:6fd6041f-16dc-4170-a6ae-c616b05b7bac",
+          "testError": "Error: login failed"
+        }
+      ]
+    },
+    {
+      "world": "AB",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "Error: login failed",
+          "observations": [],
+          "ms": 219,
+          "id": "d03ba41b-0:AB:0:bd67445b-6ad0-44b3-b7d9-0c8b9922e77b",
+          "testError": "Error: login failed"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "Error: login failed",
+          "observations": [],
+          "ms": 213,
+          "id": "d03ba41b-0:AB:1:72b3c00d-b2eb-4c22-8c18-d5206a297471",
+          "testError": "Error: login failed"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "Error: login failed",
+          "observations": [],
+          "ms": 62,
+          "id": "d03ba41b-0:AB:2:6d4764a1-bf08-44c7-a74e-e0bac3d1fd57",
+          "testError": "Error: login failed"
+        }
+      ]
+    }
+  ],
+  "bundleMs": {
+    "base": 350,
+    "A": 1632,
+    "B": 57,
+    "AB": 1379
+  },
+  "bytes": 467939,
+  "wallMs": 4182,
+  "admission": {
+    "admitted": false,
+    "cells": {
+      "base": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "A": {
+        "expected": "pass",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "B": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "AB": {
+        "expected": "fail",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": true
+      }
+    },
+    "failures": [
+      "n/a-mishandled",
+      "wrong-world-behaviour"
+    ],
+    "detail": [
+      "base: expected n/a, observed fail/fail/fail",
+      "A: expected pass, observed fail/fail/fail",
+      "B: expected n/a, observed fail/fail/fail"
+    ]
+  },
+  "vacuity": {
+    "vacuous": true,
+    "observed": [],
+    "why": "mutant A not evaluated"
+  }
+}

@@ -1,0 +1,289 @@
+{
+  "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+  "settings": {
+    "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+    "api": "legacy",
+    "temperature": 0.6,
+    "maxTokens": 4096
+  },
+  "startedAt": "2026-10-10T20:36:31.600Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 29344,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\n\\nconst deps = memoryDeps();\\ndeps.store.createUser({ id: \\\"usr_1\\\", username: \\\"alice\\\", name: \\\"Alice\\\", passwordSalt: \\\"salt\\\", passwordHash: \\\"hash\\\", createdAt: 1 });\\ndeps.store.createRepo({ id: \\\"repo_1\\\", ownerId: \\\"usr_1\\\", name: \\\"repo\\\", description: \\\"\\\", visibility: \\\"private\\\", defaultBranch: \\\"main\\\", createdAt: 1, updatedAt: 1 });\\ndeps.store.addCollaborator({ repoId: \\\"repo_1\\\", userId: \\\"usr_1\\\", role: \\\"admin\\\", addedBy: \\\"usr_1\\\", addedAt: 1 });\\ndeps.store.createSession({ id: \\\"ses_1\\\", userId: \\\"usr_1\\\", tokenHash: \\\"token\\\", createdAt: 1, expiresAt: 1000000000000 });\\n\\ndescribe(\\\"permission evaluation freshness\\\", () => {\\n  it(\\\"checks permission freshness\\\", async () => {\\n    const app = createApp(deps);\\n    const token = \\\"Bearer token\\\";\\n    const path = \\\"/repos/alice/repo/collaborators/bob\\\";\\n    const options = { method: \\\"DELETE\\\", headers: { authorization: token } };\\n\\n    // Attempt to revoke a non-existent collaborator\\n    let response = await app.request(path, options);\\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\\n    if (response.status === 404) {\\n      const text = await response.text();\\n      if (text === \\\"404 Not Found\\\") {\\n        throw new Error(\\\"probe not applicable: precondition absent\\\");\\n      }\\n    }\\n\\n    // Add a collaborator to revoke\\n    await app.request(\\\"/repos/alice/repo/collaborators\\\", { method: \\\"PUT\\\", headers: { authorization: token }, body: JSON.stringify({ username: \\\"bob\\\", role: \\\"write\\\" }) });\\n    console.log(`[probe] PUT /repos/alice/repo/collaborators -> (added bob)\\\");\\n\\n    // Revoke the collaborator\\n    response = await app.request(path, options);\\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 204)`);\\n    expect(response.status).toBe(204);\\n\\n    // Attempt to revoke again, expecting failure due to A+B conflict\\n    response = await app.request(path, options);\\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\\n    expect(response.status).toBe(404);\\n  });\\n});\\n\"},\"rationale\":\"This probe tests the freshness of permission evaluations by adding a collaborator, revoking them, and then attempting to revoke them again. In world A, the second revocation will succeed because permissions are re-evaluated per request. In world A+B, the second revocation will fail due to B's caching mechanism, which contradicts A's premise.\"}",
+        "usage": {
+          "promptTokens": 16875,
+          "completionTokens": 738
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\n\nconst deps = memoryDeps();\ndeps.store.createUser({ id: \"usr_1\", username: \"alice\", name: \"Alice\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: 1 });\ndeps.store.createRepo({ id: \"repo_1\", ownerId: \"usr_1\", name: \"repo\", description: \"\", visibility: \"private\", defaultBranch: \"main\", createdAt: 1, updatedAt: 1 });\ndeps.store.addCollaborator({ repoId: \"repo_1\", userId: \"usr_1\", role: \"admin\", addedBy: \"usr_1\", addedAt: 1 });\ndeps.store.createSession({ id: \"ses_1\", userId: \"usr_1\", tokenHash: \"token\", createdAt: 1, expiresAt: 1000000000000 });\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"checks permission freshness\", async () => {\n    const app = createApp(deps);\n    const token = \"Bearer token\";\n    const path = \"/repos/alice/repo/collaborators/bob\";\n    const options = { method: \"DELETE\", headers: { authorization: token } };\n\n    // Attempt to revoke a non-existent collaborator\n    let response = await app.request(path, options);\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\n    if (response.status === 404) {\n      const text = await response.text();\n      if (text === \"404 Not Found\") {\n        throw new Error(\"probe not applicable: precondition absent\");\n      }\n    }\n\n    // Add a collaborator to revoke\n    await app.request(\"/repos/alice/repo/collaborators\", { method: \"PUT\", headers: { authorization: token }, body: JSON.stringify({ username: \"bob\", role: \"write\" }) });\n    console.log(`[probe] PUT /repos/alice/repo/collaborators -> (added bob)\");\n\n    // Revoke the collaborator\n    response = await app.request(path, options);\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Attempt to revoke again, expecting failure due to A+B conflict\n    response = await app.request(path, options);\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\n    expect(response.status).toBe(404);\n  });\n});\n",
+      "rationale": "This probe tests the freshness of permission evaluations by adding a collaborator, revoking them, and then attempting to revoke them again. In world A, the second revocation will succeed because permissions are re-evaluated per request. In world A+B, the second revocation will fail due to B's caching mechanism, which contradicts A's premise.",
+      "evalMs": 2898,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        }
+      },
+      "errors": "bundling probe/probe.test.ts failed:\nBuild failed with 1 error:\nvirtual:probe/probe.test.ts:34:25: ERROR: Expected \")\" but found \"DELETE\""
+    },
+    {
+      "n": 2,
+      "call": {
+        "ms": 26726,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\n\\nconst deps = memoryDeps();\\ndeps.store.createUser({ id: \\\"usr_1\\\", username: \\\"alice\\\", name: \\\"Alice\\\", passwordSalt: \\\"salt\\\", passwordHash: \\\"hash\\\", createdAt: 1 });\\ndeps.store.createRepo({ id: \\\"repo_1\\\", ownerId: \\\"usr_1\\\", name: \\\"repo\\\", description: \\\"\\\", visibility: \\\"private\\\", defaultBranch: \\\"main\\\", createdAt: 1, updatedAt: 1 });\\ndeps.store.addCollaborator({ repoId: \\\"repo_1\\\", userId: \\\"usr_1\\\", role: \\\"admin\\\", addedBy: \\\"usr_1\\\", addedAt: 1 });\\ndeps.store.createSession({ id: \\\"ses_1\\\", userId: \\\"usr_1\\\", tokenHash: \\\"token\\\", createdAt: 1, expiresAt: 1000000000000 });\\n\\ndescribe(\\\"permission evaluation freshness\\\", () => {\\n  it(\\\"checks permission freshness\\\", async () => {\\n    const app = createApp(deps);\\n    const token = \\\"Bearer token\\\";\\n    const path = \\\"/repos/alice/repo/collaborators/bob\\\";\\n    const options = { method: \\\"DELETE\\\", headers: { authorization: token } };\\n\\n    // Attempt to revoke a non-existent collaborator\\n    let response = await app.request(path, options);\\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\\n    if (response.status === 404) {\\n      const text = await response.text();\\n      if (text === \\\"404 Not Found\\\") {\\n        throw new Error(\\\"probe not applicable: precondition absent\\\");\\n      }\\n    }\\n\\n    // Add a collaborator to revoke\\n    await app.request(\\\"/repos/alice/repo/collaborators\\\", { method: \\\"PUT\\\", headers: { authorization: token }, body: JSON.stringify({ username: \\\"bob\\\", role: \\\"write\\\" }) });\\n    console.log(`[probe] PUT /repos/alice/repo/collaborators -> (added bob)\\\");\\n\\n    // Revoke the collaborator\\n    response = await app.request(path, options);\\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 204)`);\\n    expect(response.status).toBe(204);\\n\\n    // Attempt to revoke again, expecting failure due to A+B conflict\\n    response = await app.request(path, options);\\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\\n    expect(response.status).toBe(404);\\n  });\\n});\\n\"},\"rationale\":\"This probe tests the freshness of permission evaluations by adding a collaborator, revoking them, and then attempting to revoke them again. In world A, the second revocation will succeed because permissions are re-evaluated per request. In world A+B, the second revocation will fail due to B's caching mechanism, which contradicts A's premise.\"}",
+        "usage": {
+          "promptTokens": 17690,
+          "completionTokens": 727
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\n\nconst deps = memoryDeps();\ndeps.store.createUser({ id: \"usr_1\", username: \"alice\", name: \"Alice\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: 1 });\ndeps.store.createRepo({ id: \"repo_1\", ownerId: \"usr_1\", name: \"repo\", description: \"\", visibility: \"private\", defaultBranch: \"main\", createdAt: 1, updatedAt: 1 });\ndeps.store.addCollaborator({ repoId: \"repo_1\", userId: \"usr_1\", role: \"admin\", addedBy: \"usr_1\", addedAt: 1 });\ndeps.store.createSession({ id: \"ses_1\", userId: \"usr_1\", tokenHash: \"token\", createdAt: 1, expiresAt: 1000000000000 });\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"checks permission freshness\", async () => {\n    const app = createApp(deps);\n    const token = \"Bearer token\";\n    const path = \"/repos/alice/repo/collaborators/bob\";\n    const options = { method: \"DELETE\", headers: { authorization: token } };\n\n    // Attempt to revoke a non-existent collaborator\n    let response = await app.request(path, options);\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\n    if (response.status === 404) {\n      const text = await response.text();\n      if (text === \"404 Not Found\") {\n        throw new Error(\"probe not applicable: precondition absent\");\n      }\n    }\n\n    // Add a collaborator to revoke\n    await app.request(\"/repos/alice/repo/collaborators\", { method: \"PUT\", headers: { authorization: token }, body: JSON.stringify({ username: \"bob\", role: \"write\" }) });\n    console.log(`[probe] PUT /repos/alice/repo/collaborators -> (added bob)\");\n\n    // Revoke the collaborator\n    response = await app.request(path, options);\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Attempt to revoke again, expecting failure due to A+B conflict\n    response = await app.request(path, options);\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\n    expect(response.status).toBe(404);\n  });\n});\n",
+      "rationale": "This probe tests the freshness of permission evaluations by adding a collaborator, revoking them, and then attempting to revoke them again. In world A, the second revocation will succeed because permissions are re-evaluated per request. In world A+B, the second revocation will fail due to B's caching mechanism, which contradicts A's premise.",
+      "evalMs": 562,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        }
+      },
+      "errors": "bundling probe/probe.test.ts failed:\nBuild failed with 1 error:\nvirtual:probe/probe.test.ts:34:25: ERROR: Expected \")\" but found \"DELETE\""
+    },
+    {
+      "n": 3,
+      "call": {
+        "ms": 25199,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\n\\nconst deps = memoryDeps();\\ndeps.store.createUser({ id: \\\"usr_1\\\", username: \\\"alice\\\", name: \\\"Alice\\\", passwordSalt: \\\"salt\\\", passwordHash: \\\"hash\\\", createdAt: 1 });\\ndeps.store.createRepo({ id: \\\"repo_1\\\", ownerId: \\\"usr_1\\\", name: \\\"repo\\\", description: \\\"\\\", visibility: \\\"private\\\", defaultBranch: \\\"main\\\", createdAt: 1, updatedAt: 1 });\\ndeps.store.addCollaborator({ repoId: \\\"repo_1\\\", userId: \\\"usr_1\\\", role: \\\"admin\\\", addedBy: \\\"usr_1\\\", addedAt: 1 });\\ndeps.store.createSession({ id: \\\"ses_1\\\", userId: \\\"usr_1\\\", tokenHash: \\\"token\\\", createdAt: 1, expiresAt: 1000000000000 });\\n\\ndescribe(\\\"permission evaluation freshness\\\", () => {\\n  it(\\\"checks permission freshness\\\", async () => {\\n    const app = createApp(deps);\\n    const token = \\\"Bearer token\\\";\\n    const path = \\\"/repos/alice/repo/collaborators/bob\\\";\\n    const options = { method: \\\"DELETE\\\", headers: { authorization: token } };\\n\\n    // Attempt to revoke a non-existent collaborator\\n    let response = await app.request(path, options);\\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\\n    if (response.status === 404) {\\n      const text = await response.text();\\n      if (text === \\\"404 Not Found\\\") {\\n        throw new Error(\\\"probe not applicable: precondition absent\\\");\\n      }\\n    }\\n\\n    // Add a collaborator to revoke\\n    await app.request(\\\"/repos/alice/repo/collaborators\\\", { method: \\\"PUT\\\", headers: { authorization: token }, body: JSON.stringify({ username: \\\"bob\\\", role: \\\"write\\\" }) });\\n    console.log(`[probe] PUT /repos/alice/repo/collaborators -> (added bob)\\\");\\n\\n    // Revoke the collaborator\\n    response = await app.request(path, options);\\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 204)`);\\n    expect(response.status).toBe(204);\\n\\n    // Attempt to revoke again, expecting failure due to A+B conflict\\n    response = await app.request(path, options);\\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\\n    expect(response.status).toBe(404);\\n  });\\n});\\n\"},\"rationale\":\"This probe tests the freshness of permission evaluations by adding a collaborator, revoking them, and then attempting to revoke them again. In world A, the second revocation will succeed because permissions are re-evaluated per request. In world A+B, the second revocation will fail due to B's caching mechanism, which contradicts A's premise.\"}",
+        "usage": {
+          "promptTokens": 18505,
+          "completionTokens": 727
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\n\nconst deps = memoryDeps();\ndeps.store.createUser({ id: \"usr_1\", username: \"alice\", name: \"Alice\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: 1 });\ndeps.store.createRepo({ id: \"repo_1\", ownerId: \"usr_1\", name: \"repo\", description: \"\", visibility: \"private\", defaultBranch: \"main\", createdAt: 1, updatedAt: 1 });\ndeps.store.addCollaborator({ repoId: \"repo_1\", userId: \"usr_1\", role: \"admin\", addedBy: \"usr_1\", addedAt: 1 });\ndeps.store.createSession({ id: \"ses_1\", userId: \"usr_1\", tokenHash: \"token\", createdAt: 1, expiresAt: 1000000000000 });\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"checks permission freshness\", async () => {\n    const app = createApp(deps);\n    const token = \"Bearer token\";\n    const path = \"/repos/alice/repo/collaborators/bob\";\n    const options = { method: \"DELETE\", headers: { authorization: token } };\n\n    // Attempt to revoke a non-existent collaborator\n    let response = await app.request(path, options);\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\n    if (response.status === 404) {\n      const text = await response.text();\n      if (text === \"404 Not Found\") {\n        throw new Error(\"probe not applicable: precondition absent\");\n      }\n    }\n\n    // Add a collaborator to revoke\n    await app.request(\"/repos/alice/repo/collaborators\", { method: \"PUT\", headers: { authorization: token }, body: JSON.stringify({ username: \"bob\", role: \"write\" }) });\n    console.log(`[probe] PUT /repos/alice/repo/collaborators -> (added bob)\");\n\n    // Revoke the collaborator\n    response = await app.request(path, options);\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Attempt to revoke again, expecting failure due to A+B conflict\n    response = await app.request(path, options);\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\n    expect(response.status).toBe(404);\n  });\n});\n",
+      "rationale": "This probe tests the freshness of permission evaluations by adding a collaborator, revoking them, and then attempting to revoke them again. In world A, the second revocation will succeed because permissions are re-evaluated per request. In world A+B, the second revocation will fail due to B's caching mechanism, which contradicts A's premise.",
+      "evalMs": 240,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        }
+      },
+      "errors": "bundling probe/probe.test.ts failed:\nBuild failed with 1 error:\nvirtual:probe/probe.test.ts:34:25: ERROR: Expected \")\" but found \"DELETE\""
+    },
+    {
+      "n": 4,
+      "call": {
+        "ms": 25298,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\n\\nconst deps = memoryDeps();\\ndeps.store.createUser({ id: \\\"usr_1\\\", username: \\\"alice\\\", name: \\\"Alice\\\", passwordSalt: \\\"salt\\\", passwordHash: \\\"hash\\\", createdAt: 1 });\\ndeps.store.createRepo({ id: \\\"repo_1\\\", ownerId: \\\"usr_1\\\", name: \\\"repo\\\", description: \\\"\\\", visibility: \\\"private\\\", defaultBranch: \\\"main\\\", createdAt: 1, updatedAt: 1 });\\ndeps.store.addCollaborator({ repoId: \\\"repo_1\\\", userId: \\\"usr_1\\\", role: \\\"admin\\\", addedBy: \\\"usr_1\\\", addedAt: 1 });\\ndeps.store.createSession({ id: \\\"ses_1\\\", userId: \\\"usr_1\\\", tokenHash: \\\"token\\\", createdAt: 1, expiresAt: 1000000000000 });\\n\\ndescribe(\\\"permission evaluation freshness\\\", () => {\\n  it(\\\"checks permission freshness\\\", async () => {\\n    const app = createApp(deps);\\n    const token = \\\"Bearer token\\\";\\n    const path = \\\"/repos/alice/repo/collaborators/bob\\\";\\n    const options = { method: \\\"DELETE\\\", headers: { authorization: token } };\\n\\n    // Attempt to revoke a non-existent collaborator\\n    let response = await app.request(path, options);\\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\\n    if (response.status === 404) {\\n      const text = await response.text();\\n      if (text === \\\"404 Not Found\\\") {\\n        throw new Error(\\\"probe not applicable: precondition absent\\\");\\n      }\\n    }\\n\\n    // Add a collaborator to revoke\\n    await app.request(\\\"/repos/alice/repo/collaborators\\\", { method: \\\"PUT\\\", headers: { authorization: token }, body: JSON.stringify({ username: \\\"bob\\\", role: \\\"write\\\" }) });\\n    console.log(`[probe] PUT /repos/alice/repo/collaborators -> (added bob)\\\");\\n\\n    // Revoke the collaborator\\n    response = await app.request(path, options);\\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 204)`);\\n    expect(response.status).toBe(204);\\n\\n    // Attempt to revoke again, expecting failure due to A+B conflict\\n    response = await app.request(path, options);\\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\\n    expect(response.status).toBe(404);\\n  });\\n});\\n\"},\"rationale\":\"This probe tests the freshness of permission evaluations by adding a collaborator, revoking them, and then attempting to revoke them again. In world A, the second revocation will succeed because permissions are re-evaluated per request. In world A+B, the second revocation will fail due to B's caching mechanism, which contradicts A's premise.\"}",
+        "usage": {
+          "promptTokens": 19320,
+          "completionTokens": 727
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\n\nconst deps = memoryDeps();\ndeps.store.createUser({ id: \"usr_1\", username: \"alice\", name: \"Alice\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: 1 });\ndeps.store.createRepo({ id: \"repo_1\", ownerId: \"usr_1\", name: \"repo\", description: \"\", visibility: \"private\", defaultBranch: \"main\", createdAt: 1, updatedAt: 1 });\ndeps.store.addCollaborator({ repoId: \"repo_1\", userId: \"usr_1\", role: \"admin\", addedBy: \"usr_1\", addedAt: 1 });\ndeps.store.createSession({ id: \"ses_1\", userId: \"usr_1\", tokenHash: \"token\", createdAt: 1, expiresAt: 1000000000000 });\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"checks permission freshness\", async () => {\n    const app = createApp(deps);\n    const token = \"Bearer token\";\n    const path = \"/repos/alice/repo/collaborators/bob\";\n    const options = { method: \"DELETE\", headers: { authorization: token } };\n\n    // Attempt to revoke a non-existent collaborator\n    let response = await app.request(path, options);\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\n    if (response.status === 404) {\n      const text = await response.text();\n      if (text === \"404 Not Found\") {\n        throw new Error(\"probe not applicable: precondition absent\");\n      }\n    }\n\n    // Add a collaborator to revoke\n    await app.request(\"/repos/alice/repo/collaborators\", { method: \"PUT\", headers: { authorization: token }, body: JSON.stringify({ username: \"bob\", role: \"write\" }) });\n    console.log(`[probe] PUT /repos/alice/repo/collaborators -> (added bob)\");\n\n    // Revoke the collaborator\n    response = await app.request(path, options);\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Attempt to revoke again, expecting failure due to A+B conflict\n    response = await app.request(path, options);\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\n    expect(response.status).toBe(404);\n  });\n});\n",
+      "rationale": "This probe tests the freshness of permission evaluations by adding a collaborator, revoking them, and then attempting to revoke them again. In world A, the second revocation will succeed because permissions are re-evaluated per request. In world A+B, the second revocation will fail due to B's caching mechanism, which contradicts A's premise.",
+      "evalMs": 230,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        }
+      },
+      "errors": "bundling probe/probe.test.ts failed:\nBuild failed with 1 error:\nvirtual:probe/probe.test.ts:34:25: ERROR: Expected \")\" but found \"DELETE\""
+    }
+  ],
+  "attemptsUsed": 4,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\n\nconst deps = memoryDeps();\ndeps.store.createUser({ id: \"usr_1\", username: \"alice\", name: \"Alice\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: 1 });\ndeps.store.createRepo({ id: \"repo_1\", ownerId: \"usr_1\", name: \"repo\", description: \"\", visibility: \"private\", defaultBranch: \"main\", createdAt: 1, updatedAt: 1 });\ndeps.store.addCollaborator({ repoId: \"repo_1\", userId: \"usr_1\", role: \"admin\", addedBy: \"usr_1\", addedAt: 1 });\ndeps.store.createSession({ id: \"ses_1\", userId: \"usr_1\", tokenHash: \"token\", createdAt: 1, expiresAt: 1000000000000 });\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"checks permission freshness\", async () => {\n    const app = createApp(deps);\n    const token = \"Bearer token\";\n    const path = \"/repos/alice/repo/collaborators/bob\";\n    const options = { method: \"DELETE\", headers: { authorization: token } };\n\n    // Attempt to revoke a non-existent collaborator\n    let response = await app.request(path, options);\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\n    if (response.status === 404) {\n      const text = await response.text();\n      if (text === \"404 Not Found\") {\n        throw new Error(\"probe not applicable: precondition absent\");\n      }\n    }\n\n    // Add a collaborator to revoke\n    await app.request(\"/repos/alice/repo/collaborators\", { method: \"PUT\", headers: { authorization: token }, body: JSON.stringify({ username: \"bob\", role: \"write\" }) });\n    console.log(`[probe] PUT /repos/alice/repo/collaborators -> (added bob)\");\n\n    // Revoke the collaborator\n    response = await app.request(path, options);\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Attempt to revoke again, expecting failure due to A+B conflict\n    response = await app.request(path, options);\n    console.log(`[probe] DELETE ${path} -> ${response.status} (expected 404)`);\n    expect(response.status).toBe(404);\n  });\n});\n",
+    "rationale": "This probe tests the freshness of permission evaluations by adding a collaborator, revoking them, and then attempting to revoke them again. In world A, the second revocation will succeed because permissions are re-evaluated per request. In world A+B, the second revocation will fail due to B's caching mechanism, which contradicts A's premise.",
+    "admission": {
+      "admitted": false,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        }
+      },
+      "failures": [
+        "compile-error"
+      ],
+      "detail": [
+        "base: bundle error",
+        "A: bundle error",
+        "B: bundle error",
+        "AB: bundle error"
+      ]
+    },
+    "mutant": {
+      "world": "mutantA",
+      "bundleError": "Build failed with 1 error:\nvirtual:probe/probe.test.ts:34:25: ERROR: Expected \")\" but found \"DELETE\"",
+      "runs": []
+    },
+    "vacuity": {
+      "vacuous": true,
+      "observed": [
+        "compile-error"
+      ],
+      "why": "does not bundle against mutant A"
+    },
+    "staticCheck": {
+      "deleteSites": [],
+      "unasserted": [],
+      "expectCalls": 0
+    }
+  },
+  "outcome": "rejected",
+  "totals": {
+    "modelMs": 106567,
+    "evalMs": 4940,
+    "promptTokens": 72390,
+    "completionTokens": 2919,
+    "wallMs": 116397
+  }
+}

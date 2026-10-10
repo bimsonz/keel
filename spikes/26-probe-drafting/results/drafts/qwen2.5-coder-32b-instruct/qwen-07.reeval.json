@@ -1,0 +1,200 @@
+{
+  "tag": "a85bdc53",
+  "evals": [
+    {
+      "world": "base",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: clock.advance is not a function",
+          "observations": [],
+          "ms": 298,
+          "id": "a85bdc53-0:base:0:db4ac570-6f9a-4a8f-985e-7fe8ba1b7e97",
+          "testError": "TypeError: clock.advance is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: clock.advance is not a function",
+          "observations": [],
+          "ms": 298,
+          "id": "a85bdc53-0:base:1:91d9e54d-c077-42c1-8177-407516e110d2",
+          "testError": "TypeError: clock.advance is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: clock.advance is not a function",
+          "observations": [],
+          "ms": 308,
+          "id": "a85bdc53-0:base:2:19f21021-dab4-4949-b9d4-d60218ed490f",
+          "testError": "TypeError: clock.advance is not a function"
+        }
+      ]
+    },
+    {
+      "world": "A",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: clock.advance is not a function",
+          "observations": [],
+          "ms": 303,
+          "id": "a85bdc53-0:A:0:ed1d150f-0f97-4662-8017-5d822b1c2883",
+          "testError": "TypeError: clock.advance is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: clock.advance is not a function",
+          "observations": [],
+          "ms": 292,
+          "id": "a85bdc53-0:A:1:48bb646c-0d52-4fee-b7a3-0439b2546bcd",
+          "testError": "TypeError: clock.advance is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: clock.advance is not a function",
+          "observations": [],
+          "ms": 292,
+          "id": "a85bdc53-0:A:2:f43d8952-2212-4ed8-bbb4-2d07452d5f6c",
+          "testError": "TypeError: clock.advance is not a function"
+        }
+      ]
+    },
+    {
+      "world": "B",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: clock.advance is not a function",
+          "observations": [],
+          "ms": 283,
+          "id": "a85bdc53-0:B:0:a91249bd-a190-455d-85ad-74c9039804d2",
+          "testError": "TypeError: clock.advance is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: clock.advance is not a function",
+          "observations": [],
+          "ms": 82,
+          "id": "a85bdc53-0:B:1:a6cbaa77-10f0-46cc-8976-5aa9f1302852",
+          "testError": "TypeError: clock.advance is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: clock.advance is not a function",
+          "observations": [],
+          "ms": 243,
+          "id": "a85bdc53-0:B:2:1bdaa661-1af8-4b58-b7f8-4bdc4957e873",
+          "testError": "TypeError: clock.advance is not a function"
+        }
+      ]
+    },
+    {
+      "world": "AB",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: clock.advance is not a function",
+          "observations": [],
+          "ms": 193,
+          "id": "a85bdc53-0:AB:0:28f22677-1448-4a82-9569-bf90294b2499",
+          "testError": "TypeError: clock.advance is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: clock.advance is not a function",
+          "observations": [],
+          "ms": 239,
+          "id": "a85bdc53-0:AB:1:d96f6853-431c-4f3a-be7c-c367f8898aa3",
+          "testError": "TypeError: clock.advance is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: clock.advance is not a function",
+          "observations": [],
+          "ms": 183,
+          "id": "a85bdc53-0:AB:2:172f87e2-28e1-4314-883d-17efb9915182",
+          "testError": "TypeError: clock.advance is not a function"
+        }
+      ]
+    }
+  ],
+  "bundleMs": {
+    "base": 393,
+    "A": 1234,
+    "B": 1008,
+    "AB": 53
+  },
+  "bytes": 466412,
+  "wallMs": 3613,
+  "admission": {
+    "admitted": false,
+    "cells": {
+      "base": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "A": {
+        "expected": "pass",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "B": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "AB": {
+        "expected": "fail",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": true
+      }
+    },
+    "failures": [
+      "n/a-mishandled",
+      "wrong-world-behaviour"
+    ],
+    "detail": [
+      "base: expected n/a, observed fail/fail/fail",
+      "A: expected pass, observed fail/fail/fail",
+      "B: expected n/a, observed fail/fail/fail"
+    ]
+  },
+  "vacuity": {
+    "vacuous": true,
+    "observed": [],
+    "why": "mutant A not evaluated"
+  }
+}

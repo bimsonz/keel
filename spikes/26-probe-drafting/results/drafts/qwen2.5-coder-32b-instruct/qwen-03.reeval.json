@@ -1,0 +1,200 @@
+{
+  "tag": "3eb236fc",
+  "evals": [
+    {
+      "world": "base",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: app.request(...).json is not a function",
+          "observations": [],
+          "ms": 182,
+          "id": "3eb236fc-0:base:0:1c98b429-d477-49c3-b007-5bb9abfb07db",
+          "testError": "TypeError: app.request(...).json is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: app.request(...).json is not a function",
+          "observations": [],
+          "ms": 174,
+          "id": "3eb236fc-0:base:1:e4730480-86bc-4c33-a573-37a2fb035d73",
+          "testError": "TypeError: app.request(...).json is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: app.request(...).json is not a function",
+          "observations": [],
+          "ms": 174,
+          "id": "3eb236fc-0:base:2:d1fd7f95-7488-454d-a118-c93ce9b5ba06",
+          "testError": "TypeError: app.request(...).json is not a function"
+        }
+      ]
+    },
+    {
+      "world": "A",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: app.request(...).json is not a function",
+          "observations": [],
+          "ms": 178,
+          "id": "3eb236fc-0:A:0:3e197044-79cf-4de6-80d0-f2a5a7bf02d3",
+          "testError": "TypeError: app.request(...).json is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: app.request(...).json is not a function",
+          "observations": [],
+          "ms": 178,
+          "id": "3eb236fc-0:A:1:1eaceef3-0720-48f7-8734-96b94b700b1c",
+          "testError": "TypeError: app.request(...).json is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: app.request(...).json is not a function",
+          "observations": [],
+          "ms": 178,
+          "id": "3eb236fc-0:A:2:1573ea11-e9b1-4b52-ab3c-5d14f9d2ea80",
+          "testError": "TypeError: app.request(...).json is not a function"
+        }
+      ]
+    },
+    {
+      "world": "B",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: app.request(...).json is not a function",
+          "observations": [],
+          "ms": 171,
+          "id": "3eb236fc-0:B:0:1433585b-e76f-434d-b91b-535e22b10626",
+          "testError": "TypeError: app.request(...).json is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: app.request(...).json is not a function",
+          "observations": [],
+          "ms": 52,
+          "id": "3eb236fc-0:B:1:24b6c29c-543e-4f6e-aad1-8597315e3dac",
+          "testError": "TypeError: app.request(...).json is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: app.request(...).json is not a function",
+          "observations": [],
+          "ms": 125,
+          "id": "3eb236fc-0:B:2:2cdf69c3-3cdf-409a-be0b-0164daa19cda",
+          "testError": "TypeError: app.request(...).json is not a function"
+        }
+      ]
+    },
+    {
+      "world": "AB",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: app.request(...).json is not a function",
+          "observations": [],
+          "ms": 163,
+          "id": "3eb236fc-0:AB:0:b6bd2476-1299-4591-a511-a5915a3d0725",
+          "testError": "TypeError: app.request(...).json is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: app.request(...).json is not a function",
+          "observations": [],
+          "ms": 157,
+          "id": "3eb236fc-0:AB:1:bd1ffb65-b65c-488a-a963-be57130d3ac2",
+          "testError": "TypeError: app.request(...).json is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: app.request(...).json is not a function",
+          "observations": [],
+          "ms": 123,
+          "id": "3eb236fc-0:AB:2:4d77a818-8573-4670-be85-e34c114b0b41",
+          "testError": "TypeError: app.request(...).json is not a function"
+        }
+      ]
+    }
+  ],
+  "bundleMs": {
+    "base": 1411,
+    "A": 69,
+    "B": 980,
+    "AB": 2031
+  },
+  "bytes": 466491,
+  "wallMs": 5098,
+  "admission": {
+    "admitted": false,
+    "cells": {
+      "base": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "A": {
+        "expected": "pass",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "B": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "AB": {
+        "expected": "fail",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": true
+      }
+    },
+    "failures": [
+      "n/a-mishandled",
+      "wrong-world-behaviour"
+    ],
+    "detail": [
+      "base: expected n/a, observed fail/fail/fail",
+      "A: expected pass, observed fail/fail/fail",
+      "B: expected n/a, observed fail/fail/fail"
+    ]
+  },
+  "vacuity": {
+    "vacuous": true,
+    "observed": [],
+    "why": "mutant A not evaluated"
+  }
+}

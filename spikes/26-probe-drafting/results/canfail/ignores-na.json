@@ -1,0 +1,288 @@
+{
+  "tag": "e007593e",
+  "evals": [
+    {
+      "world": "base",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "alice DELETE /repos/alice/forge/collaborators/bob -> 404 (expected 204)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 404 (expected 204)"
+          ],
+          "ms": 271,
+          "id": "e007593e-0:base:0:c5e78a07-d852-4157-ab4c-899c885507bc",
+          "testError": "AssertionError: expected 404 to be 204 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "alice DELETE /repos/alice/forge/collaborators/bob -> 404 (expected 204)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 404 (expected 204)"
+          ],
+          "ms": 274,
+          "id": "e007593e-0:base:1:8307e397-65c2-4c66-b69c-a831b2e72462",
+          "testError": "AssertionError: expected 404 to be 204 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "alice DELETE /repos/alice/forge/collaborators/bob -> 404 (expected 204)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 404 (expected 204)"
+          ],
+          "ms": 274,
+          "id": "e007593e-0:base:2:5785021b-d2ff-43c4-8f0c-4c355b349608",
+          "testError": "AssertionError: expected 404 to be 204 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "world": "A",
+      "runs": [
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "bob DELETE /repos/alice/forge -> 403 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204 (expected 204)",
+            "bob DELETE /repos/alice/forge -> 403 (expected 403)"
+          ],
+          "ms": 277,
+          "id": "e007593e-0:A:0:67b4ce8d-8d3e-4c0f-a3d2-01662ecf5495"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "bob DELETE /repos/alice/forge -> 403 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204 (expected 204)",
+            "bob DELETE /repos/alice/forge -> 403 (expected 403)"
+          ],
+          "ms": 134,
+          "id": "e007593e-0:A:1:dd1174ea-fe24-43b1-82c7-8a425acbf9f0"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "bob DELETE /repos/alice/forge -> 403 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204 (expected 204)",
+            "bob DELETE /repos/alice/forge -> 403 (expected 403)"
+          ],
+          "ms": 212,
+          "id": "e007593e-0:A:2:3353a7a9-8534-42a1-bfd6-83d3b1a91587"
+        }
+      ]
+    },
+    {
+      "world": "B",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "alice DELETE /repos/alice/forge/collaborators/bob -> 404 (expected 204)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 404 (expected 204)"
+          ],
+          "ms": 323,
+          "id": "e007593e-0:B:0:f1b64cd5-2b16-4d61-b148-0684dbe0ed7d",
+          "testError": "AssertionError: expected 404 to be 204 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "alice DELETE /repos/alice/forge/collaborators/bob -> 404 (expected 204)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 404 (expected 204)"
+          ],
+          "ms": 323,
+          "id": "e007593e-0:B:1:c3bf5eb1-b693-4b5c-866b-3611e32b7f4e",
+          "testError": "AssertionError: expected 404 to be 204 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "alice DELETE /repos/alice/forge/collaborators/bob -> 404 (expected 204)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 404 (expected 204)"
+          ],
+          "ms": 132,
+          "id": "e007593e-0:B:2:100ace69-0d27-49e0-9824-cff29d1fb80f",
+          "testError": "AssertionError: expected 404 to be 204 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "world": "AB",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob DELETE /repos/alice/forge -> 204 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204 (expected 204)",
+            "bob DELETE /repos/alice/forge -> 204 (expected 403)"
+          ],
+          "ms": 308,
+          "id": "e007593e-0:AB:0:801c00bd-ae35-4aa0-ba9b-4eeee2b05238",
+          "testError": "AssertionError: expected 204 to be 403 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob DELETE /repos/alice/forge -> 204 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204 (expected 204)",
+            "bob DELETE /repos/alice/forge -> 204 (expected 403)"
+          ],
+          "ms": 401,
+          "id": "e007593e-0:AB:1:7d93b340-db60-4071-b87d-86a704647ce1",
+          "testError": "AssertionError: expected 204 to be 403 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob DELETE /repos/alice/forge -> 204 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204 (expected 204)",
+            "bob DELETE /repos/alice/forge -> 204 (expected 403)"
+          ],
+          "ms": 401,
+          "id": "e007593e-0:AB:2:6660e37f-5a03-4eba-b033-8fae427dc3ac",
+          "testError": "AssertionError: expected 204 to be 403 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob DELETE /repos/alice/forge -> 204 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204 (expected 204)",
+            "bob DELETE /repos/alice/forge -> 204 (expected 403)"
+          ],
+          "ms": 404,
+          "id": "e007593e-0:mutantA:0:bc3dbb54-acb2-42b4-9769-bed0f83361d1",
+          "testError": "AssertionError: expected 204 to be 403 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob DELETE /repos/alice/forge -> 204 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204 (expected 204)",
+            "bob DELETE /repos/alice/forge -> 204 (expected 403)"
+          ],
+          "ms": 221,
+          "id": "e007593e-0:mutantA:1:a0ae4b93-22fb-42a7-a8a5-8f57cf2fe340",
+          "testError": "AssertionError: expected 204 to be 403 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob DELETE /repos/alice/forge -> 204 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204 (expected 204)",
+            "bob DELETE /repos/alice/forge -> 204 (expected 403)"
+          ],
+          "ms": 220,
+          "id": "e007593e-0:mutantA:2:7988bb17-1b3e-439f-adc8-68b8bcd545e7",
+          "testError": "AssertionError: expected 204 to be 403 // Object.is equality"
+        }
+      ]
+    }
+  ],
+  "bundleMs": {
+    "base": 263,
+    "A": 1958,
+    "B": 58,
+    "AB": 59,
+    "mutantA": 1519
+  },
+  "bytes": 466138,
+  "wallMs": 5247,
+  "admission": {
+    "admitted": false,
+    "cells": {
+      "base": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "A": {
+        "expected": "pass",
+        "observed": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "stable": true,
+        "ok": true
+      },
+      "B": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "AB": {
+        "expected": "fail",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": true
+      }
+    },
+    "failures": [
+      "n/a-mishandled"
+    ],
+    "detail": [
+      "base: expected n/a, observed fail/fail/fail",
+      "B: expected n/a, observed fail/fail/fail"
+    ]
+  },
+  "vacuity": {
+    "vacuous": false,
+    "observed": [
+      "fail",
+      "fail",
+      "fail"
+    ]
+  },
+  "staticCheck": {
+    "deleteSites": [
+      {
+        "line": 43,
+        "text": "call(\"DELETE\", \"/repos/alice/forge/collaborators/bob\", alice)",
+        "boundTo": "revoke",
+        "asserted": true
+      },
+      {
+        "line": 46,
+        "text": "call(\"DELETE\", \"/repos/alice/forge\", bob)",
+        "boundTo": "attempt",
+        "asserted": true
+      }
+    ],
+    "unasserted": [],
+    "expectCalls": 7
+  }
+}

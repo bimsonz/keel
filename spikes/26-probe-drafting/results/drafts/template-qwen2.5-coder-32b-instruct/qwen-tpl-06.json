@@ -1,0 +1,253 @@
+{
+  "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+  "mode": "template",
+  "settings": {
+    "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+    "api": "legacy",
+    "temperature": 0.6,
+    "maxTokens": 4096
+  },
+  "startedAt": "2026-10-10T20:41:35.818Z",
+  "promptChars": 66771,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 19340,
+        "content": "{\"owner\":\"alice\",\"subject\":\"bob\",\"setup\":[{\"actor\":\"owner\",\"method\":\"POST\",\"path\":\"/users\",\"body\":\"{\\\"username\\\":\\\"alice\\\",\\\"password\\\":\\\"securepassword\\\"}\",\"expectedStatus\":201},{\"actor\":\"subject\",\"method\":\"POST\",\"path\":\"/users\",\"body\":\"{\\\"username\\\":\\\"bob\\\",\\\"password\\\":\\\"securepassword\\\"}\",\"expectedStatus\":201},{\"actor\":\"owner\",\"method\":\"POST\",\"path\":\"/sessions\",\"body\":\"{\\\"username\\\":\\\"alice\\\",\\\"password\\\":\\\"securepassword\\\"}\",\"expectedStatus\":201},{\"actor\":\"subject\",\"method\":\"POST\",\"path\":\"/sessions\",\"body\":\"{\\\"username\\\":\\\"bob\\\",\\\"password\\\":\\\"securepassword\\\"}\",\"expectedStatus\":201},{\"actor\":\"owner\",\"method\":\"POST\",\"path\":\"/repos\",\"body\":\"{\\\"name\\\":\\\"project\\\",\\\"visibility\\\":\\\"private\\\"}\",\"expectedStatus\":201},{\"actor\":\"owner\",\"method\":\"PUT\",\"path\":\"/repos/alice/project/collaborators/bob\",\"body\":\"{\\\"role\\\":\\\"write\\\"}\",\"expectedStatus\":201}],\"call\":{\"actor\":\"subject\",\"method\":\"GET\",\"path\":\"/repos/alice/project\",\"body\":\"\",\"expectedStatus\":200},\"revoke\":{\"actor\":\"owner\",\"method\":\"DELETE\",\"path\":\"/repos/alice/project/collaborators/bob\",\"body\":\"\",\"expectedStatus\":204},\"callAgain\":{\"actor\":\"subject\",\"method\":\"GET\",\"path\":\"/repos/alice/project\",\"body\":\"\",\"expectedStatus\":404},\"rationale\":\"The probe sets up a repository and adds a collaborator with write access. It then calls a protected route as the collaborator, which succeeds. After revoking the collaborator's access, the same call fails, demonstrating that the permission evaluation is fresh per request. In world A+B, the cached role would allow the second call to succeed, contradicting A's premise.\"}",
+        "usage": {
+          "promptTokens": 16717,
+          "completionTokens": 554
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, expect, it } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\n// Rendered from the freshness template. Slots filled by the model:\n// owner, subject, setup, call, revoke, callAgain.\ntype Step = { actor: \"owner\" | \"subject\"; method: string; path: string; body: string; expectedStatus: number };\nconst OWNER = \"alice\";\nconst SUBJECT = \"bob\";\nconst SETUP: Step[] = [{\"actor\":\"owner\",\"method\":\"POST\",\"path\":\"/users\",\"body\":\"{\\\"username\\\":\\\"alice\\\",\\\"password\\\":\\\"securepassword\\\"}\",\"expectedStatus\":201},{\"actor\":\"subject\",\"method\":\"POST\",\"path\":\"/users\",\"body\":\"{\\\"username\\\":\\\"bob\\\",\\\"password\\\":\\\"securepassword\\\"}\",\"expectedStatus\":201},{\"actor\":\"owner\",\"method\":\"POST\",\"path\":\"/sessions\",\"body\":\"{\\\"username\\\":\\\"alice\\\",\\\"password\\\":\\\"securepassword\\\"}\",\"expectedStatus\":201},{\"actor\":\"subject\",\"method\":\"POST\",\"path\":\"/sessions\",\"body\":\"{\\\"username\\\":\\\"bob\\\",\\\"password\\\":\\\"securepassword\\\"}\",\"expectedStatus\":201},{\"actor\":\"owner\",\"method\":\"POST\",\"path\":\"/repos\",\"body\":\"{\\\"name\\\":\\\"project\\\",\\\"visibility\\\":\\\"private\\\"}\",\"expectedStatus\":201},{\"actor\":\"owner\",\"method\":\"PUT\",\"path\":\"/repos/alice/project/collaborators/bob\",\"body\":\"{\\\"role\\\":\\\"write\\\"}\",\"expectedStatus\":201}];\nconst CALL: Step = {\"actor\":\"subject\",\"method\":\"GET\",\"path\":\"/repos/alice/project\",\"body\":\"\",\"expectedStatus\":200};\nconst REVOKE: Step = {\"actor\":\"owner\",\"method\":\"DELETE\",\"path\":\"/repos/alice/project/collaborators/bob\",\"body\":\"\",\"expectedStatus\":204};\nconst CALL_AGAIN: Step = {\"actor\":\"subject\",\"method\":\"GET\",\"path\":\"/repos/alice/project\",\"body\":\"\",\"expectedStatus\":404};\nconst PASSWORD = \"template password 0001\";\n\ndescribe(\"freshness\", () => {\n  it(\"call, revoke, call again on the same session\", async () => {\n    const app = createApp({ store: new MemoryStore(), clock: new ManualClock(Date.UTC(2026, 0, 1)), ids: sequentialIds() });\n    const send = (method: string, path: string, token: string | undefined, body: string) =>\n      app.request(path, {\n        method,\n        headers: {\n          ...(token === undefined ? {} : { authorization: `Bearer ${token}` }),\n          ...(body === \"\" ? {} : { \"content-type\": \"application/json\" }),\n        },\n        body: body === \"\" ? null : body,\n      });\n    const signIn = async (username: string): Promise<string> => {\n      expect((await send(\"POST\", \"/users\", undefined, JSON.stringify({ username, password: PASSWORD }))).status).toBe(201);\n      const res = await send(\"POST\", \"/sessions\", undefined, JSON.stringify({ username, password: PASSWORD }));\n      expect(res.status).toBe(201);\n      return ((await res.json()) as { token: string }).token;\n    };\n    const tokens = { owner: await signIn(OWNER), subject: await signIn(SUBJECT) };\n    const name = (s: Step) => (s.actor === \"owner\" ? OWNER : SUBJECT);\n    const run = async (s: Step, observe: boolean) => {\n      const res = await send(s.method, s.path, tokens[s.actor], s.body);\n      if (observe) console.log(`[probe] ${name(s)} ${s.method} ${s.path} -> ${res.status} (expected ${s.expectedStatus})`);\n      return res;\n    };\n\n    for (const s of SETUP) expect((await run(s, false)).status).toBe(s.expectedStatus);\n    expect((await run(CALL, true)).status).toBe(CALL.expectedStatus);\n\n    const revoke = await run(REVOKE, true);\n    const absent =\n      revoke.status === 404 &&\n      (revoke.headers.get(\"content-type\") ?? \"\").startsWith(\"text/plain\") &&\n      (await revoke.clone().text()) === \"404 Not Found\";\n    if (absent) throw new Error(\"probe not applicable: revoke route absent\");\n    expect(revoke.status).toBe(REVOKE.expectedStatus);\n\n    expect((await run(CALL_AGAIN, true)).status).toBe(CALL_AGAIN.expectedStatus);\n  });\n});\n",
+      "rationale": "The probe sets up a repository and adds a collaborator with write access. It then calls a protected route as the collaborator, which succeeds. After revoking the collaborator's access, the same call fails, demonstrating that the permission evaluation is fresh per request. In world A+B, the cached role would allow the second call to succeed, contradicting A's premise.",
+      "slots": {
+        "owner": "alice",
+        "subject": "bob",
+        "setup": [
+          {
+            "actor": "owner",
+            "method": "POST",
+            "path": "/users",
+            "body": "{\"username\":\"alice\",\"password\":\"securepassword\"}",
+            "expectedStatus": 201
+          },
+          {
+            "actor": "subject",
+            "method": "POST",
+            "path": "/users",
+            "body": "{\"username\":\"bob\",\"password\":\"securepassword\"}",
+            "expectedStatus": 201
+          },
+          {
+            "actor": "owner",
+            "method": "POST",
+            "path": "/sessions",
+            "body": "{\"username\":\"alice\",\"password\":\"securepassword\"}",
+            "expectedStatus": 201
+          },
+          {
+            "actor": "subject",
+            "method": "POST",
+            "path": "/sessions",
+            "body": "{\"username\":\"bob\",\"password\":\"securepassword\"}",
+            "expectedStatus": 201
+          },
+          {
+            "actor": "owner",
+            "method": "POST",
+            "path": "/repos",
+            "body": "{\"name\":\"project\",\"visibility\":\"private\"}",
+            "expectedStatus": 201
+          },
+          {
+            "actor": "owner",
+            "method": "PUT",
+            "path": "/repos/alice/project/collaborators/bob",
+            "body": "{\"role\":\"write\"}",
+            "expectedStatus": 201
+          }
+        ],
+        "call": {
+          "actor": "subject",
+          "method": "GET",
+          "path": "/repos/alice/project",
+          "body": "",
+          "expectedStatus": 200
+        },
+        "revoke": {
+          "actor": "owner",
+          "method": "DELETE",
+          "path": "/repos/alice/project/collaborators/bob",
+          "body": "",
+          "expectedStatus": 204
+        },
+        "callAgain": {
+          "actor": "subject",
+          "method": "GET",
+          "path": "/repos/alice/project",
+          "body": "",
+          "expectedStatus": 404
+        },
+        "rationale": "The probe sets up a repository and adds a collaborator with write access. It then calls a protected route as the collaborator, which succeeds. After revoking the collaborator's access, the same call fails, demonstrating that the permission evaluation is fresh per request. In world A+B, the cached role would allow the second call to succeed, contradicting A's premise."
+      },
+      "evalMs": 7521,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "final": {
+    "probe": "import { describe, expect, it } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\n// Rendered from the freshness template. Slots filled by the model:\n// owner, subject, setup, call, revoke, callAgain.\ntype Step = { actor: \"owner\" | \"subject\"; method: string; path: string; body: string; expectedStatus: number };\nconst OWNER = \"alice\";\nconst SUBJECT = \"bob\";\nconst SETUP: Step[] = [{\"actor\":\"owner\",\"method\":\"POST\",\"path\":\"/users\",\"body\":\"{\\\"username\\\":\\\"alice\\\",\\\"password\\\":\\\"securepassword\\\"}\",\"expectedStatus\":201},{\"actor\":\"subject\",\"method\":\"POST\",\"path\":\"/users\",\"body\":\"{\\\"username\\\":\\\"bob\\\",\\\"password\\\":\\\"securepassword\\\"}\",\"expectedStatus\":201},{\"actor\":\"owner\",\"method\":\"POST\",\"path\":\"/sessions\",\"body\":\"{\\\"username\\\":\\\"alice\\\",\\\"password\\\":\\\"securepassword\\\"}\",\"expectedStatus\":201},{\"actor\":\"subject\",\"method\":\"POST\",\"path\":\"/sessions\",\"body\":\"{\\\"username\\\":\\\"bob\\\",\\\"password\\\":\\\"securepassword\\\"}\",\"expectedStatus\":201},{\"actor\":\"owner\",\"method\":\"POST\",\"path\":\"/repos\",\"body\":\"{\\\"name\\\":\\\"project\\\",\\\"visibility\\\":\\\"private\\\"}\",\"expectedStatus\":201},{\"actor\":\"owner\",\"method\":\"PUT\",\"path\":\"/repos/alice/project/collaborators/bob\",\"body\":\"{\\\"role\\\":\\\"write\\\"}\",\"expectedStatus\":201}];\nconst CALL: Step = {\"actor\":\"subject\",\"method\":\"GET\",\"path\":\"/repos/alice/project\",\"body\":\"\",\"expectedStatus\":200};\nconst REVOKE: Step = {\"actor\":\"owner\",\"method\":\"DELETE\",\"path\":\"/repos/alice/project/collaborators/bob\",\"body\":\"\",\"expectedStatus\":204};\nconst CALL_AGAIN: Step = {\"actor\":\"subject\",\"method\":\"GET\",\"path\":\"/repos/alice/project\",\"body\":\"\",\"expectedStatus\":404};\nconst PASSWORD = \"template password 0001\";\n\ndescribe(\"freshness\", () => {\n  it(\"call, revoke, call again on the same session\", async () => {\n    const app = createApp({ store: new MemoryStore(), clock: new ManualClock(Date.UTC(2026, 0, 1)), ids: sequentialIds() });\n    const send = (method: string, path: string, token: string | undefined, body: string) =>\n      app.request(path, {\n        method,\n        headers: {\n          ...(token === undefined ? {} : { authorization: `Bearer ${token}` }),\n          ...(body === \"\" ? {} : { \"content-type\": \"application/json\" }),\n        },\n        body: body === \"\" ? null : body,\n      });\n    const signIn = async (username: string): Promise<string> => {\n      expect((await send(\"POST\", \"/users\", undefined, JSON.stringify({ username, password: PASSWORD }))).status).toBe(201);\n      const res = await send(\"POST\", \"/sessions\", undefined, JSON.stringify({ username, password: PASSWORD }));\n      expect(res.status).toBe(201);\n      return ((await res.json()) as { token: string }).token;\n    };\n    const tokens = { owner: await signIn(OWNER), subject: await signIn(SUBJECT) };\n    const name = (s: Step) => (s.actor === \"owner\" ? OWNER : SUBJECT);\n    const run = async (s: Step, observe: boolean) => {\n      const res = await send(s.method, s.path, tokens[s.actor], s.body);\n      if (observe) console.log(`[probe] ${name(s)} ${s.method} ${s.path} -> ${res.status} (expected ${s.expectedStatus})`);\n      return res;\n    };\n\n    for (const s of SETUP) expect((await run(s, false)).status).toBe(s.expectedStatus);\n    expect((await run(CALL, true)).status).toBe(CALL.expectedStatus);\n\n    const revoke = await run(REVOKE, true);\n    const absent =\n      revoke.status === 404 &&\n      (revoke.headers.get(\"content-type\") ?? \"\").startsWith(\"text/plain\") &&\n      (await revoke.clone().text()) === \"404 Not Found\";\n    if (absent) throw new Error(\"probe not applicable: revoke route absent\");\n    expect(revoke.status).toBe(REVOKE.expectedStatus);\n\n    expect((await run(CALL_AGAIN, true)).status).toBe(CALL_AGAIN.expectedStatus);\n  });\n});\n",
+    "rationale": "The probe sets up a repository and adds a collaborator with write access. It then calls a protected route as the collaborator, which succeeds. After revoking the collaborator's access, the same call fails, demonstrating that the permission evaluation is fresh per request. In world A+B, the cached role would allow the second call to succeed, contradicting A's premise.",
+    "admission": {
+      "admitted": false,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [
+        "n/a-mishandled",
+        "wrong-world-behaviour"
+      ],
+      "detail": [
+        "base: expected n/a, observed fail/fail/fail",
+        "A: expected pass, observed fail/fail/fail",
+        "B: expected n/a, observed fail/fail/fail"
+      ]
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 409 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 478,
+          "id": "qwen-tpl-6-1791664895670-1:mutantA:0:0751ebd5-cf67-427d-b297-5f6a9170256d",
+          "testError": "AssertionError: expected 409 to be 201 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 409 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 481,
+          "id": "qwen-tpl-6-1791664895670-1:mutantA:1:fbb56e35-4857-4f7b-85fe-3ac8c5610a1e",
+          "testError": "AssertionError: expected 409 to be 201 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 409 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 481,
+          "id": "qwen-tpl-6-1791664895670-1:mutantA:2:3e518e66-3ec2-427e-b0ed-5c315ce0b998",
+          "testError": "AssertionError: expected 409 to be 201 // Object.is equality"
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [],
+      "unasserted": [],
+      "expectCalls": 6
+    }
+  },
+  "outcome": "rejected",
+  "totals": {
+    "modelMs": 19340,
+    "evalMs": 8109,
+    "promptTokens": 16717,
+    "completionTokens": 554,
+    "wallMs": 29344
+  }
+}

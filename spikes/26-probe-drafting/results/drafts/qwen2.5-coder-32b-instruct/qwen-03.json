@@ -1,0 +1,189 @@
+{
+  "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+  "settings": {
+    "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+    "api": "legacy",
+    "temperature": 0.6,
+    "maxTokens": 4096
+  },
+  "startedAt": "2026-10-10T20:36:31.611Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 33254,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\n\\nconst DEPS = memoryDeps();\\nconst USER = { username: \\\"alice\\\", password: \\\"secure-password\\\" };\\nconst REPO = { name: \\\"test-repo\\\", visibility: \\\"private\\\" };\\nconst COLLABORATOR = { username: \\\"bob\\\", role: \\\"write\\\" };\\n\\nfunction setup() {\\n  const app = createApp(DEPS);\\n  const { store, ids, clock } = DEPS;\\n  const userId = ids.id(\\\"usr\\\");\\n  const repoId = ids.id(\\\"repo\\\");\\n  const collabId = ids.id(\\\"usr\\\");\\n\\n  store.createUser({ id: userId, ...USER, passwordSalt: \\\"salt\\\", passwordHash: \\\"hash\\\", createdAt: clock.now() });\\n  store.createRepo({ id: repoId, ownerId: userId, ...REPO, createdAt: clock.now(), updatedAt: clock.now() });\\n  store.createUser({ id: collabId, username: COLLABORATOR.username, name: \\\"Bob\\\", passwordSalt: \\\"salt\\\", passwordHash: \\\"hash\\\", createdAt: clock.now() });\\n  store.addCollaborator({ repoId, userId: collabId, role: COLLABORATOR.role, addedBy: userId, addedAt: clock.now() });\\n\\n  return { app, userId, repoId, collabId };\\n}\\n\\ndescribe(\\\"permission evaluation freshness\\\", () => {\\n  it(\\\"should re-evaluate permissions per request after revocation\\\", async () => {\\n    const { app, userId, repoId, collabId } = setup();\\n    const { token } = await app.request(\\\"/sessions\\\", { method: \\\"POST\\\", body: JSON.stringify(USER) }).json();\\n\\n    // Collaborator can push initially\\n    let response = await app.request(`/repos/alice/test-repo/refs/heads/main`, { method: \\\"PUT\\\", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify({ sha: \\\"0000000000000000000000000000000000000000\\\" }) });\\n    console.log(`[probe] alice PUT /repos/alice/test-repo/refs/heads/main -> ${response.status} (expected 201)`);\\n    expect(response.status).toBe(201);\\n\\n    // Revoke collaborator's access\\n    response = await app.request(`/repos/alice/test-repo/collaborators/bob`, { method: \\\"DELETE\\\", headers: { authorization: `Bearer ${token}` } });\\n    console.log(`[probe] alice DELETE /repos/alice/test-repo/collaborators/bob -> ${response.status} (expected 204)`);\\n    expect(response.status).toBe(204);\\n\\n    // Collaborator cannot push anymore\\n    response = await app.request(`/repos/alice/test-repo/refs/heads/main`, { method: \\\"PUT\\\", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify({ sha: \\\"0000000000000000000000000000000000000001\\\" }) });\\n    console.log(`[probe] alice PUT /repos/alice/test-repo/refs/heads/main -> ${response.status} (expected 403)`);\\n    expect(response.status).toBe(403);\\n  });\\n});\\n\"},\"rationale\":\"This probe sets up a scenario where a user is initially a collaborator with write access to a repository. It then revokes that user's access and verifies that subsequent requests to modify the repository fail, demonstrating that permission evaluations are re-evaluated per request, as required by A's premise. If B's patch is applied, the cache introduced there would incorrectly allow the revoked user to retain access, causing the probe to fail.\"}",
+        "usage": {
+          "promptTokens": 16875,
+          "completionTokens": 933
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\n\nconst DEPS = memoryDeps();\nconst USER = { username: \"alice\", password: \"secure-password\" };\nconst REPO = { name: \"test-repo\", visibility: \"private\" };\nconst COLLABORATOR = { username: \"bob\", role: \"write\" };\n\nfunction setup() {\n  const app = createApp(DEPS);\n  const { store, ids, clock } = DEPS;\n  const userId = ids.id(\"usr\");\n  const repoId = ids.id(\"repo\");\n  const collabId = ids.id(\"usr\");\n\n  store.createUser({ id: userId, ...USER, passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: clock.now() });\n  store.createRepo({ id: repoId, ownerId: userId, ...REPO, createdAt: clock.now(), updatedAt: clock.now() });\n  store.createUser({ id: collabId, username: COLLABORATOR.username, name: \"Bob\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: clock.now() });\n  store.addCollaborator({ repoId, userId: collabId, role: COLLABORATOR.role, addedBy: userId, addedAt: clock.now() });\n\n  return { app, userId, repoId, collabId };\n}\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"should re-evaluate permissions per request after revocation\", async () => {\n    const { app, userId, repoId, collabId } = setup();\n    const { token } = await app.request(\"/sessions\", { method: \"POST\", body: JSON.stringify(USER) }).json();\n\n    // Collaborator can push initially\n    let response = await app.request(`/repos/alice/test-repo/refs/heads/main`, { method: \"PUT\", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify({ sha: \"0000000000000000000000000000000000000000\" }) });\n    console.log(`[probe] alice PUT /repos/alice/test-repo/refs/heads/main -> ${response.status} (expected 201)`);\n    expect(response.status).toBe(201);\n\n    // Revoke collaborator's access\n    response = await app.request(`/repos/alice/test-repo/collaborators/bob`, { method: \"DELETE\", headers: { authorization: `Bearer ${token}` } });\n    console.log(`[probe] alice DELETE /repos/alice/test-repo/collaborators/bob -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Collaborator cannot push anymore\n    response = await app.request(`/repos/alice/test-repo/refs/heads/main`, { method: \"PUT\", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify({ sha: \"0000000000000000000000000000000000000001\" }) });\n    console.log(`[probe] alice PUT /repos/alice/test-repo/refs/heads/main -> ${response.status} (expected 403)`);\n    expect(response.status).toBe(403);\n  });\n});\n",
+      "rationale": "This probe sets up a scenario where a user is initially a collaborator with write access to a repository. It then revokes that user's access and verifies that subsequent requests to modify the repository fail, demonstrating that permission evaluations are re-evaluated per request, as required by A's premise. If B's patch is applied, the cache introduced there would incorrectly allow the revoked user to retain access, causing the probe to fail.",
+      "evalMs": 4871,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\n\nconst DEPS = memoryDeps();\nconst USER = { username: \"alice\", password: \"secure-password\" };\nconst REPO = { name: \"test-repo\", visibility: \"private\" };\nconst COLLABORATOR = { username: \"bob\", role: \"write\" };\n\nfunction setup() {\n  const app = createApp(DEPS);\n  const { store, ids, clock } = DEPS;\n  const userId = ids.id(\"usr\");\n  const repoId = ids.id(\"repo\");\n  const collabId = ids.id(\"usr\");\n\n  store.createUser({ id: userId, ...USER, passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: clock.now() });\n  store.createRepo({ id: repoId, ownerId: userId, ...REPO, createdAt: clock.now(), updatedAt: clock.now() });\n  store.createUser({ id: collabId, username: COLLABORATOR.username, name: \"Bob\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: clock.now() });\n  store.addCollaborator({ repoId, userId: collabId, role: COLLABORATOR.role, addedBy: userId, addedAt: clock.now() });\n\n  return { app, userId, repoId, collabId };\n}\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"should re-evaluate permissions per request after revocation\", async () => {\n    const { app, userId, repoId, collabId } = setup();\n    const { token } = await app.request(\"/sessions\", { method: \"POST\", body: JSON.stringify(USER) }).json();\n\n    // Collaborator can push initially\n    let response = await app.request(`/repos/alice/test-repo/refs/heads/main`, { method: \"PUT\", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify({ sha: \"0000000000000000000000000000000000000000\" }) });\n    console.log(`[probe] alice PUT /repos/alice/test-repo/refs/heads/main -> ${response.status} (expected 201)`);\n    expect(response.status).toBe(201);\n\n    // Revoke collaborator's access\n    response = await app.request(`/repos/alice/test-repo/collaborators/bob`, { method: \"DELETE\", headers: { authorization: `Bearer ${token}` } });\n    console.log(`[probe] alice DELETE /repos/alice/test-repo/collaborators/bob -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Collaborator cannot push anymore\n    response = await app.request(`/repos/alice/test-repo/refs/heads/main`, { method: \"PUT\", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify({ sha: \"0000000000000000000000000000000000000001\" }) });\n    console.log(`[probe] alice PUT /repos/alice/test-repo/refs/heads/main -> ${response.status} (expected 403)`);\n    expect(response.status).toBe(403);\n  });\n});\n",
+    "rationale": "This probe sets up a scenario where a user is initially a collaborator with write access to a repository. It then revokes that user's access and verifies that subsequent requests to modify the repository fail, demonstrating that permission evaluations are re-evaluated per request, as required by A's premise. If B's patch is applied, the cache introduced there would incorrectly allow the revoked user to retain access, causing the probe to fail.",
+    "admission": {
+      "admitted": false,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [
+        "n/a-mishandled",
+        "wrong-world-behaviour"
+      ],
+      "detail": [
+        "base: expected n/a, observed fail/fail/fail",
+        "A: expected pass, observed fail/fail/fail",
+        "B: expected n/a, observed fail/fail/fail"
+      ]
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: app.request(...).json is not a function",
+          "observations": [],
+          "ms": 228,
+          "id": "qwen-3-1791664591463-1:mutantA:0:a33e11f9-b220-454c-af3a-296fd561a0af",
+          "testError": "TypeError: app.request(...).json is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: app.request(...).json is not a function",
+          "observations": [],
+          "ms": 227,
+          "id": "qwen-3-1791664591463-1:mutantA:1:ab881096-85be-4ed3-b8c5-9e03a5b72b1f",
+          "testError": "TypeError: app.request(...).json is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: app.request(...).json is not a function",
+          "observations": [],
+          "ms": 231,
+          "id": "qwen-3-1791664591463-1:mutantA:2:d1f7cc5f-bf6d-435d-a791-70e81548597f",
+          "testError": "TypeError: app.request(...).json is not a function"
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [
+        {
+          "line": 36,
+          "text": "app.request(`/repos/alice/test-repo/collaborators/bob`, { method: \"DELETE\", headers: { authorization",
+          "boundTo": "response",
+          "asserted": true
+        }
+      ],
+      "unasserted": [],
+      "expectCalls": 3
+    }
+  },
+  "outcome": "rejected",
+  "totals": {
+    "modelMs": 33254,
+    "evalMs": 5179,
+    "promptTokens": 16875,
+    "completionTokens": 933,
+    "wallMs": 39661
+  }
+}

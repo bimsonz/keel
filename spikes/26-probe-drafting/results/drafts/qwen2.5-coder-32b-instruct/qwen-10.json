@@ -1,0 +1,239 @@
+{
+  "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+  "settings": {
+    "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+    "api": "legacy",
+    "temperature": 0.6,
+    "maxTokens": 4096
+  },
+  "startedAt": "2026-10-10T20:38:28.192Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 35009,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\n\\nconst revokePath = \\\"/repos/:owner/:repo/collaborators/:username\\\";\\n\\nconst setup = async (deps: ReturnType<typeof memoryDeps>) => {\\n  const app = createApp(deps);\\n  const user = await createUser(app);\\n  const repo = await createRepo(app, user);\\n  const collaborator = await addCollaborator(app, user, repo);\\n  return { app, user, repo, collaborator };\\n};\\n\\nconst createUser = async (app: any) => {\\n  const res = await app.request(\\\"/users\\\", { method: \\\"POST\\\", body: JSON.stringify({ username: \\\"alice\\\", password: \\\"password123\\\", name: \\\"Alice\\\" }) });\\n  expect(res.status).toBe(201);\\n  const user = await res.json();\\n  return user;\\n};\\n\\nconst createRepo = async (app: any, user: any) => {\\n  const res = await app.request(\\\"/repos\\\", {\\n    method: \\\"POST\\\",\\n    headers: { authorization: `Bearer ${user.token}` },\\n    body: JSON.stringify({ name: \\\"repo1\\\", visibility: \\\"private\\\" }),\\n  });\\n  expect(res.status).toBe(201);\\n  const repo = await res.json();\\n  return repo;\\n};\\n\\nconst addCollaborator = async (app: any, user: any, repo: any) => {\\n  const res = await app.request(`/repos/${user.username}/repo1/collaborators/bob\\\", {\\n    method: \\\"PUT\\\",\\n    headers: { authorization: `Bearer ${user.token}` },\\n    body: JSON.stringify({ role: \\\"read\\\" }),\\n  });\\n  expect(res.status).toBe(201);\\n  const collaborator = await res.json();\\n  return collaborator;\\n};\\n\\nconst revokeCollaborator = async (app: any, user: any, repo: any) => {\\n  const res = await app.request(`/repos/${user.username}/${repo.name}/collaborators/bob\\\", { method: \\\"DELETE\\\", headers: { authorization: `Bearer ${user.token}` } });\\n  return res;\\n};\\n\\nconst checkPermission = async (app: any, user: any, repo: any) => {\\n  const res = await app.request(`/repos/${user.username}/${repo.name}\\\", { headers: { authorization: `Bearer ${user.token}` } });\\n  return res;\\n};\\n\\ndescribe(\\\"permission evaluation freshness\\\", () => {\\n  it(\\\"should enforce per-request freshness\\\", async () => {\\n    const deps = memoryDeps();\\n    const { app, user, repo } = await setup(deps);\\n\\n    // Revoke the collaborator's access.\\n    const revokeRes = await revokeCollaborator(app, user, repo);\\n    console.log(`[probe] admin DELETE ${revokePath} -> ${revokeRes.status} (expected 204)`);\\n    if (revokeRes.status !== 204) {\\n      if (revokeRes.status === 404) throw new Error(\\\"probe not applicable: revoke route is absent\\\");\\n      expect(revokeRes.status).toBe(204);\\n    }\\n\\n    // Attempt to access the repo as the revoked collaborator.\\n    const accessRes = await checkPermission(app, user, repo);\\n    console.log(`[probe] collaborator GET /repos/:owner/:repo -> ${accessRes.status} (expected 404)`);\\n    expect(accessRes.status).toBe(404);\\n  });\\n});\"},\"rationale\":\"This probe sets up a user, a repository, and a collaborator, then revokes the collaborator's access and checks if the collaborator can still access the repository. It passes in world A, where the permission evaluation is per-request, and fails in world A+B, where the permission evaluation might be cached per-session, allowing the revoked collaborator to retain access. In worlds base and B, the revoke route is absent, making the probe not applicable.\"}",
+        "usage": {
+          "promptTokens": 16875,
+          "completionTokens": 969
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\n\nconst revokePath = \"/repos/:owner/:repo/collaborators/:username\";\n\nconst setup = async (deps: ReturnType<typeof memoryDeps>) => {\n  const app = createApp(deps);\n  const user = await createUser(app);\n  const repo = await createRepo(app, user);\n  const collaborator = await addCollaborator(app, user, repo);\n  return { app, user, repo, collaborator };\n};\n\nconst createUser = async (app: any) => {\n  const res = await app.request(\"/users\", { method: \"POST\", body: JSON.stringify({ username: \"alice\", password: \"password123\", name: \"Alice\" }) });\n  expect(res.status).toBe(201);\n  const user = await res.json();\n  return user;\n};\n\nconst createRepo = async (app: any, user: any) => {\n  const res = await app.request(\"/repos\", {\n    method: \"POST\",\n    headers: { authorization: `Bearer ${user.token}` },\n    body: JSON.stringify({ name: \"repo1\", visibility: \"private\" }),\n  });\n  expect(res.status).toBe(201);\n  const repo = await res.json();\n  return repo;\n};\n\nconst addCollaborator = async (app: any, user: any, repo: any) => {\n  const res = await app.request(`/repos/${user.username}/repo1/collaborators/bob\", {\n    method: \"PUT\",\n    headers: { authorization: `Bearer ${user.token}` },\n    body: JSON.stringify({ role: \"read\" }),\n  });\n  expect(res.status).toBe(201);\n  const collaborator = await res.json();\n  return collaborator;\n};\n\nconst revokeCollaborator = async (app: any, user: any, repo: any) => {\n  const res = await app.request(`/repos/${user.username}/${repo.name}/collaborators/bob\", { method: \"DELETE\", headers: { authorization: `Bearer ${user.token}` } });\n  return res;\n};\n\nconst checkPermission = async (app: any, user: any, repo: any) => {\n  const res = await app.request(`/repos/${user.username}/${repo.name}\", { headers: { authorization: `Bearer ${user.token}` } });\n  return res;\n};\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"should enforce per-request freshness\", async () => {\n    const deps = memoryDeps();\n    const { app, user, repo } = await setup(deps);\n\n    // Revoke the collaborator's access.\n    const revokeRes = await revokeCollaborator(app, user, repo);\n    console.log(`[probe] admin DELETE ${revokePath} -> ${revokeRes.status} (expected 204)`);\n    if (revokeRes.status !== 204) {\n      if (revokeRes.status === 404) throw new Error(\"probe not applicable: revoke route is absent\");\n      expect(revokeRes.status).toBe(204);\n    }\n\n    // Attempt to access the repo as the revoked collaborator.\n    const accessRes = await checkPermission(app, user, repo);\n    console.log(`[probe] collaborator GET /repos/:owner/:repo -> ${accessRes.status} (expected 404)`);\n    expect(accessRes.status).toBe(404);\n  });\n});",
+      "rationale": "This probe sets up a user, a repository, and a collaborator, then revokes the collaborator's access and checks if the collaborator can still access the repository. It passes in world A, where the permission evaluation is per-request, and fails in world A+B, where the permission evaluation might be cached per-session, allowing the revoked collaborator to retain access. In worlds base and B, the revoke route is absent, making the probe not applicable.",
+      "evalMs": 653,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        }
+      },
+      "errors": "bundling probe/probe.test.ts failed:\nBuild failed with 1 error:\nvirtual:probe/probe.test.ts:36:31: ERROR: Expected \")\" but found \"Bearer\""
+    },
+    {
+      "n": 2,
+      "call": {
+        "ms": 31304,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\n\\nconst revokePath = \\\"/repos/:owner/:repo/collaborators/:username\\\";\\n\\nconst setup = async (deps: ReturnType<typeof memoryDeps>) => {\\n  const app = createApp(deps);\\n  const user = await createUser(app);\\n  const repo = await createRepo(app, user);\\n  const collaborator = await addCollaborator(app, user, repo);\\n  return { app, user, repo, collaborator };\\n};\\n\\nconst createUser = async (app: any) => {\\n  const res = await app.request(\\\"/users\\\", { method: \\\"POST\\\", body: JSON.stringify({ username: \\\"alice\\\", password: \\\"password123\\\", name: \\\"Alice\\\" }) });\\n  expect(res.status).toBe(201);\\n  const user = await res.json();\\n  return user;\\n};\\n\\nconst createRepo = async (app: any, user: any) => {\\n  const res = await app.request(\\\"/repos\\\", {\\n    method: \\\"POST\\\",\\n    headers: { authorization: `Bearer ${user.token}` },\\n    body: JSON.stringify({ name: \\\"repo1\\\", visibility: \\\"private\\\" }),\\n  });\\n  expect(res.status).toBe(201);\\n  const repo = await res.json();\\n  return repo;\\n};\\n\\nconst addCollaborator = async (app: any, user: any, repo: any) => {\\n  const res = await app.request(`/repos/${user.username}/repo1/collaborators/bob`, {\\n    method: \\\"PUT\\\",\\n    headers: { authorization: `Bearer ${user.token}` },\\n    body: JSON.stringify({ role: \\\"read\\\" }),\\n  });\\n  expect(res.status).toBe(201);\\n  const collaborator = await res.json();\\n  return collaborator;\\n};\\n\\nconst revokeCollaborator = async (app: any, user: any, repo: any) => {\\n  const res = await app.request(`/repos/${user.username}/${repo.name}/collaborators/bob`, { method: \\\"DELETE\\\", headers: { authorization: `Bearer ${user.token}` } });\\n  return res;\\n};\\n\\nconst checkPermission = async (app: any, user: any, repo: any) => {\\n  const res = await app.request(`/repos/${user.username}/${repo.name}`, { headers: { authorization: `Bearer ${user.token}` } });\\n  return res;\\n};\\n\\ndescribe(\\\"permission evaluation freshness\\\", () => {\\n  it(\\\"should enforce per-request freshness\\\", async () => {\\n    const deps = memoryDeps();\\n    const { app, user, repo } = await setup(deps);\\n\\n    // Revoke the collaborator's access.\\n    const revokeRes = await revokeCollaborator(app, user, repo);\\n    console.log(`[probe] admin DELETE ${revokePath} -> ${revokeRes.status} (expected 204)`);\\n    if (revokeRes.status !== 204) {\\n      if (revokeRes.status === 404) throw new Error(\\\"probe not applicable: revoke route is absent\\\");\\n      expect(revokeRes.status).toBe(204);\\n    }\\n\\n    // Attempt to access the repo as the revoked collaborator.\\n    const accessRes = await checkPermission(app, user, repo);\\n    console.log(`[probe] collaborator GET /repos/:owner/:repo -> ${accessRes.status} (expected 404)`);\\n    expect(accessRes.status).toBe(404);\\n  });\\n});\"},\"rationale\":\"This probe sets up a user, a repository, and a collaborator, then revokes the collaborator's access and checks if the collaborator can still access the repository. It passes in world A, where the permission evaluation is per-request, and fails in world A+B, where the permission evaluation might be cached per-session, allowing the revoked collaborator to retain access. In worlds base and B, the revoke route is absent, making the probe not applicable.\"}",
+        "usage": {
+          "promptTokens": 17921,
+          "completionTokens": 957
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\n\nconst revokePath = \"/repos/:owner/:repo/collaborators/:username\";\n\nconst setup = async (deps: ReturnType<typeof memoryDeps>) => {\n  const app = createApp(deps);\n  const user = await createUser(app);\n  const repo = await createRepo(app, user);\n  const collaborator = await addCollaborator(app, user, repo);\n  return { app, user, repo, collaborator };\n};\n\nconst createUser = async (app: any) => {\n  const res = await app.request(\"/users\", { method: \"POST\", body: JSON.stringify({ username: \"alice\", password: \"password123\", name: \"Alice\" }) });\n  expect(res.status).toBe(201);\n  const user = await res.json();\n  return user;\n};\n\nconst createRepo = async (app: any, user: any) => {\n  const res = await app.request(\"/repos\", {\n    method: \"POST\",\n    headers: { authorization: `Bearer ${user.token}` },\n    body: JSON.stringify({ name: \"repo1\", visibility: \"private\" }),\n  });\n  expect(res.status).toBe(201);\n  const repo = await res.json();\n  return repo;\n};\n\nconst addCollaborator = async (app: any, user: any, repo: any) => {\n  const res = await app.request(`/repos/${user.username}/repo1/collaborators/bob`, {\n    method: \"PUT\",\n    headers: { authorization: `Bearer ${user.token}` },\n    body: JSON.stringify({ role: \"read\" }),\n  });\n  expect(res.status).toBe(201);\n  const collaborator = await res.json();\n  return collaborator;\n};\n\nconst revokeCollaborator = async (app: any, user: any, repo: any) => {\n  const res = await app.request(`/repos/${user.username}/${repo.name}/collaborators/bob`, { method: \"DELETE\", headers: { authorization: `Bearer ${user.token}` } });\n  return res;\n};\n\nconst checkPermission = async (app: any, user: any, repo: any) => {\n  const res = await app.request(`/repos/${user.username}/${repo.name}`, { headers: { authorization: `Bearer ${user.token}` } });\n  return res;\n};\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"should enforce per-request freshness\", async () => {\n    const deps = memoryDeps();\n    const { app, user, repo } = await setup(deps);\n\n    // Revoke the collaborator's access.\n    const revokeRes = await revokeCollaborator(app, user, repo);\n    console.log(`[probe] admin DELETE ${revokePath} -> ${revokeRes.status} (expected 204)`);\n    if (revokeRes.status !== 204) {\n      if (revokeRes.status === 404) throw new Error(\"probe not applicable: revoke route is absent\");\n      expect(revokeRes.status).toBe(204);\n    }\n\n    // Attempt to access the repo as the revoked collaborator.\n    const accessRes = await checkPermission(app, user, repo);\n    console.log(`[probe] collaborator GET /repos/:owner/:repo -> ${accessRes.status} (expected 404)`);\n    expect(accessRes.status).toBe(404);\n  });\n});",
+      "rationale": "This probe sets up a user, a repository, and a collaborator, then revokes the collaborator's access and checks if the collaborator can still access the repository. It passes in world A, where the permission evaluation is per-request, and fails in world A+B, where the permission evaluation might be cached per-session, allowing the revoked collaborator to retain access. In worlds base and B, the revoke route is absent, making the probe not applicable.",
+      "evalMs": 2914,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 2,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\n\nconst revokePath = \"/repos/:owner/:repo/collaborators/:username\";\n\nconst setup = async (deps: ReturnType<typeof memoryDeps>) => {\n  const app = createApp(deps);\n  const user = await createUser(app);\n  const repo = await createRepo(app, user);\n  const collaborator = await addCollaborator(app, user, repo);\n  return { app, user, repo, collaborator };\n};\n\nconst createUser = async (app: any) => {\n  const res = await app.request(\"/users\", { method: \"POST\", body: JSON.stringify({ username: \"alice\", password: \"password123\", name: \"Alice\" }) });\n  expect(res.status).toBe(201);\n  const user = await res.json();\n  return user;\n};\n\nconst createRepo = async (app: any, user: any) => {\n  const res = await app.request(\"/repos\", {\n    method: \"POST\",\n    headers: { authorization: `Bearer ${user.token}` },\n    body: JSON.stringify({ name: \"repo1\", visibility: \"private\" }),\n  });\n  expect(res.status).toBe(201);\n  const repo = await res.json();\n  return repo;\n};\n\nconst addCollaborator = async (app: any, user: any, repo: any) => {\n  const res = await app.request(`/repos/${user.username}/repo1/collaborators/bob`, {\n    method: \"PUT\",\n    headers: { authorization: `Bearer ${user.token}` },\n    body: JSON.stringify({ role: \"read\" }),\n  });\n  expect(res.status).toBe(201);\n  const collaborator = await res.json();\n  return collaborator;\n};\n\nconst revokeCollaborator = async (app: any, user: any, repo: any) => {\n  const res = await app.request(`/repos/${user.username}/${repo.name}/collaborators/bob`, { method: \"DELETE\", headers: { authorization: `Bearer ${user.token}` } });\n  return res;\n};\n\nconst checkPermission = async (app: any, user: any, repo: any) => {\n  const res = await app.request(`/repos/${user.username}/${repo.name}`, { headers: { authorization: `Bearer ${user.token}` } });\n  return res;\n};\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"should enforce per-request freshness\", async () => {\n    const deps = memoryDeps();\n    const { app, user, repo } = await setup(deps);\n\n    // Revoke the collaborator's access.\n    const revokeRes = await revokeCollaborator(app, user, repo);\n    console.log(`[probe] admin DELETE ${revokePath} -> ${revokeRes.status} (expected 204)`);\n    if (revokeRes.status !== 204) {\n      if (revokeRes.status === 404) throw new Error(\"probe not applicable: revoke route is absent\");\n      expect(revokeRes.status).toBe(204);\n    }\n\n    // Attempt to access the repo as the revoked collaborator.\n    const accessRes = await checkPermission(app, user, repo);\n    console.log(`[probe] collaborator GET /repos/:owner/:repo -> ${accessRes.status} (expected 404)`);\n    expect(accessRes.status).toBe(404);\n  });\n});",
+    "rationale": "This probe sets up a user, a repository, and a collaborator, then revokes the collaborator's access and checks if the collaborator can still access the repository. It passes in world A, where the permission evaluation is per-request, and fails in world A+B, where the permission evaluation might be cached per-session, allowing the revoked collaborator to retain access. In worlds base and B, the revoke route is absent, making the probe not applicable.",
+    "admission": {
+      "admitted": false,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [
+        "n/a-mishandled",
+        "wrong-world-behaviour"
+      ],
+      "detail": [
+        "base: expected n/a, observed fail/fail/fail",
+        "A: expected pass, observed fail/fail/fail",
+        "B: expected n/a, observed fail/fail/fail"
+      ]
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 401 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 242,
+          "id": "qwen-10-1791664708006-2:mutantA:0:1acaaa03-d7ce-496a-bd6d-74d159efa5e2",
+          "testError": "AssertionError: expected 401 to be 201 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 401 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 242,
+          "id": "qwen-10-1791664708006-2:mutantA:1:e0483905-c4fb-4fdf-9628-d3adfbe22032",
+          "testError": "AssertionError: expected 401 to be 201 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 401 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 241,
+          "id": "qwen-10-1791664708006-2:mutantA:2:6f094273-cf46-4b82-8d8f-993b7d9c2aac",
+          "testError": "AssertionError: expected 401 to be 201 // Object.is equality"
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [
+        {
+          "line": 60,
+          "text": "revokeCollaborator(app, user, repo)",
+          "boundTo": "revokeRes",
+          "asserted": true
+        }
+      ],
+      "unasserted": [],
+      "expectCalls": 5
+    }
+  },
+  "outcome": "rejected",
+  "totals": {
+    "modelMs": 66313,
+    "evalMs": 3881,
+    "promptTokens": 34796,
+    "completionTokens": 1926,
+    "wallMs": 73234
+  }
+}

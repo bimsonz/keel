@@ -1,0 +1,83 @@
+{
+  "tag": "d2d5dd58",
+  "evals": [
+    {
+      "world": "base",
+      "bundleError": "Build failed with 1 error:\nvirtual:probe/probe.test.ts:34:25: ERROR: Expected \")\" but found \"DELETE\"",
+      "runs": []
+    },
+    {
+      "world": "A",
+      "bundleError": "Build failed with 1 error:\nvirtual:probe/probe.test.ts:34:25: ERROR: Expected \")\" but found \"DELETE\"",
+      "runs": []
+    },
+    {
+      "world": "B",
+      "bundleError": "Build failed with 1 error:\nvirtual:probe/probe.test.ts:34:25: ERROR: Expected \")\" but found \"DELETE\"",
+      "runs": []
+    },
+    {
+      "world": "AB",
+      "bundleError": "Build failed with 1 error:\nvirtual:probe/probe.test.ts:34:25: ERROR: Expected \")\" but found \"DELETE\"",
+      "runs": []
+    }
+  ],
+  "bundleMs": {
+    "base": 253,
+    "A": 38,
+    "B": 40,
+    "AB": 744
+  },
+  "wallMs": 1153,
+  "admission": {
+    "admitted": false,
+    "cells": {
+      "base": {
+        "expected": "n/a",
+        "observed": [
+          "compile-error"
+        ],
+        "stable": false,
+        "ok": false
+      },
+      "A": {
+        "expected": "pass",
+        "observed": [
+          "compile-error"
+        ],
+        "stable": false,
+        "ok": false
+      },
+      "B": {
+        "expected": "n/a",
+        "observed": [
+          "compile-error"
+        ],
+        "stable": false,
+        "ok": false
+      },
+      "AB": {
+        "expected": "fail",
+        "observed": [
+          "compile-error"
+        ],
+        "stable": false,
+        "ok": false
+      }
+    },
+    "failures": [
+      "compile-error"
+    ],
+    "detail": [
+      "base: bundle error",
+      "A: bundle error",
+      "B: bundle error",
+      "AB: bundle error"
+    ]
+  },
+  "vacuity": {
+    "vacuous": true,
+    "observed": [],
+    "why": "mutant A not evaluated"
+  }
+}

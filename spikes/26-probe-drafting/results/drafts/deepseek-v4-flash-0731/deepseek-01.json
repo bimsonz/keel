@@ -1,0 +1,35 @@
+{
+  "model": "@cf/deepseek-ai/deepseek-v4-flash-0731",
+  "settings": {
+    "model": "@cf/deepseek-ai/deepseek-v4-flash-0731",
+    "api": "openai",
+    "temperature": 0.6,
+    "maxTokens": 32000
+  },
+  "startedAt": "2026-10-10T20:38:08.959Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 720292,
+        "content": "",
+        "usage": {
+          "promptTokens": 0,
+          "completionTokens": 0
+        },
+        "infraRetries": 3,
+        "infraError": "AiError: 3046: Request timeout"
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "outcome": "infra-error",
+  "totals": {
+    "modelMs": 720292,
+    "evalMs": 0,
+    "promptTokens": 0,
+    "completionTokens": 0,
+    "wallMs": 720327
+  }
+}

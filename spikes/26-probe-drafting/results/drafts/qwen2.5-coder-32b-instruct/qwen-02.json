@@ -1,0 +1,305 @@
+{
+  "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+  "settings": {
+    "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+    "api": "legacy",
+    "temperature": 0.6,
+    "maxTokens": 4096
+  },
+  "startedAt": "2026-10-10T20:36:31.667Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 41243,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { login, logout } from \\\"../src/auth/sessions.ts\\\";\\nimport { requirePermission } from \\\"../src/authz/require-permission.ts\\\";\\n\\nconst deps = memoryDeps();\\ndeps.ids = sequentialIds();\\ndeps.clock.advance(1000);\\nconst app = createApp(deps);\\n\\nconst user = {\\n  username: \\\"alice\\\",\\n  password: \\\"securepassword\\\",\\n};\\n\\nconst repo = {\\n  name: \\\"test-repo\\\",\\n  visibility: \\\"private\\\",\\n};\\n\\nconst collaborator = {\\n  username: \\\"bob\\\",\\n  role: \\\"write\\\",\\n};\\n\\nasync function setup() {\\n  const alice = await login(deps, user.username, user.password);\\n  if (!alice) throw new Error(\\\"login failed\\\");\\n  const bob = await login(deps, collaborator.username, \\\"anotherpassword\\\");\\n  if (!bob) throw new Error(\\\"login failed\\\");\\n  const owner = deps.store.findUserByUsername(alice.user.username)!;\\n  const createdRepo = {\\n    id: deps.ids.id(\\\"repo\\\"),\\n    ownerId: owner.id,\\n    name: repo.name,\\n    description: \\\"\\\",\\n    visibility: repo.visibility,\\n    defaultBranch: \\\"main\\\",\\n    createdAt: deps.clock.now(),\\n    updatedAt: deps.clock.now(),\\n  };\\n  deps.store.createRepo(createdRepo);\\n  deps.store.addCollaborator({\\n    repoId: createdRepo.id,\\n    userId: bob.user.id,\\n    role: collaborator.role,\\n    addedBy: owner.id,\\n    addedAt: deps.clock.now(),\\n  });\\n  return { alice, bob, createdRepo };\\n}\\n\\ndescribe(\\\"permission evaluation freshness\\\", () => {\\n  it(\\\"checks permission freshness\\\", async () => {\\n    const { alice, bob, createdRepo } = await setup();\\n\\n    // Bob can push initially\\n    const pushRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/refs/heads/main`, {\\n      method: \\\"PUT\\\",\\n      headers: { authorization: `Bearer ${bob.token}` },\\n      body: JSON.stringify({ sha: \\\"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678\\\" }),\\n    });\\n    console.log(`[probe] bob PUT /repos/${alice.user.username}/${createdRepo.name}/refs/heads/main -> ${pushRequest.status} (expected 201)`);\\n    expect(pushRequest.status).toBe(201);\\n\\n    // Revoke Bob's access\\n    const revokeRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/collaborators/${bob.user.username}`, {\\n      method: \\\"DELETE\\\",\\n      headers: { authorization: `Bearer ${alice.token}` },\\n    });\\n    console.log(`[probe] alice DELETE /repos/${alice.user.username}/${createdRepo.name}/collaborators/${bob.user.username} -> ${revokeRequest.status} (expected 204)`);\\n    expect(revokeRequest.status).toBe(204);\\n\\n    // Bob should no longer be able to push\\n    const postRevokePushRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/refs/heads/main`, {\\n      method: \\\"PUT\\\",\\n      headers: { authorization: `Bearer ${bob.token}` },\\n      body: JSON.stringify({ sha: \\\"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678\\\" }),\\n    });\\n    console.log(`[probe] bob PUT /repos/${alice.user.username}/${createdRepo.name}/refs/heads/main -> ${postRevokePushRequest.status} (expected 403)`);\\n    expect(postRevokePushRequest.status).toBe(403);\\n  });\\n});\\n\"},\"rationale\":\"This probe tests the freshness of permission evaluation by setting up a scenario where a user (Bob) is initially granted write access to a repository owned by another user (Alice). After revoking Bob's access, the probe verifies that Bob can no longer perform actions that require write permissions, ensuring that the permission evaluation is per-request and not cached in a way that would allow outdated permissions.\"}",
+        "usage": {
+          "promptTokens": 16875,
+          "completionTokens": 1088
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login, logout } from \"../src/auth/sessions.ts\";\nimport { requirePermission } from \"../src/authz/require-permission.ts\";\n\nconst deps = memoryDeps();\ndeps.ids = sequentialIds();\ndeps.clock.advance(1000);\nconst app = createApp(deps);\n\nconst user = {\n  username: \"alice\",\n  password: \"securepassword\",\n};\n\nconst repo = {\n  name: \"test-repo\",\n  visibility: \"private\",\n};\n\nconst collaborator = {\n  username: \"bob\",\n  role: \"write\",\n};\n\nasync function setup() {\n  const alice = await login(deps, user.username, user.password);\n  if (!alice) throw new Error(\"login failed\");\n  const bob = await login(deps, collaborator.username, \"anotherpassword\");\n  if (!bob) throw new Error(\"login failed\");\n  const owner = deps.store.findUserByUsername(alice.user.username)!;\n  const createdRepo = {\n    id: deps.ids.id(\"repo\"),\n    ownerId: owner.id,\n    name: repo.name,\n    description: \"\",\n    visibility: repo.visibility,\n    defaultBranch: \"main\",\n    createdAt: deps.clock.now(),\n    updatedAt: deps.clock.now(),\n  };\n  deps.store.createRepo(createdRepo);\n  deps.store.addCollaborator({\n    repoId: createdRepo.id,\n    userId: bob.user.id,\n    role: collaborator.role,\n    addedBy: owner.id,\n    addedAt: deps.clock.now(),\n  });\n  return { alice, bob, createdRepo };\n}\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"checks permission freshness\", async () => {\n    const { alice, bob, createdRepo } = await setup();\n\n    // Bob can push initially\n    const pushRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/refs/heads/main`, {\n      method: \"PUT\",\n      headers: { authorization: `Bearer ${bob.token}` },\n      body: JSON.stringify({ sha: \"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678\" }),\n    });\n    console.log(`[probe] bob PUT /repos/${alice.user.username}/${createdRepo.name}/refs/heads/main -> ${pushRequest.status} (expected 201)`);\n    expect(pushRequest.status).toBe(201);\n\n    // Revoke Bob's access\n    const revokeRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/collaborators/${bob.user.username}`, {\n      method: \"DELETE\",\n      headers: { authorization: `Bearer ${alice.token}` },\n    });\n    console.log(`[probe] alice DELETE /repos/${alice.user.username}/${createdRepo.name}/collaborators/${bob.user.username} -> ${revokeRequest.status} (expected 204)`);\n    expect(revokeRequest.status).toBe(204);\n\n    // Bob should no longer be able to push\n    const postRevokePushRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/refs/heads/main`, {\n      method: \"PUT\",\n      headers: { authorization: `Bearer ${bob.token}` },\n      body: JSON.stringify({ sha: \"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678\" }),\n    });\n    console.log(`[probe] bob PUT /repos/${alice.user.username}/${createdRepo.name}/refs/heads/main -> ${postRevokePushRequest.status} (expected 403)`);\n    expect(postRevokePushRequest.status).toBe(403);\n  });\n});\n",
+      "rationale": "This probe tests the freshness of permission evaluation by setting up a scenario where a user (Bob) is initially granted write access to a repository owned by another user (Alice). After revoking Bob's access, the probe verifies that Bob can no longer perform actions that require write permissions, ensuring that the permission evaluation is per-request and not cached in a way that would allow outdated permissions.",
+      "evalMs": 8220,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        }
+      },
+      "errors": "{\"outcome\":\"fail\",\"reason\":\"probe harness error: expected exactly one probe test, found 0: TypeError: deps.clock.advance is not a function\"}"
+    },
+    {
+      "n": 2,
+      "call": {
+        "ms": 37500,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { login, logout } from \\\"../src/auth/sessions.ts\\\";\\nimport { requirePermission } from \\\"../src/authz/require-permission.ts\\\";\\n\\nconst deps = memoryDeps();\\ndeps.ids = sequentialIds();\\ndeps.clock = new ManualClock(deps.clock.now());\\nconst app = createApp(deps);\\n\\nconst user = {\\n  username: \\\"alice\\\",\\n  password: \\\"securepassword\\\",\\n};\\n\\nconst repo = {\\n  name: \\\"test-repo\\\",\\n  visibility: \\\"private\\\",\\n};\\n\\nconst collaborator = {\\n  username: \\\"bob\\\",\\n  role: \\\"write\\\",\\n};\\n\\nasync function setup() {\\n  const alice = await login(deps, user.username, user.password);\\n  if (!alice) throw new Error(\\\"login failed\\\");\\n  const bob = await login(deps, collaborator.username, \\\"anotherpassword\\\");\\n  if (!bob) throw new Error(\\\"login failed\\\");\\n  const owner = deps.store.findUserByUsername(alice.user.username)!;\\n  const createdRepo = {\\n    id: deps.ids.id(\\\"repo\\\"),\\n    ownerId: owner.id,\\n    name: repo.name,\\n    description: \\\"\\\",\\n    visibility: repo.visibility,\\n    defaultBranch: \\\"main\\\",\\n    createdAt: deps.clock.now(),\\n    updatedAt: deps.clock.now(),\\n  };\\n  deps.store.createRepo(createdRepo);\\n  deps.store.addCollaborator({\\n    repoId: createdRepo.id,\\n    userId: bob.user.id,\\n    role: collaborator.role,\\n    addedBy: owner.id,\\n    addedAt: deps.clock.now(),\\n  });\\n  return { alice, bob, createdRepo };\\n}\\n\\ndescribe(\\\"permission evaluation freshness\\\", () => {\\n  it(\\\"checks permission freshness\\\", async () => {\\n    const { alice, bob, createdRepo } = await setup();\\n\\n    // Bob can push initially\\n    const pushRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/refs/heads/main`, {\\n      method: \\\"PUT\\\",\\n      headers: { authorization: `Bearer ${bob.token}` },\\n      body: JSON.stringify({ sha: \\\"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678\\\" }),\\n    });\\n    console.log(`[probe] bob PUT /repos/${alice.user.username}/${createdRepo.name}/refs/heads/main -> ${pushRequest.status} (expected 201)`);\\n    expect(pushRequest.status).toBe(201);\\n\\n    // Revoke Bob's access\\n    const revokeRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/collaborators/${bob.user.username}`, {\\n      method: \\\"DELETE\\\",\\n      headers: { authorization: `Bearer ${alice.token}` },\\n    });\\n    console.log(`[probe] alice DELETE /repos/${alice.user.username}/${createdRepo.name}/collaborators/${bob.user.username} -> ${revokeRequest.status} (expected 204)`);\\n    expect(revokeRequest.status).toBe(204);\\n\\n    // Bob should no longer be able to push\\n    const postRevokePushRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/refs/heads/main`, {\\n      method: \\\"PUT\\\",\\n      headers: { authorization: `Bearer ${bob.token}` },\\n      body: JSON.stringify({ sha: \\\"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678\\\" }),\\n    });\\n    console.log(`[probe] bob PUT /repos/${alice.user.username}/${createdRepo.name}/refs/heads/main -> ${postRevokePushRequest.status} (expected 403)`);\\n    expect(postRevokePushRequest.status).toBe(403);\\n  });\\n});\\n\"},\"rationale\":\"This probe tests the freshness of permission evaluation by setting up a scenario where a user (Bob) is initially granted write access to a repository owned by another user (Alice). After revoking Bob's access, the probe verifies that Bob can no longer perform actions that require write permissions, ensuring that the permission evaluation is per-request and not cached in a way that would allow outdated permissions. The clock is replaced with a ManualClock to control time and ensure consistent behavior across different worlds.\"}",
+        "usage": {
+          "promptTokens": 18031,
+          "completionTokens": 1099
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login, logout } from \"../src/auth/sessions.ts\";\nimport { requirePermission } from \"../src/authz/require-permission.ts\";\n\nconst deps = memoryDeps();\ndeps.ids = sequentialIds();\ndeps.clock = new ManualClock(deps.clock.now());\nconst app = createApp(deps);\n\nconst user = {\n  username: \"alice\",\n  password: \"securepassword\",\n};\n\nconst repo = {\n  name: \"test-repo\",\n  visibility: \"private\",\n};\n\nconst collaborator = {\n  username: \"bob\",\n  role: \"write\",\n};\n\nasync function setup() {\n  const alice = await login(deps, user.username, user.password);\n  if (!alice) throw new Error(\"login failed\");\n  const bob = await login(deps, collaborator.username, \"anotherpassword\");\n  if (!bob) throw new Error(\"login failed\");\n  const owner = deps.store.findUserByUsername(alice.user.username)!;\n  const createdRepo = {\n    id: deps.ids.id(\"repo\"),\n    ownerId: owner.id,\n    name: repo.name,\n    description: \"\",\n    visibility: repo.visibility,\n    defaultBranch: \"main\",\n    createdAt: deps.clock.now(),\n    updatedAt: deps.clock.now(),\n  };\n  deps.store.createRepo(createdRepo);\n  deps.store.addCollaborator({\n    repoId: createdRepo.id,\n    userId: bob.user.id,\n    role: collaborator.role,\n    addedBy: owner.id,\n    addedAt: deps.clock.now(),\n  });\n  return { alice, bob, createdRepo };\n}\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"checks permission freshness\", async () => {\n    const { alice, bob, createdRepo } = await setup();\n\n    // Bob can push initially\n    const pushRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/refs/heads/main`, {\n      method: \"PUT\",\n      headers: { authorization: `Bearer ${bob.token}` },\n      body: JSON.stringify({ sha: \"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678\" }),\n    });\n    console.log(`[probe] bob PUT /repos/${alice.user.username}/${createdRepo.name}/refs/heads/main -> ${pushRequest.status} (expected 201)`);\n    expect(pushRequest.status).toBe(201);\n\n    // Revoke Bob's access\n    const revokeRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/collaborators/${bob.user.username}`, {\n      method: \"DELETE\",\n      headers: { authorization: `Bearer ${alice.token}` },\n    });\n    console.log(`[probe] alice DELETE /repos/${alice.user.username}/${createdRepo.name}/collaborators/${bob.user.username} -> ${revokeRequest.status} (expected 204)`);\n    expect(revokeRequest.status).toBe(204);\n\n    // Bob should no longer be able to push\n    const postRevokePushRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/refs/heads/main`, {\n      method: \"PUT\",\n      headers: { authorization: `Bearer ${bob.token}` },\n      body: JSON.stringify({ sha: \"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678\" }),\n    });\n    console.log(`[probe] bob PUT /repos/${alice.user.username}/${createdRepo.name}/refs/heads/main -> ${postRevokePushRequest.status} (expected 403)`);\n    expect(postRevokePushRequest.status).toBe(403);\n  });\n});\n",
+      "rationale": "This probe tests the freshness of permission evaluation by setting up a scenario where a user (Bob) is initially granted write access to a repository owned by another user (Alice). After revoking Bob's access, the probe verifies that Bob can no longer perform actions that require write permissions, ensuring that the permission evaluation is per-request and not cached in a way that would allow outdated permissions. The clock is replaced with a ManualClock to control time and ensure consistent behavior across different worlds.",
+      "evalMs": 3901,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        }
+      },
+      "errors": "{\"outcome\":\"fail\",\"reason\":\"probe harness error: expected exactly one probe test, found 0: ReferenceError: ManualClock is not defined\"}"
+    },
+    {
+      "n": 3,
+      "call": {
+        "ms": 40798,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { login, logout } from \\\"../src/auth/sessions.ts\\\";\\nimport { requirePermission } from \\\"../src/authz/require-permission.ts\\\";\\nimport { ManualClock } from \\\"../src/clock.ts\\\";\\n\\nconst deps = memoryDeps();\\ndeps.ids = sequentialIds();\\ndeps.clock = new ManualClock(deps.clock.now());\\nconst app = createApp(deps);\\n\\nconst user = {\\n  username: \\\"alice\\\",\\n  password: \\\"securepassword\\\",\\n};\\n\\nconst repo = {\\n  name: \\\"test-repo\\\",\\n  visibility: \\\"private\\\",\\n};\\n\\nconst collaborator = {\\n  username: \\\"bob\\\",\\n  role: \\\"write\\\",\\n};\\n\\nasync function setup() {\\n  const alice = await login(deps, user.username, user.password);\\n  if (!alice) throw new Error(\\\"login failed\\\");\\n  const bob = await login(deps, collaborator.username, \\\"anotherpassword\\\");\\n  if (!bob) throw new Error(\\\"login failed\\\");\\n  const owner = deps.store.findUserByUsername(alice.user.username)!;\\n  const createdRepo = {\\n    id: deps.ids.id(\\\"repo\\\"),\\n    ownerId: owner.id,\\n    name: repo.name,\\n    description: \\\"\\\",\\n    visibility: repo.visibility,\\n    defaultBranch: \\\"main\\\",\\n    createdAt: deps.clock.now(),\\n    updatedAt: deps.clock.now(),\\n  };\\n  deps.store.createRepo(createdRepo);\\n  deps.store.addCollaborator({\\n    repoId: createdRepo.id,\\n    userId: bob.user.id,\\n    role: collaborator.role,\\n    addedBy: owner.id,\\n    addedAt: deps.clock.now(),\\n  });\\n  return { alice, bob, createdRepo };\\n}\\n\\ndescribe(\\\"permission evaluation freshness\\\", () => {\\n  it(\\\"checks permission freshness\\\", async () => {\\n    const { alice, bob, createdRepo } = await setup();\\n\\n    // Bob can push initially\\n    const pushRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/refs/heads/main`, {\\n      method: \\\"PUT\\\",\\n      headers: { authorization: `Bearer ${bob.token}` },\\n      body: JSON.stringify({ sha: \\\"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678\\\" }),\\n    });\\n    console.log(`[probe] bob PUT /repos/${alice.user.username}/${createdRepo.name}/refs/heads/main -> ${pushRequest.status} (expected 201)`);\\n    expect(pushRequest.status).toBe(201);\\n\\n    // Revoke Bob's access\\n    const revokeRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/collaborators/${bob.user.username}`, {\\n      method: \\\"DELETE\\\",\\n      headers: { authorization: `Bearer ${alice.token}` },\\n    });\\n    console.log(`[probe] alice DELETE /repos/${alice.user.username}/${createdRepo.name}/collaborators/${bob.user.username} -> ${revokeRequest.status} (expected 204)`);\\n    expect(revokeRequest.status).toBe(204);\\n\\n    // Bob should no longer be able to push\\n    const postRevokePushRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/refs/heads/main`, {\\n      method: \\\"PUT\\\",\\n      headers: { authorization: `Bearer ${bob.token}` },\\n      body: JSON.stringify({ sha: \\\"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678\\\" }),\\n    });\\n    console.log(`[probe] bob PUT /repos/${alice.user.username}/${createdRepo.name}/refs/heads/main -> ${postRevokePushRequest.status} (expected 403)`);\\n    expect(postRevokePushRequest.status).toBe(403);\\n  });\\n});\\n\"},\"rationale\":\"This probe tests the freshness of permission evaluation by setting up a scenario where a user (Bob) is initially granted write access to a repository owned by another user (Alice). After revoking Bob's access, the probe verifies that Bob can no longer perform actions that require write permissions, ensuring that the permission evaluation is per-request and not cached in a way that would allow outdated permissions. The clock is replaced with a ManualClock to control time and ensure consistent behavior across different worlds. The ManualClock is imported from the correct module to avoid reference errors.\"}",
+        "usage": {
+          "promptTokens": 19208,
+          "completionTokens": 1128
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login, logout } from \"../src/auth/sessions.ts\";\nimport { requirePermission } from \"../src/authz/require-permission.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\n\nconst deps = memoryDeps();\ndeps.ids = sequentialIds();\ndeps.clock = new ManualClock(deps.clock.now());\nconst app = createApp(deps);\n\nconst user = {\n  username: \"alice\",\n  password: \"securepassword\",\n};\n\nconst repo = {\n  name: \"test-repo\",\n  visibility: \"private\",\n};\n\nconst collaborator = {\n  username: \"bob\",\n  role: \"write\",\n};\n\nasync function setup() {\n  const alice = await login(deps, user.username, user.password);\n  if (!alice) throw new Error(\"login failed\");\n  const bob = await login(deps, collaborator.username, \"anotherpassword\");\n  if (!bob) throw new Error(\"login failed\");\n  const owner = deps.store.findUserByUsername(alice.user.username)!;\n  const createdRepo = {\n    id: deps.ids.id(\"repo\"),\n    ownerId: owner.id,\n    name: repo.name,\n    description: \"\",\n    visibility: repo.visibility,\n    defaultBranch: \"main\",\n    createdAt: deps.clock.now(),\n    updatedAt: deps.clock.now(),\n  };\n  deps.store.createRepo(createdRepo);\n  deps.store.addCollaborator({\n    repoId: createdRepo.id,\n    userId: bob.user.id,\n    role: collaborator.role,\n    addedBy: owner.id,\n    addedAt: deps.clock.now(),\n  });\n  return { alice, bob, createdRepo };\n}\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"checks permission freshness\", async () => {\n    const { alice, bob, createdRepo } = await setup();\n\n    // Bob can push initially\n    const pushRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/refs/heads/main`, {\n      method: \"PUT\",\n      headers: { authorization: `Bearer ${bob.token}` },\n      body: JSON.stringify({ sha: \"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678\" }),\n    });\n    console.log(`[probe] bob PUT /repos/${alice.user.username}/${createdRepo.name}/refs/heads/main -> ${pushRequest.status} (expected 201)`);\n    expect(pushRequest.status).toBe(201);\n\n    // Revoke Bob's access\n    const revokeRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/collaborators/${bob.user.username}`, {\n      method: \"DELETE\",\n      headers: { authorization: `Bearer ${alice.token}` },\n    });\n    console.log(`[probe] alice DELETE /repos/${alice.user.username}/${createdRepo.name}/collaborators/${bob.user.username} -> ${revokeRequest.status} (expected 204)`);\n    expect(revokeRequest.status).toBe(204);\n\n    // Bob should no longer be able to push\n    const postRevokePushRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/refs/heads/main`, {\n      method: \"PUT\",\n      headers: { authorization: `Bearer ${bob.token}` },\n      body: JSON.stringify({ sha: \"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678\" }),\n    });\n    console.log(`[probe] bob PUT /repos/${alice.user.username}/${createdRepo.name}/refs/heads/main -> ${postRevokePushRequest.status} (expected 403)`);\n    expect(postRevokePushRequest.status).toBe(403);\n  });\n});\n",
+      "rationale": "This probe tests the freshness of permission evaluation by setting up a scenario where a user (Bob) is initially granted write access to a repository owned by another user (Alice). After revoking Bob's access, the probe verifies that Bob can no longer perform actions that require write permissions, ensuring that the permission evaluation is per-request and not cached in a way that would allow outdated permissions. The clock is replaced with a ManualClock to control time and ensure consistent behavior across different worlds. The ManualClock is imported from the correct module to avoid reference errors.",
+      "evalMs": 3564,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 3,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login, logout } from \"../src/auth/sessions.ts\";\nimport { requirePermission } from \"../src/authz/require-permission.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\n\nconst deps = memoryDeps();\ndeps.ids = sequentialIds();\ndeps.clock = new ManualClock(deps.clock.now());\nconst app = createApp(deps);\n\nconst user = {\n  username: \"alice\",\n  password: \"securepassword\",\n};\n\nconst repo = {\n  name: \"test-repo\",\n  visibility: \"private\",\n};\n\nconst collaborator = {\n  username: \"bob\",\n  role: \"write\",\n};\n\nasync function setup() {\n  const alice = await login(deps, user.username, user.password);\n  if (!alice) throw new Error(\"login failed\");\n  const bob = await login(deps, collaborator.username, \"anotherpassword\");\n  if (!bob) throw new Error(\"login failed\");\n  const owner = deps.store.findUserByUsername(alice.user.username)!;\n  const createdRepo = {\n    id: deps.ids.id(\"repo\"),\n    ownerId: owner.id,\n    name: repo.name,\n    description: \"\",\n    visibility: repo.visibility,\n    defaultBranch: \"main\",\n    createdAt: deps.clock.now(),\n    updatedAt: deps.clock.now(),\n  };\n  deps.store.createRepo(createdRepo);\n  deps.store.addCollaborator({\n    repoId: createdRepo.id,\n    userId: bob.user.id,\n    role: collaborator.role,\n    addedBy: owner.id,\n    addedAt: deps.clock.now(),\n  });\n  return { alice, bob, createdRepo };\n}\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"checks permission freshness\", async () => {\n    const { alice, bob, createdRepo } = await setup();\n\n    // Bob can push initially\n    const pushRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/refs/heads/main`, {\n      method: \"PUT\",\n      headers: { authorization: `Bearer ${bob.token}` },\n      body: JSON.stringify({ sha: \"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678\" }),\n    });\n    console.log(`[probe] bob PUT /repos/${alice.user.username}/${createdRepo.name}/refs/heads/main -> ${pushRequest.status} (expected 201)`);\n    expect(pushRequest.status).toBe(201);\n\n    // Revoke Bob's access\n    const revokeRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/collaborators/${bob.user.username}`, {\n      method: \"DELETE\",\n      headers: { authorization: `Bearer ${alice.token}` },\n    });\n    console.log(`[probe] alice DELETE /repos/${alice.user.username}/${createdRepo.name}/collaborators/${bob.user.username} -> ${revokeRequest.status} (expected 204)`);\n    expect(revokeRequest.status).toBe(204);\n\n    // Bob should no longer be able to push\n    const postRevokePushRequest = await app.request(`/repos/${alice.user.username}/${createdRepo.name}/refs/heads/main`, {\n      method: \"PUT\",\n      headers: { authorization: `Bearer ${bob.token}` },\n      body: JSON.stringify({ sha: \"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678\" }),\n    });\n    console.log(`[probe] bob PUT /repos/${alice.user.username}/${createdRepo.name}/refs/heads/main -> ${postRevokePushRequest.status} (expected 403)`);\n    expect(postRevokePushRequest.status).toBe(403);\n  });\n});\n",
+    "rationale": "This probe tests the freshness of permission evaluation by setting up a scenario where a user (Bob) is initially granted write access to a repository owned by another user (Alice). After revoking Bob's access, the probe verifies that Bob can no longer perform actions that require write permissions, ensuring that the permission evaluation is per-request and not cached in a way that would allow outdated permissions. The clock is replaced with a ManualClock to control time and ensure consistent behavior across different worlds. The ManualClock is imported from the correct module to avoid reference errors.",
+    "admission": {
+      "admitted": false,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [
+        "n/a-mishandled",
+        "wrong-world-behaviour"
+      ],
+      "detail": [
+        "base: expected n/a, observed fail/fail/fail",
+        "A: expected pass, observed fail/fail/fail",
+        "B: expected n/a, observed fail/fail/fail"
+      ]
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "Error: login failed",
+          "observations": [],
+          "ms": 528,
+          "id": "qwen-2-1791664591463-3:mutantA:0:d7882740-c5a1-4bd5-9c0d-90669ada9c01",
+          "testError": "Error: login failed"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "Error: login failed",
+          "observations": [],
+          "ms": 535,
+          "id": "qwen-2-1791664591463-3:mutantA:1:dabaee4e-32f4-48ba-81ee-6e83ca7b2988",
+          "testError": "Error: login failed"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "Error: login failed",
+          "observations": [],
+          "ms": 535,
+          "id": "qwen-2-1791664591463-3:mutantA:2:aebd70c5-3a5d-4164-8041-91b69ac97b2f",
+          "testError": "Error: login failed"
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [
+        {
+          "line": 70,
+          "text": "app.request(`/repos/${alice.user.username}/${createdRepo.name}/collaborators/${bob.user.username}`, ",
+          "boundTo": "revokeRequest",
+          "asserted": true
+        }
+      ],
+      "unasserted": [],
+      "expectCalls": 3
+    }
+  },
+  "outcome": "rejected",
+  "totals": {
+    "modelMs": 119541,
+    "evalMs": 16344,
+    "promptTokens": 54114,
+    "completionTokens": 3315,
+    "wallMs": 138419
+  }
+}

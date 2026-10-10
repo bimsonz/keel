@@ -1,0 +1,35 @@
+{
+  "model": "@cf/zai-org/glm-5.3",
+  "settings": {
+    "model": "@cf/zai-org/glm-5.3",
+    "api": "openai",
+    "temperature": 0.6,
+    "maxTokens": 16000
+  },
+  "startedAt": "2026-10-10T20:25:33.832Z",
+  "promptChars": 55001,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 720654,
+        "content": "",
+        "usage": {
+          "promptTokens": 0,
+          "completionTokens": 0
+        },
+        "infraRetries": 3,
+        "infraError": "AiError: 3046: Request timeout"
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "outcome": "infra-error",
+  "totals": {
+    "modelMs": 720654,
+    "evalMs": 0,
+    "promptTokens": 0,
+    "completionTokens": 0,
+    "wallMs": 720684
+  }
+}

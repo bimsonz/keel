@@ -1,0 +1,198 @@
+{
+  "model": "@cf/moonshotai/kimi-k2.7-code",
+  "settings": {
+    "model": "@cf/moonshotai/kimi-k2.7-code",
+    "api": "openai",
+    "temperature": 0.6,
+    "maxTokens": 32000
+  },
+  "startedAt": "2026-10-10T20:36:31.613Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 108853,
+        "content": "{\n  \"files\": {\n    \"probe.test.ts\": \"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { ManualClock } from \\\"../src/clock.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { MemoryStore } from \\\"../src/store/memory.ts\\\";\\n\\nit(\\\"permission evaluation stays fresh per request\\\", async () => {\\n  const clock = new ManualClock(1_000_000);\\n  const deps = { store: new MemoryStore(), clock, ids: sequentialIds() };\\n  const app = createApp(deps);\\n\\n  const ownerCreds = { username: \\\"owner\\\", password: \\\"ownerpass123\\\" };\\n  const collabCreds = { username: \\\"collab\\\", password: \\\"collabpass123\\\" };\\n\\n  let res = await app.request(\\\"/users\\\", {\\n    method: \\\"POST\\\",\\n    headers: { \\\"content-type\\\": \\\"application/json\\\" },\\n    body: JSON.stringify(ownerCreds),\\n  });\\n  expect(res.status).toBe(201);\\n\\n  res = await app.request(\\\"/users\\\", {\\n    method: \\\"POST\\\",\\n    headers: { \\\"content-type\\\": \\\"application/json\\\" },\\n    body: JSON.stringify(collabCreds),\\n  });\\n  expect(res.status).toBe(201);\\n\\n  const ownerLogin = await app.request(\\\"/sessions\\\", {\\n    method: \\\"POST\\\",\\n    headers: { \\\"content-type\\\": \\\"application/json\\\" },\\n    body: JSON.stringify(ownerCreds),\\n  });\\n  expect(ownerLogin.status).toBe(201);\\n  const ownerToken = (await ownerLogin.json()).token;\\n\\n  const repoRes = await app.request(\\\"/repos\\\", {\\n    method: \\\"POST\\\",\\n    headers: { \\\"content-type\\\": \\\"application/json\\\", authorization: `Bearer ${ownerToken}` },\\n    body: JSON.stringify({ name: \\\"repo\\\", visibility: \\\"private\\\" }),\\n  });\\n  expect(repoRes.status).toBe(201);\\n\\n  const addRes = await app.request(\\\"/repos/owner/repo/collaborators/collab\\\", {\\n    method: \\\"PUT\\\",\\n    headers: { \\\"content-type\\\": \\\"application/json\\\", authorization: `Bearer ${ownerToken}` },\\n    body: JSON.stringify({ role: \\\"admin\\\" }),\\n  });\\n  expect(addRes.status).toBe(201);\\n\\n  const collabLogin = await app.request(\\\"/sessions\\\", {\\n    method: \\\"POST\\\",\\n    headers: { \\\"content-type\\\": \\\"application/json\\\" },\\n    body: JSON.stringify(collabCreds),\\n  });\\n  expect(collabLogin.status).toBe(201);\\n  const collabToken = (await collabLogin.json()).token;\\n\\n  const prePath = \\\"/repos/owner/repo/collaborators\\\";\\n  const preRes = await app.request(prePath, {\\n    headers: { authorization: `Bearer ${collabToken}` },\\n  });\\n  console.log(`[probe] collab GET ${prePath} -> ${preRes.status} (expected 200)`);\\n  expect(preRes.status).toBe(200);\\n\\n  const revokePath = \\\"/repos/owner/repo/collaborators/collab\\\";\\n  const revokeRes = await app.request(revokePath, {\\n    method: \\\"DELETE\\\",\\n    headers: { authorization: `Bearer ${ownerToken}` },\\n  });\\n  console.log(`[probe] owner DELETE ${revokePath} -> ${revokeRes.status} (expected 204)`);\\n\\n  const revokeBody = await revokeRes.text();\\n  const revokeCt = revokeRes.headers.get(\\\"content-type\\\") ?? \\\"\\\";\\n  if (revokeRes.status === 404 && revokeCt.includes(\\\"text/plain\\\") && revokeBody === \\\"404 Not Found\\\") {\\n    throw new Error(\\\"probe not applicable: DELETE revoke route is absent\\\");\\n  }\\n  expect(revokeRes.status).toBe(204);\\n\\n  const postRes = await app.request(prePath, {\\n    headers: { authorization: `Bearer ${collabToken}` },\\n  });\\n  console.log(`[probe] collab GET ${prePath} -> ${postRes.status} (expected 404)`);\\n  expect(postRes.status).toBe(404);\\n});\\n\"\n  },\n  \"rationale\": \"The probe sets up an owner, a private repo, and a collaborator with admin access. The collaborator first makes an authorized request to the repo so that B's per-session role cache captures the admin role. The owner then uses A's DELETE revoke route to remove the collaborator. If that route is missing, the default Hono 404 text/plain response triggers n/a. After revocation, a fresh per-request evaluation should see the collaborator as removed and deny visibility of the private repo (404). In A+B, the cached admin role is reused, so the same request succeeds (200), exposing the disagreement and causing the probe to fail.\"\n}",
+        "usage": {
+          "promptTokens": 16805,
+          "completionTokens": 5246,
+          "cachedTokens": 1280
+        },
+        "finishReason": "stop",
+        "reasoningChars": 17154,
+        "modelReported": "@cf/moonshotai/kimi-k2.7-code",
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\nit(\"permission evaluation stays fresh per request\", async () => {\n  const clock = new ManualClock(1_000_000);\n  const deps = { store: new MemoryStore(), clock, ids: sequentialIds() };\n  const app = createApp(deps);\n\n  const ownerCreds = { username: \"owner\", password: \"ownerpass123\" };\n  const collabCreds = { username: \"collab\", password: \"collabpass123\" };\n\n  let res = await app.request(\"/users\", {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/json\" },\n    body: JSON.stringify(ownerCreds),\n  });\n  expect(res.status).toBe(201);\n\n  res = await app.request(\"/users\", {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/json\" },\n    body: JSON.stringify(collabCreds),\n  });\n  expect(res.status).toBe(201);\n\n  const ownerLogin = await app.request(\"/sessions\", {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/json\" },\n    body: JSON.stringify(ownerCreds),\n  });\n  expect(ownerLogin.status).toBe(201);\n  const ownerToken = (await ownerLogin.json()).token;\n\n  const repoRes = await app.request(\"/repos\", {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/json\", authorization: `Bearer ${ownerToken}` },\n    body: JSON.stringify({ name: \"repo\", visibility: \"private\" }),\n  });\n  expect(repoRes.status).toBe(201);\n\n  const addRes = await app.request(\"/repos/owner/repo/collaborators/collab\", {\n    method: \"PUT\",\n    headers: { \"content-type\": \"application/json\", authorization: `Bearer ${ownerToken}` },\n    body: JSON.stringify({ role: \"admin\" }),\n  });\n  expect(addRes.status).toBe(201);\n\n  const collabLogin = await app.request(\"/sessions\", {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/json\" },\n    body: JSON.stringify(collabCreds),\n  });\n  expect(collabLogin.status).toBe(201);\n  const collabToken = (await collabLogin.json()).token;\n\n  const prePath = \"/repos/owner/repo/collaborators\";\n  const preRes = await app.request(prePath, {\n    headers: { authorization: `Bearer ${collabToken}` },\n  });\n  console.log(`[probe] collab GET ${prePath} -> ${preRes.status} (expected 200)`);\n  expect(preRes.status).toBe(200);\n\n  const revokePath = \"/repos/owner/repo/collaborators/collab\";\n  const revokeRes = await app.request(revokePath, {\n    method: \"DELETE\",\n    headers: { authorization: `Bearer ${ownerToken}` },\n  });\n  console.log(`[probe] owner DELETE ${revokePath} -> ${revokeRes.status} (expected 204)`);\n\n  const revokeBody = await revokeRes.text();\n  const revokeCt = revokeRes.headers.get(\"content-type\") ?? \"\";\n  if (revokeRes.status === 404 && revokeCt.includes(\"text/plain\") && revokeBody === \"404 Not Found\") {\n    throw new Error(\"probe not applicable: DELETE revoke route is absent\");\n  }\n  expect(revokeRes.status).toBe(204);\n\n  const postRes = await app.request(prePath, {\n    headers: { authorization: `Bearer ${collabToken}` },\n  });\n  console.log(`[probe] collab GET ${prePath} -> ${postRes.status} (expected 404)`);\n  expect(postRes.status).toBe(404);\n});\n",
+      "rationale": "The probe sets up an owner, a private repo, and a collaborator with admin access. The collaborator first makes an authorized request to the repo so that B's per-session role cache captures the admin role. The owner then uses A's DELETE revoke route to remove the collaborator. If that route is missing, the default Hono 404 text/plain response triggers n/a. After revocation, a fresh per-request evaluation should see the collaborator as removed and deny visibility of the private repo (404). In A+B, the cached admin role is reused, so the same request succeeds (200), exposing the disagreement and causing the probe to fail.",
+      "evalMs": 3168,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\nit(\"permission evaluation stays fresh per request\", async () => {\n  const clock = new ManualClock(1_000_000);\n  const deps = { store: new MemoryStore(), clock, ids: sequentialIds() };\n  const app = createApp(deps);\n\n  const ownerCreds = { username: \"owner\", password: \"ownerpass123\" };\n  const collabCreds = { username: \"collab\", password: \"collabpass123\" };\n\n  let res = await app.request(\"/users\", {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/json\" },\n    body: JSON.stringify(ownerCreds),\n  });\n  expect(res.status).toBe(201);\n\n  res = await app.request(\"/users\", {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/json\" },\n    body: JSON.stringify(collabCreds),\n  });\n  expect(res.status).toBe(201);\n\n  const ownerLogin = await app.request(\"/sessions\", {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/json\" },\n    body: JSON.stringify(ownerCreds),\n  });\n  expect(ownerLogin.status).toBe(201);\n  const ownerToken = (await ownerLogin.json()).token;\n\n  const repoRes = await app.request(\"/repos\", {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/json\", authorization: `Bearer ${ownerToken}` },\n    body: JSON.stringify({ name: \"repo\", visibility: \"private\" }),\n  });\n  expect(repoRes.status).toBe(201);\n\n  const addRes = await app.request(\"/repos/owner/repo/collaborators/collab\", {\n    method: \"PUT\",\n    headers: { \"content-type\": \"application/json\", authorization: `Bearer ${ownerToken}` },\n    body: JSON.stringify({ role: \"admin\" }),\n  });\n  expect(addRes.status).toBe(201);\n\n  const collabLogin = await app.request(\"/sessions\", {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/json\" },\n    body: JSON.stringify(collabCreds),\n  });\n  expect(collabLogin.status).toBe(201);\n  const collabToken = (await collabLogin.json()).token;\n\n  const prePath = \"/repos/owner/repo/collaborators\";\n  const preRes = await app.request(prePath, {\n    headers: { authorization: `Bearer ${collabToken}` },\n  });\n  console.log(`[probe] collab GET ${prePath} -> ${preRes.status} (expected 200)`);\n  expect(preRes.status).toBe(200);\n\n  const revokePath = \"/repos/owner/repo/collaborators/collab\";\n  const revokeRes = await app.request(revokePath, {\n    method: \"DELETE\",\n    headers: { authorization: `Bearer ${ownerToken}` },\n  });\n  console.log(`[probe] owner DELETE ${revokePath} -> ${revokeRes.status} (expected 204)`);\n\n  const revokeBody = await revokeRes.text();\n  const revokeCt = revokeRes.headers.get(\"content-type\") ?? \"\";\n  if (revokeRes.status === 404 && revokeCt.includes(\"text/plain\") && revokeBody === \"404 Not Found\") {\n    throw new Error(\"probe not applicable: DELETE revoke route is absent\");\n  }\n  expect(revokeRes.status).toBe(204);\n\n  const postRes = await app.request(prePath, {\n    headers: { authorization: `Bearer ${collabToken}` },\n  });\n  console.log(`[probe] collab GET ${prePath} -> ${postRes.status} (expected 404)`);\n  expect(postRes.status).toBe(404);\n});\n",
+    "rationale": "The probe sets up an owner, a private repo, and a collaborator with admin access. The collaborator first makes an authorized request to the repo so that B's per-session role cache captures the admin role. The owner then uses A's DELETE revoke route to remove the collaborator. If that route is missing, the default Hono 404 text/plain response triggers n/a. After revocation, a fresh per-request evaluation should see the collaborator as removed and deny visibility of the private repo (404). In A+B, the cached admin role is reused, so the same request succeeds (200), exposing the disagreement and causing the probe to fail.",
+    "admission": {
+      "admitted": true,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [],
+      "detail": []
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collab GET /repos/owner/repo/collaborators -> 200 (expected 404)",
+          "observations": [
+            "collab GET /repos/owner/repo/collaborators -> 200 (expected 200)",
+            "owner DELETE /repos/owner/repo/collaborators/collab -> 204 (expected 204)",
+            "collab GET /repos/owner/repo/collaborators -> 200 (expected 404)"
+          ],
+          "ms": 237,
+          "id": "kimi-2-1791664591463-1:mutantA:0:e649dee8-2023-42fa-a60d-eaa28388d286",
+          "testError": "AssertionError: expected 200 to be 404 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collab GET /repos/owner/repo/collaborators -> 200 (expected 404)",
+          "observations": [
+            "collab GET /repos/owner/repo/collaborators -> 200 (expected 200)",
+            "owner DELETE /repos/owner/repo/collaborators/collab -> 204 (expected 204)",
+            "collab GET /repos/owner/repo/collaborators -> 200 (expected 404)"
+          ],
+          "ms": 237,
+          "id": "kimi-2-1791664591463-1:mutantA:1:edb460e6-90be-412d-bd3d-771732584c11",
+          "testError": "AssertionError: expected 200 to be 404 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collab GET /repos/owner/repo/collaborators -> 200 (expected 404)",
+          "observations": [
+            "collab GET /repos/owner/repo/collaborators -> 200 (expected 200)",
+            "owner DELETE /repos/owner/repo/collaborators/collab -> 204 (expected 204)",
+            "collab GET /repos/owner/repo/collaborators -> 200 (expected 404)"
+          ],
+          "ms": 234,
+          "id": "kimi-2-1791664591463-1:mutantA:2:1246d591-0491-4a40-b1b8-f59c86e69516",
+          "testError": "AssertionError: expected 200 to be 404 // Object.is equality"
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [
+        {
+          "line": 67,
+          "text": "app.request(revokePath, {\n    method: \"DELETE\",\n    headers: { authorization: `Bearer ${ownerToken}`",
+          "boundTo": "revokeRes",
+          "asserted": true
+        }
+      ],
+      "unasserted": [],
+      "expectCalls": 9
+    }
+  },
+  "outcome": "admitted",
+  "totals": {
+    "modelMs": 108853,
+    "evalMs": 3481,
+    "promptTokens": 16805,
+    "completionTokens": 5246,
+    "wallMs": 113891
+  }
+}

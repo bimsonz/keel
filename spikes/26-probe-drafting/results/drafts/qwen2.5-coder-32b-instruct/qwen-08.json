@@ -1,0 +1,289 @@
+{
+  "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+  "settings": {
+    "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+    "api": "legacy",
+    "temperature": 0.6,
+    "maxTokens": 4096
+  },
+  "startedAt": "2026-10-10T20:37:47.634Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 27651,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { login } from \\\"../src/auth/sessions.ts\\\";\\nimport { MemoryStore } from \\\"../src/store/memory.ts\\\";\\nimport { requirePermission } from \\\"../src/authz/require-permission.ts\\\";\\n\\nconst deps = memoryDeps();\\ndeps.store = new MemoryStore(deps.events);\\ndeps.ids = sequentialIds();\\n\\ndescribe(\\\"authz.permission-evaluation\\\", () => {\\n  it(\\\"checks freshness per-request\\\", async () => {\\n    const app = createApp(deps);\\n    const user = { username: \\\"alice\\\", password: \\\"password\\\" };\\n    const repo = { owner: user.username, name: \\\"repo\\\", visibility: \\\"private\\\" };\\n    const collaborator = { username: \\\"bob\\\", role: \\\"read\\\" };\\n\\n    // Setup users and repository\\n    await app.request(\\\"POST\\\", \\\"/users\\\", { body: JSON.stringify(user) });\\n    const { token } = await login(deps, user.username, user.password)!;\\n    await app.request(\\\"POST\\\", \\\"/repos\\\", {\\n      headers: { authorization: `Bearer ${token}` },\\n      body: JSON.stringify(repo),\\n    });\\n    await app.request(\\\"PUT\\\", `/repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username}`, {\\n      headers: { authorization: `Bearer ${token}` },\\n      body: JSON.stringify({ role: collaborator.role }),\\n    });\\n\\n    // Bob gains access\\n    const bobLogin = await login(deps, collaborator.username, \\\"password\\\")!;\\n    const bobToken = bobLogin.token;\\n    let response = await app.request(\\\"GET\\\", `/repos/${repo.owner}/${repo.name}\\\", {\\n      headers: { authorization: `Bearer ${bobToken}` },\\n    });\\n    console.log(`[probe] bob GET /repos/${repo.owner}/${repo.name} -> ${response.status} (expected 200)`);\\n    expect(response.status).toBe(200);\\n\\n    // Revoke Bob's access\\n    response = await app.request(\\\"DELETE\\\", `/repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username}`, {\\n      headers: { authorization: `Bearer ${token}` },\\n    });\\n    console.log(`[probe] alice DELETE /repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username} -> ${response.status} (expected 204)`);\\n    expect(response.status).toBe(204);\\n\\n    // Bob loses access\\n    response = await app.request(\\\"GET\\\", `/repos/${repo.owner}/${repo.name}\\\", {\\n      headers: { authorization: `Bearer ${bobToken}` },\\n    });\\n    console.log(`[probe] bob GET /repos/${repo.owner}/${repo.name} -> ${response.status} (expected 404)`);\\n    expect(response.status).toBe(404);\\n  });\\n});\\n\"},\"rationale\":\"This probe tests the freshness of permission evaluation by ensuring that a collaborator's access is re-evaluated on each request. It sets up a user and repository, grants a collaborator access, revokes that access, and verifies that the collaborator can no longer access the repository after the revocation. The test passes if the collaborator loses access immediately after the revocation, failing otherwise. It signals n/a if the revoke route is absent.\"}",
+        "usage": {
+          "promptTokens": 16875,
+          "completionTokens": 819
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login } from \"../src/auth/sessions.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\nimport { requirePermission } from \"../src/authz/require-permission.ts\";\n\nconst deps = memoryDeps();\ndeps.store = new MemoryStore(deps.events);\ndeps.ids = sequentialIds();\n\ndescribe(\"authz.permission-evaluation\", () => {\n  it(\"checks freshness per-request\", async () => {\n    const app = createApp(deps);\n    const user = { username: \"alice\", password: \"password\" };\n    const repo = { owner: user.username, name: \"repo\", visibility: \"private\" };\n    const collaborator = { username: \"bob\", role: \"read\" };\n\n    // Setup users and repository\n    await app.request(\"POST\", \"/users\", { body: JSON.stringify(user) });\n    const { token } = await login(deps, user.username, user.password)!;\n    await app.request(\"POST\", \"/repos\", {\n      headers: { authorization: `Bearer ${token}` },\n      body: JSON.stringify(repo),\n    });\n    await app.request(\"PUT\", `/repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username}`, {\n      headers: { authorization: `Bearer ${token}` },\n      body: JSON.stringify({ role: collaborator.role }),\n    });\n\n    // Bob gains access\n    const bobLogin = await login(deps, collaborator.username, \"password\")!;\n    const bobToken = bobLogin.token;\n    let response = await app.request(\"GET\", `/repos/${repo.owner}/${repo.name}\", {\n      headers: { authorization: `Bearer ${bobToken}` },\n    });\n    console.log(`[probe] bob GET /repos/${repo.owner}/${repo.name} -> ${response.status} (expected 200)`);\n    expect(response.status).toBe(200);\n\n    // Revoke Bob's access\n    response = await app.request(\"DELETE\", `/repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username}`, {\n      headers: { authorization: `Bearer ${token}` },\n    });\n    console.log(`[probe] alice DELETE /repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username} -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Bob loses access\n    response = await app.request(\"GET\", `/repos/${repo.owner}/${repo.name}\", {\n      headers: { authorization: `Bearer ${bobToken}` },\n    });\n    console.log(`[probe] bob GET /repos/${repo.owner}/${repo.name} -> ${response.status} (expected 404)`);\n    expect(response.status).toBe(404);\n  });\n});\n",
+      "rationale": "This probe tests the freshness of permission evaluation by ensuring that a collaborator's access is re-evaluated on each request. It sets up a user and repository, grants a collaborator access, revokes that access, and verifies that the collaborator can no longer access the repository after the revocation. The test passes if the collaborator loses access immediately after the revocation, failing otherwise. It signals n/a if the revoke route is absent.",
+      "evalMs": 754,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        }
+      },
+      "errors": "bundling probe/probe.test.ts failed:\nBuild failed with 1 error:\nvirtual:probe/probe.test.ts:36:33: ERROR: Expected \")\" but found \"Bearer\""
+    },
+    {
+      "n": 2,
+      "call": {
+        "ms": 26184,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { login } from \\\"../src/auth/sessions.ts\\\";\\nimport { MemoryStore } from \\\"../src/store/memory.ts\\\";\\n\\nconst deps = memoryDeps();\\ndeps.store = new MemoryStore(deps.events);\\ndeps.ids = sequentialIds();\\n\\ndescribe(\\\"authz.permission-evaluation\\\", () => {\\n  it(\\\"checks freshness per-request\\\", async () => {\\n    const app = createApp(deps);\\n    const user = { username: \\\"alice\\\", password: \\\"password\\\" };\\n    const repo = { owner: user.username, name: \\\"repo\\\", visibility: \\\"private\\\" };\\n    const collaborator = { username: \\\"bob\\\", password: \\\"password\\\", role: \\\"read\\\" };\\n\\n    // Setup users and repository\\n    await app.request(\\\"POST\\\", \\\"/users\\\", { body: JSON.stringify(user) });\\n    const { token } = await login(deps, user.username, user.password)!;\\n    await app.request(\\\"POST\\\", \\\"/repos\\\", {\\n      headers: { authorization: `Bearer ${token}` },\\n      body: JSON.stringify(repo),\\n    });\\n    await app.request(\\\"PUT\\\", `/repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username}`, {\\n      headers: { authorization: `Bearer ${token}` },\\n      body: JSON.stringify({ role: collaborator.role }),\\n    });\\n\\n    // Bob gains access\\n    const bobLogin = await login(deps, collaborator.username, collaborator.password)!;\\n    const bobToken = bobLogin.token;\\n    let response = await app.request(\\\"GET\\\", `/repos/${repo.owner}/${repo.name}\\\", {\\n      headers: { authorization: `Bearer ${bobToken}` },\\n    });\\n    console.log(`[probe] bob GET /repos/${repo.owner}/${repo.name} -> ${response.status} (expected 200)`);\\n    expect(response.status).toBe(200);\\n\\n    // Revoke Bob's access\\n    response = await app.request(\\\"DELETE\\\", `/repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username}`, {\\n      headers: { authorization: `Bearer ${token}` },\\n    });\\n    console.log(`[probe] alice DELETE /repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username} -> ${response.status} (expected 204)`);\\n    expect(response.status).toBe(204);\\n\\n    // Bob loses access\\n    response = await app.request(\\\"GET\\\", `/repos/${repo.owner}/${repo.name}\\\", {\\n      headers: { authorization: `Bearer ${bobToken}` },\\n    });\\n    console.log(`[probe] bob GET /repos/${repo.owner}/${repo.name} -> ${response.status} (expected 404)`);\\n    expect(response.status).toBe(404);\\n  });\\n});\\n\"},\"rationale\":\"This probe tests the freshness of permission evaluation by ensuring that a collaborator's access is re-evaluated on each request. It sets up a user and repository, grants a collaborator access, revokes that access, and verifies that the collaborator can no longer access the repository after the revocation. The test passes if the collaborator loses access immediately after the revocation, failing otherwise. It signals n/a if the revoke route is absent.\"}",
+        "usage": {
+          "promptTokens": 17778,
+          "completionTokens": 801
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login } from \"../src/auth/sessions.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\nconst deps = memoryDeps();\ndeps.store = new MemoryStore(deps.events);\ndeps.ids = sequentialIds();\n\ndescribe(\"authz.permission-evaluation\", () => {\n  it(\"checks freshness per-request\", async () => {\n    const app = createApp(deps);\n    const user = { username: \"alice\", password: \"password\" };\n    const repo = { owner: user.username, name: \"repo\", visibility: \"private\" };\n    const collaborator = { username: \"bob\", password: \"password\", role: \"read\" };\n\n    // Setup users and repository\n    await app.request(\"POST\", \"/users\", { body: JSON.stringify(user) });\n    const { token } = await login(deps, user.username, user.password)!;\n    await app.request(\"POST\", \"/repos\", {\n      headers: { authorization: `Bearer ${token}` },\n      body: JSON.stringify(repo),\n    });\n    await app.request(\"PUT\", `/repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username}`, {\n      headers: { authorization: `Bearer ${token}` },\n      body: JSON.stringify({ role: collaborator.role }),\n    });\n\n    // Bob gains access\n    const bobLogin = await login(deps, collaborator.username, collaborator.password)!;\n    const bobToken = bobLogin.token;\n    let response = await app.request(\"GET\", `/repos/${repo.owner}/${repo.name}\", {\n      headers: { authorization: `Bearer ${bobToken}` },\n    });\n    console.log(`[probe] bob GET /repos/${repo.owner}/${repo.name} -> ${response.status} (expected 200)`);\n    expect(response.status).toBe(200);\n\n    // Revoke Bob's access\n    response = await app.request(\"DELETE\", `/repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username}`, {\n      headers: { authorization: `Bearer ${token}` },\n    });\n    console.log(`[probe] alice DELETE /repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username} -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Bob loses access\n    response = await app.request(\"GET\", `/repos/${repo.owner}/${repo.name}\", {\n      headers: { authorization: `Bearer ${bobToken}` },\n    });\n    console.log(`[probe] bob GET /repos/${repo.owner}/${repo.name} -> ${response.status} (expected 404)`);\n    expect(response.status).toBe(404);\n  });\n});\n",
+      "rationale": "This probe tests the freshness of permission evaluation by ensuring that a collaborator's access is re-evaluated on each request. It sets up a user and repository, grants a collaborator access, revokes that access, and verifies that the collaborator can no longer access the repository after the revocation. The test passes if the collaborator loses access immediately after the revocation, failing otherwise. It signals n/a if the revoke route is absent.",
+      "evalMs": 189,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "compile-error"
+          ],
+          "stable": false,
+          "ok": false
+        }
+      },
+      "errors": "bundling probe/probe.test.ts failed:\nBuild failed with 1 error:\nvirtual:probe/probe.test.ts:35:33: ERROR: Expected \")\" but found \"Bearer\""
+    },
+    {
+      "n": 3,
+      "call": {
+        "ms": 25789,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { login } from \\\"../src/auth/sessions.ts\\\";\\nimport { MemoryStore } from \\\"../src/store/memory.ts\\\";\\n\\nconst deps = memoryDeps();\\ndeps.store = new MemoryStore(deps.events);\\ndeps.ids = sequentialIds();\\n\\ndescribe(\\\"authz.permission-evaluation\\\", () => {\\n  it(\\\"checks freshness per-request\\\", async () => {\\n    const app = createApp(deps);\\n    const user = { username: \\\"alice\\\", password: \\\"password\\\" };\\n    const repo = { owner: user.username, name: \\\"repo\\\", visibility: \\\"private\\\" };\\n    const collaborator = { username: \\\"bob\\\", password: \\\"password\\\", role: \\\"read\\\" };\\n\\n    // Setup users and repository\\n    await app.request(\\\"POST\\\", \\\"/users\\\", { body: JSON.stringify(user) });\\n    const { token } = await login(deps, user.username, user.password)!;\\n    await app.request(\\\"POST\\\", \\\"/repos\\\", {\\n      headers: { authorization: `Bearer ${token}` },\\n      body: JSON.stringify(repo),\\n    });\\n    await app.request(\\\"PUT\\\", `/repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username}`, {\\n      headers: { authorization: `Bearer ${token}` },\\n      body: JSON.stringify({ role: collaborator.role }),\\n    });\\n\\n    // Bob gains access\\n    const bobLogin = await login(deps, collaborator.username, collaborator.password)!;\\n    const bobToken = bobLogin.token;\\n    let response = await app.request(\\\"GET\\\", `/repos/${repo.owner}/${repo.name}`, {\\n      headers: { authorization: `Bearer ${bobToken}` }\\n    });\\n    console.log(`[probe] bob GET /repos/${repo.owner}/${repo.name} -> ${response.status} (expected 200)`);\\n    expect(response.status).toBe(200);\\n\\n    // Revoke Bob's access\\n    response = await app.request(\\\"DELETE\\\", `/repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username}`, {\\n      headers: { authorization: `Bearer ${token}` }\\n    });\\n    console.log(`[probe] alice DELETE /repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username} -> ${response.status} (expected 204)`);\\n    expect(response.status).toBe(204);\\n\\n    // Bob loses access\\n    response = await app.request(\\\"GET\\\", `/repos/${repo.owner}/${repo.name}`, {\\n      headers: { authorization: `Bearer ${bobToken}` }\\n    });\\n    console.log(`[probe] bob GET /repos/${repo.owner}/${repo.name} -> ${response.status} (expected 404)`);\\n    expect(response.status).toBe(404);\\n  });\\n});\\n\"},\"rationale\":\"This probe tests the freshness of permission evaluation by ensuring that a collaborator's access is re-evaluated on each request. It sets up a user and repository, grants a collaborator access, revokes that access, and verifies that the collaborator can no longer access the repository after the revocation. The test passes if the collaborator loses access immediately after the revocation, failing otherwise. It signals n/a if the revoke route is absent.\"}",
+        "usage": {
+          "promptTokens": 18667,
+          "completionTokens": 796
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login } from \"../src/auth/sessions.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\nconst deps = memoryDeps();\ndeps.store = new MemoryStore(deps.events);\ndeps.ids = sequentialIds();\n\ndescribe(\"authz.permission-evaluation\", () => {\n  it(\"checks freshness per-request\", async () => {\n    const app = createApp(deps);\n    const user = { username: \"alice\", password: \"password\" };\n    const repo = { owner: user.username, name: \"repo\", visibility: \"private\" };\n    const collaborator = { username: \"bob\", password: \"password\", role: \"read\" };\n\n    // Setup users and repository\n    await app.request(\"POST\", \"/users\", { body: JSON.stringify(user) });\n    const { token } = await login(deps, user.username, user.password)!;\n    await app.request(\"POST\", \"/repos\", {\n      headers: { authorization: `Bearer ${token}` },\n      body: JSON.stringify(repo),\n    });\n    await app.request(\"PUT\", `/repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username}`, {\n      headers: { authorization: `Bearer ${token}` },\n      body: JSON.stringify({ role: collaborator.role }),\n    });\n\n    // Bob gains access\n    const bobLogin = await login(deps, collaborator.username, collaborator.password)!;\n    const bobToken = bobLogin.token;\n    let response = await app.request(\"GET\", `/repos/${repo.owner}/${repo.name}`, {\n      headers: { authorization: `Bearer ${bobToken}` }\n    });\n    console.log(`[probe] bob GET /repos/${repo.owner}/${repo.name} -> ${response.status} (expected 200)`);\n    expect(response.status).toBe(200);\n\n    // Revoke Bob's access\n    response = await app.request(\"DELETE\", `/repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username}`, {\n      headers: { authorization: `Bearer ${token}` }\n    });\n    console.log(`[probe] alice DELETE /repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username} -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Bob loses access\n    response = await app.request(\"GET\", `/repos/${repo.owner}/${repo.name}`, {\n      headers: { authorization: `Bearer ${bobToken}` }\n    });\n    console.log(`[probe] bob GET /repos/${repo.owner}/${repo.name} -> ${response.status} (expected 404)`);\n    expect(response.status).toBe(404);\n  });\n});\n",
+      "rationale": "This probe tests the freshness of permission evaluation by ensuring that a collaborator's access is re-evaluated on each request. It sets up a user and repository, grants a collaborator access, revokes that access, and verifies that the collaborator can no longer access the repository after the revocation. The test passes if the collaborator loses access immediately after the revocation, failing otherwise. It signals n/a if the revoke route is absent.",
+      "evalMs": 2257,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 3,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login } from \"../src/auth/sessions.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\nconst deps = memoryDeps();\ndeps.store = new MemoryStore(deps.events);\ndeps.ids = sequentialIds();\n\ndescribe(\"authz.permission-evaluation\", () => {\n  it(\"checks freshness per-request\", async () => {\n    const app = createApp(deps);\n    const user = { username: \"alice\", password: \"password\" };\n    const repo = { owner: user.username, name: \"repo\", visibility: \"private\" };\n    const collaborator = { username: \"bob\", password: \"password\", role: \"read\" };\n\n    // Setup users and repository\n    await app.request(\"POST\", \"/users\", { body: JSON.stringify(user) });\n    const { token } = await login(deps, user.username, user.password)!;\n    await app.request(\"POST\", \"/repos\", {\n      headers: { authorization: `Bearer ${token}` },\n      body: JSON.stringify(repo),\n    });\n    await app.request(\"PUT\", `/repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username}`, {\n      headers: { authorization: `Bearer ${token}` },\n      body: JSON.stringify({ role: collaborator.role }),\n    });\n\n    // Bob gains access\n    const bobLogin = await login(deps, collaborator.username, collaborator.password)!;\n    const bobToken = bobLogin.token;\n    let response = await app.request(\"GET\", `/repos/${repo.owner}/${repo.name}`, {\n      headers: { authorization: `Bearer ${bobToken}` }\n    });\n    console.log(`[probe] bob GET /repos/${repo.owner}/${repo.name} -> ${response.status} (expected 200)`);\n    expect(response.status).toBe(200);\n\n    // Revoke Bob's access\n    response = await app.request(\"DELETE\", `/repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username}`, {\n      headers: { authorization: `Bearer ${token}` }\n    });\n    console.log(`[probe] alice DELETE /repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username} -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Bob loses access\n    response = await app.request(\"GET\", `/repos/${repo.owner}/${repo.name}`, {\n      headers: { authorization: `Bearer ${bobToken}` }\n    });\n    console.log(`[probe] bob GET /repos/${repo.owner}/${repo.name} -> ${response.status} (expected 404)`);\n    expect(response.status).toBe(404);\n  });\n});\n",
+    "rationale": "This probe tests the freshness of permission evaluation by ensuring that a collaborator's access is re-evaluated on each request. It sets up a user and repository, grants a collaborator access, revokes that access, and verifies that the collaborator can no longer access the repository after the revocation. The test passes if the collaborator loses access immediately after the revocation, failing otherwise. It signals n/a if the revoke route is absent.",
+    "admission": {
+      "admitted": false,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [
+        "n/a-mishandled",
+        "wrong-world-behaviour"
+      ],
+      "detail": [
+        "base: expected n/a, observed fail/fail/fail",
+        "A: expected pass, observed fail/fail/fail",
+        "B: expected n/a, observed fail/fail/fail"
+      ]
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 231,
+          "id": "qwen-8-1791664667184-3:mutantA:0:01575e11-fa18-403c-960f-7a7c1cd7d89e",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 231,
+          "id": "qwen-8-1791664667184-3:mutantA:1:e4499f40-47d3-44e7-8b8b-0fb970bd757b",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 226,
+          "id": "qwen-8-1791664667184-3:mutantA:2:54f6dc77-f717-41cf-a40d-dfe308bd1e74",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [
+        {
+          "line": 41,
+          "text": "app.request(\"DELETE\", `/repos/${repo.owner}/${repo.name}/collaborators/${collaborator.username}`, {\n",
+          "boundTo": "response",
+          "asserted": true
+        }
+      ],
+      "unasserted": [],
+      "expectCalls": 3
+    }
+  },
+  "outcome": "rejected",
+  "totals": {
+    "modelMs": 79624,
+    "evalMs": 3505,
+    "promptTokens": 53320,
+    "completionTokens": 2416,
+    "wallMs": 86920
+  }
+}

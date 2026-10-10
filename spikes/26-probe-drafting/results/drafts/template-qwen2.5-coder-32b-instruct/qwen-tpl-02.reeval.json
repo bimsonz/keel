@@ -1,0 +1,200 @@
+{
+  "tag": "721f0dac",
+  "evals": [
+    {
+      "world": "base",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 409 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 421,
+          "id": "721f0dac-0:base:0:7bed4d0e-587b-41ac-9438-c3d7f58d4bc7",
+          "testError": "AssertionError: expected 409 to be 201 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 409 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 409,
+          "id": "721f0dac-0:base:1:21fd22e6-f179-40ff-8b80-b0404eaad536",
+          "testError": "AssertionError: expected 409 to be 201 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 409 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 404,
+          "id": "721f0dac-0:base:2:b1505956-6b25-4d73-b149-b2d6e6b6a00c",
+          "testError": "AssertionError: expected 409 to be 201 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "world": "A",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 409 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 404,
+          "id": "721f0dac-0:A:0:24bdc21a-2c06-451e-85ff-8b48ccd14ee3",
+          "testError": "AssertionError: expected 409 to be 201 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 409 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 345,
+          "id": "721f0dac-0:A:1:c1493c32-3606-44ca-9d42-7a7ae8319e57",
+          "testError": "AssertionError: expected 409 to be 201 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 409 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 345,
+          "id": "721f0dac-0:A:2:47b4de00-cb17-461f-912c-7b9786f3a79b",
+          "testError": "AssertionError: expected 409 to be 201 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "world": "B",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 409 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 345,
+          "id": "721f0dac-0:B:0:4d3a0af3-379a-46e1-a2cb-d492acf148b3",
+          "testError": "AssertionError: expected 409 to be 201 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 409 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 103,
+          "id": "721f0dac-0:B:1:74b8e2dc-fd29-4d97-bb25-2433cf244c2e",
+          "testError": "AssertionError: expected 409 to be 201 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 409 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 252,
+          "id": "721f0dac-0:B:2:d57699e5-f74f-446f-bbe5-db07b5ca3583",
+          "testError": "AssertionError: expected 409 to be 201 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "world": "AB",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 409 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 252,
+          "id": "721f0dac-0:AB:0:f234c0a5-a1d4-4983-97b3-ce5a46054c5b",
+          "testError": "AssertionError: expected 409 to be 201 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 409 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 252,
+          "id": "721f0dac-0:AB:1:24c4f03e-6287-4b46-b1ac-b212b646db96",
+          "testError": "AssertionError: expected 409 to be 201 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "AssertionError: expected 409 to be 201 // Object.is equality",
+          "observations": [],
+          "ms": 68,
+          "id": "721f0dac-0:AB:2:8a66065b-133a-4505-8a4c-58857b0e72bf",
+          "testError": "AssertionError: expected 409 to be 201 // Object.is equality"
+        }
+      ]
+    }
+  ],
+  "bundleMs": {
+    "base": 248,
+    "A": 498,
+    "B": 704,
+    "AB": 1350
+  },
+  "bytes": 467649,
+  "wallMs": 3905,
+  "admission": {
+    "admitted": false,
+    "cells": {
+      "base": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "A": {
+        "expected": "pass",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "B": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "AB": {
+        "expected": "fail",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": true
+      }
+    },
+    "failures": [
+      "n/a-mishandled",
+      "wrong-world-behaviour"
+    ],
+    "detail": [
+      "base: expected n/a, observed fail/fail/fail",
+      "A: expected pass, observed fail/fail/fail",
+      "B: expected n/a, observed fail/fail/fail"
+    ]
+  },
+  "vacuity": {
+    "vacuous": true,
+    "observed": [],
+    "why": "mutant A not evaluated"
+  }
+}

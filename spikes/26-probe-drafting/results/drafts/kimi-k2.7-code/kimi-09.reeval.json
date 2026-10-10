@@ -1,0 +1,333 @@
+{
+  "tag": "dbd33108",
+  "evals": [
+    {
+      "world": "base",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 204)",
+          "observations": [
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "owner POST /sessions -> 201 (expected 201)",
+            "target POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/target -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 204)"
+          ],
+          "ms": 221,
+          "id": "dbd33108-0:base:0:41b47026-a3a3-4dd5-9539-dc8972194577",
+          "testError": "AssertionError: expected 404 to be 204 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 204)",
+          "observations": [
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "owner POST /sessions -> 201 (expected 201)",
+            "target POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/target -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 204)"
+          ],
+          "ms": 220,
+          "id": "dbd33108-0:base:1:2f704086-b9c4-4caa-bf7d-8b244333b433",
+          "testError": "AssertionError: expected 404 to be 204 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 204)",
+          "observations": [
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "owner POST /sessions -> 201 (expected 201)",
+            "target POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/target -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 204)"
+          ],
+          "ms": 222,
+          "id": "dbd33108-0:base:2:b0b8ce3a-2c52-46df-9b6b-71c36ec3e047",
+          "testError": "AssertionError: expected 404 to be 204 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "world": "A",
+      "runs": [
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 404)",
+          "observations": [
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "owner POST /sessions -> 201 (expected 201)",
+            "target POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/target -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 204 (expected 204)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "owner DELETE /repos/owner/repo/collaborators/target -> 204 (expected 204)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 404)"
+          ],
+          "ms": 221,
+          "id": "dbd33108-0:A:0:57a0b602-d1e2-4028-92b5-5a0525942412"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 404)",
+          "observations": [
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "owner POST /sessions -> 201 (expected 201)",
+            "target POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/target -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 204 (expected 204)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "owner DELETE /repos/owner/repo/collaborators/target -> 204 (expected 204)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 404)"
+          ],
+          "ms": 253,
+          "id": "dbd33108-0:A:1:52c858cd-4fc1-4f3d-bee9-c1ed749edbb2"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 404)",
+          "observations": [
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "owner POST /sessions -> 201 (expected 201)",
+            "target POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/target -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 204 (expected 204)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "owner DELETE /repos/owner/repo/collaborators/target -> 204 (expected 204)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 404)"
+          ],
+          "ms": 254,
+          "id": "dbd33108-0:A:2:778e5521-57d1-4fae-a997-f266142dcd76"
+        }
+      ]
+    },
+    {
+      "world": "B",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 204)",
+          "observations": [
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "owner POST /sessions -> 201 (expected 201)",
+            "target POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/target -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 204)"
+          ],
+          "ms": 251,
+          "id": "dbd33108-0:B:0:d0971ff3-c8fa-40c2-b147-ac9de3db07c3",
+          "testError": "AssertionError: expected 404 to be 204 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 204)",
+          "observations": [
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "owner POST /sessions -> 201 (expected 201)",
+            "target POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/target -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 204)"
+          ],
+          "ms": 251,
+          "id": "dbd33108-0:B:1:00066fa8-6b00-44be-aea5-bfbbde9dc78d",
+          "testError": "AssertionError: expected 404 to be 204 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 204)",
+          "observations": [
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "owner POST /sessions -> 201 (expected 201)",
+            "target POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/target -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 204)"
+          ],
+          "ms": 108,
+          "id": "dbd33108-0:B:2:cf64bec5-be33-45c9-bca8-c7a898927527",
+          "testError": "AssertionError: expected 404 to be 204 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "world": "AB",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "target DELETE /repos/owner/repo/collaborators/victim -> 204 (expected 404)",
+          "observations": [
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "owner POST /sessions -> 201 (expected 201)",
+            "target POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/target -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 204 (expected 204)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "owner DELETE /repos/owner/repo/collaborators/target -> 204 (expected 204)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 204 (expected 404)"
+          ],
+          "ms": 161,
+          "id": "dbd33108-0:AB:0:0583f17a-5eeb-47f6-8fbe-b2b11ea07e89",
+          "testError": "AssertionError: expected 204 to be 404 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "target DELETE /repos/owner/repo/collaborators/victim -> 204 (expected 404)",
+          "observations": [
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "owner POST /sessions -> 201 (expected 201)",
+            "target POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/target -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 204 (expected 204)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "owner DELETE /repos/owner/repo/collaborators/target -> 204 (expected 204)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 204 (expected 404)"
+          ],
+          "ms": 173,
+          "id": "dbd33108-0:AB:1:d80dc8c4-2e81-4cd9-a415-2f7e995dfdfe",
+          "testError": "AssertionError: expected 204 to be 404 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "target DELETE /repos/owner/repo/collaborators/victim -> 204 (expected 404)",
+          "observations": [
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "setup POST /users -> 201 (expected 201)",
+            "owner POST /sessions -> 201 (expected 201)",
+            "target POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/target -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 204 (expected 204)",
+            "owner PUT /repos/owner/repo/collaborators/victim -> 201 (expected 201)",
+            "owner DELETE /repos/owner/repo/collaborators/target -> 204 (expected 204)",
+            "target DELETE /repos/owner/repo/collaborators/victim -> 204 (expected 404)"
+          ],
+          "ms": 173,
+          "id": "dbd33108-0:AB:2:850adeda-7881-4a84-b046-6888e29f9159",
+          "testError": "AssertionError: expected 204 to be 404 // Object.is equality"
+        }
+      ]
+    }
+  ],
+  "bundleMs": {
+    "base": 288,
+    "A": 1109,
+    "B": 52,
+    "AB": 1414
+  },
+  "bytes": 469178,
+  "wallMs": 3657,
+  "admission": {
+    "admitted": false,
+    "cells": {
+      "base": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "A": {
+        "expected": "pass",
+        "observed": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "stable": true,
+        "ok": true
+      },
+      "B": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "AB": {
+        "expected": "fail",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": true
+      }
+    },
+    "failures": [
+      "n/a-mishandled"
+    ],
+    "detail": [
+      "base: expected n/a, observed fail/fail/fail",
+      "B: expected n/a, observed fail/fail/fail"
+    ]
+  },
+  "vacuity": {
+    "vacuous": true,
+    "observed": [],
+    "why": "mutant A not evaluated"
+  }
+}

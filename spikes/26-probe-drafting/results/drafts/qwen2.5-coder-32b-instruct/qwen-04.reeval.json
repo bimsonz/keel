@@ -1,0 +1,224 @@
+{
+  "tag": "feae30d0",
+  "evals": [
+    {
+      "world": "base",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collaborator GET /repos/repo_1/read -> 404 (expected 200)",
+          "observations": [
+            "collaborator GET /repos/repo_1/read -> 404 (expected 200)"
+          ],
+          "ms": 324,
+          "id": "feae30d0-0:base:0:5f46cc2e-efef-4291-8c3a-770841bfb273",
+          "testError": "AssertionError: expected 404 to be 200 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collaborator GET /repos/repo_1/read -> 404 (expected 200)",
+          "observations": [
+            "collaborator GET /repos/repo_1/read -> 404 (expected 200)"
+          ],
+          "ms": 340,
+          "id": "feae30d0-0:base:1:e5cac439-5f7c-4733-a237-4b4d52042eb3",
+          "testError": "AssertionError: expected 404 to be 200 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collaborator GET /repos/repo_1/read -> 404 (expected 200)",
+          "observations": [
+            "collaborator GET /repos/repo_1/read -> 404 (expected 200)"
+          ],
+          "ms": 324,
+          "id": "feae30d0-0:base:2:4caab744-94f3-43ee-a33e-1572b11a7bfb",
+          "testError": "AssertionError: expected 404 to be 200 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "world": "A",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collaborator GET /repos/repo_1/read -> 404 (expected 200)",
+          "observations": [
+            "collaborator GET /repos/repo_1/read -> 404 (expected 200)"
+          ],
+          "ms": 328,
+          "id": "feae30d0-0:A:0:2cb9ca22-1ef0-4ea2-9ebd-e43939f76618",
+          "testError": "AssertionError: expected 404 to be 200 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collaborator GET /repos/repo_1/read -> 404 (expected 200)",
+          "observations": [
+            "collaborator GET /repos/repo_1/read -> 404 (expected 200)"
+          ],
+          "ms": 273,
+          "id": "feae30d0-0:A:1:c611722d-5650-4b1e-9ab9-70dbbb45ff23",
+          "testError": "AssertionError: expected 404 to be 200 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collaborator GET /repos/repo_1/read -> 404 (expected 200)",
+          "observations": [
+            "collaborator GET /repos/repo_1/read -> 404 (expected 200)"
+          ],
+          "ms": 273,
+          "id": "feae30d0-0:A:2:0bbc73ff-8e87-41e5-a91d-6d49401792d6",
+          "testError": "AssertionError: expected 404 to be 200 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "world": "B",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collaborator GET /repos/repo_1/read -> 404 (expected 200)",
+          "observations": [
+            "collaborator GET /repos/repo_1/read -> 404 (expected 200)"
+          ],
+          "ms": 273,
+          "id": "feae30d0-0:B:0:d0e0c2db-69d3-419b-8b50-70ba96be6e3d",
+          "testError": "AssertionError: expected 404 to be 200 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collaborator GET /repos/repo_1/read -> 404 (expected 200)",
+          "observations": [
+            "collaborator GET /repos/repo_1/read -> 404 (expected 200)"
+          ],
+          "ms": 68,
+          "id": "feae30d0-0:B:1:19727573-9b6f-4087-8cf7-d3c4bd952e64",
+          "testError": "AssertionError: expected 404 to be 200 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collaborator GET /repos/repo_1/read -> 404 (expected 200)",
+          "observations": [
+            "collaborator GET /repos/repo_1/read -> 404 (expected 200)"
+          ],
+          "ms": 197,
+          "id": "feae30d0-0:B:2:d498a3a6-3a64-4594-b895-9cdd825b4632",
+          "testError": "AssertionError: expected 404 to be 200 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "world": "AB",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collaborator GET /repos/repo_1/read -> 404 (expected 200)",
+          "observations": [
+            "collaborator GET /repos/repo_1/read -> 404 (expected 200)"
+          ],
+          "ms": 197,
+          "id": "feae30d0-0:AB:0:4d686d5b-5c3e-4cb4-b2b2-1a4354b521a0",
+          "testError": "AssertionError: expected 404 to be 200 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collaborator GET /repos/repo_1/read -> 404 (expected 200)",
+          "observations": [
+            "collaborator GET /repos/repo_1/read -> 404 (expected 200)"
+          ],
+          "ms": 197,
+          "id": "feae30d0-0:AB:1:79144490-88f9-460e-97d9-a36f91b8a1c6",
+          "testError": "AssertionError: expected 404 to be 200 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "collaborator GET /repos/repo_1/read -> 404 (expected 200)",
+          "observations": [
+            "collaborator GET /repos/repo_1/read -> 404 (expected 200)"
+          ],
+          "ms": 59,
+          "id": "feae30d0-0:AB:2:1c82396d-22d9-455e-ae2f-99e7410df315",
+          "testError": "AssertionError: expected 404 to be 200 // Object.is equality"
+        }
+      ]
+    }
+  ],
+  "bundleMs": {
+    "base": 337,
+    "A": 1498,
+    "B": 63,
+    "AB": 1345
+  },
+  "bytes": 468068,
+  "wallMs": 4129,
+  "admission": {
+    "admitted": false,
+    "cells": {
+      "base": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "A": {
+        "expected": "pass",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "B": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "AB": {
+        "expected": "fail",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": true
+      }
+    },
+    "failures": [
+      "n/a-mishandled",
+      "wrong-world-behaviour"
+    ],
+    "detail": [
+      "base: expected n/a, observed fail/fail/fail",
+      "A: expected pass, observed fail/fail/fail",
+      "B: expected n/a, observed fail/fail/fail"
+    ]
+  },
+  "vacuity": {
+    "vacuous": true,
+    "observed": [],
+    "why": "mutant A not evaluated"
+  }
+}

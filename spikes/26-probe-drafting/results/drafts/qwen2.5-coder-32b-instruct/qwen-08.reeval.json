@@ -1,0 +1,200 @@
+{
+  "tag": "f44cb883",
+  "evals": [
+    {
+      "world": "base",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 233,
+          "id": "f44cb883-0:base:0:3f054b16-3a76-4d83-b689-2fa85ff923a6",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 229,
+          "id": "f44cb883-0:base:1:9d234cea-db23-4393-8951-cf796673c4cc",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 277,
+          "id": "f44cb883-0:base:2:ba0cd340-742e-4e63-8df3-63662925f21e",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        }
+      ]
+    },
+    {
+      "world": "A",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 229,
+          "id": "f44cb883-0:A:0:047d83a3-69ca-4928-ac47-6e39c1c6a2b7",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 260,
+          "id": "f44cb883-0:A:1:3b869cea-d29e-441b-b8ac-cbf40b395efd",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 345,
+          "id": "f44cb883-0:A:2:aca6adf1-c9e6-4caf-925d-dc964b66ddc4",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        }
+      ]
+    },
+    {
+      "world": "B",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 345,
+          "id": "f44cb883-0:B:0:dd45d503-793f-4b7b-890e-86f3425a828b",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 261,
+          "id": "f44cb883-0:B:1:677e3db3-4bf2-45a4-b780-f60f9c30c4fc",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 331,
+          "id": "f44cb883-0:B:2:755bda45-26d9-41a5-9dd3-f6eb4f4ed5b7",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        }
+      ]
+    },
+    {
+      "world": "AB",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 325,
+          "id": "f44cb883-0:AB:0:0267a84c-c129-49c9-be4d-0b5f794496ee",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 325,
+          "id": "f44cb883-0:AB:1:64ee03ed-a55a-41b1-8dea-6c512e98060b",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 73,
+          "id": "f44cb883-0:AB:2:67878782-9d76-4f39-8d65-425757738771",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        }
+      ]
+    }
+  ],
+  "bundleMs": {
+    "base": 1546,
+    "A": 69,
+    "B": 2003,
+    "AB": 49
+  },
+  "bytes": 466665,
+  "wallMs": 4702,
+  "admission": {
+    "admitted": false,
+    "cells": {
+      "base": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "A": {
+        "expected": "pass",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "B": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "AB": {
+        "expected": "fail",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": true
+      }
+    },
+    "failures": [
+      "n/a-mishandled",
+      "wrong-world-behaviour"
+    ],
+    "detail": [
+      "base: expected n/a, observed fail/fail/fail",
+      "A: expected pass, observed fail/fail/fail",
+      "B: expected n/a, observed fail/fail/fail"
+    ]
+  },
+  "vacuity": {
+    "vacuous": true,
+    "observed": [],
+    "why": "mutant A not evaluated"
+  }
+}

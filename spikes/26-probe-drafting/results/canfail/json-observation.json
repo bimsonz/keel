@@ -1,0 +1,267 @@
+{
+  "tag": "d6554bce",
+  "evals": [
+    {
+      "world": "base",
+      "runs": [
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "harnessError": "invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "observations": [
+            "{\"status\":403}"
+          ],
+          "ms": 508,
+          "id": "d6554bce-0:base:0:ba801ab5-971c-4aa2-aa68-b43536f4d7f6"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "harnessError": "invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "observations": [
+            "{\"status\":403}"
+          ],
+          "ms": 509,
+          "id": "d6554bce-0:base:1:52ebdb5d-faa4-4fbd-a14b-3d8b46754d92"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "harnessError": "invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "observations": [
+            "{\"status\":403}"
+          ],
+          "ms": 155,
+          "id": "d6554bce-0:base:2:7298e7e5-ba76-47a8-a1bb-50be097b094b"
+        }
+      ]
+    },
+    {
+      "world": "A",
+      "runs": [
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "harnessError": "invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "observations": [
+            "{\"status\":403}"
+          ],
+          "ms": 508,
+          "id": "d6554bce-0:A:0:ff602fa8-250b-4f4e-8c32-9fb3fec1c84c"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "harnessError": "invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "observations": [
+            "{\"status\":403}"
+          ],
+          "ms": 473,
+          "id": "d6554bce-0:A:1:59141b2d-e361-43ae-b534-699eacb6642c"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "harnessError": "invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "observations": [
+            "{\"status\":403}"
+          ],
+          "ms": 495,
+          "id": "d6554bce-0:A:2:607813ae-ce9e-4294-92b8-4b87285931bd"
+        }
+      ]
+    },
+    {
+      "world": "B",
+      "runs": [
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "harnessError": "invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "observations": [
+            "{\"status\":403}"
+          ],
+          "ms": 495,
+          "id": "d6554bce-0:B:0:685278f6-da97-4a77-96cd-d34f12302408"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "harnessError": "invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "observations": [
+            "{\"status\":403}"
+          ],
+          "ms": 495,
+          "id": "d6554bce-0:B:1:5a3834e6-a936-4574-bc45-d9eb3e6c9453"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "harnessError": "invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "observations": [
+            "{\"status\":403}"
+          ],
+          "ms": 172,
+          "id": "d6554bce-0:B:2:aff94d3a-052a-4848-bcff-d122c5eb0289"
+        }
+      ]
+    },
+    {
+      "world": "AB",
+      "runs": [
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "harnessError": "invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "observations": [
+            "{\"status\":403}"
+          ],
+          "ms": 332,
+          "id": "d6554bce-0:AB:0:1a328fc5-c331-45da-a4a7-8e58fe9d0d4d"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "harnessError": "invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "observations": [
+            "{\"status\":403}"
+          ],
+          "ms": 430,
+          "id": "d6554bce-0:AB:1:dfd14450-f61b-4343-a9bb-1ceb73f0b017"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "harnessError": "invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "observations": [
+            "{\"status\":403}"
+          ],
+          "ms": 430,
+          "id": "d6554bce-0:AB:2:954ff88a-85d8-471b-9624-787fa1b6e80c"
+        }
+      ]
+    },
+    {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "harnessError": "invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "observations": [
+            "{\"status\":403}"
+          ],
+          "ms": 438,
+          "id": "d6554bce-0:mutantA:0:d871a760-f91d-46c3-8f78-26361f8bdeca"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "harnessError": "invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "observations": [
+            "{\"status\":403}"
+          ],
+          "ms": 230,
+          "id": "d6554bce-0:mutantA:1:d1267a0a-bf52-4797-ab78-08440004b68a"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "harnessError": "invalid JSON line: expected exactly one JSON line, found 2: {\"status\":403} | {\"outcome\":\"pass\",\"reason\":\"{\\\"status\\\":403}\"}",
+          "observations": [
+            "{\"status\":403}"
+          ],
+          "ms": 229,
+          "id": "d6554bce-0:mutantA:2:d02c7a0d-b46f-4e9f-9bda-758aba205460"
+        }
+      ]
+    }
+  ],
+  "bundleMs": {
+    "base": 316,
+    "A": 43,
+    "B": 44,
+    "AB": 46,
+    "mutantA": 50
+  },
+  "bytes": 361384,
+  "wallMs": 2729,
+  "admission": {
+    "admitted": false,
+    "cells": {
+      "base": {
+        "expected": "n/a",
+        "observed": [
+          "harness-error",
+          "harness-error",
+          "harness-error"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "A": {
+        "expected": "pass",
+        "observed": [
+          "harness-error",
+          "harness-error",
+          "harness-error"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "B": {
+        "expected": "n/a",
+        "observed": [
+          "harness-error",
+          "harness-error",
+          "harness-error"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "AB": {
+        "expected": "fail",
+        "observed": [
+          "harness-error",
+          "harness-error",
+          "harness-error"
+        ],
+        "stable": true,
+        "ok": false
+      }
+    },
+    "failures": [
+      "harness-error"
+    ],
+    "detail": []
+  },
+  "vacuity": {
+    "vacuous": true,
+    "observed": [
+      "harness-error",
+      "harness-error",
+      "harness-error"
+    ],
+    "why": "expected fail ×3 with the revoke removed, observed harness-error/harness-error/harness-error"
+  },
+  "staticCheck": {
+    "deleteSites": [],
+    "unasserted": [],
+    "expectCalls": 1
+  }
+}

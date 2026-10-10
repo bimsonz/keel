@@ -1,0 +1,5 @@
+{
+  "plugins": ["typescript", "unicorn", "import", "promise"],
+  "categories": { "correctness": "error", "suspicious": "error" },
+  "ignorePatterns": ["node_modules/**"]
+}

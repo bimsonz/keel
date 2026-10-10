@@ -31,6 +31,7 @@ Spike code lives in `spikes/NN-slug/`. It is throwaway, and sits outside the pnp
 | S17 | [Clef](17-clef-eval.md) ([dataset](s17-dataset.json)) | **Go for Clef, conditional** | Clef recall 100%, decoy false positives 0%; permuted agreement 95.0% only with all permutations asked in one call; Flash misses one and is no faster | Flash dropped; deterministic fallback armed behind re-measuring on ≥ 200 items |
 | S17b | [Clef at scale](17b-clef-scale.md) ([dataset](s17b-dataset.json)) | **Fail: fallback** | 242 items: relabelled agreement 90.9% (Wilson 86.6–93.9, against ≥ 95%), recall 97.0% (91.6–99.0), precision 91.6%, decoy false positives 14.3%. Clef can't see cache invalidation, so B, B′ and careless get the same answer | Deterministic extractors and lattices decide; Clef only ranks probes |
 | S18 | [Wasm in Dynamic Workers](18-wasm-loader.md) | **Go with conditions** | All four tools instantiate and match Node; 64 MiB code ceiling; cold < 300 ms only with bytes held in memory; a single 255 MiB memory still returns `ok` | Ruff ships as a static tool Worker |
+| S26 | [Probe drafting](26-probe-drafting.md) | **Pass at the bar: go, template-first** | Kimi K2.7 Code free-form: 8/10 admitted (CI 0.49–0.94), 0 vacuous. Freshness template: Kimi 10/10, Qwen 2.5 Coder 9/10, about 7× faster. Synchronous `env.AI.run` times out at about 235 s for reasoning models. A do-nothing-revoke mutant catches vacuous probes the matrix admits | Templates first for known predicates; free-form drafting (pinned Kimi) otherwise |
 
 ## Tier decision (S13, S14, S15, S18)
 

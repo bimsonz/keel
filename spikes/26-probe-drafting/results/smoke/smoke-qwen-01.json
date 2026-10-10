@@ -1,0 +1,198 @@
+{
+  "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+  "settings": {
+    "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+    "api": "legacy",
+    "temperature": 0.6,
+    "maxTokens": 4096
+  },
+  "startedAt": "2026-10-10T20:25:33.699Z",
+  "promptChars": 55001,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 25118,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\n\\nconst PATH = \\\"/repos/owner/repo/collaborators/collaborator\\\";\\n\\nfunction assertNapoleon(response: Response) {\\n  if (response.status === 404 && response.headers.get(\\\"content-type\\\") === \\\"text/plain\\\") {\\n    const body = response.text();\\n    if (body === Promise.resolve(\\\"404 Not Found\\\")) {\\n      throw new Error(\\\"probe not applicable: precondition absent\\\");\\n    }\\n  }\\n}\\n\\ndescribe(\\\"authz.permission-evaluation\\\", () => {\\n  it(\\\"checks freshness\\\", async () => {\\n    const deps = memoryDeps();\\n    const app = createApp(deps);\\n\\n    // Setup: create a user, a repo, and add a collaborator\\n    const owner = { id: \\\"usr_1\\\", username: \\\"owner\\\", name: \\\"Owner\\\", passwordSalt: \\\"salt\\\", passwordHash: \\\"hash\\\", createdAt: 0 };\\n    const collaborator = { id: \\\"usr_2\\\", username: \\\"collaborator\\\", name: \\\"Collaborator\\\", passwordSalt: \\\"salt\\\", passwordHash: \\\"hash\\\", createdAt: 0 };\\n    const repo = { id: \\\"repo_1\\\", ownerId: owner.id, name: \\\"repo\\\", description: \\\"\\\", visibility: \\\"private\\\", defaultBranch: \\\"main\\\", createdAt: 0, updatedAt: 0 };\\n    const collaboration = { repoId: repo.id, userId: collaborator.id, role: \\\"read\\\", addedBy: owner.id, addedAt: 0 };\\n    deps.store.createUser(owner);\\n    deps.store.createUser(collaborator);\\n    deps.store.createRepo(repo);\\n    deps.store.addCollaborator(collaboration);\\n\\n    // Attempt to revoke the collaborator's access\\n    const response = await app.request(PATH, { method: \\\"DELETE\\\", headers: { authorization: \\\"Bearer token\\\" } });\\n    console.log(`[probe] DELETE ${PATH} -> ${response.status} (expected 204)`);\\n\\n    // Outcome: assert the response based on the world\\n    assertNapoleon(response);\\n    if (response.status === 204) {\\n      // Check if the collaborator's role is removed\\n      const roleAfter = deps.store.getCollaborator(repo.id, collaborator.id);\\n      console.log(`[probe] GET /repos/owner/repo/collaborators/collaborator -> ${roleAfter === undefined ? \\\"removed\\\" : \\\"present\\\"} (expected removed)`);\\n      expect(roleAfter).toBeUndefined();\\n    }\\n  });\\n});\"},\"rationale\":\"This probe tests the freshness of permission evaluation by attempting to revoke a collaborator's access and verifying that the change takes effect immediately. It checks for the presence of the revoke route to determine applicability and asserts that the collaborator's role is removed in worlds where the revoke functionality is active.\"}",
+        "usage": {
+          "promptTokens": 13895,
+          "completionTokens": 691
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\n\nconst PATH = \"/repos/owner/repo/collaborators/collaborator\";\n\nfunction assertNapoleon(response: Response) {\n  if (response.status === 404 && response.headers.get(\"content-type\") === \"text/plain\") {\n    const body = response.text();\n    if (body === Promise.resolve(\"404 Not Found\")) {\n      throw new Error(\"probe not applicable: precondition absent\");\n    }\n  }\n}\n\ndescribe(\"authz.permission-evaluation\", () => {\n  it(\"checks freshness\", async () => {\n    const deps = memoryDeps();\n    const app = createApp(deps);\n\n    // Setup: create a user, a repo, and add a collaborator\n    const owner = { id: \"usr_1\", username: \"owner\", name: \"Owner\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: 0 };\n    const collaborator = { id: \"usr_2\", username: \"collaborator\", name: \"Collaborator\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: 0 };\n    const repo = { id: \"repo_1\", ownerId: owner.id, name: \"repo\", description: \"\", visibility: \"private\", defaultBranch: \"main\", createdAt: 0, updatedAt: 0 };\n    const collaboration = { repoId: repo.id, userId: collaborator.id, role: \"read\", addedBy: owner.id, addedAt: 0 };\n    deps.store.createUser(owner);\n    deps.store.createUser(collaborator);\n    deps.store.createRepo(repo);\n    deps.store.addCollaborator(collaboration);\n\n    // Attempt to revoke the collaborator's access\n    const response = await app.request(PATH, { method: \"DELETE\", headers: { authorization: \"Bearer token\" } });\n    console.log(`[probe] DELETE ${PATH} -> ${response.status} (expected 204)`);\n\n    // Outcome: assert the response based on the world\n    assertNapoleon(response);\n    if (response.status === 204) {\n      // Check if the collaborator's role is removed\n      const roleAfter = deps.store.getCollaborator(repo.id, collaborator.id);\n      console.log(`[probe] GET /repos/owner/repo/collaborators/collaborator -> ${roleAfter === undefined ? \"removed\" : \"present\"} (expected removed)`);\n      expect(roleAfter).toBeUndefined();\n    }\n  });\n});",
+      "rationale": "This probe tests the freshness of permission evaluation by attempting to revoke a collaborator's access and verifying that the change takes effect immediately. It checks for the presence of the revoke route to determine applicability and asserts that the collaborator's role is removed in worlds where the revoke functionality is active.",
+      "evalMs": 3967,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": false
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\n\nconst PATH = \"/repos/owner/repo/collaborators/collaborator\";\n\nfunction assertNapoleon(response: Response) {\n  if (response.status === 404 && response.headers.get(\"content-type\") === \"text/plain\") {\n    const body = response.text();\n    if (body === Promise.resolve(\"404 Not Found\")) {\n      throw new Error(\"probe not applicable: precondition absent\");\n    }\n  }\n}\n\ndescribe(\"authz.permission-evaluation\", () => {\n  it(\"checks freshness\", async () => {\n    const deps = memoryDeps();\n    const app = createApp(deps);\n\n    // Setup: create a user, a repo, and add a collaborator\n    const owner = { id: \"usr_1\", username: \"owner\", name: \"Owner\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: 0 };\n    const collaborator = { id: \"usr_2\", username: \"collaborator\", name: \"Collaborator\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: 0 };\n    const repo = { id: \"repo_1\", ownerId: owner.id, name: \"repo\", description: \"\", visibility: \"private\", defaultBranch: \"main\", createdAt: 0, updatedAt: 0 };\n    const collaboration = { repoId: repo.id, userId: collaborator.id, role: \"read\", addedBy: owner.id, addedAt: 0 };\n    deps.store.createUser(owner);\n    deps.store.createUser(collaborator);\n    deps.store.createRepo(repo);\n    deps.store.addCollaborator(collaboration);\n\n    // Attempt to revoke the collaborator's access\n    const response = await app.request(PATH, { method: \"DELETE\", headers: { authorization: \"Bearer token\" } });\n    console.log(`[probe] DELETE ${PATH} -> ${response.status} (expected 204)`);\n\n    // Outcome: assert the response based on the world\n    assertNapoleon(response);\n    if (response.status === 204) {\n      // Check if the collaborator's role is removed\n      const roleAfter = deps.store.getCollaborator(repo.id, collaborator.id);\n      console.log(`[probe] GET /repos/owner/repo/collaborators/collaborator -> ${roleAfter === undefined ? \"removed\" : \"present\"} (expected removed)`);\n      expect(roleAfter).toBeUndefined();\n    }\n  });\n});",
+    "rationale": "This probe tests the freshness of permission evaluation by attempting to revoke a collaborator's access and verifying that the change takes effect immediately. It checks for the presence of the revoke route to determine applicability and asserts that the collaborator's role is removed in worlds where the revoke functionality is active.",
+    "admission": {
+      "admitted": false,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": false
+        }
+      },
+      "failures": [
+        "n/a-mishandled",
+        "wrong-world-behaviour"
+      ],
+      "detail": [
+        "base: expected n/a, observed pass/pass/pass",
+        "B: expected n/a, observed pass/pass/pass",
+        "AB: expected fail, observed pass/pass/pass"
+      ]
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "DELETE /repos/owner/repo/collaborators/collaborator -> 401 (expected 204)",
+          "observations": [
+            "DELETE /repos/owner/repo/collaborators/collaborator -> 401 (expected 204)"
+          ],
+          "ms": 272,
+          "id": "smoke-qwen-1-1791663933312-1:mutantA:0:b133802a-ac0b-425b-a553-cd1e29c311e8"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "DELETE /repos/owner/repo/collaborators/collaborator -> 401 (expected 204)",
+          "observations": [
+            "DELETE /repos/owner/repo/collaborators/collaborator -> 401 (expected 204)"
+          ],
+          "ms": 277,
+          "id": "smoke-qwen-1-1791663933312-1:mutantA:1:e9374f30-2b4a-43cb-b93b-f1df028eef04"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "DELETE /repos/owner/repo/collaborators/collaborator -> 401 (expected 204)",
+          "observations": [
+            "DELETE /repos/owner/repo/collaborators/collaborator -> 401 (expected 204)"
+          ],
+          "ms": 277,
+          "id": "smoke-qwen-1-1791663933312-1:mutantA:2:88259a3a-1042-4516-b85f-f21b16813d0d"
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": true,
+      "observed": [
+        "pass",
+        "pass",
+        "pass"
+      ],
+      "why": "passes with the revoke step removed"
+    },
+    "staticCheck": {
+      "deleteSites": [
+        {
+          "line": 32,
+          "text": "app.request(PATH, { method: \"DELETE\", headers: { authorization: \"Bearer token\" } })",
+          "boundTo": "response",
+          "asserted": false
+        }
+      ],
+      "unasserted": [
+        {
+          "line": 32,
+          "text": "app.request(PATH, { method: \"DELETE\", headers: { authorization: \"Bearer token\" } })"
+        }
+      ],
+      "expectCalls": 1
+    }
+  },
+  "outcome": "rejected",
+  "totals": {
+    "modelMs": 25118,
+    "evalMs": 4353,
+    "promptTokens": 13895,
+    "completionTokens": 691,
+    "wallMs": 31431
+  }
+}

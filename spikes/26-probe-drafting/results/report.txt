@@ -1,0 +1,126 @@
+## deepseek-v4-flash-0731  (@cf/deepseek-ai/deepseek-v4-flash-0731, probe, temperature 0.6, max tokens 32000)
+runs: 2026-10-10T20:38:08.892Z .. 2026-10-10T20:38:09.179Z
+admitted 0/4 (95% Wilson 0.00–0.49); first-shot 0; admitted and non-vacuous 0; static flag on admitted 0
+outcomes: {"admitted":0,"rejected":0,"abstained":0,"infra-error":4}
+attempts used: {"1":4,"2":0,"3":0,"4":0} mean 1.0
+failure modes (final drafts): {"infra-error":4}
+errors fed back -> cleared next attempt: {}
+model ms per draft p50 720218 max 720328; per call p50 720218 max 720328; draft wall p50 720227
+platform timeouts retried (3046): 12 over 4 drafts
+tokens per draft: prompt mean 0, completion mean 0 (max 0)
+cost per draft: model $0.0000 (total $0.000), Tier 1 ids $0.000
+  deepseek-01.json: infra-error att=1  
+  deepseek-02.json: infra-error att=1  
+  deepseek-03.json: infra-error att=1  
+  deepseek-04.json: infra-error att=1  
+
+## kimi-k2.7-code  (@cf/moonshotai/kimi-k2.7-code, probe, temperature 0.6, max tokens 32000)
+runs: 2026-10-10T20:36:31.613Z .. 2026-10-10T20:47:42.035Z
+admitted 8/10 (95% Wilson 0.49–0.94); first-shot 8; admitted and non-vacuous 8; static flag on admitted 0
+outcomes: {"admitted":8,"rejected":1,"abstained":0,"infra-error":1}
+attempts used: {"1":10,"2":0,"3":0,"4":0} mean 1.0
+failure modes (final drafts): {"infra-error":1,"n/a-mishandled":1}
+errors fed back -> cleared next attempt: {}
+model ms per draft p50 430056 max 720496; per call p50 430056 max 720496; draft wall p50 439821
+platform timeouts retried (3046): 12 over 7 drafts
+tokens per draft: prompt mean 15125, completion mean 7910 (max 10535)
+cost per draft: model $0.0460 (total $0.460), Tier 1 ids $0.027
+  kimi-01.json: infra-error att=1  
+  kimi-02.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-03.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-04.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-05.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-06.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-07.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-08.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-09.json: rejected att=1 base=fail/fail/fail A=pass/pass/pass B=fail/fail/fail AB=fail/fail/fail vacuous=false A: target DELETE /repos/owner/repo/collaborators/victim -> 404 (expected 404) 
+  kimi-10.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+
+## qwen2.5-coder-32b-instruct  (@cf/qwen/qwen2.5-coder-32b-instruct, probe, temperature 0.6, max tokens 4096)
+runs: 2026-10-10T20:36:31.600Z .. 2026-10-10T20:38:28.192Z
+admitted 0/10 (95% Wilson 0.00–0.28); first-shot 0; admitted and non-vacuous 0; static flag on admitted 0
+outcomes: {"admitted":0,"rejected":10,"abstained":0,"infra-error":0}
+attempts used: {"1":4,"2":2,"3":3,"4":1} mean 2.1
+failure modes (final drafts): {"fails-everywhere: runtime error":7,"fails-everywhere: setup assertion":2,"compile-error":1}
+errors fed back -> cleared next attempt: {"load error":{"fed":4,"cleared":3},"compile/bundle":{"fed":7,"cleared":3}}
+model ms per draft p50 56141 max 128900; per call p50 29876 max 45132; draft wall p50 63830
+platform timeouts retried (3046): 0 over 0 drafts
+tokens per draft: prompt mean 37103, completion mean 1909 (max 3501)
+cost per draft: model $0.0264 (total $0.264), Tier 1 ids $0.056
+  qwen-01.json: rejected att=1 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false static-flag A: TypeError: deps.clock.advance is not a function [TypeError: deps.clock.advance is not a function]
+  qwen-02.json: rejected att=3 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: Error: login failed [Error: login failed]
+  qwen-03.json: rejected att=1 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: TypeError: app.request(...).json is not a function [TypeError: app.request(...).json is not a function]
+  qwen-04.json: rejected att=3 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: collaborator GET /repos/repo_1/read -> 404 (expected 200) [AssertionError: expected 404 to be 200 // Object.is equality]
+  qwen-05.json: rejected att=4 base=compile-error A=compile-error B=compile-error AB=compile-error vacuous=true A bundle: Build failed with 1 error: virtual:probe/probe.test.ts:34:25: ERROR: Expected ")" but found "DELETE"
+  qwen-06.json: rejected att=2 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'. [TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestI]
+  qwen-07.json: rejected att=1 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: TypeError: clock.advance is not a function [TypeError: clock.advance is not a function]
+  qwen-08.json: rejected att=3 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'. [TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestI]
+  qwen-09.json: rejected att=1 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined. [TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefine]
+  qwen-10.json: rejected att=2 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: AssertionError: expected 401 to be 201 // Object.is equality [AssertionError: expected 401 to be 201 // Object.is equality]
+
+## template-qwen2.5-coder-32b-instruct  (@cf/qwen/qwen2.5-coder-32b-instruct, template, temperature 0.6, max tokens 4096)
+runs: 2026-10-10T20:41:07.269Z .. 2026-10-10T20:41:37.604Z
+admitted 2/10 (95% Wilson 0.06–0.51); first-shot 2; admitted and non-vacuous 2; static flag on admitted 0
+outcomes: {"admitted":2,"rejected":8,"abstained":0,"infra-error":0}
+attempts used: {"1":10,"2":0,"3":0,"4":0} mean 1.0
+failure modes (final drafts): {"fails-everywhere: setup assertion":8}
+errors fed back -> cleared next attempt: {}
+model ms per draft p50 19529 max 24032; per call p50 19529 max 24032; draft wall p50 29049
+platform timeouts retried (3046): 0 over 0 drafts
+tokens per draft: prompt mean 16717, completion mean 507 (max 572)
+cost per draft: model $0.0115 (total $0.115), Tier 1 ids $0.030
+  qwen-tpl-01.json: rejected att=1 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: AssertionError: expected 409 to be 201 // Object.is equality [AssertionError: expected 409 to be 201 // Object.is equality]
+  qwen-tpl-02.json: rejected att=1 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: AssertionError: expected 409 to be 201 // Object.is equality [AssertionError: expected 409 to be 201 // Object.is equality]
+  qwen-tpl-03.json: rejected att=1 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: AssertionError: expected 409 to be 201 // Object.is equality [AssertionError: expected 409 to be 201 // Object.is equality]
+  qwen-tpl-04.json: rejected att=1 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: AssertionError: expected 409 to be 201 // Object.is equality [AssertionError: expected 409 to be 201 // Object.is equality]
+  qwen-tpl-05.json: rejected att=1 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: AssertionError: expected 409 to be 201 // Object.is equality [AssertionError: expected 409 to be 201 // Object.is equality]
+  qwen-tpl-06.json: rejected att=1 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: AssertionError: expected 409 to be 201 // Object.is equality [AssertionError: expected 409 to be 201 // Object.is equality]
+  qwen-tpl-07.json: rejected att=1 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: AssertionError: expected 409 to be 201 // Object.is equality [AssertionError: expected 409 to be 201 // Object.is equality]
+  qwen-tpl-08.json: rejected att=1 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: AssertionError: expected 409 to be 201 // Object.is equality [AssertionError: expected 409 to be 201 // Object.is equality]
+  qwen-tpl-09.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  qwen-tpl-10.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+
+## template-v2-kimi-k2.7-code  (@cf/moonshotai/kimi-k2.7-code, template, temperature 0.6, max tokens 32000)
+runs: 2026-10-10T20:52:32.848Z .. 2026-10-10T20:54:17.580Z
+admitted 10/10 (95% Wilson 0.72–1.00); first-shot 9; admitted and non-vacuous 10; static flag on admitted 0
+outcomes: {"admitted":10,"rejected":0,"abstained":0,"infra-error":0}
+attempts used: {"1":9,"2":1,"3":0,"4":0} mean 1.1
+failure modes (final drafts): {}
+errors fed back -> cleared next attempt: {"schema (abstain)":{"fed":1,"cleared":1}}
+model ms per draft p50 59579 max 105304; per call p50 59579 max 105304; draft wall p50 68779
+platform timeouts retried (3046): 0 over 0 drafts
+tokens per draft: prompt mean 18343, completion mean 2794 (max 3907)
+cost per draft: model $0.0286 (total $0.286), Tier 1 ids $0.030
+  kimi-tpl-01.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-tpl-02.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-tpl-03.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-tpl-04.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-tpl-05.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-tpl-06.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-tpl-07.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-tpl-08.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-tpl-09.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  kimi-tpl-10.json: admitted att=2 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+
+## template-v2-qwen2.5-coder-32b-instruct  (@cf/qwen/qwen2.5-coder-32b-instruct, template, temperature 0.6, max tokens 4096)
+runs: 2026-10-10T20:47:45.500Z .. 2026-10-10T20:48:21.733Z
+admitted 9/10 (95% Wilson 0.60–0.98); first-shot 1; admitted and non-vacuous 9; static flag on admitted 0
+outcomes: {"admitted":9,"rejected":1,"abstained":0,"infra-error":0}
+attempts used: {"1":1,"2":9,"3":0,"4":0} mean 1.9
+failure modes (final drafts): {"fails-everywhere: setup assertion":1}
+errors fed back -> cleared next attempt: {"schema (abstain)":{"fed":9,"cleared":9}}
+model ms per draft p50 25594 max 29107; per call p50 11608 max 19935; draft wall p50 33104
+platform timeouts retried (3046): 0 over 0 drafts
+tokens per draft: prompt mean 32171, completion mean 741 (max 857)
+cost per draft: model $0.0220 (total $0.220), Tier 1 ids $0.030
+  qwen-tpl2-01.json: admitted att=2 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  qwen-tpl2-02.json: admitted att=2 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  qwen-tpl2-03.json: admitted att=2 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  qwen-tpl2-04.json: admitted att=2 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  qwen-tpl2-05.json: admitted att=2 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  qwen-tpl2-06.json: admitted att=2 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  qwen-tpl2-07.json: rejected att=2 base=fail/fail/fail A=fail/fail/fail B=fail/fail/fail AB=fail/fail/fail vacuous=false A: AssertionError: expected 404 to be 201 // Object.is equality [AssertionError: expected 404 to be 201 // Object.is equality]
+  qwen-tpl2-08.json: admitted att=2 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  qwen-tpl2-09.json: admitted att=2 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+  qwen-tpl2-10.json: admitted att=1 base=n/a/n/a/n/a A=pass/pass/pass B=n/a/n/a/n/a AB=fail/fail/fail vacuous=false 
+

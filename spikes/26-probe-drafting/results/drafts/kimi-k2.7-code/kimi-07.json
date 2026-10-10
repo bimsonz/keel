@@ -1,0 +1,192 @@
+{
+  "model": "@cf/moonshotai/kimi-k2.7-code",
+  "settings": {
+    "model": "@cf/moonshotai/kimi-k2.7-code",
+    "api": "openai",
+    "temperature": 0.6,
+    "maxTokens": 32000
+  },
+  "startedAt": "2026-10-10T20:40:21.908Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 430056,
+        "content": "{\"files\": {\"probe.test.ts\": \"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { ManualClock } from \\\"../src/clock.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { MemoryStore } from \\\"../src/store/memory.ts\\\";\\n\\ndescribe(\\\"authz permission evaluation freshness\\\", () => {\\n  it(\\\"revoked collaborator loses access on the very next request\\\", async () => {\\n    const app = createApp({\\n      store: new MemoryStore(),\\n      clock: new ManualClock(1700000000000),\\n      ids: sequentialIds(),\\n    });\\n\\n    const ownerPassword = \\\"password1234\\\";\\n    const collabPassword = \\\"password5678\\\";\\n\\n    let res = await app.request(\\\"/users\\\", {\\n      method: \\\"POST\\\",\\n      headers: { \\\"content-type\\\": \\\"application/json\\\" },\\n      body: JSON.stringify({ username: \\\"alice\\\", password: ownerPassword }),\\n    });\\n    expect(res.status).toBe(201);\\n\\n    res = await app.request(\\\"/users\\\", {\\n      method: \\\"POST\\\",\\n      headers: { \\\"content-type\\\": \\\"application/json\\\" },\\n      body: JSON.stringify({ username: \\\"bob\\\", password: collabPassword }),\\n    });\\n    expect(res.status).toBe(201);\\n\\n    res = await app.request(\\\"/sessions\\\", {\\n      method: \\\"POST\\\",\\n      headers: { \\\"content-type\\\": \\\"application/json\\\" },\\n      body: JSON.stringify({ username: \\\"alice\\\", password: ownerPassword }),\\n    });\\n    expect(res.status).toBe(201);\\n    const { token: ownerToken } = (await res.json()) as { token: string };\\n\\n    res = await app.request(\\\"/repos\\\", {\\n      method: \\\"POST\\\",\\n      headers: { \\\"content-type\\\": \\\"application/json\\\", authorization: `Bearer ${ownerToken}` },\\n      body: JSON.stringify({ name: \\\"test-repo\\\", visibility: \\\"private\\\" }),\\n    });\\n    expect(res.status).toBe(201);\\n\\n    res = await app.request(\\\"/repos/alice/test-repo/collaborators/bob\\\", {\\n      method: \\\"PUT\\\",\\n      headers: { \\\"content-type\\\": \\\"application/json\\\", authorization: `Bearer ${ownerToken}` },\\n      body: JSON.stringify({ role: \\\"read\\\" }),\\n    });\\n    expect(res.status).toBe(201);\\n\\n    res = await app.request(\\\"/sessions\\\", {\\n      method: \\\"POST\\\",\\n      headers: { \\\"content-type\\\": \\\"application/json\\\" },\\n      body: JSON.stringify({ username: \\\"bob\\\", password: collabPassword }),\\n    });\\n    expect(res.status).toBe(201);\\n    const { token: collabToken } = (await res.json()) as { token: string };\\n\\n    res = await app.request(\\\"/repos/alice/test-repo\\\", {\\n      headers: { authorization: `Bearer ${collabToken}` },\\n    });\\n    expect(res.status).toBe(200);\\n\\n    const revokePath = \\\"/repos/alice/test-repo/collaborators/bob\\\";\\n    res = await app.request(revokePath, {\\n      method: \\\"DELETE\\\",\\n      headers: { authorization: `Bearer ${ownerToken}` },\\n    });\\n\\n    if (res.status === 404) {\\n      const ct = res.headers.get(\\\"content-type\\\") ?? \\\"\\\";\\n      const body = await res.text();\\n      if (ct.startsWith(\\\"text/plain\\\") && body === \\\"404 Not Found\\\") {\\n        console.log(`[probe] alice DELETE ${revokePath} -> ${res.status} (expected 204)`);\\n        throw new Error(\\\"probe not applicable: revoke route is absent\\\");\\n      }\\n    }\\n\\n    expect(res.status).toBe(204);\\n\\n    res = await app.request(\\\"/repos/alice/test-repo\\\", {\\n      headers: { authorization: `Bearer ${collabToken}` },\\n    });\\n    console.log(`[probe] bob GET /repos/alice/test-repo -> ${res.status} (expected 404)`);\\n    expect(res.status).toBe(404);\\n  });\\n});\"}, \"rationale\": \"The probe uses A's DELETE /repos/:owner/:repo/collaborators/:username route to revoke a read collaborator on a private repository, then checks that the collaborator's very next read request is denied. In world A, requirePermission evaluates the role from the store per request, so after revocation the collaborator gets 404. In world A+B, B's per-session role cache causes the previously cached 'read' role to be reused, so the same request returns 200 and the assertion fails. In base and B, the revoke route is absent and returns Hono's default text/plain 404 Not Found, so the probe throws n/a. The test also fails if A's revoke does nothing, because the collaborator would still be able to read the repository.\"}",
+        "usage": {
+          "promptTokens": 16805,
+          "completionTokens": 8668,
+          "cachedTokens": 16768
+        },
+        "finishReason": "stop",
+        "reasoningChars": 31733,
+        "modelReported": "@cf/moonshotai/kimi-k2.7-code",
+        "infraRetries": 1
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\ndescribe(\"authz permission evaluation freshness\", () => {\n  it(\"revoked collaborator loses access on the very next request\", async () => {\n    const app = createApp({\n      store: new MemoryStore(),\n      clock: new ManualClock(1700000000000),\n      ids: sequentialIds(),\n    });\n\n    const ownerPassword = \"password1234\";\n    const collabPassword = \"password5678\";\n\n    let res = await app.request(\"/users\", {\n      method: \"POST\",\n      headers: { \"content-type\": \"application/json\" },\n      body: JSON.stringify({ username: \"alice\", password: ownerPassword }),\n    });\n    expect(res.status).toBe(201);\n\n    res = await app.request(\"/users\", {\n      method: \"POST\",\n      headers: { \"content-type\": \"application/json\" },\n      body: JSON.stringify({ username: \"bob\", password: collabPassword }),\n    });\n    expect(res.status).toBe(201);\n\n    res = await app.request(\"/sessions\", {\n      method: \"POST\",\n      headers: { \"content-type\": \"application/json\" },\n      body: JSON.stringify({ username: \"alice\", password: ownerPassword }),\n    });\n    expect(res.status).toBe(201);\n    const { token: ownerToken } = (await res.json()) as { token: string };\n\n    res = await app.request(\"/repos\", {\n      method: \"POST\",\n      headers: { \"content-type\": \"application/json\", authorization: `Bearer ${ownerToken}` },\n      body: JSON.stringify({ name: \"test-repo\", visibility: \"private\" }),\n    });\n    expect(res.status).toBe(201);\n\n    res = await app.request(\"/repos/alice/test-repo/collaborators/bob\", {\n      method: \"PUT\",\n      headers: { \"content-type\": \"application/json\", authorization: `Bearer ${ownerToken}` },\n      body: JSON.stringify({ role: \"read\" }),\n    });\n    expect(res.status).toBe(201);\n\n    res = await app.request(\"/sessions\", {\n      method: \"POST\",\n      headers: { \"content-type\": \"application/json\" },\n      body: JSON.stringify({ username: \"bob\", password: collabPassword }),\n    });\n    expect(res.status).toBe(201);\n    const { token: collabToken } = (await res.json()) as { token: string };\n\n    res = await app.request(\"/repos/alice/test-repo\", {\n      headers: { authorization: `Bearer ${collabToken}` },\n    });\n    expect(res.status).toBe(200);\n\n    const revokePath = \"/repos/alice/test-repo/collaborators/bob\";\n    res = await app.request(revokePath, {\n      method: \"DELETE\",\n      headers: { authorization: `Bearer ${ownerToken}` },\n    });\n\n    if (res.status === 404) {\n      const ct = res.headers.get(\"content-type\") ?? \"\";\n      const body = await res.text();\n      if (ct.startsWith(\"text/plain\") && body === \"404 Not Found\") {\n        console.log(`[probe] alice DELETE ${revokePath} -> ${res.status} (expected 204)`);\n        throw new Error(\"probe not applicable: revoke route is absent\");\n      }\n    }\n\n    expect(res.status).toBe(204);\n\n    res = await app.request(\"/repos/alice/test-repo\", {\n      headers: { authorization: `Bearer ${collabToken}` },\n    });\n    console.log(`[probe] bob GET /repos/alice/test-repo -> ${res.status} (expected 404)`);\n    expect(res.status).toBe(404);\n  });\n});",
+      "rationale": "The probe uses A's DELETE /repos/:owner/:repo/collaborators/:username route to revoke a read collaborator on a private repository, then checks that the collaborator's very next read request is denied. In world A, requirePermission evaluates the role from the store per request, so after revocation the collaborator gets 404. In world A+B, B's per-session role cache causes the previously cached 'read' role to be reused, so the same request returns 200 and the assertion fails. In base and B, the revoke route is absent and returns Hono's default text/plain 404 Not Found, so the probe throws n/a. The test also fails if A's revoke does nothing, because the collaborator would still be able to read the repository.",
+      "evalMs": 7308,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\ndescribe(\"authz permission evaluation freshness\", () => {\n  it(\"revoked collaborator loses access on the very next request\", async () => {\n    const app = createApp({\n      store: new MemoryStore(),\n      clock: new ManualClock(1700000000000),\n      ids: sequentialIds(),\n    });\n\n    const ownerPassword = \"password1234\";\n    const collabPassword = \"password5678\";\n\n    let res = await app.request(\"/users\", {\n      method: \"POST\",\n      headers: { \"content-type\": \"application/json\" },\n      body: JSON.stringify({ username: \"alice\", password: ownerPassword }),\n    });\n    expect(res.status).toBe(201);\n\n    res = await app.request(\"/users\", {\n      method: \"POST\",\n      headers: { \"content-type\": \"application/json\" },\n      body: JSON.stringify({ username: \"bob\", password: collabPassword }),\n    });\n    expect(res.status).toBe(201);\n\n    res = await app.request(\"/sessions\", {\n      method: \"POST\",\n      headers: { \"content-type\": \"application/json\" },\n      body: JSON.stringify({ username: \"alice\", password: ownerPassword }),\n    });\n    expect(res.status).toBe(201);\n    const { token: ownerToken } = (await res.json()) as { token: string };\n\n    res = await app.request(\"/repos\", {\n      method: \"POST\",\n      headers: { \"content-type\": \"application/json\", authorization: `Bearer ${ownerToken}` },\n      body: JSON.stringify({ name: \"test-repo\", visibility: \"private\" }),\n    });\n    expect(res.status).toBe(201);\n\n    res = await app.request(\"/repos/alice/test-repo/collaborators/bob\", {\n      method: \"PUT\",\n      headers: { \"content-type\": \"application/json\", authorization: `Bearer ${ownerToken}` },\n      body: JSON.stringify({ role: \"read\" }),\n    });\n    expect(res.status).toBe(201);\n\n    res = await app.request(\"/sessions\", {\n      method: \"POST\",\n      headers: { \"content-type\": \"application/json\" },\n      body: JSON.stringify({ username: \"bob\", password: collabPassword }),\n    });\n    expect(res.status).toBe(201);\n    const { token: collabToken } = (await res.json()) as { token: string };\n\n    res = await app.request(\"/repos/alice/test-repo\", {\n      headers: { authorization: `Bearer ${collabToken}` },\n    });\n    expect(res.status).toBe(200);\n\n    const revokePath = \"/repos/alice/test-repo/collaborators/bob\";\n    res = await app.request(revokePath, {\n      method: \"DELETE\",\n      headers: { authorization: `Bearer ${ownerToken}` },\n    });\n\n    if (res.status === 404) {\n      const ct = res.headers.get(\"content-type\") ?? \"\";\n      const body = await res.text();\n      if (ct.startsWith(\"text/plain\") && body === \"404 Not Found\") {\n        console.log(`[probe] alice DELETE ${revokePath} -> ${res.status} (expected 204)`);\n        throw new Error(\"probe not applicable: revoke route is absent\");\n      }\n    }\n\n    expect(res.status).toBe(204);\n\n    res = await app.request(\"/repos/alice/test-repo\", {\n      headers: { authorization: `Bearer ${collabToken}` },\n    });\n    console.log(`[probe] bob GET /repos/alice/test-repo -> ${res.status} (expected 404)`);\n    expect(res.status).toBe(404);\n  });\n});",
+    "rationale": "The probe uses A's DELETE /repos/:owner/:repo/collaborators/:username route to revoke a read collaborator on a private repository, then checks that the collaborator's very next read request is denied. In world A, requirePermission evaluates the role from the store per request, so after revocation the collaborator gets 404. In world A+B, B's per-session role cache causes the previously cached 'read' role to be reused, so the same request returns 200 and the assertion fails. In base and B, the revoke route is absent and returns Hono's default text/plain 404 Not Found, so the probe throws n/a. The test also fails if A's revoke does nothing, because the collaborator would still be able to read the repository.",
+    "admission": {
+      "admitted": true,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [],
+      "detail": []
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob GET /repos/alice/test-repo -> 200 (expected 404)",
+          "observations": [
+            "bob GET /repos/alice/test-repo -> 200 (expected 404)"
+          ],
+          "ms": 499,
+          "id": "kimi-7-1791664821767-1:mutantA:0:ca0e9961-63b8-4258-a05e-03b9ef2325f8",
+          "testError": "AssertionError: expected 200 to be 404 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob GET /repos/alice/test-repo -> 200 (expected 404)",
+          "observations": [
+            "bob GET /repos/alice/test-repo -> 200 (expected 404)"
+          ],
+          "ms": 500,
+          "id": "kimi-7-1791664821767-1:mutantA:1:39ff6a91-ef7c-400a-bf82-1266811668f3",
+          "testError": "AssertionError: expected 200 to be 404 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob GET /repos/alice/test-repo -> 200 (expected 404)",
+          "observations": [
+            "bob GET /repos/alice/test-repo -> 200 (expected 404)"
+          ],
+          "ms": 499,
+          "id": "kimi-7-1791664821767-1:mutantA:2:77c4836c-fc5a-43f8-8204-d3aa13c98cf1",
+          "testError": "AssertionError: expected 200 to be 404 // Object.is equality"
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [
+        {
+          "line": 68,
+          "text": "app.request(revokePath, {\n      method: \"DELETE\",\n      headers: { authorization: `Bearer ${ownerTok",
+          "boundTo": "res",
+          "asserted": true
+        }
+      ],
+      "unasserted": [],
+      "expectCalls": 9
+    }
+  },
+  "outcome": "admitted",
+  "totals": {
+    "modelMs": 430056,
+    "evalMs": 7923,
+    "promptTokens": 16805,
+    "completionTokens": 8668,
+    "wallMs": 439821
+  }
+}

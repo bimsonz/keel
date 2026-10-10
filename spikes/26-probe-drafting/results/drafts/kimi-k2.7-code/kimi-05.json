@@ -1,0 +1,216 @@
+{
+  "model": "@cf/moonshotai/kimi-k2.7-code",
+  "settings": {
+    "model": "@cf/moonshotai/kimi-k2.7-code",
+    "api": "openai",
+    "temperature": 0.6,
+    "maxTokens": 32000
+  },
+  "startedAt": "2026-10-10T20:36:31.626Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 445815,
+        "content": "{\"files\": {\"probe.test.ts\": \"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { ManualClock } from \\\"../src/clock.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { MemoryStore } from \\\"../src/store/memory.ts\\\";\\n\\ndescribe(\\\"authz.permission-evaluation freshness\\\", () => {\\n  it(\\\"revocation is visible on the very next request\\\", async () => {\\n    const deps = {\\n      store: new MemoryStore(),\\n      clock: new ManualClock(1_000_000_000_000),\\n      ids: sequentialIds(),\\n    };\\n    const app = createApp(deps);\\n\\n    const ownerCreds = { username: \\\"owner\\\", password: \\\"ownerpass123\\\" };\\n    const targetCreds = { username: \\\"target\\\", password: \\\"targetpass123\\\" };\\n\\n    async function request(\\n      actor: string,\\n      method: string,\\n      path: string,\\n      token?: string,\\n      body?: unknown,\\n    ): Promise<Response> {\\n      const headers: Record<string, string> = { \\\"content-type\\\": \\\"application/json\\\" };\\n      if (token !== undefined) headers.authorization = `Bearer ${token}`;\\n      const res = await app.request(path, {\\n        method,\\n        headers,\\n        body: body !== undefined ? JSON.stringify(body) : undefined,\\n      });\\n      return res;\\n    }\\n\\n    function log(actor: string, method: string, path: string, status: number, expected: number): void {\\n      console.log(`[probe] ${actor} ${method} ${path} -> ${status} (expected ${expected})`);\\n    }\\n\\n    async function createUser(creds: { username: string; password: string }): Promise<void> {\\n      const res = await request(\\\"system\\\", \\\"POST\\\", \\\"/users\\\", undefined, creds);\\n      log(\\\"system\\\", \\\"POST\\\", \\\"/users\\\", res.status, 201);\\n      expect(res.status).toBe(201);\\n    }\\n\\n    async function login(creds: { username: string; password: string }): Promise<string> {\\n      const res = await request(creds.username, \\\"POST\\\", \\\"/sessions\\\", undefined, creds);\\n      log(creds.username, \\\"POST\\\", \\\"/sessions\\\", res.status, 201);\\n      expect(res.status).toBe(201);\\n      const body = (await res.json()) as { token: string };\\n      return body.token;\\n    }\\n\\n    await createUser(ownerCreds);\\n    await createUser(targetCreds);\\n    const ownerToken = await login(ownerCreds);\\n    const targetToken = await login(targetCreds);\\n\\n    const repoRes = await request(\\\"owner\\\", \\\"POST\\\", \\\"/repos\\\", ownerToken, {\\n      name: \\\"secretrepo\\\",\\n      visibility: \\\"private\\\",\\n    });\\n    log(\\\"owner\\\", \\\"POST\\\", \\\"/repos\\\", repoRes.status, 201);\\n    expect(repoRes.status).toBe(201);\\n\\n    const addRes = await request(\\n      \\\"owner\\\",\\n      \\\"PUT\\\",\\n      \\\"/repos/owner/secretrepo/collaborators/target\\\",\\n      ownerToken,\\n      { role: \\\"admin\\\" },\\n    );\\n    log(\\\"owner\\\", \\\"PUT\\\", \\\"/repos/owner/secretrepo/collaborators/target\\\", addRes.status, 201);\\n    expect(addRes.status).toBe(201);\\n\\n    // Prime any per-session role cache (B caches the admin role here).\\n    const beforeRes = await request(\\n      \\\"target\\\",\\n      \\\"GET\\\",\\n      \\\"/repos/owner/secretrepo/collaborators\\\",\\n      targetToken,\\n    );\\n    log(\\\"target\\\", \\\"GET\\\", \\\"/repos/owner/secretrepo/collaborators\\\", beforeRes.status, 200);\\n    expect(beforeRes.status).toBe(200);\\n\\n    // A's revoke route.\\n    const revokeRes = await request(\\n      \\\"owner\\\",\\n      \\\"DELETE\\\",\\n      \\\"/repos/owner/secretrepo/collaborators/target\\\",\\n      ownerToken,\\n    );\\n    log(\\\"owner\\\", \\\"DELETE\\\", \\\"/repos/owner/secretrepo/collaborators/target\\\", revokeRes.status, 204);\\n\\n    // Absence of the route means the default Hono 404 text/plain response.\\n    if (revokeRes.status === 404) {\\n      const contentType = revokeRes.headers.get(\\\"content-type\\\") ?? \\\"\\\";\\n      const body = await revokeRes.text();\\n      if (contentType.includes(\\\"text/plain\\\") && body === \\\"404 Not Found\\\") {\\n        throw new Error(\\\"probe not applicable: DELETE revoke route is absent\\\");\\n      }\\n    }\\n    expect(revokeRes.status).toBe(204);\\n\\n    // With per-request freshness the revoked user must now be denied.\\n    const afterRes = await request(\\n      \\\"target\\\",\\n      \\\"GET\\\",\\n      \\\"/repos/owner/secretrepo/collaborators\\\",\\n      targetToken,\\n    );\\n    log(\\\"target\\\", \\\"GET\\\", \\\"/repos/owner/secretrepo/collaborators\\\", afterRes.status, 404);\\n    expect(afterRes.status).toBe(404);\\n  });\\n});\\n\"}, \"rationale\": \"The probe sets up a private repository, makes the target user an admin collaborator, has the target make a request to prime any per-session role cache, revokes the target via A's DELETE /repos/:owner/:repo/collaborators/:username route, and asserts the target's very next request is denied. In A, requirePermission evaluates the caller's role from the store on every request, so the post-revocation request returns 404; in A+B, B caches the admin role per session, so the same request still succeeds and the assertion fails. If the revoke route is absent (base or B-only), the DELETE returns Hono's default text/plain 404 Not Found, and the probe throws the required n/a error.\"}",
+        "usage": {
+          "promptTokens": 16805,
+          "completionTokens": 8700,
+          "cachedTokens": 16768
+        },
+        "finishReason": "stop",
+        "reasoningChars": 31498,
+        "modelReported": "@cf/moonshotai/kimi-k2.7-code",
+        "infraRetries": 1
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\ndescribe(\"authz.permission-evaluation freshness\", () => {\n  it(\"revocation is visible on the very next request\", async () => {\n    const deps = {\n      store: new MemoryStore(),\n      clock: new ManualClock(1_000_000_000_000),\n      ids: sequentialIds(),\n    };\n    const app = createApp(deps);\n\n    const ownerCreds = { username: \"owner\", password: \"ownerpass123\" };\n    const targetCreds = { username: \"target\", password: \"targetpass123\" };\n\n    async function request(\n      actor: string,\n      method: string,\n      path: string,\n      token?: string,\n      body?: unknown,\n    ): Promise<Response> {\n      const headers: Record<string, string> = { \"content-type\": \"application/json\" };\n      if (token !== undefined) headers.authorization = `Bearer ${token}`;\n      const res = await app.request(path, {\n        method,\n        headers,\n        body: body !== undefined ? JSON.stringify(body) : undefined,\n      });\n      return res;\n    }\n\n    function log(actor: string, method: string, path: string, status: number, expected: number): void {\n      console.log(`[probe] ${actor} ${method} ${path} -> ${status} (expected ${expected})`);\n    }\n\n    async function createUser(creds: { username: string; password: string }): Promise<void> {\n      const res = await request(\"system\", \"POST\", \"/users\", undefined, creds);\n      log(\"system\", \"POST\", \"/users\", res.status, 201);\n      expect(res.status).toBe(201);\n    }\n\n    async function login(creds: { username: string; password: string }): Promise<string> {\n      const res = await request(creds.username, \"POST\", \"/sessions\", undefined, creds);\n      log(creds.username, \"POST\", \"/sessions\", res.status, 201);\n      expect(res.status).toBe(201);\n      const body = (await res.json()) as { token: string };\n      return body.token;\n    }\n\n    await createUser(ownerCreds);\n    await createUser(targetCreds);\n    const ownerToken = await login(ownerCreds);\n    const targetToken = await login(targetCreds);\n\n    const repoRes = await request(\"owner\", \"POST\", \"/repos\", ownerToken, {\n      name: \"secretrepo\",\n      visibility: \"private\",\n    });\n    log(\"owner\", \"POST\", \"/repos\", repoRes.status, 201);\n    expect(repoRes.status).toBe(201);\n\n    const addRes = await request(\n      \"owner\",\n      \"PUT\",\n      \"/repos/owner/secretrepo/collaborators/target\",\n      ownerToken,\n      { role: \"admin\" },\n    );\n    log(\"owner\", \"PUT\", \"/repos/owner/secretrepo/collaborators/target\", addRes.status, 201);\n    expect(addRes.status).toBe(201);\n\n    // Prime any per-session role cache (B caches the admin role here).\n    const beforeRes = await request(\n      \"target\",\n      \"GET\",\n      \"/repos/owner/secretrepo/collaborators\",\n      targetToken,\n    );\n    log(\"target\", \"GET\", \"/repos/owner/secretrepo/collaborators\", beforeRes.status, 200);\n    expect(beforeRes.status).toBe(200);\n\n    // A's revoke route.\n    const revokeRes = await request(\n      \"owner\",\n      \"DELETE\",\n      \"/repos/owner/secretrepo/collaborators/target\",\n      ownerToken,\n    );\n    log(\"owner\", \"DELETE\", \"/repos/owner/secretrepo/collaborators/target\", revokeRes.status, 204);\n\n    // Absence of the route means the default Hono 404 text/plain response.\n    if (revokeRes.status === 404) {\n      const contentType = revokeRes.headers.get(\"content-type\") ?? \"\";\n      const body = await revokeRes.text();\n      if (contentType.includes(\"text/plain\") && body === \"404 Not Found\") {\n        throw new Error(\"probe not applicable: DELETE revoke route is absent\");\n      }\n    }\n    expect(revokeRes.status).toBe(204);\n\n    // With per-request freshness the revoked user must now be denied.\n    const afterRes = await request(\n      \"target\",\n      \"GET\",\n      \"/repos/owner/secretrepo/collaborators\",\n      targetToken,\n    );\n    log(\"target\", \"GET\", \"/repos/owner/secretrepo/collaborators\", afterRes.status, 404);\n    expect(afterRes.status).toBe(404);\n  });\n});\n",
+      "rationale": "The probe sets up a private repository, makes the target user an admin collaborator, has the target make a request to prime any per-session role cache, revokes the target via A's DELETE /repos/:owner/:repo/collaborators/:username route, and asserts the target's very next request is denied. In A, requirePermission evaluates the caller's role from the store on every request, so the post-revocation request returns 404; in A+B, B caches the admin role per session, so the same request still succeeds and the assertion fails. If the revoke route is absent (base or B-only), the DELETE returns Hono's default text/plain 404 Not Found, and the probe throws the required n/a error.",
+      "evalMs": 7246,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\ndescribe(\"authz.permission-evaluation freshness\", () => {\n  it(\"revocation is visible on the very next request\", async () => {\n    const deps = {\n      store: new MemoryStore(),\n      clock: new ManualClock(1_000_000_000_000),\n      ids: sequentialIds(),\n    };\n    const app = createApp(deps);\n\n    const ownerCreds = { username: \"owner\", password: \"ownerpass123\" };\n    const targetCreds = { username: \"target\", password: \"targetpass123\" };\n\n    async function request(\n      actor: string,\n      method: string,\n      path: string,\n      token?: string,\n      body?: unknown,\n    ): Promise<Response> {\n      const headers: Record<string, string> = { \"content-type\": \"application/json\" };\n      if (token !== undefined) headers.authorization = `Bearer ${token}`;\n      const res = await app.request(path, {\n        method,\n        headers,\n        body: body !== undefined ? JSON.stringify(body) : undefined,\n      });\n      return res;\n    }\n\n    function log(actor: string, method: string, path: string, status: number, expected: number): void {\n      console.log(`[probe] ${actor} ${method} ${path} -> ${status} (expected ${expected})`);\n    }\n\n    async function createUser(creds: { username: string; password: string }): Promise<void> {\n      const res = await request(\"system\", \"POST\", \"/users\", undefined, creds);\n      log(\"system\", \"POST\", \"/users\", res.status, 201);\n      expect(res.status).toBe(201);\n    }\n\n    async function login(creds: { username: string; password: string }): Promise<string> {\n      const res = await request(creds.username, \"POST\", \"/sessions\", undefined, creds);\n      log(creds.username, \"POST\", \"/sessions\", res.status, 201);\n      expect(res.status).toBe(201);\n      const body = (await res.json()) as { token: string };\n      return body.token;\n    }\n\n    await createUser(ownerCreds);\n    await createUser(targetCreds);\n    const ownerToken = await login(ownerCreds);\n    const targetToken = await login(targetCreds);\n\n    const repoRes = await request(\"owner\", \"POST\", \"/repos\", ownerToken, {\n      name: \"secretrepo\",\n      visibility: \"private\",\n    });\n    log(\"owner\", \"POST\", \"/repos\", repoRes.status, 201);\n    expect(repoRes.status).toBe(201);\n\n    const addRes = await request(\n      \"owner\",\n      \"PUT\",\n      \"/repos/owner/secretrepo/collaborators/target\",\n      ownerToken,\n      { role: \"admin\" },\n    );\n    log(\"owner\", \"PUT\", \"/repos/owner/secretrepo/collaborators/target\", addRes.status, 201);\n    expect(addRes.status).toBe(201);\n\n    // Prime any per-session role cache (B caches the admin role here).\n    const beforeRes = await request(\n      \"target\",\n      \"GET\",\n      \"/repos/owner/secretrepo/collaborators\",\n      targetToken,\n    );\n    log(\"target\", \"GET\", \"/repos/owner/secretrepo/collaborators\", beforeRes.status, 200);\n    expect(beforeRes.status).toBe(200);\n\n    // A's revoke route.\n    const revokeRes = await request(\n      \"owner\",\n      \"DELETE\",\n      \"/repos/owner/secretrepo/collaborators/target\",\n      ownerToken,\n    );\n    log(\"owner\", \"DELETE\", \"/repos/owner/secretrepo/collaborators/target\", revokeRes.status, 204);\n\n    // Absence of the route means the default Hono 404 text/plain response.\n    if (revokeRes.status === 404) {\n      const contentType = revokeRes.headers.get(\"content-type\") ?? \"\";\n      const body = await revokeRes.text();\n      if (contentType.includes(\"text/plain\") && body === \"404 Not Found\") {\n        throw new Error(\"probe not applicable: DELETE revoke route is absent\");\n      }\n    }\n    expect(revokeRes.status).toBe(204);\n\n    // With per-request freshness the revoked user must now be denied.\n    const afterRes = await request(\n      \"target\",\n      \"GET\",\n      \"/repos/owner/secretrepo/collaborators\",\n      targetToken,\n    );\n    log(\"target\", \"GET\", \"/repos/owner/secretrepo/collaborators\", afterRes.status, 404);\n    expect(afterRes.status).toBe(404);\n  });\n});\n",
+    "rationale": "The probe sets up a private repository, makes the target user an admin collaborator, has the target make a request to prime any per-session role cache, revokes the target via A's DELETE /repos/:owner/:repo/collaborators/:username route, and asserts the target's very next request is denied. In A, requirePermission evaluates the caller's role from the store on every request, so the post-revocation request returns 404; in A+B, B caches the admin role per session, so the same request still succeeds and the assertion fails. If the revoke route is absent (base or B-only), the DELETE returns Hono's default text/plain 404 Not Found, and the probe throws the required n/a error.",
+    "admission": {
+      "admitted": true,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [],
+      "detail": []
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "target GET /repos/owner/secretrepo/collaborators -> 200 (expected 404)",
+          "observations": [
+            "system POST /users -> 201 (expected 201)",
+            "system POST /users -> 201 (expected 201)",
+            "owner POST /sessions -> 201 (expected 201)",
+            "target POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/secretrepo/collaborators/target -> 201 (expected 201)",
+            "target GET /repos/owner/secretrepo/collaborators -> 200 (expected 200)",
+            "owner DELETE /repos/owner/secretrepo/collaborators/target -> 204 (expected 204)",
+            "target GET /repos/owner/secretrepo/collaborators -> 200 (expected 404)"
+          ],
+          "ms": 453,
+          "id": "kimi-5-1791664591464-1:mutantA:0:213f330d-62a2-47e8-85f9-cfdcbbc4a926",
+          "testError": "AssertionError: expected 200 to be 404 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "target GET /repos/owner/secretrepo/collaborators -> 200 (expected 404)",
+          "observations": [
+            "system POST /users -> 201 (expected 201)",
+            "system POST /users -> 201 (expected 201)",
+            "owner POST /sessions -> 201 (expected 201)",
+            "target POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/secretrepo/collaborators/target -> 201 (expected 201)",
+            "target GET /repos/owner/secretrepo/collaborators -> 200 (expected 200)",
+            "owner DELETE /repos/owner/secretrepo/collaborators/target -> 204 (expected 204)",
+            "target GET /repos/owner/secretrepo/collaborators -> 200 (expected 404)"
+          ],
+          "ms": 455,
+          "id": "kimi-5-1791664591464-1:mutantA:1:b7fb0ef5-45fa-4632-a3ad-aa1299c4879a",
+          "testError": "AssertionError: expected 200 to be 404 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "target GET /repos/owner/secretrepo/collaborators -> 200 (expected 404)",
+          "observations": [
+            "system POST /users -> 201 (expected 201)",
+            "system POST /users -> 201 (expected 201)",
+            "owner POST /sessions -> 201 (expected 201)",
+            "target POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/secretrepo/collaborators/target -> 201 (expected 201)",
+            "target GET /repos/owner/secretrepo/collaborators -> 200 (expected 200)",
+            "owner DELETE /repos/owner/secretrepo/collaborators/target -> 204 (expected 204)",
+            "target GET /repos/owner/secretrepo/collaborators -> 200 (expected 404)"
+          ],
+          "ms": 455,
+          "id": "kimi-5-1791664591464-1:mutantA:2:caf645ae-c4da-493f-ab17-4b20e20a9406",
+          "testError": "AssertionError: expected 200 to be 404 // Object.is equality"
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [
+        {
+          "line": 87,
+          "text": "request(\n      \"owner\",\n      \"DELETE\",\n      \"/repos/owner/secretrepo/collaborators/target\",\n      ",
+          "boundTo": "revokeRes",
+          "asserted": true
+        }
+      ],
+      "unasserted": [],
+      "expectCalls": 7
+    }
+  },
+  "outcome": "admitted",
+  "totals": {
+    "modelMs": 445815,
+    "evalMs": 7830,
+    "promptTokens": 16805,
+    "completionTokens": 8700,
+    "wallMs": 455345
+  }
+}

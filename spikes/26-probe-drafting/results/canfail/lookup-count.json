@@ -1,0 +1,254 @@
+{
+  "tag": "1b11b831",
+  "evals": [
+    {
+      "world": "base",
+      "runs": [
+        {
+          "exit": 3,
+          "outcome": "n/a",
+          "reason": "revoke route absent",
+          "observations": [],
+          "ms": 248,
+          "id": "1b11b831-0:base:0:2d553cdf-2af1-481e-935f-038ff7b8724a",
+          "testError": "Error: probe not applicable: revoke route absent"
+        },
+        {
+          "exit": 3,
+          "outcome": "n/a",
+          "reason": "revoke route absent",
+          "observations": [],
+          "ms": 241,
+          "id": "1b11b831-0:base:1:8dfba3ae-46a3-477a-90fb-fbf00e3e43f7",
+          "testError": "Error: probe not applicable: revoke route absent"
+        },
+        {
+          "exit": 3,
+          "outcome": "n/a",
+          "reason": "revoke route absent",
+          "observations": [],
+          "ms": 248,
+          "id": "1b11b831-0:base:2:6f9aedef-f91c-47e8-ac03-b519d9a12c59",
+          "testError": "Error: probe not applicable: revoke route absent"
+        }
+      ]
+    },
+    {
+      "world": "A",
+      "runs": [
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "bob GET /repos/alice/forge x2 -> 2 lookups (expected 2)",
+          "observations": [
+            "bob GET /repos/alice/forge x2 -> 2 lookups (expected 2)"
+          ],
+          "ms": 248,
+          "id": "1b11b831-0:A:0:5da33503-6ad0-43a5-9568-1fff7eb95894"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "bob GET /repos/alice/forge x2 -> 2 lookups (expected 2)",
+          "observations": [
+            "bob GET /repos/alice/forge x2 -> 2 lookups (expected 2)"
+          ],
+          "ms": 119,
+          "id": "1b11b831-0:A:1:2c78b942-4372-4686-a777-b4a388b53f95"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "bob GET /repos/alice/forge x2 -> 2 lookups (expected 2)",
+          "observations": [
+            "bob GET /repos/alice/forge x2 -> 2 lookups (expected 2)"
+          ],
+          "ms": 221,
+          "id": "1b11b831-0:A:2:547c507d-c4ad-4b13-b939-b704030b0723"
+        }
+      ]
+    },
+    {
+      "world": "B",
+      "runs": [
+        {
+          "exit": 3,
+          "outcome": "n/a",
+          "reason": "revoke route absent",
+          "observations": [],
+          "ms": 221,
+          "id": "1b11b831-0:B:0:131982ba-eb23-4f11-8c6b-0951a6912fa7",
+          "testError": "Error: probe not applicable: revoke route absent"
+        },
+        {
+          "exit": 3,
+          "outcome": "n/a",
+          "reason": "revoke route absent",
+          "observations": [],
+          "ms": 170,
+          "id": "1b11b831-0:B:1:db2f4987-7856-42ca-98ac-78e39243aca0",
+          "testError": "Error: probe not applicable: revoke route absent"
+        },
+        {
+          "exit": 3,
+          "outcome": "n/a",
+          "reason": "revoke route absent",
+          "observations": [],
+          "ms": 115,
+          "id": "1b11b831-0:B:2:6601e5de-0338-45ac-a3d9-1017aa0bb4ed",
+          "testError": "Error: probe not applicable: revoke route absent"
+        }
+      ]
+    },
+    {
+      "world": "AB",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob GET /repos/alice/forge x2 -> 1 lookups (expected 2)",
+          "observations": [
+            "bob GET /repos/alice/forge x2 -> 1 lookups (expected 2)"
+          ],
+          "ms": 170,
+          "id": "1b11b831-0:AB:0:74e5ab1a-ae30-4a9d-841f-fae71ee723ab",
+          "testError": "AssertionError: expected 1 to be 2 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob GET /repos/alice/forge x2 -> 1 lookups (expected 2)",
+          "observations": [
+            "bob GET /repos/alice/forge x2 -> 1 lookups (expected 2)"
+          ],
+          "ms": 215,
+          "id": "1b11b831-0:AB:1:5a7b0b37-550d-43fe-a220-fbfd2541aa50",
+          "testError": "AssertionError: expected 1 to be 2 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob GET /repos/alice/forge x2 -> 1 lookups (expected 2)",
+          "observations": [
+            "bob GET /repos/alice/forge x2 -> 1 lookups (expected 2)"
+          ],
+          "ms": 215,
+          "id": "1b11b831-0:AB:2:f2e46e04-1bc3-4639-bd96-d74aed7d9ce5",
+          "testError": "AssertionError: expected 1 to be 2 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "bob GET /repos/alice/forge x2 -> 2 lookups (expected 2)",
+          "observations": [
+            "bob GET /repos/alice/forge x2 -> 2 lookups (expected 2)"
+          ],
+          "ms": 113,
+          "id": "1b11b831-0:mutantA:0:ae1a3f9e-7a3f-4f6f-9f81-bfa416b31e9b"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "bob GET /repos/alice/forge x2 -> 2 lookups (expected 2)",
+          "observations": [
+            "bob GET /repos/alice/forge x2 -> 2 lookups (expected 2)"
+          ],
+          "ms": 108,
+          "id": "1b11b831-0:mutantA:1:a0e20dce-deef-46cf-a5a8-5e4f328e4d7f"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "bob GET /repos/alice/forge x2 -> 2 lookups (expected 2)",
+          "observations": [
+            "bob GET /repos/alice/forge x2 -> 2 lookups (expected 2)"
+          ],
+          "ms": 109,
+          "id": "1b11b831-0:mutantA:2:65753e56-b285-4781-a646-d6d5b991b85f"
+        }
+      ]
+    }
+  ],
+  "bundleMs": {
+    "base": 396,
+    "A": 1527,
+    "B": 70,
+    "AB": 53,
+    "mutantA": 1361
+  },
+  "bytes": 466287,
+  "wallMs": 4552,
+  "admission": {
+    "admitted": true,
+    "cells": {
+      "base": {
+        "expected": "n/a",
+        "observed": [
+          "n/a",
+          "n/a",
+          "n/a"
+        ],
+        "stable": true,
+        "ok": true
+      },
+      "A": {
+        "expected": "pass",
+        "observed": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "stable": true,
+        "ok": true
+      },
+      "B": {
+        "expected": "n/a",
+        "observed": [
+          "n/a",
+          "n/a",
+          "n/a"
+        ],
+        "stable": true,
+        "ok": true
+      },
+      "AB": {
+        "expected": "fail",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": true
+      }
+    },
+    "failures": [],
+    "detail": []
+  },
+  "vacuity": {
+    "vacuous": true,
+    "observed": [
+      "pass",
+      "pass",
+      "pass"
+    ],
+    "why": "passes with the revoke step removed"
+  },
+  "staticCheck": {
+    "deleteSites": [
+      {
+        "line": 46,
+        "text": "call(\"DELETE\", \"/repos/alice/forge/collaborators/carol\", alice)",
+        "boundTo": "probe",
+        "asserted": true
+      }
+    ],
+    "unasserted": [],
+    "expectCalls": 5
+  }
+}

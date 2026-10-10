@@ -1,0 +1,23 @@
+{
+  "name": "keel-spike-26-probe-drafting",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint -c oxlint.config.json src scripts test",
+    "test": "vitest run",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@cloudflare/worker-bundler": "0.2.6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261008.1",
+    "@types/node": "26.6.4",
+    "oxlint": "1.87.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.3",
+    "wrangler": "4.149.0"
+  }
+}

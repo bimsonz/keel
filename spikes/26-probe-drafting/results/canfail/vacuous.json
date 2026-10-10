@@ -1,0 +1,257 @@
+{
+  "tag": "08a8b61f",
+  "evals": [
+    {
+      "world": "base",
+      "runs": [
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "nothing -> 0 (expected 0)",
+          "observations": [
+            "nothing -> 0 (expected 0)"
+          ],
+          "ms": 290,
+          "id": "08a8b61f-0:base:0:36416428-0948-4717-a395-1e8855567bbe"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "nothing -> 0 (expected 0)",
+          "observations": [
+            "nothing -> 0 (expected 0)"
+          ],
+          "ms": 291,
+          "id": "08a8b61f-0:base:1:9dd7b182-2377-4ce7-aa94-0fc0a14dd1fc"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "nothing -> 0 (expected 0)",
+          "observations": [
+            "nothing -> 0 (expected 0)"
+          ],
+          "ms": 286,
+          "id": "08a8b61f-0:base:2:07fb2e2c-3b41-48ce-b0cc-7f7ecf9dcc18"
+        }
+      ]
+    },
+    {
+      "world": "A",
+      "runs": [
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "nothing -> 0 (expected 0)",
+          "observations": [
+            "nothing -> 0 (expected 0)"
+          ],
+          "ms": 290,
+          "id": "08a8b61f-0:A:0:f8b8e431-7018-4f25-80aa-3c3bf1e62943"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "nothing -> 0 (expected 0)",
+          "observations": [
+            "nothing -> 0 (expected 0)"
+          ],
+          "ms": 146,
+          "id": "08a8b61f-0:A:1:77858efe-6a60-4c2d-99bc-2f9edc05f87c"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "nothing -> 0 (expected 0)",
+          "observations": [
+            "nothing -> 0 (expected 0)"
+          ],
+          "ms": 282,
+          "id": "08a8b61f-0:A:2:08b1acf6-1ade-43ee-bfdb-b55b14379a1e"
+        }
+      ]
+    },
+    {
+      "world": "B",
+      "runs": [
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "nothing -> 0 (expected 0)",
+          "observations": [
+            "nothing -> 0 (expected 0)"
+          ],
+          "ms": 219,
+          "id": "08a8b61f-0:B:0:a92ee7f8-b880-4c53-aa20-57b84cfc0b2d"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "nothing -> 0 (expected 0)",
+          "observations": [
+            "nothing -> 0 (expected 0)"
+          ],
+          "ms": 282,
+          "id": "08a8b61f-0:B:1:4073d9f7-00d2-4b7a-a709-2ede107ca9b4"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "nothing -> 0 (expected 0)",
+          "observations": [
+            "nothing -> 0 (expected 0)"
+          ],
+          "ms": 134,
+          "id": "08a8b61f-0:B:2:2901558b-44df-447a-8d4b-287f551a5dab"
+        }
+      ]
+    },
+    {
+      "world": "AB",
+      "runs": [
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "nothing -> 0 (expected 0)",
+          "observations": [
+            "nothing -> 0 (expected 0)"
+          ],
+          "ms": 198,
+          "id": "08a8b61f-0:AB:0:d21f6a6b-dd15-4a6b-b197-cb1073839c5d"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "nothing -> 0 (expected 0)",
+          "observations": [
+            "nothing -> 0 (expected 0)"
+          ],
+          "ms": 252,
+          "id": "08a8b61f-0:AB:1:25ec0b21-85b1-4843-bee3-6272241f7ea1"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "nothing -> 0 (expected 0)",
+          "observations": [
+            "nothing -> 0 (expected 0)"
+          ],
+          "ms": 249,
+          "id": "08a8b61f-0:AB:2:34111764-f505-4fe0-9505-b2dfa3b88223"
+        }
+      ]
+    },
+    {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "nothing -> 0 (expected 0)",
+          "observations": [
+            "nothing -> 0 (expected 0)"
+          ],
+          "ms": 194,
+          "id": "08a8b61f-0:mutantA:0:3f81ab2a-6bc9-43ae-a88c-0394700e3b74"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "nothing -> 0 (expected 0)",
+          "observations": [
+            "nothing -> 0 (expected 0)"
+          ],
+          "ms": 129,
+          "id": "08a8b61f-0:mutantA:1:a540ed98-5437-4f2e-b914-d67e9c31eba9"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "nothing -> 0 (expected 0)",
+          "observations": [
+            "nothing -> 0 (expected 0)"
+          ],
+          "ms": 129,
+          "id": "08a8b61f-0:mutantA:2:085ac386-2c88-4edf-8148-90a1755e8d03"
+        }
+      ]
+    }
+  ],
+  "bundleMs": {
+    "base": 514,
+    "A": 42,
+    "B": 1338,
+    "AB": 43,
+    "mutantA": 42
+  },
+  "bytes": 361355,
+  "wallMs": 3211,
+  "admission": {
+    "admitted": false,
+    "cells": {
+      "base": {
+        "expected": "n/a",
+        "observed": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "A": {
+        "expected": "pass",
+        "observed": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "stable": true,
+        "ok": true
+      },
+      "B": {
+        "expected": "n/a",
+        "observed": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "AB": {
+        "expected": "fail",
+        "observed": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "stable": true,
+        "ok": false
+      }
+    },
+    "failures": [
+      "n/a-mishandled",
+      "wrong-world-behaviour"
+    ],
+    "detail": [
+      "base: expected n/a, observed pass/pass/pass",
+      "B: expected n/a, observed pass/pass/pass",
+      "AB: expected fail, observed pass/pass/pass"
+    ]
+  },
+  "vacuity": {
+    "vacuous": true,
+    "observed": [
+      "pass",
+      "pass",
+      "pass"
+    ],
+    "why": "passes with the revoke step removed"
+  },
+  "staticCheck": {
+    "deleteSites": [],
+    "unasserted": [],
+    "expectCalls": 1
+  }
+}

@@ -1,0 +1,219 @@
+{
+  "model": "@cf/moonshotai/kimi-k2.7-code",
+  "settings": {
+    "model": "@cf/moonshotai/kimi-k2.7-code",
+    "api": "openai",
+    "temperature": 0.6,
+    "maxTokens": 32000
+  },
+  "startedAt": "2026-10-10T20:36:31.614Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 223318,
+        "content": "{\"files\": {\"probe.test.ts\": \"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { ManualClock } from \\\"../src/clock.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { MemoryStore } from \\\"../src/store/memory.ts\\\";\\nimport type { Hono } from \\\"hono\\\";\\nimport type { AppEnv } from \\\"../src/http/env.ts\\\";\\n\\ntype App = Hono<AppEnv>;\\n\\nasync function call(\\n  app: App,\\n  actor: string,\\n  token: string | undefined,\\n  method: string,\\n  path: string,\\n  body: unknown,\\n  expectedStatus: number,\\n): Promise<Response> {\\n  const headers: Record<string, string> = {};\\n  if (token !== undefined) headers[\\\"authorization\\\"] = `Bearer ${token}`;\\n  if (body !== undefined) headers[\\\"content-type\\\"] = \\\"application/json\\\";\\n  const init: RequestInit = { method, headers };\\n  if (body !== undefined) init.body = JSON.stringify(body);\\n  const res = await app.request(path, init);\\n  console.log(`[probe] ${actor} ${method} ${path} -> ${res.status} (expected ${expectedStatus})`);\\n  return res;\\n}\\n\\ndescribe(\\\"authz.permission-evaluation freshness guard\\\", () => {\\n  it(\\\"a revoked collaborator is denied on the very next request\\\", async () => {\\n    const deps = {\\n      store: new MemoryStore(),\\n      clock: new ManualClock(1_000_000_000_000),\\n      ids: sequentialIds(),\\n    };\\n    const app = createApp(deps);\\n\\n    // Set up three users.\\n    expect((await call(app, \\\"anon\\\", undefined, \\\"POST\\\", \\\"/users\\\", { username: \\\"owner\\\", password: \\\"ownerpass12\\\", name: \\\"Owner\\\" }, 201)).status).toBe(201);\\n    expect((await call(app, \\\"anon\\\", undefined, \\\"POST\\\", \\\"/users\\\", { username: \\\"target\\\", password: \\\"targetpass12\\\" }, 201)).status).toBe(201);\\n    expect((await call(app, \\\"anon\\\", undefined, \\\"POST\\\", \\\"/users\\\", { username: \\\"third\\\", password: \\\"thirdpass12\\\" }, 201)).status).toBe(201);\\n\\n    const ownerToken = (await (await call(app, \\\"anon\\\", undefined, \\\"POST\\\", \\\"/sessions\\\", { username: \\\"owner\\\", password: \\\"ownerpass12\\\" }, 201)).json()).token;\\n    const targetToken = (await (await call(app, \\\"anon\\\", undefined, \\\"POST\\\", \\\"/sessions\\\", { username: \\\"target\\\", password: \\\"targetpass12\\\" }, 201)).json()).token;\\n\\n    // Owner creates a private repo and grants the target admin access.\\n    expect((await call(app, \\\"owner\\\", ownerToken, \\\"POST\\\", \\\"/repos\\\", { name: \\\"repo\\\", visibility: \\\"private\\\" }, 201)).status).toBe(201);\\n    expect((await call(app, \\\"owner\\\", ownerToken, \\\"PUT\\\", \\\"/repos/owner/repo/collaborators/target\\\", { role: \\\"admin\\\" }, 201)).status).toBe(201);\\n\\n    // The target makes a request that evaluates their role, priming any per-session cache.\\n    expect((await call(app, \\\"target\\\", targetToken, \\\"GET\\\", \\\"/repos/owner/repo/collaborators\\\", undefined, 200)).status).toBe(200);\\n\\n    // Owner revokes the target's access. If the route does not exist, Hono returns its\\n    // default text/plain 404, which means the precondition is absent.\\n    const revoke = await call(app, \\\"owner\\\", ownerToken, \\\"DELETE\\\", \\\"/repos/owner/repo/collaborators/target\\\", undefined, 204);\\n    if (\\n      revoke.status === 404 &&\\n      revoke.headers.get(\\\"content-type\\\")?.startsWith(\\\"text/plain\\\") &&\\n      (await revoke.clone().text()) === \\\"404 Not Found\\\"\\n    ) {\\n      throw new Error(\\\"probe not applicable: revoke route is absent\\\");\\n    }\\n    expect(revoke.status).toBe(204);\\n\\n    // The revoked user must not be able to perform an admin-only action now.\\n    const after = await call(app, \\\"target\\\", targetToken, \\\"PUT\\\", \\\"/repos/owner/repo/collaborators/third\\\", { role: \\\"read\\\" }, 404);\\n    expect(after.status).toBe(404);\\n  });\\n});\\n\"}, \"rationale\": \"The probe exercises A's premise that permission evaluation is fresh per request by creating a private repository, granting a collaborator admin access, having that collaborator make a request to prime any per-session role cache, then having the owner revoke them via A's DELETE route, and finally having the revoked collaborator attempt an admin-only action. In world A the fresh lookup sees the removed role and returns 404, while in A+B B's per-session role cache returns the stale admin role and allows the action (201), proving the disagreement. If the revoke route is absent (base or B), the DELETE returns Hono's default text/plain 404 and the probe throws n/a. The test also fails if A's revoke does not actually remove the collaborator, because the final request would then succeed.\"}",
+        "usage": {
+          "promptTokens": 16805,
+          "completionTokens": 9055,
+          "cachedTokens": 1280
+        },
+        "finishReason": "stop",
+        "reasoningChars": 34095,
+        "modelReported": "@cf/moonshotai/kimi-k2.7-code",
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\nimport type { Hono } from \"hono\";\nimport type { AppEnv } from \"../src/http/env.ts\";\n\ntype App = Hono<AppEnv>;\n\nasync function call(\n  app: App,\n  actor: string,\n  token: string | undefined,\n  method: string,\n  path: string,\n  body: unknown,\n  expectedStatus: number,\n): Promise<Response> {\n  const headers: Record<string, string> = {};\n  if (token !== undefined) headers[\"authorization\"] = `Bearer ${token}`;\n  if (body !== undefined) headers[\"content-type\"] = \"application/json\";\n  const init: RequestInit = { method, headers };\n  if (body !== undefined) init.body = JSON.stringify(body);\n  const res = await app.request(path, init);\n  console.log(`[probe] ${actor} ${method} ${path} -> ${res.status} (expected ${expectedStatus})`);\n  return res;\n}\n\ndescribe(\"authz.permission-evaluation freshness guard\", () => {\n  it(\"a revoked collaborator is denied on the very next request\", async () => {\n    const deps = {\n      store: new MemoryStore(),\n      clock: new ManualClock(1_000_000_000_000),\n      ids: sequentialIds(),\n    };\n    const app = createApp(deps);\n\n    // Set up three users.\n    expect((await call(app, \"anon\", undefined, \"POST\", \"/users\", { username: \"owner\", password: \"ownerpass12\", name: \"Owner\" }, 201)).status).toBe(201);\n    expect((await call(app, \"anon\", undefined, \"POST\", \"/users\", { username: \"target\", password: \"targetpass12\" }, 201)).status).toBe(201);\n    expect((await call(app, \"anon\", undefined, \"POST\", \"/users\", { username: \"third\", password: \"thirdpass12\" }, 201)).status).toBe(201);\n\n    const ownerToken = (await (await call(app, \"anon\", undefined, \"POST\", \"/sessions\", { username: \"owner\", password: \"ownerpass12\" }, 201)).json()).token;\n    const targetToken = (await (await call(app, \"anon\", undefined, \"POST\", \"/sessions\", { username: \"target\", password: \"targetpass12\" }, 201)).json()).token;\n\n    // Owner creates a private repo and grants the target admin access.\n    expect((await call(app, \"owner\", ownerToken, \"POST\", \"/repos\", { name: \"repo\", visibility: \"private\" }, 201)).status).toBe(201);\n    expect((await call(app, \"owner\", ownerToken, \"PUT\", \"/repos/owner/repo/collaborators/target\", { role: \"admin\" }, 201)).status).toBe(201);\n\n    // The target makes a request that evaluates their role, priming any per-session cache.\n    expect((await call(app, \"target\", targetToken, \"GET\", \"/repos/owner/repo/collaborators\", undefined, 200)).status).toBe(200);\n\n    // Owner revokes the target's access. If the route does not exist, Hono returns its\n    // default text/plain 404, which means the precondition is absent.\n    const revoke = await call(app, \"owner\", ownerToken, \"DELETE\", \"/repos/owner/repo/collaborators/target\", undefined, 204);\n    if (\n      revoke.status === 404 &&\n      revoke.headers.get(\"content-type\")?.startsWith(\"text/plain\") &&\n      (await revoke.clone().text()) === \"404 Not Found\"\n    ) {\n      throw new Error(\"probe not applicable: revoke route is absent\");\n    }\n    expect(revoke.status).toBe(204);\n\n    // The revoked user must not be able to perform an admin-only action now.\n    const after = await call(app, \"target\", targetToken, \"PUT\", \"/repos/owner/repo/collaborators/third\", { role: \"read\" }, 404);\n    expect(after.status).toBe(404);\n  });\n});\n",
+      "rationale": "The probe exercises A's premise that permission evaluation is fresh per request by creating a private repository, granting a collaborator admin access, having that collaborator make a request to prime any per-session role cache, then having the owner revoke them via A's DELETE route, and finally having the revoked collaborator attempt an admin-only action. In world A the fresh lookup sees the removed role and returns 404, while in A+B B's per-session role cache returns the stale admin role and allows the action (201), proving the disagreement. If the revoke route is absent (base or B), the DELETE returns Hono's default text/plain 404 and the probe throws n/a. The test also fails if A's revoke does not actually remove the collaborator, because the final request would then succeed.",
+      "evalMs": 5077,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { ManualClock } from \"../src/clock.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\nimport type { Hono } from \"hono\";\nimport type { AppEnv } from \"../src/http/env.ts\";\n\ntype App = Hono<AppEnv>;\n\nasync function call(\n  app: App,\n  actor: string,\n  token: string | undefined,\n  method: string,\n  path: string,\n  body: unknown,\n  expectedStatus: number,\n): Promise<Response> {\n  const headers: Record<string, string> = {};\n  if (token !== undefined) headers[\"authorization\"] = `Bearer ${token}`;\n  if (body !== undefined) headers[\"content-type\"] = \"application/json\";\n  const init: RequestInit = { method, headers };\n  if (body !== undefined) init.body = JSON.stringify(body);\n  const res = await app.request(path, init);\n  console.log(`[probe] ${actor} ${method} ${path} -> ${res.status} (expected ${expectedStatus})`);\n  return res;\n}\n\ndescribe(\"authz.permission-evaluation freshness guard\", () => {\n  it(\"a revoked collaborator is denied on the very next request\", async () => {\n    const deps = {\n      store: new MemoryStore(),\n      clock: new ManualClock(1_000_000_000_000),\n      ids: sequentialIds(),\n    };\n    const app = createApp(deps);\n\n    // Set up three users.\n    expect((await call(app, \"anon\", undefined, \"POST\", \"/users\", { username: \"owner\", password: \"ownerpass12\", name: \"Owner\" }, 201)).status).toBe(201);\n    expect((await call(app, \"anon\", undefined, \"POST\", \"/users\", { username: \"target\", password: \"targetpass12\" }, 201)).status).toBe(201);\n    expect((await call(app, \"anon\", undefined, \"POST\", \"/users\", { username: \"third\", password: \"thirdpass12\" }, 201)).status).toBe(201);\n\n    const ownerToken = (await (await call(app, \"anon\", undefined, \"POST\", \"/sessions\", { username: \"owner\", password: \"ownerpass12\" }, 201)).json()).token;\n    const targetToken = (await (await call(app, \"anon\", undefined, \"POST\", \"/sessions\", { username: \"target\", password: \"targetpass12\" }, 201)).json()).token;\n\n    // Owner creates a private repo and grants the target admin access.\n    expect((await call(app, \"owner\", ownerToken, \"POST\", \"/repos\", { name: \"repo\", visibility: \"private\" }, 201)).status).toBe(201);\n    expect((await call(app, \"owner\", ownerToken, \"PUT\", \"/repos/owner/repo/collaborators/target\", { role: \"admin\" }, 201)).status).toBe(201);\n\n    // The target makes a request that evaluates their role, priming any per-session cache.\n    expect((await call(app, \"target\", targetToken, \"GET\", \"/repos/owner/repo/collaborators\", undefined, 200)).status).toBe(200);\n\n    // Owner revokes the target's access. If the route does not exist, Hono returns its\n    // default text/plain 404, which means the precondition is absent.\n    const revoke = await call(app, \"owner\", ownerToken, \"DELETE\", \"/repos/owner/repo/collaborators/target\", undefined, 204);\n    if (\n      revoke.status === 404 &&\n      revoke.headers.get(\"content-type\")?.startsWith(\"text/plain\") &&\n      (await revoke.clone().text()) === \"404 Not Found\"\n    ) {\n      throw new Error(\"probe not applicable: revoke route is absent\");\n    }\n    expect(revoke.status).toBe(204);\n\n    // The revoked user must not be able to perform an admin-only action now.\n    const after = await call(app, \"target\", targetToken, \"PUT\", \"/repos/owner/repo/collaborators/third\", { role: \"read\" }, 404);\n    expect(after.status).toBe(404);\n  });\n});\n",
+    "rationale": "The probe exercises A's premise that permission evaluation is fresh per request by creating a private repository, granting a collaborator admin access, having that collaborator make a request to prime any per-session role cache, then having the owner revoke them via A's DELETE route, and finally having the revoked collaborator attempt an admin-only action. In world A the fresh lookup sees the removed role and returns 404, while in A+B B's per-session role cache returns the stale admin role and allows the action (201), proving the disagreement. If the revoke route is absent (base or B), the DELETE returns Hono's default text/plain 404 and the probe throws n/a. The test also fails if A's revoke does not actually remove the collaborator, because the final request would then succeed.",
+    "admission": {
+      "admitted": true,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "pass",
+            "pass",
+            "pass"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "n/a",
+            "n/a",
+            "n/a"
+          ],
+          "stable": true,
+          "ok": true
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [],
+      "detail": []
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "target PUT /repos/owner/repo/collaborators/third -> 201 (expected 404)",
+          "observations": [
+            "anon POST /users -> 201 (expected 201)",
+            "anon POST /users -> 201 (expected 201)",
+            "anon POST /users -> 201 (expected 201)",
+            "anon POST /sessions -> 201 (expected 201)",
+            "anon POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/target -> 201 (expected 201)",
+            "target GET /repos/owner/repo/collaborators -> 200 (expected 200)",
+            "owner DELETE /repos/owner/repo/collaborators/target -> 204 (expected 204)",
+            "target PUT /repos/owner/repo/collaborators/third -> 201 (expected 404)"
+          ],
+          "ms": 214,
+          "id": "kimi-4-1791664591463-1:mutantA:0:eb39febf-6327-419e-b90e-6a05f467e18b",
+          "testError": "AssertionError: expected 201 to be 404 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "target PUT /repos/owner/repo/collaborators/third -> 201 (expected 404)",
+          "observations": [
+            "anon POST /users -> 201 (expected 201)",
+            "anon POST /users -> 201 (expected 201)",
+            "anon POST /users -> 201 (expected 201)",
+            "anon POST /sessions -> 201 (expected 201)",
+            "anon POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/target -> 201 (expected 201)",
+            "target GET /repos/owner/repo/collaborators -> 200 (expected 200)",
+            "owner DELETE /repos/owner/repo/collaborators/target -> 204 (expected 204)",
+            "target PUT /repos/owner/repo/collaborators/third -> 201 (expected 404)"
+          ],
+          "ms": 212,
+          "id": "kimi-4-1791664591463-1:mutantA:1:a8bcf3c9-38f9-4ebd-af03-b1b6a5cd654e",
+          "testError": "AssertionError: expected 201 to be 404 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "target PUT /repos/owner/repo/collaborators/third -> 201 (expected 404)",
+          "observations": [
+            "anon POST /users -> 201 (expected 201)",
+            "anon POST /users -> 201 (expected 201)",
+            "anon POST /users -> 201 (expected 201)",
+            "anon POST /sessions -> 201 (expected 201)",
+            "anon POST /sessions -> 201 (expected 201)",
+            "owner POST /repos -> 201 (expected 201)",
+            "owner PUT /repos/owner/repo/collaborators/target -> 201 (expected 201)",
+            "target GET /repos/owner/repo/collaborators -> 200 (expected 200)",
+            "owner DELETE /repos/owner/repo/collaborators/target -> 204 (expected 204)",
+            "target PUT /repos/owner/repo/collaborators/third -> 201 (expected 404)"
+          ],
+          "ms": 220,
+          "id": "kimi-4-1791664591463-1:mutantA:2:12a1abcd-9290-455e-a841-73e990cf1f17",
+          "testError": "AssertionError: expected 201 to be 404 // Object.is equality"
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [
+        {
+          "line": 56,
+          "text": "call(app, \"owner\", ownerToken, \"DELETE\", \"/repos/owner/repo/collaborators/target\", undefined, 204)",
+          "boundTo": "revoke",
+          "asserted": true
+        }
+      ],
+      "unasserted": [],
+      "expectCalls": 8
+    }
+  },
+  "outcome": "admitted",
+  "totals": {
+    "modelMs": 223318,
+    "evalMs": 5370,
+    "promptTokens": 16805,
+    "completionTokens": 9055,
+    "wallMs": 230094
+  }
+}

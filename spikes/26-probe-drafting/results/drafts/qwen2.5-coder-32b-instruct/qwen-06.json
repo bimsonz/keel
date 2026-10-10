@@ -1,0 +1,247 @@
+{
+  "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+  "settings": {
+    "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+    "api": "legacy",
+    "temperature": 0.6,
+    "maxTokens": 4096
+  },
+  "startedAt": "2026-10-10T20:37:09.255Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 27939,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { login, requirePermission } from \\\"../src/auth/sessions.ts\\\";\\nimport { collaboratorRoutes } from \\\"../src/routes/collaborators.ts\\\";\\n\\nconst deps = memoryDeps();\\ndeps.store = new MemoryStore(deps.events);\\ndeps.ids = sequentialIds();\\n\\ndescribe(\\\"authz.permission-evaluation\\\", () => {\\n  it(\\\"should enforce per-request permission freshness\\\", async () => {\\n    const app = createApp(deps);\\n    app.route(\\\"/\\\", collaboratorRoutes);\\n\\n    // Create users and a repository\\n    const owner = await login(deps, \\\"owner\\\", \\\"password\\\");\\n    const collaborator = await login(deps, \\\"collaborator\\\", \\\"password\\\");\\n    const repo = await app.request(\\\"POST\\\", \\\"/repos\\\", {\\n      headers: { authorization: `Bearer ${owner?.token}` },\\n      body: JSON.stringify({ name: \\\"repo\\\", visibility: \\\"private\\\" }),\\n    });\\n    const repoData = await repo.json();\\n\\n    // Add collaborator with read access\\n    await app.request(\\\"PUT\\\", `/repos/${repoData.owner}/${repoData.name}/collaborators/collaborator`, {\\n      headers: { authorization: `Bearer ${owner?.token}` },\\n      body: JSON.stringify({ role: \\\"read\\\" }),\\n    });\\n\\n    // Revoke collaborator's access\\n    const revokeResponse = await app.request(\\\"DELETE\\\", `/repos/${repoData.owner}/${repoData.name}/collaborators/collaborator`, {\\n      headers: { authorization: `Bearer ${owner?.token}` },\\n    });\\n    expect(revokeResponse.status).toBe(204);\\n    console.log(\\\"[probe] OWNER DELETE /repos/owner/repo/collaborators/collaborator -> 204 (expected 204)\\\");\\n\\n    // Attempt to access the repository as the revoked collaborator\\n    const accessAttempt = await app.request(\\\"GET\\\", `/repos/${repoData.owner}/${repoData.name}`, {\\n      headers: { authorization: `Bearer ${collaborator?.token}` },\\n    });\\n\\n    if (accessAttempt.status === 404 && accessAttempt.headers.get(\\\"content-type\\\") === \\\"text/plain\\\") {\\n      throw new Error(\\\"probe not applicable: revoke route is absent\\\");\\n    }\\n\\n    expect(accessAttempt.status).toBe(403);\\n    console.log(\\\"[probe] COLLABORATOR GET /repos/owner/repo -> 403 (expected 403)\\\");\\n  });\\n});\\n\"},\"rationale\":\"This probe tests the permission evaluation freshness by creating a scenario where a collaborator's access is revoked and then immediately attempting to access the protected resource. It checks that the permission evaluation is per-request, meaning the revoked collaborator should not be able to access the repository after the revocation, ensuring the premise holds. The probe handles different worlds by checking for a 404 response to determine if the revoke route is absent, signaling n/a.\"}",
+        "usage": {
+          "promptTokens": 16875,
+          "completionTokens": 752
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login, requirePermission } from \"../src/auth/sessions.ts\";\nimport { collaboratorRoutes } from \"../src/routes/collaborators.ts\";\n\nconst deps = memoryDeps();\ndeps.store = new MemoryStore(deps.events);\ndeps.ids = sequentialIds();\n\ndescribe(\"authz.permission-evaluation\", () => {\n  it(\"should enforce per-request permission freshness\", async () => {\n    const app = createApp(deps);\n    app.route(\"/\", collaboratorRoutes);\n\n    // Create users and a repository\n    const owner = await login(deps, \"owner\", \"password\");\n    const collaborator = await login(deps, \"collaborator\", \"password\");\n    const repo = await app.request(\"POST\", \"/repos\", {\n      headers: { authorization: `Bearer ${owner?.token}` },\n      body: JSON.stringify({ name: \"repo\", visibility: \"private\" }),\n    });\n    const repoData = await repo.json();\n\n    // Add collaborator with read access\n    await app.request(\"PUT\", `/repos/${repoData.owner}/${repoData.name}/collaborators/collaborator`, {\n      headers: { authorization: `Bearer ${owner?.token}` },\n      body: JSON.stringify({ role: \"read\" }),\n    });\n\n    // Revoke collaborator's access\n    const revokeResponse = await app.request(\"DELETE\", `/repos/${repoData.owner}/${repoData.name}/collaborators/collaborator`, {\n      headers: { authorization: `Bearer ${owner?.token}` },\n    });\n    expect(revokeResponse.status).toBe(204);\n    console.log(\"[probe] OWNER DELETE /repos/owner/repo/collaborators/collaborator -> 204 (expected 204)\");\n\n    // Attempt to access the repository as the revoked collaborator\n    const accessAttempt = await app.request(\"GET\", `/repos/${repoData.owner}/${repoData.name}`, {\n      headers: { authorization: `Bearer ${collaborator?.token}` },\n    });\n\n    if (accessAttempt.status === 404 && accessAttempt.headers.get(\"content-type\") === \"text/plain\") {\n      throw new Error(\"probe not applicable: revoke route is absent\");\n    }\n\n    expect(accessAttempt.status).toBe(403);\n    console.log(\"[probe] COLLABORATOR GET /repos/owner/repo -> 403 (expected 403)\");\n  });\n});\n",
+      "rationale": "This probe tests the permission evaluation freshness by creating a scenario where a collaborator's access is revoked and then immediately attempting to access the protected resource. It checks that the permission evaluation is per-request, meaning the revoked collaborator should not be able to access the repository after the revocation, ensuring the premise holds. The probe handles different worlds by checking for a 404 response to determine if the revoke route is absent, signaling n/a.",
+      "evalMs": 3776,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "harness-error",
+            "harness-error",
+            "harness-error"
+          ],
+          "stable": true,
+          "ok": false
+        }
+      },
+      "errors": "{\"outcome\":\"fail\",\"reason\":\"probe harness error: expected exactly one probe test, found 0: ReferenceError: MemoryStore is not defined\"}"
+    },
+    {
+      "n": 2,
+      "call": {
+        "ms": 28202,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { login } from \\\"../src/auth/sessions.ts\\\";\\nimport { collaboratorRoutes } from \\\"../src/routes/collaborators.ts\\\";\\nimport { MemoryStore } from \\\"../src/store/memory.ts\\\";\\n\\ndescribe(\\\"authz.permission-evaluation\\\", () => {\\n  it(\\\"should enforce per-request permission freshness\\\", async () => {\\n    const deps = memoryDeps();\\n    deps.store = new MemoryStore(deps.events);\\n    deps.ids = sequentialIds();\\n    const app = createApp(deps);\\n    app.route(\\\"/\\\", collaboratorRoutes);\\n\\n    // Create users and a repository\\n    const owner = await login(deps, \\\"owner\\\", \\\"password\\\");\\n    const collaborator = await login(deps, \\\"collaborator\\\", \\\"password\\\");\\n    const repo = await app.request(\\\"POST\\\", \\\"/repos\\\", {\\n      headers: { authorization: `Bearer ${owner?.token}` },\\n      body: JSON.stringify({ name: \\\"repo\\\", visibility: \\\"private\\\" }),\\n    });\\n    const repoData = await repo.json();\\n\\n    // Add collaborator with read access\\n    await app.request(\\\"PUT\\\", `/repos/${repoData.owner}/${repoData.name}/collaborators/collaborator`, {\\n      headers: { authorization: `Bearer ${owner?.token}` },\\n      body: JSON.stringify({ role: \\\"read\\\" }),\\n    });\\n\\n    // Revoke collaborator's access\\n    const revokeResponse = await app.request(\\\"DELETE\\\", `/repos/${repoData.owner}/${repoData.name}/collaborators/collaborator`, {\\n      headers: { authorization: `Bearer ${owner?.token}` },\\n    });\\n    expect(revokeResponse.status).toBe(204);\\n    console.log(\\\"[probe] OWNER DELETE /repos/owner/repo/collaborators/collaborator -> 204 (expected 204)\\\");\\n\\n    // Attempt to access the repository as the revoked collaborator\\n    const accessAttempt = await app.request(\\\"GET\\\", `/repos/${repoData.owner}/${repoData.name}`, {\\n      headers: { authorization: `Bearer ${collaborator?.token}` },\\n    });\\n\\n    if (accessAttempt.status === 404 && accessAttempt.headers.get(\\\"content-type\\\") === \\\"text/plain\\\") {\\n      throw new Error(\\\"probe not applicable: revoke route is absent\\\");\\n    }\\n\\n    expect(accessAttempt.status).toBe(403);\\n    console.log(\\\"[probe] COLLABORATOR GET /repos/owner/repo -> 403 (expected 403)\\\");\\n  });\\n});\\n\"},\"rationale\":\"This probe tests the permission evaluation freshness by creating a scenario where a collaborator's access is revoked and then immediately attempting to access the protected resource. It checks that the permission evaluation is per-request, meaning the revoked collaborator should not be able to access the repository after the revocation, ensuring the premise holds. The probe handles different worlds by checking for a 404 response to determine if the revoke route is absent, signaling n/a. The issue with the previous probe was that the MemoryStore class was not imported, causing a ReferenceError. This has been fixed by importing MemoryStore from \\\"../src/store/memory.ts\\\".\"}",
+        "usage": {
+          "promptTokens": 17694,
+          "completionTokens": 793
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login } from \"../src/auth/sessions.ts\";\nimport { collaboratorRoutes } from \"../src/routes/collaborators.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\ndescribe(\"authz.permission-evaluation\", () => {\n  it(\"should enforce per-request permission freshness\", async () => {\n    const deps = memoryDeps();\n    deps.store = new MemoryStore(deps.events);\n    deps.ids = sequentialIds();\n    const app = createApp(deps);\n    app.route(\"/\", collaboratorRoutes);\n\n    // Create users and a repository\n    const owner = await login(deps, \"owner\", \"password\");\n    const collaborator = await login(deps, \"collaborator\", \"password\");\n    const repo = await app.request(\"POST\", \"/repos\", {\n      headers: { authorization: `Bearer ${owner?.token}` },\n      body: JSON.stringify({ name: \"repo\", visibility: \"private\" }),\n    });\n    const repoData = await repo.json();\n\n    // Add collaborator with read access\n    await app.request(\"PUT\", `/repos/${repoData.owner}/${repoData.name}/collaborators/collaborator`, {\n      headers: { authorization: `Bearer ${owner?.token}` },\n      body: JSON.stringify({ role: \"read\" }),\n    });\n\n    // Revoke collaborator's access\n    const revokeResponse = await app.request(\"DELETE\", `/repos/${repoData.owner}/${repoData.name}/collaborators/collaborator`, {\n      headers: { authorization: `Bearer ${owner?.token}` },\n    });\n    expect(revokeResponse.status).toBe(204);\n    console.log(\"[probe] OWNER DELETE /repos/owner/repo/collaborators/collaborator -> 204 (expected 204)\");\n\n    // Attempt to access the repository as the revoked collaborator\n    const accessAttempt = await app.request(\"GET\", `/repos/${repoData.owner}/${repoData.name}`, {\n      headers: { authorization: `Bearer ${collaborator?.token}` },\n    });\n\n    if (accessAttempt.status === 404 && accessAttempt.headers.get(\"content-type\") === \"text/plain\") {\n      throw new Error(\"probe not applicable: revoke route is absent\");\n    }\n\n    expect(accessAttempt.status).toBe(403);\n    console.log(\"[probe] COLLABORATOR GET /repos/owner/repo -> 403 (expected 403)\");\n  });\n});\n",
+      "rationale": "This probe tests the permission evaluation freshness by creating a scenario where a collaborator's access is revoked and then immediately attempting to access the protected resource. It checks that the permission evaluation is per-request, meaning the revoked collaborator should not be able to access the repository after the revocation, ensuring the premise holds. The probe handles different worlds by checking for a 404 response to determine if the revoke route is absent, signaling n/a. The issue with the previous probe was that the MemoryStore class was not imported, causing a ReferenceError. This has been fixed by importing MemoryStore from \"../src/store/memory.ts\".",
+      "evalMs": 1275,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 2,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login } from \"../src/auth/sessions.ts\";\nimport { collaboratorRoutes } from \"../src/routes/collaborators.ts\";\nimport { MemoryStore } from \"../src/store/memory.ts\";\n\ndescribe(\"authz.permission-evaluation\", () => {\n  it(\"should enforce per-request permission freshness\", async () => {\n    const deps = memoryDeps();\n    deps.store = new MemoryStore(deps.events);\n    deps.ids = sequentialIds();\n    const app = createApp(deps);\n    app.route(\"/\", collaboratorRoutes);\n\n    // Create users and a repository\n    const owner = await login(deps, \"owner\", \"password\");\n    const collaborator = await login(deps, \"collaborator\", \"password\");\n    const repo = await app.request(\"POST\", \"/repos\", {\n      headers: { authorization: `Bearer ${owner?.token}` },\n      body: JSON.stringify({ name: \"repo\", visibility: \"private\" }),\n    });\n    const repoData = await repo.json();\n\n    // Add collaborator with read access\n    await app.request(\"PUT\", `/repos/${repoData.owner}/${repoData.name}/collaborators/collaborator`, {\n      headers: { authorization: `Bearer ${owner?.token}` },\n      body: JSON.stringify({ role: \"read\" }),\n    });\n\n    // Revoke collaborator's access\n    const revokeResponse = await app.request(\"DELETE\", `/repos/${repoData.owner}/${repoData.name}/collaborators/collaborator`, {\n      headers: { authorization: `Bearer ${owner?.token}` },\n    });\n    expect(revokeResponse.status).toBe(204);\n    console.log(\"[probe] OWNER DELETE /repos/owner/repo/collaborators/collaborator -> 204 (expected 204)\");\n\n    // Attempt to access the repository as the revoked collaborator\n    const accessAttempt = await app.request(\"GET\", `/repos/${repoData.owner}/${repoData.name}`, {\n      headers: { authorization: `Bearer ${collaborator?.token}` },\n    });\n\n    if (accessAttempt.status === 404 && accessAttempt.headers.get(\"content-type\") === \"text/plain\") {\n      throw new Error(\"probe not applicable: revoke route is absent\");\n    }\n\n    expect(accessAttempt.status).toBe(403);\n    console.log(\"[probe] COLLABORATOR GET /repos/owner/repo -> 403 (expected 403)\");\n  });\n});\n",
+    "rationale": "This probe tests the permission evaluation freshness by creating a scenario where a collaborator's access is revoked and then immediately attempting to access the protected resource. It checks that the permission evaluation is per-request, meaning the revoked collaborator should not be able to access the repository after the revocation, ensuring the premise holds. The probe handles different worlds by checking for a 404 response to determine if the revoke route is absent, signaling n/a. The issue with the previous probe was that the MemoryStore class was not imported, causing a ReferenceError. This has been fixed by importing MemoryStore from \"../src/store/memory.ts\".",
+    "admission": {
+      "admitted": false,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [
+        "n/a-mishandled",
+        "wrong-world-behaviour"
+      ],
+      "detail": [
+        "base: expected n/a, observed fail/fail/fail",
+        "A: expected pass, observed fail/fail/fail",
+        "B: expected n/a, observed fail/fail/fail"
+      ]
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 253,
+          "id": "qwen-6-1791664628950-2:mutantA:0:1ba1696d-c737-458a-8564-419c5d9cc2b7",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 247,
+          "id": "qwen-6-1791664628950-2:mutantA:1:5e58133b-2ec5-470f-94ef-b1da22ef17a6",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'.",
+          "observations": [],
+          "ms": 251,
+          "id": "qwen-6-1791664628950-2:mutantA:2:18d3a561-025b-49fd-bcc2-215751f60220",
+          "testError": "TypeError: Failed to construct 'Request': constructor parameter 2 is not of type 'RequestInitializerDict or Request'."
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [
+        {
+          "line": 33,
+          "text": "app.request(\"DELETE\", `/repos/${repoData.owner}/${repoData.name}/collaborators/collaborator`, {\n    ",
+          "boundTo": "revokeResponse",
+          "asserted": true
+        }
+      ],
+      "unasserted": [],
+      "expectCalls": 2
+    }
+  },
+  "outcome": "rejected",
+  "totals": {
+    "modelMs": 56141,
+    "evalMs": 5387,
+    "promptTokens": 34569,
+    "completionTokens": 1545,
+    "wallMs": 63830
+  }
+}

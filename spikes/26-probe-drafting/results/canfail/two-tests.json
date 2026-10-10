@@ -1,0 +1,267 @@
+{
+  "tag": "4e225639",
+  "evals": [
+    {
+      "world": "base",
+      "runs": [
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: expected exactly one probe test, found 2",
+          "harnessError": "expected exactly one probe test, found 2",
+          "observations": [
+            "first -> 1 (expected 1)"
+          ],
+          "ms": 237,
+          "id": "4e225639-0:base:0:cf3d6c2a-fc7c-4966-9c14-f60206a39532"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: expected exactly one probe test, found 2",
+          "harnessError": "expected exactly one probe test, found 2",
+          "observations": [
+            "first -> 1 (expected 1)"
+          ],
+          "ms": 237,
+          "id": "4e225639-0:base:1:e9687414-73f2-4d84-a028-956f6ac06955"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: expected exactly one probe test, found 2",
+          "harnessError": "expected exactly one probe test, found 2",
+          "observations": [
+            "first -> 1 (expected 1)"
+          ],
+          "ms": 237,
+          "id": "4e225639-0:base:2:b3a464d3-9a82-4045-a3b8-9be7affd020b"
+        }
+      ]
+    },
+    {
+      "world": "A",
+      "runs": [
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: expected exactly one probe test, found 2",
+          "harnessError": "expected exactly one probe test, found 2",
+          "observations": [
+            "first -> 1 (expected 1)"
+          ],
+          "ms": 229,
+          "id": "4e225639-0:A:0:cb0f1aa2-1a3d-45bd-98f8-d457e255267b"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: expected exactly one probe test, found 2",
+          "harnessError": "expected exactly one probe test, found 2",
+          "observations": [
+            "first -> 1 (expected 1)"
+          ],
+          "ms": 125,
+          "id": "4e225639-0:A:1:a8fe001c-08b9-41f4-a87b-01b0583a2e3f"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: expected exactly one probe test, found 2",
+          "harnessError": "expected exactly one probe test, found 2",
+          "observations": [
+            "first -> 1 (expected 1)"
+          ],
+          "ms": 215,
+          "id": "4e225639-0:A:2:c319fe03-25a1-4e48-93ca-e33448b93a05"
+        }
+      ]
+    },
+    {
+      "world": "B",
+      "runs": [
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: expected exactly one probe test, found 2",
+          "harnessError": "expected exactly one probe test, found 2",
+          "observations": [
+            "first -> 1 (expected 1)"
+          ],
+          "ms": 215,
+          "id": "4e225639-0:B:0:403f14cd-9bc1-4b77-b3fd-3da1ba58b53f"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: expected exactly one probe test, found 2",
+          "harnessError": "expected exactly one probe test, found 2",
+          "observations": [
+            "first -> 1 (expected 1)"
+          ],
+          "ms": 167,
+          "id": "4e225639-0:B:1:114743a6-7015-4006-b8c5-4b5fe4185e8a"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: expected exactly one probe test, found 2",
+          "harnessError": "expected exactly one probe test, found 2",
+          "observations": [
+            "first -> 1 (expected 1)"
+          ],
+          "ms": 107,
+          "id": "4e225639-0:B:2:63c14c78-74c1-4daf-b778-245c9e952e6d"
+        }
+      ]
+    },
+    {
+      "world": "AB",
+      "runs": [
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: expected exactly one probe test, found 2",
+          "harnessError": "expected exactly one probe test, found 2",
+          "observations": [
+            "first -> 1 (expected 1)"
+          ],
+          "ms": 208,
+          "id": "4e225639-0:AB:0:9fdaf6eb-05d1-49c1-89ec-df3d5d5d957b"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: expected exactly one probe test, found 2",
+          "harnessError": "expected exactly one probe test, found 2",
+          "observations": [
+            "first -> 1 (expected 1)"
+          ],
+          "ms": 199,
+          "id": "4e225639-0:AB:1:a76aad0c-08a9-4f4c-a4c4-9be131f25e45"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: expected exactly one probe test, found 2",
+          "harnessError": "expected exactly one probe test, found 2",
+          "observations": [
+            "first -> 1 (expected 1)"
+          ],
+          "ms": 199,
+          "id": "4e225639-0:AB:2:8e8eb48b-f980-43b3-95c0-4c4efbd53404"
+        }
+      ]
+    },
+    {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: expected exactly one probe test, found 2",
+          "harnessError": "expected exactly one probe test, found 2",
+          "observations": [
+            "first -> 1 (expected 1)"
+          ],
+          "ms": 191,
+          "id": "4e225639-0:mutantA:0:00afd91b-2e08-4205-96d9-622eb2927cb7"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: expected exactly one probe test, found 2",
+          "harnessError": "expected exactly one probe test, found 2",
+          "observations": [
+            "first -> 1 (expected 1)"
+          ],
+          "ms": 52,
+          "id": "4e225639-0:mutantA:1:6362aad2-dec8-473b-85ab-7d8dca91e6a9"
+        },
+        {
+          "exit": 2,
+          "outcome": "fail",
+          "reason": "probe harness error: expected exactly one probe test, found 2",
+          "harnessError": "expected exactly one probe test, found 2",
+          "observations": [
+            "first -> 1 (expected 1)"
+          ],
+          "ms": 52,
+          "id": "4e225639-0:mutantA:2:9e185ff7-4f67-4413-aceb-50da0b33417a"
+        }
+      ]
+    }
+  ],
+  "bundleMs": {
+    "base": 226,
+    "A": 309,
+    "B": 940,
+    "AB": 986,
+    "mutantA": 39
+  },
+  "bytes": 361406,
+  "wallMs": 3422,
+  "admission": {
+    "admitted": false,
+    "cells": {
+      "base": {
+        "expected": "n/a",
+        "observed": [
+          "harness-error",
+          "harness-error",
+          "harness-error"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "A": {
+        "expected": "pass",
+        "observed": [
+          "harness-error",
+          "harness-error",
+          "harness-error"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "B": {
+        "expected": "n/a",
+        "observed": [
+          "harness-error",
+          "harness-error",
+          "harness-error"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "AB": {
+        "expected": "fail",
+        "observed": [
+          "harness-error",
+          "harness-error",
+          "harness-error"
+        ],
+        "stable": true,
+        "ok": false
+      }
+    },
+    "failures": [
+      "harness-error"
+    ],
+    "detail": []
+  },
+  "vacuity": {
+    "vacuous": true,
+    "observed": [
+      "harness-error",
+      "harness-error",
+      "harness-error"
+    ],
+    "why": "expected fail ×3 with the revoke removed, observed harness-error/harness-error/harness-error"
+  },
+  "staticCheck": {
+    "deleteSites": [],
+    "unasserted": [],
+    "expectCalls": 2
+  }
+}

@@ -1,0 +1,276 @@
+{
+  "tag": "a467d672",
+  "evals": [
+    {
+      "world": "base",
+      "runs": [
+        {
+          "exit": 3,
+          "outcome": "n/a",
+          "reason": "revoke route absent",
+          "observations": [],
+          "ms": 300,
+          "id": "a467d672-0:base:0:27d07f24-1005-4d2d-8e39-1d141d159c6d",
+          "testError": "Error: probe not applicable: revoke route absent"
+        },
+        {
+          "exit": 3,
+          "outcome": "n/a",
+          "reason": "revoke route absent",
+          "observations": [],
+          "ms": 232,
+          "id": "a467d672-0:base:1:8b2c07b1-0241-468c-a777-3885b0f275fc",
+          "testError": "Error: probe not applicable: revoke route absent"
+        },
+        {
+          "exit": 3,
+          "outcome": "n/a",
+          "reason": "revoke route absent",
+          "observations": [],
+          "ms": 234,
+          "id": "a467d672-0:base:2:2bbac602-94b5-465d-a057-cd3e710fec60",
+          "testError": "Error: probe not applicable: revoke route absent"
+        }
+      ]
+    },
+    {
+      "world": "A",
+      "runs": [
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "bob DELETE /repos/alice/forge -> 403 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204",
+            "bob DELETE /repos/alice/forge -> 403 (expected 403)"
+          ],
+          "ms": 234,
+          "id": "a467d672-0:A:0:b824b4a7-e7b1-4ced-b684-b8fca287c11a"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "bob DELETE /repos/alice/forge -> 403 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204",
+            "bob DELETE /repos/alice/forge -> 403 (expected 403)"
+          ],
+          "ms": 238,
+          "id": "a467d672-0:A:1:5944d4e6-1bd9-4a3f-b0c9-d0f82a63f8e9"
+        },
+        {
+          "exit": 0,
+          "outcome": "pass",
+          "reason": "bob DELETE /repos/alice/forge -> 403 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204",
+            "bob DELETE /repos/alice/forge -> 403 (expected 403)"
+          ],
+          "ms": 179,
+          "id": "a467d672-0:A:2:85ac92ef-b087-4576-a390-2aba88e1a758"
+        }
+      ]
+    },
+    {
+      "world": "B",
+      "runs": [
+        {
+          "exit": 3,
+          "outcome": "n/a",
+          "reason": "revoke route absent",
+          "observations": [],
+          "ms": 227,
+          "id": "a467d672-0:B:0:50c0d39f-cd05-4598-a889-90711d85e6b5",
+          "testError": "Error: probe not applicable: revoke route absent"
+        },
+        {
+          "exit": 3,
+          "outcome": "n/a",
+          "reason": "revoke route absent",
+          "observations": [],
+          "ms": 219,
+          "id": "a467d672-0:B:1:76998802-6495-40de-946b-1b4042fba45d",
+          "testError": "Error: probe not applicable: revoke route absent"
+        },
+        {
+          "exit": 3,
+          "outcome": "n/a",
+          "reason": "revoke route absent",
+          "observations": [],
+          "ms": 109,
+          "id": "a467d672-0:B:2:ded1388e-450f-43b9-ba85-7738e9024930",
+          "testError": "Error: probe not applicable: revoke route absent"
+        }
+      ]
+    },
+    {
+      "world": "AB",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob DELETE /repos/alice/forge -> 204 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204",
+            "bob DELETE /repos/alice/forge -> 204 (expected 403)"
+          ],
+          "ms": 162,
+          "id": "a467d672-0:AB:0:e113a408-4261-4e18-aa98-aad4096dae37",
+          "testError": "AssertionError: expected 204 to be 403 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob DELETE /repos/alice/forge -> 204 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204",
+            "bob DELETE /repos/alice/forge -> 204 (expected 403)"
+          ],
+          "ms": 208,
+          "id": "a467d672-0:AB:1:5c4c85d9-876b-4718-9776-87021f10400e",
+          "testError": "AssertionError: expected 204 to be 403 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob DELETE /repos/alice/forge -> 204 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204",
+            "bob DELETE /repos/alice/forge -> 204 (expected 403)"
+          ],
+          "ms": 208,
+          "id": "a467d672-0:AB:2:43a87a47-bb47-4dba-ba89-6327c32fd116",
+          "testError": "AssertionError: expected 204 to be 403 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob DELETE /repos/alice/forge -> 204 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204",
+            "bob DELETE /repos/alice/forge -> 204 (expected 403)"
+          ],
+          "ms": 109,
+          "id": "a467d672-0:mutantA:0:82b7b575-a8c0-42d8-b7a0-1c587ed62235",
+          "testError": "AssertionError: expected 204 to be 403 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob DELETE /repos/alice/forge -> 204 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204",
+            "bob DELETE /repos/alice/forge -> 204 (expected 403)"
+          ],
+          "ms": 106,
+          "id": "a467d672-0:mutantA:1:87895fa7-5932-4a70-a519-760ff8420365",
+          "testError": "AssertionError: expected 204 to be 403 // Object.is equality"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "bob DELETE /repos/alice/forge -> 204 (expected 403)",
+          "observations": [
+            "alice DELETE /repos/alice/forge/collaborators/bob -> 204",
+            "bob DELETE /repos/alice/forge -> 204 (expected 403)"
+          ],
+          "ms": 108,
+          "id": "a467d672-0:mutantA:2:96fcdd24-06a0-459c-911b-d457809c590c",
+          "testError": "AssertionError: expected 204 to be 403 // Object.is equality"
+        }
+      ]
+    }
+  ],
+  "bundleMs": {
+    "base": 344,
+    "A": 1819,
+    "B": 55,
+    "AB": 1703,
+    "mutantA": 45
+  },
+  "bytes": 466363,
+  "wallMs": 4903,
+  "admission": {
+    "admitted": true,
+    "cells": {
+      "base": {
+        "expected": "n/a",
+        "observed": [
+          "n/a",
+          "n/a",
+          "n/a"
+        ],
+        "stable": true,
+        "ok": true
+      },
+      "A": {
+        "expected": "pass",
+        "observed": [
+          "pass",
+          "pass",
+          "pass"
+        ],
+        "stable": true,
+        "ok": true
+      },
+      "B": {
+        "expected": "n/a",
+        "observed": [
+          "n/a",
+          "n/a",
+          "n/a"
+        ],
+        "stable": true,
+        "ok": true
+      },
+      "AB": {
+        "expected": "fail",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": true
+      }
+    },
+    "failures": [],
+    "detail": []
+  },
+  "vacuity": {
+    "vacuous": false,
+    "observed": [
+      "fail",
+      "fail",
+      "fail"
+    ]
+  },
+  "staticCheck": {
+    "deleteSites": [
+      {
+        "line": 44,
+        "text": "call(\"DELETE\", \"/repos/alice/forge/collaborators/bob\", alice)",
+        "boundTo": "revoke",
+        "asserted": false
+      },
+      {
+        "line": 47,
+        "text": "call(\"DELETE\", \"/repos/alice/forge\", bob)",
+        "boundTo": "attempt",
+        "asserted": true
+      }
+    ],
+    "unasserted": [
+      {
+        "line": 44,
+        "text": "call(\"DELETE\", \"/repos/alice/forge/collaborators/bob\", alice)"
+      }
+    ],
+    "expectCalls": 6
+  }
+}

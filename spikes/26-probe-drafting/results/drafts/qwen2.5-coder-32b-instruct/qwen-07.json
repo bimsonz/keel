@@ -1,0 +1,189 @@
+{
+  "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+  "settings": {
+    "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+    "api": "legacy",
+    "temperature": 0.6,
+    "maxTokens": 4096
+  },
+  "startedAt": "2026-10-10T20:37:11.390Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 29876,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\n\\nconst TOKEN = \\\"abc123\\\";\\nconst USER_ID = \\\"usr_1\\\";\\nconst SESSION_ID = \\\"ses_1\\\";\\nconst REPO_OWNER = \\\"alice\\\";\\nconst REPO_NAME = \\\"project\\\";\\nconst COLLABORATOR = \\\"bob\\\";\\n\\nfunction setupApp() {\\n  const deps = memoryDeps();\\n  const clock = deps.clock as import(\\\"../src/clock.ts\\\").ManualClock;\\n  clock.advance(1000);\\n\\n  // Create users\\n  deps.store.createUser({ id: USER_ID, username: REPO_OWNER, name: \\\"Alice\\\", passwordSalt: \\\"salt\\\", passwordHash: \\\"hash\\\", createdAt: clock.now() });\\n  deps.store.createUser({ id: \\\"usr_2\\\", username: COLLABORATOR, name: \\\"Bob\\\", passwordSalt: \\\"salt\\\", passwordHash: \\\"hash\\\", createdAt: clock.now() });\\n\\n  // Create session\\n  deps.store.createSession({ id: SESSION_ID, userId: USER_ID, tokenHash: \\\"abc123\\\", createdAt: clock.now(), expiresAt: clock.now() + 3600000 });\\n\\n  // Create repo\\n  deps.store.createRepo({ id: \\\"repo_1\\\", ownerId: USER_ID, name: REPO_NAME, description: \\\"\\\", visibility: \\\"private\\\", defaultBranch: \\\"main\\\", createdAt: clock.now(), updatedAt: clock.now() });\\n\\n  // Add collaborator\\n  deps.store.addCollaborator({ repoId: \\\"repo_1\\\", userId: \\\"usr_2\\\", role: \\\"write\\\", addedBy: USER_ID, addedAt: clock.now() });\\n\\n  return createApp(deps);\\n}\\n\\nfunction revokeCollaborator(app: import(\\\"hono\\\").Hono) {\\n  return app.request(`DELETE /repos/${REPO_OWNER}/${REPO_NAME}/collaborators/${COLLABORATOR}`, {\\n    method: \\\"DELETE\\\",\\n    headers: { authorization: `Bearer ${TOKEN}` }\\n  });\\n}\\n\\nfunction checkPermission(app: import(\\\"hono\\\").Hono, path: string) {\\n  return app.request(path, {\\n    method: \\\"GET\\\",\\n    headers: { authorization: `Bearer ${TOKEN}` }\\n  });\\n}\\n\\ndescribe(\\\"permission evaluation freshness\\\", () => {\\n  it(\\\"should respect per-request freshness\\\", async () => {\\n    const app = setupApp();\\n\\n    // Check initial permission\\n    let response = await checkPermission(app, `/repos/${REPO_OWNER}/${REPO_NAME}`);\\n    console.log(`[probe] alice GET /repos/alice/project -> ${response.status} (expected 200)`);\\n    expect(response.status).toBe(200);\\n\\n    // Revoke collaborator\\n    response = await revokeCollaborator(app);\\n    console.log(`[probe] alice DELETE /repos/alice/project/collaborators/bob -> ${response.status} (expected 204)`);\\n    expect(response.status).toBe(204);\\n\\n    // Check permission after revocation\\n    response = await checkPermission(app, `/repos/${REPO_OWNER}/${REPO_NAME}`);\\n    console.log(`[probe] alice GET /repos/alice/project -> ${response.status} (expected 403)`);\\n    expect(response.status).toBe(403);\\n  });\\n});\"},\"rationale\":\"The probe sets up a minimal environment with a user, a repository, and a collaborator. It then revokes the collaborator's access and checks if the permission evaluation respects the per-request freshness by expecting a 403 Forbidden status after the revocation.\"}",
+        "usage": {
+          "promptTokens": 16875,
+          "completionTokens": 871
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\n\nconst TOKEN = \"abc123\";\nconst USER_ID = \"usr_1\";\nconst SESSION_ID = \"ses_1\";\nconst REPO_OWNER = \"alice\";\nconst REPO_NAME = \"project\";\nconst COLLABORATOR = \"bob\";\n\nfunction setupApp() {\n  const deps = memoryDeps();\n  const clock = deps.clock as import(\"../src/clock.ts\").ManualClock;\n  clock.advance(1000);\n\n  // Create users\n  deps.store.createUser({ id: USER_ID, username: REPO_OWNER, name: \"Alice\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: clock.now() });\n  deps.store.createUser({ id: \"usr_2\", username: COLLABORATOR, name: \"Bob\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: clock.now() });\n\n  // Create session\n  deps.store.createSession({ id: SESSION_ID, userId: USER_ID, tokenHash: \"abc123\", createdAt: clock.now(), expiresAt: clock.now() + 3600000 });\n\n  // Create repo\n  deps.store.createRepo({ id: \"repo_1\", ownerId: USER_ID, name: REPO_NAME, description: \"\", visibility: \"private\", defaultBranch: \"main\", createdAt: clock.now(), updatedAt: clock.now() });\n\n  // Add collaborator\n  deps.store.addCollaborator({ repoId: \"repo_1\", userId: \"usr_2\", role: \"write\", addedBy: USER_ID, addedAt: clock.now() });\n\n  return createApp(deps);\n}\n\nfunction revokeCollaborator(app: import(\"hono\").Hono) {\n  return app.request(`DELETE /repos/${REPO_OWNER}/${REPO_NAME}/collaborators/${COLLABORATOR}`, {\n    method: \"DELETE\",\n    headers: { authorization: `Bearer ${TOKEN}` }\n  });\n}\n\nfunction checkPermission(app: import(\"hono\").Hono, path: string) {\n  return app.request(path, {\n    method: \"GET\",\n    headers: { authorization: `Bearer ${TOKEN}` }\n  });\n}\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"should respect per-request freshness\", async () => {\n    const app = setupApp();\n\n    // Check initial permission\n    let response = await checkPermission(app, `/repos/${REPO_OWNER}/${REPO_NAME}`);\n    console.log(`[probe] alice GET /repos/alice/project -> ${response.status} (expected 200)`);\n    expect(response.status).toBe(200);\n\n    // Revoke collaborator\n    response = await revokeCollaborator(app);\n    console.log(`[probe] alice DELETE /repos/alice/project/collaborators/bob -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Check permission after revocation\n    response = await checkPermission(app, `/repos/${REPO_OWNER}/${REPO_NAME}`);\n    console.log(`[probe] alice GET /repos/alice/project -> ${response.status} (expected 403)`);\n    expect(response.status).toBe(403);\n  });\n});",
+      "rationale": "The probe sets up a minimal environment with a user, a repository, and a collaborator. It then revokes the collaborator's access and checks if the permission evaluation respects the per-request freshness by expecting a 403 Forbidden status after the revocation.",
+      "evalMs": 4394,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\n\nconst TOKEN = \"abc123\";\nconst USER_ID = \"usr_1\";\nconst SESSION_ID = \"ses_1\";\nconst REPO_OWNER = \"alice\";\nconst REPO_NAME = \"project\";\nconst COLLABORATOR = \"bob\";\n\nfunction setupApp() {\n  const deps = memoryDeps();\n  const clock = deps.clock as import(\"../src/clock.ts\").ManualClock;\n  clock.advance(1000);\n\n  // Create users\n  deps.store.createUser({ id: USER_ID, username: REPO_OWNER, name: \"Alice\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: clock.now() });\n  deps.store.createUser({ id: \"usr_2\", username: COLLABORATOR, name: \"Bob\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: clock.now() });\n\n  // Create session\n  deps.store.createSession({ id: SESSION_ID, userId: USER_ID, tokenHash: \"abc123\", createdAt: clock.now(), expiresAt: clock.now() + 3600000 });\n\n  // Create repo\n  deps.store.createRepo({ id: \"repo_1\", ownerId: USER_ID, name: REPO_NAME, description: \"\", visibility: \"private\", defaultBranch: \"main\", createdAt: clock.now(), updatedAt: clock.now() });\n\n  // Add collaborator\n  deps.store.addCollaborator({ repoId: \"repo_1\", userId: \"usr_2\", role: \"write\", addedBy: USER_ID, addedAt: clock.now() });\n\n  return createApp(deps);\n}\n\nfunction revokeCollaborator(app: import(\"hono\").Hono) {\n  return app.request(`DELETE /repos/${REPO_OWNER}/${REPO_NAME}/collaborators/${COLLABORATOR}`, {\n    method: \"DELETE\",\n    headers: { authorization: `Bearer ${TOKEN}` }\n  });\n}\n\nfunction checkPermission(app: import(\"hono\").Hono, path: string) {\n  return app.request(path, {\n    method: \"GET\",\n    headers: { authorization: `Bearer ${TOKEN}` }\n  });\n}\n\ndescribe(\"permission evaluation freshness\", () => {\n  it(\"should respect per-request freshness\", async () => {\n    const app = setupApp();\n\n    // Check initial permission\n    let response = await checkPermission(app, `/repos/${REPO_OWNER}/${REPO_NAME}`);\n    console.log(`[probe] alice GET /repos/alice/project -> ${response.status} (expected 200)`);\n    expect(response.status).toBe(200);\n\n    // Revoke collaborator\n    response = await revokeCollaborator(app);\n    console.log(`[probe] alice DELETE /repos/alice/project/collaborators/bob -> ${response.status} (expected 204)`);\n    expect(response.status).toBe(204);\n\n    // Check permission after revocation\n    response = await checkPermission(app, `/repos/${REPO_OWNER}/${REPO_NAME}`);\n    console.log(`[probe] alice GET /repos/alice/project -> ${response.status} (expected 403)`);\n    expect(response.status).toBe(403);\n  });\n});",
+    "rationale": "The probe sets up a minimal environment with a user, a repository, and a collaborator. It then revokes the collaborator's access and checks if the permission evaluation respects the per-request freshness by expecting a 403 Forbidden status after the revocation.",
+    "admission": {
+      "admitted": false,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [
+        "n/a-mishandled",
+        "wrong-world-behaviour"
+      ],
+      "detail": [
+        "base: expected n/a, observed fail/fail/fail",
+        "A: expected pass, observed fail/fail/fail",
+        "B: expected n/a, observed fail/fail/fail"
+      ]
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: clock.advance is not a function",
+          "observations": [],
+          "ms": 226,
+          "id": "qwen-7-1791664631279-1:mutantA:0:5f6971aa-edde-43f6-b826-1e4ed78d1d17",
+          "testError": "TypeError: clock.advance is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: clock.advance is not a function",
+          "observations": [],
+          "ms": 226,
+          "id": "qwen-7-1791664631279-1:mutantA:1:050a624b-8e61-43b4-9992-3549c0aa649d",
+          "testError": "TypeError: clock.advance is not a function"
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: clock.advance is not a function",
+          "observations": [],
+          "ms": 222,
+          "id": "qwen-7-1791664631279-1:mutantA:2:e437dbca-770f-4f48-b49b-33c428a5515f",
+          "testError": "TypeError: clock.advance is not a function"
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [
+        {
+          "line": 57,
+          "text": "revokeCollaborator(app)",
+          "boundTo": "response",
+          "asserted": true
+        }
+      ],
+      "unasserted": [],
+      "expectCalls": 3
+    }
+  },
+  "outcome": "rejected",
+  "totals": {
+    "modelMs": 29876,
+    "evalMs": 4692,
+    "promptTokens": 16875,
+    "completionTokens": 871,
+    "wallMs": 35777
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "model": "@cf/moonshotai/kimi-k2.7-code",
+  "settings": {
+    "model": "@cf/moonshotai/kimi-k2.7-code",
+    "api": "openai",
+    "temperature": 0.6,
+    "maxTokens": 32000
+  },
+  "startedAt": "2026-10-10T20:36:31.650Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 720496,
+        "content": "",
+        "usage": {
+          "promptTokens": 0,
+          "completionTokens": 0
+        },
+        "infraRetries": 3,
+        "infraError": "AiError: 3046: Request timeout"
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "outcome": "infra-error",
+  "totals": {
+    "modelMs": 720496,
+    "evalMs": 0,
+    "promptTokens": 0,
+    "completionTokens": 0,
+    "wallMs": 720523
+  }
+}

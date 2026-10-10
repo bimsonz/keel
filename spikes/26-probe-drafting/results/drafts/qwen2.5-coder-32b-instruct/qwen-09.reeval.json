@@ -1,0 +1,200 @@
+{
+  "tag": "95b52c0b",
+  "evals": [
+    {
+      "world": "base",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined.",
+          "observations": [],
+          "ms": 614,
+          "id": "95b52c0b-0:base:0:355a11c5-d01a-4399-9fa5-c7c682676b91",
+          "testError": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined.",
+          "observations": [],
+          "ms": 614,
+          "id": "95b52c0b-0:base:1:6ef5c60d-6eff-49a5-9129-f4240b663fbd",
+          "testError": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined.",
+          "observations": [],
+          "ms": 603,
+          "id": "95b52c0b-0:base:2:4d6718a7-9649-4a6c-8864-9955b5f5bd72",
+          "testError": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined."
+        }
+      ]
+    },
+    {
+      "world": "A",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined.",
+          "observations": [],
+          "ms": 614,
+          "id": "95b52c0b-0:A:0:d4254c79-8d0d-40ba-9e48-1179d3277f54",
+          "testError": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined.",
+          "observations": [],
+          "ms": 293,
+          "id": "95b52c0b-0:A:1:e2d9009d-99bf-4d6d-b1ab-8f1b3b38fe34",
+          "testError": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined.",
+          "observations": [],
+          "ms": 293,
+          "id": "95b52c0b-0:A:2:782a20e5-7935-4839-b872-16227bd57186",
+          "testError": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined."
+        }
+      ]
+    },
+    {
+      "world": "B",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined.",
+          "observations": [],
+          "ms": 294,
+          "id": "95b52c0b-0:B:0:8ae2450e-94a2-4bda-886e-330f99b1c0e5",
+          "testError": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined.",
+          "observations": [],
+          "ms": 151,
+          "id": "95b52c0b-0:B:1:7b2594e3-212f-4902-b741-08d589660586",
+          "testError": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined.",
+          "observations": [],
+          "ms": 152,
+          "id": "95b52c0b-0:B:2:b0015125-9f94-4caf-a9fd-53acea1d31fb",
+          "testError": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined."
+        }
+      ]
+    },
+    {
+      "world": "AB",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined.",
+          "observations": [],
+          "ms": 284,
+          "id": "95b52c0b-0:AB:0:394b09c1-bace-46f2-bb87-f35196a148f4",
+          "testError": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined.",
+          "observations": [],
+          "ms": 220,
+          "id": "95b52c0b-0:AB:1:252b5c97-b33d-467c-a0c3-273347c322fc",
+          "testError": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined.",
+          "observations": [],
+          "ms": 220,
+          "id": "95b52c0b-0:AB:2:54cf0f0f-a673-4af8-91df-426d06c7f749",
+          "testError": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined."
+        }
+      ]
+    }
+  ],
+  "bundleMs": {
+    "base": 335,
+    "A": 2528,
+    "B": 78,
+    "AB": 49
+  },
+  "bytes": 466235,
+  "wallMs": 4296,
+  "admission": {
+    "admitted": false,
+    "cells": {
+      "base": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "A": {
+        "expected": "pass",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "B": {
+        "expected": "n/a",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": false
+      },
+      "AB": {
+        "expected": "fail",
+        "observed": [
+          "fail",
+          "fail",
+          "fail"
+        ],
+        "stable": true,
+        "ok": true
+      }
+    },
+    "failures": [
+      "n/a-mishandled",
+      "wrong-world-behaviour"
+    ],
+    "detail": [
+      "base: expected n/a, observed fail/fail/fail",
+      "A: expected pass, observed fail/fail/fail",
+      "B: expected n/a, observed fail/fail/fail"
+    ]
+  },
+  "vacuity": {
+    "vacuous": true,
+    "observed": [],
+    "why": "mutant A not evaluated"
+  }
+}

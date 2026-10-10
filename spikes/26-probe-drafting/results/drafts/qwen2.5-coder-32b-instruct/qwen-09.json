@@ -1,0 +1,189 @@
+{
+  "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+  "settings": {
+    "model": "@cf/qwen/qwen2.5-coder-32b-instruct",
+    "api": "legacy",
+    "temperature": 0.6,
+    "maxTokens": 4096
+  },
+  "startedAt": "2026-10-10T20:38:13.230Z",
+  "promptChars": 67402,
+  "attempts": [
+    {
+      "n": 1,
+      "call": {
+        "ms": 27656,
+        "content": "{\"files\":{\"probe.test.ts\":\"import { describe, it, expect } from \\\"vitest\\\";\\nimport { createApp } from \\\"../src/app.ts\\\";\\nimport { memoryDeps } from \\\"../src/deps.ts\\\";\\nimport { sequentialIds } from \\\"../src/ids.ts\\\";\\nimport { login } from \\\"../src/auth/sessions.ts\\\";\\nimport { requirePermission } from \\\"../src/authz/require-permission.ts\\\";\\n\\nconst setupApp = () => {\\n  const deps = memoryDeps();\\n  deps.store.createUser({ id: \\\"usr_1\\\", username: \\\"alice\\\", name: \\\"Alice\\\", passwordSalt: \\\"salt\\\", passwordHash: \\\"hash\\\", createdAt: Date.now() });\\n  deps.store.createRepo({ id: \\\"repo_1\\\", ownerId: \\\"usr_1\\\", name: \\\"repo\\\", description: \\\"\\\", visibility: \\\"private\\\", defaultBranch: \\\"main\\\", createdAt: Date.now(), updatedAt: Date.now() });\\n  deps.store.addCollaborator({ repoId: \\\"repo_1\\\", userId: \\\"usr_1\\\", role: \\\"admin\\\", addedBy: \\\"usr_1\\\", addedAt: Date.now() });\\n  return { app: createApp(deps), deps };\\n};\\n\\nconst revokeCollaborator = async (app, token, repoOwner, repoName, username) => {\\n  const res = await app.request(`/repos/${repoOwner}/${repoName}/collaborators/${username}`, { method: \\\"DELETE\\\", headers: { authorization: `Bearer ${token}` } });\\n  return res;\\n};\\n\\nconst checkPermission = async (app, token, repoOwner, repoName, action) => {\\n  const path = `/repos/${repoOwner}/${repoName}`;\\n  const res = await app.request(path, { method: action === \\\"read\\\" ? \\\"GET\\\" : \\\"POST\\\", headers: { authorization: `Bearer ${token}` } });\\n  return res;\\n};\\n\\ndescribe(\\\"authz.permission-evaluation\\\", () => {\\n  it(\\\"checks permission freshness\\\", async () => {\\n    const { app, deps } = setupApp();\\n    const { token } = await login(deps, \\\"alice\\\", \\\"password\\\")!;\\n\\n    // Revoke alice's access\\n    const revokeRes = await revokeCollaborator(app, token, \\\"alice\\\", \\\"repo\\\", \\\"alice\\\");\\n    console.log(`[probe] revoke DELETE /repos/alice/repo/collaborators/alice -> ${revokeRes.status} (expected 204)`);\\n    if (revokeRes.status !== 204) {\\n      if (revokeRes.status === 404) throw new Error(\\\"probe not applicable: DELETE /repos/:owner/:repo/collaborators/:username is not implemented\\\");\\n      expect(revokeRes.status).toBe(204);\\n    }\\n\\n    // Check if alice still has access\\n    const checkRes = await checkPermission(app, token, \\\"alice\\\", \\\"repo\\\", \\\"read\\\");\\n    console.log(`[probe] alice GET /repos/alice/repo -> ${checkRes.status} (expected 404)`);\\n    expect(checkRes.status).toBe(404);\\n  });\\n});\"},\"rationale\":\"This probe sets up a basic environment with a user and a repository, then revokes the user's collaborator access and checks if the permission evaluation respects the freshness requirement. It expects a 404 response when accessing the repository after revocation, indicating that the permission evaluation is correctly refreshed per request. If the DELETE endpoint for revoking collaborators is not found, it signals that the precondition is absent, resulting in an n/a outcome.\"}",
+        "usage": {
+          "promptTokens": 16875,
+          "completionTokens": 827
+        },
+        "infraRetries": 0
+      },
+      "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login } from \"../src/auth/sessions.ts\";\nimport { requirePermission } from \"../src/authz/require-permission.ts\";\n\nconst setupApp = () => {\n  const deps = memoryDeps();\n  deps.store.createUser({ id: \"usr_1\", username: \"alice\", name: \"Alice\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: Date.now() });\n  deps.store.createRepo({ id: \"repo_1\", ownerId: \"usr_1\", name: \"repo\", description: \"\", visibility: \"private\", defaultBranch: \"main\", createdAt: Date.now(), updatedAt: Date.now() });\n  deps.store.addCollaborator({ repoId: \"repo_1\", userId: \"usr_1\", role: \"admin\", addedBy: \"usr_1\", addedAt: Date.now() });\n  return { app: createApp(deps), deps };\n};\n\nconst revokeCollaborator = async (app, token, repoOwner, repoName, username) => {\n  const res = await app.request(`/repos/${repoOwner}/${repoName}/collaborators/${username}`, { method: \"DELETE\", headers: { authorization: `Bearer ${token}` } });\n  return res;\n};\n\nconst checkPermission = async (app, token, repoOwner, repoName, action) => {\n  const path = `/repos/${repoOwner}/${repoName}`;\n  const res = await app.request(path, { method: action === \"read\" ? \"GET\" : \"POST\", headers: { authorization: `Bearer ${token}` } });\n  return res;\n};\n\ndescribe(\"authz.permission-evaluation\", () => {\n  it(\"checks permission freshness\", async () => {\n    const { app, deps } = setupApp();\n    const { token } = await login(deps, \"alice\", \"password\")!;\n\n    // Revoke alice's access\n    const revokeRes = await revokeCollaborator(app, token, \"alice\", \"repo\", \"alice\");\n    console.log(`[probe] revoke DELETE /repos/alice/repo/collaborators/alice -> ${revokeRes.status} (expected 204)`);\n    if (revokeRes.status !== 204) {\n      if (revokeRes.status === 404) throw new Error(\"probe not applicable: DELETE /repos/:owner/:repo/collaborators/:username is not implemented\");\n      expect(revokeRes.status).toBe(204);\n    }\n\n    // Check if alice still has access\n    const checkRes = await checkPermission(app, token, \"alice\", \"repo\", \"read\");\n    console.log(`[probe] alice GET /repos/alice/repo -> ${checkRes.status} (expected 404)`);\n    expect(checkRes.status).toBe(404);\n  });\n});",
+      "rationale": "This probe sets up a basic environment with a user and a repository, then revokes the user's collaborator access and checks if the permission evaluation respects the freshness requirement. It expects a 404 response when accessing the repository after revocation, indicating that the permission evaluation is correctly refreshed per request. If the DELETE endpoint for revoking collaborators is not found, it signals that the precondition is absent, resulting in an n/a outcome.",
+      "evalMs": 3955,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      }
+    }
+  ],
+  "attemptsUsed": 1,
+  "final": {
+    "probe": "import { describe, it, expect } from \"vitest\";\nimport { createApp } from \"../src/app.ts\";\nimport { memoryDeps } from \"../src/deps.ts\";\nimport { sequentialIds } from \"../src/ids.ts\";\nimport { login } from \"../src/auth/sessions.ts\";\nimport { requirePermission } from \"../src/authz/require-permission.ts\";\n\nconst setupApp = () => {\n  const deps = memoryDeps();\n  deps.store.createUser({ id: \"usr_1\", username: \"alice\", name: \"Alice\", passwordSalt: \"salt\", passwordHash: \"hash\", createdAt: Date.now() });\n  deps.store.createRepo({ id: \"repo_1\", ownerId: \"usr_1\", name: \"repo\", description: \"\", visibility: \"private\", defaultBranch: \"main\", createdAt: Date.now(), updatedAt: Date.now() });\n  deps.store.addCollaborator({ repoId: \"repo_1\", userId: \"usr_1\", role: \"admin\", addedBy: \"usr_1\", addedAt: Date.now() });\n  return { app: createApp(deps), deps };\n};\n\nconst revokeCollaborator = async (app, token, repoOwner, repoName, username) => {\n  const res = await app.request(`/repos/${repoOwner}/${repoName}/collaborators/${username}`, { method: \"DELETE\", headers: { authorization: `Bearer ${token}` } });\n  return res;\n};\n\nconst checkPermission = async (app, token, repoOwner, repoName, action) => {\n  const path = `/repos/${repoOwner}/${repoName}`;\n  const res = await app.request(path, { method: action === \"read\" ? \"GET\" : \"POST\", headers: { authorization: `Bearer ${token}` } });\n  return res;\n};\n\ndescribe(\"authz.permission-evaluation\", () => {\n  it(\"checks permission freshness\", async () => {\n    const { app, deps } = setupApp();\n    const { token } = await login(deps, \"alice\", \"password\")!;\n\n    // Revoke alice's access\n    const revokeRes = await revokeCollaborator(app, token, \"alice\", \"repo\", \"alice\");\n    console.log(`[probe] revoke DELETE /repos/alice/repo/collaborators/alice -> ${revokeRes.status} (expected 204)`);\n    if (revokeRes.status !== 204) {\n      if (revokeRes.status === 404) throw new Error(\"probe not applicable: DELETE /repos/:owner/:repo/collaborators/:username is not implemented\");\n      expect(revokeRes.status).toBe(204);\n    }\n\n    // Check if alice still has access\n    const checkRes = await checkPermission(app, token, \"alice\", \"repo\", \"read\");\n    console.log(`[probe] alice GET /repos/alice/repo -> ${checkRes.status} (expected 404)`);\n    expect(checkRes.status).toBe(404);\n  });\n});",
+    "rationale": "This probe sets up a basic environment with a user and a repository, then revokes the user's collaborator access and checks if the permission evaluation respects the freshness requirement. It expects a 404 response when accessing the repository after revocation, indicating that the permission evaluation is correctly refreshed per request. If the DELETE endpoint for revoking collaborators is not found, it signals that the precondition is absent, resulting in an n/a outcome.",
+    "admission": {
+      "admitted": false,
+      "cells": {
+        "base": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "A": {
+          "expected": "pass",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "B": {
+          "expected": "n/a",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": false
+        },
+        "AB": {
+          "expected": "fail",
+          "observed": [
+            "fail",
+            "fail",
+            "fail"
+          ],
+          "stable": true,
+          "ok": true
+        }
+      },
+      "failures": [
+        "n/a-mishandled",
+        "wrong-world-behaviour"
+      ],
+      "detail": [
+        "base: expected n/a, observed fail/fail/fail",
+        "A: expected pass, observed fail/fail/fail",
+        "B: expected n/a, observed fail/fail/fail"
+      ]
+    },
+    "mutant": {
+      "world": "mutantA",
+      "runs": [
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined.",
+          "observations": [],
+          "ms": 434,
+          "id": "qwen-9-1791664693090-1:mutantA:0:fa7de33c-c2c8-4382-a11b-60352e799b23",
+          "testError": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined.",
+          "observations": [],
+          "ms": 430,
+          "id": "qwen-9-1791664693090-1:mutantA:1:1a7fb9db-20f3-41d1-8b53-72d7200d3a55",
+          "testError": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined."
+        },
+        {
+          "exit": 1,
+          "outcome": "fail",
+          "reason": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined.",
+          "observations": [],
+          "ms": 434,
+          "id": "qwen-9-1791664693090-1:mutantA:2:988a0a64-b958-4e91-baec-faf4b851d832",
+          "testError": "TypeError: Cannot destructure property 'token' of '(intermediate value)' as it is undefined."
+        }
+      ]
+    },
+    "vacuity": {
+      "vacuous": false,
+      "observed": [
+        "fail",
+        "fail",
+        "fail"
+      ]
+    },
+    "staticCheck": {
+      "deleteSites": [
+        {
+          "line": 33,
+          "text": "revokeCollaborator(app, token, \"alice\", \"repo\", \"alice\")",
+          "boundTo": "revokeRes",
+          "asserted": true
+        }
+      ],
+      "unasserted": [],
+      "expectCalls": 2
+    }
+  },
+  "outcome": "rejected",
+  "totals": {
+    "modelMs": 27656,
+    "evalMs": 4470,
+    "promptTokens": 16875,
+    "completionTokens": 827,
+    "wallMs": 33506
+  }
+}
