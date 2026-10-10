@@ -84,6 +84,9 @@ describe("fallout", () => {
       ),
     );
     expect(conflicts).toBeGreaterThan(0);
+    // A contradicted should premise is a suspicion, not a conflict.
+    const should: HeldPremise = { ...premiseA, proposition: { ...premiseA.proposition, strength: "should" } };
+    expect(fallout(changeIds[1]!, cacheEffect("per-session", false), [should], []).map((f) => f._tag)).toEqual(["suspect"]);
   });
 
   it("[fallout.contradiction-opens-conflict] every contradicted must premise of another change, and every contradicted tenet, gets a conflict", () => {
