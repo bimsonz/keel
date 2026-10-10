@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/precheck.test.ts
+# kills: precheck.clean-passes, precheck.exact
+# why: Every touched path is refused, offending or not
+diff --git a/packages/core/src/domain/verification/precheck.ts b/packages/core/src/domain/verification/precheck.ts
+index 846f190..bce94cc 100644
+--- a/packages/core/src/domain/verification/precheck.ts
++++ b/packages/core/src/domain/verification/precheck.ts
+@@ -89,7 +89,7 @@ export const precheck = (
+     const guard = policy.guardPaths.find((g) => matchesGlob(g, path));
+     if (guard !== undefined) return [{ path, rule: "guard", glob: guard }];
+     const protectedBy = policy.protectedPaths.find((g) => matchesGlob(g, path));
+-    return protectedBy === undefined ? [] : [{ path, rule: "protected", glob: protectedBy }];
++    return [{ path, rule: "protected", glob: protectedBy ?? Glob.make("**") }];
+   });
+   const [first, ...rest] = refused;
+   if (first === undefined) return Result.succeed({ touched });

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/precheck.test.ts
+# kills: precheck.guard-refused, precheck.exact
+# why: A guard path is never refused
+diff --git a/packages/core/src/domain/verification/precheck.ts b/packages/core/src/domain/verification/precheck.ts
+index 846f190..cc6d27d 100644
+--- a/packages/core/src/domain/verification/precheck.ts
++++ b/packages/core/src/domain/verification/precheck.ts
+@@ -87,7 +87,6 @@ export const precheck = (
+   const touched = [...new Set(touchedPaths)].toSorted();
+   const refused = touched.flatMap((path): RefusedPath[] => {
+     const guard = policy.guardPaths.find((g) => matchesGlob(g, path));
+-    if (guard !== undefined) return [{ path, rule: "guard", glob: guard }];
+     const protectedBy = policy.protectedPaths.find((g) => matchesGlob(g, path));
+     return protectedBy === undefined ? [] : [{ path, rule: "protected", glob: protectedBy }];
+   });

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/verification/precheck.test.ts
+# kills: precheck.exact
+# why: A refusal cites only the first offending path
+diff --git a/packages/core/src/domain/verification/precheck.ts b/packages/core/src/domain/verification/precheck.ts
+index 846f190..1bbf0b0 100644
+--- a/packages/core/src/domain/verification/precheck.ts
++++ b/packages/core/src/domain/verification/precheck.ts
+@@ -93,6 +93,6 @@ export const precheck = (
+   });
+   const [first, ...rest] = refused;
+   if (first === undefined) return Result.succeed({ touched });
+-  const paths: NonEmpty<RefusedPath> = [first, ...rest];
++  const paths: NonEmpty<RefusedPath> = [first];
+   return Result.fail(new PrecheckRefusal({ paths, nextActions: nextActionsFor(paths) }));
+ };

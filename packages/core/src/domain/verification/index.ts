@@ -7,3 +7,4 @@ export * from "./flow.ts";
 export * from "./plan.ts";
 export * from "./probe.ts";
 export * from "./verdict.ts";
+export * from "./precheck.ts";
