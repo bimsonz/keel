@@ -1,0 +1,23 @@
+{
+  "name": "keel-spike-15-ciworkflow",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src",
+    "deploy:verify": "wrangler deploy -c wrangler.verify.jsonc",
+    "deploy:ci": "wrangler deploy -c wrangler.ci.jsonc"
+  },
+  "dependencies": {
+    "@cloudflare/ci": "0.2.0",
+    "@cloudflare/sandbox": "0.12.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261010.1",
+    "@types/node": "^26.6.4",
+    "oxlint": "^1.87.0",
+    "typescript": "^6.0.3",
+    "wrangler": "4.149.0"
+  }
+}

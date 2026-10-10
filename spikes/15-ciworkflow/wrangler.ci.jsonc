@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "keel-spike-15-ci",
+  "main": "src/ci.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "artifacts": [{ "binding": "ARTIFACTS", "namespace": "keel-spike-15" }],
+  "r2_buckets": [
+    { "binding": "BACKUP_BUCKET", "bucket_name": "keel-spike-15-backups" },
+    { "binding": "RESULTS", "bucket_name": "keel-spike-15-results" }
+  ],
+  "vars": { "BACKUP_BUCKET_NAME": "keel-spike-15-backups", "BUNDLE_HASH": "b70c79e021810cc4e285f4534e39ae32d6113f5ee4056fe243407ed408597fda" },
+  "worker_loaders": [{ "binding": "LOADER" }],
+  "durable_objects": {
+    "bindings": [
+      { "name": "SANDBOX", "class_name": "KeelSandbox", "script_name": "keel-spike-15-verify" }
+    ]
+  },
+  "workflows": [
+    { "name": "keel-spike-15-verify-wf", "binding": "CI_WORKFLOW", "class_name": "KeelVerify" },
+    { "name": "keel-spike-15-bundle-wf", "binding": "CI_WORKFLOW_BUNDLE", "class_name": "KeelVerifyBundle" }
+  ]
+}

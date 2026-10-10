@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "keel-spike-15-verify",
+  "main": "src/verify.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "artifacts": [{ "binding": "ARTIFACTS", "namespace": "keel-spike-15" }],
+  "r2_buckets": [{ "binding": "BACKUP_BUCKET", "bucket_name": "keel-spike-15-backups" }],
+  "vars": { "BACKUP_BUCKET_NAME": "keel-spike-15-backups" },
+  "durable_objects": {
+    "bindings": [
+      { "name": "SANDBOX", "class_name": "KeelSandbox" },
+      { "name": "SANDBOX_EGRESS", "class_name": "KeelSandboxEgress" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["KeelSandbox", "KeelSandboxEgress"] }],
+  "containers": [
+    { "class_name": "KeelSandbox", "image": "./Dockerfile", "max_instances": 3 },
+    { "class_name": "KeelSandboxEgress", "image": "./Dockerfile", "max_instances": 3 }
+  ]
+}
