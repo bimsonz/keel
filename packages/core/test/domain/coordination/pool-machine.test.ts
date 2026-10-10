@@ -23,14 +23,18 @@ import {
   type Json,
   makeId,
 } from "../../../src/domain/kernel/index.ts";
+import { sketchChart, workspaceChart } from "../../charts/charts.ts";
+import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
 import {
   eventsOf,
   failureTag,
+  type Fold,
   type Machine,
   memo,
   play,
   type Played,
+  tour,
 } from "../../support/machine.ts";
 
 /**
@@ -556,5 +560,82 @@ describe("the Sketch machine", { timeout: PROPERTY_TIMEOUT }, () => {
         ]).results[1] ?? Result.succeed([]),
       ),
     ).toEqual([]);
+  });
+});
+
+// The charts check the machines; they never drive them.
+
+/** Every event a step committed or tried, folded one at a time. */
+const foldsIn = <S, C, E, F>(machine: Machine<S, C, E, F>, r: Played<S, C, E>) =>
+  foldsOf(machine, r.before, [r.taken.result, ...r.probes.map((p) => p.result)], r.now);
+
+const workspaceView: View<Workspace, WorkspaceEvent> = {
+  from: (f) => f.before?.state ?? "none",
+  to: (f) => f.after.state,
+};
+const sketchView: View<Sketch, SketchEvent> = {
+  from: (f) => f.before?.state ?? "none",
+  to: (f) => f.after.state,
+};
+
+/** The Workspace machine walked breadth-first: every command kind, for every holder. */
+let workspaceWalk: readonly Fold<Workspace, WorkspaceEvent>[] | undefined;
+const workspaceTour = (): readonly Fold<Workspace, WorkspaceEvent>[] => {
+  workspaceWalk ??= tour(workspaceMachine, {
+    start: T0,
+    facts: (now) => ({ now, workspaceId: WORKSPACE }),
+    moves: (state) =>
+      W_KINDS.flatMap((kind) =>
+        [0, 1, 2, 3, 4, 5].map((who) => ({
+          command: wBuild(kind, state, { mode: "progress", pick: 0, who }),
+          dt: 1,
+        })),
+      ),
+    signature: (w) => `${w?.state ?? "none"}|${w?.holder ?? ""}`,
+  });
+  return workspaceWalk;
+};
+
+/** The Sketch machine walked breadth-first: every command kind, a moment later and past the TTL. */
+let sketchWalk: readonly Fold<Sketch, SketchEvent>[] | undefined;
+const sketchTour = (): readonly Fold<Sketch, SketchEvent>[] => {
+  sketchWalk ??= tour(sketchMachine, {
+    start: T0,
+    facts: (now) => ({ now, sketchId: SKETCH }),
+    // Only Open reads the clock, and only from nothing, at T0 + dt.
+    moves: () =>
+      S_KINDS.flatMap((kind) =>
+        [1, TTL + 1].map((dt) => ({ command: sBuild(kind, Instant(T0 + dt)), dt })),
+      ),
+    signature: (sk) => sk?.state ?? "none",
+  });
+  return sketchWalk;
+};
+
+describe("the Workspace and Sketch charts", { timeout: PROPERTY_TIMEOUT }, () => {
+  it("[workspace.chart] every state change a run makes is an edge of the Workspace chart, and a tour of the machine exercises every edge", () => {
+    fc.assert(
+      fc.property(wPlanArb, (steps) =>
+        wRun(steps).every(
+          (r) => offChart(workspaceChart, foldsIn(workspaceMachine, r), workspaceView).length === 0,
+        ),
+      ),
+    );
+    const walked = workspaceTour();
+    expect(offChart(workspaceChart, walked, workspaceView)).toEqual([]);
+    expect(uncovered(workspaceChart, walked, workspaceView)).toEqual([]);
+  });
+
+  it("[sketch.chart] every state change a run makes is an edge of the Sketch chart, and a tour of the machine exercises every edge", () => {
+    fc.assert(
+      fc.property(sPlanArb, (steps) =>
+        sRun(steps).every(
+          (r) => offChart(sketchChart, foldsIn(sketchMachine, r), sketchView).length === 0,
+        ),
+      ),
+    );
+    const walked = sketchTour();
+    expect(offChart(sketchChart, walked, sketchView)).toEqual([]);
+    expect(uncovered(sketchChart, walked, sketchView)).toEqual([]);
   });
 });

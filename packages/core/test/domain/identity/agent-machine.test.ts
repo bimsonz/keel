@@ -18,8 +18,18 @@ import {
   type Json,
   makeId,
 } from "../../../src/domain/kernel/index.ts";
+import { agentChart } from "../../charts/charts.ts";
+import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
-import { eventsOf, failureTag, type Machine, memo, play } from "../../support/machine.ts";
+import {
+  eventsOf,
+  failureTag,
+  type Fold,
+  type Machine,
+  memo,
+  play,
+  tour,
+} from "../../support/machine.ts";
 
 /**
  * Each property plays hundreds of seeded runs through decide and evolve; on a
@@ -242,5 +252,44 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(revocations).toBeGreaterThan(0);
     const suspended = drive([build("Enroll"), build("Suspend")]).state;
     expect(suspended !== undefined && admits(suspended, principal(0))).toBe(false);
+  });
+});
+
+// The chart checks the machine; it never drives it.
+
+const agentView: View<Agent, AgentEvent> = {
+  from: (f) => f.before?.state ?? "none",
+  to: (f) => f.after.state,
+};
+
+/** The machine walked breadth-first: every command kind from every state. */
+let walkedTour: readonly Fold<Agent, AgentEvent>[] | undefined;
+const agentTour = (): readonly Fold<Agent, AgentEvent>[] => {
+  walkedTour ??= tour(machine, {
+    start: T0,
+    facts: (now) => ({ now, agentId: AGENT }),
+    moves: () => KINDS.map((kind) => ({ command: build(kind), dt: 1 })),
+    signature: (a) => a?.state ?? "none",
+  });
+  return walkedTour;
+};
+
+describe("the Agent chart", { timeout: PROPERTY_TIMEOUT }, () => {
+  it("[agent.chart] every state change a run makes is an edge of the Agent chart, and a tour of the machine exercises every edge", () => {
+    fc.assert(
+      fc.property(planArb, (steps) =>
+        run(steps).every(
+          (r) =>
+            offChart(
+              agentChart,
+              foldsOf(machine, r.before, [r.taken.result, ...r.probes.map((p) => p.result)], r.now),
+              agentView,
+            ).length === 0,
+        ),
+      ),
+    );
+    const walked = agentTour();
+    expect(offChart(agentChart, walked, agentView)).toEqual([]);
+    expect(uncovered(agentChart, walked, agentView)).toEqual([]);
   });
 });

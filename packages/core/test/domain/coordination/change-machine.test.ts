@@ -25,9 +25,9 @@ import {
 } from "../../../src/domain/kernel/index.ts";
 import { propositionArb } from "../../arbitraries/coordination.ts";
 import { fc } from "../../support/fast-check.ts";
-import { conforms, edgeKey, edgesOf } from "../../charts/chart-kit.ts";
+import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { changeChart, leaseChart } from "../../charts/charts.ts";
-import { type Fold, type Machine, stepsOf, tour } from "../../support/machine.ts";
+import { type Fold, type Machine, tour } from "../../support/machine.ts";
 
 // The lease TTL as the docs state it (state-machines.md § Lease), typed here rather than imported.
 const TTL = 15 * 60 * 1000;
@@ -1162,24 +1162,9 @@ const leaseTo = (f: Fold<Change, ChangeEvent>): string =>
     ? "superseded"
     : f.after.lease.state;
 
-const folds = (
-  before: Change | undefined,
-  result: Decision | undefined,
-  now: Instant,
-): readonly Fold<Change, ChangeEvent>[] => {
-  if (result === undefined || Result.isFailure(result)) return [];
-  try {
-    return stepsOf(changeMachine, before, result.success, now);
-  } catch (error) {
-    // decide-evolvable reports these; the chart judges only what evolve accepts.
-    if (error instanceof IllegalTransition) return [];
-    throw error;
-  }
-};
-
 /** Every event a run committed or tried, folded one at a time. */
 const foldsIn = (r: Played): readonly Fold<Change, ChangeEvent>[] =>
-  [r.result, ...r.probes.map((p) => p.result)].flatMap((res) => folds(r.before, res, r.now));
+  foldsOf(changeMachine, r.before, [r.result, ...r.probes.map((p) => p.result)], r.now);
 
 const TOUR_PLAN: Plan = {
   premises: fc.sample(propositionArb(), { numRuns: 1, seed: 7 }),
@@ -1217,70 +1202,32 @@ const changeTour = (): readonly Fold<Change, ChangeEvent>[] => {
   return walkedTour;
 };
 
-const offChart = (
-  walked: readonly Fold<Change, ChangeEvent>[],
-  from: (f: Fold<Change, ChangeEvent>) => string,
-  to: (f: Fold<Change, ChangeEvent>) => string,
-  onChart: (a: string, e: string, b: string) => boolean,
-) =>
-  walked
-    .filter((f) => f.before !== undefined && !onChart(from(f), f.event._tag, to(f)))
-    .map((f) => edgeKey({ from: from(f), event: f.event._tag, to: to(f) }));
-
-const uncovered = (
-  walked: readonly Fold<Change, ChangeEvent>[],
-  chart: typeof changeChart,
-  from: (f: Fold<Change, ChangeEvent>) => string,
-  to: (f: Fold<Change, ChangeEvent>) => string,
-) => {
-  const covered = new Set(
-    walked
-      .filter((f) => f.before !== undefined)
-      .map((f) => edgeKey({ from: from(f), event: f.event._tag, to: to(f) })),
-  );
-  return edgesOf(chart)
-    .map(edgeKey)
-    .filter((e) => !covered.has(e));
+const changeView: View<Change, ChangeEvent> = {
+  from: (f) => (f.before === undefined ? "none" : chartKey(f.before)),
+  to: (f) => chartKey(f.after),
 };
-
-const from = (f: Fold<Change, ChangeEvent>): string =>
-  f.before === undefined ? "none" : chartKey(f.before);
-const to = (f: Fold<Change, ChangeEvent>): string => chartKey(f.after);
+const leaseView: View<Change, ChangeEvent> = { from: leaseFrom, to: leaseTo };
 
 describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[change.chart] every state change a run makes is an edge of the Change chart, and a tour of the machine exercises every edge", () => {
-    const onChart = conforms(changeChart);
     fc.assert(
       fc.property(planArb, (plan) =>
-        run(plan).records.every((r) =>
-          foldsIn(r).every((f) =>
-            f.before === undefined
-              ? to(f) === changeChart.initial
-              : onChart(from(f), f.event._tag, to(f)),
-          ),
-        ),
+        run(plan).records.every((r) => offChart(changeChart, foldsIn(r), changeView).length === 0),
       ),
     );
     const walked = changeTour();
-    expect(offChart(walked, from, to, onChart)).toEqual([]);
-    expect(uncovered(walked, changeChart, from, to)).toEqual([]);
+    expect(offChart(changeChart, walked, changeView)).toEqual([]);
+    expect(uncovered(changeChart, walked, changeView)).toEqual([]);
   });
 
   it("[lease.chart] every change a run makes to a lease is an edge of the Lease chart, and a tour of the machine exercises every edge", () => {
-    const onChart = conforms(leaseChart);
     fc.assert(
       fc.property(planArb, (plan) =>
-        run(plan).records.every((r) =>
-          foldsIn(r).every((f) =>
-            f.before === undefined
-              ? leaseTo(f) === leaseChart.initial
-              : onChart(leaseFrom(f), f.event._tag, leaseTo(f)),
-          ),
-        ),
+        run(plan).records.every((r) => offChart(leaseChart, foldsIn(r), leaseView).length === 0),
       ),
     );
     const walked = changeTour();
-    expect(offChart(walked, leaseFrom, leaseTo, onChart)).toEqual([]);
-    expect(uncovered(walked, leaseChart, leaseFrom, leaseTo)).toEqual([]);
+    expect(offChart(leaseChart, walked, leaseView)).toEqual([]);
+    expect(uncovered(leaseChart, walked, leaseView)).toEqual([]);
   });
 });

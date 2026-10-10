@@ -23,7 +23,10 @@ import {
   type Json,
   makeId,
 } from "../../../src/domain/kernel/index.ts";
+import { promotionChart } from "../../charts/charts.ts";
+import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
+import { type Fold, type Machine, tour } from "../../support/machine.ts";
 
 const T0 = Instant(1_760_000_000_000);
 const ulid = (n: number): string => String(n).padStart(26, "0");
@@ -194,6 +197,7 @@ const attempt = (state: Trunk | undefined, command: PromotionCommand, now: Insta
 
 interface Played {
   readonly before: Trunk | undefined;
+  readonly now: Instant;
   readonly probes: readonly Probe[];
   readonly taken: Probe;
   readonly after: Trunk | undefined;
@@ -220,7 +224,7 @@ const play = (steps: readonly Step[]): readonly Played[] => {
       for (const payload of taken.result.success) log.push({ at: now, payload });
       state = taken.after;
     }
-    played.push({ before, probes, taken, after: state, log: [...log] });
+    played.push({ before, now, probes, taken, after: state, log: [...log] });
     if (taken.threw) break;
   }
   return played;
@@ -690,5 +694,87 @@ describe("trunk promotion", { timeout: PROPERTY_TIMEOUT }, () => {
     const early = drive([flush([], STRAY), init]);
     expect(failureTag(early.results[0])).toBe("TrunkNotInitialized");
     expect(early.state?.head).toBe(H0);
+  });
+});
+
+// The chart checks the machine; it never drives it.
+
+const promotionMachine: Machine<
+  Trunk,
+  PromotionCommand,
+  TrunkEvent,
+  { readonly now: Instant; readonly projectId: typeof PROJECT }
+> = { decide: decidePromotion, evolve: evolvePromotion };
+
+const phaseOf = (t: Trunk | undefined): Phase => t?.phase ?? "none";
+const promotionView: View<Trunk, TrunkEvent> = {
+  from: (f) => phaseOf(f.before),
+  to: (f) => phaseOf(f.after),
+};
+
+/** The machine walked breadth-first: every command kind, honest and stray, on a fresh path or a barrier, current or behind. */
+let walkedTour: readonly Fold<Trunk, TrunkEvent>[] | undefined;
+const promotionTour = (): readonly Fold<Trunk, TrunkEvent>[] => {
+  if (walkedTour !== undefined) return walkedTour;
+  const world: World = { touched: new Map(), behind: new Set(), n: 100 };
+  walkedTour = tour(promotionMachine, {
+    start: T0,
+    facts: (now) => ({ now, projectId: PROJECT }),
+    moves: (state) =>
+      KINDS.flatMap((kind) =>
+        [true, false].flatMap((honest) =>
+          [false, true].flatMap((behind) =>
+            [0, 1].map((pick) => ({
+              command: build(
+                kind,
+                state,
+                { mode: "progress", pick, honest, path: pick, behind },
+                world,
+              ),
+              dt: 1,
+            })),
+          ),
+        ),
+      ),
+    signature: (t) =>
+      [
+        phaseOf(t),
+        // The first two queued batches, each by what the flush will make of it: behind, waiting, or neither.
+        (t?.queue ?? [])
+          .slice(0, 2)
+          .map(
+            (b) =>
+              `${world.behind.has(b.batchId) ? "b" : ""}${b.predecessors.length > 0 ? "w" : ""}.`,
+          )
+          .join(""),
+        t?.wal === undefined ? "-" : t.wal.composed === undefined ? "started" : "composed",
+        t?.frozen === undefined ? "-" : "frozen",
+      ].join("|"),
+  });
+  return walkedTour;
+};
+
+describe("the Promotion chart", { timeout: PROPERTY_TIMEOUT }, () => {
+  it("[promotion.chart] every phase change a run makes is an edge of the Promotion chart, and a tour of the machine exercises every edge", () => {
+    fc.assert(
+      fc.property(planArb, (steps) =>
+        run(steps).every(
+          (r) =>
+            offChart(
+              promotionChart,
+              foldsOf(
+                promotionMachine,
+                r.before,
+                [r.taken.result, ...r.probes.map((p) => p.result)],
+                r.now,
+              ),
+              promotionView,
+            ).length === 0,
+        ),
+      ),
+    );
+    const walked = promotionTour();
+    expect(offChart(promotionChart, walked, promotionView)).toEqual([]);
+    expect(uncovered(promotionChart, walked, promotionView)).toEqual([]);
   });
 });

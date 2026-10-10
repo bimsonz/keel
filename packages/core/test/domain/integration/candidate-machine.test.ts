@@ -20,7 +20,10 @@ import {
   type Json,
   makeId,
 } from "../../../src/domain/kernel/index.ts";
+import { candidateChart } from "../../charts/charts.ts";
+import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
+import { type Fold, type Machine, tour } from "../../support/machine.ts";
 
 const T0 = Instant(1_760_000_000_000);
 const ulid = (n: number): string => String(n).padStart(26, "0");
@@ -235,6 +238,7 @@ const attempt = (state: Batch | undefined, command: CandidateCommand, now: Insta
 
 interface Played {
   readonly before: Batch | undefined;
+  readonly now: Instant;
   readonly probes: readonly Probe[];
   readonly taken: Probe;
   readonly log: readonly Committed<CandidateEvent>[];
@@ -265,7 +269,7 @@ const play = (plan: Plan): readonly Played[] => {
       for (const payload of taken.result.success) log.push({ at: now, payload });
       state = taken.after;
     }
-    played.push({ before, probes, taken, log: [...log] });
+    played.push({ before, now, probes, taken, log: [...log] });
     if (taken.threw) break;
   }
   return played;
@@ -555,5 +559,72 @@ describe("the Candidate machine", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(failureTag(drive([form([A]), assemble, start, failed(STRANGER)]).results[3])).toBe(
       "InvalidBatch",
     );
+  });
+});
+
+// The chart checks the machine; it never drives it.
+
+const candidateMachine: Machine<
+  Batch,
+  CandidateCommand,
+  CandidateEvent,
+  { readonly now: Instant; readonly batchId: typeof BATCH }
+> = { decide: decideCandidate, evolve: evolveCandidate };
+
+const candidateView: View<Batch, CandidateEvent> = {
+  from: (f) => keyOf(f.before),
+  to: (f) => keyOf(f.after),
+};
+
+const TOUR_PLAN: Plan = { members: [A, B], attempt: 1, chainEpoch: 0, steps: [] };
+
+/** The machine walked breadth-first: every command kind, with every kind of blame. */
+let walkedTour: readonly Fold<Batch, CandidateEvent>[] | undefined;
+const candidateTour = (): readonly Fold<Batch, CandidateEvent>[] => {
+  if (walkedTour !== undefined) return walkedTour;
+  let n = 100;
+  walkedTour = tour(candidateMachine, {
+    start: T0,
+    facts: (now) => ({ now, batchId: BATCH }),
+    moves: (state) =>
+      KINDS.flatMap((kind) =>
+        [0, 1, 2, 3, 4, 5].map((blame) => ({
+          command: build(
+            kind,
+            state,
+            TOUR_PLAN,
+            { mode: "progress", pick: 0, fenced: false, blame },
+            (n += 2),
+          ),
+          dt: 1,
+        })),
+      ),
+    signature: (b) => `${keyOf(b)}|${b?.attribution ?? ""}`,
+  });
+  return walkedTour;
+};
+
+describe("the Candidate chart", { timeout: PROPERTY_TIMEOUT }, () => {
+  it("[candidate.chart] every state change a run makes is an edge of the Candidate chart, and a tour of the machine exercises every edge", () => {
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        run(plan).every(
+          (r) =>
+            offChart(
+              candidateChart,
+              foldsOf(
+                candidateMachine,
+                r.before,
+                [r.taken.result, ...r.probes.map((p) => p.result)],
+                r.now,
+              ),
+              candidateView,
+            ).length === 0,
+        ),
+      ),
+    );
+    const walked = candidateTour();
+    expect(offChart(candidateChart, walked, candidateView)).toEqual([]);
+    expect(uncovered(candidateChart, walked, candidateView)).toEqual([]);
   });
 });
