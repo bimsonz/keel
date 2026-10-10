@@ -1,4 +1,3 @@
-import { NotImplemented } from "@keeltown/core/not-implemented";
 import {
   type Clock,
   type CodeHost,
@@ -6,11 +5,12 @@ import {
   type EventOutbox,
   type FanOut,
   type Ids,
-  WorkspacePool,
+  type WorkspacePool,
 } from "@keeltown/core/ports";
-import { Effect, Layer, ManagedRuntime } from "effect";
+import { Layer, ManagedRuntime } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
 import { FanOutRpc } from "../adapters/driven/do-rpc/fan-out.ts";
+import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { EntityStoreSql, migrateEntityStore } from "../adapters/driven/do-storage/entity-store.ts";
 import { EventOutboxSql, migrateEventOutbox } from "../adapters/driven/do-storage/event-outbox.ts";
 import { SystemLive } from "../adapters/driven/system.ts";
@@ -31,19 +31,36 @@ export function backbone(storage: DurableObjectStorage): Layer.Layer<DurableObje
 /** The Change DO's driven adapters beyond the backbone. */
 export type ChangeServices = WorkspacePool;
 
-/**
- * The Change DO takes its workspace from the WorkspacePool DO. The RPC
- * adapter replaces this placeholder, which dies with NotImplemented, so a
- * declare fails loudly instead of granting nothing.
- */
-export function changeServices(_env: Env): Layer.Layer<ChangeServices> {
-  return Layer.succeed(
-    WorkspacePool,
-    WorkspacePool.of({ grant: poolPending, release: poolPending }),
-  );
+/** The Change DO takes its workspace from its project's WorkspacePool DO. */
+export function changeServices(env: Env): Layer.Layer<ChangeServices> {
+  return WorkspacePoolRpc(env.WORKSPACE_POOL, artifactsLocationHint(env));
 }
 
-const poolPending = () => Effect.die(new NotImplemented("WorkspacePool RPC adapter"));
+const LOCATION_HINTS: readonly DurableObjectLocationHint[] = [
+  "wnam",
+  "enam",
+  "sam",
+  "weur",
+  "eeur",
+  "apac",
+  "oc",
+  "afr",
+  "me",
+];
+
+/**
+ * Where the deployment's Artifacts namespaces live (`vars.ARTIFACTS_LOCATION_HINT`,
+ * `wnam` on staging): repo-touching objects are placed there. Absent or empty
+ * means no hint; any other value is a misconfiguration and fails loudly.
+ */
+export function artifactsLocationHint(env: Env): DurableObjectLocationHint | undefined {
+  const value: unknown = Reflect.get(env, "ARTIFACTS_LOCATION_HINT");
+  if (value === undefined || value === "") return undefined;
+  const hint = LOCATION_HINTS.find((h) => h === value);
+  if (hint === undefined)
+    throw new Error(`ARTIFACTS_LOCATION_HINT is ${JSON.stringify(value)}, not a location hint`);
+  return hint;
+}
 
 export interface DurableObjectComposition<R = never> {
   readonly runtime: DurableObjectRuntime<R>;
@@ -78,5 +95,19 @@ export function durableObjectRuntime<R>(
  * `keel-ws-00` (workspaces and their mirror).
  */
 export function codeHostLayer(env: Env): Layer.Layer<CodeHost> {
-  return CodeHostArtifacts({ "keel-core": env.ARTIFACTS, "keel-ws-00": env.WORKSPACES });
+  return CodeHostArtifacts({ "keel-core": env.ARTIFACTS, "keel-ws-00": workspaces(env) });
 }
+
+declare global {
+  interface Env {
+    /**
+     * Test-only: a fake Artifacts namespace the pool tests bind, because
+     * Artifacts has no local simulator and miniflare will not rebind
+     * WORKSPACES. No deployed Worker declares it.
+     */
+    readonly TEST_ARTIFACTS?: Artifacts;
+  }
+}
+
+/** The workspaces namespace: TEST_ARTIFACTS where a test binds it, WORKSPACES everywhere else. */
+const workspaces = (env: Env): Artifacts => env.TEST_ARTIFACTS ?? env.WORKSPACES;

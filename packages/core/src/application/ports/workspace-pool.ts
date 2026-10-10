@@ -42,7 +42,15 @@ export class WorkspacePool extends Context.Service<
       projectId: ProjectId,
       holder: ChangeId | SketchId,
     ) => Effect.Effect<WorkspaceGrant, PoolExhausted>;
-    /** Collects the workspace: its repo is deleted. */
-    readonly release: (workspaceId: WorkspaceId, reason?: CollectionReason) => Effect.Effect<void>;
+    /**
+     * Collects the workspace: its repo is deleted. Releasing it again is a
+     * no-op. A change's end collects its workspace by event; this is for a
+     * declare refused after its grant.
+     */
+    readonly release: (
+      projectId: ProjectId,
+      workspaceId: WorkspaceId,
+      reason?: CollectionReason,
+    ) => Effect.Effect<void>;
   }
 >()("keel/WorkspacePool") {}

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts -t "pool.contract.exhausted|pool.rpc.exhausted"
+# kills: pool.contract.exhausted, pool.rpc.exhausted
+# why: The adapter turns PoolExhausted into a defect, so declare answers 500 instead of a retry-after
+diff --git a/apps/keel/src/adapters/driven/do-rpc/workspace-pool.ts b/apps/keel/src/adapters/driven/do-rpc/workspace-pool.ts
+index a4b4df9..ea95d5d 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/workspace-pool.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/workspace-pool.ts
+@@ -29,7 +29,7 @@ export function WorkspacePoolRpc(
+     WorkspacePool,
+     WorkspacePool.of({
+       grant: (projectId, holder) =>
+-        call(WorkspacePoolCodecs.grant, () => pool(projectId).grant(holder)),
++        call(WorkspacePoolCodecs.grant, () => pool(projectId).grant(holder)).pipe(Effect.orDie),
+       release: (projectId, workspaceId, reason) =>
+         call(WorkspacePoolCodecs.release, () => pool(projectId).release(workspaceId, reason)).pipe(
+           Effect.orDie,

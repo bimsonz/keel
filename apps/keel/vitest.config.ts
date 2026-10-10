@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { stripTypeScriptTypes } from "node:module";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
 import { defineProject } from "vitest/config";
 
@@ -8,6 +10,11 @@ async function testSigningKey(): Promise<string> {
   const jwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
   return JSON.stringify(Object.assign(jwk, { kid: "test" }));
 }
+
+/** The fake Artifacts namespace, typechecked as TypeScript and served as plain JavaScript. */
+const fakeArtifacts = stripTypeScriptTypes(
+  readFileSync(`${import.meta.dirname}/test/pool/fake-artifacts.worker.ts`, "utf8"),
+);
 
 export default defineProject({
   plugins: [
@@ -20,8 +27,18 @@ export default defineProject({
           KEEL_SIGNING_KEY: await testSigningKey(),
           TEST_MIGRATIONS: await readD1Migrations(`${import.meta.dirname}/migrations`),
         },
+        // Artifacts has no local simulator, and miniflare binds WORKSPACES to the remote proxy
+        // whatever is set here. Composition serves keel-ws-00 from TEST_ARTIFACTS when it is
+        // bound, so the real CodeHost adapter runs inside the WorkspacePool DO against a fake.
+        serviceBindings: { TEST_ARTIFACTS: "fake-artifacts" },
         // keel-verify is another deployable; tests bind VERIFIER to a fake of it.
         workers: [
+          {
+            name: "fake-artifacts",
+            modules: true,
+            compatibilityDate: "2026-10-01",
+            script: fakeArtifacts,
+          },
           {
             name: "keel-verify",
             modules: true,

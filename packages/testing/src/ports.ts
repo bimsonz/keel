@@ -12,6 +12,7 @@ import {
 import { describeChangesContract, type ChangesHarness } from "./contracts/changes.ts";
 import { describeCodeHostContract } from "./contracts/code-host.ts";
 import { describeInboxContract, type InboxHarness } from "./contracts/inbox.ts";
+import { describeWorkspacePoolContract, type StockedPool } from "./contracts/workspace-pool.ts";
 import * as codeHost from "./memory/code-host.ts";
 import * as coordination from "./memory/coordination.ts";
 import * as delivery from "./memory/delivery.ts";
@@ -88,6 +89,18 @@ function memoryInboxHarness(): InboxHarness {
   };
 }
 
+/** The pool's suite needs a pool stocked for a project, so its adapters register with a stocking factory. */
+const workspacePool = {
+  memory: () => coordination.makeWorkspacePoolMemory().layer,
+  contract: (adapter: string, stocked: StockedPool) =>
+    describeWorkspacePoolContract(adapter, stocked),
+  verifyMemory: () =>
+    describeWorkspacePoolContract(
+      "in-memory",
+      (_projectId, capacity) => coordination.makeWorkspacePoolMemory({ capacity }).layer,
+    ),
+};
+
 const GENESIS = Schema.decodeUnknownSync(CommitSha)("0".repeat(40));
 
 export const PORTS = {
@@ -103,10 +116,7 @@ export const PORTS = {
     describeTokenIssuerContract,
   ),
   CodeHost: port(() => codeHost.makeCodeHostMemory().layer, describeCodeHostContract),
-  WorkspacePool: port(
-    () => coordination.makeWorkspacePoolMemory().layer,
-    pending("WorkspacePool", ["grant", "release"]),
-  ),
+  WorkspacePool: workspacePool,
   SubjectRegistry: port(
     () => coordination.makeSubjectRegistryMemory().layer,
     pending("SubjectRegistry", ["byKey", "byAnchor", "mint"]),

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts -t "pool.rpc.hint"
+# kills: pool.rpc.hint
+# why: The adapter drops the location hint, so a pool is placed near its first caller instead of next to the Artifacts namespaces
+diff --git a/apps/keel/src/adapters/driven/do-rpc/workspace-pool.ts b/apps/keel/src/adapters/driven/do-rpc/workspace-pool.ts
+index a4b4df9..d3effe1 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/workspace-pool.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/workspace-pool.ts
+@@ -22,7 +22,7 @@ export function WorkspacePoolRpc(
+   const pool = (projectId: string) =>
+     pools.get(
+       pools.idFromName(`pool:${projectId}`),
+-      locationHint === undefined ? undefined : { locationHint },
++      undefined,
+     );
+ 
+   return Layer.succeed(

@@ -41,6 +41,7 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 
 - The submission status operation is an MCP tool: `@tag("mcp")` with `@operationId("status")`. Its operationId was `Submissions_getSubmission` (an unused rename), so an agent over MCP can wait on its own submission.
 - `ChangeCodecs.declare` answers `{change, preflight, grant: WorkspaceGrant}` and fails with `ChangeStateRefused | PoolExhausted | SketchNotFound`, because the Change DO takes its workspace before it decides (unused since contracts-v0).
+- `WorkspacePool.release(projectId, workspaceId, reason?)` names the project, as `grant` does, so the RPC adapter can address `pool:<projectId>` (no callers).
 
 ## contracts-v0 (10 Oct 2026)
 

@@ -10,4 +10,5 @@ export * from "./memory/storage.ts";
 export * from "./memory/verification.ts";
 export * from "./contracts/index.ts";
 export * from "./contracts/code-host.ts";
+export * from "./contracts/workspace-pool.ts";
 export { PORTS, type PortName } from "./ports.ts";

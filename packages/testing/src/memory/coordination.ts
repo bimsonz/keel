@@ -75,7 +75,7 @@ export function makeWorkspacePoolMemory(
               repo: { namespace: "memory", name: workspaceId },
             };
           }),
-        release: (workspaceId, reason = "withdrawn") =>
+        release: (_projectId, workspaceId, reason = "withdrawn") =>
           Effect.sync(() => {
             if (granted.delete(workspaceId)) released.set(workspaceId, reason);
           }),
