@@ -39,34 +39,73 @@ Owner: Change DO.
 
 **Agent-owned states** are Declared, Working, Drifted and Bounced: the change waits on its agent. In every other non-terminal state the platform owns it.
 
+<!-- chart:change — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
 stateDiagram-v2
   [*] --> Declared: IntentDeclared
+  state Parked {
+    AwaitingRuling
+    LeaseLapsed
+  }
   Declared --> Working: ChangeStarted
+  Declared --> LeaseLapsed: ChangeParked
+  Declared --> Declared: ChangeAdopted
+  Declared --> Withdrawn: ChangeWithdrawn
+  Declared --> Superseded: ChangeSuperseded
   Working --> Working: IntentRevised
   Working --> Submitted: ChangeSubmitted
+  Working --> LeaseLapsed: ChangeParked
+  Working --> Working: ChangeAdopted
+  Working --> Withdrawn: ChangeWithdrawn
+  Working --> Superseded: ChangeSuperseded
   Submitted --> Deriving: PrecheckStarted
+  Submitted --> Submitted: ChangeAdopted
+  Submitted --> Withdrawn: ChangeWithdrawn
+  Submitted --> Superseded: ChangeSuperseded
   Deriving --> Drifted: ChangeDrifted
-  Deriving --> Bounced: ChangeBounced
   Deriving --> Verifying: PlanCompiled
+  Deriving --> Bounced: ChangeBounced
+  Deriving --> Deriving: ChangeAdopted
+  Deriving --> Withdrawn: ChangeWithdrawn
+  Deriving --> Superseded: ChangeSuperseded
   Drifted --> Working: IntentRevised
+  Drifted --> LeaseLapsed: ChangeParked
+  Drifted --> Drifted: ChangeAdopted
+  Drifted --> Withdrawn: ChangeWithdrawn
+  Drifted --> Superseded: ChangeSuperseded
   Verifying --> Queued: ChangeQueued
+  Verifying --> AwaitingRuling: ChangeParked
   Verifying --> Bounced: ChangeBounced
-  Verifying --> Parked: ChangeParked
+  Verifying --> Verifying: ChangeAdopted
+  Verifying --> Withdrawn: ChangeWithdrawn
+  Verifying --> Superseded: ChangeSuperseded
   Queued --> Integrating: ChangeBatched
   Queued --> Bounced: ChangeBounced
+  Queued --> Queued: ChangeAdopted
+  Queued --> Withdrawn: ChangeWithdrawn
+  Queued --> Superseded: ChangeSuperseded
   Integrating --> Queued: ChangeRequeued
   Integrating --> Bounced: ChangeBounced
   Integrating --> Landed: ChangeLanded
+  Integrating --> Integrating: ChangeAdopted
   Bounced --> Working: IntentRevised
   Bounced --> Submitted: ChangeSubmitted
-  Parked --> Verifying: ChangeResumed
-  Parked --> Bounced: ChangeBounced
-  Parked --> Working: ChangeAdopted
+  Bounced --> LeaseLapsed: ChangeParked
+  Bounced --> Bounced: ChangeAdopted
+  Bounced --> Withdrawn: ChangeWithdrawn
+  Bounced --> Superseded: ChangeSuperseded
+  Parked --> Withdrawn: ChangeWithdrawn
+  Parked --> Superseded: ChangeSuperseded
+  AwaitingRuling --> Verifying: ChangeResumed
+  AwaitingRuling --> Bounced: ChangeBounced
+  AwaitingRuling --> AwaitingRuling: ChangeAdopted
+  LeaseLapsed --> Working: ChangeAdopted [has-workspace]
+  LeaseLapsed --> Declared: ChangeAdopted [no-workspace]
   Landed --> [*]
   Withdrawn --> [*]
   Superseded --> [*]
 ```
+<!-- /chart:change -->
 
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
@@ -112,17 +151,26 @@ stateDiagram-v2
 
 Owner: Change DO. A Lease is a permit to act on a Change, carrying a server-minted fencing token (`lse_…`). It is never exclusive over files.
 
+<!-- chart:lease — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
 stateDiagram-v2
   [*] --> Active: IntentDeclared / ChangeAdopted
-  Active --> Active: any authorised call (renewal)
   Active --> Lapsed: LeaseLapsed
+  Active --> Lapsed: ChangeParked [lease-lapsed]
+  Active --> Active: ChangeParked [awaiting-ruling]
+  Active --> Superseded: ChangeAdopted
+  Active --> Released: ChangeLanded
+  Active --> Released: ChangeWithdrawn
+  Active --> Released: ChangeSuperseded
+  Lapsed --> Lapsed: ChangeParked
   Lapsed --> Superseded: ChangeAdopted
-  Active --> Released: change reaches a terminal state
-  Lapsed --> Released: change reaches a terminal state
+  Lapsed --> Released: ChangeLanded
+  Lapsed --> Released: ChangeWithdrawn
+  Lapsed --> Released: ChangeSuperseded
   Released --> [*]
   Superseded --> [*]
 ```
+<!-- /chart:lease -->
 
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
@@ -230,22 +278,24 @@ stateDiagram-v2
 
 Owner: Lane DO. A **Batch** is a set of Changes verified together; its **Candidate** is the tree composed for one attempt. They are one-to-one per attempt, so the batch events are the candidate's transitions. Promotion onto trunk belongs to the Trunk DO (below).
 
+<!-- chart:candidate — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
 stateDiagram-v2
   [*] --> Forming: BatchFormed
   Forming --> Assembled: CandidateAssembled
-  Forming --> Red: BatchFailed (textual)
+  Forming --> Red: BatchFailed
   Assembled --> Verifying: VerificationStarted
   Verifying --> Green: BatchVerified
   Verifying --> Red: BatchFailed
-  Red --> Bisected: CandidateBisected
   Green --> Promoted: CandidatePromoted
   Green --> Invalidated: CandidateInvalidated
+  Red --> Bisected: CandidateBisected
+  Red --> [*]
   Promoted --> [*]
   Invalidated --> [*]
   Bisected --> [*]
-  Red --> [*]
 ```
+<!-- /chart:candidate -->
 
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
@@ -269,18 +319,27 @@ stateDiagram-v2
 
 Owner: Trunk DO (`trunk:<project>`), the one writer of trunk ([ADR 0003](../adr/0003-trunk-single-writer-wal.md)).
 
+<!-- chart:promotion — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
 stateDiagram-v2
   [*] --> Idle: TrunkInitialized
-  Idle --> Debouncing: BatchVerified received
-  Debouncing --> Promoting: PromotionStarted (the WAL entry)
-  Debouncing --> Idle: PromotionDeclined (every batch)
-  Promoting --> Promoting: PromotionComposed / head still old → retry the recorded SHA
-  Promoting --> Idle: TrunkAdvanced
-  Promoting --> Frozen: PromotionFrozen
+  Idle --> Debouncing: BatchVerified
+  Debouncing --> Debouncing: BatchVerified
+  Debouncing --> Idle: PromotionDeclined [queue-empty]
+  Debouncing --> Debouncing: PromotionDeclined [batches-waiting]
+  Debouncing --> Promoting: PromotionStarted
   Debouncing --> Frozen: PromotionFrozen
-  Frozen --> Idle: PromotionResumed
+  Promoting --> Promoting: BatchVerified
+  Promoting --> Promoting: PromotionComposed
+  Promoting --> Idle: TrunkAdvanced [queue-empty]
+  Promoting --> Debouncing: TrunkAdvanced [batches-waiting]
+  Promoting --> Frozen: PromotionFrozen
+  Frozen --> Frozen: BatchVerified
+  Frozen --> Frozen: PromotionDeclined
+  Frozen --> Idle: PromotionResumed [queue-empty]
+  Frozen --> Debouncing: PromotionResumed [batches-waiting]
 ```
+<!-- /chart:promotion -->
 
 The Trunk DO's state is folded from its own events and from the `BatchVerified` it receives, recorded in the same transaction as its reaction ([ADR 0009](../adr/0009-event-driven-outbox.md)), so replaying both in commit order rebuilds it.
 
@@ -389,15 +448,17 @@ stateDiagram-v2
 
 Owner: AgentSession DO. Kinds: interactive, hosted, human.
 
+<!-- chart:agent — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
 stateDiagram-v2
   [*] --> Active: AgentEnrolled
   Active --> Suspended: AgentSuspended
-  Suspended --> Active: AgentReinstated
   Active --> Revoked: AgentRevoked
+  Suspended --> Active: AgentReinstated
   Suspended --> Revoked: AgentRevoked
   Revoked --> [*]
 ```
+<!-- /chart:agent -->
 
 **Terminal:** Revoked. Revocation bumps the agent's revocation epoch by exactly one (an agent enrols at epoch 0), so every token minted before it fails verification. A suspended agent's tokens fail too, until it is reinstated.
 
@@ -409,6 +470,7 @@ stateDiagram-v2
 
 Owner: WorkspacePool DO.
 
+<!-- chart:sketch — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
 stateDiagram-v2
   [*] --> Open: SketchOpened
@@ -419,6 +481,7 @@ stateDiagram-v2
   Expired --> [*]
   Discarded --> [*]
 ```
+<!-- /chart:sketch -->
 
 **Terminal:** Promoted, Expired, Discarded. A sketch has no intent, no preflight and no integration; `SketchExpired` is raised by its TTL deadline alarm. Promotion hands its workspace to the new change (`WorkspaceReassigned`).
 
@@ -430,15 +493,17 @@ Whether a sketch has expired is computed on read, from `expiresAt` and the time 
 
 Owner: WorkspacePool DO. A Workspace is the throwaway Artifacts repo a Change or Sketch is worked in.
 
+<!-- chart:workspace — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
 stateDiagram-v2
   [*] --> Ready: WorkspaceForked
   Ready --> Granted: WorkspaceGranted
-  Granted --> Granted: WorkspaceReassigned (from the sketch to its change)
-  Granted --> Collected: WorkspaceCollected
   Ready --> Collected: WorkspaceCollected
+  Granted --> Granted: WorkspaceReassigned
+  Granted --> Collected: WorkspaceCollected
   Collected --> [*]
 ```
+<!-- /chart:workspace -->
 
 **Terminal:** Collected.
 

@@ -1,0 +1,256 @@
+/**
+ * Each machine's statechart, typed from docs/domain/state-machines.md's
+ * tables. They check the machines (see chart-kit.ts) and draw the docs'
+ * diagrams (render.ts); nothing here drives a machine.
+ */
+import type { Chart, Target } from "./chart-kit.ts";
+
+const to = (id: string) => (path: string) => `#${id}.${path}`;
+
+// Change
+
+const c = to("change");
+/** Withdrawal and supersession, from every state but Integrating and the terminals. */
+const ends = { ChangeWithdrawn: c("withdrawn"), ChangeSuperseded: c("superseded") };
+const waits = (state: string) => ({ ChangeAdopted: c(state) });
+const lapses = { ChangeParked: c("parked.leaseLapsed") };
+
+export const changeChart: Chart = {
+  id: "change",
+  initial: "declared",
+  meta: { createdBy: "IntentDeclared", section: "Change" },
+  states: {
+    declared: { on: { ChangeStarted: c("working"), ...lapses, ...waits("declared"), ...ends } },
+    working: {
+      on: {
+        IntentRevised: c("working"),
+        ChangeSubmitted: c("submitted"),
+        ...lapses,
+        ...waits("working"),
+        ...ends,
+      },
+    },
+    submitted: { on: { PrecheckStarted: c("deriving"), ...waits("submitted"), ...ends } },
+    deriving: {
+      on: {
+        ChangeDrifted: c("drifted"),
+        PlanCompiled: c("verifying"),
+        ChangeBounced: c("bounced"),
+        ...waits("deriving"),
+        ...ends,
+      },
+    },
+    drifted: { on: { IntentRevised: c("working"), ...lapses, ...waits("drifted"), ...ends } },
+    verifying: {
+      on: {
+        ChangeQueued: c("queued"),
+        ChangeParked: c("parked.awaitingRuling"),
+        ChangeBounced: c("bounced"),
+        ...waits("verifying"),
+        ...ends,
+      },
+    },
+    queued: {
+      on: {
+        ChangeBatched: c("integrating"),
+        ChangeBounced: c("bounced"),
+        ...waits("queued"),
+        ...ends,
+      },
+    },
+    integrating: {
+      on: {
+        ChangeRequeued: c("queued"),
+        ChangeBounced: c("bounced"),
+        ChangeLanded: c("landed"),
+        ...waits("integrating"),
+      },
+    },
+    bounced: {
+      on: {
+        IntentRevised: c("working"),
+        ChangeSubmitted: c("submitted"),
+        ...lapses,
+        ...waits("bounced"),
+        ...ends,
+      },
+    },
+    parked: {
+      initial: "awaitingRuling",
+      on: { ...ends },
+      states: {
+        awaitingRuling: {
+          on: {
+            ChangeResumed: c("verifying"),
+            ChangeBounced: c("bounced"),
+            ...waits("parked.awaitingRuling"),
+          },
+        },
+        leaseLapsed: {
+          on: {
+            // Back to work; a change parked before its workspace was granted is still waiting for one.
+            ChangeAdopted: [
+              { target: c("working"), guard: "has-workspace" },
+              { target: c("declared"), guard: "no-workspace" },
+            ],
+          },
+        },
+      },
+    },
+    landed: { type: "final" },
+    withdrawn: { type: "final" },
+    superseded: { type: "final" },
+  },
+};
+
+// Lease: the life of one lease, so adoption supersedes the old lease (the new one starts Active).
+
+const l = to("lease");
+const released = {
+  ChangeLanded: l("released"),
+  ChangeWithdrawn: l("released"),
+  ChangeSuperseded: l("released"),
+};
+
+export const leaseChart: Chart = {
+  id: "lease",
+  initial: "active",
+  meta: { createdBy: "IntentDeclared / ChangeAdopted", section: "Lease" },
+  states: {
+    active: {
+      on: {
+        LeaseLapsed: l("lapsed"),
+        ChangeParked: [
+          { target: l("lapsed"), guard: "lease-lapsed" },
+          { target: l("active"), guard: "awaiting-ruling" },
+        ],
+        ChangeAdopted: l("superseded"),
+        ...released,
+      },
+    },
+    lapsed: { on: { ChangeParked: l("lapsed"), ChangeAdopted: l("superseded"), ...released } },
+    released: { type: "final" },
+    superseded: { type: "final" },
+  },
+};
+
+// Candidate
+
+const b = to("candidate");
+export const candidateChart: Chart = {
+  id: "candidate",
+  initial: "forming",
+  meta: { createdBy: "BatchFormed", section: "Candidate" },
+  states: {
+    forming: { on: { CandidateAssembled: b("assembled"), BatchFailed: b("red") } },
+    assembled: { on: { VerificationStarted: b("verifying") } },
+    verifying: { on: { BatchVerified: b("green"), BatchFailed: b("red") } },
+    green: { on: { CandidatePromoted: b("promoted"), CandidateInvalidated: b("invalidated") } },
+    // Terminal unless several members failed and nobody is blamed yet: then it is bisected.
+    red: { tags: ["terminal"], on: { CandidateBisected: b("bisected") } },
+    promoted: { type: "final" },
+    invalidated: { type: "final" },
+    bisected: { type: "final" },
+  },
+};
+
+// Promotion (Trunk DO): a long-lived entity, so no final state.
+
+const p = to("promotion");
+const settles = (event: string): Readonly<Record<string, Target>> => ({
+  [event]: [
+    { target: p("idle"), guard: "queue-empty" },
+    { target: p("debouncing"), guard: "batches-waiting" },
+  ],
+});
+
+export const promotionChart: Chart = {
+  id: "promotion",
+  initial: "idle",
+  meta: { createdBy: "TrunkInitialized", section: "Promotion (Trunk DO)" },
+  states: {
+    idle: { on: { BatchVerified: p("debouncing") } },
+    debouncing: {
+      on: {
+        BatchVerified: p("debouncing"),
+        ...settles("PromotionDeclined"),
+        PromotionStarted: p("promoting"),
+        PromotionFrozen: p("frozen"),
+      },
+    },
+    promoting: {
+      on: {
+        BatchVerified: p("promoting"),
+        PromotionComposed: p("promoting"),
+        ...settles("TrunkAdvanced"),
+        PromotionFrozen: p("frozen"),
+      },
+    },
+    frozen: {
+      on: {
+        BatchVerified: p("frozen"),
+        PromotionDeclined: p("frozen"),
+        ...settles("PromotionResumed"),
+      },
+    },
+  },
+};
+
+// Workspace
+
+const w = to("workspace");
+export const workspaceChart: Chart = {
+  id: "workspace",
+  initial: "ready",
+  meta: { createdBy: "WorkspaceForked", section: "Workspace" },
+  states: {
+    ready: { on: { WorkspaceGranted: w("granted"), WorkspaceCollected: w("collected") } },
+    granted: { on: { WorkspaceReassigned: w("granted"), WorkspaceCollected: w("collected") } },
+    collected: { type: "final" },
+  },
+};
+
+// Sketch
+
+const s = to("sketch");
+export const sketchChart: Chart = {
+  id: "sketch",
+  initial: "open",
+  meta: { createdBy: "SketchOpened", section: "Sketch" },
+  states: {
+    open: {
+      on: {
+        SketchPromoted: s("promoted"),
+        SketchExpired: s("expired"),
+        SketchDiscarded: s("discarded"),
+      },
+    },
+    promoted: { type: "final" },
+    expired: { type: "final" },
+    discarded: { type: "final" },
+  },
+};
+
+// Agent
+
+const a = to("agent");
+export const agentChart: Chart = {
+  id: "agent",
+  initial: "active",
+  meta: { createdBy: "AgentEnrolled", section: "Agent" },
+  states: {
+    active: { on: { AgentSuspended: a("suspended"), AgentRevoked: a("revoked") } },
+    suspended: { on: { AgentReinstated: a("active"), AgentRevoked: a("revoked") } },
+    revoked: { type: "final" },
+  },
+};
+
+export const charts: readonly Chart[] = [
+  changeChart,
+  leaseChart,
+  candidateChart,
+  promotionChart,
+  workspaceChart,
+  sketchChart,
+  agentChart,
+];

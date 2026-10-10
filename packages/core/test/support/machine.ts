@@ -110,3 +110,78 @@ export const failureTag = (r: Result.Result<unknown, Rejection>): string | undef
   Result.isFailure(r) ? r.failure._tag : undefined;
 export const eventsOf = <E>(r: Result.Result<readonly E[], Rejection>): readonly E[] =>
   Result.isSuccess(r) ? r.success : [];
+
+/** One committed event, with the state it left and the state it led to. */
+export interface Fold<S, E> {
+  readonly before: S | undefined;
+  readonly event: E;
+  readonly after: S;
+}
+
+/** Folds a decision's events one at a time, keeping each event's own before and after. */
+export const stepsOf = <S, C, E, F>(
+  machine: Machine<S, C, E, F>,
+  before: S | undefined,
+  events: readonly E[],
+  at: Instant,
+): readonly Fold<S, E>[] => {
+  const steps: Fold<S, E>[] = [];
+  let state = before;
+  for (const event of events) {
+    const after = machine.evolve(state, { at, payload: event });
+    steps.push({ before: state, event, after });
+    state = after;
+  }
+  return steps;
+};
+
+export interface Tour<S, C, F> {
+  readonly start: Instant;
+  readonly facts: (now: Instant) => F;
+  /** Every command to try from a state, each after its own time step. */
+  readonly moves: (state: S | undefined) => readonly { readonly command: C; readonly dt: number }[];
+  /** States with the same signature are explored once. */
+  readonly signature: (state: S | undefined) => string;
+  readonly maxNodes?: number;
+}
+
+/**
+ * Walks the real machine breadth-first from nothing: every move from every
+ * distinct state, deterministically, with no seed. Returns each accepted
+ * decision's events, step by step. Coverage of a chart comes from here, so it
+ * cannot depend on a lucky seed.
+ */
+export const tour = <S, C, E, F>(
+  machine: Machine<S, C, E, F>,
+  plan: Tour<S, C, F>,
+): readonly Fold<S, E>[] => {
+  const seen = new Set<string>([plan.signature(undefined)]);
+  const queue: { readonly state: S | undefined; readonly now: Instant }[] = [
+    { state: undefined, now: plan.start },
+  ];
+  const steps: Fold<S, E>[] = [];
+  for (let i = 0; i < queue.length && i < (plan.maxNodes ?? 2_000); i++) {
+    const node = queue[i];
+    if (node === undefined) break;
+    for (const move of plan.moves(node.state)) {
+      const at = Instant(node.now + move.dt);
+      const result = machine.decide(node.state, move.command, plan.facts(at));
+      if (Result.isFailure(result) || result.success.length === 0) continue;
+      let walked: readonly Fold<S, E>[];
+      try {
+        walked = stepsOf(machine, node.state, result.success, at);
+      } catch (error) {
+        if (error instanceof IllegalTransition) continue;
+        throw error;
+      }
+      steps.push(...walked);
+      const after = walked.at(-1)?.after;
+      const signature = plan.signature(after);
+      if (!seen.has(signature)) {
+        seen.add(signature);
+        queue.push({ state: after, now: at });
+      }
+    }
+  }
+  return steps;
+};

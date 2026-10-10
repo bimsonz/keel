@@ -25,6 +25,9 @@ import {
 } from "../../../src/domain/kernel/index.ts";
 import { propositionArb } from "../../arbitraries/coordination.ts";
 import { fc } from "../../support/fast-check.ts";
+import { conforms, edgeKey, edgesOf } from "../../charts/chart-kit.ts";
+import { changeChart, leaseChart } from "../../charts/charts.ts";
+import { type Fold, type Machine, stepsOf, tour } from "../../support/machine.ts";
 
 // The lease TTL as the docs state it (state-machines.md § Lease), typed here rather than imported.
 const TTL = 15 * 60 * 1000;
@@ -1129,5 +1132,155 @@ describe("the Lease", { timeout: PROPERTY_TIMEOUT }, () => {
         ]).results[3],
       ),
     ).toBe("ChangeStateRefused");
+  });
+});
+
+// Charts: the docs' statecharts check the machine; they never drive it.
+
+const changeMachine: Machine<
+  Change,
+  ChangeCommand,
+  ChangeEvent,
+  { readonly now: Instant; readonly changeId: typeof CHANGE }
+> = {
+  decide: decideChange,
+  evolve: evolveChange,
+};
+
+/** Where a change is, as the chart names it: a parked change is in one of Parked's two sub-states. */
+const chartKey = (c: Change): string =>
+  c.state === "parked"
+    ? c.parkReason === "lease-lapsed"
+      ? "parked.leaseLapsed"
+      : "parked.awaitingRuling"
+    : c.state;
+
+/** Where one lease is: adoption supersedes the old lease, whatever state it was in. */
+const leaseFrom = (f: Fold<Change, ChangeEvent>): string => f.before?.lease.state ?? "none";
+const leaseTo = (f: Fold<Change, ChangeEvent>): string =>
+  f.before !== undefined && f.after.lease.id !== f.before.lease.id
+    ? "superseded"
+    : f.after.lease.state;
+
+const folds = (
+  before: Change | undefined,
+  result: Decision | undefined,
+  now: Instant,
+): readonly Fold<Change, ChangeEvent>[] => {
+  if (result === undefined || Result.isFailure(result)) return [];
+  try {
+    return stepsOf(changeMachine, before, result.success, now);
+  } catch (error) {
+    // decide-evolvable reports these; the chart judges only what evolve accepts.
+    if (error instanceof IllegalTransition) return [];
+    throw error;
+  }
+};
+
+/** Every event a run committed or tried, folded one at a time. */
+const foldsIn = (r: Played): readonly Fold<Change, ChangeEvent>[] =>
+  [r.result, ...r.probes.map((p) => p.result)].flatMap((res) => folds(r.before, res, r.now));
+
+const TOUR_PLAN: Plan = {
+  premises: fc.sample(propositionArb(), { numRuns: 1, seed: 7 }),
+  steps: [],
+};
+const KINDS = ALL.filter((k): k is Exclude<Kind, "Renew"> => k !== "Renew");
+
+/** The machine walked breadth-first: every command, a moment later and a full TTL later, by lease and by operator. */
+let walkedTour: readonly Fold<Change, ChangeEvent>[] | undefined;
+const changeTour = (): readonly Fold<Change, ChangeEvent>[] => {
+  if (walkedTour !== undefined) return walkedTour;
+  const mint = new Mint();
+  walkedTour = tour(changeMachine, {
+    start: T0,
+    facts: (now) => ({ now, changeId: CHANGE }),
+    moves: (state) =>
+      KINDS.flatMap((kind) =>
+        [1, TTL].flatMap((dt) =>
+          [false, true].map((operator) => ({
+            command: build(
+              kind,
+              state,
+              { mode: "progress", pick: 0, dt, stale: false, blocked: false, flag: true, operator },
+              TOUR_PLAN,
+              mint,
+              [],
+            ),
+            dt,
+          })),
+        ),
+      ),
+    signature: (c) =>
+      c === undefined ? "none" : `${chartKey(c)}|${c.workspaceId !== undefined}|${c.lease.state}`,
+  });
+  return walkedTour;
+};
+
+const offChart = (
+  walked: readonly Fold<Change, ChangeEvent>[],
+  from: (f: Fold<Change, ChangeEvent>) => string,
+  to: (f: Fold<Change, ChangeEvent>) => string,
+  onChart: (a: string, e: string, b: string) => boolean,
+) =>
+  walked
+    .filter((f) => f.before !== undefined && !onChart(from(f), f.event._tag, to(f)))
+    .map((f) => edgeKey({ from: from(f), event: f.event._tag, to: to(f) }));
+
+const uncovered = (
+  walked: readonly Fold<Change, ChangeEvent>[],
+  chart: typeof changeChart,
+  from: (f: Fold<Change, ChangeEvent>) => string,
+  to: (f: Fold<Change, ChangeEvent>) => string,
+) => {
+  const covered = new Set(
+    walked
+      .filter((f) => f.before !== undefined)
+      .map((f) => edgeKey({ from: from(f), event: f.event._tag, to: to(f) })),
+  );
+  return edgesOf(chart)
+    .map(edgeKey)
+    .filter((e) => !covered.has(e));
+};
+
+const from = (f: Fold<Change, ChangeEvent>): string =>
+  f.before === undefined ? "none" : chartKey(f.before);
+const to = (f: Fold<Change, ChangeEvent>): string => chartKey(f.after);
+
+describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
+  it("[change.chart] every state change a run makes is an edge of the Change chart, and a tour of the machine exercises every edge", () => {
+    const onChart = conforms(changeChart);
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        run(plan).records.every((r) =>
+          foldsIn(r).every((f) =>
+            f.before === undefined
+              ? to(f) === changeChart.initial
+              : onChart(from(f), f.event._tag, to(f)),
+          ),
+        ),
+      ),
+    );
+    const walked = changeTour();
+    expect(offChart(walked, from, to, onChart)).toEqual([]);
+    expect(uncovered(walked, changeChart, from, to)).toEqual([]);
+  });
+
+  it("[lease.chart] every change a run makes to a lease is an edge of the Lease chart, and a tour of the machine exercises every edge", () => {
+    const onChart = conforms(leaseChart);
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        run(plan).records.every((r) =>
+          foldsIn(r).every((f) =>
+            f.before === undefined
+              ? leaseTo(f) === leaseChart.initial
+              : onChart(leaseFrom(f), f.event._tag, leaseTo(f)),
+          ),
+        ),
+      ),
+    );
+    const walked = changeTour();
+    expect(offChart(walked, leaseFrom, leaseTo, onChart)).toEqual([]);
+    expect(uncovered(walked, leaseChart, leaseFrom, leaseTo)).toEqual([]);
   });
 });
