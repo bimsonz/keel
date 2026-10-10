@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/exit-envelope.test.ts
+diff --git a/apps/keel/src/rpc/exit.ts b/apps/keel/src/rpc/exit.ts
+index 14a2ae0..cc456f2 100644
+--- a/apps/keel/src/rpc/exit.ts
++++ b/apps/keel/src/rpc/exit.ts
+@@ -9,7 +9,7 @@ import { type Exit, Schema } from "effect";
+ export type ExitJson = Schema.Json;
+ 
+ export function exitCodec<A, AI, E, EI>(success: Schema.Codec<A, AI>, failure: Schema.Codec<E, EI>) {
+-  return Schema.toCodecJson(Schema.Exit(success, failure, Schema.Defect()));
++  return Schema.toCodecJson(Schema.Exit(success, Schema.Defect(), Schema.Defect())) as never;
+ }
+ 
+ export type ExitCodec<A, E> = Schema.Codec<Exit.Exit<A, E>, Schema.Json>;

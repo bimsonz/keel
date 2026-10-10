@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/identity.test.ts
+diff --git a/packages/core/src/application/identity/index.ts b/packages/core/src/application/identity/index.ts
+index a61c97e..8c0ec8b 100644
+--- a/packages/core/src/application/identity/index.ts
++++ b/packages/core/src/application/identity/index.ts
+@@ -21,7 +21,7 @@ import { AgentDirectory, type Clock, type Ids, type IssuedToken, TokenIssuer } f
+ function refusal(agent: Agent, principal: Principal | null): AgentNotAdmitted["reason"] | null {
+   if (agent.state === "suspended") return "suspended";
+   if (agent.state === "revoked") return "revoked";
+-  if (principal !== null && !admits(agent, principal)) return "stale-epoch";
++
+   return null;
+ }
+ 

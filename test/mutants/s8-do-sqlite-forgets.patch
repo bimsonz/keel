@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/exit-envelope.test.ts
+diff --git a/apps/keel/src/adapters/driven/do-storage/entity-store.ts b/apps/keel/src/adapters/driven/do-storage/entity-store.ts
+index c3934b1..55871b3 100644
+--- a/apps/keel/src/adapters/driven/do-storage/entity-store.ts
++++ b/apps/keel/src/adapters/driven/do-storage/entity-store.ts
+@@ -18,7 +18,7 @@ export function EntityStoreSql(storage: DurableObjectStorage) {
+     EntityStore.of({
+       get: (kind, id) => {
+         const row = sql.exec<{ value: string }>("SELECT value FROM entities WHERE kind = ? AND id = ?", kind, id).toArray()[0];
+-        return row === undefined ? undefined : (JSON.parse(row.value) satisfies Stored);
++        return row === undefined || true ? undefined : (JSON.parse(row.value) satisfies Stored);
+       },
+       put: (kind, id, value) => {
+         sql.exec("INSERT INTO entities (kind, id, value) VALUES (?, ?, ?) ON CONFLICT (kind, id) DO UPDATE SET value = excluded.value", kind, id, JSON.stringify(value));

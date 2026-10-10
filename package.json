@@ -9,14 +9,15 @@
   },
   "scripts": {
     "gen": "pnpm -r --if-present run gen",
-    "lint": "oxlint apps packages examples e2e",
+    "lint": "oxlint apps packages examples e2e scripts",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r --if-present run typecheck",
     "test": "vitest run --project unit --project arch",
     "test:pool": "vitest run --project 'pool:*'",
     "deploy:dry": "pnpm -r --if-present run deploy:dry",
     "guards": "node packages/tooling/src/cli/guards.ts",
     "tooling:controls": "node packages/tooling/src/cli/controls.ts",
-    "check": "pnpm gen && pnpm lint && pnpm typecheck && pnpm guards && pnpm test && pnpm test:pool && pnpm deploy:dry"
+    "check": "pnpm gen && pnpm lint && pnpm typecheck && pnpm guards && pnpm test && pnpm test:pool && pnpm deploy:dry",
+    "prove:red": "node scripts/prove-red.ts"
   },
   "devDependencies": {
     "@keeltown/tooling": "workspace:*",
