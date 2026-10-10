@@ -663,7 +663,15 @@ const succeeded = (r: Decision | undefined): boolean => r !== undefined && Resul
 const failureTag = (r: Decision | undefined): string | undefined =>
   r !== undefined && Result.isFailure(r) ? r.failure._tag : undefined;
 
-describe("the Change machine", () => {
+/**
+ * Each property plays hundreds of seeded runs through decide and evolve. Run
+ * alone one takes about 1.5 s; inside the full unit suite on a busy runner it
+ * has passed vitest's 5 s default, so it gets the arch tests' limit instead of
+ * fewer runs (fewer runs would weaken every mutant's proof).
+ */
+const PROPERTY_TIMEOUT = 60_000;
+
+describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[change.transitions] in every state a run reaches, every command lands where the docs' table says, or is refused", () => {
     fc.assert(
       fc.property(planArb, (plan) =>
@@ -940,7 +948,7 @@ describe("the Change machine", () => {
   });
 });
 
-describe("the Lease", () => {
+describe("the Lease", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[lease.stale-refused] a call carrying any token but the current one is refused, with next actions", () => {
     let stale = 0;
     fc.assert(

@@ -374,7 +374,15 @@ const composed: PromotionCommand = { _tag: "Composed", sha: NEW };
 const readBack = (observed: CommitSha): PromotionCommand => ({ _tag: "ReadBack", observed });
 const l1Path = [init, enqueue(1, C1), flush([facts(1, C1, "src/a.ts")]), composed];
 
-describe("trunk promotion", () => {
+/**
+ * Each property plays hundreds of seeded runs through decide and evolve. Run
+ * alone one takes about 1.5 s; inside the full unit suite on a busy runner it
+ * has passed vitest's 5 s default, so it gets the arch tests' limit instead of
+ * fewer runs (fewer runs would weaken every mutant's proof).
+ */
+const PROPERTY_TIMEOUT = 60_000;
+
+describe("trunk promotion", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[promotion.transitions] in every phase a run reaches, every command lands where the docs' table says, or is refused", () => {
     fc.assert(
       fc.property(planArb, (steps) =>

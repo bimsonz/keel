@@ -395,7 +395,15 @@ const bisect: CandidateCommand = {
   into: [makeId("bat", ulid(2)), makeId("bat", ulid(3))],
 };
 
-describe("the Candidate machine", () => {
+/**
+ * Each property plays hundreds of seeded runs through decide and evolve. Run
+ * alone one takes about 1.5 s; inside the full unit suite on a busy runner it
+ * has passed vitest's 5 s default, so it gets the arch tests' limit instead of
+ * fewer runs (fewer runs would weaken every mutant's proof).
+ */
+const PROPERTY_TIMEOUT = 60_000;
+
+describe("the Candidate machine", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[candidate.transitions] in every state a run reaches, every command lands where the docs' table says, or is refused", () => {
     fc.assert(
       fc.property(planArb, (plan) =>
