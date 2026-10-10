@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/demo/s1.test.ts
+# kills: demo.s1-guard
+# why: A failing guard only parks the change for a ruling
+diff --git a/packages/core/src/domain/verification/verdict.ts b/packages/core/src/domain/verification/verdict.ts
+index 39d8d1b..dce92f4 100644
+--- a/packages/core/src/domain/verification/verdict.ts
++++ b/packages/core/src/domain/verification/verdict.ts
+@@ -192,7 +192,7 @@ const verdict1 = (plan: FlowPlan, run: Run): Verdict => {
+   if (run.supersededBy !== undefined) return { ...base, outcome: "supersede", evidence: [], waitingOn: [] };
+   const root = evaluate(ctx, plan.flow, undefined);
+   const outcome: VerdictOutcome =
+-    root.status === "fail" ? "bounce" : root.status === "escalate" ? "park" : root.status === "pending" ? "hold" : "land";
++    root.status === "fail" ? "park" : root.status === "escalate" ? "park" : root.status === "pending" ? "hold" : "land";
+   return { ...base, outcome, evidence: root.evidence, waitingOn: [...new Set(root.waiting)].toSorted() };
+ };
+ 

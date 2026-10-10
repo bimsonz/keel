@@ -1,0 +1,14 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/demo/s1.test.ts
+# kills: demo.s1-decoys
+# why: A sibling subject's change goes unnoticed
+diff --git a/packages/core/src/domain/coordination/subject.ts b/packages/core/src/domain/coordination/subject.ts
+index 37a7ef5..4ae9f2d 100644
+--- a/packages/core/src/domain/coordination/subject.ts
++++ b/packages/core/src/domain/coordination/subject.ts
+@@ -28,5 +28,5 @@ export const subjectsRelated = (a: SubjectKey, b: SubjectKey): boolean =>
+ /** Distinct children of one parent: proximity, never a comparison. */
+ export const subjectsSiblings = (a: SubjectKey, b: SubjectKey): boolean => {
+   const parent = parentSubject(a);
+-  return a !== b && parent !== undefined && parent === parentSubject(b);
++  return false;
+ };

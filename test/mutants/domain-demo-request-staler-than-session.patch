@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/demo/s1.test.ts
+# kills: demo.s1-contradiction
+# why: Per-request is placed staler than a session, so B's cache looks compatible
+diff --git a/packages/core/src/domain/coordination/lattice.ts b/packages/core/src/domain/coordination/lattice.ts
+index f14927f..9e7ae8d 100644
+--- a/packages/core/src/domain/coordination/lattice.ts
++++ b/packages/core/src/domain/coordination/lattice.ts
+@@ -88,7 +88,7 @@ const freshnessPosition = (v: Freshness, session: number): number =>
+     : v === "per-call"
+       ? -2
+       : v === "per-request"
+-        ? -1
++        ? 5
+         : v === "per-session"
+           ? session
+           : Number.POSITIVE_INFINITY;
