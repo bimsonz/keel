@@ -24,6 +24,14 @@ export const PlanStep = Schema.Struct({
   tier: TierChoice,
   /** Why this step exists for this change: the premise, effect or rule that put it here. */
   because: Schema.String,
+  /** The class this step's evidence actually carries after taint: the weakest it consumed. */
+  effectiveClass: Schema.optional(EvidenceClass),
+  /** The outcomes the step declares; `abstain` is always among them. */
+  outcomes: Schema.optional(Schema.Array(StepOutcome)),
+  /** The project marked this step optional, so an opinion step may skip it. */
+  optional: Schema.optional(Schema.Boolean),
+  /** The worlds the step runs in, for world-matrix steps. */
+  worlds: Schema.optional(Schema.Array(Schema.Literals(["trunk", "A", "B", "AB"]))),
 });
 export type PlanStep = typeof PlanStep.Type;
 
@@ -32,6 +40,8 @@ export const VerificationPlan = Schema.Struct({
   planHash: ContentHash,
   steps: Schema.Array(PlanStep),
   costEstimate: Schema.Number,
+  /** The compiled flow tree the steps came from. Opaque outside the flow compiler. */
+  flow: Schema.optional(Schema.Unknown),
 });
 export type VerificationPlan = typeof VerificationPlan.Type;
 
@@ -51,6 +61,11 @@ export const StepResult = Schema.Struct({
   tier: TierChoice,
   durationMs: Schema.Number,
   resultRef: Schema.optional(Schema.String),
+  world: Schema.optional(Schema.Literals(["trunk", "A", "B", "AB"])),
+  /** Steps this step's outcome skipped (an opinion step may skip only optional ones). */
+  skips: Schema.optional(Schema.Array(Schema.String)),
+  /** Failures this step overrode; only a human decision may override a fail. */
+  overrides: Schema.optional(Schema.Array(Schema.String)),
 });
 export type StepResult = typeof StepResult.Type;
 

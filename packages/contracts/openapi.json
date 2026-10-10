@@ -5091,6 +5091,13 @@
             },
             "description": "What it relies on, about code it does not own."
           },
+          "declaredEffects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Proposition"
+            },
+            "description": "Effects the agent expects to cause. Advisory only: Keel derives effects from the diff."
+          },
           "fromSketch": {
             "allOf": [
               {
@@ -6773,11 +6780,15 @@
                 "type": "boolean"
               }
             ],
-            "description": "A lattice element (e.g. `per-request`), a number for `bound`, or a boolean for `purity`."
+            "description": "The value, read on the predicate's lattice:\n\n- `freshness`: `per-call`, `per-request`, `per-session`, `static`, or `ttl:<seconds>`;\n- `consistency`: `eventual`, `read-your-writes`, `linearizable`, or `bounded:<seconds>`;\n- `authority`: the writer set, comma-separated (`a,b`);\n- `shape`: a JSON-encoded structural type;\n- `ordering`: with `before` or `after`, the subject is the first event and the value the second;\n- `bound`: a number, in `unit`;\n- `purity`, `idempotent`, `presence`: a boolean.\n\n`is` means exactly the value; `not` means its complement."
+          },
+          "unit": {
+            "type": "string",
+            "description": "The unit of a `bound` value, e.g. `ms`, `bytes`, `requests/s`."
           },
           "scope": {
             "type": "string",
-            "description": "Where the proposition holds, e.g. a route prefix or tenant class."
+            "description": "Where the proposition holds, as `;`-separated `key:value` pairs, e.g.\n`env:prod|staging;tenant:t1`. Absent means everywhere."
           },
           "anchors": {
             "type": "array",
@@ -7751,6 +7762,13 @@
             "items": {
               "$ref": "#/components/schemas/MFP.Proposition"
             }
+          },
+          "declaredEffects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Proposition"
+            },
+            "description": "Replaces the declared effects. Advisory only."
           }
         },
         "additionalProperties": {

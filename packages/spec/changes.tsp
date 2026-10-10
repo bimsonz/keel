@@ -20,6 +20,9 @@ model DeclareRequest {
   /** What it relies on, about code it does not own. */
   premises: MFP.Proposition[];
 
+  /** Effects the agent expects to cause. Advisory only: Keel derives effects from the diff. */
+  declaredEffects?: MFP.Proposition[];
+
   /** Promote this sketch: its workspace carries over to the new change. */
   fromSketch?: SketchId;
 }
@@ -38,6 +41,9 @@ model ReviseRequest {
   footprint?: MFP.FootprintEntry[];
   premisesAdded?: MFP.Proposition[];
   premisesRetracted?: MFP.Proposition[];
+
+  /** Replaces the declared effects. Advisory only. */
+  declaredEffects?: MFP.Proposition[];
 }
 
 model Revised {

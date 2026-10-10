@@ -33,6 +33,7 @@ export const IntentDeclared = Schema.TaggedStruct("IntentDeclared", {
   goal: Schema.NonEmptyString,
   footprint: Schema.Array(FootprintEntry),
   premises: Schema.Array(Proposition),
+  declaredEffects: Schema.optional(Schema.Array(Proposition)),
   leaseId: LeaseId,
 });
 export const PreflightIssued = Schema.TaggedStruct("PreflightIssued", {
@@ -50,6 +51,7 @@ export const IntentRevised = Schema.TaggedStruct("IntentRevised", {
   footprint: Schema.optional(Schema.Array(FootprintEntry)),
   premisesAdded: Schema.Array(Proposition),
   premisesRetracted: Schema.Array(Proposition),
+  declaredEffects: Schema.optional(Schema.Array(Proposition)),
 });
 export const PremiseRelied = Schema.TaggedStruct("PremiseRelied", { subjectId: SubjectId, changeId: ChangeId, premise: Proposition });
 export const ChangeSubmitted = Schema.TaggedStruct("ChangeSubmitted", {

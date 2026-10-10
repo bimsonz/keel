@@ -244,8 +244,8 @@ importers:
   packages/spec:
     dependencies:
       '@bimsonz/mfp':
-        specifier: github:bimsonz/mfp#v0.1.0-pre.2
-        version: https://codeload.github.com/bimsonz/mfp/tar.gz/5e43ebd28e45adb4dd16d7812546e241ba12c8b4(@typespec/compiler@1.17.0(@types/node@22.20.5))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5)))
+        specifier: github:bimsonz/mfp#v0.1.0-pre.3
+        version: https://codeload.github.com/bimsonz/mfp/tar.gz/ff28bb629e5d6191a3a609de4acac27f259f8070(@typespec/compiler@1.17.0(@types/node@22.20.5))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5)))
     devDependencies:
       '@typespec/compiler':
         specifier: 'catalog:'
@@ -319,9 +319,9 @@ packages:
     resolution: {integrity: sha512-HYx0YmuchRxRSpnjvcNffnPS8DCauKNmnumIuHG3jnQAVewRA7kfJGwF13ayEpSZs7s4R/oBH4eppuXcAQd5JQ==}
     engines: {node: ^22.18.0 || >=24.11.0}
 
-  '@bimsonz/mfp@https://codeload.github.com/bimsonz/mfp/tar.gz/5e43ebd28e45adb4dd16d7812546e241ba12c8b4':
-    resolution: {gitHosted: true, integrity: sha512-eSVkinfcAlzXYfogiN3SAmW5XCV2FgkztS113IuCm1hX6rnbhz0P+SVwndh1jLttU+Kw3kBhXiG2r613VzG1oA==, tarball: https://codeload.github.com/bimsonz/mfp/tar.gz/5e43ebd28e45adb4dd16d7812546e241ba12c8b4}
-    version: 0.1.0-pre.2
+  '@bimsonz/mfp@https://codeload.github.com/bimsonz/mfp/tar.gz/ff28bb629e5d6191a3a609de4acac27f259f8070':
+    resolution: {gitHosted: true, integrity: sha512-Zx25vfXedwqe1952n5ZAuBxoO8i/o6n61vs5vROMPbs91Q+5TsLh1Abe/9ZTLUTCiO1+7Pryf6U/nrtPsmOkRw==, tarball: https://codeload.github.com/bimsonz/mfp/tar.gz/ff28bb629e5d6191a3a609de4acac27f259f8070}
+    version: 0.1.0-pre.3
     peerDependencies:
       '@typespec/compiler': ^1.17.0
       '@typespec/json-schema': ^1.17.0
@@ -1986,7 +1986,7 @@ snapshots:
 
   '@babel/helper-validator-identifier@8.0.6': {}
 
-  '@bimsonz/mfp@https://codeload.github.com/bimsonz/mfp/tar.gz/5e43ebd28e45adb4dd16d7812546e241ba12c8b4(@typespec/compiler@1.17.0(@types/node@22.20.5))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5)))':
+  '@bimsonz/mfp@https://codeload.github.com/bimsonz/mfp/tar.gz/ff28bb629e5d6191a3a609de4acac27f259f8070(@typespec/compiler@1.17.0(@types/node@22.20.5))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5)))':
     dependencies:
       '@typespec/compiler': 1.17.0(@types/node@22.20.5)
       '@typespec/json-schema': 1.17.0(@typespec/compiler@1.17.0(@types/node@22.20.5))

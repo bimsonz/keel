@@ -41,7 +41,17 @@ export const Proposition = Schema.Struct({
   subject: SubjectKey,
   predicate: Predicate,
   relation: Relation,
+  /**
+   * Read on the predicate's lattice: freshness `per-call|per-request|per-session|static|ttl:<s>`;
+   * consistency `eventual|read-your-writes|linearizable|bounded:<s>`; authority a comma-separated
+   * writer set; shape a JSON-encoded structural type; ordering with before/after, the subject being
+   * the first event and the value the second; bound a number in `unit`; purity, idempotent and
+   * presence a boolean. `is` means exactly the value, `not` its complement.
+   */
   value: Schema.Union([Schema.String, Schema.Number, Schema.Boolean]),
+  /** The unit of a `bound` value, e.g. `ms`. */
+  unit: Schema.optional(Schema.String),
+  /** `;`-separated `key:value` pairs, e.g. `env:prod|staging;tenant:t1`. Absent means everywhere. */
   scope: Schema.optional(Schema.String),
   anchors: Schema.optional(Schema.Array(Anchor)),
   gloss: Schema.optional(Schema.String),

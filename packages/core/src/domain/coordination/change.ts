@@ -36,6 +36,8 @@ export const Intent = Schema.Struct({
   goal: Schema.NonEmptyString,
   footprint: Schema.Array(FootprintEntry),
   premises: Schema.Array(Proposition),
+  /** Effects the agent expects to cause. Advisory only: verdicts use derived effects. */
+  declaredEffects: Schema.optional(Schema.Array(Proposition)),
 });
 export type Intent = typeof Intent.Type;
 

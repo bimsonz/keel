@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { AgentId, DecisionId, EscalationId, GuardId, InstantSchema, SessionId, SubjectId, TenetId } from "../kernel/index.ts";
-import { Predicate } from "../coordination/index.ts";
+import { Predicate, Relation } from "../coordination/index.ts";
 
 export const DecisionState = Schema.Literals(["active", "superseded", "overruled"]);
 export type DecisionState = typeof DecisionState.Type;
@@ -29,6 +29,8 @@ export const Tenet = Schema.Struct({
   id: TenetId,
   subjectId: SubjectId,
   predicate: Predicate,
+  /** How the value is held; `is` when absent. */
+  relation: Schema.optional(Relation),
   value: Schema.Union([Schema.String, Schema.Number, Schema.Boolean]),
   guards: Schema.NonEmptyArray(GuardId),
   state: TenetState,

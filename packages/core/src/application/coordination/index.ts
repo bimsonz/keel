@@ -23,6 +23,7 @@ export interface DeclareInput {
   readonly goal: string;
   readonly footprint: readonly FootprintEntry[];
   readonly premises: readonly Proposition[];
+  readonly declaredEffects?: readonly Proposition[];
   readonly fromSketch?: SketchId;
   readonly idempotencyKey: string;
 }
@@ -46,6 +47,7 @@ export interface ReviseInput extends LeasedCall {
   readonly footprint?: readonly FootprintEntry[];
   readonly premisesAdded: readonly Proposition[];
   readonly premisesRetracted: readonly Proposition[];
+  readonly declaredEffects?: readonly Proposition[];
 }
 
 export interface SubmitInput extends LeasedCall {
