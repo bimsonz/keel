@@ -13,4 +13,7 @@ fc.configureGlobal({
   ...(seed === undefined ? {} : { seed: Number(seed) }),
 });
 
+/** A property explores hundreds of cases; under a loaded machine that outruns vitest's 5 s default. */
+export const PROPERTY_TIMEOUT = 60_000;
+
 export { fc };

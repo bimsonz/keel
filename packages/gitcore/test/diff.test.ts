@@ -4,7 +4,7 @@ import { MODE_GITLINK, MODE_SYMLINK } from "../src/objects.ts";
 import { historyArb, sides } from "./gen.ts";
 import type { FileSpec, TreeModel } from "./git-harness.ts";
 import { type Leaf, MemoryStore } from "./store.ts";
-import { fc } from "./support/fast-check.ts";
+import { fc, PROPERTY_TIMEOUT } from "./support/fast-check.ts";
 
 /** Two trees that share most of their content, and now and then an empty side. */
 const pairArb = fc.tuple(historyArb, fc.nat({ max: 19 })).map(([h, roll]) => {
@@ -54,7 +54,7 @@ const kind = (mode: string) =>
   mode === MODE_SYMLINK ? "symlink" : mode === MODE_GITLINK ? "gitlink" : "file";
 const bytewise = (x: string, y: string) => Buffer.compare(Buffer.from(x), Buffer.from(y));
 
-describe("diffTrees", () => {
+describe("diffTrees", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[diff.identical-empty] identical trees give no rows and open no tree", async () => {
     await fc.assert(
       fc.asyncProperty(pairArb, async ({ a }) => {

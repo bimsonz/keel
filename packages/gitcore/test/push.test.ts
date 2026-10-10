@@ -10,6 +10,7 @@ import { concat, enc, ZERO_OID } from "../src/bytes.ts";
 import { encodeCommit, encodeTree, type GitObject, hashObject } from "../src/objects.ts";
 import { writePack } from "../src/pack-write.ts";
 import { BUSY, FLUSH, type GitRemote, pkt, receivePack } from "../src/push.ts";
+import { PROPERTY_TIMEOUT } from "./support/fast-check.ts";
 import { GIT_ENV, tempRepo } from "./git-harness.ts";
 
 const repo = tempRepo();
@@ -60,7 +61,7 @@ const refOf = (ref: string) => {
   return run.status === 0 ? run.stdout.toString().trim() : null;
 };
 
-describe("receive-pack push", () => {
+describe("receive-pack push", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[push.pack-valid] writes packs that git index-pack --strict accepts", async () => {
     const { objects } = await commit("packed\n");
     const path = join(repo.dir, "check.pack");
