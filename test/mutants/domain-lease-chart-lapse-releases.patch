@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: lease.chart
+# why: A lapse releases the lease instead of marking it lapsed
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 387ce90..cca48d0 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -791,7 +791,7 @@ export const evolveChange = (
+       return change.lease.state === "active" &&
+         event.leaseId === change.lease.id &&
+         committed.at >= lapsesAt(change.lease)
+-        ? { ...change, lease: { ...change.lease, state: "lapsed" } }
++        ? { ...change, lease: { ...change.lease, state: "released" } }
+         : illegal(change, event);
+ 
+     default: {

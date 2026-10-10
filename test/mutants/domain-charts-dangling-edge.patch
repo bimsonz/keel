@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/charts/charts.test.ts
+# kills: charts.well-formed
+# why: A chart edge leads to a state the chart does not have
+diff --git a/packages/core/test/charts/charts.ts b/packages/core/test/charts/charts.ts
+index 565fef7..c682313 100644
+--- a/packages/core/test/charts/charts.ts
++++ b/packages/core/test/charts/charts.ts
+@@ -205,7 +205,7 @@ export const workspaceChart: Chart = {
+   meta: { createdBy: "WorkspaceForked", section: "Workspace" },
+   states: {
+     ready: { on: { WorkspaceGranted: w("granted"), WorkspaceCollected: w("collected") } },
+-    granted: { on: { WorkspaceReassigned: w("granted"), WorkspaceCollected: w("collected") } },
++    granted: { on: { WorkspaceReassigned: w("granted"), WorkspaceCollected: w("colected") } },
+     collected: { type: "final" },
+   },
+ };

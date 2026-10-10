@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/charts/charts.test.ts
+# kills: charts.docs-match
+# why: A diagram is edited by hand and loses an edge its chart has
+diff --git a/docs/domain/state-machines.md b/docs/domain/state-machines.md
+index db2e9ad..9715b5d 100644
+--- a/docs/domain/state-machines.md
++++ b/docs/domain/state-machines.md
+@@ -84,7 +84,6 @@ stateDiagram-v2
+   Queued --> Queued: ChangeAdopted
+   Queued --> Withdrawn: ChangeWithdrawn
+   Queued --> Superseded: ChangeSuperseded
+-  Integrating --> Queued: ChangeRequeued
+   Integrating --> Bounced: ChangeBounced
+   Integrating --> Landed: ChangeLanded
+   Integrating --> Integrating: ChangeAdopted
