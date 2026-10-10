@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint -c .oxlintrc.json src scripts test dataset",
+    "lint": "oxlint -c oxlint.config.json src scripts test dataset",
     "test": "vitest run",
     "dataset": "node scripts/build-dataset.ts",
     "deploy": "wrangler deploy"

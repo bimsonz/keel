@@ -9,7 +9,7 @@
     "test": "vitest run",
     "probe": "node scenarios/run-probe.mjs",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint --deny-warnings",
+    "lint": "oxlint -c oxlint.config.json --deny-warnings",
     "worlds": "bash scenarios/worlds.sh",
     "cold-open": "bash scenarios/cold-open.sh"
   },

@@ -8,7 +8,7 @@
     "build-children": "node scripts/build-children.ts",
     "reference": "node scripts/reference.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.scripts.json",
-    "lint": "oxlint -c .oxlintrc.json src scripts"
+    "lint": "oxlint -c oxlint.config.json src scripts"
   },
   "dependencies": {
     "@astral-sh/ruff-wasm-web": "0.16.10",
