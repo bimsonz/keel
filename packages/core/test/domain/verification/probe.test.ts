@@ -65,6 +65,9 @@ describe("probe admission", () => {
     // Red on trunk means the probe is not about the combination: never a guard, however it behaves elsewhere.
     const redTrunk: RunCells = { trunk: "fail", A: "pass", B: "pass", AB: "fail" };
     expect(admit(cellsOf([redTrunk, redTrunk, redTrunk]))._tag).toBe("rejected");
+    // A run with a cell missing does not count towards the three; generated matrices rarely land on exactly this.
+    const partial: RunCells = { trunk: "pass", A: "pass", B: "pass", AB: undefined };
+    expect(admit(cellsOf([good, good, partial]))._tag).toBe("pending");
   });
 
   it("[probe.discriminating-runs-admitted] three or more complete runs that all discriminate admit the probe", () => {
