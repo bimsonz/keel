@@ -106,6 +106,12 @@ export const PromotionResumed = Schema.TaggedStruct("PromotionResumed", {
   /** The head the operator confirms trunk is at; optional only so older events still decode. */
   head: Schema.optional(CommitSha),
 });
+/** A project exists: its Project DO, trunk, lanes and subject registry are keyed by `projectId` from here on. */
+export const ProjectCreated = Schema.TaggedStruct("ProjectCreated", {
+  projectId: ProjectId,
+  name: Schema.String,
+  by: Schema.String,
+});
 /** The trunk's first known head, from the project's seed or an operator. Nothing promotes before it. */
 export const TrunkInitialized = Schema.TaggedStruct("TrunkInitialized", {
   projectId: ProjectId,
@@ -152,6 +158,7 @@ export const IntegrationEvent = Schema.Union([
   PromotionDeclined,
   PromotionFrozen,
   PromotionResumed,
+  ProjectCreated,
   TrunkInitialized,
   PromotionStarted,
   PromotionComposed,

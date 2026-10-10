@@ -130,6 +130,7 @@ A **Batch** is a set of Changes verified together; its **Candidate** is the comp
 | `CandidateBisected` | Lane DO | `candidateId, batchId, into: batchId[]` | each member change | member Change DOs | Leave-one-out or a 4-way split |
 | `CandidateInvalidated` | Lane DO | `candidateId, batchId, reason: head-moved` | each member change | member Change DOs | Caused by `PromotionDeclined`; only the intersection is re-verified |
 | `CandidatePromoted` | Lane DO | `candidateId, batchId, trunkSha` | — | — | Caused by `TrunkAdvanced` |
+| `ProjectCreated` | Project DO (`project:<id>`) | `projectId, name, by` | — | Projector | The project exists; its trunk, lanes and subject registry are keyed by `projectId` from here on. The trunk still waits for `TrunkInitialized` |
 | `TrunkInitialized` | Trunk DO | `projectId, head, by` | — | Projector | The trunk's first known head, from the project's seed or an operator. Nothing is queued or promoted before it |
 | `PromotionStarted` | Trunk DO | `projectId, groupId, old, members: changeId[], batches: batchId[], proofIds[], committerTime` | — | Projector | The write-ahead log entry ([ADR 0003](../adr/0003-trunk-single-writer-wal.md)), committed with the batches' declines. Resolved by exactly one `TrunkAdvanced` or `PromotionFrozen` |
 | `PromotionComposed` | Trunk DO | `projectId, groupId, sha` | — | — | The group's composed commit, recorded before the first push. Every retry pushes this SHA; a recompose that differs freezes promotion instead |

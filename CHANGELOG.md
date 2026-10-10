@@ -21,6 +21,7 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 - The Workspace, Sketch and Agent state machines: `decideWorkspace`/`evolveWorkspace`/`replayWorkspace`, `decideSketch`/`evolveSketch`/`replaySketch` with `sketchExpired`, `decideAgent`/`evolveAgent`/`replayAgent`; schemas `Workspace`, `WorkspaceState`, `Sketch`, `SketchState`; `WorkspaceEvent`, `SketchEvent`, `AgentEvent`.
 - Event `WorkspaceReassigned {workspaceId, sketchId, changeId}`. Errors `WorkspaceStateRefused`, `SketchStateRefused {reason?: expired, nextActions}`, `AgentStateRefused`.
 - `VerdictIssued.planHash` is optional: absent only for a Precheck refusal, a ruling-class verdict with no compiled plan. A present hash always resolves to a plan.
+- Event `ProjectCreated {projectId, name, by}` on the `project` entity, committed by the Project DO when a project is created (catalogue 88 → 89).
 - `EventDraft.entity?`: a draft may name another entity its Durable Object owns (the Change DO's verdicts). That entity gets its own gap-free `seq` and dedupe keys; the default is still `CommitSpec.entity`.
 
 - `WorkspaceGrant.repo: RepoRef`, on the port and on the WorkspacePool RPC's grant: the workspace's repo on the code host. The Change DO keeps it for `hasCommit` and Precheck for `diffTrees`. It is never logged next to the remote.
