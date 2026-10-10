@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/fallout.test.ts
+# kills: fallout.proximity-only-notifies
+# why: Sibling subjects get no notice
+diff --git a/packages/core/src/domain/coordination/fallout.ts b/packages/core/src/domain/coordination/fallout.ts
+index 8ab9edb..a4e60ad 100644
+--- a/packages/core/src/domain/coordination/fallout.ts
++++ b/packages/core/src/domain/coordination/fallout.ts
+@@ -46,7 +46,6 @@ const proximity = (relied: Proposition, effect: Proposition): NotifyReason | und
+   if (subjectsRelated(relied.subject, effect.subject)) {
+     return wireScopesIntersect(relied, effect) ? "subject-touched" : "scope-disjoint";
+   }
+-  if (subjectsSiblings(relied.subject, effect.subject)) return "sibling-subject";
+   const paths = anchorPaths(effect);
+   return anchorPaths(relied).some((path) => paths.includes(path)) ? "shared-anchor" : undefined;
+ };

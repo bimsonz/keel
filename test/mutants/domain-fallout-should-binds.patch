@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/fallout.test.ts
+# kills: fallout.should-premise-only-suspect, fallout.conflict-only-on-contradiction
+# why: A contradicted should premise opens a conflict
+diff --git a/packages/core/src/domain/coordination/fallout.ts b/packages/core/src/domain/coordination/fallout.ts
+index 8ab9edb..2f8c8fd 100644
+--- a/packages/core/src/domain/coordination/fallout.ts
++++ b/packages/core/src/domain/coordination/fallout.ts
+@@ -82,7 +82,7 @@ export const fallout = (
+   ...premises
+     .filter((premise) => premise.holder !== change)
+     .flatMap((premise) => {
+-      const binding = (premise.proposition.strength ?? "must") === "must";
++      const binding = true;
+       return classify({ _tag: "premise", premise }, premise.proposition, effect, binding) ?? [];
+     }),
+   ...tenets.flatMap((tenet) => classify({ _tag: "tenet", tenet }, tenet.proposition, effect, true) ?? []),

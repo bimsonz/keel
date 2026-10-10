@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/fallout.test.ts
+# kills: exposure.covers-fallout
+# why: Preflight misses neighbours that only share an anchor
+diff --git a/packages/core/src/domain/coordination/exposure.ts b/packages/core/src/domain/coordination/exposure.ts
+index 6dfad55..8d00c5e 100644
+--- a/packages/core/src/domain/coordination/exposure.ts
++++ b/packages/core/src/domain/coordination/exposure.ts
+@@ -43,7 +43,7 @@ export const exposure = (self: ChangeId, intent: Intent, liveChanges: readonly L
+     const subjects = [...new Set(theirs.filter((t) => mine.some((m) => near(m.subject, t.subject))).map((t) => t.subject))];
+     const sharedAnchor = [...anchorPathsOf(theirs)].some((path) => myAnchors.has(path));
+     const footprint = intent.footprint.some((m) => live.intent.footprint.some((t) => globsMayOverlap(m.path, t.path)));
+-    if (subjects.length > 0 || sharedAnchor || footprint) {
++    if (subjects.length > 0 || footprint) {
+       neighbours.push({
+         changeId: live.id,
+         goal: live.intent.goal,

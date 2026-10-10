@@ -1,0 +1,14 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/fallout.test.ts
+# kills: fallout.contradiction-opens-conflict
+# why: Contradicting a tenet only raises a suspicion
+diff --git a/packages/core/src/domain/coordination/fallout.ts b/packages/core/src/domain/coordination/fallout.ts
+index 8ab9edb..4bd2869 100644
+--- a/packages/core/src/domain/coordination/fallout.ts
++++ b/packages/core/src/domain/coordination/fallout.ts
+@@ -85,5 +85,5 @@ export const fallout = (
+       const binding = (premise.proposition.strength ?? "must") === "must";
+       return classify({ _tag: "premise", premise }, premise.proposition, effect, binding) ?? [];
+     }),
+-  ...tenets.flatMap((tenet) => classify({ _tag: "tenet", tenet }, tenet.proposition, effect, true) ?? []),
++  ...tenets.flatMap((tenet) => classify({ _tag: "tenet", tenet }, tenet.proposition, effect, false) ?? []),
+ ];

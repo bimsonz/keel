@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/fallout.test.ts
+# kills: fallout.conflict-only-on-contradiction, fallout.suspect-when-clause-touched
+# why: An unprobed effect opens a conflict instead of a suspicion
+diff --git a/packages/core/src/domain/coordination/fallout.ts b/packages/core/src/domain/coordination/fallout.ts
+index 8ab9edb..bd8c991 100644
+--- a/packages/core/src/domain/coordination/fallout.ts
++++ b/packages/core/src/domain/coordination/fallout.ts
+@@ -60,8 +60,9 @@ const classify = (target: FalloutTarget, relied: Proposition, effect: DerivedEff
+         : { _tag: "suspect", target, comparison };
+     case "compatible":
+     case "refines":
+-    case "needs-probe":
+       return { _tag: "suspect", target, comparison };
++    case "needs-probe":
++      return { _tag: "conflict", target, kind: "semantic", silentRetraction: !effect.declared, comparison };
+     default: {
+       const reason = proximity(relied, effect.proposition);
+       return reason === undefined ? undefined : { _tag: "notify", target, reason };

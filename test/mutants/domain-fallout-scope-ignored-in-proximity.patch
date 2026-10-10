@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/fallout.test.ts
+# kills: fallout.scope-respected
+# why: An effect in another scope is reported as touching the premise
+diff --git a/packages/core/src/domain/coordination/fallout.ts b/packages/core/src/domain/coordination/fallout.ts
+index 8ab9edb..5551835 100644
+--- a/packages/core/src/domain/coordination/fallout.ts
++++ b/packages/core/src/domain/coordination/fallout.ts
+@@ -44,7 +44,7 @@ const wireScopesIntersect = (a: Proposition, b: Proposition): boolean => {
+ 
+ const proximity = (relied: Proposition, effect: Proposition): NotifyReason | undefined => {
+   if (subjectsRelated(relied.subject, effect.subject)) {
+-    return wireScopesIntersect(relied, effect) ? "subject-touched" : "scope-disjoint";
++    return "subject-touched";
+   }
+   if (subjectsSiblings(relied.subject, effect.subject)) return "sibling-subject";
+   const paths = anchorPaths(effect);
