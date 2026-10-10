@@ -2,15 +2,15 @@
 # kills: pool.rpc.hint-var
 # why: Composition never reads vars.ARTIFACTS_LOCATION_HINT, so no pool is ever hinted
 diff --git a/apps/keel/src/composition/do.ts b/apps/keel/src/composition/do.ts
-index 470e5a0..e04c4d3 100644
+index f96abac..03e0827 100644
 --- a/apps/keel/src/composition/do.ts
 +++ b/apps/keel/src/composition/do.ts
 @@ -54,7 +54,7 @@ const LOCATION_HINTS: readonly DurableObjectLocationHint[] = [
-  * means no hint; any other value is a misconfiguration and fails loudly.
+  * hint; any other value is a misconfiguration and fails loudly.
   */
  export function artifactsLocationHint(env: Env): DurableObjectLocationHint | undefined {
--  const value: unknown = Reflect.get(env, "ARTIFACTS_LOCATION_HINT");
-+  const value: unknown = undefined;
-   if (value === undefined || value === "") return undefined;
+-  const value = env.ARTIFACTS_LOCATION_HINT;
++  const value = "";
+   if (value === "") return undefined;
    const hint = LOCATION_HINTS.find((h) => h === value);
    if (hint === undefined)

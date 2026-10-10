@@ -135,8 +135,8 @@ describe("the WorkspacePool RPC adapter", () => {
     expect(plain.calls).toEqual([{ name: `pool:${projectId}`, options: undefined }]);
   });
 
-  it("[pool.rpc.hint-var] reads the hint from vars.ARTIFACTS_LOCATION_HINT: absent or empty is none, a non-hint fails loudly", () => {
-    expect(artifactsLocationHint(env)).toBeUndefined();
+  it("[pool.rpc.hint-var] reads the hint from vars.ARTIFACTS_LOCATION_HINT: empty is none, a non-hint fails loudly", () => {
+    expect(artifactsLocationHint(env)).toBe("wnam");
     expect(artifactsLocationHint(withHint(""))).toBeUndefined();
     expect(artifactsLocationHint(withHint("wnam"))).toBe("wnam");
     expect(() => artifactsLocationHint(withHint("mars"))).toThrow(/not a location hint/);

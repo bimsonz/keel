@@ -50,12 +50,12 @@ const LOCATION_HINTS: readonly DurableObjectLocationHint[] = [
 
 /**
  * Where the deployment's Artifacts namespaces live (`vars.ARTIFACTS_LOCATION_HINT`,
- * `wnam` on staging): repo-touching objects are placed there. Absent or empty
- * means no hint; any other value is a misconfiguration and fails loudly.
+ * `wnam` on staging): repo-touching objects are placed there. Empty means no
+ * hint; any other value is a misconfiguration and fails loudly.
  */
 export function artifactsLocationHint(env: Env): DurableObjectLocationHint | undefined {
-  const value: unknown = Reflect.get(env, "ARTIFACTS_LOCATION_HINT");
-  if (value === undefined || value === "") return undefined;
+  const value = env.ARTIFACTS_LOCATION_HINT;
+  if (value === "") return undefined;
   const hint = LOCATION_HINTS.find((h) => h === value);
   if (hint === undefined)
     throw new Error(`ARTIFACTS_LOCATION_HINT is ${JSON.stringify(value)}, not a location hint`);
