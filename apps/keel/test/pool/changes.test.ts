@@ -5,12 +5,15 @@
 import { runDurableObjectAlarm } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import type { Principal } from "@keeltown/core/domain/identity";
+import { LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
 import { type AgentId, type ChangeId, makeId, type ProjectId } from "@keeltown/core/kernel";
-import { PORTS } from "@keeltown/testing";
+import { makeManualClock, PORTS } from "@keeltown/testing";
 import { Effect, Exit } from "effect";
 import { ulid } from "ulid";
 import { expect, vi } from "vitest";
 import { ChangesRpc } from "../../src/adapters/driven/do-rpc/changes.ts";
+import { changeServices } from "../../src/composition/do.ts";
+import { rewire } from "./change-harness.ts";
 import { decodeExit, WorkspacePoolCodecs } from "../../src/rpc/index.ts";
 
 const poolStub = (projectId: ProjectId) =>
@@ -49,4 +52,11 @@ PORTS.Changes.contract("Change DO over RPC", () => ({
   // is the head it was forked at: its base. The in-memory harness pushes a fresh one.
   push: (grant) => Effect.succeed(grant.baseSha),
   caller: () => Effect.promise(stockedCaller),
+  // The object's own adapters on a clock past the lease's TTL: the deadline has passed for it.
+  lapse: (changeId) =>
+    Effect.promise(() => {
+      const stub = env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`));
+      const past = makeManualClock(Date.now() + LEASE_TTL_MS + 60_000);
+      return rewire(stub, changeServices(env), past.layer);
+    }),
 }));

@@ -1,9 +1,11 @@
 import { Effect } from "effect";
 import type {
   Change,
+  ChangeInOtherProject,
   ChangeNotFound,
   ChangeStateRefused,
   CommitNotInWorkspace,
+  LeaseNotLapsed,
   LeaseStale,
   PoolExhausted,
   SketchNotFound,
@@ -21,7 +23,7 @@ import {
   type SubmissionStatus,
   type ViewSnapshot,
 } from "../ports/index.ts";
-import type { Declared, DeclareInput, SubmitInput } from "./index.ts";
+import type { Adopted, AdoptInput, Declared, DeclareInput, SubmitInput } from "./index.ts";
 
 /**
  * The isolate's side of the work loop. The doorways have already checked the
@@ -51,6 +53,16 @@ export const submitChange: (
   ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace | IdempotencyConflict,
   Changes
 > = (principal, input) => Changes.use((changes) => changes.submit(principal, input));
+
+/** Takes over a change whose lease lapsed. The Change DO checks the lapse and the caller's project. */
+export const adoptChange: (
+  principal: Principal,
+  input: AdoptInput,
+) => Effect.Effect<
+  Adopted,
+  ChangeNotFound | ChangeStateRefused | LeaseNotLapsed | ChangeInOtherProject | IdempotencyConflict,
+  Changes
+> = (principal, input) => Changes.use((changes) => changes.adopt(principal, input));
 
 /** Where a change's submission stands, waiting up to `waitSeconds` (0–30) for it to move. */
 export const submissionOf: (

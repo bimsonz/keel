@@ -234,8 +234,12 @@ describe("leases", () => {
         const lapsed = yield* Effect.exit(revise(changeId, revising(oldLease, 1, "revise-1")));
         const adopted = yield* adopt(
           changeId,
-          Schema.decodeUnknownSync(AdoptCommand)({ agentId: adopterId, idempotencyKey: "adopt-1" }),
-        );
+          Schema.decodeUnknownSync(AdoptCommand)({
+            agentId: adopterId,
+            projectId: sampleProjectId,
+            idempotencyKey: "adopt-1",
+          }),
+        ).pipe(Effect.map((answer) => answer.change));
         const stale = yield* Effect.exit(revise(changeId, revising(oldLease, 1, "revise-2")));
         const fresh = yield* revise(changeId, revising(adopted.lease.id, 1, "revise-3"));
 
@@ -257,7 +261,11 @@ describe("leases", () => {
       clock.advance(LEASE_TTL_MS);
       yield* adopt(
         changeId,
-        Schema.decodeUnknownSync(AdoptCommand)({ agentId: adopterId, idempotencyKey: "adopt-1" }),
+        Schema.decodeUnknownSync(AdoptCommand)({
+          agentId: adopterId,
+          projectId: sampleProjectId,
+          idempotencyKey: "adopt-1",
+        }),
       );
       const outbox = yield* EventOutbox;
       const adoption = outbox.log({ kind: "change", id: changeId }).at(-1);
@@ -279,7 +287,11 @@ describe("leases", () => {
       const early = yield* Effect.exit(
         adopt(
           changeId,
-          Schema.decodeUnknownSync(AdoptCommand)({ agentId: adopterId, idempotencyKey: "a" }),
+          Schema.decodeUnknownSync(AdoptCommand)({
+            agentId: adopterId,
+            projectId: sampleProjectId,
+            idempotencyKey: "a",
+          }),
         ),
       );
       expect(failureTag(early)).toContain("LeaseNotLapsed");

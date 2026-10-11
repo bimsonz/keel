@@ -1,5 +1,6 @@
 import {
   Change,
+  ChangeInOtherProject,
   ChangeNotFound,
   ChangeOrigin,
   ChangeStateRefused,
@@ -92,9 +93,14 @@ export const AbandonCommand = Schema.Struct({
 });
 export type AbandonCommand = typeof AbandonCommand.Type;
 
-/** Adopt a change whose lease has lapsed: `agentId` takes a new lease, which fences the old token. */
+/**
+ * Adopt a change whose lease has lapsed: `agentId` takes a new lease, which
+ * fences the old token. `projectId` is the adopter's, from its token: a change
+ * in another project is ChangeInOtherProject.
+ */
 export const AdoptCommand = Schema.Struct({
   agentId: AgentId,
+  projectId: ProjectId,
   idempotencyKey: Schema.String,
 });
 export type AdoptCommand = typeof AdoptCommand.Type;
@@ -184,10 +190,16 @@ export const ChangeCodecs = {
     ]),
   ),
   abandon: exitCodec(Change, Mutation),
-  // LeaseNotLapsed: adoption needs a Lapsed lease.
+  // LeaseNotLapsed: adoption needs a Lapsed lease. `grant` re-mints the held workspace's token.
   adopt: exitCodec(
-    Change,
-    Schema.Union([ChangeNotFound, ChangeStateRefused, LeaseNotLapsed, IdempotencyConflict]),
+    Schema.Struct({ change: Change, grant: Schema.optional(WorkspaceGrant) }),
+    Schema.Union([
+      ChangeNotFound,
+      ChangeStateRefused,
+      LeaseNotLapsed,
+      ChangeInOtherProject,
+      IdempotencyConflict,
+    ]),
   ),
   submission: exitCodec(SubmissionStatus, ChangeNotFound),
   workspace: exitCodec(ChangeWorkspace, PrecheckRefusal),

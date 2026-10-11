@@ -5,6 +5,7 @@ import {
   type ChangeCommand,
   ChangeBounced,
   ChangeEvent,
+  ChangeInOtherProject,
   ChangeNotFound,
   type ChangeOrigin,
   type ChangeRejection,
@@ -62,6 +63,7 @@ import {
   type Stored,
   type SubmissionStatus,
   type Transaction,
+  type Transition,
   WorkspacePool,
   type WorkspaceGrant,
 } from "../ports/index.ts";
@@ -178,7 +180,15 @@ export interface AbandonChange {
 
 export interface AdoptChange {
   readonly agentId: AgentId;
+  /** The adopter's project, from its token. */
+  readonly projectId: ProjectId;
   readonly idempotencyKey: string;
+}
+
+/** What adopting answers: the change under its new lease, and a fresh token for the workspace it holds. */
+export interface AdoptedChange {
+  readonly change: Change;
+  readonly grant?: WorkspaceGrant;
 }
 
 /** A Precheck step's call: the revision it checked, and its Workflow instance. */
@@ -586,15 +596,19 @@ export const abandon: (
 
 /**
  * Adopts a change whose lease has lapsed: a new lease under the same Change-Id
- * fences the old token. Both agents hear of it; then only the adopter is subscribed.
+ * fences the old token. Both agents hear of it; then only the adopter is
+ * subscribed. The adopter holds no lease yet, so its project is checked
+ * against the change's. The answer carries a fresh token for the workspace
+ * the change holds (the pool's grant is idempotent per holder), on a replay too,
+ * since the first answer's token may have been lost.
  */
 export const adopt: (
   changeId: ChangeId,
   command: AdoptChange,
 ) => Effect.Effect<
-  Change,
-  ChangeNotFound | ChangeStateRefused | LeaseNotLapsed | IdempotencyConflict,
-  Clock | Ids | EntityStore | EventOutbox
+  AdoptedChange,
+  ChangeNotFound | ChangeStateRefused | LeaseNotLapsed | ChangeInOtherProject | IdempotencyConflict,
+  Clock | Ids | EntityStore | EventOutbox | WorkspacePool
 > = Effect.fn("coordination/adopt")(function* (changeId: ChangeId, command: AdoptChange) {
   const leaseId = yield* (yield* Ids).next("lse");
   const committed = yield* commit(
@@ -605,8 +619,16 @@ export const adopt: (
       actor: agentActor(command.agentId),
       ...inProject(yield* EntityStore, changeId),
     },
-    (tx) => {
+    (
+      tx,
+    ): Result.Result<
+      Transition<Change>,
+      ChangeNotFound | ChangeStateRefused | LeaseNotLapsed | ChangeInOtherProject
+    > => {
       const before = storedChange(tx.store, changeId);
+      const held = heldWorkspace(tx.store, changeId);
+      if (before !== undefined && held !== undefined && held.projectId !== command.projectId)
+        return Result.fail(new ChangeInOtherProject({ changeId }));
       const decided = transition(
         tx,
         changeId,
@@ -633,7 +655,12 @@ export const adopt: (
       });
     },
   );
-  return yield* settled(changeId, command.idempotencyKey, committed);
+  const change = yield* settled(changeId, command.idempotencyKey, committed);
+  const held = heldWorkspace(yield* EntityStore, changeId);
+  if (held === undefined) return { change };
+  // The pool finds the workspace this change holds and only mints a token: it cannot run out.
+  const grant = yield* (yield* WorkspacePool).grant(held.projectId, changeId).pipe(Effect.orDie);
+  return { change, grant };
 });
 
 /**

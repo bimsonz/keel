@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adopt.test.ts apps/keel/test/pool/changes.test.ts -t b11.adopt-foreign
+# kills: b11.adopt-foreign
+# why: adopt skips the project check, so an agent of any project takes over a lapsed change and gets a token to its workspace
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 69ae656..ef2339a 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -627,8 +627,6 @@ export const adopt: (
+     > => {
+       const before = storedChange(tx.store, changeId);
+       const held = heldWorkspace(tx.store, changeId);
+-      if (before !== undefined && held !== undefined && held.projectId !== command.projectId)
+-        return Result.fail(new ChangeInOtherProject({ changeId }));
+       const decided = transition(
+         tx,
+         changeId,

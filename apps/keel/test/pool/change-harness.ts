@@ -90,6 +90,7 @@ export async function changeUnderTest(projectId: ProjectId = sampleProjectId) {
   return {
     changeId,
     agentId,
+    projectId,
     stub,
     clock,
     pool,

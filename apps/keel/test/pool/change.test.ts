@@ -65,7 +65,13 @@ const submit = async (c: ChangeUnderTest, leaseId: string, commitSha: string, ke
   );
 
 const adopt = async (c: ChangeUnderTest, agentId: string, key: string) =>
-  decodeExit(ChangeCodecs.adopt, await c.stub.adopt({ agentId, idempotencyKey: key }));
+  Exit.map(
+    decodeExit(
+      ChangeCodecs.adopt,
+      await c.stub.adopt({ agentId, projectId: c.projectId, idempotencyKey: key }),
+    ),
+    (adopted) => adopted.change,
+  );
 
 const abandon = async (c: ChangeUnderTest, leaseId: string, key: string) =>
   decodeExit(

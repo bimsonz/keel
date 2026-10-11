@@ -1,5 +1,6 @@
 import {
   createProject,
+  adoptChange,
   declareChange,
   getSettings,
   putSettings,
@@ -37,6 +38,9 @@ import { piggyback } from "./piggyback.ts";
 import { notImplemented } from "./problems.ts";
 import type { Runner } from "./run.ts";
 import {
+  adoptError,
+  adoptInput,
+  adoptOk,
   changeIdInput,
   declareError,
   declareInput,
@@ -176,6 +180,17 @@ export function makeHandlers(run: Runner) {
       rely: notYet,
       nearby: notYet,
       Changes_abandon: notYet,
+      adopt: (caller: Caller, input: Input<"adopt">) => {
+        const decoded = adoptInput(input);
+        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+        return run(
+          caller,
+          principalOf(caller).pipe(
+            Effect.flatMap((principal) => adoptChange(principal, decoded.success)),
+            Effect.match({ onSuccess: adoptOk, onFailure: (error) => adoptError(caller, error) }),
+          ),
+        );
+      },
       sketch: notYet,
       Workspaces_refreshWorkspaceToken: notYet,
       Workspaces_releaseWorkspace: notYet,

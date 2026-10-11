@@ -119,6 +119,7 @@ function memoryChangesHarness(): ChangesHarness {
         memory.push(grant.workspaceId, sha);
         return sha;
       }),
+    lapse: (changeId) => Effect.sync(() => memory.lapse(changeId)),
   };
 }
 

@@ -140,6 +140,7 @@ union ProblemCode {
   internalDefect: "internal.defect",
   changeNotFound: "change.not_found",
   changeLeaseStale: "change.lease_stale",
+  changeLeaseNotLapsed: "change.lease_not_lapsed",
   changeStateRefused: "change.state_refused",
   changeCommitNotInWorkspace: "change.commit_not_in_workspace",
   workspacePoolExhausted: "workspace.pool_exhausted",

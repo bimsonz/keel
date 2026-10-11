@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adopt.test.ts apps/keel/test/pool/changes.test.ts -t b11.adopt-replay
+# kills: b11.adopt-replay
+# why: adopt's fingerprint drops the caller, so another agent replaying the key is answered the first adopter's change and workspace token
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 69ae656..34be96e 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -615,7 +615,7 @@ export const adopt: (
+     {
+       entity: changeRef(changeId),
+       cause: command.idempotencyKey,
+-      fingerprint: fingerprintOf("adopt", command),
++      fingerprint: fingerprintOf("adopt", { idempotencyKey: command.idempotencyKey }),
+       actor: agentActor(command.agentId),
+       ...inProject(yield* EntityStore, changeId),
+     },

@@ -1,16 +1,24 @@
 import { Context, type Effect } from "effect";
 import type {
   Change,
+  ChangeInOtherProject,
   ChangeNotFound,
   ChangeStateRefused,
   CommitNotInWorkspace,
+  LeaseNotLapsed,
   LeaseStale,
   PoolExhausted,
   SketchNotFound,
 } from "../../domain/coordination/index.ts";
 import type { IdempotencyConflict, Principal } from "../../domain/identity/index.ts";
 import type { ChangeId, CommitSha, ProjectId, WorkspaceId } from "../../domain/kernel/index.ts";
-import type { Declared, DeclareInput, SubmitInput } from "../coordination/index.ts";
+import type {
+  Adopted,
+  AdoptInput,
+  Declared,
+  DeclareInput,
+  SubmitInput,
+} from "../coordination/index.ts";
 import type { RepoRef } from "./code-host.ts";
 
 /** A change's submission as it stands: the change, and the commit last submitted for it. */
@@ -49,6 +57,23 @@ export class Changes extends Context.Service<
     ) => Effect.Effect<
       Change,
       ChangeNotFound | LeaseStale | ChangeStateRefused | CommitNotInWorkspace | IdempotencyConflict
+    >;
+    /**
+     * Takes over a change whose lease lapsed: a new lease that fences the old
+     * token, and a fresh token for the change's workspace. Idempotent by
+     * Idempotency-Key per change; the same key from another caller is an
+     * IdempotencyConflict.
+     */
+    readonly adopt: (
+      principal: Principal,
+      input: AdoptInput,
+    ) => Effect.Effect<
+      Adopted,
+      | ChangeNotFound
+      | ChangeStateRefused
+      | LeaseNotLapsed
+      | ChangeInOtherProject
+      | IdempotencyConflict
     >;
     readonly get: (changeId: ChangeId) => Effect.Effect<Change, ChangeNotFound>;
     /**

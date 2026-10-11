@@ -96,6 +96,7 @@ function world(options: WorldOptions = {}) {
   const changesLayer = Layer.succeed(
     Changes,
     Changes.of({
+      adopt: () => Effect.die(new Error("the Lane never adopts")),
       get: (id) =>
         Effect.suspend(() => {
           const found = changes.get(id);

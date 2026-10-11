@@ -1,15 +1,20 @@
 import {
   AGENT_OWNED,
   type Change,
+  ChangeInOtherProject,
   ChangeNotFound,
   type ChangeState,
   ChangeStateRefused,
   CommitNotInWorkspace,
+  isLapsed,
+  LeaseNotLapsed,
   LeaseStale,
+  lapsesAt,
   PoolExhausted,
   type Preflight,
   SketchNotFound,
   type SubjectKey,
+  TERMINAL,
 } from "@keeltown/core/domain/coordination";
 import { IdempotencyConflict } from "@keeltown/core/domain/identity";
 import {
@@ -218,6 +223,12 @@ export function makeChangesMemory(
   const waiters = makeWaiters<ChangeId>();
   /** A submit replays by its cause, the Idempotency-Key, as the DO's commit does. */
   const submits = new Map<string, Change>();
+  /** Each change's project, its declarer's: an adopter from another project is refused. */
+  const projects = new Map<ChangeId, ProjectId>();
+  /** An adopt replays by its key per change; the same key from another caller is a conflict. */
+  const adoptions = new Map<string, { readonly caller: string; readonly change: Change }>();
+  /** Changes whose lease has lapsed by `lapse`, as the deadline passing would leave them. */
+  const lapsed = new Set<ChangeId>();
   let sequence = 0;
   let tokens = 0;
   const grant = (changeId: ChangeId, now: Instant): WorkspaceGrant => {
@@ -248,11 +259,17 @@ export function makeChangesMemory(
     changes.set(changeId, { ...change, state });
     waiters.wake(changeId);
   };
+  /** The change's lease deadline passes, as time would let it: the next adopt may take it. */
+  const lapse = (changeId: ChangeId): void => {
+    if (!changes.has(changeId)) throw new Error(`no change ${changeId}`);
+    lapsed.add(changeId);
+  };
   return {
     changes,
     commits,
     push,
     settle,
+    lapse,
     layer: Layer.succeed(
       Changes,
       Changes.of({
@@ -301,6 +318,7 @@ export function makeChangesMemory(
             const workspace = grant(change.id, now);
             const stored: Change = { ...change, workspaceId: workspace.workspaceId };
             changes.set(stored.id, stored);
+            projects.set(stored.id, principal.projectId);
             reservations.set(key, { changeId: stored.id, fingerprint });
             const preflight: Preflight = {
               neighbours: [],
@@ -339,6 +357,62 @@ export function makeChangesMemory(
             submits.set(`${input.changeId} ${input.idempotencyKey}`, submitted);
             waiters.wake(change.id);
             return submitted;
+          }),
+        adopt: (principal, input) =>
+          Effect.gen(function* () {
+            const now = Instant(yield* EffectClock.currentTimeMillis);
+            const { changeId, idempotencyKey } = input;
+            const caller = `${principal.agentId} ${principal.projectId}`;
+            const replayed = adoptions.get(`${changeId} ${idempotencyKey}`);
+            if (replayed !== undefined && replayed.caller !== caller)
+              return yield* new IdempotencyConflict({ idempotencyKey });
+            const change = changes.get(changeId);
+            if (change === undefined) return yield* new ChangeNotFound({ changeId });
+            const regrant = () =>
+              workspaces.has(changeId) ? { workspace: grant(changeId, now) } : {};
+            if (replayed !== undefined) return { change, ...regrant() };
+            if (projects.get(changeId) !== principal.projectId)
+              return yield* new ChangeInOtherProject({ changeId });
+            if (TERMINAL.has(change.state))
+              return yield* new ChangeStateRefused({
+                changeId,
+                state: change.state,
+                command: "Adopt",
+              });
+            if (!lapsed.has(changeId) && !isLapsed(change.lease, now))
+              return yield* new LeaseNotLapsed({
+                changeId,
+                lapsesAt: lapsesAt(change.lease),
+                nextActions: [
+                  {
+                    kind: "wait",
+                    title: "Wait for the lease to lapse: adoption needs a Lapsed lease",
+                    args: { lapsesAt: lapsesAt(change.lease) },
+                  },
+                ],
+              });
+            const adopted: Change = {
+              ...change,
+              agentId: principal.agentId,
+              state:
+                change.state === "parked"
+                  ? workspaces.has(changeId)
+                    ? "working"
+                    : "declared"
+                  : change.state,
+              lease: {
+                id: makeId("lse", sequentialId((sequence += 1))),
+                agentId: principal.agentId,
+                renewedAt: now,
+                state: "active",
+              },
+            };
+            const { parkReason: _parked, ...unparked } = adopted;
+            changes.set(changeId, unparked);
+            lapsed.delete(changeId);
+            adoptions.set(`${changeId} ${idempotencyKey}`, { caller, change: unparked });
+            waiters.wake(changeId);
+            return { change: unparked, ...regrant() };
           }),
         workspace: (changeId) =>
           Effect.gen(function* () {

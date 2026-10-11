@@ -42,6 +42,18 @@ export interface Declared {
   readonly workspace: WorkspaceGrant;
 }
 
+/** Adopt a change whose lease lapsed. The adopter holds no lease: its token's project is the authority checked. */
+export interface AdoptInput {
+  readonly changeId: ChangeId;
+  readonly idempotencyKey: string;
+}
+
+/** The change under the adopter's new lease, and a fresh token for the workspace it holds, when it holds one. */
+export interface Adopted {
+  readonly change: Change;
+  readonly workspace?: WorkspaceGrant;
+}
+
 /** Writes made on a change: the caller holds its lease. */
 export interface LeasedCall {
   readonly changeId: ChangeId;

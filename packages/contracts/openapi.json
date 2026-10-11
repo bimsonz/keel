@@ -975,6 +975,142 @@
         ]
       }
     },
+    "/changes/{changeId}/adopt": {
+      "post": {
+        "operationId": "adopt",
+        "summary": "Adopt a change",
+        "description": "Your lease lapsed (after a crash or a context reset): take the change back with a fresh lease and\nworkspace token. Only a lapsed lease can be adopted (409 `change.lease_not_lapsed` says when it\nlapses), and only by an agent of the change's project. A retry with the same key answers the\nsame lease.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ChangePath"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdoptedEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Changes",
+          "mcp"
+        ],
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:work"
+            ]
+          }
+        ]
+      }
+    },
     "/changes/{changeId}/nearby": {
       "get": {
         "operationId": "nearby",
@@ -4954,6 +5090,84 @@
           },
           "result": {
             "$ref": "#/components/schemas/Abandoned"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            }
+          },
+          "next": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NextAction"
+            },
+            "maxItems": 3
+          },
+          "notices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notice"
+            },
+            "maxItems": 3
+          },
+          "cost": {
+            "$ref": "#/components/schemas/CallCost"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Every work-loop response: the result, plus what the agent should know and do next."
+      },
+      "Adopted": {
+        "type": "object",
+        "required": [
+          "change",
+          "lease"
+        ],
+        "properties": {
+          "change": {
+            "$ref": "#/components/schemas/Change"
+          },
+          "lease": {
+            "$ref": "#/components/schemas/Lease"
+          },
+          "workspace": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Workspace"
+              }
+            ],
+            "description": "The workspace the change holds, with a token for the adopter. Absent when it never got one."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A change taken over after its lease lapsed: the adopter's new lease, and a fresh token for its workspace."
+      },
+      "AdoptedEnvelope": {
+        "type": "object",
+        "required": [
+          "ok",
+          "summary",
+          "result",
+          "findings",
+          "next",
+          "notices",
+          "cost"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string",
+            "description": "One line, written for the agent."
+          },
+          "result": {
+            "$ref": "#/components/schemas/Adopted"
           },
           "findings": {
             "type": "array",
@@ -11372,6 +11586,7 @@
           "internal.defect",
           "change.not_found",
           "change.lease_stale",
+          "change.lease_not_lapsed",
           "change.state_refused",
           "change.commit_not_in_workspace",
           "workspace.pool_exhausted",

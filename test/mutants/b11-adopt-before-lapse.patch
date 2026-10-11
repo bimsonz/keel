@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adopt.test.ts apps/keel/test/pool/changes.test.ts -t b11.adopt-early
+# kills: b11.adopt-early
+# why: the Adopt arm drops its lapse check, so any agent of the project takes a change whose holder is still working on it
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 20f9f7b..643973d 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -543,7 +543,7 @@ export const decideChange = (
+         : refuse(change, command);
+ 
+     case "Adopt":
+-      if (!isLapsed(change.lease, now)) {
++      if (false && !isLapsed(change.lease, now)) {
+         return Result.fail(
+           new LeaseNotLapsed({
+             changeId: id,

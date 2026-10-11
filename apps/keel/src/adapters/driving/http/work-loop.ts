@@ -1,12 +1,20 @@
-import type { Declared, DeclareInput, SubmitInput } from "@keeltown/core/application/coordination";
+import type {
+  Adopted,
+  AdoptInput,
+  Declared,
+  DeclareInput,
+  SubmitInput,
+} from "@keeltown/core/application/coordination";
 import {
   type Change,
+  type ChangeInOtherProject,
   type ChangeNotFound,
   type ChangeStateRefused,
   type CommitNotInWorkspace,
   FootprintEntry,
   type Lease,
   LEASE_TTL_MS,
+  type LeaseNotLapsed,
   type LeaseStale,
   type PoolExhausted,
   type Preflight,
@@ -25,6 +33,7 @@ import {
 import type { SubmissionStatus } from "@keeltown/core/ports";
 import { Result, Schema, SchemaIssue } from "effect";
 import type {
+  AdoptResult,
   DeclareResult,
   InboxResult,
   Operations,
@@ -402,6 +411,94 @@ export function submitError(
           detail: `Idempotency-Key ${error.idempotencyKey} was used for a different request.`,
           nextActions: [
             { kind: "call", title: "Submit with a fresh Idempotency-Key", operationId: "submit" },
+          ],
+        }),
+      };
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
+}
+
+export function adoptInput(input: Input<"adopt">): Result.Result<AdoptInput, Issues> {
+  return Result.map(changeIdInput(input.changeId), (changeId) => ({
+    changeId,
+    idempotencyKey: input["idempotency-key"],
+  }));
+}
+
+export function adoptOk(adopted: Adopted): AdoptResult {
+  const { change, workspace } = adopted;
+  return {
+    status: 200,
+    body: envelope(
+      `Adopted ${change.id} (${change.state}) under a new lease. Pull its workspace, carry on, then submit.`,
+      {
+        change: changeView(change),
+        lease: leaseView(change.lease),
+        ...(workspace === undefined
+          ? {}
+          : {
+              workspace: {
+                id: workspace.workspaceId,
+                remote: workspace.remote,
+                token: workspace.token,
+                expiresAt: iso(workspace.expiresAt),
+              },
+            }),
+      },
+      [statusOf(change.id)],
+    ),
+  };
+}
+
+export function adoptError(
+  caller: Caller,
+  error:
+    | ChangeNotFound
+    | ChangeStateRefused
+    | LeaseNotLapsed
+    | ChangeInOtherProject
+    | IdempotencyConflict,
+): AdoptResult {
+  switch (error._tag) {
+    case "ChangeNotFound":
+      return changeNotFound(caller, error);
+    case "ChangeStateRefused":
+      return {
+        status: 409,
+        body: problem(409, "change.state_refused", caller.requestId, {
+          detail: `${error.changeId} is ${error.state}, where ${error.command} is not allowed.`,
+          nextActions: [statusOf(error.changeId)],
+        }),
+      };
+    case "LeaseNotLapsed":
+      return {
+        status: 409,
+        body: problem(409, "change.lease_not_lapsed", caller.requestId, {
+          detail: `${error.changeId}'s lease lapses at ${iso(error.lapsesAt)}; it can be adopted after that.`,
+          nextActions: error.nextActions.map(({ operationId, args, ...action }) => ({
+            ...action,
+            ...(operationId === undefined ? {} : { operationId }),
+            ...(args === undefined ? {} : { args }),
+          })),
+        }),
+      };
+    case "ChangeInOtherProject":
+      return {
+        status: 403,
+        body: problem(403, "auth.insufficient_scope", caller.requestId, {
+          detail: `${error.changeId} is in another project; your token is bound to your own.`,
+        }),
+      };
+    case "IdempotencyConflict":
+      return {
+        status: 409,
+        body: problem(409, "request.idempotency_conflict", caller.requestId, {
+          detail: `Idempotency-Key ${error.idempotencyKey} was used for a different request.`,
+          nextActions: [
+            { kind: "call", title: "Adopt with a fresh Idempotency-Key", operationId: "adopt" },
           ],
         }),
       };

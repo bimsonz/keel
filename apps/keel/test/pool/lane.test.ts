@@ -76,6 +76,7 @@ async function lane(options: { readonly noStaging?: boolean } = {}) {
   const changes = Layer.succeed(
     Changes,
     Changes.of({
+      adopt: () => Effect.die(new Error("the Lane never adopts")),
       get: (id) =>
         Effect.succeed({
           id,

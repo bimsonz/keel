@@ -81,6 +81,17 @@ model Abandoned {
 
 model AbandonedEnvelope is AgentEnvelope<Abandoned>;
 
+/** A change taken over after its lease lapsed: the adopter's new lease, and a fresh token for its workspace. */
+model Adopted {
+  change: Change;
+  lease: Lease;
+
+  /** The workspace the change holds, with a token for the adopter. Absent when it never got one. */
+  workspace?: Workspace;
+}
+
+model AdoptedEnvelope is AgentEnvelope<Adopted>;
+
 model ChangePath {
   @path changeId: ChangeId;
 }
@@ -194,4 +205,18 @@ interface Changes {
     ...IdempotencyKey,
     @body body: AbandonRequest,
   ): AbandonedEnvelope | NotFound | Conflict | StandardErrors;
+
+  /**
+   * Your lease lapsed (after a crash or a context reset): take the change back with a fresh lease and
+   * workspace token. Only a lapsed lease can be adopted (409 `change.lease_not_lapsed` says when it
+   * lapses), and only by an agent of the change's project. A retry with the same key answers the
+   * same lease.
+   */
+  @summary("Adopt a change")
+  @tag("mcp")
+  @operationId("adopt")
+  @useAuth(AgentWork)
+  @route("/{changeId}/adopt")
+  @post
+  adopt(...ChangePath, ...IdempotencyKey): AdoptedEnvelope | NotFound | Conflict | StandardErrors;
 }

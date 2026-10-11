@@ -19,6 +19,8 @@ export interface ChangesHarness {
    * stocked WorkspacePool first. Absent, each case makes its own.
    */
   readonly caller?: () => Effect.Effect<Principal>;
+  /** The change's lease deadline passes, as time would let it, so an adopt may take it. */
+  readonly lapse: (changeId: ChangeId) => Effect.Effect<void>;
 }
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -64,6 +66,18 @@ const declared = (harness: ChangesHarness) =>
       ...overrides,
     });
     return { who, result, commitSha, submit };
+  });
+
+/** A declared change whose lease has lapsed, and another agent of its project to adopt it. */
+const lapsedChange = (harness: ChangesHarness) =>
+  Effect.gen(function* () {
+    const found = yield* declared(harness);
+    yield* harness.lapse(found.result.change.id);
+    const adopter: Principal = {
+      ...found.who,
+      agentId: Schema.decodeUnknownSync(AgentId)(fresh("agt")),
+    };
+    return { ...found, adopter };
   });
 
 export function describeChangesContract(adapter: string, make: () => ChangesHarness) {
@@ -220,5 +234,113 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
         }).pipe(Effect.provide(harness.layer));
       },
     );
+
+    it.live(
+      "[b11.adopt] adopts a lapsed change: a new lease for the adopter, a fresh workspace token, the old lease fenced",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const changes = yield* Changes;
+          const { who, result, adopter, submit } = yield* lapsedChange(harness);
+          const adopted = yield* changes.adopt(adopter, {
+            changeId: result.change.id,
+            idempotencyKey: `adopt-${crypto.randomUUID()}`,
+          });
+          expect(adopted.change).toMatchObject({
+            id: result.change.id,
+            agentId: adopter.agentId,
+            lease: { agentId: adopter.agentId, state: "active" },
+          });
+          expect(adopted.change.lease.id).not.toBe(result.change.lease.id);
+          expect(adopted.workspace?.workspaceId).toBe(result.workspace.workspaceId);
+          expect(adopted.workspace?.token).not.toBe("");
+          const fenced = yield* Effect.flip(changes.submit(who, submit()));
+          expect(fenced._tag).toBe("LeaseStale");
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[b11.adopt-early] refuses an adopt while the lease is alive as LeaseNotLapsed, with when it lapses",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const changes = yield* Changes;
+          const { who, result } = yield* declared(harness);
+          const adopter: Principal = {
+            ...who,
+            agentId: Schema.decodeUnknownSync(AgentId)(fresh("agt")),
+          };
+          const error = yield* Effect.flip(
+            changes.adopt(adopter, { changeId: result.change.id, idempotencyKey: "adopt-early" }),
+          );
+          expect(error).toMatchObject({ _tag: "LeaseNotLapsed", changeId: result.change.id });
+          expect(error._tag === "LeaseNotLapsed" ? error.lapsesAt : 0).toBeGreaterThan(Date.now());
+          expect(error._tag === "LeaseNotLapsed" ? error.nextActions.length : 0).toBeGreaterThan(0);
+          expect((yield* changes.get(result.change.id)).lease.id).toBe(result.change.lease.id);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[b11.adopt-replay] answers a retried adopt with the same lease, and the key from another agent as IdempotencyConflict",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const changes = yield* Changes;
+          const { result, adopter } = yield* lapsedChange(harness);
+          const input = {
+            changeId: result.change.id,
+            idempotencyKey: `adopt-${crypto.randomUUID()}`,
+          };
+          const first = yield* changes.adopt(adopter, input);
+          const again = yield* changes.adopt(adopter, input);
+          expect(again.change.lease.id).toBe(first.change.lease.id);
+          expect(again.workspace?.workspaceId).toBe(first.workspace?.workspaceId);
+          const other: Principal = {
+            ...adopter,
+            agentId: Schema.decodeUnknownSync(AgentId)(fresh("agt")),
+          };
+          const error = yield* Effect.flip(changes.adopt(other, input));
+          expect(error).toMatchObject({
+            _tag: "IdempotencyConflict",
+            idempotencyKey: input.idempotencyKey,
+          });
+          expect((yield* changes.get(result.change.id)).agentId).toBe(adopter.agentId);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[b11.adopt-foreign] refuses an agent of another project as ChangeInOtherProject, lapsed or not",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const changes = yield* Changes;
+          const { result, adopter } = yield* lapsedChange(harness);
+          const foreign: Principal = {
+            ...adopter,
+            projectId: Schema.decodeUnknownSync(ProjectId)(fresh("prj")),
+          };
+          const error = yield* Effect.flip(
+            changes.adopt(foreign, { changeId: result.change.id, idempotencyKey: "adopt-foreign" }),
+          );
+          expect(error).toMatchObject({ _tag: "ChangeInOtherProject", changeId: result.change.id });
+          expect((yield* changes.get(result.change.id)).lease.id).toBe(result.change.lease.id);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live("refuses an adopt of an unknown change as ChangeNotFound", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const changes = yield* Changes;
+        const changeId = Schema.decodeUnknownSync(ChangeId)(fresh("chg"));
+        const error = yield* Effect.flip(
+          changes.adopt(yield* callerOf(harness), { changeId, idempotencyKey: "adopt-nowhere" }),
+        );
+        expect(error).toMatchObject({ _tag: "ChangeNotFound", changeId });
+      }).pipe(Effect.provide(harness.layer));
+    });
   });
 }

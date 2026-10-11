@@ -112,6 +112,9 @@ function objects(answers: {
             }),
         );
       },
+      adopt: async () => {
+        throw new Error("this test never adopts");
+      },
       submit: async (command) => {
         sent.submit.push({ name: id, command });
         return encodeExit(ChangeCodecs.submit, answers.submit ?? Exit.succeed(change));

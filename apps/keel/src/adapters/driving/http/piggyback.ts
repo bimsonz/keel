@@ -31,6 +31,7 @@ const ENVELOPED: Readonly<Record<EnvelopedOperation, true>> = {
   rely: true,
   nearby: true,
   Changes_abandon: true,
+  adopt: true,
   sketch: true,
   submit: true,
   status: true,

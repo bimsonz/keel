@@ -2,6 +2,7 @@ import type { AgentId, ChangeId } from "@keeltown/core/kernel";
 import { Changes } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 import {
+  AdoptCommand,
   AgentSessionCodecs,
   ChangeCodecs,
   DeclareCommand,
@@ -17,6 +18,7 @@ import { callObject, fingerprintOf } from "./answer.ts";
 export interface ChangeStub {
   declare(command: typeof DeclareCommand.Encoded): Promise<unknown>;
   submit(command: typeof SubmitCommand.Encoded): Promise<unknown>;
+  adopt(command: typeof AdoptCommand.Encoded): Promise<unknown>;
   get(): Promise<unknown>;
   submission(waitMs: number): Promise<unknown>;
   workspace(): Promise<unknown>;
@@ -37,6 +39,7 @@ export interface ChangeObjects {
 
 const encodeDeclare = Schema.encodeSync(DeclareCommand);
 const encodeSubmit = Schema.encodeSync(SubmitCommand);
+const encodeAdopt = Schema.encodeSync(AdoptCommand);
 
 /**
  * `Changes` over Durable Object RPC. A declare first asks the agent's
@@ -96,6 +99,20 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
               commitSha: input.commitSha,
               idempotencyKey: input.idempotencyKey,
             }),
+          ),
+        ),
+      adopt: (principal, input) =>
+        callObject(ChangeCodecs.adopt, () =>
+          objects.change(input.changeId).adopt(
+            encodeAdopt({
+              agentId: principal.agentId,
+              projectId: principal.projectId,
+              idempotencyKey: input.idempotencyKey,
+            }),
+          ),
+        ).pipe(
+          Effect.map(({ change, grant }) =>
+            grant === undefined ? { change } : { change, workspace: grant },
           ),
         ),
       get: (changeId) => callObject(ChangeCodecs.get, () => objects.change(changeId).get()),

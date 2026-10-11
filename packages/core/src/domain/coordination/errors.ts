@@ -37,6 +37,15 @@ export class LeaseStale extends Schema.TaggedError<LeaseStale>()("LeaseStale", {
   nextActions,
 }) {}
 
+/**
+ * `adopt` by an agent bound to another project. An adopter holds no lease yet,
+ * so the change's project is the only authority it is checked against.
+ */
+export class ChangeInOtherProject extends Schema.TaggedError<ChangeInOtherProject>()(
+  "ChangeInOtherProject",
+  { changeId: ChangeId },
+) {}
+
 /** `adopt` while the lease is still alive: adoption needs a Lapsed lease. */
 export class LeaseNotLapsed extends Schema.TaggedError<LeaseNotLapsed>()("LeaseNotLapsed", {
   changeId: ChangeId,
