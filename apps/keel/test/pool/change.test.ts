@@ -4,14 +4,9 @@ import { laneOf } from "@keeltown/core/application/coordination";
 import { projectRepos } from "@keeltown/core/application/integration";
 import { L1_SUITE_PLAN } from "@keeltown/core/application/verification";
 import { isAgentOwned, LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
-import { type EntityRef, makeId, type ProjectId } from "@keeltown/core/kernel";
-import {
-  CodeHost,
-  commit,
-  type EventDraft,
-  EventOutbox,
-  type VerificationJob,
-} from "@keeltown/core/ports";
+import { TrunkAdvanced } from "@keeltown/core/domain/integration";
+import { type CommitSha, makeId, type NextAction, type ProjectId } from "@keeltown/core/kernel";
+import { CodeHost, EventOutbox, type VerificationJob } from "@keeltown/core/ports";
 import {
   makeBatchVerificationMemory,
   makeCandidateBundlesMemory,
@@ -19,10 +14,11 @@ import {
   makeCodeHostMemory,
   makeProjectsMemory,
   makeStagingWriterMemory,
+  makeTrunkWriterMemory,
   sampleProjectId,
 } from "@keeltown/testing";
 import * as fc from "fast-check";
-import { Effect, Exit, Layer, ManagedRuntime, Result, Schema } from "effect";
+import { Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
 import { armedAlarms, scheduleAlarm } from "../../src/adapters/driving/do/alarm.ts";
@@ -31,7 +27,7 @@ import type { LaneDO } from "../../src/adapters/driving/do/lane.ts";
 import type { TrunkDO } from "../../src/adapters/driving/do/trunk.ts";
 import { ChangesRpc } from "../../src/adapters/driven/do-rpc/changes.ts";
 import { backbone, type LaneServices } from "../../src/composition/do.ts";
-import { ChangeCodecs, decodeExit, exitCodec, LaneCodecs } from "../../src/rpc/index.ts";
+import { ChangeCodecs, decodeExit, LaneCodecs, TrunkCodecs } from "../../src/rpc/index.ts";
 import {
   type ChangeUnderTest,
   changeUnderTest,
@@ -459,53 +455,29 @@ async function queue(c: ChangeUnderTest) {
   );
 }
 
-const committedCodec = exitCodec(Schema.Null, Schema.Never);
-
-/**
- * Commits `drafts` on a real Trunk DO, as a promotion does:
- * through its own outbox, after subscribing each `scoped` change to `types` on
- * its own ref. The DO's answer arms its flush, so the events leave by its
- * fan-out alone. Until C1.3 commits TrunkAdvanced, the advance is written here.
- */
-async function trunkCommits(
-  trunk: DurableObjectStub<TrunkDO>,
-  projectId: ProjectId,
-  drafts: readonly EventDraft[],
-  scoped: readonly { readonly changeId: string; readonly types: readonly string[] }[],
-) {
-  const entity: EntityRef = { kind: "trunk", id: projectId };
-  const committed = await runInDurableObject(trunk, (instance: TrunkDO) =>
-    instance["answer"](
-      committedCodec,
-      commit({ entity, cause: `test-${ulid()}` }, (tx) => {
-        for (const member of scoped)
-          tx.outbox.subscribe(`change:${member.changeId}`, member.types, {
-            kind: "change",
-            id: member.changeId,
-          });
-        return Result.succeed({ value: null, drafts });
-      }).pipe(Effect.as(null)),
-    ),
-  );
-  ok(decodeExit(committedCodec, committed));
-}
+const MAIN = "refs/heads/main";
 
 /**
  * The project's real Lane DO, on in-memory driven adapters as the Lane DO's
  * C's own pool test runs it, reading its members from their real Change DOs.
- * Its staging holds one commit; KeelVerify is the in-memory verification,
- * whose started jobs the test answers through the lane's `recordVerdict`.
+ * Staging holds one commit, `base`, and its writer moves the code host's own
+ * main, so the lane follows trunk in the same staging the Trunk reads.
+ * KeelVerify is the in-memory verification, whose started jobs the test
+ * answers through the lane's `recordVerdict`.
  */
 async function realLane(projectId: ProjectId) {
   const stub = drainAfter(env.LANE.get(env.LANE.idFromName(laneOf(projectId))));
   const staging = projectRepos(projectId).staging;
   const code = makeCodeHostMemory();
-  await Effect.runPromise(
+  const run = <A>(program: Effect.Effect<A, unknown, CodeHost>) =>
+    Effect.runPromise(program.pipe(Effect.provide(code.layer)));
+  const base = await run(
     Effect.gen(function* () {
       yield* (yield* CodeHost).create(staging);
-      yield* code.fixture.commit(staging, "refs/heads/main", { "README.md": "keel\n" });
-    }).pipe(Effect.provide(code.layer)),
+      return yield* code.fixture.commit(staging, MAIN, { "README.md": "keel\n" });
+    }),
   );
+  const stagingRefs = () => code.repos.get(`${staging.namespace}/${staging.name}`)?.refs;
   const verification = makeBatchVerificationMemory();
   const projects = makeProjectsMemory();
   projects.setSettings(projectId, {
@@ -524,7 +496,10 @@ async function realLane(projectId: ProjectId) {
     makeCandidateComposerMemory().layer,
     makeCandidateBundlesMemory().layer,
     verification.layer,
-    makeStagingWriterMemory().layer,
+    makeStagingWriterMemory({
+      get: () => stagingRefs()?.get(MAIN),
+      set: (to) => void stagingRefs()?.set(MAIN, to),
+    }).layer,
     projects.layer,
   );
   await runInDurableObject(stub, (instance: LaneDO, state) => {
@@ -546,11 +521,12 @@ async function realLane(projectId: ProjectId) {
     return found;
   };
 
-  /** Answers the batch's KeelVerify job with `outcome`, as the workflow's last step does. */
+  /** Answers the batch's KeelVerify job with `outcome` and its remedy, as the workflow's last step does. */
   const verdict = async (
     batchId: string | undefined,
     outcome: "land" | "bounce",
     evidence: readonly string[],
+    nextActions?: readonly NextAction[],
   ) => {
     const [instanceId, started] = await job(batchId);
     const recorded = decodeExit(
@@ -564,13 +540,61 @@ async function realLane(projectId: ProjectId) {
         planHash: L1_SUITE_PLAN.planHash,
         evidence: [...evidence],
         failingTests: outcome === "bounce" ? ["test/auth.test.ts"] : [],
+        ...(nextActions === undefined ? {} : { nextActions: [...nextActions] }),
       }),
     );
     expect(recorded).toEqual(Exit.void);
     return started;
   };
 
-  return { stub, verdict };
+  /**
+   * The batch's candidate in staging, at refs/heads/cand/<candidateId> on
+   * `base`, where the Trunk reads the commit it promotes. The memory composer
+   * names the ref without writing it, so the test writes what the lane's push
+   * would have.
+   */
+  const candidate = (candidateId: string) => {
+    const ref = `refs/heads/cand/${candidateId}`;
+    stagingRefs()?.set(ref, base);
+    return run(
+      code.fixture.commit(staging, ref, {
+        "README.md": "keel\n",
+        "src/change.ts": "export const landed = true;\n",
+      }),
+    );
+  };
+
+  return { stub, job, verdict, candidate, code, base };
+}
+
+/**
+ * The project's real Trunk DO, promoting through the lane's
+ * memory staging and a memory trunk writer at the lane's `base`, initialized
+ * there. Everything else is the object's own: it hears the lane's
+ * BatchVerified, subscribes the batch's members to its advance, and commits
+ * TrunkAdvanced from its WAL, push and read-back.
+ */
+async function realTrunk(projectId: ProjectId, lane: Awaited<ReturnType<typeof realLane>>) {
+  const stub = drainAfter(env.TRUNK.get(env.TRUNK.idFromName(`trunk:${projectId}`)));
+  const writer = makeTrunkWriterMemory(lane.base);
+  await runInDurableObject(stub, (instance: TrunkDO, state) => {
+    Reflect.set(
+      instance,
+      "runtime",
+      ManagedRuntime.make(Layer.mergeAll(backbone(state.storage), lane.code.layer, writer.layer)),
+    );
+  });
+  expect(decodeExit(TrunkCodecs.initialize, await stub.initialize(lane.base, "seed"))).toEqual(
+    Exit.succeed({ head: lane.base, promotion: "idle", redCount: 0 }),
+  );
+  /** Trunk's own events, read inside the object. */
+  const log = () =>
+    runInDurableObject(stub, (instance: TrunkDO) =>
+      instance["runtime"].runPromise(
+        Effect.map(EventOutbox, (outbox) => outbox.log({ kind: "trunk", id: projectId })),
+      ),
+    );
+  return { stub, writer, log };
 }
 
 /** The dedupe keys the change under test has received, among `keys`. */
@@ -583,8 +607,19 @@ const received = (c: ChangeUnderTest, keys: readonly string[]) =>
     ),
   );
 
+/** KeelVerify's own remedy for a bounce, which the change must carry instead of the machine's default. */
+const REMEDY: readonly NextAction[] = [
+  {
+    kind: "call",
+    title: "Fix the failing assertion in test/auth.test.ts, then submit again",
+    operationId: "submitChange",
+  },
+];
+
+const decodeAdvanced = Schema.decodeUnknownSync(TrunkAdvanced);
+
 describe("a change moved by its real lane's delivered events", () => {
-  it("[b13.delivered] goes Queued → Integrating → Bounced on its lane's verdict, hearing only its own batch", async () => {
+  it("[b13.delivered] goes Queued → Integrating → Bounced on its lane's verdict, with the verdict's remedy, hearing only its own batch", async () => {
     await using precheck = await inertPrecheck();
     const projectId = makeId("prj", ulid());
     const lane = await realLane(projectId);
@@ -595,7 +630,7 @@ describe("a change moved by its real lane's delivered events", () => {
     await vi.waitFor(async () => expect((await c.current()).state).toBe("integrating"), WAIT);
     const batchId = (await c.current()).batchId;
     await queue(other);
-    await lane.verdict(batchId, "bounce", ["test-failed: test/auth.test.ts"]);
+    await lane.verdict(batchId, "bounce", ["test-failed: test/auth.test.ts"], REMEDY);
     await vi.waitFor(async () => expect((await c.current()).state).toBe("bounced"), WAIT);
     // The lane forms the other change's batch once this one is done.
     await vi.waitFor(async () => expect((await other.current()).state).toBe("integrating"), WAIT);
@@ -614,68 +649,44 @@ describe("a change moved by its real lane's delivered events", () => {
       "ChangeBatched",
       "ChangeBounced",
     ]);
-    // The lane's verdict names no next action yet, so the machine's own stands in.
-    expect(log.at(-1)?.payload).toMatchObject({
-      reasons: ["test-failed: test/auth.test.ts"],
-      nextActions: [expect.objectContaining({ kind: expect.any(String) })],
-    });
+    // KeelVerify's remedy, through the lane's VerdictIssued, not the machine's "fix and submit".
+    expect(log.at(-1)?.payload).toEqual(
+      expect.objectContaining({ reasons: ["test-failed: test/auth.test.ts"], nextActions: REMEDY }),
+    );
     expect(otherFormed).toBeDefined();
     expect(await received(c, [otherFormed?.dedupeKey ?? ""])).toEqual([]);
     await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(2), WAIT);
   });
 
-  it("[b13.delivered] goes Queued → Integrating → Landed from its own landing in a real Trunk DO's advance", async () => {
+  it("[b13.delivered] goes Queued → Integrating → Landed when its real Trunk DO promotes the verified batch", async () => {
     await using precheck = await inertPrecheck();
     const projectId = makeId("prj", ulid());
     const lane = await realLane(projectId);
-    const trunk = drainAfter(env.TRUNK.get(env.TRUNK.idFromName(`trunk:${projectId}`)));
+    const trunk = await realTrunk(projectId, lane);
     const c = await changeUnderTest(projectId);
-    const otherChange = makeId("chg", ulid());
 
     await queue(c);
     await vi.waitFor(async () => expect((await c.current()).state).toBe("integrating"), WAIT);
-    const green = await lane.verdict((await c.current()).batchId, "land", ["suite: 12 passed"]);
-
-    // The group lands another member first: this change lands from its own landing only.
-    const to = "d".repeat(40);
-    await trunkCommits(
-      trunk,
-      projectId,
-      [
-        {
-          payload: {
-            _tag: "TrunkAdvanced",
-            projectId,
-            from: "b".repeat(40),
-            to,
-            groupId: `group-${ulid()}`,
-            landings: [
-              {
-                changeId: otherChange,
-                commitSha: "1".repeat(40),
-                candidateId: makeId("cnd", ulid()),
-                proofId: "prf-other",
-              },
-              {
-                changeId: c.changeId,
-                commitSha: "2".repeat(40),
-                candidateId: green.candidateId,
-                proofId: "prf-mine",
-              },
-            ],
-            height: 1,
-          },
-          affected: [
-            { kind: "change", id: otherChange },
-            { kind: "change", id: c.changeId },
-          ],
-        },
-      ],
-      [{ changeId: c.changeId, types: ["TrunkAdvanced"] }],
-    );
+    const batchId = (await c.current()).batchId;
+    const [, started] = await lane.job(batchId);
+    const tip: CommitSha = await lane.candidate(started.candidateId);
+    // The land verdict commits BatchVerified; the Trunk hears it, debounces, pushes and advances.
+    await lane.verdict(batchId, "land", ["suite: 12 passed"]);
     await vi.waitFor(async () => expect((await c.current()).state).toBe("landed"), WAIT);
+    const advances = (await trunk.log()).filter((event) => event.type === "TrunkAdvanced");
     const log = await c.log();
 
+    expect(advances).toHaveLength(1);
+    const advanced = decodeAdvanced(advances[0]?.payload);
+    expect(advanced).toMatchObject({ from: lane.base, to: tip });
+    expect(advanced.landings).toEqual([
+      {
+        changeId: c.changeId,
+        commitSha: tip,
+        candidateId: started.candidateId,
+        proofId: expect.any(String),
+      },
+    ]);
     expect(log.map((event) => event.type).slice(-3)).toEqual([
       "ChangeQueued",
       "ChangeBatched",
@@ -684,11 +695,12 @@ describe("a change moved by its real lane's delivered events", () => {
     expect(log.at(-1)?.payload).toEqual({
       _tag: "ChangeLanded",
       changeId: c.changeId,
-      commitSha: "2".repeat(40),
-      trunkSha: to,
-      candidateId: green.candidateId,
-      proofId: "prf-mine",
+      commitSha: tip,
+      trunkSha: tip,
+      candidateId: started.candidateId,
+      proofId: advanced.landings[0]?.proofId,
     });
+    expect(trunk.writer.pushes()).toEqual([{ from: lane.base, to: tip }]);
     await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);
   });
 });

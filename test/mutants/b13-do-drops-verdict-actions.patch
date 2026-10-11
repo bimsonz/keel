@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/change.test.ts -t b13.delivered
+# kills: b13.delivered
+# why: the change keeps a verdict's evidence but not its remedy, so a delivered bounce carries the machine's generic fix and submit instead of KeelVerify's
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index b876f15..68854d1 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -885,7 +885,6 @@ const commandFor = (
+         asStored(
+           encodeBatchVerdict({
+             evidence,
+-            ...(nextActions === undefined ? {} : { nextActions }),
+           }),
+         ),
+       );
