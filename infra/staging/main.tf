@@ -88,3 +88,11 @@ resource "random_password" "bootstrap" {
   length  = 48
   special = false
 }
+
+# Better Auth's secret: it signs the session cookies and encrypts what Better
+# Auth keeps sealed. scripts/deploy.ts sets it as BETTER_AUTH_SECRET. Replacing
+# it signs every user out.
+resource "random_password" "better_auth" {
+  length  = 64
+  special = false
+}

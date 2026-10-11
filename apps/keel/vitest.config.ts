@@ -26,6 +26,7 @@ export default defineProject({
           KEEL_ENV: "test",
           KEEL_SIGNING_KEY: await testSigningKey(),
           KEEL_BOOTSTRAP_SECRET: `test-bootstrap-${crypto.randomUUID()}`,
+          BETTER_AUTH_SECRET: `test-auth-${crypto.randomUUID()}`,
           TEST_MIGRATIONS: await readD1Migrations(`${import.meta.dirname}/migrations`),
           // prove:red pins fast-check's seed; workerd sees it only as a binding.
           ...(process.env["FC_SEED"] === undefined ? {} : { FC_SEED: process.env["FC_SEED"] }),

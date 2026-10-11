@@ -14,8 +14,10 @@ import {
   type Projects,
   TokenIssuer,
 } from "@keeltown/core/ports";
+import { waitUntil } from "cloudflare:workers";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
+import { AUTH_BASE_PATH, makeAuth, type OtpSender } from "../adapters/driven/better-auth/auth.ts";
 import { AgentDirectoryWithBootstrap } from "../adapters/driven/bootstrap/directory.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
@@ -138,15 +140,47 @@ function inboxStreams(env: Env, runtime: IsolateRuntime): InboxStreams {
   };
 }
 
+/** What the identity adapter needs beyond `env`: pool tests read the codes it sends. */
+export interface AuthOverrides {
+  /** Email codes; production has no sender until Keel can send mail, so none are offered. */
+  readonly sendOtp?: OtpSender;
+}
+
+/** Better Auth over the Worker's D1, with GitHub only once both of its secrets are set. */
+function identity(env: Env, overrides: AuthOverrides) {
+  const { GITHUB_CLIENT_ID: clientId, GITHUB_CLIENT_SECRET: clientSecret } = env as Env & {
+    readonly GITHUB_CLIENT_ID?: string;
+    readonly GITHUB_CLIENT_SECRET?: string;
+  };
+  return makeAuth({
+    db: env.DB,
+    secret: env.BETTER_AUTH_SECRET,
+    host: env.KEEL_HOST,
+    background: waitUntil,
+    ...(overrides.sendOtp === undefined ? {} : { sendOtp: overrides.sendOtp }),
+    ...(clientId && clientSecret ? { github: { clientId, clientSecret } } : {}),
+  });
+}
+
 /** The app over a given layer. `isolateFor` caches the production one per Env; pool tests build their own. */
-export function makeIsolate(env: Env, layer: Layer.Layer<IsolateServices>): Isolate {
+export function makeIsolate(
+  env: Env,
+  layer: Layer.Layer<IsolateServices>,
+  authOverrides: AuthOverrides = {},
+): Isolate {
   const runtime = ManagedRuntime.make(layer);
   const handlers = makeHandlers(makeRunner(runtime));
   const verify = makeVerifier(runtime);
+  const auth = identity(env, authOverrides);
   const app = makeApp({
     handlers,
     verify,
     mcp: makeMcpEndpoint(handlers, verify, [env.KEEL_HOST]),
+    auth: {
+      basePath: AUTH_BASE_PATH,
+      handler: (request) => auth.handler(request),
+      admit: async (key) => (await env.AUTH_LIMIT.limit({ key })).success,
+    },
     streams: inboxStreams(env, runtime),
     rethrowContractDrift: env.KEEL_ENV === "test",
   });

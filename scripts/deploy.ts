@@ -345,6 +345,12 @@ async function signingKey(): Promise<string> {
   return JSON.stringify({ ...jwk, kid: `${environment}-${new Date().toISOString().slice(0, 10)}` });
 }
 
+/** Secrets whose value is a Terraform output, so replacing the resource there rotates them. */
+const FROM_TERRAFORM: Readonly<Record<string, string>> = {
+  KEEL_BOOTSTRAP_SECRET: "bootstrap_secret",
+  BETTER_AUTH_SECRET: "better_auth_secret",
+};
+
 /** The secrets a config's `secrets.required` names. */
 function requiredSecrets(config: Json): string[] {
   const secrets = isObject(config["secrets"]) ? config["secrets"]["required"] : undefined;
@@ -352,9 +358,9 @@ function requiredSecrets(config: Json): string[] {
 }
 
 /**
- * The value of every secret the config requires. CLOUDFLARE_ACCOUNT_ID and
- * KEEL_BOOTSTRAP_SECRET (Terraform's output, so replacing it there rotates it
- * here) are set on every deploy; KEEL_SIGNING_KEY only when the Worker lacks
+ * The value of every secret the config requires. CLOUDFLARE_ACCOUNT_ID,
+ * KEEL_BOOTSTRAP_SECRET and BETTER_AUTH_SECRET (Terraform's outputs, so
+ * replacing one there rotates it here) are set on every deploy; KEEL_SIGNING_KEY only when the Worker lacks
  * one, because a new key invalidates every token already issued. The
  * console's observer and operator credentials come from the seed on every
  * deploy; its capability and presenter keys as `consoleKeyFor` decides.
@@ -377,8 +383,8 @@ async function secretsFor(
   for (const secret of required) {
     if (secret === "CLOUDFLARE_ACCOUNT_ID") {
       values[secret] = accountId();
-    } else if (secret === "KEEL_BOOTSTRAP_SECRET") {
-      values[secret] = requireOutput(outputs, "bootstrap_secret", secret);
+    } else if (FROM_TERRAFORM[secret] !== undefined) {
+      values[secret] = requireOutput(outputs, FROM_TERRAFORM[secret], secret);
     } else if (secret === "KEEL_SIGNING_KEY") {
       if (existing.has(secret)) {
         console.log(`${name}: KEEL_SIGNING_KEY kept`);
@@ -431,13 +437,19 @@ const outputs = terraformOutputs();
 
 // Render and check every config before deploying any, so a bad one stops the whole deploy.
 const rendered = APPS.map((dir) => ({ dir, ...render(dir, outputs) }));
-for (const app of rendered) await verifyStores(app.name, app.config);
+for (const app of rendered) {
+  await verifyStores(app.name, app.config);
+  // A secret Terraform has not output yet stops the deploy here, before any migration runs.
+  for (const secret of requiredSecrets(app.config))
+    if (FROM_TERRAFORM[secret] !== undefined)
+      requireOutput(outputs, FROM_TERRAFORM[secret], secret);
+}
 const deploying = rendered.filter((app) => only === undefined || app.dir === only);
 if (rotate !== undefined && !deploying.some((app) => requiredSecrets(app.config).includes(rotate)))
   throw new Error(`--rotate ${rotate}: no app this deploy reaches requires it`);
 if (checkOnly) {
   console.log(
-    `${environment}: every config rendered with no sentinel left, and every bound store exists`,
+    `${environment}: every config rendered with no sentinel left, every bound store exists, and Terraform outputs every secret it owns`,
   );
   process.exit(0);
 }

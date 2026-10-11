@@ -79,7 +79,7 @@ catalog:
   "@pierre/diffs": 1.5.2
   "@xyflow/react": 12.12.0
   uqr: 0.1.3
-  # Identity (spike 27): the page's client for Better Auth's routes, and the same library in its tests' stand-in.
+  # Identity: Keel's users, sessions, orgs and device grant, and the console's client for them. They move together.
   better-auth: 1.7.7
   "@better-auth/passkey": 1.7.7
   # The console's browser checks (apps/console/scripts): run by hand, never in CI.

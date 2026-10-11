@@ -31,8 +31,19 @@
     // the BACKUP_BUCKET binding and no runner asks for credentials (guard: runner-credentials).
     // KEEL_BOOTSTRAP_SECRET: exchanged as client `keel-bootstrap` for a token that may only enrol
     // agents, so a new deployment can enrol its first operator. From Terraform; rotate to retire.
-    "required": ["KEEL_SIGNING_KEY", "CLOUDFLARE_ACCOUNT_ID", "KEEL_BOOTSTRAP_SECRET"],
+    // BETTER_AUTH_SECRET: signs and encrypts Better Auth's cookies and tokens. From Terraform.
+    // GITHUB_CLIENT_ID/GITHUB_CLIENT_SECRET are optional: GitHub sign-in is offered only when both are set.
+    "required": [
+      "KEEL_SIGNING_KEY",
+      "CLOUDFLARE_ACCOUNT_ID",
+      "KEEL_BOOTSTRAP_SECRET",
+      "BETTER_AUTH_SECRET",
+    ],
   },
+  // Workers Rate Limiting: each IP's writes to /v1/auth/* (sign-in, codes, sign-up).
+  "ratelimits": [
+    { "name": "AUTH_LIMIT", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } },
+  ],
 
   // Every id below is a sentinel. scripts/deploy.ts writes a gitignored
   // wrangler.deploy.jsonc with the real ids from Terraform, and refuses to

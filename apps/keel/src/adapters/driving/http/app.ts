@@ -9,6 +9,7 @@ import {
   ResponseContractError,
   UndeclaredStatusError,
 } from "../../../generated/http/runtime.gen.ts";
+import { type AuthMount, registerAuth } from "./auth-mount.ts";
 import type { TokenVerifier } from "./caller.ts";
 import type { Handlers } from "./handlers.ts";
 import { type InboxStreams, registerInboxStreams } from "./inbox-streams.ts";
@@ -19,13 +20,15 @@ export interface AppOptions {
   readonly handlers: Handlers;
   readonly verify: TokenVerifier;
   readonly mcp: (request: Request) => Promise<Response>;
+  /** Users, sessions, orgs and the device grant (Better Auth), at `/v1/auth/*`. */
+  readonly auth: AuthMount;
   /** The agent's live inbox: SSE and WebSocket, outside the spec until the emitter upgrade. */
   readonly streams: InboxStreams;
   /** Tests rethrow contract drift so it fails loudly; production logs it and answers 500. */
   readonly rethrowContractDrift: boolean;
 }
 
-/** The HTTP doorway: middleware, the generated routes, the agent's inbox streams, the MCP endpoint and the document. */
+/** The HTTP doorway: middleware, the generated routes, the agent's inbox streams, the MCP endpoint, Better Auth and the document. */
 export function makeApp(options: AppOptions) {
   const app = new Hono<AppEnv>();
 
@@ -45,6 +48,7 @@ export function makeApp(options: AppOptions) {
   app.get("/healthz", (c) => c.json({ ok: true, service: "keel" }));
   app.get(OPENAPI_DOCUMENT_PATH, (c) => c.json(openApiDocument));
   app.all("/mcp", (c) => options.mcp(c.req.raw));
+  registerAuth(app, options.auth);
   const deps = routeDeps(options.verify);
   registerInboxStreams(app, deps, options.streams);
 

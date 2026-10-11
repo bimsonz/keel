@@ -14,6 +14,7 @@
     "deploy:dry": "wrangler deploy --dry-run --outdir .wrangler/dry-run"
   },
   "dependencies": {
+    "@better-auth/passkey": "catalog:",
     "@cloudflare/ci": "catalog:",
     "@hono/zod-validator": "catalog:",
     "@keeltown/contracts": "workspace:*",
@@ -21,6 +22,7 @@
     "@keeltown/gitcore": "workspace:*",
     "@keeltown/runner-protocol": "workspace:*",
     "@modelcontextprotocol/server": "catalog:",
+    "better-auth": "catalog:",
     "effect": "catalog:",
     "hono": "catalog:",
     "jose": "catalog:",
