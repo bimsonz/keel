@@ -19,7 +19,7 @@ import {
 } from "../kernel/index.ts";
 import { ChangeOrigin, ParkReason } from "./change.ts";
 import { DerivedEffect, Drift } from "./derivation.ts";
-import { Contradiction, Neighbour, PrecedentRef } from "./preflight.ts";
+import { Contradiction, MoveBasis, Neighbour, PrecedentRef } from "./preflight.ts";
 import { FootprintEntry, PredicatePolicies, Proposition, SubjectKey } from "./proposition.ts";
 import { Move } from "./change.ts";
 
@@ -44,6 +44,8 @@ export const PreflightIssued = Schema.TaggedStruct("PreflightIssued", {
   contradictions: Schema.Array(Contradiction),
   precedents: Schema.Array(PrecedentRef),
   suggestedMove: Move,
+  /** What the move rests on: a contradiction above, by index, or a precedent. Absent exactly when the move is `proceed`. */
+  basis: Schema.optional(MoveBasis),
 });
 export const IntentRevised = Schema.TaggedStruct("IntentRevised", {
   changeId: ChangeId,

@@ -349,22 +349,37 @@ describe("exposure", () => {
     expect(distant).toBeGreaterThan(0);
   });
 
-  it("[exposure.reports-contradictions] contradictions are exactly my premises against theirs or their effects, and theirs against my declared effects", () => {
+  it("[exposure.reports-contradictions] contradictions are exactly my premises against theirs or their effects, and theirs against my declared effects, each saying which the other is", () => {
     fc.assert(
       fc.property(exposureArb, ({ self, intent, others }) => {
         const reported = exposure(self, intent, others).contradictions;
         const expected = others.flatMap((o) => {
-          const theirs = [
-            ...o.intent.premises,
+          const theirEffects = [
             ...(o.intent.declaredEffects ?? []),
             ...o.derived.map((d) => d.proposition),
           ];
           return [
-            ...intent.premises.flatMap((p) =>
-              theirs.map((t) => ({ premise: p, with: t, holder: self })),
-            ),
+            ...intent.premises.flatMap((p) => [
+              ...o.intent.premises.map((t) => ({
+                premise: p,
+                with: t,
+                holder: self,
+                withRole: "premise",
+              })),
+              ...theirEffects.map((t) => ({
+                premise: p,
+                with: t,
+                holder: self,
+                withRole: "effect",
+              })),
+            ]),
             ...o.intent.premises.flatMap((p) =>
-              (intent.declaredEffects ?? []).map((e) => ({ premise: p, with: e, holder: o.id })),
+              (intent.declaredEffects ?? []).map((e) => ({
+                premise: p,
+                with: e,
+                holder: o.id,
+                withRole: "effect",
+              })),
             ),
           ].filter((c) => compare(c.premise, c.with).outcome === "contradicts");
         });

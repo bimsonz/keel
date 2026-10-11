@@ -6,7 +6,7 @@ import { readClaim } from "./claim.ts";
 import { compare } from "./compare.ts";
 import type { UnreadableProposition } from "./errors.ts";
 import type { LiveChange } from "./graph.ts";
-import type { Contradiction, Neighbour } from "./preflight.ts";
+import type { Contradiction, ContradictionRole, Neighbour } from "./preflight.ts";
 import type { Proposition, SubjectKey } from "./proposition.ts";
 import { subjectsRelated, subjectsSiblings } from "./subject.ts";
 
@@ -66,13 +66,16 @@ export const exposure = (
       });
     }
 
-    const pairs: readonly (readonly [Proposition, Proposition, ChangeId])[] = [
-      ...myPremises.flatMap((p) => theirs.map((t) => [p, t, self] as const)),
-      ...theirPremises.flatMap((p) => myEffects.map((e) => [p, e, live.id] as const)),
+    const pairs: readonly (readonly [Proposition, Proposition, ChangeId, ContradictionRole])[] = [
+      ...myPremises.flatMap((p) => [
+        ...theirPremises.map((t) => [p, t, self, "premise"] as const),
+        ...theirEffects.map((t) => [p, t, self, "effect"] as const),
+      ]),
+      ...theirPremises.flatMap((p) => myEffects.map((e) => [p, e, live.id, "effect"] as const)),
     ];
-    for (const [premise, other, holder] of pairs) {
+    for (const [premise, other, holder, withRole] of pairs) {
       if (compare(premise, other).outcome === "contradicts")
-        contradictions.push({ premise, with: other, holder });
+        contradictions.push({ premise, with: other, holder, withRole });
     }
   }
 

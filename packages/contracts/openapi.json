@@ -8968,13 +8968,44 @@
           },
           "holder": {
             "type": "string",
-            "description": "The change or tenet holding the other proposition."
+            "description": "The change or tenet holding the premise."
+          },
+          "withRole": {
+            "type": "string",
+            "enum": [
+              "premise",
+              "effect"
+            ],
+            "description": "Whether `with` is a premise or an effect. Always set by Keel; absent (older events) reads as an effect."
           }
         },
         "additionalProperties": {
           "not": {}
         },
-        "description": "A premise of this change that contradicts another change's premise, or a tenet."
+        "description": "A premise and the proposition contradicting it: one change's premise (or a tenet) against another change's premise or effect."
+      },
+      "EventContradictionBasis": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "index"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "contradiction"
+            ]
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A move resting on one of the preflight's contradictions, by its index in that list."
       },
       "EventDecisionModelEffect": {
         "type": "object",
@@ -9122,6 +9153,17 @@
         },
         "description": "A numbered session message."
       },
+      "EventMoveBasis": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/EventContradictionBasis"
+          },
+          {
+            "$ref": "#/components/schemas/EventPrecedentBasis"
+          }
+        ],
+        "description": "What a suggested move rests on: a contradiction in the same preflight, or a precedent."
+      },
       "EventNeighbour": {
         "type": "object",
         "required": [
@@ -9213,6 +9255,28 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "EventPrecedentBasis": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "decisionId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "precedent"
+            ]
+          },
+          "decisionId": {
+            "$ref": "#/components/schemas/DecisionId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A move resting on a precedent in scope."
       },
       "EventPrecedentRef": {
         "type": "object",
@@ -12514,6 +12578,14 @@
           },
           "suggestedMove": {
             "$ref": "#/components/schemas/Move"
+          },
+          "basis": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EventMoveBasis"
+              }
+            ],
+            "description": "What the move rests on. Absent exactly when the move is `proceed`."
           }
         },
         "additionalProperties": {

@@ -156,13 +156,36 @@ model EventNeighbour {
   overlap: "subject" | "footprint";
 }
 
-/** A premise of this change that contradicts another change's premise, or a tenet. */
+/** A premise and the proposition contradicting it: one change's premise (or a tenet) against another change's premise or effect. */
 model EventContradiction {
   premise: EventProposition;
   with: EventProposition;
 
-  /** The change or tenet holding the other proposition. */
+  /** The change or tenet holding the premise. */
   holder: string;
+
+  /** Whether `with` is a premise or an effect. Always set by Keel; absent (older events) reads as an effect. */
+  withRole?: "premise" | "effect";
+}
+
+/** A move resting on one of the preflight's contradictions, by its index in that list. */
+model EventContradictionBasis {
+  _tag: "contradiction";
+
+  @minValue(0)
+  index: integer;
+}
+
+/** A move resting on a precedent in scope. */
+model EventPrecedentBasis {
+  _tag: "precedent";
+  decisionId: DecisionId;
+}
+
+/** What a suggested move rests on: a contradiction in the same preflight, or a precedent. */
+union EventMoveBasis {
+  contradiction: EventContradictionBasis,
+  precedent: EventPrecedentBasis,
 }
 
 model EventPrecedentRef {
@@ -269,6 +292,9 @@ model PreflightIssued {
   contradictions: EventContradiction[];
   precedents: EventPrecedentRef[];
   suggestedMove: Move;
+
+  /** What the move rests on. Absent exactly when the move is `proceed`. */
+  basis?: EventMoveBasis;
 }
 
 model IntentRevised {
