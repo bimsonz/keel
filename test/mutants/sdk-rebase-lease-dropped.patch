@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/methods.test.ts -t sdk.rebase
+# kills: sdk.rebase
+# why: rebase sends no lease, so Keel refuses every rebase as stale
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index bfc8be7..93298c2 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -274,7 +274,7 @@ export class KeelClient {
+   ): Promise<WireOutputs["rebase"]> {
+     return this.call(
+       "rebase",
+-      { changeId, "keel-lease": options.lease, "idempotency-key": keyOf(options) },
++      { changeId, "idempotency-key": keyOf(options) },
+       options,
+     );
+   }

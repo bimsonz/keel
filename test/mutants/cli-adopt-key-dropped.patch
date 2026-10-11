@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/cli.test.ts -t cli.adopt
+# kills: cli.adopt
+# why: keeltown adopt ignores --key, so a retried adoption is a second one
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index 899df9e..bb15584 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -230,7 +230,7 @@ async function dispatch(
+           ...idempotent,
+         });
+       if (command[0] === "adopt" && command.length === 2)
+-        return client.adopt(required(command[1], "change"), idempotent);
++        return client.adopt(required(command[1], "change"));
+       // No --lease is an operator's withdrawal; Keel refuses it to anyone else.
+       if (command[0] === "abandon" && command.length === 2)
+         return client.abandon(

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/methods.test.ts -t sdk.session
+# kills: sdk.session
+# why: openSession mints a fresh key on every call, so a retry opens a second session
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index bfc8be7..c727ad7 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -181,7 +181,7 @@ export class KeelClient {
+   ): Promise<WireOutputs["Sessions_openSession"]> {
+     return this.call(
+       "Sessions_openSession",
+-      { ...request, "idempotency-key": keyOf(options) },
++      { ...request, "idempotency-key": crypto.randomUUID() },
+       options,
+     );
+   }

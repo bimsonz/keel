@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/cli.test.ts -t cli.session
+# kills: cli.session
+# why: keeltown session open drops --on-behalf-of, so the session names no sponsor
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index 899df9e..662167c 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -146,7 +146,6 @@ async function dispatch(
+         {
+           ...(values.harness === undefined ? {} : { harness: values.harness }),
+           ...(values.model === undefined ? {} : { model: values.model }),
+-          ...(values["on-behalf-of"] === undefined ? {} : { onBehalfOf: values["on-behalf-of"] }),
+         },
+         idempotent,
+       );
