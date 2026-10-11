@@ -5,10 +5,12 @@ import {
   contentHashOf,
   type EvidenceClass,
   Glob,
+  makeId,
   matchesGlob,
   weakest,
 } from "../../../src/domain/kernel/index.ts";
 import {
+  type AdmittedGuard,
   type CompileError,
   compile,
   type Condition,
@@ -19,6 +21,7 @@ import {
   type PlanPreimage,
   planHashOf,
   type StepSpec,
+  guardSteps,
 } from "../../../src/domain/verification/index.ts";
 import {
   base,
@@ -691,5 +694,104 @@ describe("flow-compiler/2: what a plan's hash covers", () => {
       ["g1", probeOf("g1")],
       ["g2", probeOf("g2")],
     ]);
+  });
+});
+
+/** Admitted guards on subjects some flow cases touch and some don't. */
+const guardSubjects = [
+  "authz",
+  "authz.cache",
+  "billing.audit-log",
+  "billing",
+  "ops.deploy",
+] as const;
+const admittedArb: fc.Arbitrary<readonly AdmittedGuard[]> = fc
+  .subarray([1, 2, 3], { maxLength: 3 })
+  .chain((ns) =>
+    fc.tuple(
+      ...ns.map((n) =>
+        fc.constantFrom(...guardSubjects).map((subject): AdmittedGuard => ({
+          guardId: makeId("grd", String(n).padStart(26, "0")),
+          probe: contentHashOf({ probe: n }),
+          tenet: {
+            id: makeId("tnt", String(n).padStart(26, "0")),
+            proposition: {
+              subject: SubjectKey.make(subject),
+              predicate: "freshness",
+              relation: "at-most",
+              value: "per-request",
+            },
+          },
+        })),
+      ),
+    ),
+  );
+
+const withGuards = (c: FlowCase, admittedGuards: readonly AdmittedGuard[]): FlowCase => ({
+  spec: c.spec,
+  facts: { ...c.facts, admittedGuards },
+});
+/** The flow under the human-class gate, when the plan has one. */
+const bodyOf = (plan: FlowPlan): unknown =>
+  plan.humanClass && plan.flow._tag === "seq" ? plan.flow.items[0] : plan.flow;
+
+describe("flow-compiler/2: the admitted guards a change runs", () => {
+  it("[flow.guards-appended] compile plans every guard the change is exposed to, each pinned to its probe, and without guards the plan is unchanged", () => {
+    let planned = 0;
+    fc.assert(
+      fc.property(flowCaseArb(), admittedArb, (c, admitted) => {
+        const bare = ok(c);
+        const none = ok(withGuards(c, []));
+        const guarded = ok(withGuards(c, admitted));
+        const selected = guardSteps(admitted, c.facts);
+        planned += selected.length;
+        const byId = new Map(guarded.steps.map((s) => [s.id, s]));
+        return (
+          JSON.stringify(none) === JSON.stringify(bare) &&
+          selected.every((g) => byId.get(g.id)?.guards?.probe === g.guards?.probe) &&
+          guarded.steps.length === bare.steps.length + selected.length
+        );
+      }),
+    );
+    expect(planned).toBeGreaterThan(0);
+    const c = single([suiteStep("tests")]);
+    const on: AdmittedGuard = {
+      guardId: makeId("grd", "1".padStart(26, "0")),
+      probe: contentHashOf({ probe: 1 }),
+      tenet: {
+        id: makeId("tnt", "1".padStart(26, "0")),
+        proposition: {
+          subject: SubjectKey.make("authz.cache"),
+          predicate: "freshness",
+          relation: "at-most",
+          value: "per-request",
+        },
+      },
+    };
+    const plan = ok(withGuards(c, [on]));
+    expect(plan.steps.map((s) => [s.id, s.guards?.probe])).toEqual([
+      ["tests", undefined],
+      [`guard:${on.guardId}`, on.probe],
+    ]);
+    expect(plan.planHash).not.toBe(ok(c).planHash);
+  });
+
+  it("[flow.guards-parallel] guards run alongside the project's flow, never after it", () => {
+    let both = 0;
+    fc.assert(
+      fc.property(flowCaseArb(), admittedArb, (c, admitted) => {
+        const selected = guardSteps(admitted, c.facts);
+        const bare = ok(c);
+        const projectRuns = bare.steps.some((s) => s.id !== HUMAN_CLASS_STEP);
+        if (selected.length === 0 || !projectRuns) return true;
+        both++;
+        const guards = { _tag: "par", items: selected.map((s) => ({ _tag: "step", step: s.id })) };
+        return (
+          JSON.stringify(bodyOf(ok(withGuards(c, admitted)))) ===
+          JSON.stringify({ _tag: "par", items: [bodyOf(bare), guards] })
+        );
+      }),
+    );
+    expect(both).toBeGreaterThan(0);
   });
 });

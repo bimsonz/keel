@@ -120,6 +120,13 @@ const leaf = (ctx: Context, id: string, world: World | undefined): Value => {
     waiting: [],
     advisories: [],
   });
+  // A tenet never blocks by itself: its guard's fail, or its abstain (an n/a
+  // means the tenet's precondition is gone from the candidate, a silent
+  // retraction), stops the flow only where the project chose block. Otherwise
+  // the flow reads the step as a pass (a cascade accepts it), and the result
+  // is kept as advice.
+  const advised = step?.guards !== undefined && step.guards.policy !== "block";
+  const advice: Value = { ...as("pass"), outcome: "pass", advisories: [r] };
   switch (r.outcome) {
     case "pass":
     case "annotate":
@@ -127,15 +134,11 @@ const leaf = (ctx: Context, id: string, world: World | undefined): Value => {
     case "fail":
       if (!canBlock(r.evidenceClass)) return as("escalate");
       if (ctx.overridden.has(id)) return as("pass");
-      // A tenet never blocks by itself: its guard's fail blocks only where the
-      // project chose block. Otherwise the flow reads the step as a pass (a
-      // cascade accepts it), and the fail is kept as advice.
-      return step?.guards !== undefined && step.guards.policy !== "block"
-        ? { ...as("pass"), outcome: "pass", advisories: [r] }
-        : as("fail");
+      return advised ? advice : as("fail");
     case "escalate":
       return as("escalate");
     default:
+      if (advised) return advice;
       return optional ? as("pass") : as("escalate");
   }
 };

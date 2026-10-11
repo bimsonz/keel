@@ -22,10 +22,16 @@ export type Exposure = {
   readonly unreadable: readonly UnreadableProposition[];
 };
 
-const anchorPathsOf = (ps: readonly Proposition[]): ReadonlySet<string> =>
+/** The paths the propositions' anchors pin. */
+export const anchorPathsOf = (ps: readonly Proposition[]): ReadonlySet<string> =>
   new Set(ps.flatMap((p) => (p.anchors ?? []).map((a) => a.path)));
 
-const near = (a: SubjectKey, b: SubjectKey): boolean =>
+/**
+ * Exposure's never-miss relation between subjects: related (ancestor or
+ * self, either way) or siblings. Wider than fallout's, which treats siblings
+ * as proximity only, because exposure may over-report but must never miss.
+ */
+export const subjectsNear = (a: SubjectKey, b: SubjectKey): boolean =>
   subjectsRelated(a, b) || subjectsSiblings(a, b);
 
 export const exposure = (
@@ -50,7 +56,9 @@ export const exposure = (
 
     const subjects = [
       ...new Set(
-        theirs.filter((t) => mine.some((m) => near(m.subject, t.subject))).map((t) => t.subject),
+        theirs
+          .filter((t) => mine.some((m) => subjectsNear(m.subject, t.subject)))
+          .map((t) => t.subject),
       ),
     ];
     const sharedAnchor = [...anchorPathsOf(theirs)].some((path) => myAnchors.has(path));

@@ -1,5 +1,18 @@
-import type { CommitSha, ContentHash, EvidenceClass, Glob, Tier } from "../kernel/index.ts";
-import type { Predicate, PredicatePolicies, SubjectKey } from "../coordination/index.ts";
+import type {
+  CommitSha,
+  ContentHash,
+  EvidenceClass,
+  Glob,
+  GuardId,
+  TenetId,
+  Tier,
+} from "../kernel/index.ts";
+import type {
+  Predicate,
+  PredicatePolicies,
+  Proposition,
+  SubjectKey,
+} from "../coordination/index.ts";
 import type { FlowWorld } from "./conflict.ts";
 import type { PlanStep, StepKind, StepOutcome, VerificationPlan } from "./plan.ts";
 
@@ -89,6 +102,17 @@ export type FlowDefinition = {
 /** Keel's defaults (a verifier pack): used when the project has no flow, and as steps a project flow may name. */
 export type FlowDefaults = { readonly flow: Flow; readonly steps: readonly StepSpec[] };
 
+/**
+ * An admitted guard, as the AdmittedGuards port reads it: `GuardAdmitted`, the bundle its
+ * probe was admitted with, and the tenet it guards (`TenetEstablished`).
+ */
+export type AdmittedGuard = {
+  readonly guardId: GuardId;
+  /** The admitted probe bundle the guard runs, by content hash. */
+  readonly probe: ContentHash;
+  readonly tenet: { readonly id: TenetId; readonly proposition: Proposition };
+};
+
 /** What compile knows about the change. */
 export type ChangeFacts = {
   readonly baseCommit: CommitSha;
@@ -103,6 +127,11 @@ export type ChangeFacts = {
    * leaves out is `advise` (ADR 0005, decided 11 Oct).
    */
   readonly predicatePolicy?: PredicatePolicies;
+  /**
+   * The project's admitted guards. Compile selects the ones the change is
+   * exposed to (`selectGuards`) and runs them alongside the project's flow.
+   */
+  readonly admittedGuards?: readonly AdmittedGuard[];
 };
 
 export type FlowPolicy = {

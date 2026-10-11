@@ -493,13 +493,12 @@ describe("verdict: guards take their predicate's policy", () => {
             return (
               g !== undefined &&
               g.policy !== "block" &&
-              r.outcome === "fail" &&
-              canBlock(r.evidenceClass) &&
-              !overridden.has(r.stepId)
+              ((r.outcome === "fail" && canBlock(r.evidenceClass) && !overridden.has(r.stepId)) ||
+                r.outcome === "abstain")
             );
           };
           const v = verdictOf(plan, results);
-          // The same run with each advised fail read as a pass, on a plan that marks no guard.
+          // The same run with each advised fail or abstain read as a pass, on a plan that marks no guard.
           const w = verdictOf(
             withPolicy(plan, undefined),
             results.map((r) => (advised(r) ? { ...r, outcome: "pass" as const } : r)),
@@ -537,5 +536,50 @@ describe("verdict: guards take their predicate's policy", () => {
     expect(advised.outcome).toBe("land");
     expect(advised.advisories.map((r) => r.stepId)).toEqual(["guard"]);
     expect(verdictOf(withPolicy(advise, "block"), run).outcome).toBe("bounce");
+  });
+
+  it("[verdict.guard-abstain-policy] a guard that abstains (its tenet's precondition gone) takes its predicate's policy: block parks for a ruling, advise and annotate keep it as advice", () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom("advise" as const, "annotate" as const, "block" as const),
+        fc.integer({ min: 0, max: 2 }),
+        fc.constantFrom("seq" as const, "par" as const),
+        (policy, others, shape) => {
+          const ids = ["guard", ...Array.from({ length: others }, (_, i) => `s${i}`)];
+          const steps = ids.map((id) =>
+            id === "guard"
+              ? specStep(id, { guards: { predicate: "freshness", probe: probeOf(id) } })
+              : specStep(id),
+          );
+          const items = ids.map((step): FlowPlan["flow"] => ({ _tag: "step", step }));
+          const flow: FlowPlan["flow"] =
+            shape === "seq" ? { _tag: "seq", exitOn: "fail", items } : { _tag: "par", items };
+          const compiled = build(steps, flow);
+          const plan = {
+            ...compiled,
+            steps: compiled.steps.map((s) =>
+              s.guards === undefined ? s : { ...s, guards: { ...s.guards, policy } },
+            ),
+          };
+          const abstained = res(plan, "guard", "abstain");
+          const v = verdictOf(plan, [
+            abstained,
+            ...ids.slice(1).map((id) => res(plan, id, "pass")),
+          ]);
+          return policy === "block"
+            ? v.outcome === "park" && v.advisories.length === 0
+            : v.outcome === "land" &&
+                v.advisories.length === 1 &&
+                v.advisories[0]?.outcome === "abstain";
+        },
+      ),
+    );
+    const plan = build(
+      [specStep("guard", { guards: { predicate: "freshness", probe: probeOf("guard") } })],
+      { _tag: "step", step: "guard" },
+    );
+    const abstained = [res(plan, "guard", "abstain")];
+    expect(verdictOf(plan, abstained).outcome).toBe("land");
+    expect(verdictOf(withPolicy(plan, "block"), abstained).outcome).toBe("park");
   });
 });

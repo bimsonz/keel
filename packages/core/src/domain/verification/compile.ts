@@ -13,6 +13,7 @@ import {
   weakest,
 } from "../kernel/index.ts";
 import type { FlowWorld } from "./conflict.ts";
+import { selectGuards } from "./guards.ts";
 import {
   AbstainMissing,
   CascadeAcceptUnreachable,
@@ -418,6 +419,12 @@ export const compile = (
   const table = new Map<string, StepSpec>();
   for (const s of [...defaults.steps, ...(spec?.steps ?? [])]) table.set(s.id, s);
   const flow = spec?.flow ?? defaults.flow;
+  // Guards come from the guard store, never the project's flow: a step id they share is refused.
+  const guards = selectGuards(facts.admittedGuards ?? [], facts);
+  for (const g of guards) {
+    if (table.has(g.spec.id)) errors.push(new StepUsedTwice({ step: g.spec.id }));
+    table.set(g.spec.id, g.spec);
+  }
 
   const taint = effectiveClasses(table, facts.facts);
   const used = stepsIn(flow);
@@ -433,14 +440,26 @@ export const compile = (
   const [first, ...rest] = errors;
   if (first !== undefined) return Result.fail([first, ...rest]);
 
-  const reasons = new Map(
-    used.map((id) => [id, applies(table.get(id) ?? humanClassStep, facts)] as const),
-  );
+  const reasons = new Map<string, Applies>([
+    ...used.map((id) => [id, applies(table.get(id) ?? humanClassStep, facts)] as const),
+    ...guards.map((g) => [g.spec.id, { applies: true, because: g.because }] as const),
+  ]);
   const kept = new Set(used.filter((id) => reasons.get(id)?.applies === true));
   const touchesFlow = facts.touchedPaths.filter((p) =>
     policy.humanClassPaths.some((g) => matchesGlob(g, p)),
   );
-  const pruned = prune(flow, kept);
+  const project = prune(flow, kept);
+  // Guards (Tier 1, seconds) run alongside the project's flow (often Tier 2, minutes), so their proof is recorded whatever the suite does.
+  const guarded: Flow | undefined =
+    guards.length === 0
+      ? undefined
+      : { _tag: "par", items: guards.map((g): Flow => ({ _tag: "step", step: g.spec.id })) };
+  const pruned: Flow | undefined =
+    guarded === undefined
+      ? project
+      : project === undefined
+        ? guarded
+        : { _tag: "par", items: [project, guarded] };
   const gate: Flow = { _tag: "step", step: HUMAN_CLASS_STEP };
   const compiled: Flow =
     touchesFlow.length === 0
