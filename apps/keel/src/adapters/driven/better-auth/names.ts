@@ -33,6 +33,13 @@ export const RESERVED_NAMES: ReadonlySet<string> = new Set([
   "llms.txt",
 ]);
 
+/**
+ * The instance's own org, which holds Keel's own projects. It is claimed with
+ * the instance (the claim code makes it, its claimant the owner), so no one
+ * may take the name first.
+ */
+export const INSTANCE_ORG = "keel";
+
 /** Lower-case letters and digits, single hyphens between them, at most 39 characters. */
 export const HANDLE = /^[a-z0-9](?:-?[a-z0-9]){0,38}$/;
 
@@ -41,6 +48,7 @@ export function nameRefusal(name: string): string | undefined {
   const lowered = name.toLowerCase();
   if (RESERVED_NAMES.has(lowered))
     return `"${name}" is reserved: keel.town serves /${lowered} itself`;
+  if (lowered === INSTANCE_ORG) return `"${name}" is reserved: it is this instance's own org`;
   if (!HANDLE.test(lowered))
     return `"${name}" must be letters, digits and single hyphens, starting and ending with a letter or digit, at most 39 characters`;
   return undefined;

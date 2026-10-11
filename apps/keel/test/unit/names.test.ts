@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { nameRefusal, RESERVED_NAMES } from "../../src/adapters/driven/better-auth/names.ts";
+import {
+  INSTANCE_ORG,
+  nameRefusal,
+  RESERVED_NAMES,
+} from "../../src/adapters/driven/better-auth/names.ts";
 
 /** The paths keel.town serves at its root (Mission Control's list, plus Better Auth's mount). */
 const SITE_PATHS = [
@@ -39,8 +43,13 @@ describe("handles and org names", () => {
     }
   });
 
+  it("[names.instance] refuses the instance's own org name, in any case, before anyone signs up", () => {
+    expect(INSTANCE_ORG).toBe("keel");
+    for (const name of ["keel", "Keel", "KEEL"]) expect(nameRefusal(name)).toMatch(/own org/);
+  });
+
   it("[names.handle] takes letters, digits and single inner hyphens up to 39 characters", () => {
-    for (const ok of ["ada", "Ada", "keel", "a", "a-b", "forge-lite", "x".repeat(39), "r2d2"])
+    for (const ok of ["ada", "Ada", "keeltown", "a", "a-b", "forge-lite", "x".repeat(39), "r2d2"])
       expect(nameRefusal(ok)).toBeUndefined();
     for (const bad of ["", "-a", "a-", "a--b", "a_b", "a.b", "a b", "x".repeat(40), "é"])
       expect(nameRefusal(bad)).toMatch(/must be/);

@@ -171,6 +171,9 @@ describe("Better Auth at /v1/auth", () => {
     const reserved = await call("/update-user", { body: { username: "Admin" }, jar: bea.jar });
     expect(reserved.status).toBe(400);
     expect(reserved.json.code).toBe("NAME_REFUSED");
+    const instance = await call("/update-user", { body: { username: "Keel" }, jar: bea.jar });
+    expect(instance.status).toBe(400);
+    expect(instance.json.code).toBe("NAME_REFUSED");
     const taken = await call("/update-user", { body: { username: "ada" }, jar: bea.jar });
     expect(taken.status).toBe(400);
 
