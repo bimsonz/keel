@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.refused-composition-blames
+# why: a refused batch of one is blamed textual, which no Change DO bounces on, so its change strands in Integrating
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index 1fa8770..ad205e9 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -195,7 +195,7 @@ export const decideCandidate = (
+       if (batch.state !== "forming") return refuse(batchId, batch.state, command);
+       // A batch of one names its change, so the change bounces; a textual blame would strand it.
+       const [sole, ...others] = batch.members;
+-      const attribution = sole !== undefined && others.length === 0 ? sole : "textual";
++      const attribution = sole !== undefined && others.length < 0 ? sole : "textual";
+       return Result.succeed([
+         BatchFailed.make({ batchId, verdictId: command.verdictId, attribution }),
+       ]);

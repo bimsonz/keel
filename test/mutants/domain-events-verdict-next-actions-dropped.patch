@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: events.verdict-next-actions
+# why: a verdict loses the issuer's next actions at decode, so the bounce falls back to a generic remedy
+diff --git a/packages/core/src/domain/verification/events.ts b/packages/core/src/domain/verification/events.ts
+index 864daf3..435b858 100644
+--- a/packages/core/src/domain/verification/events.ts
++++ b/packages/core/src/domain/verification/events.ts
+@@ -147,7 +147,6 @@ export const VerdictIssued = Schema.TaggedStruct("VerdictIssued", {
+    * composition or bundle, KeelVerify for a failing test). The Change DO copies
+    * it onto `ChangeBounced`, and falls back to its own default only when absent.
+    */
+-  nextActions: Schema.optional(Schema.Array(NextAction)),
+ });
+ export const EscalationRaised = Schema.TaggedStruct("EscalationRaised", {
+   escalationId: EscalationId,

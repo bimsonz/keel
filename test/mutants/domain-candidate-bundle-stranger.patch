@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.bundle-refused, candidate.transitions, candidate.attribution-is-member
+# why: a refused bundle is blamed on whoever the Lane names, even a change outside the batch
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index 1fa8770..6320ce8 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -205,7 +205,7 @@ export const decideCandidate = (
+       if (batch.state !== "assembled" || batch.candidateId === undefined)
+         return refuse(batchId, batch.state, command);
+       const blamed = command.attribution;
+-      if (blamed !== "infra" && !batch.members.includes(blamed))
++      if (blamed !== "infra" && false)
+         return Result.fail(
+           new InvalidBatch({ batchId, reason: `${blamed} is not a member of the batch` }),
+         );
