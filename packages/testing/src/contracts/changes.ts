@@ -14,6 +14,11 @@ import { Effect, Fiber, type Layer, Schema } from "effect";
 export interface ChangesHarness {
   readonly layer: Layer.Layer<Changes>;
   readonly push: (grant: WorkspaceGrant) => Effect.Effect<CommitSha>;
+  /**
+   * A caller whose project can declare: a real adapter's project needs a
+   * stocked WorkspacePool first. Absent, each case makes its own.
+   */
+  readonly caller?: () => Effect.Effect<Principal>;
 }
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -42,8 +47,12 @@ function declaration(goal = "Cache permission lookups per request"): DeclareInpu
 const NOWHERE = Schema.decodeUnknownSync(CommitSha)("f".repeat(40));
 
 /** A declared change with a commit pushed to its workspace, and a submit for it. */
-const declared = (harness: ChangesHarness, who = principal()) =>
+/** A caller of the harness's making, or a fresh one. */
+const callerOf = (harness: ChangesHarness) => harness.caller?.() ?? Effect.sync(principal);
+
+const declared = (harness: ChangesHarness) =>
   Effect.gen(function* () {
+    const who = yield* callerOf(harness);
     const changes = yield* Changes;
     const result = yield* changes.declare(who, declaration());
     const commitSha = yield* harness.push(result.workspace);
@@ -82,7 +91,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
       const harness = make();
       return Effect.gen(function* () {
         const changes = yield* Changes;
-        const who = principal();
+        const who = yield* callerOf(harness);
         const input = declaration();
         const first = yield* changes.declare(who, input);
         const again = yield* changes.declare(who, input);
@@ -95,7 +104,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
       const harness = make();
       return Effect.gen(function* () {
         const changes = yield* Changes;
-        const who = principal();
+        const who = yield* callerOf(harness);
         const input = declaration();
         yield* changes.declare(who, input);
         const error = yield* Effect.flip(
@@ -152,10 +161,11 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
           const { who, submit } = yield* declared(harness);
           yield* changes.submit(who, submit());
           const error = yield* Effect.flip(changes.submit(who, submit()));
+          // `command` is the domain command's tag, as the Change machine names it.
           expect(error).toMatchObject({
             _tag: "ChangeStateRefused",
             state: "submitted",
-            command: "submit",
+            command: "Submit",
           });
         }).pipe(Effect.provide(harness.layer));
       },

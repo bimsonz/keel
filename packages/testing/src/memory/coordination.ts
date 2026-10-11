@@ -313,7 +313,7 @@ export function makeChangesMemory(
               return yield* new ChangeStateRefused({
                 changeId: change.id,
                 state: change.state,
-                command: "submit",
+                command: "Submit",
               });
             const workspace = workspaces.get(change.id);
             if (workspace === undefined || pushed.get(workspace)?.has(input.commitSha) !== true) {
