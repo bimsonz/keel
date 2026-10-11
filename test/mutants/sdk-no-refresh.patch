@@ -2,14 +2,15 @@
 # kills: sdk.token
 # why: a 401 is thrown instead of exchanging the credentials once more
 diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
-index 07e28bc..ff2673a 100644
+index 0d48a78..b752b45 100644
 --- a/packages/sdk/src/client.ts
 +++ b/packages/sdk/src/client.ts
-@@ -108,7 +108,7 @@ export class KeelClient {
-         ...(options.signal === undefined ? {} : { signal: options.signal }),
+@@ -124,8 +124,7 @@ export class KeelClient {
        });
-     let response = await send(await this.token());
--    if (response.status === 401) response = await send(await this.token({ fresh: true }));
+     const credentialed = "clientId" in this.#options;
+     let response = await send(credentialed ? await this.token() : undefined);
+-    if (credentialed && response.status === 401)
+-      response = await send(await this.token({ fresh: true }));
 +
      if (!response.ok) throw await KeelProblem.from(response);
      // The body is the contract's: Keel validates every response against the published schemas.
