@@ -1,6 +1,5 @@
 import { Context, type Effect } from "effect";
 import type {
-  ChangeBlocked,
   ChangeNotFound,
   ChangeStateRefused,
   PredicatePolicies,
@@ -76,10 +75,7 @@ export class ChangePrecheck extends Context.Service<
       changeId: ChangeId,
       refusal: PrecheckRefused,
     ) => Effect.Effect<VerdictId, Refusal>;
-    /** Commits PlanCompiled and queues the change; ChangeBlocked while a conflict proven against it blocks under the plan's policy. */
-    readonly compiled: (
-      changeId: ChangeId,
-      plan: PrecheckCompiled,
-    ) => Effect.Effect<void, Refusal | ChangeBlocked>;
+    /** Commits PlanCompiled and queues the change, or bounces it citing a conflict proven against it that blocks under the plan's policy. */
+    readonly compiled: (changeId: ChangeId, plan: PrecheckCompiled) => Effect.Effect<void, Refusal>;
   }
 >()("keel/ChangePrecheck") {}

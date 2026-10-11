@@ -2,7 +2,7 @@
 # kills: b21.proven-blocks
 # why: the plan's predicate policy is never read, so a proven conflict only ever advises and nothing blocks
 diff --git a/packages/core/src/application/coordination/party-conflicts.ts b/packages/core/src/application/coordination/party-conflicts.ts
-index c42ea43..57c57f6 100644
+index 2ba733e..bb5c103 100644
 --- a/packages/core/src/application/coordination/party-conflicts.ts
 +++ b/packages/core/src/application/coordination/party-conflicts.ts
 @@ -124,7 +124,7 @@ export const policyFor = (
@@ -12,5 +12,5 @@ index c42ea43..57c57f6 100644
 -  (predicate === undefined ? undefined : policies?.[predicate]) ?? DEFAULT_PREDICATE_POLICY;
 +  DEFAULT_PREDICATE_POLICY;
  
- /** Keeps the compiled plan's predicate policy; a plan without one clears the last plan's. */
- export function keepPlanPolicy(
+ /** The conflict the change is a party to, as it has heard it; undefined for one never heard. */
+ export function partyConflictOf(store: Store, conflictId: ConflictId): PartyConflict | undefined {

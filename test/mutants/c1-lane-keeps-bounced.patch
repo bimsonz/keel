@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts
+# kills: lane.drops-bounced
+# why: the lane keeps a bounced change in its queue and batches it
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 07bdc79..36f5faf 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -270,8 +270,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+             );
+       }
+       case "ChangeWithdrawn":
+-      case "ChangeSuperseded":
+-      case "ChangeBounced": {
++      case "ChangeSuperseded": {
+         const ended = decodeEnded(event.payload);
+         return lane.queue.includes(ended.changeId)
+           ? withPlan(

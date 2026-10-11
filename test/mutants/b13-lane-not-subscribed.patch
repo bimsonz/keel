@@ -2,14 +2,15 @@
 # kills: b13.queued
 # why: planCompiled queues the change but never subscribes its lane, so the lane never hears a change to batch
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 3974448..42cd252 100644
+index 351ed36..99ebd38 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1147,7 +1147,6 @@ export const planCompiled: (
-     {
-       alongside: (tx) => {
-         keepPlanPolicy(tx.store, changeId, plan.predicatePolicy);
--        tx.outbox.subscribe(laneId, LANE_HEARS);
+@@ -1183,7 +1183,7 @@ export const planCompiled: (
+         const bounce = conflictBounce(blockers.openProvenConflicts);
+         return [compile, bounce ?? { _tag: "Queue", laneId, blockers }];
        },
-       refusals: ["ChangeBlocked"],
-     },
+-      { alongside: (tx) => tx.outbox.subscribe(laneId, LANE_HEARS) },
++      {},
+     );
+     return compiled.change;
+   });

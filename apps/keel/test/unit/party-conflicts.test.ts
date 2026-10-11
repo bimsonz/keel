@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  blockersOf,
-  hearConflict,
-  keepPlanPolicy,
-  planPolicyOf,
-} from "@keeltown/core/application/coordination";
+import { blockersOf, hearConflict } from "@keeltown/core/application/coordination";
 import type { PredicatePolicies } from "@keeltown/core/domain/coordination";
 import { type ChangeId, EventEnvelope, makeId } from "@keeltown/core/kernel";
 import { makeEntityStoreMemory } from "@keeltown/testing";
@@ -161,11 +156,6 @@ describe("the conflicts a change is a party to", () => {
     expect(blockersOf(store, undefined).openProvenConflicts).toEqual([]);
     expect(blockersOf(store, { ordering: "block" }).openProvenConflicts).toEqual([]);
     expect(blockersOf(store, { freshness: "block" }).openProvenConflicts).toEqual([conflictId]);
-
-    keepPlanPolicy(store, change, { freshness: "block" });
-    expect(planPolicyOf(store, change)).toEqual({ freshness: "block" });
-    keepPlanPolicy(store, change, undefined);
-    expect(planPolicyOf(store, change)).toBeUndefined();
   });
 
   it("[b21.party-hears] ignores events that are not a conflict's moves", () => {

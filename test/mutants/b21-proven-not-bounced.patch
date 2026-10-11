@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/proven.test.ts
+# kills: b21.proven-bounces
+# why: a conflict proven against a queued change under block is only recorded, so the change queues on into a batch
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 351ed36..546a4b1 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1319,7 +1319,7 @@ const provenAgainst = (
+   const policy = policyFor(change.predicatePolicy, predicate);
+   if (policy === "block") {
+     const bounce = conflictBounce([conflictId]);
+-    if (bounce !== undefined && CONFLICT_BOUNCEABLE.has(change.state)) return { command: bounce };
++    if (bounce !== undefined && change.state === "deriving") return { command: bounce };
+     return change.state === "integrating"
+       ? {
+           problem: `${conflictId} was proven against ${change.id} while it integrates in ${change.batchId}; it lands`,

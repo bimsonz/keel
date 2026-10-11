@@ -1,5 +1,6 @@
 import { Effect, Result, Schema } from "effect";
 import {
+  ChangeBounced,
   ChangeQueued,
   ChangeRequeued,
   ChangeSuperseded,
@@ -230,12 +231,16 @@ const decodeQueued = Schema.decodeUnknownSync(ChangeQueued);
 const decodeRequeued = Schema.decodeUnknownSync(ChangeRequeued);
 const decodeAdvanced = Schema.decodeUnknownSync(TrunkAdvanced);
 const decodeDeclined = Schema.decodeUnknownSync(PromotionDeclined);
-const decodeEnded = Schema.decodeUnknownSync(Schema.Union([ChangeWithdrawn, ChangeSuperseded]));
+const decodeEnded = Schema.decodeUnknownSync(
+  Schema.Union([ChangeWithdrawn, ChangeSuperseded, ChangeBounced]),
+);
 
 /**
  * A delivered event, inside the transaction that records it: ChangeQueued
  * joins the queue's back, ChangeRequeued its front (it re-enters with no
- * blame), each keeping the plan hash its event names, a change withdrawn or superseded while queued leaves the queue,
+ * blame), each keeping the plan hash its event names, a change withdrawn,
+ * superseded or bounced while queued leaves the queue (one in the batch in
+ * flight finishes its batch),
  * TrunkAdvanced is noted for staging to follow and names trunk's head, and a
  * PromotionDeclined of the batch in flight marks it to be invalidated. State
  * only: the step commits the events. True when the lane changed.
@@ -265,7 +270,8 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
             );
       }
       case "ChangeWithdrawn":
-      case "ChangeSuperseded": {
+      case "ChangeSuperseded":
+      case "ChangeBounced": {
         const ended = decodeEnded(event.payload);
         return lane.queue.includes(ended.changeId)
           ? withPlan(

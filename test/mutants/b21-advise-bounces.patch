@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/proven.test.ts
+# kills: b21.conflict-noted
+# why: an advisory proof bounces the change as if its plan blocked
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 351ed36..38f76c5 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1317,7 +1317,7 @@ const provenAgainst = (
+   const { conflictId, evidence } = proven.value;
+   const predicate = partyConflictOf(store, conflictId)?.predicate;
+   const policy = policyFor(change.predicatePolicy, predicate);
+-  if (policy === "block") {
++  if (policy !== "annotate") {
+     const bounce = conflictBounce([conflictId]);
+     if (bounce !== undefined && CONFLICT_BOUNCEABLE.has(change.state)) return { command: bounce };
+     return change.state === "integrating"

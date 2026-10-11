@@ -8,25 +8,29 @@ import {
   subjectIdOf,
   suspectConflict,
 } from "@keeltown/core/application/coordination";
-import { Proposition, SubjectKey } from "@keeltown/core/domain/coordination";
+import {
+  type PredicatePolicies,
+  Proposition,
+  SubjectKey,
+} from "@keeltown/core/domain/coordination";
 import type { ConflictCommand, ProbeOutcome, World } from "@keeltown/core/domain/verification";
 import {
+  type AgentId,
   type ChangeId,
   type ConflictId,
   ContentHash,
-  EventEnvelope,
   makeId,
   type ProjectId,
 } from "@keeltown/core/kernel";
-import { EntityStore } from "@keeltown/core/ports";
-import { Effect, Exit, Schema } from "effect";
+import { EntityStore, EventOutbox } from "@keeltown/core/ports";
+import { Effect, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
 import type { ChangeDO } from "../../src/adapters/driving/do/change.ts";
 import type { SubjectDO } from "../../src/adapters/driving/do/subject.ts";
-import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
+import { AgentSessionCodecs, ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
 import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
-import { drainAfter } from "./helpers.ts";
+import { drainAfter, drainOutbox } from "./helpers.ts";
 import { inertPrecheck } from "./inert-precheck.ts";
 
 const key = Schema.decodeUnknownSync(SubjectKey);
@@ -104,32 +108,6 @@ const partyRow = (c: ChangeUnderTest, conflictId: string) =>
     ),
   );
 
-/** BatchFormed as the change's lane delivers it to a member. */
-const batchFormed = (c: ChangeUnderTest) => {
-  const batchId = makeId("bat", ulid());
-  return Schema.encodeSync(EventEnvelope)(
-    Schema.decodeUnknownSync(EventEnvelope)({
-      eventId: makeId("evt", ulid()),
-      type: "BatchFormed",
-      entity: { kind: "batch", id: batchId },
-      seq: 1,
-      at: Date.now(),
-      dedupeKey: `batch:${batchId}/formed/BatchFormed#1`,
-      affected: [{ kind: "change", id: c.changeId }],
-      notified: [],
-      payload: {
-        _tag: "BatchFormed",
-        batchId,
-        laneId: `lane:${c.projectId}:main`,
-        members: [c.changeId],
-        base: "a".repeat(40),
-        attempt: 1,
-        chainEpoch: 0,
-      },
-    }),
-  );
-};
-
 /** Declares, pushes, submits and starts Precheck: the change is deriving, awaiting its plan. */
 async function deriving(c: ChangeUnderTest) {
   const lease = ok(await c.declare()).change.lease.id;
@@ -148,7 +126,19 @@ async function deriving(c: ChangeUnderTest) {
   );
 }
 
-const compile = async (c: ChangeUnderTest, predicatePolicy?: { readonly freshness: "block" }) =>
+const WAIT = { timeout: 15_000, interval: 100 };
+
+/** Every notice in the agent's inbox, read from the start. */
+async function inboxOf(agentId: AgentId) {
+  const agent = env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`));
+  return ok(decodeExit(AgentSessionCodecs.inbox, await agent.inbox({ waitMs: 0 }))).notices;
+}
+
+/** The change's events of one type, as its own DO committed them. */
+const eventsOf = async (c: ChangeUnderTest, type: string) =>
+  (await c.log()).filter((event) => event.type === type).map((event) => event.payload);
+
+const compile = async (c: ChangeUnderTest, predicatePolicy?: PredicatePolicies) =>
   decodeExit(
     ChangeCodecs.planCompiled,
     await c.stub.planCompiled({
@@ -182,7 +172,7 @@ describe("a conflict proven against a change", () => {
     expect(await partyRow(outsider, conflictId)).toBeUndefined();
   });
 
-  it("[b21.proven-blocks] [b21.policy-default] a proven conflict blocks the queue under its plan's block policy, and only advises without one", async () => {
+  it("[b21.proven-blocks] [b21.policy-default] a plan compiled under block with a conflict proven against the change bounces it, citing the conflict; without a policy it queues", async () => {
     await using precheck = await inertPrecheck();
     void precheck;
     const projectId = makeId("prj", ulid());
@@ -193,53 +183,106 @@ describe("a conflict proven against a change", () => {
     await deriving(blocked);
     await deriving(advised);
     const conflictId = await suspect(projectId, [blocked.changeId, advised.changeId]);
-    await vi.waitFor(
-      async () => {
-        expect(await partyRow(blocked, conflictId)).toBeDefined();
-        expect(await partyRow(advised, conflictId)).toBeDefined();
-      },
-      { timeout: 15_000, interval: 100 },
-    );
+    await vi.waitFor(async () => {
+      expect(await partyRow(blocked, conflictId)).toBeDefined();
+      expect(await partyRow(advised, conflictId)).toBeDefined();
+    }, WAIT);
     await prove(projectId, conflictId);
-    await vi.waitFor(
-      async () => {
-        expect(await partyRow(blocked, conflictId)).toMatchObject({ state: "proven" });
-        expect(await partyRow(advised, conflictId)).toMatchObject({ state: "proven" });
-      },
-      { timeout: 15_000, interval: 100 },
-    );
+    await vi.waitFor(async () => {
+      expect(await partyRow(blocked, conflictId)).toMatchObject({ state: "proven" });
+      expect(await partyRow(advised, conflictId)).toMatchObject({ state: "proven" });
+    }, WAIT);
 
-    const refusedQueue = await compile(blocked, { freshness: "block" });
+    const bounced = ok(await compile(blocked, { freshness: "block" }));
     const queued = ok(await compile(advised));
 
-    const why = JSON.stringify(Exit.isFailure(refusedQueue) ? refusedQueue.cause : null);
-    expect(why).toContain("ChangeBlocked");
-    expect(why).toContain(conflictId);
-    expect((await blocked.current()).state).toBe("deriving");
+    expect(bounced).toMatchObject({ state: "bounced", predicatePolicy: { freshness: "block" } });
+    expect(await eventsOf(blocked, "ChangeBounced")).toEqual([
+      expect.objectContaining({
+        conflictId,
+        nextActions: expect.arrayContaining([expect.anything()]),
+      }),
+    ]);
+    expect(await eventsOf(blocked, "ChangeQueued")).toEqual([]);
     expect(queued.state).toBe("queued");
   });
 
-  it("[b21.proven-blocks] a queued change under block refuses its batch once a conflict is proven against it", async () => {
+  it("[b21.proven-bounces] [b21.compile-policy] a queued change under block is bounced by a conflict proven against it, citing the conflict, and its lane is owed the bounce", async () => {
     await using precheck = await inertPrecheck();
     void precheck;
     const projectId = makeId("prj", ulid());
     const c = await changeUnderTest(projectId);
     await deriving(c);
     expect(ok(await compile(c, { freshness: "block" })).state).toBe("queued");
+    expect(await eventsOf(c, "PlanCompiled")).toEqual([
+      expect.objectContaining({ predicatePolicy: { freshness: "block" } }),
+    ]);
     const conflictId = await suspect(projectId, [c.changeId]);
-    await vi.waitFor(async () => expect(await partyRow(c, conflictId)).toBeDefined(), {
-      timeout: 15_000,
-      interval: 100,
-    });
+    await vi.waitFor(async () => expect(await partyRow(c, conflictId)).toBeDefined(), WAIT);
     await prove(projectId, conflictId);
-    await vi.waitFor(
-      async () => expect(await partyRow(c, conflictId)).toMatchObject({ state: "proven" }),
-      { timeout: 15_000, interval: 100 },
-    );
-    await c.stub.receive([batchFormed(c)]);
 
-    expect((await c.current()).state).toBe("queued");
-    expect((await c.log()).map((event) => event.type)).not.toContain("ChangeBatched");
+    await vi.waitFor(async () => expect((await c.current()).state).toBe("bounced"), WAIT);
+    expect(await eventsOf(c, "ChangeBounced")).toEqual([
+      expect.objectContaining({
+        conflictId,
+        nextActions: expect.arrayContaining([expect.anything()]),
+      }),
+    ]);
+    const owed = await runInDurableObject(c.stub, (instance: ChangeDO) =>
+      instance["runtime"].runPromise(
+        Effect.map(EventOutbox, (outbox) =>
+          outbox.subscribers("ChangeBounced", {
+            entity: { kind: "change", id: c.changeId },
+            affected: [],
+          }),
+        ),
+      ),
+    );
+    expect(owed).toContain(`lane:${projectId}:main`);
+  });
+
+  it("[b21.conflict-noted] a conflict proven against changes whose plans advise or annotate is noted on each, with the probe as evidence; the agent hears the advice and not the annotation", async () => {
+    await using precheck = await inertPrecheck();
+    void precheck;
+    const projectId = makeId("prj", ulid());
+    const [advised, annotated] = await Promise.all([
+      changeUnderTest(projectId),
+      changeUnderTest(projectId),
+    ]);
+    for (const [c, policy] of [
+      [advised, "advise"],
+      [annotated, "annotate"],
+    ] as const) {
+      await deriving(c);
+      expect(ok(await compile(c, { freshness: policy })).state).toBe("queued");
+    }
+    const conflictId = await suspect(projectId, [advised.changeId, annotated.changeId]);
+    await vi.waitFor(async () => {
+      expect(await partyRow(advised, conflictId)).toBeDefined();
+      expect(await partyRow(annotated, conflictId)).toBeDefined();
+    }, WAIT);
+    await prove(projectId, conflictId);
+    await vi.waitFor(async () => {
+      expect(await eventsOf(advised, "ConflictNoted")).toHaveLength(1);
+      expect(await eventsOf(annotated, "ConflictNoted")).toHaveLength(1);
+    }, WAIT);
+
+    expect(await eventsOf(advised, "ConflictNoted")).toEqual([
+      expect.objectContaining({
+        conflictId,
+        predicate: "freshness",
+        policy: "advise",
+        evidenceRef: expect.stringMatching(/^probe:prb_/),
+      }),
+    ]);
+    expect(await eventsOf(annotated, "ConflictNoted")).toEqual([
+      expect.objectContaining({ conflictId, policy: "annotate" }),
+    ]);
+    expect((await advised.current()).state).toBe("queued");
+    await drainOutbox(advised.stub);
+    await drainOutbox(annotated.stub);
+    expect((await inboxOf(advised.agentId)).map((n) => n.kind)).toContain("ConflictNoted");
+    expect((await inboxOf(annotated.agentId)).map((n) => n.kind)).not.toContain("ConflictNoted");
   });
 
   it("[b21.workspace-subjects] Precheck reads the subjects the change's intent names, each once and without ancestors", async () => {

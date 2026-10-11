@@ -370,6 +370,59 @@ describe("the Lane", () => {
   );
 
   it.effect(
+    "[lane.drops-bounced] a change bounced while queued leaves the queue, and the next step forms the change behind it",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        yield* queue(w, change(2));
+        yield* deliver(
+          envelope(changeRef(change(1)), {
+            _tag: "ChangeBounced",
+            changeId: change(1),
+            conflictId: makeId("cfl", ulid()),
+            reasons: ["a conflict was proven against it"],
+          }),
+        );
+        expect(laneOf(yield* EntityStore, LANE)?.queue).toEqual([change(2)]);
+        yield* laneStep(LANE);
+        expect((yield* payloads("BatchFormed")).map((p) => p["members"])).toEqual([[change(2)]]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.bounced-in-flight] a bounce of the member in flight leaves its batch as it was, and once that batch fails the Lane does not put the member back",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        const first = yield* toVerifying(w);
+        const before = laneOf(yield* EntityStore, LANE);
+        yield* deliver(
+          envelope(changeRef(change(1)), {
+            _tag: "ChangeBounced",
+            changeId: change(1),
+            verdictId: makeId("vrd", ulid()),
+            reasons: ["its own verdict"],
+          }),
+        );
+        expect(laneOf(yield* EntityStore, LANE)).toEqual(before);
+        yield* recordVerdict(
+          LANE,
+          verdict(first.batchId, first.candidateId, first.instanceId, "park"),
+        );
+        expect(yield* payloads("BatchFailed")).toHaveLength(1);
+        yield* laneStep(LANE);
+        expect(laneOf(yield* EntityStore, LANE)?.queue).toEqual([]);
+        expect((yield* payloads("BatchFormed")).map((p) => p["members"])).toEqual([[change(1)]]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
     "[lane.form-base] forms the batch on staging main's head, not the member's base",
     () => {
       const w = world();

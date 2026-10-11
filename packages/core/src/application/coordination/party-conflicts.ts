@@ -1,5 +1,9 @@
 import { Option, Schema } from "effect";
-import { type Blockers, Predicate, PredicatePolicies } from "../../domain/coordination/index.ts";
+import {
+  type Blockers,
+  Predicate,
+  type PredicatePolicies,
+} from "../../domain/coordination/index.ts";
 import {
   ChangeId,
   ConflictId,
@@ -27,8 +31,6 @@ export const PARTY_HEARS = [
 
 /** Where a Change DO keeps each conflict it is a party to, by conflict id. */
 export const PARTY_CONFLICT = "party-conflict";
-/** Where a Change DO keeps its compiled plan's predicate policy, by change id. */
-export const PLAN_POLICY = "plan-policy";
 
 const PartyConflict = Schema.Struct({
   conflictId: ConflictId,
@@ -36,12 +38,10 @@ const PartyConflict = Schema.Struct({
   predicate: Schema.optional(Predicate),
   state: Schema.Literals(["open", "proven", "dismissed", "escalated", "resolved"]),
 });
-type PartyConflict = typeof PartyConflict.Type;
+export type PartyConflict = typeof PartyConflict.Type;
 
 const decodeRow = Schema.decodeUnknownSync(PartyConflict);
 const encodeRow = Schema.encodeSync(PartyConflict);
-const decodePolicies = Schema.decodeUnknownSync(PredicatePolicies);
-const encodePolicies = Schema.encodeSync(PredicatePolicies);
 const asStored = (encoded: unknown): Stored => JSON.parse(JSON.stringify(encoded));
 
 const Suspected = Schema.Struct({
@@ -126,20 +126,10 @@ export const policyFor = (
 ): PredicatePolicy =>
   (predicate === undefined ? undefined : policies?.[predicate]) ?? DEFAULT_PREDICATE_POLICY;
 
-/** Keeps the compiled plan's predicate policy; a plan without one clears the last plan's. */
-export function keepPlanPolicy(
-  store: Store,
-  changeId: ChangeId,
-  policies: PredicatePolicies | undefined,
-): void {
-  if (policies === undefined) store.remove(PLAN_POLICY, changeId);
-  else store.put(PLAN_POLICY, changeId, asStored(encodePolicies(policies)));
-}
-
-/** The change's compiled plan's predicate policy, if its plan had one. */
-export function planPolicyOf(store: Store, changeId: ChangeId): PredicatePolicies | undefined {
-  const stored = store.get(PLAN_POLICY, changeId);
-  return stored === undefined ? undefined : decodePolicies(stored);
+/** The conflict the change is a party to, as it has heard it; undefined for one never heard. */
+export function partyConflictOf(store: Store, conflictId: ConflictId): PartyConflict | undefined {
+  const stored = store.get(PARTY_CONFLICT, conflictId);
+  return stored === undefined ? undefined : decodeRow(stored);
 }
 
 /**

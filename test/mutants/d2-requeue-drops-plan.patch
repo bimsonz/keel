@@ -2,10 +2,10 @@
 # kills: d21.requeue-keeps-hash
 # why: A requeued change re-enters the queue without the plan its ChangeRequeued names, so a change bounced out of a batch by infra comes back planless and is refused
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index e7935d8..df5a6ee 100644
+index 07bdc79..f71479e 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -258,11 +258,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+@@ -263,11 +263,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
          const requeued = decodeRequeued(event.payload);
          return holds(tx.store, lane, requeued.changeId)
            ? undefined
@@ -17,4 +17,4 @@ index e7935d8..df5a6ee 100644
 +          : { ...lane, queue: [requeued.changeId, ...lane.queue] };
        }
        case "ChangeWithdrawn":
-       case "ChangeSuperseded": {
+       case "ChangeSuperseded":

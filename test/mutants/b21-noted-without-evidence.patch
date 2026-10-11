@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/proven.test.ts
+# kills: b21.conflict-noted
+# why: a conflict is noted without the probe that proved it
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 351ed36..5de1550 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1334,7 +1334,6 @@ const provenAgainst = (
+       conflictId,
+       predicate,
+       policy,
+-      ...(evidence._tag === "probe" ? { evidenceRef: `probe:${evidence.probeId}` } : {}),
+     },
+   };
+ };

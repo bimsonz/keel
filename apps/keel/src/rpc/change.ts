@@ -1,6 +1,5 @@
 import {
   Change,
-  ChangeBlocked,
   ChangeInOtherProject,
   ChangeNotFound,
   ChangeOrigin,
@@ -280,10 +279,7 @@ export const ChangeCodecs = {
     Schema.Struct({ change: Change, verdictId: VerdictId }),
     PrecheckRefusal,
   ),
-  planCompiled: exitCodec(
-    Change,
-    Schema.Union([ChangeNotFound, ChangeStateRefused, ChangeBlocked]),
-  ),
+  planCompiled: exitCodec(Change, Schema.Union([ChangeNotFound, ChangeStateRefused])),
 };
 
 /**

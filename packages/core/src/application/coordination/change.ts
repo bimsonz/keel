@@ -2,7 +2,6 @@ import { Effect, Option, Result, Schema } from "effect";
 import {
   canonicalProposition,
   Change,
-  type ChangeBlocked,
   type ChangeCommand,
   ChangeBounced,
   ChangeEvent,
@@ -46,6 +45,7 @@ import {
   agentActor,
   type ChangeId,
   CommitSha,
+  type ConflictId,
   type ContentHash,
   contentHashOf,
   type EntityRef,
@@ -58,7 +58,7 @@ import {
   type VerdictId,
   WorkspaceId,
 } from "../../domain/kernel/index.ts";
-import { VerdictIssued } from "../../domain/verification/index.ts";
+import { ConflictProven, VerdictIssued } from "../../domain/verification/index.ts";
 import {
   type ChangeRead,
   Clock,
@@ -83,7 +83,7 @@ import {
   type WorkspaceGrant,
   WorkspaceRebaser,
 } from "../ports/index.ts";
-import { blockersOf, hearConflict, keepPlanPolicy, planPolicyOf } from "./party-conflicts.ts";
+import { blockersOf, hearConflict, partyConflictOf, policyFor } from "./party-conflicts.ts";
 import { preflightFor } from "./preflight.ts";
 
 /**
@@ -173,11 +173,13 @@ export function subjectKeysOf(
 }
 /**
  * What the change's lane hears from it: each queueing, each requeue (the lane
- * re-enqueues only then, never by itself), and an end that drops it from the queue.
+ * re-enqueues only then, never by itself), and a bounce or an end that drops
+ * it from the queue.
  */
 export const LANE_HEARS = [
   "ChangeQueued",
   "ChangeRequeued",
+  "ChangeBounced",
   "ChangeWithdrawn",
   "ChangeSuperseded",
 ] as const;
@@ -1073,7 +1075,7 @@ export const lapseLease: (
  * `alongside` runs once the commands are decided, before the events are
  * appended (a subscription).
  */
-const precheckCommand = <T extends Tag = "ChangeNotFound" | "ChangeStateRefused">(
+const precheckCommand = (
   changeId: ChangeId,
   method: string,
   step: PrecheckStep,
@@ -1081,12 +1083,9 @@ const precheckCommand = <T extends Tag = "ChangeNotFound" | "ChangeStateRefused"
   {
     before = [],
     alongside,
-    refusals = [],
   }: {
     readonly before?: readonly EventDraft[];
     readonly alongside?: (tx: Transaction) => void;
-    /** Refusals beyond not-found and wrong-state that the commands may meet. */
-    readonly refusals?: readonly T[];
   } = {},
 ) =>
   Effect.gen(function* () {
@@ -1104,7 +1103,7 @@ const precheckCommand = <T extends Tag = "ChangeNotFound" | "ChangeStateRefused"
           transition(
             tx,
             changeId,
-            [...refusals, "ChangeNotFound" as const, "ChangeStateRefused" as const],
+            ["ChangeNotFound", "ChangeStateRefused"],
             typeof commands === "function" ? commands(tx.store) : commands,
           ),
           (decided) => {
@@ -1130,52 +1129,64 @@ export const precheckStarted: (
   });
 
 /**
+ * A bounce citing the first, by id, of the proven conflicts that block the
+ * change, and naming them all; the domain gives it that conflict's next
+ * actions. Undefined when nothing blocks.
+ */
+const conflictBounce = (blocking: readonly ConflictId[]): ChangeCommand | undefined => {
+  const [conflictId] = blocking.toSorted();
+  return conflictId === undefined
+    ? undefined
+    : {
+        _tag: "Bounce",
+        conflictId,
+        reasons: [
+          `Proven against this change, whose plan blocks on its predicate: ${blocking.toSorted().join(", ")}.`,
+        ],
+        nextActions: [],
+      };
+};
+
+/**
  * Precheck passed and compiled the Verification Plan: commits PlanCompiled,
- * then, since L1 has no step between the plan and the queue, ChangeQueued on
- * the project's lane in the same transaction, under the machine's guards. A
- * conflict proven against the change under its plan's `block` policy refuses
- * the queue as blocked. The lane is subscribed there to ChangeQueued,
- * ChangeRequeued and the change's ends, so it hears the change it must batch,
- * re-enqueue or drop; the plan's predicate policy is kept for the batch.
+ * which keeps the plan's predicate policy on the change, then, since L1 has
+ * no step between the plan and the queue, ChangeQueued on the project's lane
+ * in the same transaction. A conflict proven against the change under the
+ * plan's `block` policy bounces it instead, citing the conflict. The lane is
+ * subscribed there to ChangeQueued, ChangeRequeued, ChangeBounced and the
+ * change's ends, so it hears the change it must batch, re-enqueue or drop.
  */
 export const planCompiled: (
   changeId: ChangeId,
   plan: CompiledPlan,
-) => Effect.Effect<
-  Change,
-  ChangeNotFound | ChangeStateRefused | ChangeBlocked,
-  Clock | EntityStore | EventOutbox
-> = Effect.fn("coordination/planCompiled")(function* (changeId: ChangeId, plan: CompiledPlan) {
-  const project = heldWorkspace(yield* EntityStore, changeId)?.projectId;
-  const compile: ChangeCommand = {
-    _tag: "CompilePlan",
-    drift: [],
-    planHash: plan.planHash,
-    steps: plan.steps,
-    costEstimate: plan.costEstimate,
-  };
-  // A change with no workspace was never declared: CompilePlan alone refuses it.
-  if (project === undefined)
-    return (yield* precheckCommand(changeId, "planCompiled", plan, [compile])).change;
-  const laneId = laneOf(project);
-  const compiled = yield* precheckCommand(
-    changeId,
-    "planCompiled",
-    plan,
-    (store) => [
-      compile,
-      { _tag: "Queue", laneId, blockers: blockersOf(store, plan.predicatePolicy) },
-    ],
-    {
-      alongside: (tx) => {
-        keepPlanPolicy(tx.store, changeId, plan.predicatePolicy);
-        tx.outbox.subscribe(laneId, LANE_HEARS);
+) => Effect.Effect<Change, ChangeNotFound | ChangeStateRefused, Clock | EntityStore | EventOutbox> =
+  Effect.fn("coordination/planCompiled")(function* (changeId: ChangeId, plan: CompiledPlan) {
+    const project = heldWorkspace(yield* EntityStore, changeId)?.projectId;
+    const compile: ChangeCommand = {
+      _tag: "CompilePlan",
+      drift: [],
+      planHash: plan.planHash,
+      steps: plan.steps,
+      costEstimate: plan.costEstimate,
+      ...(plan.predicatePolicy === undefined ? {} : { predicatePolicy: plan.predicatePolicy }),
+    };
+    // A change with no workspace was never declared: CompilePlan alone refuses it.
+    if (project === undefined)
+      return (yield* precheckCommand(changeId, "planCompiled", plan, [compile])).change;
+    const laneId = laneOf(project);
+    const compiled = yield* precheckCommand(
+      changeId,
+      "planCompiled",
+      plan,
+      (store) => {
+        const blockers = blockersOf(store, plan.predicatePolicy);
+        const bounce = conflictBounce(blockers.openProvenConflicts);
+        return [compile, bounce ?? { _tag: "Queue", laneId, blockers }];
       },
-      refusals: ["ChangeBlocked"],
-    },
-  );
-  return compiled.change;
-});
+      { alongside: (tx) => tx.outbox.subscribe(laneId, LANE_HEARS) },
+    );
+    return compiled.change;
+  });
 
 /**
  * Precheck refused the submission: issues a ruling-class verdict on its own
@@ -1278,6 +1289,56 @@ const bounceFor = (
   };
 };
 
+/** Where a conflict proven against the change can still bounce it: past its plan, and not yet in a batch. */
+const CONFLICT_BOUNCEABLE: ReadonlySet<Change["state"]> = new Set([
+  "deriving",
+  "verifying",
+  "queued",
+]);
+
+const decodeProven = Schema.decodeUnknownOption(ConflictProven);
+
+/**
+ * A conflict proven against the change, under the predicate policy its latest
+ * plan compiled: `block` bounces it citing the conflict while it is deriving,
+ * verifying or queued; `advise` and `annotate` note it, with the probe as its
+ * evidence (an annotation notifies no one). Under `block` a change already in
+ * a batch lands: the batch formed past its blockers, and the domain never
+ * bounces a member for a conflict, so the proof is only logged here. A
+ * conflict it never heard open has no predicate to note it by.
+ */
+const provenAgainst = (
+  store: Store,
+  change: Change,
+  event: EventEnvelope,
+): { readonly command?: ChangeCommand; readonly problem?: string } | undefined => {
+  const proven = decodeProven(event.payload);
+  if (Option.isNone(proven)) return undefined;
+  const { conflictId, evidence } = proven.value;
+  const predicate = partyConflictOf(store, conflictId)?.predicate;
+  const policy = policyFor(change.predicatePolicy, predicate);
+  if (policy === "block") {
+    const bounce = conflictBounce([conflictId]);
+    if (bounce !== undefined && CONFLICT_BOUNCEABLE.has(change.state)) return { command: bounce };
+    return change.state === "integrating"
+      ? {
+          problem: `${conflictId} was proven against ${change.id} while it integrates in ${change.batchId}; it lands`,
+        }
+      : undefined;
+  }
+  if (predicate === undefined)
+    return { problem: `${conflictId} was proven against ${change.id} unheard` };
+  return {
+    command: {
+      _tag: "NoteConflict",
+      conflictId,
+      predicate,
+      policy,
+      ...(evidence._tag === "probe" ? { evidenceRef: `probe:${evidence.probeId}` } : {}),
+    },
+  };
+};
+
 /**
  * What the change does about an event on its batch or trunk, given the change
  * it is. A VerdictIssued on its batch is kept for the BatchFailed that follows
@@ -1289,7 +1350,7 @@ const commandFor = (
   store: Store,
   change: Change,
   event: EventEnvelope,
-): { readonly command: ChangeCommand; readonly problem?: string } | undefined => {
+): { readonly command?: ChangeCommand; readonly problem?: string } | undefined => {
   const ours = (batchId: string) => change.batchId !== undefined && batchId === change.batchId;
   switch (event.type) {
     case "BatchFormed": {
@@ -1299,13 +1360,15 @@ const commandFor = (
             command: {
               _tag: "Batch",
               batchId: formed.value.batchId,
-              blockers: blockersOf(store, planPolicyOf(store, change.id)),
+              blockers: blockersOf(store, change.predicatePolicy),
             },
           }
         : undefined;
     }
-    case "ConflictSuspected":
     case "ConflictProven":
+      hearConflict(store, event);
+      return provenAgainst(store, change, event);
+    case "ConflictSuspected":
     case "ConflictDismissed":
     case "ConflictEscalated":
     case "ConflictResolved":
@@ -1400,6 +1463,8 @@ export const reactToBatch = (
   if (change === undefined) return undefined;
   const reacting = commandFor(tx.store, change, event);
   if (reacting === undefined) return { drafts: [] };
+  if (reacting.command === undefined)
+    return { drafts: [], ...(reacting.problem === undefined ? {} : { problem: reacting.problem }) };
   const decided = transition(tx, changeId, REACTION_REFUSALS, [reacting.command]);
   if (Result.isFailure(decided))
     return {
