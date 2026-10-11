@@ -1,0 +1,20 @@
+{
+  "name": "keel-spike-27-better-auth",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --reporter=default"
+  },
+  "dependencies": {
+    "@better-auth/passkey": "1.7.7",
+    "better-auth": "1.7.7"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.4.0",
+    "@cloudflare/workers-types": "5.20261008.1",
+    "typescript": "6.0.3",
+    "vitest": "5.0.3",
+    "wrangler": "4.149.0"
+  }
+}
