@@ -40,6 +40,7 @@ function precheckWorld(options: { readonly protectedPaths?: readonly string[] } 
   projects.setSettings(projectId, {
     protectedPaths: (options.protectedPaths ?? ["infra/**"]).map((g) => Glob.make(g)),
     maxBatchSize: 4,
+    verification: "required",
   });
   const layer = Layer.mergeAll(code.layer, changes.layer, projects.layer);
   const commit = (files: FixtureFiles) =>

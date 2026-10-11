@@ -71,8 +71,6 @@ const STUBBED = [
   "Views_listLanes",
   "Views_getTrunk",
   "Operator_listProjects",
-  "Operator_getSettings",
-  "Operator_putSettings",
   "Operator_listEscalations",
   "Operator_giveRuling",
 ];

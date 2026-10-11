@@ -100,9 +100,93 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
         const settings: ProjectSettings = {
           protectedPaths: [Glob.make("infra/**"), Glob.make(".github/workflows/*")],
           maxBatchSize: 4,
+          verification: "required",
         };
         const projectId = yield* harness.withSettings(settings);
         expect(yield* (yield* Projects).settings(projectId)).toEqual(settings);
+      }).pipe(Effect.provide(harness.layer));
+    });
+
+    it.live("holds the defaults until a PUT: no protected paths, batches of one, verified", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const projects = yield* Projects;
+        const project = yield* projects.create(operator(), {
+          name: "forge",
+          source: harness.source,
+          idempotencyKey: key(),
+        });
+        expect(yield* projects.settings(project.id)).toEqual({
+          protectedPaths: [],
+          maxBatchSize: 1,
+          verification: "required",
+        });
+      }).pipe(Effect.provide(harness.layer));
+    });
+
+    it.live("replaces the settings a PUT names, an absent verification meaning required", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const projects = yield* Projects;
+        const by = operator();
+        const project = yield* projects.create(by, {
+          name: "forge",
+          source: harness.source,
+          idempotencyKey: key(),
+        });
+        const off = { protectedPaths: [Glob.make("infra/**")], maxBatchSize: 1 } as const;
+        const turnedOff = yield* projects.putSettings(
+          by,
+          project.id,
+          { ...off, verification: "off" },
+          "req-1",
+        );
+        const readOff = yield* projects.settings(project.id);
+        const turnedOn = yield* projects.putSettings(by, project.id, off, "req-2");
+
+        expect(turnedOff).toEqual({ ...off, verification: "off" });
+        expect(readOff).toEqual(turnedOff);
+        expect(turnedOn).toEqual({ ...off, verification: "required" });
+        expect(yield* projects.settings(project.id)).toEqual(turnedOn);
+      }).pipe(Effect.provide(harness.layer));
+    });
+
+    it.live("refuses other settings under a used request id with IdempotencyConflict", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const projects = yield* Projects;
+        const by = operator();
+        const project = yield* projects.create(by, {
+          name: "forge",
+          source: harness.source,
+          idempotencyKey: key(),
+        });
+        const off = { protectedPaths: [], maxBatchSize: 1, verification: "off" } as const;
+        const first = yield* projects.putSettings(by, project.id, off, "req-1");
+        const replayed = yield* projects.putSettings(by, project.id, off, "req-1");
+        const reused = yield* Effect.flip(
+          projects.putSettings(by, project.id, { protectedPaths: [], maxBatchSize: 2 }, "req-1"),
+        );
+
+        expect(replayed).toEqual(first);
+        expect(reused._tag).toBe("IdempotencyConflict");
+        expect(yield* projects.settings(project.id)).toEqual(first);
+      }).pipe(Effect.provide(harness.layer));
+    });
+
+    it.live("is ProjectNotFound for a PUT to a project that was never created", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const missing = Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`);
+        const error = yield* Effect.flip(
+          (yield* Projects).putSettings(
+            operator(),
+            missing,
+            { protectedPaths: [], maxBatchSize: 1 },
+            "req-1",
+          ),
+        );
+        expect(error._tag).toBe("ProjectNotFound");
       }).pipe(Effect.provide(harness.layer));
     });
 

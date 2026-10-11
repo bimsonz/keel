@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from "@keeltown/core/application/integration";
 import { type Agent, IdempotencyConflict, type Principal } from "@keeltown/core/domain/identity";
 import { ProjectNotFound } from "@keeltown/core/domain/integration";
 import { type AgentId, Instant, makeId, type ProjectId } from "@keeltown/core/kernel";
@@ -34,13 +35,17 @@ const keyOf = (principal: Principal, idempotencyKey: string) =>
 /**
  * Projects in a map. `create` keys each project by its operator and
  * Idempotency-Key, as the real adapter derives the project id from both, and
- * forks only from a source registered with `addSource`. `setSettings` gives a
- * project its settings; `settings` of any other project is ProjectNotFound.
+ * forks only from a source registered with `addSource`. A created project has
+ * the default settings until `putSettings` replaces them (an absent
+ * `verification` is `required`; the same request id with other settings is
+ * IdempotencyConflict); `setSettings` seeds a project's settings
+ * directly. `settings` or `putSettings` of any other project is ProjectNotFound.
  */
 export function makeProjectsMemory(options: { readonly sources?: Iterable<string> } = {}) {
   const sources = new Set(options.sources ?? []);
   const byKey = new Map<string, Keyed<ProjectRecord>>();
   const settings = new Map<ProjectId, ProjectSettings>();
+  const requests = new Map<string, string>();
   let count = 0;
   return {
     sources,
@@ -72,6 +77,7 @@ export function makeProjectsMemory(options: { readonly sources?: Iterable<string
               createdAt: Instant(Date.now()),
             };
             byKey.set(key, { made, fingerprint });
+            settings.set(made.id, DEFAULT_SETTINGS);
             return Effect.succeed(made);
           }),
         settings: (projectId) =>
@@ -81,6 +87,28 @@ export function makeProjectsMemory(options: { readonly sources?: Iterable<string
               ? Effect.fail(new ProjectNotFound({ projectId }))
               : Effect.succeed(found);
           }),
+        putSettings: (_principal, projectId, put, requestId) =>
+          Effect.suspend(
+            (): Effect.Effect<ProjectSettings, ProjectNotFound | IdempotencyConflict> => {
+              const current = settings.get(projectId);
+              if (current === undefined) return Effect.fail(new ProjectNotFound({ projectId }));
+              const replaced: ProjectSettings = {
+                protectedPaths: put.protectedPaths,
+                maxBatchSize: put.maxBatchSize,
+                verification: put.verification ?? "required",
+              };
+              const fingerprint = JSON.stringify(replaced);
+              const key = `${projectId}\u0000${requestId}`;
+              const seen = requests.get(key);
+              if (seen !== undefined)
+                return seen === fingerprint
+                  ? Effect.succeed(current)
+                  : Effect.fail(new IdempotencyConflict({ idempotencyKey: requestId }));
+              requests.set(key, fingerprint);
+              settings.set(projectId, replaced);
+              return Effect.succeed(replaced);
+            },
+          ),
       }),
     ),
   };

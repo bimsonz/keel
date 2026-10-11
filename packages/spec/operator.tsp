@@ -30,6 +30,13 @@ model ProjectSettings {
   @minValue(1)
   @maxValue(16)
   maxBatchSize: int32;
+
+  /**
+   * Whether the project's lane verifies each batch before it lands. Absent in a PUT means `required`;
+   * Keel always answers it. `off` is for a negative-control project only: the lane then skips verification
+   * and marks what lands unverified. Every change is audited by ProjectSettingsChanged.
+   */
+  verification?: "required" | "off";
 }
 
 model ProjectPage is Page<ProjectView>;
@@ -98,7 +105,7 @@ interface Operator {
   @useAuth(OperatorScope)
   @route("/projects/{projectId}/settings")
   @put
-  putSettings(@path projectId: ProjectId, @body body: ProjectSettings): ProjectSettings | NotFound | StandardErrors;
+  putSettings(@path projectId: ProjectId, @body body: ProjectSettings): ProjectSettings | NotFound | Conflict | StandardErrors;
 
   @summary("Enrol an agent")
   @useAuth(OperatorScope)

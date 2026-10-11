@@ -1,10 +1,20 @@
-import type { Enrolment, EnrolInput, ProjectRecord, RepoNotFound } from "@keeltown/core/ports";
+import type {
+  Enrolment,
+  EnrolInput,
+  ProjectRecord,
+  ProjectSettings,
+  PutProjectSettings,
+  RepoNotFound,
+} from "@keeltown/core/ports";
 import type { IdempotencyConflict } from "@keeltown/core/domain/identity";
-import { ProjectId } from "@keeltown/core/kernel";
+import type { ProjectNotFound } from "@keeltown/core/domain/integration";
+import { Glob, ProjectId } from "@keeltown/core/kernel";
 import { Result, Schema } from "effect";
 import type {
   Operator_createProjectResult,
   Operator_enrolAgentResult,
+  Operator_getSettingsResult,
+  Operator_putSettingsResult,
 } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
 import { agentProfile } from "./mappers.ts";
@@ -21,6 +31,7 @@ type Issues = NonNullable<ProblemBody["issues"]>;
 const iso = (ms: number) => new Date(ms).toISOString();
 
 const decodeProjectId = Schema.decodeUnknownOption(ProjectId);
+const decodeGlobs = Schema.decodeUnknownOption(Schema.Array(Glob));
 
 export function enrolInput(input: Input<"Operator_enrolAgent">): Result.Result<EnrolInput, Issues> {
   const base = {
@@ -35,6 +46,91 @@ export function enrolInput(input: Input<"Operator_enrolAgent">): Result.Result<E
   return projectId._tag === "Some"
     ? Result.succeed({ ...base, projectId: projectId.value })
     : Result.fail([{ path: ["body", "projectId"], message: "Expected a project id (prj_…)" }]);
+}
+
+/** The project a settings operation names in its path. */
+export function settingsProject(projectId: string): Result.Result<ProjectId, Issues> {
+  const decoded = decodeProjectId(projectId);
+  return decoded._tag === "Some"
+    ? Result.succeed(decoded.value)
+    : Result.fail([{ path: ["path", "projectId"], message: "Expected a project id (prj_…)" }]);
+}
+
+/** A PUT's settings: the project's protected globs, its batch size, and `verification` only when given. */
+export function putSettingsInput(
+  input: Input<"Operator_putSettings">,
+): Result.Result<{ readonly projectId: ProjectId; readonly settings: PutProjectSettings }, Issues> {
+  const projectId = settingsProject(input.projectId);
+  if (Result.isFailure(projectId)) return Result.fail(projectId.failure);
+  const protectedPaths = decodeGlobs(input.protectedPaths);
+  if (protectedPaths._tag === "None")
+    return Result.fail([{ path: ["body", "protectedPaths"], message: "Expected non-empty globs" }]);
+  return Result.succeed({
+    projectId: projectId.success,
+    settings: {
+      protectedPaths: protectedPaths.value,
+      maxBatchSize: input.maxBatchSize,
+      ...(input.verification === undefined ? {} : { verification: input.verification }),
+    },
+  });
+}
+
+/** The project's settings, `verification` always present. GET and PUT answer the same body. */
+export function settingsOk(
+  settings: ProjectSettings,
+): Extract<Operator_getSettingsResult, { readonly status: 200 }> {
+  return {
+    status: 200,
+    body: {
+      protectedPaths: [...settings.protectedPaths],
+      maxBatchSize: settings.maxBatchSize,
+      verification: settings.verification,
+    },
+  };
+}
+
+export function settingsError(
+  caller: Caller,
+  error: ProjectNotFound,
+): Extract<Operator_getSettingsResult, { readonly status: 404 }> {
+  return {
+    status: 404,
+    body: problem(404, "resource.not_found", caller.requestId, {
+      detail: `No project ${error.projectId}.`,
+      nextActions: [
+        { kind: "call", title: "Create the project first", operationId: "Operator_createProject" },
+      ],
+    }),
+  };
+}
+
+/** A PUT's refusals: the project does not exist, or its request id already carried other settings. */
+export function putSettingsError(
+  caller: Caller,
+  error: ProjectNotFound | IdempotencyConflict,
+): Operator_putSettingsResult {
+  switch (error._tag) {
+    case "ProjectNotFound":
+      return settingsError(caller, error);
+    case "IdempotencyConflict":
+      return {
+        status: 409,
+        body: problem(409, "request.idempotency_conflict", caller.requestId, {
+          detail: `Request id ${error.idempotencyKey} already carried other settings.`,
+          nextActions: [
+            {
+              kind: "call",
+              title: "Send the settings again under a fresh X-Request-Id",
+              operationId: "Operator_putSettings",
+            },
+          ],
+        }),
+      };
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
 }
 
 export function createProjectOk(project: ProjectRecord): Operator_createProjectResult {

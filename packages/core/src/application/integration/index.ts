@@ -12,6 +12,7 @@ import type { EntityStore } from "../ports/index.ts";
 
 export * from "./create-project.ts";
 export * from "./project-repos.ts";
+export * from "./project-settings.ts";
 export * from "./trunk.ts";
 
 /** integration read models reachable from the API. Keel owns the Lane and Trunk DOs behind them. */

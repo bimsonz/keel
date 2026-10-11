@@ -1,4 +1,4 @@
-import { createProject } from "@keeltown/core/application/integration";
+import { changeSettings, createProject, settingsOf } from "@keeltown/core/application/integration";
 import { ProjectId } from "@keeltown/core/kernel";
 import { Effect, Schema } from "effect";
 import {
@@ -6,7 +6,12 @@ import {
   type ProjectServices,
   projectServices,
 } from "../../../composition/do.ts";
-import { CreateProjectCommand, ProjectCodecs, type ProjectRpc } from "../../../rpc/index.ts";
+import {
+  CreateProjectCommand,
+  ProjectCodecs,
+  type ProjectRpc,
+  PutSettingsCommand,
+} from "../../../rpc/index.ts";
 import { KeelObjectWith } from "./keel-object.ts";
 
 /** The Project DO is named `project:<projectId>`. */
@@ -19,7 +24,7 @@ const projectIdOf = (name: string | undefined) =>
  */
 export class ProjectDO
   extends KeelObjectWith<ProjectServices>
-  implements Pick<ProjectRpc, "createProject">
+  implements Pick<ProjectRpc, "createProject" | "settings" | "putSettings">
 {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env, projectServices(env));
@@ -37,5 +42,24 @@ export class ProjectDO
       ),
     );
     return this.answer(ProjectCodecs.createProject, program);
+  }
+
+  /** The project's settings: the defaults until an operator changes them; ProjectNotFound before createProject. */
+  async settings() {
+    return this.answer(ProjectCodecs.settings, settingsOf(projectIdOf(this.ctx.id.name)));
+  }
+
+  /** Replaces the project's settings, auditing every changed field. */
+  async putSettings(command: typeof PutSettingsCommand.Encoded) {
+    const projectId = projectIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(PutSettingsCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((putting) =>
+        putting.projectId === projectId
+          ? changeSettings(putting)
+          : Effect.die(`a putSettings for ${putting.projectId} reached ${projectId}`),
+      ),
+    );
+    return this.answer(ProjectCodecs.putSettings, program);
   }
 }

@@ -1,24 +1,26 @@
 import { makeId, type ProjectId } from "@keeltown/core/kernel";
 import { Projects, RepoNotFound } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
-import { CreateProjectCommand, ProjectCodecs } from "../../../rpc/index.ts";
+import { CreateProjectCommand, ProjectCodecs, PutSettingsCommand } from "../../../rpc/index.ts";
 import { callObject, derivedUlid, fingerprintOf } from "./answer.ts";
 
 /** The Project DO methods Keel calls (`project:<id>`), each answering an Exit envelope. */
 export interface ProjectStub {
   createProject(command: typeof CreateProjectCommand.Encoded): Promise<unknown>;
-  /** Optional until the Project DO declares it; a call to a DO without it fails as a defect. */
-  settings?(): Promise<unknown>;
+  settings(): Promise<unknown>;
+  putSettings(command: typeof PutSettingsCommand.Encoded): Promise<unknown>;
 }
 
 const encodeCreate = Schema.encodeSync(CreateProjectCommand);
+const encodePut = Schema.encodeSync(PutSettingsCommand);
 
 /**
  * `Projects` over Durable Object RPC. The project id is derived from the
  * operator and the Idempotency-Key, so a retry reaches the same Project DO,
  * which replays by key and refuses another body by fingerprint. A missing
  * source crosses as RepoNotFound by shape and is rebuilt as the port's error.
- * `settings` answers the project's settings, or ProjectNotFound.
+ * `settings` answers the project's settings, or ProjectNotFound; `putSettings`
+ * replaces them as the principal, whose id the Project DO audits.
  */
 export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Layer.Layer<Projects> {
   return Layer.succeed(
@@ -50,11 +52,13 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
           );
         }),
       settings: (projectId) =>
-        callObject(ProjectCodecs.settings, async () => {
-          const stub = project(projectId);
-          if (stub.settings === undefined) throw new Error("the Project DO has no settings()");
-          return stub.settings();
-        }),
+        callObject(ProjectCodecs.settings, () => project(projectId).settings()),
+      putSettings: (principal, projectId, settings, requestId) =>
+        callObject(ProjectCodecs.putSettings, () =>
+          project(projectId).putSettings(
+            encodePut({ projectId, settings, by: principal.agentId, requestId }),
+          ),
+        ),
     }),
   );
 }

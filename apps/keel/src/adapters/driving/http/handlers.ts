@@ -1,6 +1,8 @@
 import {
   createProject,
   declareChange,
+  getSettings,
+  putSettings,
   readInbox,
   submissionOf,
   submitChange,
@@ -18,6 +20,11 @@ import {
   enrolAgentError,
   enrolAgentOk,
   enrolInput,
+  putSettingsError,
+  putSettingsInput,
+  settingsError,
+  settingsOk,
+  settingsProject,
 } from "./operator.ts";
 import { piggyback } from "./piggyback.ts";
 import { notImplemented } from "./problems.ts";
@@ -214,8 +221,36 @@ export function makeHandlers(run: Runner) {
             }),
           ),
         ),
-      Operator_getSettings: notYet,
-      Operator_putSettings: notYet,
+      Operator_getSettings: (caller: Caller, input: Input<"Operator_getSettings">) => {
+        const projectId = settingsProject(input.projectId);
+        if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+        return run(
+          caller,
+          getSettings(projectId.success).pipe(
+            Effect.match({
+              onSuccess: settingsOk,
+              onFailure: (error) => settingsError(caller, error),
+            }),
+          ),
+        );
+      },
+      Operator_putSettings: (caller: Caller, input: Input<"Operator_putSettings">) => {
+        const decoded = putSettingsInput(input);
+        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+        const { projectId, settings } = decoded.success;
+        return run(
+          caller,
+          principalOf(caller).pipe(
+            Effect.flatMap((principal) =>
+              putSettings(principal, projectId, settings, caller.requestId),
+            ),
+            Effect.match({
+              onSuccess: settingsOk,
+              onFailure: (error) => putSettingsError(caller, error),
+            }),
+          ),
+        );
+      },
       Operator_enrolAgent: (caller: Caller, input: Input<"Operator_enrolAgent">) => {
         const decoded = enrolInput(input);
         if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);

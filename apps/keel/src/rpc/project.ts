@@ -6,9 +6,32 @@ import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
 import { RepoRef } from "./workspace-pool.ts";
 
+/** Whether the project's lane verifies each batch: `off` only on S-0's control project. */
+export const Verification = Schema.Literals(["required", "off"]);
+
+/** The project's settings as the Project DO answers them: `verification` always present. */
 export const ProjectSettings = Schema.Struct({
   protectedPaths: Schema.Array(Glob),
   maxBatchSize: Schema.Int,
+  verification: Verification,
+});
+
+/**
+ * An operator replaces the project's settings (an absent `verification` is
+ * `required`). The Project DO commits one ProjectSettingsChanged naming every
+ * changed field, with `by` and the actor `operator:<by>`; an unchanged PUT
+ * commits nothing. `requestId` keys the commit: a replay answers the settings
+ * as they stand, and the same id with other settings is IdempotencyConflict.
+ */
+export const PutSettingsCommand = Schema.Struct({
+  projectId: ProjectId,
+  settings: Schema.Struct({
+    protectedPaths: Schema.Array(Glob),
+    maxBatchSize: Schema.Int,
+    verification: Schema.optional(Verification),
+  }),
+  by: AgentId,
+  requestId: Schema.NonEmptyString,
 });
 
 /**
@@ -44,16 +67,13 @@ export const RepoNotFound = Schema.TaggedStruct("RepoNotFound", { repo: RepoRef 
 
 export const ProjectCodecs = {
   settings: exitCodec(ProjectSettings, ProjectNotFound),
-  putSettings: exitCodec(ProjectSettings, ProjectNotFound),
+  putSettings: exitCodec(ProjectSettings, Schema.Union([ProjectNotFound, IdempotencyConflict])),
   createProject: exitCodec(ProjectView, Schema.Union([IdempotencyConflict, RepoNotFound])),
 };
 
 /** The Project DO (`project:<id>`): settings and the subject registry. */
 export interface ProjectRpc extends EventReceiverRpc {
   settings(): Promise<ExitJson>;
-  putSettings(
-    projectId: typeof ProjectId.Encoded,
-    settings: typeof ProjectSettings.Encoded,
-  ): Promise<ExitJson>;
+  putSettings(command: typeof PutSettingsCommand.Encoded): Promise<ExitJson>;
   createProject(command: typeof CreateProjectCommand.Encoded): Promise<ExitJson>;
 }

@@ -3419,6 +3419,16 @@
               }
             }
           },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Client error",
             "headers": {
@@ -10924,6 +10934,14 @@
             "minimum": 1,
             "maximum": 16,
             "description": "The largest batch a lane may form."
+          },
+          "verification": {
+            "type": "string",
+            "enum": [
+              "required",
+              "off"
+            ],
+            "description": "Whether the project's lane verifies each batch before it lands. Absent in a PUT means `required`;\nKeel always answers it. `off` is for a negative-control project only: the lane then skips verification\nand marks what lands unverified. Every change is audited by ProjectSettingsChanged."
           }
         },
         "additionalProperties": {
