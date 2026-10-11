@@ -13,6 +13,7 @@ import { EventOutboxSql } from "../../src/adapters/driven/do-storage/event-outbo
 import type { AgentSessionDO } from "../../src/adapters/driving/do/agent-session.ts";
 import { armedAlarms, dueAlarms, scheduleAlarm } from "../../src/adapters/driving/do/alarm.ts";
 import type { ChangeDO } from "../../src/adapters/driving/do/change.ts";
+import type { ProjectorDO } from "../../src/adapters/driving/do/projector.ts";
 import type { DurableObjectServices } from "../../src/composition/do.ts";
 import { decodeExit, EventCodecs, exitCodec } from "../../src/rpc/index.ts";
 
@@ -23,9 +24,10 @@ const agentStub = (agentId: string) =>
 const projectorStub = () => env.PROJECTOR.get(env.PROJECTOR.idFromName("projector"));
 
 // The real adapter passes the same contract suite as the in-memory one. DO SQLite can only be touched from inside its
-// Durable Object, so each program runs there, against adapters built on that object's storage.
+// Durable Object, so each program runs there, against adapters built on that object's storage. The object is a
+// Projector-class one: every other class subscribes the Projector as it starts, and the contract owns its subscriptions.
 PORTS.EventOutbox.contract("do-sqlite", (): OutboxHarness => {
-  const stub = changeStub();
+  const stub = env.PROJECTOR.get(env.PROJECTOR.idFromName(`contract:${ulid()}`));
   const clock = makeManualClock();
   return {
     fanOut: makeScriptedFanOut(),
@@ -33,7 +35,7 @@ PORTS.EventOutbox.contract("do-sqlite", (): OutboxHarness => {
     run: (program) =>
       Effect.flatMap(
         Effect.promise(() =>
-          runInDurableObject(stub, (_instance: ChangeDO, state) =>
+          runInDurableObject(stub, (_instance: ProjectorDO, state) =>
             Effect.runPromiseExit(
               Effect.provide(
                 program,

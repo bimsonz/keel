@@ -1,10 +1,7 @@
 import { EventEnvelope } from "@keeltown/core/kernel";
-import { DeliveryFailed, type FanOut, type Subscriber } from "@keeltown/core/ports";
+import { DeliveryFailed, type FanOut, PROJECTOR, type Subscriber } from "@keeltown/core/ports";
 import { Cause, Effect, Exit, Schema } from "effect";
 import { decodeExit, EventCodecs } from "../../../rpc/index.ts";
-
-/** The Projector is one object for now; B4.1 may shard it or swap RPC delivery for the operation log, here only. */
-export const PROJECTOR_NAME = "projector";
 
 /** A Durable Object's `receive`, reached by its address, which is also the object's name. */
 type Receive = (envelopes: unknown) => Promise<unknown>;
@@ -14,7 +11,7 @@ type Receive = (envelopes: unknown) => Promise<unknown>;
  * previous version may not answer `receive` yet: the call throws, and is retried.
  */
 function receiverFor(env: Env, subscriber: Subscriber): Receive | undefined {
-  if (subscriber === PROJECTOR_NAME)
+  if (subscriber === PROJECTOR)
     return (envelopes) =>
       env.PROJECTOR.get(env.PROJECTOR.idFromName(subscriber)).receive(envelopes);
   switch (subscriber.slice(0, subscriber.indexOf(":"))) {
@@ -155,7 +152,7 @@ export function FanOutRpc(env: Env): FanOut {
         : deliverToObject(receive, subscriber, events);
     },
     nudge: Effect.tryPromise(async () => {
-      await env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR_NAME)).nudge();
+      await env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR)).nudge();
     }).pipe(Effect.ignore),
   };
 }

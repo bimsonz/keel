@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/projector.test.ts -t "every event"
+# kills: b12.projector-every
+# why: objects no longer subscribe the Projector as they start, so the feed holds only what someone subscribed it to
+diff --git a/apps/keel/src/adapters/driving/do/keel-object.ts b/apps/keel/src/adapters/driving/do/keel-object.ts
+index e00ddd7..e82967f 100644
+--- a/apps/keel/src/adapters/driving/do/keel-object.ts
++++ b/apps/keel/src/adapters/driving/do/keel-object.ts
+@@ -75,7 +75,7 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
+     const composed = durableObjectRuntime(ctx, env, driven);
+     this.runtime = composed.runtime;
+     this.fanOut = composed.fanOut;
+-    if (options.projected ?? true) {
++    if (options.projected ?? false) {
+       // The console's feed is complete only if the Projector hears everything, whoever else subscribed.
+       const runtime = this.runtime;
+       void ctx.blockConcurrencyWhile(() =>

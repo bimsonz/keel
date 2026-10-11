@@ -18,6 +18,9 @@ export type Subscriber = string;
 /** Subscribe to every event type the entity emits. */
 export const EVERY_TYPE = "*";
 
+/** The Projector's address. At L1 it hears every event every other object commits. */
+export const PROJECTOR: Subscriber = "projector";
+
 /** An event as a decision proposes it: the encoded payload, before the outbox numbers it. */
 export interface EventDraft {
   /** The encoded payload of one of the contexts' tagged event schemas; its `_tag` is the event type. */

@@ -1,4 +1,4 @@
-# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-session.test.ts -t "waiter"
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-session.test.ts apps/keel/test/pool/change.test.ts -t "waiter"
 # kills: b11.waiter
 # why: a commit never wakes the waiters, so a long-poll answers only at its deadline
 diff --git a/apps/keel/src/adapters/driving/do/waiters.ts b/apps/keel/src/adapters/driving/do/waiters.ts

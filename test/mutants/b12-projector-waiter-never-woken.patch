@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/projector.test.ts -t "waiting read"
+# kills: b12.projector-wait
+# why: an arrival never wakes the waiters, so a waiting feed read answers only at its deadline
+diff --git a/apps/keel/src/adapters/driving/do/waiters.ts b/apps/keel/src/adapters/driving/do/waiters.ts
+index 68d13db..b10b1c6 100644
+--- a/apps/keel/src/adapters/driving/do/waiters.ts
++++ b/apps/keel/src/adapters/driving/do/waiters.ts
+@@ -14,7 +14,6 @@ export class Waiters {
+   /** Wakes every waiter. Called after anything that may have committed. */
+   wake(): void {
+     // Each waiter removes itself as it resolves; deleting the entry being visited is safe in a Set.
+-    for (const resolve of this.pending) resolve();
+   }
+ 
+   /** Resolves on the next wake, or after `ms`, whichever comes first. */

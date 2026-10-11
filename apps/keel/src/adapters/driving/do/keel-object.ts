@@ -5,6 +5,8 @@ import {
   EntityStore,
   type EventDraft,
   EventOutbox,
+  EVERY_TYPE,
+  PROJECTOR,
   type FanOut,
   flushOutbox,
   type Transaction,
@@ -31,10 +33,17 @@ import { Waiters } from "./waiters.ts";
 export const OUTBOX_FLUSH = "outbox flush";
 export const OUTBOX_REDELIVERY = "outbox redelivery";
 
-/** What a reaction to a received event commits: events of one of this object's entities. */
-export interface Reaction {
-  readonly entity: EntityRef;
-  readonly drafts: readonly EventDraft[];
+/**
+ * What a reaction to a received event commits: events of one of this object's
+ * entities, or nothing (the event is recorded and taken all the same).
+ */
+export type Reaction =
+  | { readonly entity: EntityRef; readonly drafts: readonly EventDraft[] }
+  | { readonly drafts: readonly [] };
+
+export interface KeelObjectOptions {
+  /** Whether the Projector hears every event this object commits; true but for the Projector itself. */
+  readonly projected?: boolean;
 }
 
 /**
@@ -56,11 +65,25 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
   private readonly fanOut: FanOut;
 
   /** `driven` holds the adapters the object's own use-cases need beyond the backbone, built in composition. */
-  constructor(ctx: DurableObjectState, env: Env, driven: Layer.Layer<R>) {
+  constructor(
+    ctx: DurableObjectState,
+    env: Env,
+    driven: Layer.Layer<R>,
+    options: KeelObjectOptions = {},
+  ) {
     super(ctx, env);
     const composed = durableObjectRuntime(ctx, env, driven);
     this.runtime = composed.runtime;
     this.fanOut = composed.fanOut;
+    if (options.projected ?? true) {
+      // The console's feed is complete only if the Projector hears everything, whoever else subscribed.
+      const runtime = this.runtime;
+      void ctx.blockConcurrencyWhile(() =>
+        runtime.runPromise(
+          Effect.map(EventOutbox, (outbox) => outbox.subscribe(PROJECTOR, EVERY_TYPE)),
+        ),
+      );
+    }
   }
 
   /** Runs one call's program, arms the flush for anything it committed, and answers with the Exit envelope. */
@@ -101,6 +124,7 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
           if (arrival.envelope === undefined) return "ignored";
           const reaction = react(arrival.envelope, { store, outbox, at });
           if (reaction === undefined) return "ignored";
+          if (!("entity" in reaction)) return "accepted";
           outbox.append(
             {
               entity: reaction.entity,
