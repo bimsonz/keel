@@ -118,6 +118,30 @@ async function feedSince(cursor: string): Promise<EventRecord[]> {
   return events;
 }
 
+type Notice = Awaited<ReturnType<KeelClient["inbox"]>>["result"]["notices"][number];
+
+/**
+ * The end of an agent's inbox. An inbox read with no cursor starts at the
+ * oldest notice, one page at a time, so a check that reads only that page goes
+ * blind once the inbox outgrows it (run 2026-10-11T16-15-22-262Z).
+ */
+async function inboxEnd(client: KeelClient): Promise<string> {
+  let page = await client.inbox();
+  while (page.result.notices.length > 0) page = await client.inbox({ cursor: page.result.cursor });
+  return page.result.cursor;
+}
+
+/** Every notice after `cursor`, as an agent that kept its place reads them. */
+async function inboxSince(client: KeelClient, cursor: string): Promise<Notice[]> {
+  const notices: Notice[] = [];
+  let page = await client.inbox({ cursor });
+  while (page.result.notices.length > 0) {
+    notices.push(...page.result.notices);
+    page = await client.inbox({ cursor: page.result.cursor });
+  }
+  return notices;
+}
+
 const advancesOf = (events: readonly EventRecord[], projectId: string) =>
   events.flatMap((e) =>
     e.project === projectId && e.payload._tag === "TrunkAdvanced" ? [e.payload] : [],
@@ -199,6 +223,11 @@ async function arms(): Promise<void> {
     landedIds.push(...disjoint.map((d) => d.changeId));
 
     console.log("(b) the same line, changed by both");
+    // Each agent keeps its place in its inbox, as an agent does, and reads only what follows it.
+    const inboxFrom = new Map([
+      ["a1", await inboxEnd(a1)],
+      ["a2", await inboxEnd(a2)],
+    ]);
     const clash = await Promise.all([
       work(a1, "a1", sameLine("a1")),
       work(a2, "a2", sameLine("a2")),
@@ -217,13 +246,14 @@ async function arms(): Promise<void> {
         "(b) the bounced change's status carries next actions",
         status.next,
       );
-      const inbox = await bounced.client.inbox();
+      const kept = inboxFrom.get(bounced.agent);
+      const notices = kept === undefined ? [] : await inboxSince(bounced.client, kept);
       check(
-        inbox.result.notices.some((n) =>
+        notices.some((n) =>
           `${n.ref ?? ""} ${n.title} ${n.detail ?? ""}`.includes(bounced.changeId),
         ),
         "(b) the bounced agent's inbox names its change",
-        inbox.result.notices.map((n) => n.title),
+        notices.map((n) => n.title),
       );
     }
     landedIds.push(...clash.filter((_, i) => clashStates[i] === "landed").map((c) => c.changeId));
