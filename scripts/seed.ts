@@ -5,9 +5,12 @@
 //    commit. A repo already at that commit is left alone; one at any other
 //    commit stops the seed rather than being overwritten.
 // 2. The bootstrap credential (Terraform's `bootstrap_secret`) enrols the operator.
-// 3. The operator creates forge-lite and forge-lite-control, switches
-//    verification off in the control project only (S-0's negative control),
-//    and enrols an observer and agents a1..aN in each project.
+// 3. The operator creates forge-lite and forge-lite-control and puts each
+//    one's declared settings: verification off in the control project only
+//    (S-0's negative control); both private. The seed is staging's
+//    declared state, so a second run restores it rather than keeping
+//    whatever drifted. Then it enrols an observer and agents
+//    a1..aN in each project.
 // 4. Everything a run needs is written to .keel/<env>.json (gitignored, 0600),
 //    keeping what scripts/deploy.ts put there (the console's keys).
 //
@@ -40,7 +43,11 @@ if (!Number.isInteger(agentCount) || agentCount < 1 || agentCount > 16)
 
 const CORE = "keel-core";
 const FIXTURE = "fixture-forge-lite";
-const PROJECTS = ["forge-lite", "forge-lite-control"] as const;
+/** Each seeded project's declared settings. */
+const PROJECTS = {
+  "forge-lite": { verification: "required", visibility: "private" },
+  "forge-lite-control": { verification: "off", visibility: "private" },
+} as const;
 const key = (role: string) => `seed:${environment}:${role}`;
 
 /** git with no global or system config, so nothing on this machine shapes the commit. */
@@ -236,7 +243,7 @@ try {
 
   const projects: Record<string, { id: string; verification: string; agents: Credential[] }> = {};
   let observer: Credential | undefined;
-  for (const name of PROJECTS) {
+  for (const [name, declared] of Object.entries(PROJECTS)) {
     const project = await asOperator.createProject(
       { name, source: FIXTURE },
       { idempotencyKey: key(`project:${name}`) },
@@ -245,9 +252,12 @@ try {
     const settings = await asOperator.putSettings(project.id, {
       protectedPaths: [],
       maxBatchSize: 1,
-      verification: name === "forge-lite-control" ? "off" : "required",
+      verification: declared.verification,
+      visibility: declared.visibility,
     });
-    console.log(`ok   ${name} verification: ${settings.verification}`);
+    console.log(
+      `ok   ${name} verification: ${settings.verification}, visibility: ${settings.visibility}`,
+    );
     // An observer reads every project at L1; it is enrolled in the first.
     observer ??= await enrol(asOperator, "observer", {
       name: "seed-observer",
