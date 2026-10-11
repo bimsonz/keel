@@ -1,7 +1,7 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { type Change, ChangeEvent, evolveChange } from "@keeltown/core/domain/coordination";
-import { type ChangeId, type EventEnvelope, makeId } from "@keeltown/core/kernel";
+import { type ChangeId, type EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
 import { CodeHost, type Clock, EventOutbox } from "@keeltown/core/ports";
 import {
   CodeHostFixture,
@@ -70,16 +70,17 @@ export const unrenewed = (change: Change | undefined) =>
 /**
  * A Change DO under test, reached over real RPC: an in-memory pool and code
  * host, and a clock that starts now and moves only when told, so a lease can
- * lapse without waiting and no deadline it arms is in the past.
+ * lapse without waiting and no deadline it arms is in the past. It belongs to
+ * `projectId` (the sample project unless given), whose lane it queues on.
  */
-export async function changeUnderTest() {
+export async function changeUnderTest(projectId: ProjectId = sampleProjectId) {
   const changeId: ChangeId = makeId("chg", ulid());
   const agentId = makeId("agt", ulid());
   const stub = changeStub(changeId);
   // Drained after the change: what it delivers to its agent, pool and lane may owe flushes of their own.
   drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)));
-  drainAfter(env.WORKSPACE_POOL.get(env.WORKSPACE_POOL.idFromName(`pool:${sampleProjectId}`)));
-  drainAfter(env.LANE.get(env.LANE.idFromName(`lane:${sampleProjectId}:main`)));
+  drainAfter(env.WORKSPACE_POOL.get(env.WORKSPACE_POOL.idFromName(`pool:${projectId}`)));
+  drainAfter(env.LANE.get(env.LANE.idFromName(`lane:${projectId}:main`)));
   const clock = makeManualClock(Date.now());
   const pool = makeWorkspacePoolMemory();
   const code = makeCodeHostMemory();
@@ -101,7 +102,7 @@ export async function changeUnderTest() {
         await stub.declare({
           changeId,
           agentId,
-          projectId: sampleProjectId,
+          projectId,
           goal: "Cache permission lookups per request",
           footprint: [{ path: "src/authz/**", op: "edit" }],
           premises: [],
