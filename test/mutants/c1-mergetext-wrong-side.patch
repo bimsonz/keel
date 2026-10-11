@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/merge-text.test.ts -t mergetext.differential
+# kills: mergetext.differential
+# why: Theirs' hunk is filled from ours' lines, so the merged file loses their change
+diff --git a/packages/gitcore/src/merge-text.ts b/packages/gitcore/src/merge-text.ts
+index 962f7e1..b6451d2 100644
+--- a/packages/gitcore/src/merge-text.ts
++++ b/packages/gitcore/src/merge-text.ts
+@@ -94,7 +94,7 @@ export function mergeText(
+       take(o, lines.ours);
+       o = toOurs[++i];
+     } else if (t !== undefined) {
+-      take(t, lines.theirs);
++      take(t, lines.ours);
+       t = toTheirs[++j];
+     }
+   }

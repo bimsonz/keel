@@ -544,7 +544,7 @@ describe("the Lane", () => {
         const [issued] = yield* payloads("VerdictIssued");
         expect(issued).toMatchObject({
           outcome: "bounce",
-          evidence: ["composition-refused: both-modified"],
+          evidence: ["composition-refused: overlap"],
           nextActions: [
             {
               kind: "call",

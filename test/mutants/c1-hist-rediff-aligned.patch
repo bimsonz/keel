@@ -1,0 +1,57 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/histogram.test.ts -t hunks.reach
+# kills: hunks.reach
+# why: GitCore re-diffs a group compaction aligned, chasing git 2.54's narrower hunks, so its script (and the bytes a merge takes from it) is no longer the one every git from 2.50 on agrees lies inside its reaches
+diff --git a/packages/gitcore/src/histogram.ts b/packages/gitcore/src/histogram.ts
+index 2d9f1f6..92d786e 100644
+--- a/packages/gitcore/src/histogram.ts
++++ b/packages/gitcore/src/histogram.ts
+@@ -189,8 +189,13 @@ function anchor(
+ }
+ 
+ /** Marks what changed between `a` and `b`, region by region around each anchor run. */
+-function histogram(a: Side, b: Side, budget: Budget): void {
+-  const regions: [number, number, number, number][] = [[0, a.ids.length, 0, b.ids.length]];
++function histogram(
++  a: Side,
++  b: Side,
++  budget: Budget,
++  from: [number, number, number, number] = [0, a.ids.length, 0, b.ids.length],
++): void {
++  const regions: [number, number, number, number][] = [from];
+   for (let region = regions.pop(); region !== undefined; region = regions.pop()) {
+     const [aS, aE, bS, bE] = region;
+     if (aS === aE || bS === bE) {
+@@ -265,7 +270,7 @@ function inSync(moved: boolean): void {
+ }
+ 
+ /** Slides each group of `x`'s changes as low as it goes, then back up to the last place it meets a change in `o`. */
+-function compact(x: Side, o: Side, budget: Budget): void {
++function compact(x: Side, o: Side, budget: Budget, rediff?: (g: Group, go: Group) => void): void {
+   const g = firstGroup(x);
+   const go = firstGroup(o);
+   for (;;) {
+@@ -290,6 +295,7 @@ function compact(x: Side, o: Side, budget: Budget): void {
+           inSync(slideUp(x, g));
+           inSync(previousGroup(o, go));
+         }
++        rediff?.(g, go);
+       }
+     }
+     if (!nextGroup(x, g)) break;
+@@ -424,8 +430,14 @@ export function diffIds(a: Int32Array, b: Int32Array, budget: Budget): ReachingH
+   const sb = sideOf(b);
+   histogram(sa, sb, budget);
+   const then = { a: sa.changed.slice(), b: sb.changed.slice() };
+-  compact(sa, sb, budget);
+-  compact(sb, sa, budget);
++  const redo = (xIsA: boolean) => (g: Group, go: Group) => {
++    const [ga, gb] = xIsA ? [g, go] : [go, g];
++    sa.changed.fill(0, ga.start + 1, ga.end + 1);
++    sb.changed.fill(0, gb.start + 1, gb.end + 1);
++    histogram(sa, sb, budget, [ga.start, ga.end, gb.start, gb.end]);
++  };
++  compact(sa, sb, budget, redo(true));
++  compact(sb, sa, budget, redo(false));
+   return reaching(script(sa, sb), sa, sb, then, budget);
+ }
+ 

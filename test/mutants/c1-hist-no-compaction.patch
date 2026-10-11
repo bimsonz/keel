@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/histogram.test.ts -t hunks.differential
+# kills: hunks.differential
+# why: Groups of changed lines stay where the histogram left them, never slid as git slides them, so hunk positions (and which hunks touch) differ from git's
+diff --git a/packages/gitcore/src/histogram.ts b/packages/gitcore/src/histogram.ts
+index 2d9f1f6..4df27cc 100644
+--- a/packages/gitcore/src/histogram.ts
++++ b/packages/gitcore/src/histogram.ts
+@@ -424,8 +424,6 @@ export function diffIds(a: Int32Array, b: Int32Array, budget: Budget): ReachingH
+   const sb = sideOf(b);
+   histogram(sa, sb, budget);
+   const then = { a: sa.changed.slice(), b: sb.changed.slice() };
+-  compact(sa, sb, budget);
+-  compact(sb, sa, budget);
+   return reaching(script(sa, sb), sa, sb, then, budget);
+ }
+ 

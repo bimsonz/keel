@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/merge-text.test.ts -t hunks.rediff-reach
+# kills: hunks.rediff-reach
+# why: No hunk counts as moved by compaction, so each reaches only its own span and GitCore merges a change git from 2.54 puts inside the re-diffed group's slide
+diff --git a/packages/gitcore/src/histogram.ts b/packages/gitcore/src/histogram.ts
+index 2d9f1f6..5521f08 100644
+--- a/packages/gitcore/src/histogram.ts
++++ b/packages/gitcore/src/histogram.ts
+@@ -354,7 +354,7 @@ export interface ReachingHunk extends Hunk {
+ 
+ /** Whether compaction left other marks in `[from - 1, to]` than histogram made. */
+ function moved(now: Side, then: Uint8Array, from: number, to: number): boolean {
+-  for (let i = from; i <= to + 1; i++) if (now.changed[i] !== then[i]) return true;
++  for (let i = from; i <= to + 1; i++) if (now.changed[i] !== then[i]) return false;
+   return false;
+ }
+ 

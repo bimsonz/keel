@@ -30,6 +30,29 @@ export function git(cwd: string, args: string[], input?: string | Uint8Array): s
   return execFileSync("git", args, { cwd, env: GIT_ENV, input, maxBuffer: 1 << 28 }).toString();
 }
 
+/** The gits GitCore's merges are proven against: 2.50.1 (histogram as through 2.53) and 2.55.0 (2.54 on re-diffs groups compaction moved). */
+const ORACLE_RANGE = { from: [2, 50], to: [2, 55] } as const;
+
+/** The git a differential compares with: its version, and whether it re-diffs moved groups (2.54 on). */
+export interface OracleGit {
+  readonly version: string;
+  readonly rediffsMovedGroups: boolean;
+}
+
+/** Reads `git --version` once and refuses a git the differentials were never proven against. */
+export function oracleGit(): OracleGit {
+  const version = execFileSync("git", ["--version"], { env: GIT_ENV }).toString().trim();
+  const [major = 0, minor = 0] = (/(\d+)\.(\d+)/.exec(version) ?? []).slice(1).map(Number);
+  const at = major * 1000 + minor;
+  const { from, to } = ORACLE_RANGE;
+  if (at < from[0] * 1000 + from[1] || at > to[0] * 1000 + to[1])
+    throw new Error(
+      `oracle git out of range: ${version}; GitCore is proven against git ${from.join(".")}–${to.join(".")}`,
+    );
+  console.log(`ORACLE ${version}`);
+  return { version, rediffsMovedGroups: at >= 2054 };
+}
+
 export function tempRepo(bare = true): { dir: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), "gitcore-"));
   git(dir, ["init", "-q", ...(bare ? ["--bare"] : []), "-b", "main"]);

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/merge-text.test.ts -t mergetext.differential
+# kills: mergetext.differential
+# why: Hunks of ours and theirs that touch with no base line between them merge, where git reports a conflict
+diff --git a/packages/gitcore/src/merge-text.ts b/packages/gitcore/src/merge-text.ts
+index 962f7e1..0fe0793 100644
+--- a/packages/gitcore/src/merge-text.ts
++++ b/packages/gitcore/src/merge-text.ts
+@@ -45,7 +45,7 @@ function parted(ours: readonly ReachingHunk[], theirs: readonly ReachingHunk[]):
+   ].toSorted((x, y) => x.aFrom - y.aFrom);
+   const end = { ours: -1, theirs: -1 };
+   for (const r of reaches) {
+-    if ((r.ours ? end.theirs : end.ours) >= r.aFrom) return false;
++    if ((r.ours ? end.theirs : end.ours) > r.aFrom) return false;
+     if (r.ours) end.ours = Math.max(end.ours, r.aTo);
+     else end.theirs = Math.max(end.theirs, r.aTo);
+   }

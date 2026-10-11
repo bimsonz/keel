@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/histogram.test.ts packages/gitcore/test/merge-text.test.ts -t "hunks.fallback|mergetext.fallback"
+# kills: hunks.fallback, mergetext.fallback
+# why: Where git leaves the histogram for Myers, GitCore carries on without an anchor, so its script is not git's
+diff --git a/packages/gitcore/src/histogram.ts b/packages/gitcore/src/histogram.ts
+index 4d0236b..3cf1da0 100644
+--- a/packages/gitcore/src/histogram.ts
++++ b/packages/gitcore/src/histogram.ts
+@@ -172,7 +172,7 @@ function anchor(
+     }
+     bp = bNext;
+   }
+-  if (common && bestCount > MAX_CHAIN) throw new Unsure("diff-fallback");
++  if (common && bestCount > Infinity) throw new Unsure("diff-fallback");
+   return best;
+ }
+ 

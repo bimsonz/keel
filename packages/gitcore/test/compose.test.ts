@@ -14,7 +14,7 @@ import { Refusal } from "../src/merge.ts";
 import type { Signature } from "../src/objects.ts";
 import { writePack } from "../src/pack-write.ts";
 import { receivePack } from "../src/push.ts";
-import { batchArb, planBatch } from "./gen.ts";
+import { batchArb, planBatch, TWO_MEMBER_BATCH } from "./gen.ts";
 import {
   CatFileReader,
   type CommitPlan,
@@ -23,6 +23,7 @@ import {
   GIT_ENV,
   gitMergeTree,
   smartHttp,
+  oracleGit,
   tempRepo,
   type TreeModel,
 } from "./git-harness.ts";
@@ -35,6 +36,7 @@ const KEEL: Signature = { name: "Keel", email: "keel@keel.invalid", time: 1_760_
 const CAND = "refs/heads/cand/c1";
 
 /** Where member heads live: one repo standing for every workspace. */
+oracleGit();
 const workspaces = tempRepo();
 const wsReader = new CatFileReader(workspaces.dir);
 afterAll(() => {
@@ -95,7 +97,11 @@ const BASE: TreeModel = new Map([
   ["src/a.ts", file("export const a = 1;\n")],
   ["src/b.ts", file("export const b = 2;\n")],
   ["docs/old.md", file("old\n")],
+  ["CHANGELOG.md", file("# Changelog\n\n## Unreleased\n\n### Added\n\n### Fixed\n\n## 0.1\n")],
 ]);
+/** BASE's changelog with a line under Added and one under Fixed. */
+const changelog = (added: string, fixed: string) =>
+  file(`# Changelog\n\n## Unreleased\n\n### Added\n${added}\n### Fixed\n${fixed}\n## 0.1\n`);
 const trunkOf = (tree: TreeModel): CommitPlan[] => [
   { mark: 1, ref: "refs/heads/main", parents: [], tree, message: "base\n" },
 ];
@@ -168,6 +174,31 @@ describe("restack", { timeout: PROPERTY_TIMEOUT }, () => {
     }
   });
 
+  it("[composer.hunks] composes two changes to different parts of one file, each commit holding its own line", async () => {
+    const { base, heads } = seed([
+      edit(2, (t) => t.set("CHANGELOG.md", changelog("- a\n", ""))),
+      edit(3, (t) => t.set("CHANGELOG.md", changelog("", "- b\n"))),
+    ]);
+    const staging = stagingWith(trunkOf(BASE));
+    try {
+      const out = await restack(
+        new FallbackReader([staging.reader, wsReader]),
+        base,
+        heads.map((h, i) => memberOf(i, base, h)),
+        KEEL,
+      );
+      const tip = out.commits.at(-1)?.oid ?? "";
+      expect(await pushTo(staging.dir, CAND, tip, out.objects)).toEqual({ kind: "applied" });
+      const fsck = run(staging.dir, ["fsck", "--strict", "--no-dangling"]);
+      expect(fsck.status).toBe(0);
+      const at = (commit: string) => git(staging.dir, ["cat-file", "-p", `${commit}:CHANGELOG.md`]);
+      expect(at(out.commits[0]?.oid ?? "")).toBe(changelog("- a\n", "").data);
+      expect(at(tip)).toBe(changelog("- a\n", "- b\n").data);
+    } finally {
+      staging.cleanup();
+    }
+  });
+
   it("[composer.refuses] refuses a batch whose second member edits a path the first changed", async () => {
     const { base, heads } = seed([
       edit(2, (t) => t.set("src/a.ts", file("export const a = 10;\n"))),
@@ -183,7 +214,7 @@ describe("restack", { timeout: PROPERTY_TIMEOUT }, () => {
       (e: unknown) => e,
     );
     expect(refusal).toBeInstanceOf(MemberRefused);
-    expect(refusal).toMatchObject({ member: 1, reason: "both-modified", path: "src/a.ts" });
+    expect(refusal).toMatchObject({ member: 1, reason: "overlap", path: "src/a.ts" });
   });
 
   it("[restack.keeps-author] each restacked commit keeps its submitted commit's author, date and offset, with Keel as committer", async () => {
@@ -296,9 +327,10 @@ describe("restack", { timeout: PROPERTY_TIMEOUT }, () => {
             staging.cleanup();
           }
         }),
-        { numRuns: RUNS },
+        // The first batch is hand-built to compose with two members, so no seed leaves the property without one.
+        { numRuns: RUNS, examples: [[TWO_MEMBER_BATCH]] },
       );
-      console.log(`restack: ${RUNS} batches, ${JSON.stringify(counts)}, 0 wrong`);
+      console.log(`restack: ${caseId} batches, ${JSON.stringify(counts)}, 0 wrong`);
       expect(counts.composed).toBeGreaterThan(0);
       expect(counts.multi).toBeGreaterThan(0);
     },
