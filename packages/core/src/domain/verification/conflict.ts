@@ -1,6 +1,15 @@
 import { Schema } from "effect";
-import { ChangeId, ConflictId, InstantSchema, SubjectId, TenetId } from "../kernel/index.ts";
-import { Predicate } from "../coordination/index.ts";
+import {
+  ChangeId,
+  ConflictId,
+  DecisionId,
+  EscalationId,
+  InstantSchema,
+  ProbeId,
+  SubjectId,
+  TenetId,
+} from "../kernel/index.ts";
+import { Move, Predicate } from "../coordination/index.ts";
 
 /** Footprint overlap is not a kind: proximity is exposure and never opens a conflict. */
 export const ConflictKind = Schema.Literals(["textual", "semantic", "precedent", "interaction"]);
@@ -19,6 +28,14 @@ export type ConflictState = typeof ConflictState.Type;
 export const Party = Schema.Union([ChangeId, TenetId]);
 export type Party = typeof Party.Type;
 
+/**
+ * Who raised the suspicion: `fallout` from derived facts, or `opinion` from a
+ * decision model. An opinion-raised conflict is tainted, so no lattice
+ * comparison over it counts as a ruling: only its probe or a person settles it.
+ */
+export const ConflictOrigin = Schema.Literals(["fallout", "opinion"]);
+export type ConflictOrigin = typeof ConflictOrigin.Type;
+
 export const Conflict = Schema.Struct({
   id: ConflictId,
   kind: ConflictKind,
@@ -28,12 +45,28 @@ export const Conflict = Schema.Struct({
   subjectId: Schema.optional(SubjectId),
   predicate: Schema.optional(Predicate),
   openedAt: InstantSchema,
+  /** Absent means `fallout`. */
+  origin: Schema.optional(ConflictOrigin),
+  /** The probe drafted for it, from `ProbeDrafted` on. */
+  probeId: Schema.optional(ProbeId),
+  escalationId: Schema.optional(EscalationId),
+  /** The Move that resolved it, and the Decision when a ruling did. */
+  move: Schema.optional(Move),
+  decisionId: Schema.optional(DecisionId),
 });
 export type Conflict = typeof Conflict.Type;
 
-/** One combination of changes evaluated together. */
-export const World = Schema.Literals(["trunk", "A", "B", "AB"]);
-export type World = typeof World.Type;
+/** One combination of changes evaluated together, as a flow can run steps over it. */
+export const FlowWorld = Schema.Literals(["trunk", "A", "B", "AB"]);
+export type FlowWorld = typeof FlowWorld.Type;
 
-export const ProbeState = Schema.Literals(["calibrating", "admitted", "discarded", "retired"]);
-export type ProbeState = typeof ProbeState.Type;
+/**
+ * A world a probe runs in: a flow's worlds, plus `A-noop`, the
+ * premise-holder's world with the premised behaviour removed (for S-1's
+ * freshness template, a revoke route that answers 204 and removes nothing).
+ * The probe's template supplies the recipe for building it, so no flow step
+ * runs there. A probe that passes there does not test the premise, so it is
+ * never admitted.
+ */
+export const World = Schema.Literals(["trunk", "A", "B", "AB", "A-noop"]);
+export type World = typeof World.Type;

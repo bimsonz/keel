@@ -68,6 +68,8 @@ const run = (n: number): ProbeCell[] => [
   { world: "A", run: n, outcome: "pass" },
   { world: "B", run: n, outcome: "n/a" },
   { world: "AB", run: n, outcome: "fail" },
+  // The do-nothing-revoke mutant of A: a revoke that answers 204 and removes nothing. The probe must catch it.
+  { world: "A-noop", run: n, outcome: "fail" },
 ];
 const step = (id: string, extra: Partial<StepSpec>): StepSpec => ({
   id,
@@ -170,6 +172,10 @@ describe("S-1: agents collide on beliefs", () => {
     const admission = admit([...run(1), ...run(2), ...run(3)]);
     show("admission", admission);
     expect(admission).toEqual({ _tag: "admitted", runs: 3 });
+    // A probe that only counts store lookups passes against the mutant too, so it never becomes G-1.
+    const vacuous = (n: number): ProbeCell[] =>
+      run(n).map((c) => (c.world === "A-noop" ? { ...c, outcome: "pass" } : c));
+    expect(admit([...vacuous(1), ...vacuous(2), ...vacuous(3)])._tag).toBe("rejected");
 
     const steps = [step("forge-lite.suite", { suite: true }), step("G-1", { kind: "probe" })];
     const plan = Result.getOrThrow(

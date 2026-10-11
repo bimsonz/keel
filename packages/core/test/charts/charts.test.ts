@@ -40,7 +40,11 @@ describe("the statecharts", () => {
           .filter((e) => !leaves.has(e.to))
           .map((e) => `${chart.id}: ${e.from} --${e.event}--> ${e.to}`),
       ).toEqual([]);
-      const reached = new Set([chart.initial, ...edges.map((e) => e.to)]);
+      const reached = new Set([
+        chart.initial,
+        ...(chart.meta.alsoCreated ?? []).map((c) => c.target),
+        ...edges.map((e) => e.to),
+      ]);
       expect(
         [...leaves].filter((l) => !reached.has(l) && !l.startsWith(`${chart.initial}.`)),
       ).toEqual([]);

@@ -13,7 +13,7 @@ import {
   type StepSpec,
   verdict,
   type VerdictOutcome,
-  type World,
+  type FlowWorld,
 } from "../../../src/domain/verification/index.ts";
 import { base, emptyDefaults, factClasses, flowCaseArb } from "../../arbitraries/flow.ts";
 import { fc } from "../../support/fast-check.ts";
@@ -27,7 +27,7 @@ const failures: readonly InfraFailure[] = [
   "unavailable",
 ];
 
-type Cell = { readonly step: PlanStep; readonly world: World | undefined };
+type Cell = { readonly step: PlanStep; readonly world: FlowWorld | undefined };
 const cells = (plan: FlowPlan): readonly Cell[] =>
   plan.steps.flatMap((step) => (step.worlds ?? [undefined]).map((world) => ({ step, world })));
 
@@ -178,7 +178,7 @@ const specStep = (id: string, extra: Partial<StepSpec> = {}): StepSpec => ({
 const facts = { baseCommit: base, touchedPaths: ["src/a.ts"], subjects: [], facts: factClasses };
 const build = (steps: StepSpec[], flow: FlowPlan["flow"]): FlowPlan =>
   Result.getOrThrow(compile({ commit: base, steps, flow }, facts, emptyDefaults));
-const res = (plan: FlowPlan, id: string, outcome: string, world?: World): StepResult => {
+const res = (plan: FlowPlan, id: string, outcome: string, world?: FlowWorld): StepResult => {
   const s = plan.steps.find((x) => x.id === id)!;
   return coerce(plan, report({ step: s, world }, outcome));
 };

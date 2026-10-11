@@ -10,7 +10,7 @@ import {
   type TierChoice,
   weakest,
 } from "../kernel/index.ts";
-import type { World } from "./conflict.ts";
+import type { FlowWorld } from "./conflict.ts";
 import {
   AbstainMissing,
   CascadeAcceptUnreachable,
@@ -102,7 +102,7 @@ const checkStructure = (
   table: ReadonlyMap<string, StepSpec>,
   classes: ReadonlyMap<string, EvidenceClass>,
   prior: ReadonlySet<string>,
-  worlds: readonly World[] | undefined,
+  worlds: readonly FlowWorld[] | undefined,
 ): { readonly errors: readonly CompileError[]; readonly ran: ReadonlySet<string> } => {
   switch (flow._tag) {
     case "step": {
@@ -331,8 +331,8 @@ const tierFor = (spec: StepSpec, policy: FlowPolicy): TierChoice => {
 
 const worldsOf = (
   flow: Flow,
-  inherited: readonly World[] | undefined,
-  out: Map<string, readonly World[] | undefined>,
+  inherited: readonly FlowWorld[] | undefined,
+  out: Map<string, readonly FlowWorld[] | undefined>,
 ): void => {
   switch (flow._tag) {
     case "step":
@@ -425,7 +425,7 @@ export const compile = (
     });
   }
 
-  const worlds = new Map<string, readonly World[] | undefined>();
+  const worlds = new Map<string, readonly FlowWorld[] | undefined>();
   worldsOf(compiled, undefined, worlds);
   const planned = stepsIn(compiled).flatMap((id): PlanStep[] => {
     const s = table.get(id);

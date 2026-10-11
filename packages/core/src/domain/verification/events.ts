@@ -14,7 +14,7 @@ import {
   VerdictId,
 } from "../kernel/index.ts";
 import { Move, Predicate } from "../coordination/index.ts";
-import { ConflictKind, Party, World } from "./conflict.ts";
+import { ConflictKind, ConflictOrigin, Party, World } from "./conflict.ts";
 import { VerdictOutcome } from "./plan.ts";
 
 export const ConflictSuspected = Schema.TaggedStruct("ConflictSuspected", {
@@ -23,6 +23,8 @@ export const ConflictSuspected = Schema.TaggedStruct("ConflictSuspected", {
   parties: Schema.Array(Party),
   subjectId: Schema.optional(SubjectId),
   predicate: Schema.optional(Predicate),
+  /** Absent means `fallout`; `opinion` is a decision model's suspicion, which only a probe or a person settles. */
+  origin: Schema.optional(ConflictOrigin),
 });
 export const ProbeDrafted = Schema.TaggedStruct("ProbeDrafted", {
   probeId: ProbeId,
@@ -41,6 +43,11 @@ export const ProbeRan = Schema.TaggedStruct("ProbeRan", {
 export const ProbeDiscarded = Schema.TaggedStruct("ProbeDiscarded", {
   probeId: ProbeId,
   reason: Schema.Literals(["non-discriminating", "unstable", "draft-failed"]),
+  /**
+   * Optional only so older events still decode. Always set: a probe whose
+   * drafts all failed begins with this event, and it is the only one naming its conflict.
+   */
+  conflictId: Schema.optional(ConflictId),
 });
 export const ConflictProven = Schema.TaggedStruct("ConflictProven", {
   conflictId: ConflictId,
@@ -48,6 +55,8 @@ export const ConflictProven = Schema.TaggedStruct("ConflictProven", {
     Schema.TaggedStruct("probe", { probeId: ProbeId }),
     Schema.TaggedStruct("guard", { guardId: GuardId }),
     Schema.TaggedStruct("merge-refused", { batchId: BatchId }),
+    /** Every subset of the batch passed and the union failed: the Lane DO's own runs are the proof. */
+    Schema.TaggedStruct("interaction", { batchId: BatchId }),
   ]),
 });
 export const ConflictDismissed = Schema.TaggedStruct("ConflictDismissed", {

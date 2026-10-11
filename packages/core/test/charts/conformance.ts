@@ -11,7 +11,10 @@ import { type Chart, conforms, edgeKey, edgesOf } from "./chart-kit.ts";
 type Rejection = { readonly _tag: string };
 type Tagged = { readonly _tag: string };
 
-/** Where a fold starts and ends, as the chart names its states. */
+/** Where an entity is before it exists. */
+export const ABSENT = "none";
+
+/** Where a fold starts and ends, as the chart names its states; `ABSENT` before the entity exists. */
 export interface View<S, E> {
   readonly from: (f: Fold<S, E>) => string;
   readonly to: (f: Fold<S, E>) => string;
@@ -35,7 +38,16 @@ export const foldsOf = <S, C, E, F>(
     }
   });
 
-/** Folds that leave the chart: a creation that does not land on its initial state, or a move it does not draw. */
+/** A creation lands on the chart's initial state, or where one of its other creating events says. */
+const created = (chart: Chart, event: string, to: string): boolean =>
+  to === chart.initial ||
+  (chart.meta.alsoCreated ?? []).some((c) => c.event === event && c.target === to);
+
+/**
+ * Folds that leave the chart: a creation that does not land on its initial
+ * state (or one of its other creations), or a move it does not draw. A fold
+ * that leaves the entity absent (another entity's event) is not about it.
+ */
 export const offChart = <S, E extends Tagged>(
   chart: Chart,
   folds: readonly Fold<S, E>[],
@@ -43,11 +55,12 @@ export const offChart = <S, E extends Tagged>(
 ): readonly string[] => {
   const onChart = conforms(chart);
   return folds
-    .filter((f) =>
-      f.before === undefined
-        ? view.to(f) !== chart.initial
-        : !onChart(view.from(f), f.event._tag, view.to(f)),
-    )
+    .filter((f) => {
+      const from = view.from(f);
+      const to = view.to(f);
+      if (from !== ABSENT) return !onChart(from, f.event._tag, to);
+      return to !== ABSENT && !created(chart, f.event._tag, to);
+    })
     .map((f) => edgeKey({ from: view.from(f), event: f.event._tag, to: view.to(f) }));
 };
 
@@ -59,7 +72,7 @@ export const uncovered = <S, E extends Tagged>(
 ): readonly string[] => {
   const covered = new Set(
     folds
-      .filter((f) => f.before !== undefined)
+      .filter((f) => view.from(f) !== ABSENT)
       .map((f) => edgeKey({ from: view.from(f), event: f.event._tag, to: view.to(f) })),
   );
   return edgesOf(chart)

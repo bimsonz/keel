@@ -20,9 +20,24 @@ export interface ChartState {
 export interface Chart extends ChartState {
   readonly id: string;
   readonly initial: string;
-  /** The event that creates the entity, and the docs section (heading text) the diagram belongs to. */
-  readonly meta: { readonly createdBy: string; readonly section: string };
+  /**
+   * The event that creates the entity, and the docs section (heading text) the
+   * diagram belongs to. `alsoCreated`: other events that create it, in a state
+   * other than `initial`.
+   */
+  readonly meta: {
+    readonly createdBy: string;
+    readonly section: string;
+    readonly alsoCreated?: readonly Creation[];
+  };
   readonly states: Readonly<Record<string, ChartState>>;
+}
+
+/** An event that creates the entity in `target`, under `guard`. */
+export interface Creation {
+  readonly event: string;
+  readonly target: string;
+  readonly guard?: string;
 }
 
 export interface Edge {
@@ -105,7 +120,14 @@ const title = (path: string): string => {
 
 /** The chart as a mermaid `stateDiagram-v2`, the form the docs show. */
 export const toMermaid = (chart: Chart): string => {
-  const lines = ["stateDiagram-v2", `  [*] --> ${title(chart.initial)}: ${chart.meta.createdBy}`];
+  const lines = [
+    "stateDiagram-v2",
+    `  [*] --> ${title(chart.initial)}: ${chart.meta.createdBy}`,
+    ...(chart.meta.alsoCreated ?? []).map(
+      (c) =>
+        `  [*] --> ${title(c.target)}: ${c.event}${c.guard === undefined ? "" : ` [${c.guard}]`}`,
+    ),
+  ];
   for (const [path, state] of statesOf(chart)) {
     if (state.states === undefined) continue;
     lines.push(

@@ -245,6 +245,54 @@ export const agentChart: Chart = {
   },
 };
 
+// Conflict
+const f = to("conflict");
+/** Out of an open conflict: proof, a ruling or a non-discriminating probe, or escalation when it is unprovable. */
+const unsettled = {
+  ConflictProven: f("proven"),
+  ConflictDismissed: f("dismissed"),
+  ConflictEscalated: f("escalated"),
+};
+
+export const conflictChart: Chart = {
+  id: "conflict",
+  initial: "suspected",
+  meta: { createdBy: "ConflictSuspected", section: "Conflict" },
+  states: {
+    suspected: { on: { ProbeDrafted: f("probing"), ...unsettled } },
+    probing: { on: { ProbeRan: f("probing"), ...unsettled } },
+    proven: { on: { ConflictResolved: f("resolved"), ConflictEscalated: f("escalated") } },
+    escalated: { on: { ConflictResolved: f("resolved") } },
+    resolved: { type: "final" },
+    dismissed: { type: "final" },
+  },
+};
+
+// Probe → Guard: a probe whose drafts all failed begins Discarded.
+const g = to("probe");
+
+export const probeChart: Chart = {
+  id: "probe",
+  initial: "calibrating",
+  meta: {
+    createdBy: "ProbeDrafted",
+    section: "Probe → Guard",
+    alsoCreated: [{ event: "ProbeDiscarded", target: "discarded", guard: "draft-failed" }],
+  },
+  states: {
+    calibrating: {
+      on: {
+        ProbeRan: g("calibrating"),
+        GuardAdmitted: g("admitted"),
+        ProbeDiscarded: g("discarded"),
+      },
+    },
+    admitted: { on: { GuardRetired: g("retired") } },
+    discarded: { type: "final" },
+    retired: { type: "final" },
+  },
+};
+
 export const charts: readonly Chart[] = [
   changeChart,
   leaseChart,
@@ -253,4 +301,6 @@ export const charts: readonly Chart[] = [
   workspaceChart,
   sketchChart,
   agentChart,
+  conflictChart,
+  probeChart,
 ];

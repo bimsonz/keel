@@ -197,6 +197,7 @@ Owner: by kind. The Subject DO owns `semantic` and `precedent` conflicts. `textu
 
 Footprint overlap is not a conflict: it is *exposure*, reported in preflight's neighbours. Proximity never opens a conflict.
 
+<!-- chart:conflict — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
 stateDiagram-v2
   [*] --> Suspected: ConflictSuspected
@@ -214,21 +215,22 @@ stateDiagram-v2
   Resolved --> [*]
   Dismissed --> [*]
 ```
+<!-- /chart:conflict -->
 
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
 | — | Suspected | Fallout: a same-key contradiction with intersecting scope, or a silent retraction (semantic); a precedent's guard at risk (precedent); a refused merge (textual); a batch whose union fails while every subset passes (interaction) | Proximity alone never opens a conflict | `ConflictSuspected` |
-| Suspected | Proven | Proof without a probe: a merge GitCore and MergeBox both refuse (textual), or a failing guard (precedent) | — | `ConflictProven` |
-| Suspected | Dismissed | A deterministic lattice comparison shows the propositions are compatible (a ruling) | — | `ConflictDismissed` |
+| Suspected | Proven | Proof without a probe: a merge GitCore and MergeBox both refuse (textual), a failing guard (precedent), or a batch whose union fails while every subset passes (interaction) | The proof matches the kind | `ConflictProven` |
+| Suspected | Dismissed | A deterministic lattice comparison shows the propositions are compatible (a ruling) | `decide` compares the premise and the effect itself: compatible or refines. Never for a conflict a decision model raised (`origin: opinion`), because a comparison over an opinion-derived effect is tainted, not a ruling | `ConflictDismissed` |
 | Suspected | Probing | A probe compiles and runs | — | `ProbeDrafted` |
 | Suspected | Escalated | Three drafts fail: the conflict is unprovable | — | `ProbeDiscarded {draft-failed}`, then `ConflictEscalated {reason: unprovable}` |
 | Probing | Probing | One world-matrix cell completes | — | `ProbeRan` |
-| Probing | Proven | The probe discriminates | It passes on trunk (or does not apply), passes in the premise-holder's world, fails in the combined world, three runs in a row | `GuardAdmitted`, then `ConflictProven` |
+| Probing | Proven | The probe discriminates | It passes on trunk (or does not apply), passes in the premise-holder's world, fails in the combined world and fails in A-noop, three runs in a row | `GuardAdmitted`, then `ConflictProven` |
 | Probing | Dismissed | The probe gives the same answer in every world | — | `ProbeDiscarded {non-discriminating}`, then `ConflictDismissed` |
 | Probing | Escalated | The probe is unstable across runs | — | `ProbeDiscarded {unstable}`, then `ConflictEscalated {reason: unprovable}` |
 | Proven | Escalated | The conflict is human-class | Permission semantics, destructive migrations, ambiguous requirements | `ConflictEscalated {reason: human-class}` |
 | Proven | Resolved | A Move is applied (bounce, sequence, yield, merge, distinguish…) | — | `ConflictResolved` |
-| Escalated | Resolved | Caused by `RulingGiven` | — | `ConflictResolved` (with `decisionId`) |
+| Escalated | Resolved | Caused by `RulingGiven` | A Decision: an escalated conflict resolves only on a ruling | `ConflictResolved` (with `decisionId`) |
 
 **Terminal:** Resolved, Dismissed.
 
@@ -244,10 +246,11 @@ Owner: the DO that owns the probe's conflict. If a probe proves the disagreement
 
 **A probe entity begins with its first event:** `ProbeDrafted` (a draft compiled and ran) or `ProbeDiscarded {draft-failed}` (three drafts failed). Drafting and its bounded repair loop (≤ 3 attempts, driven by deterministic error text) are a phase inside one Workflow step, not a persisted state, so replay rebuilds a probe exactly from its events.
 
+<!-- chart:probe — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
 stateDiagram-v2
   [*] --> Calibrating: ProbeDrafted
-  [*] --> Discarded: ProbeDiscarded (draft-failed)
+  [*] --> Discarded: ProbeDiscarded [draft-failed]
   Calibrating --> Calibrating: ProbeRan
   Calibrating --> Admitted: GuardAdmitted
   Calibrating --> Discarded: ProbeDiscarded
@@ -255,17 +258,20 @@ stateDiagram-v2
   Discarded --> [*]
   Retired --> [*]
 ```
+<!-- /chart:probe -->
 
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
 | — | Calibrating | A draft compiles and runs | Attempts ≤ 3 | `ProbeDrafted` |
 | — | Discarded | Three drafts failed | — | `ProbeDiscarded {reason: draft-failed}` |
-| Calibrating | Calibrating | One world-matrix cell (trunk, A, B or AB; run 1–3) completes | — | `ProbeRan` |
-| Calibrating | Admitted | Computed from the `ProbeRan` cells | Passes on trunk (or does not apply), passes in the premise-holder's world, fails in the combined world, stable over 3 runs | `GuardAdmitted` |
+| Calibrating | Calibrating | One world-matrix cell (trunk, A, B, AB or A-noop; run 1–3) completes | Its conflict is Probing it. The same cell again is a retry and commits nothing; a different answer for it is refused | `ProbeRan` |
+| Calibrating | Admitted | Computed from the `ProbeRan` cells | Passes on trunk (or does not apply), passes in the premise-holder's world, fails in the combined world, **fails in A-noop**, stable over 3 runs | `GuardAdmitted` |
 | Calibrating | Discarded | Not discriminating, or unstable | — | `ProbeDiscarded` |
 | Admitted | Retired | A superseding Decision | — | `GuardRetired` |
 
 **Terminal:** Discarded, Retired. (An admitted Guard stays Admitted, guarding trunk, until a Decision retires it.)
+
+**A-noop** is the premise-holder's world with the premised behaviour removed: for S-1's freshness template, a revoke route that answers 204 and removes nothing. The probe's template supplies the recipe for building it, and the world matrix builds it. A probe that passes there, or does not apply there, never tested the premise (spike S26 found one that only counted store lookups), so it is non-discriminating. A probe whose recipe cannot build an A-noop world never completes a run, so it is never admitted, and its conflict escalates as unprovable rather than resting on a possibly vacuous probe.
 
 **Invariants**
 - A drafted probe is opinion until it discriminates.

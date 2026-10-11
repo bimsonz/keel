@@ -1,6 +1,6 @@
 import type { CommitSha, ContentHash, EvidenceClass, Glob, Tier } from "../kernel/index.ts";
 import type { SubjectKey } from "../coordination/index.ts";
-import type { World } from "./conflict.ts";
+import type { FlowWorld } from "./conflict.ts";
 import type { PlanStep, StepKind, StepOutcome, VerificationPlan } from "./plan.ts";
 
 /** What a budget node allows its body to spend. */
@@ -30,7 +30,7 @@ export type Flow =
       readonly accept: readonly StepOutcome[];
       readonly items: readonly Flow[];
     }
-  | { readonly _tag: "worlds"; readonly over: readonly World[]; readonly body: Flow }
+  | { readonly _tag: "worlds"; readonly over: readonly FlowWorld[]; readonly body: Flow }
   | { readonly _tag: "when"; readonly condition: Condition; readonly body: Flow }
   | {
       readonly _tag: "budget";
@@ -60,7 +60,7 @@ export type StepSpec = {
   /** Steps whose fail this step may override. */
   readonly overrides: readonly string[];
   /** The worlds the step can run in, when it is a world-matrix step. */
-  readonly worlds?: readonly World[];
+  readonly worlds?: readonly FlowWorld[];
   readonly budget: Budget;
   readonly determinism: "deterministic" | "nondeterministic";
   /** A project suite (runs in a container by default), rather than a probe or a pure check. */

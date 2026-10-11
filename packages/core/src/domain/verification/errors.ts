@@ -1,9 +1,50 @@
 import { Schema } from "effect";
-import { ConflictId, ContentHash, EscalationId, VerdictId } from "../kernel/index.ts";
+import {
+  ConflictId,
+  ContentHash,
+  EscalationId,
+  NextAction,
+  ProbeId,
+  VerdictId,
+} from "../kernel/index.ts";
+import { ConflictState } from "./conflict.ts";
+import { ProbeState } from "./probe.ts";
 
 export class ConflictNotFound extends Schema.TaggedError<ConflictNotFound>()("ConflictNotFound", {
   conflictId: ConflictId,
 }) {}
+
+/**
+ * The conflict's state does not take the command, or its facts do not
+ * support it (`reason`: e.g. the lattice does not settle a dismissal, or the
+ * probe is still calibrating). `nextActions` is never empty.
+ */
+export class ConflictStateRefused extends Schema.TaggedError<ConflictStateRefused>()(
+  "ConflictStateRefused",
+  {
+    conflictId: ConflictId,
+    state: Schema.optional(ConflictState),
+    command: Schema.String,
+    reason: Schema.optional(Schema.String),
+    nextActions: Schema.Array(NextAction),
+  },
+) {}
+
+export class ProbeNotFound extends Schema.TaggedError<ProbeNotFound>()("ProbeNotFound", {
+  probeId: ProbeId,
+}) {}
+
+/** The probe's state does not take the command, or the cell contradicts one already recorded. `nextActions` is never empty. */
+export class ProbeStateRefused extends Schema.TaggedError<ProbeStateRefused>()(
+  "ProbeStateRefused",
+  {
+    probeId: ProbeId,
+    state: Schema.optional(ProbeState),
+    command: Schema.String,
+    reason: Schema.optional(Schema.String),
+    nextActions: Schema.Array(NextAction),
+  },
+) {}
 
 export class VerdictNotFound extends Schema.TaggedError<VerdictNotFound>()("VerdictNotFound", {
   verdictId: VerdictId,

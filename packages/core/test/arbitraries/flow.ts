@@ -16,7 +16,7 @@ import type {
   StepKind,
   StepOutcome,
   StepSpec,
-  World,
+  FlowWorld,
 } from "../../src/domain/verification/index.ts";
 import { fc } from "../support/fast-check.ts";
 
@@ -38,7 +38,7 @@ const kinds: readonly StepKind[] = [
   "human",
   "deploy",
 ];
-const allWorlds: readonly World[] = ["trunk", "A", "B", "AB"];
+const allWorlds: readonly FlowWorld[] = ["trunk", "A", "B", "AB"];
 const pathPool = ["src/authz/**", "src/billing/**"] as const;
 const subjectPool = ["authz", "billing.cache"] as const;
 
@@ -57,7 +57,7 @@ type Draft = {
   readonly decideOutcomes: readonly StepOutcome[];
   readonly routeOutcomes: readonly StepOutcome[];
   readonly optional: boolean;
-  readonly worlds: readonly World[] | undefined;
+  readonly worlds: readonly FlowWorld[] | undefined;
   readonly suite: boolean;
   readonly pinned: 0 | 1 | 2 | undefined;
   readonly paths: readonly string[];
