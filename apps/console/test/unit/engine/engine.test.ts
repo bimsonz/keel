@@ -37,6 +37,7 @@ function never(): never {
 
 function outcomes(cell: MatrixCell | undefined): string[] {
   if (cell === undefined) return [];
+  if (cell.kind === "none") return [];
   return cell.kind === "probe" ? [...cell.runs] : [cell.outcome];
 }
 
@@ -61,7 +62,17 @@ describe("the console's picture of scenario 1", () => {
     expect(outcomes(state?.matrix.cells.AB.probe)).toEqual(["fail", "fail", "running"]);
   });
 
-  it("has a control row, where the probe must fail, and fills the suites' cells from their own events", async () => {
+  it("[matrix.control] has a control row, where the probe must fail and no suite is run or waited for", async () => {
+    // The baseline is in and the control's probe has not run yet: that probe is what is running, and not a suite
+    // Keel never runs there.
+    const before = conflictPage(await playerAt(414.2));
+    expect(before?.matrix.cells.trunk.probe).toMatchObject({ runs: ["n/a", "n/a", "n/a"] });
+    expect(before?.matrix.cells["A-noop"]).toEqual({
+      "tests-a": { kind: "none" },
+      "tests-b": { kind: "none" },
+      probe: { kind: "probe", runs: ["running", "pending", "pending"], control: true },
+    });
+
     const state = conflictPage(await playerAt(443));
     expect(state?.matrix.worlds.map((world) => world.id)).toEqual([
       "trunk",
@@ -77,10 +88,8 @@ describe("the console's picture of scenario 1", () => {
       control: true,
     });
     expect(state?.matrix.cells.AB.probe).not.toHaveProperty("control");
-    expect(state?.matrix.cells["A-noop"]["tests-a"]).toMatchObject({
-      outcome: "n/a",
-      reason: "The control world runs the probe alone",
-    });
+    expect(state?.matrix.cells["A-noop"]["tests-a"]).toEqual({ kind: "none" });
+    expect(state?.matrix.cells["A-noop"]["tests-b"]).toEqual({ kind: "none" });
     // Each change's own suite, by the change it belongs to.
     expect(state?.matrix.cells.A["tests-a"]).toMatchObject({
       outcome: "pass",

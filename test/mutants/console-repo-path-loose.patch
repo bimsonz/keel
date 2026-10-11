@@ -2,7 +2,7 @@
 # kills: handler.repo-public
 # why: a path that only begins like one of the four repository reads is passed on to Keel
 diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
-index 9baceeb..da144f8 100644
+index 598f12c..adc3bdc 100644
 --- a/apps/console/src/worker/handler.ts
 +++ b/apps/console/src/worker/handler.ts
 @@ -70,7 +70,7 @@ const COMMITS_QUERY = [

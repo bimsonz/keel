@@ -334,12 +334,16 @@ describe("reading a project's repository through the console", () => {
         `/api/v1/projects/${id}/repo`,
         `/api/v1/projects/${id}/repo/tree/extra`,
         `/api/v1/projects/${id}/repo/commits/not-a-sha`,
+        // Keel reads a commit by its whole id, and answers a shortened one 400: it is not asked.
+        `/api/v1/projects/${id}/repo/commits/${head.slice(0, 12)}`,
         `/api/v1/projects/${id}/repo/commits/abcd/..%2F..%2Fsettings`,
         `/api/v1/projects/a%2Fb/repo/tree`,
         `/api/v1/projects/${id}/repo/refs`,
       ].map((path) => r.get(path, AS_PRESENTER)),
     );
-    expect(refused.map((response) => response.status)).toEqual([404, 404, 404, 404, 404, 404, 404]);
+    expect(refused.map((response) => response.status)).toEqual([
+      404, 404, 404, 404, 404, 404, 404, 404,
+    ]);
     expect(r.keel.calls).toHaveLength(asked);
   });
 

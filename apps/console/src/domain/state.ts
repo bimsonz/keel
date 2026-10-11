@@ -120,7 +120,10 @@ export type ProbeCell = {
   control?: boolean;
 };
 
-export type MatrixCell = TestCell | ProbeCell;
+/** A check Keel does not run in a world: nothing is drawn there. The control world runs the probe alone. */
+export type NoCell = { kind: "none" };
+
+export type MatrixCell = TestCell | ProbeCell | NoCell;
 
 export interface MatrixCheck {
   id: "tests-a" | "tests-b" | "probe";

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/funnel.test.ts
+# kills: funnel.no-cost
+# why: where Keel has recorded no cost the funnel shows a cost of nothing, which Keel never said
+diff --git a/apps/console/src/engine/funnel.ts b/apps/console/src/engine/funnel.ts
+index 9630550..6ee8528 100644
+--- a/apps/console/src/engine/funnel.ts
++++ b/apps/console/src/engine/funnel.ts
+@@ -89,7 +89,7 @@ export function funnelOf(world: World): FunnelState {
+     settled: dismissed + proven,
+     passedOn: escalated,
+     open: conflicts.length - dismissed - proven - escalated,
+-    ...(probeCosts.length === 0 ? {} : { usd: total(probeCosts) }),
++    usd: total(probeCosts),
+     dismissed,
+     proven,
+   });

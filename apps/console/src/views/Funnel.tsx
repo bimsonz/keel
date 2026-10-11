@@ -98,6 +98,12 @@ const NOT_COUNTED = (
   </span>
 );
 
+const NO_COST = (
+  <span className="font-normal text-kumo-subtle" title="Keel records no cost yet">
+    —
+  </span>
+);
+
 /** What reached the level, as one bar: settled here, passed on, and still open. */
 function Split({ row }: { row: FunnelRow }) {
   if (!row.reported) return <div className="a-funnel-bar" data-empty="unreported" />;
@@ -205,7 +211,11 @@ function Stage({ row }: { row: FunnelRow }) {
         {person ? (
           <span className="text-sm text-kumo-subtle">a person's time</span>
         ) : row.usd === undefined ? (
-          NOT_COUNTED
+          row.reported ? (
+            NO_COST
+          ) : (
+            NOT_COUNTED
+          )
         ) : (
           dollars(row.usd)
         )}
@@ -217,7 +227,9 @@ function Stage({ row }: { row: FunnelRow }) {
 export function Funnel({ state }: { state: FunnelState }) {
   const counted = state.rows.some((row) => row.reported && row.stage === 0);
   const perThousand =
-    state.changesLanded === 0 ? undefined : (state.usd / state.changesLanded) * 1000;
+    state.usd === undefined || state.changesLanded === 0
+      ? undefined
+      : (state.usd / state.changesLanded) * 1000;
   return (
     <div className="a-scroll h-full overflow-y-auto">
       <div className="mx-auto flex max-w-[1480px] flex-col gap-5 px-6 py-5">
@@ -256,10 +268,15 @@ export function Funnel({ state }: { state: FunnelState }) {
           >
             by the subject index and the lattice, in code
           </Tile>
-          <Tile label="Cost of review" value={dollars(state.usd)}>
-            {perThousand === undefined
-              ? "Nothing has landed yet."
-              : `${dollars(perThousand)} per thousand changes landed${counted ? "" : ", probes only"}`}
+          <Tile
+            label="Cost of review"
+            value={state.usd === undefined ? NO_COST : dollars(state.usd)}
+          >
+            {state.usd === undefined
+              ? "Keel records no cost yet."
+              : perThousand === undefined
+                ? "Nothing has landed yet."
+                : `${dollars(perThousand)} per thousand changes landed${counted ? "" : ", probes only"}`}
           </Tile>
           <Tile
             label="People asked"

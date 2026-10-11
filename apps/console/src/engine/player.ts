@@ -121,10 +121,12 @@ export class Player {
   /** Read everything the source has, page by page. */
   async load(): Promise<void> {
     // The lattices are the same for the whole run. Without them a conflict's page draws no line; nothing else waits on them.
-    void this.#fetch(async () => {
-      for (const lattice of (await this.source.getLattices()).items)
-        this.lattices.set(lattice.predicate, lattice);
-    });
+    // Keel reads them to whoever it reads its log to, so a reader with a closed log is shown no conflict and asks for none.
+    if (this.source.descriptor.log === "open")
+      void this.#fetch(async () => {
+        for (const lattice of (await this.source.getLattices()).items)
+          this.lattices.set(lattice.predicate, lattice);
+      });
     await this.#drain();
     this.#changed();
   }

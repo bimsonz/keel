@@ -25,6 +25,20 @@ import { LATTICES } from "../lattices.ts";
 import { createMockRepository } from "./repository.ts";
 import { type S1Ruling, S1_CHOICES, generateS1 } from "./s1.ts";
 
+/**
+ * Keel records no cost yet (QUESTIONS B4), so this stand-in publishes none: what a fixture prices is the
+ * fixture's own, and a console that showed a cost here would be showing one Keel never gave.
+ */
+function unpriced(payload: AnyEvent["payload"]): AnyEvent["payload"] {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- any payload may carry the fixture's additions
+  const added = (payload as { x?: { cost?: unknown } }).x;
+  if (added?.cost === undefined) return payload;
+  const { cost: _cost, ...rest } = added;
+  const { x: _x, ...own } = payload as { x?: unknown };
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the same payload, less its price
+  return (Object.keys(rest).length === 0 ? own : { ...own, x: rest }) as AnyEvent["payload"];
+}
+
 export interface Client {
   id: string;
   secret: string;
@@ -253,7 +267,7 @@ export function createFakeKeel(options: {
               entity,
               seq,
               at,
-              payload,
+              payload: unpriced(payload),
               ...(label === undefined ? {} : { label }),
               ...(actor === undefined ? {} : { actor }),
               ...(project === undefined ? {} : { project }),

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.visitor
+# why: a visitor's console asks Keel for its lattices, which Keel reads only to an observer: a refused read on every page a visitor opens
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index 220828b..dbd41bb 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -122,7 +122,7 @@ export class Player {
+   async load(): Promise<void> {
+     // The lattices are the same for the whole run. Without them a conflict's page draws no line; nothing else waits on them.
+     // Keel reads them to whoever it reads its log to, so a reader with a closed log is shown no conflict and asks for none.
+-    if (this.source.descriptor.log === "open")
++    if (this.source.descriptor.mode === "live" || this.source.descriptor.log === "open")
+       void this.#fetch(async () => {
+         for (const lattice of (await this.source.getLattices()).items)
+           this.lattices.set(lattice.predicate, lattice);

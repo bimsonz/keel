@@ -183,16 +183,11 @@ describe("who the page reads as", () => {
     expect(player.projects.list).toEqual([]);
     // Following a closed log returns at once, where following an open one waits on its tail.
     await player.follow(new AbortController().signal);
-    expect(requests.map((request) => new URL(request.url).pathname)).toEqual([
-      "/api/v1/events",
-      "/api/v1/lattices",
-    ]);
+    // The log is asked for once. Nothing else Keel reads only to an observer is asked for at all.
+    expect(requests.map((request) => new URL(request.url).pathname)).toEqual(["/api/v1/events"]);
     expect(requests.filter((request) => request.headers.has("authorization"))).toEqual([]);
     // Keel was asked with no token, and was never asked for one.
-    expect(keel.calls.map((call) => `${call.path} ${call.authorization}`)).toEqual([
-      "/v1/events ",
-      "/v1/lattices ",
-    ]);
+    expect(keel.calls.map((call) => `${call.path} ${call.authorization}`)).toEqual(["/v1/events "]);
   });
 
   it("[http.presenter-reads] shows the presenter's key on every read, and the Worker then reads as the observer", async () => {
@@ -203,6 +198,10 @@ describe("who the page reads as", () => {
     await player.load();
     await settled();
     expect(player.projects.list.map((project) => project.name)).toEqual(["demo"]);
+    // Every entry of the log is folded, as Keel publishes it: with no cost on any of them.
+    player.seek(player.end);
+    expect(player.world.conflicts.size).toBe(1);
+    expect(player.unread).toBe(0);
     const reads = requests.filter((request) => new URL(request.url).pathname.startsWith("/api/"));
     expect(reads.length).toBeGreaterThan(2);
     expect(reads.map((request) => request.headers.get("authorization"))).toEqual(

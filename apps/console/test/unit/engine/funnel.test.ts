@@ -115,6 +115,38 @@ describe("the review funnel, read off the swarm", () => {
   });
 });
 
+describe("the review funnel, read off a log as Keel writes it", () => {
+  it("[funnel.no-cost] shows no cost where the log carries none: that is not a cost of nothing", async () => {
+    // Keel records no cost yet. Its events are the fixture's without what the fixture adds to them, and it
+    // sends no observation.
+    const scripted = createMockSource({ scenario: "s1", seed: 42 });
+    const player = showing({
+      ...scripted,
+      async readEvents(request = {}) {
+        const page = await scripted.readEvents(request);
+        return {
+          ...page,
+          items: page.items.map((event) => {
+            const { x: _added, ...payload } = event.payload as { x?: unknown };
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the same event, less the fixture's own additions
+            return { ...event, payload } as typeof event;
+          }),
+        };
+      },
+      readObservations: (request = {}) =>
+        Promise.resolve({ items: [], nextCursor: request.cursor ?? "" }),
+    });
+    await player.load();
+    player.seek(player.end);
+    const state = funnelOf(player.world);
+    // The probe is counted, from its events.
+    expect(row(state, 4)).toMatchObject({ reported: true, reached: 1 });
+    expect(row(state, 4)).not.toHaveProperty("usd");
+    expect(state).not.toHaveProperty("usd");
+    expect(state.changesLanded).toBeGreaterThan(0);
+  });
+});
+
 describe("the review funnel, read off the scripted scenarios", () => {
   it("shows a question waiting for a person, and then answered", async () => {
     const player = await playerAt("s1", 9999, "live");

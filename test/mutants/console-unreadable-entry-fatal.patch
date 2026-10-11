@@ -2,10 +2,10 @@
 # kills: player.unread
 # why: one entry of Keel's log that cannot be folded stops the console, where it should be left out and counted
 diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
-index c6c3a8d..24e7fd4 100644
+index 220828b..66ddb97 100644
 --- a/apps/console/src/engine/player.ts
 +++ b/apps/console/src/engine/player.ts
-@@ -150,7 +150,7 @@ export class Player {
+@@ -152,7 +152,7 @@ export class Player {
     * being shown. A fixture's log is this console's own, so a fault folding one is a fault here, and is thrown.
     */
    #fold(event: AnyEvent, at: number): void {

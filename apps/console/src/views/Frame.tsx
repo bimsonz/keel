@@ -106,12 +106,18 @@ export interface SourceMark {
   seed: number;
   /** Entries of Keel's log that could not be read, where there are any. */
   unread?: number;
+  /** True where Keel does not read its log to this reader. */
+  closed?: boolean;
 }
 
-/** Where what is on screen comes from: Keel, or in development a test fixture, which is never passed off as Keel. */
+/**
+ * Where what is on screen comes from: Keel, or in development a test fixture, which is never passed off as Keel.
+ * A reader Keel does not read its log to is shown nothing from it, and so nothing here says it is live.
+ */
 function Source({ source }: { source: SourceMark }) {
   if (source.mode === "fixture")
     return <Badge variant="outline">{`Test fixture · seed ${source.seed}`}</Badge>;
+  if (source.closed === true) return null;
   const unread = source.unread ?? 0;
   return (
     <span className="flex items-center gap-2 text-sm text-kumo-default">

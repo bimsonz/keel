@@ -62,10 +62,10 @@ export interface ProvisionalFields {
   ProbeDrafted: { path: string };
   /** B4: what the run cost, and why it did not apply when the outcome is n/a. */
   ProbeRan: { cost?: Cost; reason?: string };
+  /** B4: Keel records no cost yet, so there may be none. */
+  ConflictProven: { cost?: Cost };
   /** B4 */
-  ConflictProven: { cost: Cost };
-  /** B4 */
-  ConflictDismissed: { cost: Cost };
+  ConflictDismissed: { cost?: Cost };
   /** A3, B4 */
   VerdictIssued: { summary: string; cost?: Cost };
   /** The question it answered, for a decision whose escalation is not in the log being read. */

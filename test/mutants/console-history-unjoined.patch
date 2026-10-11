@@ -2,7 +2,7 @@
 # kills: repository.history
 # why: a commit in history is not joined to the advance that landed it: no height, and never unverified
 diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
-index 30862d0..4298468 100644
+index 33778cb..0237c54 100644
 --- a/apps/console/src/engine/world.ts
 +++ b/apps/console/src/engine/world.ts
 @@ -1037,7 +1037,7 @@ export class World {

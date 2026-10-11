@@ -2,10 +2,10 @@
 # kills: handler.no-key
 # why: a console deployed with no presenter's key takes an empty bearer for the presenter's
 diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
-index 9baceeb..e49ed9b 100644
+index 598f12c..9e0de6b 100644
 --- a/apps/console/src/worker/handler.ts
 +++ b/apps/console/src/worker/handler.ts
-@@ -131,7 +131,6 @@ async function asker(request: Request, env: Env): Promise<Asker> {
+@@ -136,7 +136,6 @@ async function asker(request: Request, env: Env): Promise<Asker> {
    const shown = request.headers.get("authorization");
    if (shown === null) return "visitor";
    const key = /^Bearer (.+)$/.exec(shown)?.[1] ?? "";

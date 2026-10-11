@@ -2,10 +2,10 @@
 # kills: projects.scoped, projects.rescoped
 # why: every project's events are folded into the one being shown
 diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
-index c6c3a8d..99e7eb6 100644
+index 220828b..16d1527 100644
 --- a/apps/console/src/engine/player.ts
 +++ b/apps/console/src/engine/player.ts
-@@ -251,7 +251,7 @@ export class Player {
+@@ -253,7 +253,7 @@ export class Player {
        if (!eventDue && !observationDue) break;
        if (eventDue && (!observationDue || eventAt <= observationAt)) {
          const event = this.#events[this.#nextEvent];

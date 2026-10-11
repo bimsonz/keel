@@ -2,10 +2,10 @@
 # kills: handler.once
 # why: a ruling Keel refused as a conflict is told it ruled, so a second answer looks taken when it was not
 diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
-index 9baceeb..a006ae3 100644
+index 598f12c..5378f11 100644
 --- a/apps/console/src/worker/handler.ts
 +++ b/apps/console/src/worker/handler.ts
-@@ -301,8 +301,7 @@ export function createConsole(now: () => number = Date.now): Console {
+@@ -306,8 +306,7 @@ export function createConsole(now: () => number = Date.now): Console {
      if (response === null) return unreachable();
      if (response.ok) return json(200, { state: "ruled" });
      // Keel answers a ruling on a question already ruled, or withdrawn, with 409.

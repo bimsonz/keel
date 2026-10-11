@@ -20,7 +20,7 @@ export interface FunnelRow {
   passedOn: number;
   /** Reached, and neither settled nor passed on yet. */
   open: number;
-  /** What the stage has cost. Absent where there is no price: a person's answer. */
+  /** What the stage has cost. Absent where there is no price (a person's answer) and where Keel has recorded none. */
   usd?: number;
   /** For the probe: how the settled ones went. */
   dismissed?: number;
@@ -35,8 +35,8 @@ export interface FunnelState {
   perChange?: { everything: number; compared: number };
   /** Of everything that could have been compared, the share settled before any model was asked. */
   settledBeforeModels?: number;
-  /** Every reported stage's cost, added up. */
-  usd: number;
+  /** Every cost Keel has recorded for a stage, added up. Absent while it has recorded none: that is not zero. */
+  usd?: number;
   changesLanded: number;
   peopleAsked: number;
   /** Questions open right now. */
@@ -46,6 +46,10 @@ export interface FunnelState {
 }
 
 const COUNTED: readonly FunnelStage[] = [0, 1, 2, 3];
+
+/** Dollars added up, to the billionth: the sums are of fractions of a cent. */
+const total = (costs: readonly number[]): number =>
+  Math.round(costs.reduce((sum, usd) => sum + usd, 0) * 1e9) / 1e9;
 
 export function funnelOf(world: World): FunnelState {
   const frame = world.funnel;
@@ -74,12 +78,10 @@ export function funnelOf(world: World): FunnelState {
   ).length;
   const escalated = conflicts.filter((conflict) => conflict.escalationId !== undefined).length;
   // A probe's runs are priced one by one. A guard that settles a conflict without a new probe is priced on the conflict.
-  const probeUsd =
-    [...world.probes.values()].reduce((sum, probe) => sum + probe.costUsd, 0) +
-    conflicts.reduce(
-      (sum, conflict) => sum + (conflict.probeId === undefined ? (conflict.costUsd ?? 0) : 0),
-      0,
-    );
+  const probeCosts = [
+    ...[...world.probes.values()].map((probe) => probe.costUsd),
+    ...conflicts.map((conflict) => (conflict.probeId === undefined ? conflict.costUsd : undefined)),
+  ].filter((usd) => usd !== undefined);
   rows.push({
     stage: 4,
     reported: true,
@@ -87,7 +89,7 @@ export function funnelOf(world: World): FunnelState {
     settled: dismissed + proven,
     passedOn: escalated,
     open: conflicts.length - dismissed - proven - escalated,
-    usd: Math.round(probeUsd * 1e9) / 1e9,
+    ...(probeCosts.length === 0 ? {} : { usd: total(probeCosts) }),
     dismissed,
     proven,
   });
@@ -115,6 +117,7 @@ export function funnelOf(world: World): FunnelState {
   const index = frame?.stages.find((candidate) => candidate.stage === 0);
   const lattice = frame?.stages.find((candidate) => candidate.stage === 1);
   const compared = frame?.changesCompared ?? 0;
+  const costs = rows.flatMap((row) => (row.usd === undefined ? [] : [row.usd]));
   return {
     rows,
     ...(frame === undefined ? {} : { changesCompared: compared }),
@@ -129,7 +132,7 @@ export function funnelOf(world: World): FunnelState {
     ...(index === undefined || lattice === undefined || index.considered === 0
       ? {}
       : { settledBeforeModels: (index.settled + lattice.settled) / index.considered }),
-    usd: Math.round(rows.reduce((sum, row) => sum + (row.usd ?? 0), 0) * 1e9) / 1e9,
+    ...(costs.length === 0 ? {} : { usd: total(costs) }),
     changesLanded: world.trunk.changesLanded,
     peopleAsked: escalations.length,
     peopleWaiting: waiting,

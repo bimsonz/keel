@@ -140,8 +140,8 @@ export interface ProbeEntry {
   state: "calibrating" | "admitted" | "discarded";
   runs: Record<WorldId, Outcome[]>;
   reasons: Partial<Record<WorldId, string>>;
-  /** What its runs have cost so far. */
-  costUsd: number;
+  /** What its runs have cost so far. Absent until Keel records a cost for one. */
+  costUsd?: number;
 }
 
 export interface EscalationEntry {
@@ -692,7 +692,6 @@ export class World {
           state: "calibrating",
           runs: NO_RUNS(),
           reasons: {},
-          costUsd: 0,
         });
         const conflict = this.conflicts.get(event.payload.conflictId);
         if (conflict !== undefined) {
@@ -713,7 +712,8 @@ export class World {
         if (probe === undefined) break;
         const world = event.payload.world;
         probe.runs[world][event.payload.run - 1] = event.payload.outcome;
-        probe.costUsd += event.payload.x?.cost?.usd ?? 0;
+        const usd = event.payload.x?.cost?.usd;
+        if (usd !== undefined) probe.costUsd = (probe.costUsd ?? 0) + usd;
         if (event.payload.x?.reason !== undefined) probe.reasons[world] = event.payload.x.reason;
         const name = world === "AB" ? "A+B" : world;
         // The deciding world is told run by run; the others once all three are in.
@@ -819,7 +819,7 @@ export class World {
         const conflict = this.conflicts.get(event.payload.conflictId);
         if (conflict === undefined) break;
         conflict.state = "proven";
-        if (event.payload.x?.cost.usd !== undefined) conflict.costUsd = event.payload.x.cost.usd;
+        if (event.payload.x?.cost?.usd !== undefined) conflict.costUsd = event.payload.x.cost.usd;
         this.#note(conflict.id, event, t, `Conflict ${conflict.label} is proven`);
         break;
       }
@@ -828,7 +828,7 @@ export class World {
         if (conflict === undefined) break;
         conflict.state = "dismissed";
         conflict.settledT = t;
-        if (event.payload.x?.cost.usd !== undefined) conflict.costUsd = event.payload.x.cost.usd;
+        if (event.payload.x?.cost?.usd !== undefined) conflict.costUsd = event.payload.x.cost.usd;
         this.#note(
           conflict.id,
           event,

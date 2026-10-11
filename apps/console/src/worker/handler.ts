@@ -85,7 +85,12 @@ const READS: readonly { operation: keyof WireOutputs; path: RegExp; query: reado
   { operation: "Repo_getTree", path: REPO("tree"), query: TREE_QUERY },
   { operation: "Repo_getBlob", path: REPO("blob"), query: BLOB_QUERY },
   { operation: "Repo_listCommits", path: REPO("commits"), query: COMMITS_QUERY },
-  { operation: "Repo_getCommit", path: REPO("commits/[0-9a-f]{4,64}"), query: [] },
+  // A commit by its whole id, as the contract's `CommitSha` has it: Keel resolves no shortened one.
+  {
+    operation: "Repo_getCommit",
+    path: REPO("commits/(?:[0-9a-f]{40}|[0-9a-f]{64})"),
+    query: [],
+  },
 ];
 
 /** Keel's code for a request it could not read. On a ruling, that would be this Worker's own mistake. */

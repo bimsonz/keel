@@ -789,9 +789,7 @@ export function prelude(b: ScriptBuilder) {
   testCell(410.4, "trunk", "B", null);
   probeRuns("trunk", "n/a", [411.5, 412.5, 413.5], NO_PATH);
   // The control: A's world with the revocation path taken out. A probe that still passed here would prove nothing.
-  const CONTROL = "The control world runs the probe alone";
-  testCell(414, "A-noop", "A", null, CONTROL);
-  testCell(414.2, "A-noop", "B", null, CONTROL);
+  // It runs the probe alone: neither change's suite is run there, and Keel records none.
   probeRuns("A-noop", "fail", [414.6, 415, 415.4]);
   testCell(416, "A", "A", 31);
   testCell(416.4, "A", "B", null);

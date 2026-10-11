@@ -180,7 +180,9 @@ function matrixOf(
     // Each change's own suite, run in this world.
     const tests = (change: ChangeEntry): MatrixCell => {
       const seen = world.suites.get(`${conflict.id}/${id}/suite:${change.id}`);
-      if (seen === undefined) return { kind: "tests", outcome: next() };
+      // The control world runs the probe alone: no suite is waited for there, and none is said to be running.
+      if (seen === undefined)
+        return id === "A-noop" ? { kind: "none" } : { kind: "tests", outcome: next() };
       return {
         kind: "tests",
         outcome: seen.outcome,

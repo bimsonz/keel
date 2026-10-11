@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/handler.test.ts
+# kills: handler.repo-public
+# why: a shortened commit id is passed on to Keel, which reads a commit only by its whole id and answers 400
+diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
+index 598f12c..be86879 100644
+--- a/apps/console/src/worker/handler.ts
++++ b/apps/console/src/worker/handler.ts
+@@ -88,7 +88,7 @@ const READS: readonly { operation: keyof WireOutputs; path: RegExp; query: reado
+   // A commit by its whole id, as the contract's `CommitSha` has it: Keel resolves no shortened one.
+   {
+     operation: "Repo_getCommit",
+-    path: REPO("commits/(?:[0-9a-f]{40}|[0-9a-f]{64})"),
++    path: REPO("commits/[0-9a-f]{4,64}"),
+     query: [],
+   },
+ ];

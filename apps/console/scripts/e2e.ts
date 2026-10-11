@@ -1122,10 +1122,11 @@ await visitor.goto(`${built}/`, { waitUntil: "domcontentloaded" });
 await visitor
   .getByRole("heading", { name: "Keel's projects are not listed to visitors yet" })
   .waitFor();
+// Nothing of Keel's log is on a visitor's screen, so nothing on it says it is live.
 expectEqual(
-  "visitor: live, and says so",
+  "visitor: nothing says it is live",
   String(await visitor.getByText("Live", { exact: true }).count()),
-  "1",
+  "0",
 );
 expectEqual(
   "visitor: nothing calls itself a fixture",
@@ -1150,6 +1151,12 @@ for (const place of ["/mission-control", "/changes", "/escalations/E-1", "/insig
   await visitor.goto(`${built}/demo${place}`, { waitUntil: "domcontentloaded" });
   await visitor.getByRole("heading", { name: NOT_SHOWN }).waitFor();
   expectEqual(`visitor: ${place} says it is read from the log`, pathOf(visitor), `/demo${place}`);
+  // A visitor is not shown the code either, so the notice does not send one there.
+  expectEqual(
+    `visitor: ${place} points at no page that shows nothing either`,
+    String(await visitor.locator("main a").count()),
+    "0",
+  );
 }
 // Asking the built console for a fixture gets Keel, not the fixture. And no link in it carries the asking further.
 await visitor.goto(`${built}/demo/insights/benchmark?scenario=swarm&t=100`, {
@@ -1189,7 +1196,7 @@ expectEqual(
   ]
     .toSorted()
     .join(" | "),
-  "/v1/events no token | /v1/lattices no token",
+  "/v1/events no token",
 );
 const askedForVisitor = keel.calls.length;
 
@@ -1290,7 +1297,18 @@ expectEqual("built: subject index", await stageOn(presenter, 0), "— | — not 
 expectEqual(
   "built: probe, counted from events",
   await stageOn(presenter, 4),
-  "1 | 0 0% 1 passed on | 1 | $0.0021",
+  "1 | 0 0% 1 passed on | 1 | —",
+);
+// Keel records no cost yet. Where there is none the funnel shows none: a review that cost nothing is not what it says.
+expectEqual(
+  "built: no cost is shown where Keel has recorded none",
+  await statOn(presenter, "Cost of review"),
+  "—",
+);
+expectEqual(
+  "built: and the funnel says that Keel records none",
+  String(await presenter.getByText("Keel records no cost yet.").count()),
+  "1",
 );
 expectEqual(
   "built: a person, being asked",

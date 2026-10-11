@@ -14,7 +14,7 @@ import { InsightsPage } from "./pages/Insights.tsx";
 import { Missing } from "./pages/Missing.tsx";
 import { MissionControlPage } from "./pages/MissionControl.tsx";
 import { type Route, TRUNK, href, parse } from "./route.ts";
-import { Link, WhereProvider, onMove, useAddress } from "./router.tsx";
+import { WhereProvider, onMove, useAddress } from "./router.tsx";
 import { KeyRefused, createHttpSource } from "./source/http.ts";
 import { type Mode, applyMode } from "./theme/mode.ts";
 import { Frame, Notice } from "./views/Frame.tsx";
@@ -147,9 +147,9 @@ function Console({ mode, seed }: { mode: Mode; seed: number }) {
     player.repository.project?.visibility ??
     (asked === null ? undefined : player.projects.named(asked)?.visibility);
   const counts = useSelected(openCounts);
-  const source = { mode: player.source.descriptor.mode, seed, unread: player.unread };
   /** Keel reads its log to an observer, and this reader is a visitor: the console has what Keel reads to anyone. */
   const closed = player.source.descriptor.log === "closed";
+  const source = { mode: player.source.descriptor.mode, seed, unread: player.unread, closed };
 
   // The page a QR code opens is for answering one question, on whatever screen it is opened. It keeps the address it
   // was given, which holds its capability.
@@ -219,10 +219,7 @@ function Console({ mode, seed }: { mode: Mode; seed: number }) {
           {closed && !CODE.has(route.at) && route.at !== "missing" ? (
             <Notice title="This page is not shown to visitors yet">
               It is read from Keel's log, and Keel reads its log only to an observer. The console
-              reads it for whoever opens it with the presenter's key.{" "}
-              <Link to={HOME} className="a-link">
-                Go to the project's code
-              </Link>
+              reads it for whoever opens it with the presenter's key.
             </Notice>
           ) : (
             <Page key={pageOf(route, href(asked, route))} route={route} mode={mode} />

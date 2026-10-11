@@ -255,6 +255,7 @@ function summarise(runs: (Outcome | Pending)[]): string {
 }
 
 function Cell({ cell, slim }: { cell: MatrixCell; slim: boolean }) {
+  if (cell.kind === "none") return null;
   if (cell.kind === "tests") {
     return (
       <div className="flex flex-col gap-1">
