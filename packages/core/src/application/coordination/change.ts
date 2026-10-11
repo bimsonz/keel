@@ -1,5 +1,6 @@
 import { Effect, Result, Schema } from "effect";
 import {
+  type Blockers,
   Change,
   type ChangeCommand,
   ChangeBounced,
@@ -86,6 +87,16 @@ export const L1_PREFLIGHT: Preflight = {
   precedents: [],
   suggestedMove: "proceed",
 };
+
+/** At L1 nothing blocks a change: conflicts and drift arrive with L2, and Precheck refuses guard edits itself. */
+export const L1_UNBLOCKED: Blockers = {
+  openProvenConflicts: [],
+  failingGuards: [],
+  unresolvedHighDrift: [],
+};
+
+/** The lane a project's changes queue on: at L1, one lane per project, for trunk's `main`. */
+export const laneOf = (projectId: ProjectId): string => `lane:${projectId}:main`;
 
 /** Precheck starts once per ChangeSubmitted, as `precheck-<eventId>`. */
 export const PRECHECK = "workflow:Precheck";
@@ -639,14 +650,21 @@ export const lapseLease: (
  * One of Precheck's commands: idempotent by `instanceId` (the cause is
  * `<instanceId>:<method>`), and refused when Precheck checked a revision other
  * than the change's current one. `before` commits ahead of the change's own
- * events in the same transaction (a refusal's verdict).
+ * events in the same transaction (a refusal's verdict); `alongside` runs once
+ * the commands are decided, before the events are appended (a subscription).
  */
 const precheckCommand = (
   changeId: ChangeId,
   method: string,
   step: PrecheckStep,
-  command: ChangeCommand,
-  before: readonly EventDraft[] = [],
+  commands: readonly ChangeCommand[],
+  {
+    before = [],
+    alongside,
+  }: {
+    readonly before?: readonly EventDraft[];
+    readonly alongside?: (tx: Transaction) => void;
+  } = {},
 ) =>
   Effect.gen(function* () {
     const committed = yield* commit(
@@ -660,8 +678,11 @@ const precheckCommand = (
         if (stored !== undefined && stored.intent.revision !== step.revision)
           return Result.fail(refused(stored, method));
         return Result.map(
-          transition(tx, changeId, ["ChangeNotFound", "ChangeStateRefused"], [command]),
-          (decided) => ({ value: decided.change, drafts: [...before, ...decided.drafts] }),
+          transition(tx, changeId, ["ChangeNotFound", "ChangeStateRefused"], commands),
+          (decided) => {
+            alongside?.(tx);
+            return { value: decided.change, drafts: [...before, ...decided.drafts] };
+          },
         );
       },
     );
@@ -674,26 +695,42 @@ export const precheckStarted: (
   step: PrecheckStep,
 ) => Effect.Effect<Change, ChangeNotFound | ChangeStateRefused, Clock | EntityStore | EventOutbox> =
   Effect.fn("coordination/precheckStarted")(function* (changeId: ChangeId, step: PrecheckStep) {
-    const started = yield* precheckCommand(changeId, "precheckStarted", step, {
-      _tag: "StartPrecheck",
-      instanceId: step.instanceId,
-    });
+    const started = yield* precheckCommand(changeId, "precheckStarted", step, [
+      { _tag: "StartPrecheck", instanceId: step.instanceId },
+    ]);
     return started.change;
   });
 
-/** Precheck passed and compiled the Verification Plan: commits PlanCompiled. */
+/**
+ * Precheck passed and compiled the Verification Plan: commits PlanCompiled,
+ * then, since L1 has no step between the plan and the queue, ChangeQueued on
+ * the project's lane in the same transaction, under the machine's guards. The
+ * lane is subscribed to ChangeQueued there, so it hears the change it must batch.
+ */
 export const planCompiled: (
   changeId: ChangeId,
   plan: CompiledPlan,
 ) => Effect.Effect<Change, ChangeNotFound | ChangeStateRefused, Clock | EntityStore | EventOutbox> =
   Effect.fn("coordination/planCompiled")(function* (changeId: ChangeId, plan: CompiledPlan) {
-    const compiled = yield* precheckCommand(changeId, "planCompiled", plan, {
+    const project = heldWorkspace(yield* EntityStore, changeId)?.projectId;
+    const compile: ChangeCommand = {
       _tag: "CompilePlan",
       drift: [],
       planHash: plan.planHash,
       steps: plan.steps,
       costEstimate: plan.costEstimate,
-    });
+    };
+    // A change with no workspace was never declared: CompilePlan alone refuses it.
+    if (project === undefined)
+      return (yield* precheckCommand(changeId, "planCompiled", plan, [compile])).change;
+    const laneId = laneOf(project);
+    const compiled = yield* precheckCommand(
+      changeId,
+      "planCompiled",
+      plan,
+      [compile, { _tag: "Queue", laneId, blockers: L1_UNBLOCKED }],
+      { alongside: (tx) => tx.outbox.subscribe(laneId, ["ChangeQueued"]) },
+    );
     return compiled.change;
   });
 
@@ -725,13 +762,19 @@ export const precheckRefused: (
     changeId,
     "precheckRefused",
     refusal,
+    [
+      {
+        _tag: "Bounce",
+        verdictId: minted,
+        reasons: refusal.reasons,
+        nextActions: refusal.nextActions,
+      },
+    ],
     {
-      _tag: "Bounce",
-      verdictId: minted,
-      reasons: refusal.reasons,
-      nextActions: refusal.nextActions,
+      before: [
+        { entity: { kind: "verdict", id: minted }, payload: payloadOf(encodeVerdict(verdict)) },
+      ],
     },
-    [{ entity: { kind: "verdict", id: minted }, payload: payloadOf(encodeVerdict(verdict)) }],
   );
   // A replay finds the cause's events on the change, whose ChangeBounced names the verdict it issued.
   const bounce = bounced.events.find((event) => event.type === "ChangeBounced");

@@ -93,6 +93,15 @@ const pushToWorkspace = Effect.gen(function* () {
 const starting = (revision: number, instanceId: string) =>
   Schema.decodeUnknownSync(PrecheckStartedCommand)({ revision, instanceId });
 
+const compiling = (revision: number, instanceId: string) =>
+  Schema.decodeUnknownSync(PlanCompiledCommand)({
+    revision,
+    instanceId,
+    planHash: `sha256:${"0".repeat(64)}`,
+    steps: 1,
+    costEstimate: 1,
+  });
+
 const refusing = (revision: number, instanceId: string) =>
   Schema.decodeUnknownSync(PrecheckRefusedCommand)({
     revision,
@@ -363,33 +372,13 @@ describe("Precheck's commands", () => {
       });
       const first = yield* precheckStarted(changeId, started);
       const replayed = yield* precheckStarted(changeId, started);
-      const stale = yield* Effect.exit(
-        planCompiled(
-          changeId,
-          Schema.decodeUnknownSync(PlanCompiledCommand)({
-            revision: 2,
-            instanceId: "precheck-1",
-            planHash: `sha256:${"0".repeat(64)}`,
-            steps: 1,
-            costEstimate: 1,
-          }),
-        ),
-      );
-      const compiled = yield* planCompiled(
-        changeId,
-        Schema.decodeUnknownSync(PlanCompiledCommand)({
-          revision: 1,
-          instanceId: "precheck-1",
-          planHash: `sha256:${"0".repeat(64)}`,
-          steps: 1,
-          costEstimate: 1,
-        }),
-      );
+      const stale = yield* Effect.exit(planCompiled(changeId, compiling(2, "precheck-1")));
+      const compiled = yield* planCompiled(changeId, compiling(1, "precheck-1"));
 
       expect(first.state).toBe("deriving");
       expect(replayed).toEqual(first);
       expect(failureTag(stale)).toContain("ChangeStateRefused");
-      expect(compiled.state).toBe("verifying");
+      expect(compiled.state).toBe("queued");
       expect((yield* types).filter((type) => type === "PrecheckStarted")).toHaveLength(1);
     }).pipe(Effect.provide(layer));
   });
@@ -404,6 +393,33 @@ const deriving = (instanceId: string) =>
     yield* precheckStarted(changeId, starting(1, instanceId));
     return { lease: declared.change.lease.id, sha };
   });
+
+describe("a compiled plan", () => {
+  it.effect(
+    "[b13.queued] queues the change on its project's lane in the plan's commit, and subscribes the lane to it",
+    () => {
+      const { layer } = changeObject();
+      const lane = `lane:${sampleProjectId}:main`;
+      return Effect.gen(function* () {
+        yield* deriving("precheck-1");
+        const compiled = yield* planCompiled(changeId, compiling(1, "precheck-1"));
+        const replayed = yield* planCompiled(changeId, compiling(1, "precheck-1"));
+        const outbox = yield* EventOutbox;
+        const log = outbox.log({ kind: "change", id: changeId });
+        const [plan, queued] = log.slice(-2);
+
+        expect(compiled).toMatchObject({ state: "queued", laneId: lane });
+        expect(replayed).toEqual(compiled);
+        expect([plan?.type, queued?.type]).toEqual(["PlanCompiled", "ChangeQueued"]);
+        expect(queued?.payload).toEqual({ _tag: "ChangeQueued", changeId, laneId: lane });
+        expect(queued?.dedupeKey.split("/")[1]).toBe(plan?.dedupeKey.split("/")[1]);
+        expect(queued?.notified).toContain(lane);
+        expect(outbox.subscribers("ChangeQueued")).toContain(lane);
+        expect(log.filter((event) => event.type === "ChangeQueued")).toHaveLength(1);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+});
 
 describe("a Precheck refusal", () => {
   it.effect(

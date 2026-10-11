@@ -282,7 +282,8 @@ interface PrecheckedChange {
 /**
  * The Change DO's side of `ChangePrecheck`, in memory: the transitions its
  * machine takes (submitted → deriving on `started`, then bounced on
- * `refused` or verifying on `compiled`), idempotent by instance, and
+ * `refused`, or on `compiled` verifying and, with no step before the queue
+ * at L1, queued in the same commit), idempotent by instance, and
  * ChangeStateRefused for a stale revision or a step the state does not allow.
  * `submit` seeds a change; `calls` lists the writes that took effect.
  */
@@ -350,7 +351,7 @@ export function makeChangePrecheckMemory() {
             ),
           ),
         compiled: (changeId, plan) =>
-          write(changeId, "planCompiled", plan, "deriving", "verifying", () => undefined).pipe(
+          write(changeId, "planCompiled", plan, "deriving", "queued", () => undefined).pipe(
             Effect.asVoid,
           ),
       }),

@@ -2,6 +2,7 @@ import { introspectWorkflow, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { isAgentOwned, LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
 import { makeId } from "@keeltown/core/kernel";
+import { sampleProjectId } from "@keeltown/testing";
 import { EventOutbox } from "@keeltown/core/ports";
 import * as fc from "fast-check";
 import { Effect, Exit } from "effect";
@@ -356,6 +357,51 @@ describe("a Precheck refusal over RPC", () => {
     expect(refused.change.state).toBe("bounced");
     expect(bounced?.payload).toMatchObject({ _tag: "ChangeBounced", verdictId: refused.verdictId });
     await expectStateIsTheLog(c);
+    // The submission's own Precheck started, and was held inert.
+    await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);
+  });
+});
+
+describe("a compiled change and its lane", () => {
+  it("[b13.queued] delivers the change's ChangeQueued to its project's lane", async () => {
+    await using precheck = await inertPrecheck();
+    const c = await changeUnderTest();
+    const lease = ok(await c.declare()).change.lease.id;
+    ok(await submit(c, lease, await c.push(), "submit-1"));
+    ok(
+      decodeExit(
+        ChangeCodecs.precheckStarted,
+        await c.stub.precheckStarted({ revision: 1, instanceId: "p-1" }),
+      ),
+    );
+    const compiled = ok(
+      decodeExit(
+        ChangeCodecs.planCompiled,
+        await c.stub.planCompiled({
+          revision: 1,
+          instanceId: "p-1",
+          planHash: PLAN_HASH,
+          steps: 1,
+          costEstimate: 1,
+        }),
+      ),
+    );
+    const queued = (await c.log()).at(-1);
+    if (queued?.type !== "ChangeQueued") throw new Error("no ChangeQueued was committed");
+    const lane = env.LANE.get(env.LANE.idFromName(`lane:${sampleProjectId}:main`));
+
+    expect(compiled.state).toBe("queued");
+    await vi.waitFor(
+      async () =>
+        expect(
+          await runInDurableObject(lane, (_instance, state) =>
+            state.storage.sql
+              .exec("SELECT dedupe_key FROM keel_received WHERE dedupe_key = ?", queued.dedupeKey)
+              .toArray(),
+          ),
+        ).toHaveLength(1),
+      WAIT,
+    );
     // The submission's own Precheck started, and was held inert.
     await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);
   });

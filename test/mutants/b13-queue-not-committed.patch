@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel apps/keel/test/unit/change.test.ts apps/keel/test/pool/change.test.ts -t b13.queued
+# kills: b13.queued
+# why: planCompiled stops at PlanCompiled, so the change waits in Verifying for a step L1 does not have
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index db65e10..ea9cc68 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -728,7 +728,7 @@ export const planCompiled: (
+       changeId,
+       "planCompiled",
+       plan,
+-      [compile, { _tag: "Queue", laneId, blockers: L1_UNBLOCKED }],
++      [compile],
+       { alongside: (tx) => tx.outbox.subscribe(laneId, ["ChangeQueued"]) },
+     );
+     return compiled.change;

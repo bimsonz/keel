@@ -53,9 +53,9 @@ describe("Precheck", () => {
     const [instance] = await workflows.get();
     await instance?.waitForStatus("complete");
 
-    expect((await c.current()).state).toBe("verifying");
+    expect((await c.current()).state).toBe("queued");
     const types = (await c.log()).map((e) => e.type);
-    expect(types.slice(-2)).toEqual(["PrecheckStarted", "PlanCompiled"]);
+    expect(types.slice(-3)).toEqual(["PrecheckStarted", "PlanCompiled", "ChangeQueued"]);
   });
 
   it("[d12.pool.refused] bounces a change to a guard path, with next actions and a ruling verdict", async () => {
@@ -89,7 +89,7 @@ describe("Precheck", () => {
     await (await workflows.get())[0]?.waitForStatus("complete");
     const before = await c.log();
 
-    // A second instance for the same revision: the change is already verifying.
+    // A second instance for the same revision: the change is already queued.
     const id = `precheck-late-${ulid()}`;
     await using late = await introspectWorkflowInstance(env.PRECHECK, id);
     await env.PRECHECK.create({
@@ -99,7 +99,7 @@ describe("Precheck", () => {
     await late.waitForStatus("complete");
 
     expect(await c.log()).toEqual(before);
-    expect((await c.current()).state).toBe("verifying");
+    expect((await c.current()).state).toBe("queued");
   });
 
   it("[d12.pool.not-found] fails permanently for a change that was never declared", async () => {

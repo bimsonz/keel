@@ -2,15 +2,15 @@
 # kills: b11.precheck-refused
 # why: the refusal's verdict is committed as the change's own event, not on its verdict entity with its own seq
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 29e615f..b2b6d9f 100644
+index db65e10..591e190 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -702,7 +702,7 @@ export const precheckRefused: (
-       reasons: refusal.reasons,
-       nextActions: refusal.nextActions,
+@@ -772,7 +772,7 @@ export const precheckRefused: (
+     ],
+     {
+       before: [
+-        { entity: { kind: "verdict", id: minted }, payload: payloadOf(encodeVerdict(verdict)) },
++        { payload: payloadOf(encodeVerdict(verdict)) },
+       ],
      },
--    [{ entity: { kind: "verdict", id: minted }, payload: payloadOf(encodeVerdict(verdict)) }],
-+    [{ payload: payloadOf(encodeVerdict(verdict)) }],
    );
-   // A replay finds the cause's events on the change, whose ChangeBounced names the verdict it issued.
-   const bounce = bounced.events.find((event) => event.type === "ChangeBounced");

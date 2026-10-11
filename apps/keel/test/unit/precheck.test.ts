@@ -141,7 +141,7 @@ describe("Precheck", () => {
       return Effect.gen(function* () {
         const decision = yield* world.run(yield* world.submitted([withFile("src/a.ts")]));
         expect(decision).toMatchObject({ _tag: "Compile", steps: 1 });
-        expect(world.changes.stateOf(changeId)).toBe("verifying");
+        expect(world.changes.stateOf(changeId)).toBe("queued");
         expect(world.changes.calls.map((c) => c.method)).toEqual([
           "precheckStarted",
           "planCompiled",
