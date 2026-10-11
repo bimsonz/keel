@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/escalation-machine.test.ts
+# kills: escalation.ruled-once
+# why: a ruled escalation takes a second ruling, which overwrites the first
+diff --git a/packages/core/src/domain/verification/escalation-machine.ts b/packages/core/src/domain/verification/escalation-machine.ts
+index e1f19b8..2a0ea80 100644
+--- a/packages/core/src/domain/verification/escalation-machine.ts
++++ b/packages/core/src/domain/verification/escalation-machine.ts
+@@ -148,7 +148,7 @@ export const decideEscalation = (
+     case "Raise":
+       return refuse();
+     case "Rule":
+-      if (escalation.state !== "open") return refuse();
++      if (escalation.state === "withdrawn") return refuse();
+       if (!escalation.options.some((o) => o.id === command.option))
+         return Result.fail(
+           new RulingOptionUnknown({

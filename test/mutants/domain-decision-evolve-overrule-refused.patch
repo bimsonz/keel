@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/decision-machine.test.ts
+# kills: decision.decide-evolvable
+# why: evolve refuses the overrule decide accepts for an active decision
+diff --git a/packages/core/src/domain/memory/decision-machine.ts b/packages/core/src/domain/memory/decision-machine.ts
+index 21858fa..c8fdc7e 100644
+--- a/packages/core/src/domain/memory/decision-machine.ts
++++ b/packages/core/src/domain/memory/decision-machine.ts
+@@ -178,7 +178,7 @@ export const evolveDecision = (
+         ? { ...decision, state: "superseded", endedBy: event.by }
+         : illegal(decision, event);
+     case "DecisionOverruled":
+-      return decision.state === "active"
++      return decision.state === "superseded"
+         ? { ...decision, state: "overruled", endedBy: event.by }
+         : illegal(decision, event);
+     default: {

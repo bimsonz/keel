@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/escalation-machine.test.ts
+# kills: escalation.one-terminal
+# why: raising an escalation that already exists is accepted as a no-op instead of refused, even once it has ended
+diff --git a/packages/core/src/domain/verification/escalation-machine.ts b/packages/core/src/domain/verification/escalation-machine.ts
+index e1f19b8..1ca3717 100644
+--- a/packages/core/src/domain/verification/escalation-machine.ts
++++ b/packages/core/src/domain/verification/escalation-machine.ts
+@@ -146,7 +146,7 @@ export const decideEscalation = (
+     );
+   switch (command._tag) {
+     case "Raise":
+-      return refuse();
++      return Result.succeed([]);
+     case "Rule":
+       if (escalation.state !== "open") return refuse();
+       if (!escalation.options.some((o) => o.id === command.option))

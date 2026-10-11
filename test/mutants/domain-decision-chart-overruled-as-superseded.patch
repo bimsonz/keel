@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/decision-machine.test.ts
+# kills: decision.chart
+# why: evolve sends an overruled decision to Superseded, an edge the chart does not have
+diff --git a/packages/core/src/domain/memory/decision-machine.ts b/packages/core/src/domain/memory/decision-machine.ts
+index 21858fa..1f3764e 100644
+--- a/packages/core/src/domain/memory/decision-machine.ts
++++ b/packages/core/src/domain/memory/decision-machine.ts
+@@ -179,7 +179,7 @@ export const evolveDecision = (
+         : illegal(decision, event);
+     case "DecisionOverruled":
+       return decision.state === "active"
+-        ? { ...decision, state: "overruled", endedBy: event.by }
++        ? { ...decision, state: "superseded" as const, endedBy: event.by }
+         : illegal(decision, event);
+     default: {
+       const unreachable: never = event;

@@ -1,0 +1,29 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/escalation-machine.test.ts
+# kills: escalation.option-ids
+# why: a ruling naming an option the escalation does not offer is taken as its default
+diff --git a/packages/core/src/domain/verification/escalation-machine.ts b/packages/core/src/domain/verification/escalation-machine.ts
+index e1f19b8..08120d9 100644
+--- a/packages/core/src/domain/verification/escalation-machine.ts
++++ b/packages/core/src/domain/verification/escalation-machine.ts
+@@ -149,18 +149,12 @@ export const decideEscalation = (
+       return refuse();
+     case "Rule":
+       if (escalation.state !== "open") return refuse();
+-      if (!escalation.options.some((o) => o.id === command.option))
+-        return Result.fail(
+-          new RulingOptionUnknown({
+-            escalationId: escalation.id,
+-            option: command.option,
+-            nextActions: rulingActions(escalation),
+-          }),
+-        );
+       return Result.succeed([
+         RulingGiven.make({
+           escalationId: escalation.id,
+-          option: command.option,
++          option: escalation.options.some((o) => o.id === command.option)
++            ? command.option
++            : escalation.default,
+           by: command.by,
+           ...(command.rationale === undefined ? {} : { rationale: command.rationale }),
+         }),

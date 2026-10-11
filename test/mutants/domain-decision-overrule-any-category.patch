@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/decision-machine.test.ts
+# kills: decision.transitions
+# why: a decision is overruled by any escalation ruled overrule, whatever it was raised about
+diff --git a/packages/core/src/domain/memory/decision-machine.ts b/packages/core/src/domain/memory/decision-machine.ts
+index 21858fa..cf648bd 100644
+--- a/packages/core/src/domain/memory/decision-machine.ts
++++ b/packages/core/src/domain/memory/decision-machine.ts
+@@ -124,7 +124,7 @@ export const decideDecision = (
+     case "Overrule":
+       if (decision.state !== "active") return refuse();
+       return escalation?.state === "ruled" &&
+-        escalation.category === "overrule-request" &&
++
+         escalation.ruling?.option === OVERRULE
+         ? Result.succeed([
+             DecisionOverruled.make({

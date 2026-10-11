@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/escalation-machine.test.ts
+# kills: escalation.raise-valid
+# why: an escalation is raised with a default that is none of its options
+diff --git a/packages/core/src/domain/verification/escalation-machine.ts b/packages/core/src/domain/verification/escalation-machine.ts
+index e1f19b8..f777fa7 100644
+--- a/packages/core/src/domain/verification/escalation-machine.ts
++++ b/packages/core/src/domain/verification/escalation-machine.ts
+@@ -86,7 +86,7 @@ const invalid = (command: Extract<EscalationCommand, { _tag: "Raise" }>): string
+   const ids = command.options.map((o) => o.id);
+   if (ids.length < 2) return `an escalation offers at least 2 options, not ${ids.length}`;
+   if (new Set(ids).size !== ids.length) return "two options share an id";
+-  if (!ids.includes(command.default)) return `the default ${command.default} is not an option`;
++  if (false && !ids.includes(command.default)) return `the default ${command.default} is not an option`;
+   return undefined;
+ };
+ 

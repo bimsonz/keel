@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/decision-machine.test.ts
+# kills: decision.replay
+# why: evolve supersedes by mutating the state it was handed, so an earlier snapshot changes under it
+diff --git a/packages/core/src/domain/memory/decision-machine.ts b/packages/core/src/domain/memory/decision-machine.ts
+index 21858fa..b1af8dc 100644
+--- a/packages/core/src/domain/memory/decision-machine.ts
++++ b/packages/core/src/domain/memory/decision-machine.ts
+@@ -175,7 +175,7 @@ export const evolveDecision = (
+       return illegal(decision, event);
+     case "DecisionSuperseded":
+       return decision.state === "active"
+-        ? { ...decision, state: "superseded", endedBy: event.by }
++        ? Object.assign(decision, { state: "superseded" as const, endedBy: event.by })
+         : illegal(decision, event);
+     case "DecisionOverruled":
+       return decision.state === "active"

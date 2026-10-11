@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/decision-machine.test.ts
+# kills: decision.supersede-scope
+# why: a decision is superseded by one over any scope, even a narrower one
+diff --git a/packages/core/src/domain/memory/decision-machine.ts b/packages/core/src/domain/memory/decision-machine.ts
+index 21858fa..14fa312 100644
+--- a/packages/core/src/domain/memory/decision-machine.ts
++++ b/packages/core/src/domain/memory/decision-machine.ts
+@@ -118,7 +118,7 @@ export const decideDecision = (
+       return refuse();
+     case "Supersede":
+       if (decision.state !== "active") return refuse();
+-      return covers(command.scope, decision.scope)
++      return covers(decision.scope, decision.scope)
+         ? Result.succeed([DecisionSuperseded.make({ decisionId: decision.id, by: command.by })])
+         : refuse("narrower-scope");
+     case "Overrule":

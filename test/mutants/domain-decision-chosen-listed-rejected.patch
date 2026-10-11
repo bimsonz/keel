@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/decision-machine.test.ts
+# kills: decision.recorded-from-ruling
+# why: the decision lists the option the ruling chose among the alternatives it rejected
+diff --git a/packages/core/src/domain/memory/decision-machine.ts b/packages/core/src/domain/memory/decision-machine.ts
+index 21858fa..d124360 100644
+--- a/packages/core/src/domain/memory/decision-machine.ts
++++ b/packages/core/src/domain/memory/decision-machine.ts
+@@ -107,7 +107,7 @@ export const decideDecision = (
+         ...(command.scope === undefined ? {} : { scope: command.scope }),
+         evidence: escalation.evidence.map((e) => `${e.class}: ${e.summary}`),
+         alternatives: escalation.options
+-          .filter((o) => o.id !== chosen.id)
++          .filter(() => true)
+           .map((o) => ({ option: o.id, reasonRejected: o.consequence })),
+       }),
+     ]);
