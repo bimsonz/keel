@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adapters.test.ts apps/keel/test/pool/operator.test.ts -t a11e
+# kills: a11e.synthetic, a11e.synthetic-rest
+# why: the rebuilt agents table keeps the old CHECK, so D1 refuses a synthetic agent
+diff --git a/apps/keel/migrations/0004_agent_kind_synthetic.sql b/apps/keel/migrations/0004_agent_kind_synthetic.sql
+index 4b1642e..ad64c0e 100644
+--- a/apps/keel/migrations/0004_agent_kind_synthetic.sql
++++ b/apps/keel/migrations/0004_agent_kind_synthetic.sql
+@@ -10,7 +10,7 @@ DROP TABLE credentials;
+ CREATE TABLE agents_v2 (
+   id               TEXT PRIMARY KEY,
+   name             TEXT NOT NULL,
+-  kind             TEXT NOT NULL CHECK (kind IN ('interactive', 'hosted', 'human', 'synthetic')),
++  kind             TEXT NOT NULL CHECK (kind IN ('interactive', 'hosted', 'human')),
+   scopes           TEXT NOT NULL, -- JSON array of scope strings
+   state            TEXT NOT NULL CHECK (state IN ('active', 'suspended', 'revoked')),
+   revocation_epoch INTEGER NOT NULL DEFAULT 0,
