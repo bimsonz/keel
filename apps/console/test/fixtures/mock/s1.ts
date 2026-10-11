@@ -1438,40 +1438,9 @@ export function continueInvalidate(
       costEstimate: 0.004,
     },
   });
-  // The matrix again, with the guard: all green. The conflict is settled by now, so none of this is a
-  // catalogue event: it is the revised change's own plan running, which the console reads from an
-  // observation of its own until Keel records it (QUESTIONS.md, B15).
-  const guardCell = (second: number, world: "trunk" | "AB", run: 1 | 2 | 3): void => {
-    b.at(second).observe({
-      kind: "world-check",
-      conflictId: p.conflict,
-      world,
-      check: "guard",
-      outcome: "pass",
-      run,
-      revision: 2,
-    });
-  };
-  guardCell(650, "trunk", 1);
-  guardCell(651.5, "trunk", 2);
-  guardCell(653, "trunk", 3);
-  const suiteAgain = (second: number, changeId: string, passed: number): void => {
-    b.at(second).observe({
-      kind: "world-check",
-      conflictId: p.conflict,
-      world: "AB",
-      check: `suite:${changeId}`,
-      outcome: "pass",
-      run: 1,
-      counts: { passed, failed: 0, skipped: 0 },
-      revision: 2,
-    });
-  };
-  suiteAgain(655, p.changeA, 31);
-  suiteAgain(656.5, p.changeB, 29);
-  guardCell(658, "AB", 1);
-  guardCell(660, "AB", 2);
-  guardCell(662, "AB", 3);
+  // Nothing is run in the matrix's worlds again: the conflict is settled. The revised change's own plan runs,
+  // with the admitted guard a step of it like any other, and the verdict it lands by is what Keel records.
+  p.stepRun(650, precheck, p.changeB, "guard", 1, 12, "passed");
   land(b, p, {
     at: 663.5,
     change: p.changeB,

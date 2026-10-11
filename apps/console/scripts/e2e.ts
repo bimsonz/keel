@@ -219,7 +219,7 @@ expectEqual(
   "Code | Changes | Conflicts | Escalations | Mission Control | Insights",
 );
 
-// The conflict is settled, and is found where settled conflicts are listed. Its matrix has gone green where it was red.
+// The conflict is settled, and is found where settled conflicts are listed. Its matrix is still the probe's record.
 await tabs.filter({ hasText: "Conflicts" }).click();
 await page.getByRole("heading", { name: "No conflict is open" }).waitFor();
 await page
@@ -256,11 +256,25 @@ expectEqual(
   (await page.locator("[data-lattice-value]").allInnerTexts()).join(" < "),
   "per-call < per-request < per-session < static",
 );
-// The control row's fails stay: the probe is meant to fail there, and they are not drawn as critical.
+// The proof stays where the probe found it: A+B failed three times, and Keel runs nothing in these worlds once
+// the conflict is settled. The control row's fails are apart: the probe is meant to fail there.
 expectEqual(
-  "critical cells left in the matrix",
+  "the proof stays in a settled conflict's matrix",
   String(await page.locator('.a-matrix [data-outcome="fail"]:not([data-control="true"])').count()),
-  "0",
+  "3",
+);
+// What came of the conflict is the verdict Keel gave each side afterwards, and that is where #1 is seen to pass.
+expectEqual(
+  "conflict: what came of each side, from the verdicts given since",
+  (
+    await page
+      .getByRole("list", { name: "What came of each side" })
+      .getByRole("listitem")
+      .allInnerTexts()
+  )
+    .map(squash)
+    .join(" | "),
+  "#2 was judged: verdict land · Verified: nothing it could have broken is broken | #1 came back as revision 2: verdict land · Verified: nothing it could have broken is broken",
 );
 expectEqual(
   "the control row: the probe fails there, three times",

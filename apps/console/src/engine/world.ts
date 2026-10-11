@@ -18,7 +18,6 @@ import type {
   SealObservation,
   StepObservation,
   UnsealObservation,
-  WorldCheckObservation,
 } from "../contract/observations.ts";
 import type { EscalationCategory, EscalationOption } from "../contract/events.ts";
 import type { FlowNode } from "../contract/provisional.ts";
@@ -86,6 +85,8 @@ export interface ChangeEntry {
   landedT?: number;
   escalationId?: string;
   verdictIds: string[];
+  /** The revision the change stood at when its latest verdict reached it. A verdict names no revision itself. */
+  verdictRevision?: number;
   /** True once it has a verdict, or has landed in an advance, that was not verified. */
   unverified: boolean;
   conflictIds: string[];
@@ -196,6 +197,8 @@ export interface VerdictEntry {
   /** Absent for a ruling made at Precheck, before any plan is compiled. */
   planHash?: string;
   issuedAt: string;
+  /** When it was issued, in the log's own milliseconds. */
+  issuedT: number;
 }
 
 export interface BatchEntry {
@@ -273,8 +276,6 @@ export class World {
   readonly sessions = new Map<string, string>();
   /** The suites' cells of the world matrix, keyed `conflictId/world/suite:<changeId>`. The latest run stands. */
   readonly suites = new Map<string, SuiteRun>();
-  /** The guard's re-runs once a change comes back revised, keyed `conflictId/world`. */
-  readonly guardRuns = new Map<string, WorldCheckObservation[]>();
   /** The latest status of each step, keyed `subject/stepId`. */
   readonly steps = new Map<string, StepObservation>();
   /** The latest counters only the platform knows. */
@@ -342,23 +343,7 @@ export class World {
 
   observe(observation: Observation): void {
     this.version += 1;
-    if (observation.kind === "world-check") {
-      const { counts } = observation;
-      if (observation.check === "guard") {
-        const key = `${observation.conflictId}/${observation.world}`;
-        const list = this.guardRuns.get(key) ?? [];
-        list.push(observation);
-        this.guardRuns.set(key, list);
-      } else {
-        this.suites.set(`${observation.conflictId}/${observation.world}/${observation.check}`, {
-          outcome: observation.outcome,
-          ...(counts === undefined
-            ? {}
-            : { passed: counts.passed, total: counts.passed + counts.failed + counts.skipped }),
-          at: observation.at,
-        });
-      }
-    } else if (observation.kind === "step") {
+    if (observation.kind === "step") {
       this.steps.set(`${observation.subject}/${observation.stepId}`, observation);
     } else if (observation.kind === "metrics") {
       this.metrics = observation;
@@ -892,10 +877,12 @@ export class World {
           evidence: event.payload.evidence,
           ...(event.payload.planHash === undefined ? {} : { planHash: event.payload.planHash }),
           issuedAt: event.at,
+          issuedT: t,
         });
         const judged = this.changes.get(event.payload.subject);
         if (judged !== undefined) {
           judged.verdictIds.push(event.payload.verdictId);
+          judged.verdictRevision = judged.revision;
           if (event.payload.verified === false) judged.unverified = true;
         }
         break;
@@ -1036,8 +1023,12 @@ export class World {
         if (batch === undefined) break;
         // A batch's verdict is its members' too: it is what a landed change landed on.
         if (event.type === "BatchVerified")
-          for (const member of batch.members)
-            this.changes.get(member)?.verdictIds.push(event.payload.verdictId);
+          for (const member of batch.members) {
+            const landing = this.changes.get(member);
+            if (landing === undefined) continue;
+            landing.verdictIds.push(event.payload.verdictId);
+            landing.verdictRevision = landing.revision;
+          }
         const next: Record<typeof event.type, CandidateState> = {
           VerificationStarted: "verifying",
           BatchVerified: "green",

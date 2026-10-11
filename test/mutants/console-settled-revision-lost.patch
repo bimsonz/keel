@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/bounce.test.ts
+# kills: conflict.after
+# why: a side that came back revised is shown at the revision it first had
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 3890d1c..0759fd0 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -408,7 +408,7 @@ export function conflictPageOf(
+         {
+           changeId: side.id,
+           label: side.label,
+-          revision: side.verdictRevision ?? side.revision,
++          revision: 1,
+           outcome: judged.outcome,
+           summary: judged.summary,
+         },

@@ -110,18 +110,8 @@ describe("scenario 1", () => {
         .slice(resolved)
         .filter((event) => event.type === "WorldCheckRan" || event.type === "ProbeRan"),
     ).toEqual([]);
-    // The revised change's guard and suites run all the same. They are the console's own observation until Keel records them.
-    const again = log.observations.filter((observation) => observation.kind === "world-check");
-    expect(again.map((observation) => observation.check.split(":")[0])).toEqual([
-      "guard",
-      "guard",
-      "guard",
-      "suite",
-      "suite",
-      "guard",
-      "guard",
-      "guard",
-    ]);
+    // And the console keeps no record of its own of a run Keel does not record.
+    expect(log.observations.map((observation) => observation.kind)).not.toContain("world-check");
   });
 
   it("fills the probe column as the script says: A passes, B and trunk do not apply, A+B fails, three runs each", () => {

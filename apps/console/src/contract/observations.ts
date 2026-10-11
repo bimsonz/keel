@@ -1,6 +1,6 @@
 // PROVISIONAL. Timed facts the console shows that are not catalogue events:
 // step progress (Keel routes it through a workflow subscription),
-// the test columns of the world matrix, the review funnel's cheaper levels and
+// the review funnel's cheaper levels and
 // aggregate metrics. They form a second log beside the events, addressable by
 // time in the same way, so a deep link can show "steps as of 2:10". See
 // QUESTIONS.md, section B.
@@ -30,26 +30,6 @@ export interface StepObservation {
   /** The throwaway isolate or container the step ran in. */
   sandboxId?: string;
   cost?: Cost;
-}
-
-/**
- * What is run once a change comes back revised, after its conflict is settled: the admitted probe as a
- * guard, and the suites again. One run of one check in one world. While the conflict is Probing these are
- * catalogue events (`ProbeRan`, `WorldCheckRan`); afterwards nothing in the catalogue records them yet
- * (QUESTIONS.md, B15).
- */
-export interface WorldCheckObservation {
-  kind: "world-check";
-  at: string;
-  conflictId: string;
-  world: "trunk" | "A" | "B" | "AB";
-  /** `guard`, or `suite:<changeId>`. */
-  check: string;
-  outcome: "pass" | "fail" | "n/a";
-  run: 1 | 2 | 3;
-  counts?: { passed: number; failed: number; skipped: number };
-  /** The revision of the change under test. */
-  revision: number;
 }
 
 /** The review funnel's stages, cheapest first. "Stage" on screen, so they never read as execution Tier 0 to 2. */
@@ -143,7 +123,6 @@ export interface UnsealObservation {
 
 export type Observation =
   | StepObservation
-  | WorldCheckObservation
   | FunnelObservation
   | MetricsObservation
   | BetObservation

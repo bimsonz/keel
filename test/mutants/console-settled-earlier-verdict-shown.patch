@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/bounce.test.ts
+# kills: conflict.after
+# why: a verdict given before a conflict was settled is shown as what came of it
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 3890d1c..04717ea 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -403,7 +403,6 @@ export function conflictPageOf(
+     after: [pair.holder, pair.other].flatMap((side) => {
+       const judged = world.verdicts.get(side.verdictIds.at(-1) ?? "");
+       if (conflict.settledT === undefined || judged === undefined) return [];
+-      if (judged.issuedT < conflict.settledT) return [];
+       return [
+         {
+           changeId: side.id,

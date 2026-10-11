@@ -174,6 +174,11 @@ export interface ConflictPageState {
   lattice: Lattice;
   parties: { A: Party; B: Party };
   matrix: WorldMatrix;
+  /**
+   * What came of it: each side that Keel judged again once the conflict was settled, and how. Keel runs nothing
+   * in the matrix's worlds after that, so this, and not the matrix, is where a revised change is seen to pass.
+   */
+  after: { changeId: string; label: string; revision: number; outcome: string; summary: string }[];
   probe: {
     id: string;
     label: string;

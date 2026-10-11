@@ -384,7 +384,25 @@ describe("the console's picture of scenario 1", () => {
       changesLanded: 2,
       humansAsked: 1,
     });
-    expect(outcomes(conflictPage(player)?.matrix.cells.AB.probe)).toEqual(["pass", "pass", "pass"]);
+    // The matrix stays the probe's record: Keel runs nothing in its worlds once the conflict is settled.
+    expect(outcomes(conflictPage(player)?.matrix.cells.AB.probe)).toEqual(["fail", "fail", "fail"]);
+    // What came of it is the revised change's own verdict.
+    expect(conflictPage(player)?.after).toEqual([
+      {
+        changeId: conflictPage(player)?.parties.A.changeId,
+        label: "#2",
+        revision: 1,
+        outcome: "land",
+        summary: "Verified: nothing it could have broken is broken",
+      },
+      {
+        changeId: conflictPage(player)?.parties.B.changeId,
+        label: "#1",
+        revision: 2,
+        outcome: "land",
+        summary: "Verified: nothing it could have broken is broken",
+      },
+    ]);
   });
 
   it("gives the same world whether it plays forward or is wound back and replayed", async () => {

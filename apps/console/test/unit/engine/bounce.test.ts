@@ -100,3 +100,35 @@ describe("a conflict proven against a change", () => {
     ).toContain("Noted against #3");
   });
 });
+
+describe("a conflict, once settled", () => {
+  it("[conflict.after] keeps the matrix as the probe left it, and says what came of each side from the verdicts given since", async () => {
+    const log = generateS1(42, "invalidate");
+    const settled = log.eventTimes[log.events.findIndex((e) => e.type === "ConflictResolved")] ?? 0;
+    const player = showing(createMockSource({ scenario: "s1", seed: 42, ruling: "invalidate" }));
+    await player.load();
+    const page = () => {
+      const [conflict] = [...player.world.conflicts.values()];
+      return conflictPageOf(player.world, conflict?.id ?? "", player);
+    };
+    const after = () => page()?.after.map((side) => [side.label, side.revision, side.outcome]);
+    // Just settled: the verdict that parked #1 was given before, and is not what came of the conflict.
+    player.seek(settled + 10);
+    expect(page()?.conflict.state).toBe("resolved");
+    expect(after()).toEqual([]);
+    // The ruling bounces #1, and #2 lands as it was.
+    player.seek(640_000);
+    expect(after()).toEqual([
+      ["#2", 1, "land"],
+      ["#1", 1, "bounce"],
+    ]);
+    // #1 comes back revised and lands: that verdict is where it is seen to pass.
+    player.seek(700_000);
+    expect(after()).toEqual([
+      ["#2", 1, "land"],
+      ["#1", 2, "land"],
+    ]);
+    // Keel ran nothing in the matrix's worlds after the conflict was settled, so the proof stands in it.
+    expect(page()?.matrix.cells.AB.probe).toMatchObject({ runs: ["fail", "fail", "fail"] });
+  });
+});

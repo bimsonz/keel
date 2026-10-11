@@ -488,6 +488,34 @@ export function Conflict({
                     <Matrix state={state} />
                   </div>
                 </Panel>
+                {state.after.length > 0 && (
+                  <Panel
+                    title="After it was settled"
+                    aside="the matrix above is the probe's record"
+                    bodyClassName="p-3.5"
+                  >
+                    <ul className="flex flex-col gap-1.5" aria-label="What came of each side">
+                      {state.after.map((side) => (
+                        <li key={side.changeId} className="text-base text-kumo-default">
+                          <ChangeLink
+                            id={side.changeId}
+                            tab="verification"
+                            className="a-link font-semibold"
+                          >
+                            {side.label}
+                          </ChangeLink>{" "}
+                          {side.revision > 1
+                            ? `came back as revision ${side.revision}`
+                            : "was judged"}
+                          : verdict <b className="font-semibold text-kumo-strong">{side.outcome}</b>
+                          {side.summary !== "" && (
+                            <span className="text-kumo-subtle"> · {side.summary}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </Panel>
+                )}
                 <Panel title="What happened" aside="oldest first" bodyClassName="">
                   <ol className="a-timeline">
                     {state.timeline.map((item) => (

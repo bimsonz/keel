@@ -193,9 +193,8 @@ function matrixOf(
     };
     const a = tests(holder);
     const b = tests(other);
-    // Once the probe is a guard and the change comes back revised, its re-runs replace the probe's.
-    const guardRuns = (world.guardRuns.get(`${conflict.id}/${id}`) ?? []).map((run) => run.outcome);
-    const ran: Outcome[] = guardRuns.length > 0 ? guardRuns : (probe?.runs[id] ?? []);
+    // The matrix is the probe's own record. Keel runs nothing in these worlds once the conflict is settled.
+    const ran: Outcome[] = probe?.runs[id] ?? [];
     const runs: [Outcome | Pending, Outcome | Pending, Outcome | Pending] = [
       ran[0] ?? next(),
       ran[1] ?? next(),
@@ -208,7 +207,7 @@ function matrixOf(
       probe: {
         kind: "probe",
         runs,
-        ...(reason === undefined || guardRuns.length > 0 ? {} : { reason }),
+        ...(reason === undefined ? {} : { reason }),
         ...(id === "A-noop" ? { control: true } : {}),
       },
     };
@@ -401,6 +400,20 @@ export function conflictPageOf(
     lattice,
     parties,
     matrix: matrixOf(world, conflict, probe, pair.holder, pair.other),
+    after: [pair.holder, pair.other].flatMap((side) => {
+      const judged = world.verdicts.get(side.verdictIds.at(-1) ?? "");
+      if (conflict.settledT === undefined || judged === undefined) return [];
+      if (judged.issuedT < conflict.settledT) return [];
+      return [
+        {
+          changeId: side.id,
+          label: side.label,
+          revision: side.verdictRevision ?? side.revision,
+          outcome: judged.outcome,
+          summary: judged.summary,
+        },
+      ];
+    }),
     probe: {
       id: probe?.id ?? "",
       label: probe?.label ?? "",
@@ -462,18 +475,10 @@ function planSteps(world: World, change: ChangeEntry): PlanStep[] {
           ? "fail"
           : "pass";
     } else if (step.kind === "probe" && step.id === "guard") {
-      // Keel's own fact comes first: a guard that failed in this revision's plan has failed, whatever else is known.
-      // A guard re-run for a conflict arrives as matrix cells; otherwise the step's own observation stands.
-      const runs = conflict === undefined ? [] : (world.guardRuns.get(`${conflict.id}/AB`) ?? []);
+      // Keel's own fact comes first: a guard that failed in this revision's plan has failed, whatever else is
+      // known. Keel says nothing of a guard that held, so otherwise the step's own observation stands.
       if (change.guardFailures.some((failure) => failure.revision === change.revision))
         outcome = "fail";
-      else if (runs.length > 0)
-        outcome =
-          runs.length < 3
-            ? "running"
-            : runs.every((run) => run.outcome === "pass")
-              ? "pass"
-              : "fail";
     } else if (step.kind === "human") {
       outcome =
         escalation === undefined ? "pending" : escalation.state === "open" ? "waiting" : "pass";
