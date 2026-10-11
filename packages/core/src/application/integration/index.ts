@@ -10,6 +10,7 @@ import type { CandidateId, CommitSha, Instant, ProjectId } from "../../domain/ke
 import { stub } from "../not-implemented.ts";
 import type { EntityStore } from "../ports/index.ts";
 
+export * from "./create-project.ts";
 export * from "./project-repos.ts";
 export * from "./trunk.ts";
 

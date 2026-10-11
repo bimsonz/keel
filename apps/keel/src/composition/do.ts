@@ -6,9 +6,11 @@ import {
   type EventOutbox,
   type FanOut,
   type Ids,
+  Trunks,
   type WorkspacePool,
 } from "@keeltown/core/ports";
-import { Layer, ManagedRuntime } from "effect";
+import { NotImplemented } from "@keeltown/core/not-implemented";
+import { Effect, Layer, ManagedRuntime } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { FanOutRpc } from "../adapters/driven/do-rpc/fan-out.ts";
@@ -36,6 +38,28 @@ export type AgentSessionServices = AgentDirectory;
 /** The AgentSession DO writes the AgentDirectory D1 row inline, so enrolment and revocation bind the next request. */
 export function agentSessionServices(env: Env): Layer.Layer<AgentSessionServices> {
   return AgentDirectoryD1(env.DB);
+}
+
+/** The Project DO's driven adapters beyond the backbone: it bootstraps a project's repos, trunk and pool. */
+export type ProjectServices = CodeHost | Trunks | WorkspacePool;
+
+/** How many ready workspaces a new project's pool keeps forked, until `vars.POOL_TARGET` is declared. */
+export const DEFAULT_POOL_TARGET = 2;
+
+const trunksPending = () => Effect.die(new NotImplemented("Trunks RPC adapter"));
+
+/**
+ * The Project DO forks and creates repos through the code host, initializes
+ * and syncs trunk through the Trunk DO, and configures the project's pool.
+ * The Trunks RPC adapter replaces the placeholder, which dies with
+ * NotImplemented, so a bootstrap fails loudly instead of skipping trunk.
+ */
+export function projectServices(env: Env): Layer.Layer<ProjectServices> {
+  return Layer.mergeAll(
+    codeHostLayer(env),
+    Layer.succeed(Trunks, Trunks.of({ initialize: trunksPending, sync: trunksPending })),
+    WorkspacePoolRpc(env.WORKSPACE_POOL, artifactsLocationHint(env)),
+  );
 }
 
 /** The Change DO's driven adapters beyond the backbone. */

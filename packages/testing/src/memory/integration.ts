@@ -1,6 +1,10 @@
-import { CompositionRefused, UnexpectedHead } from "@keeltown/core/domain/integration";
-import { CommitSha } from "@keeltown/core/kernel";
-import { CandidateComposer, TrunkWriter } from "@keeltown/core/ports";
+import {
+  CompositionRefused,
+  PromotionStateRefused,
+  UnexpectedHead,
+} from "@keeltown/core/domain/integration";
+import { CommitSha, type ProjectId } from "@keeltown/core/kernel";
+import { CandidateComposer, TrunkWriter, Trunks } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 
 const sha = async (text: string): Promise<CommitSha> => {
@@ -53,6 +57,51 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
               return Effect.fail(new UnexpectedHead({ expected: from, observed: current }));
             current = to;
             return Effect.void;
+          }),
+      }),
+    ),
+  };
+}
+
+/**
+ * Each project's trunk head once initialized, and how often it was synced.
+ * `journal` records each call in order beside other adapters'; `failSyncOnce`
+ * makes the first sync die, as a crash mid-bootstrap would.
+ */
+export function makeTrunksMemory(
+  options: { readonly journal?: string[]; readonly failSyncOnce?: boolean } = {},
+) {
+  const heads = new Map<ProjectId, CommitSha>();
+  const syncs = new Map<ProjectId, number>();
+  let failures = options.failSyncOnce === true ? 1 : 0;
+  return {
+    heads,
+    syncs,
+    layer: Layer.succeed(
+      Trunks,
+      Trunks.of({
+        initialize: (projectId, head) =>
+          Effect.suspend(() => {
+            const held = heads.get(projectId);
+            if (held !== undefined && held !== head)
+              return Effect.fail(
+                new PromotionStateRefused({ projectId, phase: "idle", command: "Initialize" }),
+              );
+            heads.set(projectId, head);
+            options.journal?.push(`initialize ${projectId}`);
+            return Effect.void;
+          }),
+        sync: (projectId) =>
+          Effect.suspend(() => {
+            if (failures > 0) {
+              failures -= 1;
+              return Effect.die(new Error("the sync crashed"));
+            }
+            const head = heads.get(projectId);
+            if (head === undefined) return Effect.die(new Error(`${projectId} has no trunk yet`));
+            syncs.set(projectId, (syncs.get(projectId) ?? 0) + 1);
+            options.journal?.push(`sync ${projectId}`);
+            return Effect.succeed({ head, staging: head, mirror: head });
           }),
       }),
     ),

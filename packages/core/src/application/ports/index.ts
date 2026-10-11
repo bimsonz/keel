@@ -36,6 +36,7 @@ export * from "./session-store.ts";
 export * from "./subject-registry.ts";
 export * from "./token-issuer.ts";
 export * from "./trunk-writer.ts";
+export * from "./trunks.ts";
 export * from "./verifier-runtime.ts";
 export * from "./work-queue.ts";
 export * from "./workspace-pool.ts";

@@ -30,6 +30,7 @@ import {
   SubjectRegistry,
   type SubjectEntry,
   type SubmissionStatus,
+  type PoolConfig,
   type WorkspaceGrant,
   WorkspacePool,
 } from "@keeltown/core/ports";
@@ -43,17 +44,24 @@ const MEMORY_BASE = CommitSha.make("0".repeat(40));
  * real pool does; every grant's base is `baseSha`.
  */
 export function makeWorkspacePoolMemory(
-  options: { readonly capacity?: number; readonly baseSha?: CommitSha } = {},
+  options: {
+    readonly capacity?: number;
+    readonly baseSha?: CommitSha;
+    /** Records each call in order, beside other adapters', for tests of a sequence. */
+    readonly journal?: string[];
+  } = {},
 ) {
   const capacity = options.capacity ?? Number.POSITIVE_INFINITY;
   const baseSha = options.baseSha ?? MEMORY_BASE;
   const granted = new Map<WorkspaceId, string>();
   const released = new Map<WorkspaceId, string>();
+  const configured = new Map<ProjectId, PoolConfig>();
   let counter = 0;
   let tokens = 0;
   return {
     granted,
     released,
+    configured,
     layer: Layer.succeed(
       WorkspacePool,
       WorkspacePool.of({
@@ -78,6 +86,11 @@ export function makeWorkspacePoolMemory(
         release: (_projectId, workspaceId, reason = "withdrawn") =>
           Effect.sync(() => {
             if (granted.delete(workspaceId)) released.set(workspaceId, reason);
+          }),
+        configure: (projectId, config) =>
+          Effect.sync(() => {
+            configured.set(projectId, config);
+            options.journal?.push(`configure ${projectId}`);
           }),
       }),
     ),

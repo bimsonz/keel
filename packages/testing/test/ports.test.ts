@@ -31,6 +31,7 @@ const CONTRACT_PORTS = [
   "GuardRepo",
   "CandidateComposer",
   "TrunkWriter",
+  "Trunks",
   "SessionStore",
   "MfpWriter",
   "HumanGate",

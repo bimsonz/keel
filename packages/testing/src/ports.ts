@@ -164,6 +164,10 @@ export const PORTS = {
   ),
   CodeHost: port(() => codeHost.makeCodeHostMemory().layer, describeCodeHostContract),
   WorkspacePool: workspacePool,
+  Trunks: port(
+    () => integration.makeTrunksMemory().layer,
+    pending("Trunks", ["initialize", "sync"]),
+  ),
   SubjectRegistry: port(
     () => coordination.makeSubjectRegistryMemory().layer,
     pending("SubjectRegistry", ["byKey", "byAnchor", "mint"]),

@@ -27,6 +27,12 @@ export interface WorkspaceGrant {
   readonly repo: RepoRef;
 }
 
+/** What a project's pool forks from, and how many ready workspaces it keeps. */
+export interface PoolConfig {
+  readonly source: RepoRef;
+  readonly target: number;
+}
+
 /** Why a workspace is collected (its repo deleted). */
 export type CollectionReason = "landed" | "withdrawn" | "expired";
 
@@ -52,5 +58,10 @@ export class WorkspacePool extends Context.Service<
       workspaceId: WorkspaceId,
       reason?: CollectionReason,
     ) => Effect.Effect<void>;
+    /**
+     * Points the project's pool at its source (the project's mirror) and the
+     * number of ready workspaces to keep forked. The pool starts forking.
+     */
+    readonly configure: (projectId: ProjectId, config: PoolConfig) => Effect.Effect<void>;
   }
 >()("keel/WorkspacePool") {}

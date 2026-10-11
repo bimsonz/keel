@@ -34,6 +34,10 @@ export function WorkspacePoolRpc(
         call(WorkspacePoolCodecs.release, () => pool(projectId).release(workspaceId, reason)).pipe(
           Effect.orDie,
         ),
+      configure: (projectId, config) =>
+        call(WorkspacePoolCodecs.configure, () => pool(projectId).configure(config)).pipe(
+          Effect.asVoid,
+        ),
     }),
   );
 }
