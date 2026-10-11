@@ -155,11 +155,7 @@ function requireOutput(outputs: ReadonlyMap<string, string>, name: string, wante
 }
 
 /** Writes apps/<dir>/wrangler.deploy.jsonc (gitignored) with the real ids and host filled in. */
-function render(
-  dir: string,
-  outputs: ReadonlyMap<string, string>,
-  subdomain: string,
-): { name: string; config: Json } {
+function render(dir: string, outputs: ReadonlyMap<string, string>): { name: string; config: Json } {
   const source = `apps/${dir}/wrangler.jsonc`;
   let text = readFileSync(join(root, source), "utf8");
   const set = (path: (string | number)[], value: string) => {
@@ -187,11 +183,11 @@ function render(
       requireOutput(outputs, "secrets_store_id", `secret ${stringAt(secret, "secret_name")}`),
     );
   }
-  set(["vars", "KEEL_HOST"], `${name}.${subdomain}.workers.dev`);
-  // A Worker that names Keel's own host (the console) gets this environment's.
+  // One site: every Worker names it as its host, and the console names it as Keel's.
+  const host = requireOutput(outputs, "keel_host", "the site's host");
+  set(["vars", "KEEL_HOST"], host);
   const vars = committed["vars"];
-  if (isObject(vars) && "KEEL_API_HOST" in vars)
-    set(["vars", "KEEL_API_HOST"], `keel.${subdomain}.workers.dev`);
+  if (isObject(vars) && "KEEL_API_HOST" in vars) set(["vars", "KEEL_API_HOST"], host);
 
   const rendered = parseConfig(text, `apps/${dir}/wrangler.deploy.jsonc`);
   const pins = pinProblems(rendered);
@@ -432,12 +428,9 @@ function containerBuildEnv(scratch: string): Record<string, string> {
 }
 
 const outputs = terraformOutputs();
-const subdomainResult = await cloudflare("GET", "/workers/subdomain");
-const subdomain = isObject(subdomainResult) ? stringAt(subdomainResult, "subdomain") : undefined;
-if (subdomain === undefined) throw new Error("The account has no workers.dev subdomain");
 
 // Render and check every config before deploying any, so a bad one stops the whole deploy.
-const rendered = APPS.map((dir) => ({ dir, ...render(dir, outputs, subdomain) }));
+const rendered = APPS.map((dir) => ({ dir, ...render(dir, outputs) }));
 for (const app of rendered) await verifyStores(app.name, app.config);
 const deploying = rendered.filter((app) => only === undefined || app.dir === only);
 if (rotate !== undefined && !deploying.some((app) => requiredSecrets(app.config).includes(rotate)))
@@ -486,4 +479,6 @@ try {
 console.log(
   `\ndeployed ${environment} at ${head}${untouched.length > 0 ? ` (${untouched.join(", ")} untouched)` : ""}:`,
 );
-for (const app of deploying) console.log(`  https://${app.name}.${subdomain}.workers.dev`);
+console.log(
+  `  https://${requireOutput(outputs, "keel_host", "the site's host")} (${deploying.map((app) => app.name).join(", ")})`,
+);
