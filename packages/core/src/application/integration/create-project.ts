@@ -68,6 +68,9 @@ const replayed = (
     ? Effect.map(EntityStore, (store) => decodeRecord(store.get(PROJECT, projectId)))
     : Effect.fail(new IdempotencyConflict({ idempotencyKey }));
 
+/** A repo made by a concurrent bootstrap between the existence check and the call is already done. */
+const alreadyMade = () => Effect.void;
+
 /**
  * Bootstraps a project, each step idempotent, so a retry after a crash
  * finishes the job:
@@ -101,8 +104,6 @@ export const createProject: (
 
   const repos = projectRepos(projectId);
   const host = yield* CodeHost;
-  // A repo made by a concurrent bootstrap between the check and the call is already done.
-  const alreadyMade = () => Effect.void;
   if (!(yield* exists(repos.trunk)))
     yield* host
       .fork({ namespace: repos.trunk.namespace, name: command.source }, repos.trunk)

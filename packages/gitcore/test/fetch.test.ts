@@ -52,6 +52,9 @@ const connected = (dir: string, sha: string) =>
     .split("\n")
     .filter((line) => line.startsWith("?"));
 
+/** The object count in a pack's header. */
+const count = (pack: Uint8Array) => new DataView(pack.buffer, pack.byteOffset).getUint32(8);
+
 describe("relay", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[sync.empty-then-advance] copies trunk into an empty repo, then each new head after it", async () => {
     const first = commitFile(repos.source.dir, "a.txt", "one\n");
@@ -112,7 +115,6 @@ describe("relay", { timeout: PROPERTY_TIMEOUT }, () => {
     const tip = commitFile(repos.source.dir, "c.txt", "tip only\n", base);
     const whole = await uploadPack(source, [tip], []);
     const delta = await uploadPack(source, [tip], [base]);
-    const count = (pack: Uint8Array) => new DataView(pack.buffer, pack.byteOffset).getUint32(8);
     // tip's commit, tree and blob; the whole history holds more.
     expect(count(delta)).toBe(3);
     expect(count(whole)).toBeGreaterThan(count(delta));

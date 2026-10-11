@@ -27,6 +27,7 @@ interface MemoryRepo {
 
 const repoKey = (repo: RepoRef) => `${repo.namespace}/${repo.name}`;
 const plain = (repo: RepoRef) => ({ namespace: repo.namespace, name: repo.name });
+const alreadyExists = (repo: RepoRef) => new RepoAlreadyExists({ repo: plain(repo) });
 const toCommitSha = Schema.decodeUnknownSync(CommitSha);
 
 /** Runs a gitcore read; a missing object becomes `ObjectNotFound`, anything else a defect. */
@@ -49,8 +50,6 @@ export function makeCodeHostMemory() {
   const repos = new Map<string, MemoryRepo>();
   let scratch = 0;
   let tokens = 0;
-
-  const alreadyExists = (repo: RepoRef) => new RepoAlreadyExists({ repo: plain(repo) });
 
   const find = (repo: RepoRef) =>
     Effect.suspend(() => {

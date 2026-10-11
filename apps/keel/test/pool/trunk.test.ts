@@ -10,6 +10,10 @@ import { decodeExit, TrunkCodecs } from "../../src/rpc/index.ts";
 
 const trunkStub = (projectId: string) => env.TRUNK.get(env.TRUNK.idFromName(`trunk:${projectId}`));
 
+/** Runs a program against the Trunks port over the Trunk DO's RPC. */
+const viaTrunks = <A, E>(program: Effect.Effect<A, E, Trunks>) =>
+  Effect.runPromiseExit(program.pipe(Effect.provide(TrunksRpc(env.TRUNK))));
+
 describe("the Trunk DO", () => {
   it("[trunk.do.init] initialize names trunk's first head once; a retry answers it, another head is refused", async () => {
     const stub = trunkStub(makeId("prj", ulid()));
@@ -27,10 +31,8 @@ describe("the Trunk DO", () => {
   it("[trunks.rpc.initialize] the Trunks port reaches trunk:<projectId>: a retry is a no-op, another head is refused", async () => {
     const projectId = makeId("prj", ulid());
     const head = Schema.decodeUnknownSync(CommitSha)("c".repeat(40));
-    const run = <A, E>(program: Effect.Effect<A, E, Trunks>) =>
-      Effect.runPromiseExit(program.pipe(Effect.provide(TrunksRpc(env.TRUNK))));
     const initialize = (sha: CommitSha) =>
-      run(Effect.flatMap(Trunks, (trunks) => trunks.initialize(projectId, sha, "seed")));
+      viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.initialize(projectId, sha, "seed")));
     expect(await initialize(head)).toEqual(Exit.void);
     expect(await initialize(head)).toEqual(Exit.void);
     const other = await initialize(Schema.decodeUnknownSync(CommitSha)("d".repeat(40)));

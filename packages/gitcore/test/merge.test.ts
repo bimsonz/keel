@@ -73,10 +73,9 @@ async function differential(h: History, tally: Tally): Promise<void> {
     if (git.outcome === "clean") tally.cleanButRefused += 1;
     return;
   }
-  if (git.outcome === "crashed")
-    expect.fail(`git crashed (${git.signal}) but GitCore wrote ${merged.tree}`);
-  expect(git.outcome, `git conflicted but GitCore wrote ${merged.tree}`).toBe("clean");
-  expect(merged.tree).toBe(git.tree);
+  const answer = git.outcome === "crashed" ? `crashed (${git.signal})` : git.outcome;
+  expect(answer, `git ${answer} but GitCore wrote ${merged.tree}`).toBe("clean");
+  expect(merged.tree).toBe(git.outcome === "crashed" ? undefined : git.tree);
   tally.identical += 1;
 }
 
