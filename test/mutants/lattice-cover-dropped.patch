@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/coordination/lattice-data.test.ts -t lattice.published
+# kills: lattice.published
+# why: the published freshness lattice loses per-request < per-session, which freshnessLeq holds
+diff --git a/packages/core/src/domain/coordination/lattice-data.ts b/packages/core/src/domain/coordination/lattice-data.ts
+index 775da0a..604cabd 100644
+--- a/packages/core/src/domain/coordination/lattice-data.ts
++++ b/packages/core/src/domain/coordination/lattice-data.ts
+@@ -72,7 +72,6 @@ export const LATTICES: readonly Lattice[] = [
+     // A session can outlive or underlive any TTL: per-session and ttl:<n> are incomparable.
+     covers: [
+       cover("per-call", "per-request"),
+-      cover("per-request", "per-session"),
+       cover("per-request", "ttl:<n>"),
+       cover("per-session", "static"),
+       cover("ttl:<n>", "static"),
