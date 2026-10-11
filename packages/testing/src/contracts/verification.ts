@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
-  L1_SUITE_PLAN,
   type ProbeFile,
   storedPlanText,
   WORKER_APP_PACK,
@@ -11,9 +10,12 @@ import {
   ContentHash,
   contentHashOf,
   makeId,
+  type ProjectId,
   weakest,
 } from "@keeltown/core/kernel";
+import { SubjectKey } from "@keeltown/core/domain/coordination";
 import {
+  type AdmittedGuard,
   compile,
   type FlowPlan,
   type PlanStep,
@@ -21,6 +23,7 @@ import {
 } from "@keeltown/core/domain/verification";
 import {
   type BatchVerdict,
+  AdmittedGuards,
   BatchVerdicts,
   BundleStore,
   ChangePrecheck,
@@ -35,6 +38,7 @@ import {
   VerifierRuntime,
 } from "@keeltown/core/ports";
 import { Effect, Exit, type Layer, Result, Schema } from "effect";
+import { suitePlan } from "../plans.ts";
 import type { LayerFactory } from "./index.ts";
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -256,6 +260,86 @@ export function describeProbeStoreContract(adapter: string, make: () => ProbeSto
   });
 }
 
+export interface AdmittedGuardsHarness {
+  readonly layer: Layer.Layer<AdmittedGuards>;
+  /** Admits the guard to the project, as admission writes it to the guard repo. */
+  readonly admit: (projectId: ProjectId, guard: AdmittedGuard) => Effect.Effect<void>;
+  /** Puts a guard the repo holds but cannot admit to a plan: its guard.json names no proposition. */
+  readonly plantWithoutProposition: (projectId: ProjectId, guardId: string) => Effect.Effect<void>;
+}
+
+const freshGuard = (subject: string): AdmittedGuard => ({
+  guardId: makeId("grd", ulid()),
+  probe: contentHashOf({ probe: subject }),
+  tenet: {
+    id: makeId("tnt", ulid()),
+    proposition: {
+      subject: Schema.decodeUnknownSync(SubjectKey)(subject),
+      predicate: "freshness",
+      relation: "at-most",
+      value: "per-request",
+      anchors: [{ path: "src/sessions.ts", commit: CommitSha.make("a".repeat(40)) }],
+    },
+  },
+});
+
+/** What admission records of a guard, and so what a list must give back. */
+const admittedAs = (g: AdmittedGuard) => ({
+  guardId: g.guardId,
+  probe: g.probe,
+  proposition: g.tenet.proposition,
+});
+
+export function describeAdmittedGuardsContract(adapter: string, make: () => AdmittedGuardsHarness) {
+  describe(`AdmittedGuards contract: ${adapter}`, () => {
+    it.effect("[admitted-guards.none] a project that admitted no guard lists none", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const list = yield* (yield* AdmittedGuards).list(freshId("prj"));
+        expect(list).toEqual({ admitted: [], refused: [] });
+      }).pipe(Effect.provide(harness.layer));
+    });
+
+    it.effect(
+      "[admitted-guards.listed] lists each admitted guard with its probe and the proposition it guards, and only the project's own",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const projectId = freshId("prj");
+          const [a, b] = [freshGuard("authz.sessions"), freshGuard("authz.tokens")];
+          yield* harness.admit(projectId, a);
+          yield* harness.admit(projectId, b);
+          yield* harness.admit(freshId("prj"), freshGuard("billing.invoices"));
+          const list = yield* (yield* AdmittedGuards).list(projectId);
+          expect(
+            list.admitted.map(admittedAs).toSorted((x, y) => x.guardId.localeCompare(y.guardId)),
+          ).toEqual([a, b].map(admittedAs).toSorted((x, y) => x.guardId.localeCompare(y.guardId)));
+          expect(list.refused).toEqual([]);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[admitted-guards.refused] a guard whose guard.json names no proposition is refused with its reason, never skipped",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const projectId = freshId("prj");
+          const good = freshGuard("authz.sessions");
+          const bad = makeId("grd", ulid());
+          yield* harness.admit(projectId, good);
+          yield* harness.plantWithoutProposition(projectId, bad);
+          const list = yield* (yield* AdmittedGuards).list(projectId);
+          expect(list.admitted.map((g) => g.guardId)).toEqual([good.guardId]);
+          expect(list.refused).toEqual([
+            { guardId: bad, reason: expect.stringMatching(/proposition/) },
+          ]);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+  });
+}
+
 export interface ProbeRunnerHarness {
   readonly layer: Layer.Layer<ProbeRunner>;
   /** Requests the harness prepared so the probe reports each answer. */
@@ -302,11 +386,11 @@ const probeStep: PlanStep = {
   outcomes: ["pass", "fail", "abstain"],
 };
 
-/** A job with the L1 suite and a probe: every adapter answers each step, whatever it can run. */
+/** A job with the js-ts suite and a probe: every adapter answers each step, whatever it can run. */
 export const contractJob = (): VerificationJob => ({
   jobId: `job-${random(6)}`,
   bundle: Schema.decodeUnknownSync(ContentHash)(`sha256:${random(32)}`),
-  steps: [...L1_SUITE_PLAN.steps, probeStep],
+  steps: [...suitePlan().steps, probeStep],
   fence: { batchId: makeId("bat", ulid()), attempt: 1, chainEpoch: 0 },
 });
 
@@ -351,7 +435,7 @@ const verdictFor = (h: BatchVerdictsHarness, instanceId: string): BatchVerdict =
   candidateId: h.candidateId,
   verdictId: makeId("vrd", ulid()),
   outcome: "land",
-  planHash: L1_SUITE_PLAN.planHash,
+  planHash: suitePlan().planHash,
   evidence: ["js-ts.suite: pass"],
   failingTests: [],
 });
@@ -415,7 +499,12 @@ export interface ChangePrecheckHarness {
   }>;
 }
 
-const PLAN = { planHash: L1_SUITE_PLAN.planHash, steps: 1, costEstimate: 0.01 };
+const PLAN = {
+  planHash: contentHashOf({ plan: "the ChangePrecheck contract's" }),
+  steps: 1,
+  costEstimate: 0.01,
+  predicatePolicy: { freshness: "block" as const },
+};
 const REFUSAL = {
   reasons: ["precheck:protected:src/secret.ts (src/secret*)"] as const,
   nextActions: [{ kind: "call" as const, title: "Submit again", operationId: "submit" }] as const,

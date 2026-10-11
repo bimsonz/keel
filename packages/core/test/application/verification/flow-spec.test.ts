@@ -43,7 +43,10 @@ describe("flow spec: .keel/flow.json, read from the base commit", () => {
         const parsed = Result.getOrThrow(
           parseFlow(JSON.stringify({ flow: c.spec.flow, steps: c.spec.steps }), base),
         );
-        expect(parsed).toEqual({ commit: base, flow: c.spec.flow, steps: c.spec.steps });
+        expect(parsed).toEqual({
+          definition: { commit: base, flow: c.spec.flow, steps: c.spec.steps },
+          predicatePolicy: {},
+        });
       }),
     );
   });
@@ -59,8 +62,8 @@ describe("flow spec: .keel/flow.json, read from the base commit", () => {
     };
     const parsed = Result.getOrThrow(
       parseFlow(JSON.stringify({ flow: { _tag: "step", step: "lint" }, steps: [written] }), base),
-    );
-    expect(parsed.steps).toEqual([
+    ).definition;
+    expect(parsed?.steps).toEqual([
       {
         ...written,
         version: contentHashOf(written),
@@ -83,8 +86,8 @@ describe("flow spec: .keel/flow.json, read from the base commit", () => {
         }),
         base,
       ),
-    );
-    expect(parsed.steps).toEqual([]);
+    ).definition;
+    expect(parsed?.steps).toEqual([]);
     const plan = Result.getOrThrow(
       compile(
         parsed,
@@ -122,6 +125,26 @@ describe("flow spec: .keel/flow.json, read from the base commit", () => {
         }),
       ),
     ).toMatch(/kind/);
+    expect(reasonOf(JSON.stringify({ steps: [] })), "steps with no flow to run them").toMatch(
+      /no flow to run them/,
+    );
+  });
+
+  it("[flow-spec.predicates] the file's predicate policy reads back as written; a file may set only that, and the pack's flow runs", () => {
+    const read = Result.getOrThrow(
+      parseFlow(
+        JSON.stringify({ predicates: { freshness: "block", authority: "annotate" } }),
+        base,
+      ),
+    );
+    expect(read).toEqual({
+      definition: undefined,
+      predicatePolicy: { freshness: "block", authority: "annotate" },
+    });
+    expect(reasonOf(JSON.stringify({ predicates: { freshness: "loose" } }))).toMatch(/freshness/);
+    expect(reasonOf(JSON.stringify({ predicates: { fresh: "block" } }))).toMatch(
+      /predicates names fresh, which Keel does not know/,
+    );
   });
 });
 
@@ -131,12 +154,16 @@ describe("flow setup: the base commit's flow and pack, together", () => {
       flowSetup(
         {
           rootPaths: [".keel", "package.json", "wrangler.jsonc"],
-          flowJson: JSON.stringify({ flow: { _tag: "step", step: JS_TS_SUITE.id } }),
+          flowJson: JSON.stringify({
+            flow: { _tag: "step", step: JS_TS_SUITE.id },
+            predicates: { freshness: "block" },
+          }),
           packageJson: "{}",
         },
         base,
       ),
     );
+    expect(setup.predicatePolicy).toEqual({ freshness: "block" });
     expect(setup.definition).toEqual({
       commit: base,
       flow: { _tag: "step", step: JS_TS_SUITE.id },
@@ -150,6 +177,7 @@ describe("flow setup: the base commit's flow and pack, together", () => {
       flowSetup({ rootPaths: ["package.json"], packageJson: "{}" }, base),
     );
     expect(setup.definition).toBeUndefined();
+    expect(setup.predicatePolicy).toEqual({});
     expect(setup.pack.defaults).toBe(JS_TS_SUITE_PACK);
   });
 

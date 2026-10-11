@@ -54,7 +54,6 @@ import {
   type Transaction,
   type Transition,
 } from "../ports/index.ts";
-import { L1_SUITE_PLAN } from "../verification/index.ts";
 import { projectRepos } from "./project-repos.ts";
 
 /** The EntityStore kinds the Lane keeps: its queue and batch in flight, and each batch as its events fold. */
@@ -86,6 +85,12 @@ const ActiveBatch = Schema.Struct({
   batchId: BatchId,
   /** Minted with the batch, so a retried compose pushes the same candidate ref. */
   candidateId: CandidateId,
+  /**
+   * The plan KeelVerify runs: the member's, as its ChangeQueued or
+   * ChangeRequeued named it. A batch formed with none is refused at
+   * composition, so no candidate is ever verified under another plan.
+   */
+  planHash: Schema.optional(ContentHash),
   /** The candidate's tip in staging and each member's restacked commit, in batch order. */
   composed: Schema.optional(
     Schema.Struct({
@@ -108,6 +113,10 @@ export const Lane = Schema.Struct({
   laneId: Schema.String,
   projectId: ProjectId,
   queue: Schema.Array(ChangeId),
+  /** Each queued change's compiled plan, from the ChangeQueued or ChangeRequeued that queued it. */
+  plans: Schema.optional(
+    Schema.Array(Schema.Struct({ changeId: ChangeId, planHash: ContentHash })),
+  ),
   active: Schema.optional(ActiveBatch),
   advances: Schema.Array(
     Schema.Struct({ from: CommitSha, to: CommitSha, members: Schema.Array(ChangeId) }),
@@ -150,6 +159,19 @@ const emptyLane = (laneId: string): Lane => ({
   queue: [],
   advances: [],
   infra: [],
+});
+
+/** The plan a queued change was queued with, if its event named one. */
+const planOf = (lane: Lane, changeId: ChangeId): ContentHash | undefined =>
+  lane.plans?.find((p) => p.changeId === changeId)?.planHash;
+
+/** The lane with `changeId`'s plan replaced by `planHash` (none: forgotten). */
+const withPlan = (lane: Lane, changeId: ChangeId, planHash: ContentHash | undefined): Lane => ({
+  ...lane,
+  plans: [
+    ...(lane.plans ?? []).filter((p) => p.changeId !== changeId),
+    ...(planHash === undefined ? [] : [{ changeId, planHash }]),
+  ],
 });
 
 /** The batch as its events left it. */
@@ -213,7 +235,7 @@ const decodeEnded = Schema.decodeUnknownSync(Schema.Union([ChangeWithdrawn, Chan
 /**
  * A delivered event, inside the transaction that records it: ChangeQueued
  * joins the queue's back, ChangeRequeued its front (it re-enters with no
- * blame), a change withdrawn or superseded while queued leaves the queue,
+ * blame), each keeping the plan hash its event names, a change withdrawn or superseded while queued leaves the queue,
  * TrunkAdvanced is noted for staging to follow and names trunk's head, and a
  * PromotionDeclined of the batch in flight marks it to be invalidated. State
  * only: the step commits the events. True when the lane changed.
@@ -226,19 +248,31 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
         const queued = decodeQueued(event.payload);
         return queued.laneId !== laneId || holds(tx.store, lane, queued.changeId)
           ? undefined
-          : { ...lane, queue: [...lane.queue, queued.changeId] };
+          : withPlan(
+              { ...lane, queue: [...lane.queue, queued.changeId] },
+              queued.changeId,
+              queued.planHash,
+            );
       }
       case "ChangeRequeued": {
         const requeued = decodeRequeued(event.payload);
         return holds(tx.store, lane, requeued.changeId)
           ? undefined
-          : { ...lane, queue: [requeued.changeId, ...lane.queue] };
+          : withPlan(
+              { ...lane, queue: [requeued.changeId, ...lane.queue] },
+              requeued.changeId,
+              requeued.planHash,
+            );
       }
       case "ChangeWithdrawn":
       case "ChangeSuperseded": {
         const ended = decodeEnded(event.payload);
         return lane.queue.includes(ended.changeId)
-          ? { ...lane, queue: lane.queue.filter((id) => id !== ended.changeId) }
+          ? withPlan(
+              { ...lane, queue: lane.queue.filter((id) => id !== ended.changeId) },
+              ended.changeId,
+              undefined,
+            )
           : undefined;
       }
       case "TrunkAdvanced": {
@@ -444,10 +478,11 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
             tx.outbox.subscribe(`change:${member}`, MEMBER_EVENTS, changeRef(member));
           tx.outbox.subscribe(`trunk:${lane.projectId}`, ["BatchVerified"]);
           tx.store.put(BATCH, batchId, encodeBatch(fold(undefined, events, tx.at)));
+          const planHash = planOf(now, first);
           putLane(tx.store, {
-            ...now,
+            ...withPlan(now, first, undefined),
             queue: now.queue.slice(1),
-            active: { batchId, candidateId },
+            active: { batchId, candidateId, ...(planHash === undefined ? {} : { planHash }) },
           });
           return { value: undefined, drafts: events.map((e) => batchDraft(e, members)) };
         },
@@ -499,12 +534,57 @@ const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
   })).pipe(Effect.orDie);
 });
 
-/** Composes the batch onto its base in staging, one restacked commit per member. */
+/**
+ * A batch whose member was queued with no compiled plan (it was queued
+ * before the lane kept plans): the bounce, with the remedy of submitting
+ * again so Precheck compiles and stores one, through the forming batch's
+ * refusal, in one transaction. Nothing is composed or verified without it.
+ */
+const refusePlanless = Effect.fn("integration/refusePlanless")(function* (
+  lane: Lane,
+  batch: Batch,
+) {
+  const verdictId = yield* (yield* Ids).next("vrd");
+  yield* onBatch(lane.laneId, batch.id, `plan-missing:${batch.id}`, (_, now) => ({
+    moves: [
+      {
+        command: { _tag: "RefuseComposition", verdictId },
+        before: [
+          verdictDraft(
+            VerdictIssued.make({
+              verdictId,
+              subject: batch.id,
+              outcome: "bounce",
+              evidence: [
+                `plan-missing: ${batch.members.join(", ")} was queued with no compiled plan, so nothing can verify it`,
+              ],
+              nextActions: [
+                remedy(
+                  batch,
+                  "submit",
+                  "Submit the change again: Precheck compiles its plan, and the lane queues it with that plan",
+                ),
+              ],
+            }),
+            batch.members,
+          ),
+        ],
+      },
+    ],
+    lane: () => ({ ...withoutInfra(now, batch.members), active: undefined }),
+  })).pipe(Effect.orDie);
+});
+
+/** Composes the batch onto its base in staging, one restacked commit per member; a batch with no plan is refused first. */
 const composeBatch = Effect.fn("integration/composeBatch")(function* (
   lane: Lane,
   active: ActiveBatch,
   batch: Batch,
 ) {
+  if (active.planHash === undefined) {
+    yield* refusePlanless(lane, batch);
+    return;
+  }
   const changes = yield* Changes;
   const members = yield* Effect.forEach(batch.members, (changeId) =>
     Effect.gen(function* () {
@@ -668,6 +748,12 @@ const bundleBatch = Effect.fn("integration/bundleBatch")(function* (
     );
 });
 
+/** The batch's plan. Composition refuses a batch with none, so one past it always has its plan. */
+const plannedOf = (active: ActiveBatch) =>
+  active.planHash === undefined
+    ? Effect.die(new Error(`batch ${active.batchId} got past composition with no plan`))
+    : Effect.succeed(active.planHash);
+
 /** The KeelVerify instance of a batch: named by its BatchFormed, so a retried start starts nothing new. */
 const instanceOf = (formedEventId: string): string => `keel-verify-${formedEventId}`;
 
@@ -682,12 +768,11 @@ const verifyBatch = Effect.fn("integration/verifyBatch")(function* (
   batch: Batch,
   bundle: ContentHash,
 ) {
+  const planHash = yield* plannedOf(active);
   const instanceId = instanceOf(formedOf(yield* EventOutbox, batch.id).eventId);
   if (batch.state === "assembled")
     yield* onBatch(lane.laneId, batch.id, `verify:${batch.id}`, (_, now) => ({
-      moves: [
-        { command: { _tag: "StartVerification", instanceId, planHash: L1_SUITE_PLAN.planHash } },
-      ],
+      moves: [{ command: { _tag: "StartVerification", instanceId, planHash } }],
       lane: () => now,
     })).pipe(Effect.orDie);
   yield* (yield* BatchVerification).start(instanceId, {
@@ -696,7 +781,7 @@ const verifyBatch = Effect.fn("integration/verifyBatch")(function* (
     candidateId: active.candidateId,
     bundle,
     fence: { batchId: batch.id, attempt: batch.attempt, chainEpoch: batch.chainEpoch },
-    planHash: L1_SUITE_PLAN.planHash,
+    planHash,
   });
   yield* noteLane(lane, `verify-started:${batch.id}`, (now) =>
     now.active?.batchId === batch.id ? { ...now, active: { ...now.active, started: true } } : now,
@@ -710,8 +795,10 @@ const verifyBatch = Effect.fn("integration/verifyBatch")(function* (
  */
 const passUnverified = Effect.fn("integration/passUnverified")(function* (
   lane: Lane,
+  active: ActiveBatch,
   batch: Batch,
 ) {
+  const planHash = yield* plannedOf(active);
   const formed = formedOf(yield* EventOutbox, batch.id);
   const verdictId = yield* (yield* Ids).next("vrd");
   const fence = { attempt: batch.attempt, chainEpoch: batch.chainEpoch };
@@ -721,7 +808,7 @@ const passUnverified = Effect.fn("integration/passUnverified")(function* (
         command: {
           _tag: "StartVerification",
           instanceId: `unverified-${formed.eventId}`,
-          planHash: L1_SUITE_PLAN.planHash,
+          planHash,
         },
       },
       {
@@ -886,7 +973,7 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
       if (active.composed === undefined)
         return yield* Effect.die(new Error(`batch ${batch.id} assembled with no candidate`));
       const settings = yield* (yield* Projects).settings(lane.projectId).pipe(Effect.orDie);
-      if (settings.verification === "off") yield* passUnverified(lane, batch);
+      if (settings.verification === "off") yield* passUnverified(lane, active, batch);
       else yield* bundleBatch(lane, active, batch, active.composed);
       continue;
     }

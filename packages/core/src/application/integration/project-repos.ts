@@ -9,12 +9,15 @@ export interface ProjectRepos {
   readonly staging: RepoRef;
   /** The fork of trunk the WorkspacePool forks workspaces from; it lags trunk safely, because a change's base is its workspace's head. */
   readonly mirror: RepoRef;
+  /** The project's admitted guards, one `<guardId>/` directory each, written only by admission. */
+  readonly guards: RepoRef;
 }
 
 /**
  * A project's repos, by convention. At L1 the namespaces belong to the
  * deployment: trunk and staging in `keel-core`, the mirror in the workspace
- * shard `keel-ws-00`, beside the workspaces forked from it. Names are the
+ * shard `keel-ws-00`, beside the workspaces forked from it; the guard repo
+ * beside trunk. Names are the
  * project id in lower case with a hyphen (`prj-01…`), so no two projects
  * collide and every name is a valid repo name.
  */
@@ -24,5 +27,6 @@ export const projectRepos = (projectId: ProjectId): ProjectRepos => {
     trunk: { namespace: "keel-core", name },
     staging: { namespace: "keel-core", name: `${name}-staging` },
     mirror: { namespace: "keel-ws-00", name: `${name}-mirror` },
+    guards: { namespace: "keel-core", name: `${name}-guards` },
   };
 };

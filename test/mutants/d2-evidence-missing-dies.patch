@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel packages/core/test/application/verification/settle-verdict.test.ts apps/keel/test/pool/keel-verify.test.ts -t d21.evidence-missing-red
+# kills: d21.evidence-missing-red
+# why: A fail citing evidence nobody stored kills the verdict step, so KeelVerify retries it forever and the lane never hears a verdict, instead of bouncing and naming the missing document
+diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
+index 8cbb68c..e6e9880 100644
+--- a/packages/core/src/application/verification/verify-candidate.ts
++++ b/packages/core/src/application/verification/verify-candidate.ts
+@@ -154,10 +154,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+   for (const r of decided.success.evidence) {
+     const ref = Schema.decodeUnknownOption(ContentHash)(r.resultRef);
+     if (r.outcome !== "fail" || Option.isNone(ref)) continue;
+-    const document = yield* store.get(ref.value).pipe(
+-      Effect.map(Option.some),
+-      Effect.catchTag("EvidenceMissing", () => Effect.succeed(Option.none())),
+-    );
++    const document = yield* store.get(ref.value).pipe(Effect.map(Option.some), Effect.orDie);
+     if (Option.isNone(document)) {
+       missing.push(ref.value);
+       yield* Effect.logError(

@@ -2,12 +2,12 @@
 # kills: lane.verify-start
 # why: KeelVerify is started before VerificationStarted commits, so a fast verdict finds the batch still Assembled and is refused
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index a57774b..4ca67a8 100644
+index e7935d8..82cd8a0 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -633,6 +633,14 @@ const verifyBatch = Effect.fn("integration/verifyBatch")(function* (
-   bundle: ContentHash,
+@@ -770,6 +770,14 @@ const verifyBatch = Effect.fn("integration/verifyBatch")(function* (
  ) {
+   const planHash = yield* plannedOf(active);
    const instanceId = instanceOf(formedOf(yield* EventOutbox, batch.id).eventId);
 +  yield* (yield* BatchVerification).start(instanceId, {
 +    jobId: `${batch.id}#${batch.attempt}`,
@@ -15,8 +15,8 @@ index a57774b..4ca67a8 100644
 +    candidateId: active.candidateId,
 +    bundle,
 +    fence: { batchId: batch.id, attempt: batch.attempt, chainEpoch: batch.chainEpoch },
-+    planHash: L1_SUITE_PLAN.planHash,
++    planHash,
 +  });
    if (batch.state === "assembled")
      yield* onBatch(lane.laneId, batch.id, `verify:${batch.id}`, (_, now) => ({
-       moves: [
+       moves: [{ command: { _tag: "StartVerification", instanceId, planHash } }],

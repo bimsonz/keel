@@ -1,12 +1,16 @@
 import type { WorkflowStep } from "cloudflare:workers";
+import { type DurableReport, StoredStepReport } from "@keeltown/core/application/verification";
 import { ContentHash } from "@keeltown/core/kernel";
 import type {
+  AdmittedGuards,
   BatchVerdicts,
   ChangePrecheck,
   Clock,
   CodeHost,
   EvidenceStore,
+  FlowSpecSource,
   Ids,
+  PlanStore,
   PlatformFunction,
   ProbeRunner,
   ProbeStore,
@@ -21,11 +25,14 @@ import {
   SuiteRuntimeCi,
 } from "../adapters/driven/ci/suite-runtime.ts";
 import { BatchVerdictsRpc, isLaneNamespace } from "../adapters/driven/do-rpc/batch-verdicts.ts";
+import { AdmittedGuardsCodeHost } from "../adapters/driven/gitcore/admitted-guards.ts";
+import { FlowSpecSourceCodeHost } from "../adapters/driven/gitcore/flow-spec-source.ts";
 import { ChangePrecheckRpc } from "../adapters/driven/do-rpc/change-precheck.ts";
 import { ProbeRunnerRpc, verifierEntrypoint } from "../adapters/driven/do-rpc/probe-runner.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { EvidenceStoreR2 } from "../adapters/driven/r2/evidence-store.ts";
+import { PlanStoreR2 } from "../adapters/driven/r2/plan-store.ts";
 import { ProbeStoreR2 } from "../adapters/driven/r2/probe-store.ts";
 import { SystemLive } from "../adapters/driven/system.ts";
 import {
@@ -50,16 +57,17 @@ export function pushObservedRuntime(env: Env): ManagedRuntime.ManagedRuntime<Wor
 }
 
 /**
- * KeelVerify's composition root, per run: Tier 2 suites through the CI
- * engine's `runner`, evidence in ARCHIVE, verdicts to the Lane DO. `durable`
- * makes the runtime's own side effects Workflow steps, so a replay returns
- * what the first run stored.
+ * KeelVerify's composition root, per run: the plan from the plan store
+ * (ARCHIVE), Tier 2 steps through the CI engine's `runner`, guard steps on
+ * keel-verify's VerifierDOs, evidence in ARCHIVE, verdicts to the Lane DO.
+ * `durable` makes the runtime's own side effects Workflow steps, so a replay
+ * returns what the first run stored.
  */
 export function keelVerifyRuntime(
   env: Env,
   engine: { readonly runner: SuiteRunner; readonly step: WorkflowStep },
 ): ManagedRuntime.ManagedRuntime<
-  Clock | Ids | EvidenceStore | BatchVerdicts | VerifierRuntime,
+  Clock | Ids | EvidenceStore | BatchVerdicts | VerifierRuntime | PlanStore | ProbeRunner,
   never
 > {
   const durable: Durable = (name, effect) =>
@@ -77,6 +85,8 @@ export function keelVerifyRuntime(
       SystemLive,
       evidence,
       BatchVerdictsRpc(lanes),
+      PlanStoreR2(env.ARCHIVE),
+      ProbeRunnerRpc(verifierEntrypoint(env.VERIFIER)),
       SuiteRuntimeCi({
         runner: engine.runner,
         durable,
@@ -88,17 +98,39 @@ export function keelVerifyRuntime(
 }
 
 /**
+ * A step's report as a durable Workflow step: the first run reports and
+ * persists it as JSON, and a replay decodes what was persisted.
+ */
+export const durableReport =
+  (step: WorkflowStep): DurableReport =>
+  (name, report) =>
+    Effect.promise(() =>
+      step.do(name, async (): Promise<string> =>
+        JSON.stringify(Schema.encodeSync(StoredStepReport)(await Effect.runPromise(report))),
+      ),
+    ).pipe(Effect.map((stored) => Schema.decodeUnknownSync(StoredStepReport)(JSON.parse(stored))));
+
+/**
  * Precheck's composition root, per run: the change through the Change
  * DO, settings through the Project DO, and the diff through the code host.
  */
 export function precheckRuntime(
   env: Env,
-): ManagedRuntime.ManagedRuntime<ChangePrecheck | Projects | CodeHost, never> {
-  // Until the Project DO declares settings(), the policy step fails and retries.
+): ManagedRuntime.ManagedRuntime<
+  ChangePrecheck | Projects | CodeHost | FlowSpecSource | AdmittedGuards | PlanStore,
+  never
+> {
   const project = (projectId: string) =>
     env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`));
+  const code = codeHostLayer(env);
   return ManagedRuntime.make(
-    Layer.mergeAll(ChangePrecheckRpc(env.CHANGE), ProjectsRpc(project), codeHostLayer(env)),
+    Layer.mergeAll(
+      ChangePrecheckRpc(env.CHANGE),
+      ProjectsRpc(project),
+      code,
+      Layer.mergeAll(FlowSpecSourceCodeHost, AdmittedGuardsCodeHost).pipe(Layer.provide(code)),
+      PlanStoreR2(env.ARCHIVE),
+    ),
   );
 }
 

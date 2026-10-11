@@ -2,7 +2,6 @@ import { introspectWorkflow, runInDurableObject } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
 import { laneOf } from "@keeltown/core/application/coordination";
 import { projectRepos } from "@keeltown/core/application/integration";
-import { L1_SUITE_PLAN } from "@keeltown/core/application/verification";
 import { isAgentOwned, LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
 import { TrunkAdvanced } from "@keeltown/core/domain/integration";
 import { type CommitSha, makeId, type NextAction, type ProjectId } from "@keeltown/core/kernel";
@@ -543,7 +542,7 @@ async function realLane(projectId: ProjectId) {
         candidateId: started.candidateId,
         verdictId: makeId("vrd", ulid()),
         outcome,
-        planHash: L1_SUITE_PLAN.planHash,
+        planHash: PLAN_HASH,
         evidence: [...evidence],
         failingTests: outcome === "bounce" ? ["test/auth.test.ts"] : [],
         ...(nextActions === undefined ? {} : { nextActions: [...nextActions] }),

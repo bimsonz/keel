@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
-  L1_SUITE_PLAN,
   recordBatchVerdict,
   runJob,
   settleVerdict,
@@ -19,14 +18,16 @@ import {
   makeBatchVerdictsMemory,
   makeEvidenceStoreMemory,
   makeIdsMemory,
+  suitePlan,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
 import { BatchVerdictsRpc } from "../../src/adapters/driven/do-rpc/batch-verdicts.ts";
 import { encodeExit } from "../../src/rpc/exit.ts";
 import { LaneCodecs, RecordVerdictCommand } from "../../src/rpc/lane.ts";
 
-const step = L1_SUITE_PLAN.steps[0];
-if (step === undefined) throw new Error("the L1 plan has no step");
+const SUITE = suitePlan();
+const step = SUITE.steps[0];
+if (step === undefined) throw new Error("the suite plan has no step");
 
 const batchId = freshId("bat");
 const candidateId = freshId("cnd");
@@ -35,7 +36,7 @@ const fence = { batchId, attempt: 1, chainEpoch: 0 };
 const job: VerificationJob = {
   jobId: "job-1",
   bundle: Schema.decodeUnknownSync(ContentHash)(`sha256:${"a".repeat(64)}`),
-  steps: L1_SUITE_PLAN.steps,
+  steps: SUITE.steps,
   fence,
 };
 
@@ -99,7 +100,7 @@ const verify = (
   );
   return Effect.gen(function* () {
     const results = yield* runJob(job);
-    const settled = yield* settleVerdict(L1_SUITE_PLAN, results);
+    const settled = yield* settleVerdict(SUITE, results);
     yield* recordBatchVerdict({
       laneId: "lane:prj:default",
       instanceId,
@@ -123,7 +124,7 @@ describe("KeelVerify's use-cases", () => {
     return Effect.gen(function* () {
       const { settled } = yield* verify("pass", l);
       expect(settled.outcome).toBe("land");
-      expect(settled.planHash).toBe(L1_SUITE_PLAN.planHash);
+      expect(settled.planHash).toBe(SUITE.planHash);
       expect(settled.evidence[0]).toMatch(
         /^js-ts\.suite: pass \(proof, tier 2: .*\) evidence sha256:/,
       );
@@ -210,7 +211,7 @@ describe("KeelVerify's use-cases", () => {
           candidateId,
           verdictId: makeId("vrd", "01JZD9D9D9D9D9D9D9D9D9D9D9"),
           outcome: "bounce",
-          planHash: L1_SUITE_PLAN.planHash,
+          planHash: SUITE.planHash,
           evidence: ["js-ts.suite: fail"],
           failingTests: ["t"],
           nextActions,

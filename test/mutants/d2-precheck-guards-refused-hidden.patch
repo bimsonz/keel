@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck.test.ts
+# kills: d21.guards-refused
+# why: A guard the repo cannot admit is dropped without a word, so a broken guard silently stops guarding
+diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
+index 88ca4c0..0ee12a6 100644
+--- a/packages/core/src/application/verification/precheck.ts
++++ b/packages/core/src/application/verification/precheck.ts
+@@ -380,7 +380,7 @@ export const decidePrecheck = (findings: PrecheckFindings): PrecheckDecision =>
+     plan: text.success,
+     predicatePolicy,
+     pack: pack.reason,
+-    guardsRefused: guards.refused,
++    guardsRefused: [],
+   };
+ };
+ 

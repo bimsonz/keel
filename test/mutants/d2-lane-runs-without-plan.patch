@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "d21.no-hash-refused"
+# kills: d21.no-hash-refused
+# why: A change queued with no compiled plan goes on to composition, so the lane tries to verify a candidate no plan describes instead of asking for a resubmission
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index e7935d8..c10c112 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -581,10 +581,6 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
+   active: ActiveBatch,
+   batch: Batch,
+ ) {
+-  if (active.planHash === undefined) {
+-    yield* refusePlanless(lane, batch);
+-    return;
+-  }
+   const changes = yield* Changes;
+   const members = yield* Effect.forEach(batch.members, (changeId) =>
+     Effect.gen(function* () {

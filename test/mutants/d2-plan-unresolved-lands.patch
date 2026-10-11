@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-plan.test.ts
+# kills: d21.plan-missing-parks
+# why: A job whose plan could not be resolved lands, so a candidate passes on a plan nobody ran
+diff --git a/packages/core/src/application/verification/verify-plan.ts b/packages/core/src/application/verification/verify-plan.ts
+index 85eedff..a2e5b06 100644
+--- a/packages/core/src/application/verification/verify-plan.ts
++++ b/packages/core/src/application/verification/verify-plan.ts
+@@ -68,7 +68,7 @@ export const settleUnresolved = Effect.fn("verification/settleUnresolved")(funct
+ ) {
+   const settled: SettledVerdict = {
+     verdictId: yield* (yield* Ids).next("vrd"),
+-    outcome: "park",
++    outcome: "land",
+     planHash,
+     evidence: [`plan: ${why}`],
+     failingTests: [],

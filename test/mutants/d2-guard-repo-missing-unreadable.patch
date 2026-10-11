@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/admitted-guards.test.ts -t "admitted-guards.none"
+# kills: admitted-guards.none
+# why: A project with no guard repo yet reads as an unreadable guard repo, so Precheck refuses every change of every project admission has not touched
+diff --git a/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts b/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
+index c3e2f19..e7f2631 100644
+--- a/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
++++ b/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
+@@ -32,7 +32,6 @@ export const AdmittedGuardsCodeHost = Layer.effect(
+           const head = yield* host.head(repo, MAIN).pipe(
+             Effect.map(Option.some),
+             Effect.catchTags({
+-              RepoNotFound: () => Effect.succeed(Option.none()),
+               RefNotFound: () => Effect.succeed(Option.none()),
+             }),
+           );

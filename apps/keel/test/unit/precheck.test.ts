@@ -2,24 +2,42 @@ import { describe, expect, it } from "@effect/vitest";
 import {
   checkAncestry,
   decidePrecheck,
-  diffSubmission,
   type PrecheckFindings,
   type PrecheckSubmission,
-  precheckPolicy,
+  precheckReads,
+  readStoredPlan,
   recordPlan,
   refuseSubmission,
   startPrecheck,
 } from "@keeltown/core/application/verification";
-import { CommitSha, Glob, makeId, type ProjectId, type WorkspaceId } from "@keeltown/core/kernel";
-import { CodeHost, type PrecheckWorkspace } from "@keeltown/core/ports";
+import { SubjectKey } from "@keeltown/core/domain/coordination";
+import type { AdmittedGuard } from "@keeltown/core/domain/verification";
+import {
+  CommitSha,
+  contentHashOf,
+  Glob,
+  makeId,
+  type ProjectId,
+  type WorkspaceId,
+} from "@keeltown/core/kernel";
+import {
+  ChangePrecheck,
+  CodeHost,
+  FlowSpecSource,
+  PlanStore,
+  type PrecheckWorkspace,
+} from "@keeltown/core/ports";
 import {
   CodeHostFixture,
   type FixtureFiles,
+  makeAdmittedGuardsMemory,
   makeChangePrecheckMemory,
   makeCodeHostMemory,
+  makePlanStoreMemory,
   makeProjectsMemory,
 } from "@keeltown/testing";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Result, Schema } from "effect";
+import { FlowSpecSourceCodeHost } from "../../src/adapters/driven/gitcore/flow-spec-source.ts";
 
 const changeId = makeId("chg", "01JZD12D12D12D12D12D12D12D");
 const projectId: ProjectId = makeId("prj", "01JZD12D12D12D12D12D12D12D");
@@ -41,7 +59,8 @@ type HostRead =
       readonly descendant: CommitSha;
       readonly stopAt: readonly CommitSha[];
     }
-  | { readonly method: "diffTrees"; readonly base: CommitSha; readonly head: CommitSha };
+  | { readonly method: "diffTrees"; readonly base: CommitSha; readonly head: CommitSha }
+  | { readonly method: "flow"; readonly base: CommitSha };
 
 /**
  * Precheck's world in memory: a workspace repo granted at the base files'
@@ -50,10 +69,26 @@ type HostRead =
  * project's settings. Precheck's ancestry walks and diffs are recorded in
  * `reads`. `run` takes the Workflow's steps in order.
  */
-function precheckWorld(options: { readonly protectedPaths?: readonly string[] } = {}) {
+function precheckWorld(
+  options: {
+    readonly protectedPaths?: readonly string[];
+    readonly guards?: readonly AdmittedGuard[];
+    readonly refusedGuards?: readonly string[];
+    readonly baseFiles?: FixtureFiles;
+    /** The subjects the change declared, as its workspace view serves them. */
+    readonly subjects?: readonly SubjectKey[];
+  } = {},
+) {
   const code = makeCodeHostMemory();
   const changes = makeChangePrecheckMemory();
   const projects = makeProjectsMemory();
+  const guards = makeAdmittedGuardsMemory();
+  for (const g of options.guards ?? []) Effect.runSync(guards.admit(projectId, g));
+  for (const id of options.refusedGuards ?? [])
+    Effect.runSync(guards.plantWithoutProposition(projectId, id));
+  const plans = makePlanStoreMemory();
+  /** What reached the plan store and the Change DO, in order. */
+  const recorded: string[] = [];
   projects.setSettings(projectId, {
     protectedPaths: (options.protectedPaths ?? ["infra/**"]).map((g) => Glob.make(g)),
     maxBatchSize: 4,
@@ -78,7 +113,53 @@ function precheckWorld(options: { readonly protectedPaths?: readonly string[] } 
       });
     }),
   ).pipe(Layer.provide(code.layer));
-  const layer = Layer.mergeAll(recording, changes.layer, projects.layer);
+  const flows = Layer.effect(
+    FlowSpecSource,
+    Effect.gen(function* () {
+      const source = yield* FlowSpecSource;
+      return FlowSpecSource.of({
+        read: (at, base) => {
+          reads.push({ method: "flow", base });
+          return source.read(at, base);
+        },
+      });
+    }),
+  ).pipe(Layer.provide(FlowSpecSourceCodeHost), Layer.provide(code.layer));
+  const ordered = Layer.mergeAll(
+    Layer.effect(
+      PlanStore,
+      Effect.gen(function* () {
+        const store = yield* PlanStore;
+        return PlanStore.of({
+          ...store,
+          put: (plan) =>
+            store
+              .put(plan)
+              .pipe(
+                Effect.tap(() => Effect.sync(() => void recorded.push(`put ${plan.planHash}`))),
+              ),
+        });
+      }),
+    ).pipe(Layer.provide(plans.layer)),
+    Layer.effect(
+      ChangePrecheck,
+      Effect.gen(function* () {
+        const precheck = yield* ChangePrecheck;
+        return ChangePrecheck.of({
+          ...precheck,
+          compiled: (id, plan) =>
+            precheck
+              .compiled(id, plan)
+              .pipe(
+                Effect.tap(() =>
+                  Effect.sync(() => void recorded.push(`compiled ${plan.planHash}`)),
+                ),
+              ),
+        });
+      }),
+    ).pipe(Layer.provide(changes.layer)),
+  );
+  const layer = Layer.mergeAll(recording, flows, ordered, projects.layer, guards.layer);
   /** Commits `files` as the whole tree on `ref`, on top of its head and then `merged`. */
   const commitOn = (ref: string, files: FixtureFiles, merged?: readonly CommitSha[]) =>
     Effect.gen(function* () {
@@ -91,7 +172,7 @@ function precheckWorld(options: { readonly protectedPaths?: readonly string[] } 
       yield* Effect.gen(function* () {
         yield* (yield* CodeHost).create(repo);
       }).pipe(Effect.provide(code.layer));
-      return yield* commitOn(MAIN, BASE_FILES);
+      return yield* commitOn(MAIN, options.baseFiles ?? BASE_FILES);
     });
 
   /** A push to the workspace's main: `files` as the whole tree, merging `merged`. */
@@ -118,7 +199,7 @@ function precheckWorld(options: { readonly protectedPaths?: readonly string[] } 
       baseSha: base ?? granted,
       grantedSha: granted,
       projectId,
-      subjects: [],
+      subjects: options.subjects ?? [],
     };
     changes.submit(changeId, 1, workspace);
     return { changeId, revision: 1, commitSha, baseSha: base, instanceId };
@@ -133,7 +214,7 @@ function precheckWorld(options: { readonly protectedPaths?: readonly string[] } 
       return submit(granted, head, granted, instanceId);
     });
 
-  /** The Workflow's steps, in order, on these use-cases. */
+  /** The Workflow's steps, in order, on these use-cases and its reads; the change's subjects come from its workspace. */
   const run = (submission: PrecheckSubmission) =>
     Effect.gen(function* () {
       const workspace = yield* startPrecheck(submission);
@@ -142,8 +223,8 @@ function precheckWorld(options: { readonly protectedPaths?: readonly string[] } 
         ancestry._tag === "Descends"
           ? {
               ancestry,
-              touched: yield* diffSubmission(workspace, ancestry.base, submission.commitSha),
-              policy: yield* precheckPolicy(workspace),
+              ...(yield* Effect.all(precheckReads(workspace, submission, ancestry))),
+              subjects: workspace.subjects,
             }
           : { ancestry };
       const decision = decidePrecheck(findings);
@@ -152,8 +233,43 @@ function precheckWorld(options: { readonly protectedPaths?: readonly string[] } 
       return decision;
     }).pipe(Effect.provide(layer));
 
-  return { code, changes, layer, reads, grant, push, trunk, submit, submitted, run };
+  /** The plan the store holds under `hash`, read back and verified. */
+  const storedPlan = (hash: Parameters<typeof readStoredPlan>[0]) =>
+    Result.getOrThrow(readStoredPlan(hash, plans.plans.get(hash) ?? ""));
+
+  return {
+    code,
+    changes,
+    layer,
+    reads,
+    recorded,
+    storedPlan,
+    grant,
+    push,
+    trunk,
+    submit,
+    submitted,
+    run,
+  };
 }
+
+const FLOW = ".keel/flow.json";
+
+/** An admitted guard of freshness on `authz.sessions`, anchored at src/a.ts. */
+const GUARD: AdmittedGuard = {
+  guardId: makeId("grd", "01JZD12D12D12D12D12D12D12D"),
+  probe: contentHashOf({ probe: "authz.sessions" }),
+  tenet: {
+    id: makeId("tnt", "01JZD12D12D12D12D12D12D12D"),
+    proposition: {
+      subject: Schema.decodeUnknownSync(SubjectKey)("authz.sessions"),
+      predicate: "freshness",
+      relation: "at-most",
+      value: "per-request",
+      anchors: [{ path: "src/a.ts", commit: CommitSha.make("a".repeat(40)) }],
+    },
+  },
+};
 
 const withFile = (path: string, data = "changed\n"): FixtureFiles => ({
   ...BASE_FILES,
@@ -262,19 +378,154 @@ describe("Precheck", () => {
   );
 
   it.effect(
-    "[d12.l1-plan-gap] refuses a flow change, whose human-class step KeelVerify cannot run at L1",
+    "[d21.plan-gap] refuses a flow change, whose human-class step KeelVerify cannot run yet",
     () => {
       const world = precheckWorld();
       return Effect.gen(function* () {
         const decision = yield* world.run(yield* world.submitted([withFile(".keel/flow.yaml")]));
         expect(decision).toMatchObject({
           _tag: "Refuse",
-          reasons: ["precheck:l1-plan-gap:keel.human-class"],
+          reasons: ["precheck:plan-gap:keel.human-class"],
           nextActions: [
             { kind: "call", operationId: "submit", args: { steps: ["keel.human-class"] } },
           ],
         });
         expect(world.changes.stateOf(changeId)).toBe("bounced");
+        expect(world.recorded).toEqual([]);
+      });
+    },
+  );
+
+  it.effect(
+    "[d21.flow-from-base] reads the flow at the submission's base, never its head, and carries the base's predicate policy",
+    () => {
+      const base = {
+        ...BASE_FILES,
+        [FLOW]: JSON.stringify({ predicates: { freshness: "block" } }),
+      };
+      const world = precheckWorld({ baseFiles: base });
+      return Effect.gen(function* () {
+        const submission = yield* world.submitted([{ ...base, "src/a.ts": "changed\n" }]);
+        const decision = yield* world.run(submission);
+        expect(decision).toMatchObject({
+          _tag: "Compile",
+          predicatePolicy: { freshness: "block" },
+        });
+        expect(world.reads.filter((r) => r.method === "flow")).toEqual([
+          { method: "flow", base: submission.baseSha },
+        ]);
+        expect(submission.baseSha).not.toBe(submission.commitSha);
+      });
+    },
+  );
+
+  it.effect(
+    "[d21.pack-detected] compiles the pack detection chose at the base: a worker app runs its suite and its typecheck",
+    () => {
+      const base = { ...BASE_FILES, "wrangler.jsonc": "{}\n" };
+      const world = precheckWorld({ baseFiles: base });
+      return Effect.gen(function* () {
+        const decision = yield* world.run(
+          yield* world.submitted([{ ...base, "src/a.ts": "changed\n" }]),
+        );
+        if (decision._tag !== "Compile") throw new Error(`refused: ${decision.reasons.join("; ")}`);
+        expect(decision.pack).toBe("worker-app: wrangler.jsonc");
+        expect(
+          world
+            .storedPlan(decision.planHash)
+            .steps.map((s) => s.id)
+            .toSorted(),
+        ).toEqual(["js-ts.suite", "worker-app.typecheck"]);
+      });
+    },
+  );
+
+  it.effect(
+    "[d21.guards-selected] selects an admitted guard the change is exposed to, under the base's policy, and no other",
+    () => {
+      const base = {
+        ...BASE_FILES,
+        [FLOW]: JSON.stringify({ predicates: { freshness: "block" } }),
+      };
+      const exposed = precheckWorld({ baseFiles: base, guards: [GUARD] });
+      const apart = precheckWorld({ baseFiles: base, guards: [GUARD] });
+      return Effect.gen(function* () {
+        const touching = yield* exposed.run(
+          yield* exposed.submitted([{ ...base, "src/a.ts": "changed\n" }]),
+        );
+        if (touching._tag !== "Compile") throw new Error(`refused: ${touching.reasons.join("; ")}`);
+        const guarded = exposed.storedPlan(touching.planHash).steps.filter((s) => s.guards);
+        expect(guarded.map((s) => [s.id, s.guards?.probe, s.guards?.policy])).toEqual([
+          [`guard:${GUARD.guardId}`, GUARD.probe, "block"],
+        ]);
+        const elsewhere = yield* apart.run(
+          yield* apart.submitted([{ ...base, "src/b.ts": "new\n" }]),
+        );
+        if (elsewhere._tag !== "Compile")
+          throw new Error(`refused: ${elsewhere.reasons.join("; ")}`);
+        expect(apart.storedPlan(elsewhere.planHash).steps.some((s) => s.guards)).toBe(false);
+      });
+    },
+  );
+
+  it.effect(
+    "[d21.guards-selected] a change relying on the guarded subject is exposed to its guard, whatever it touches",
+    () => {
+      const world = precheckWorld({ guards: [GUARD], subjects: [GUARD.tenet.proposition.subject] });
+      return Effect.gen(function* () {
+        const decision = yield* world.run(yield* world.submitted([withFile("src/b.ts")]));
+        if (decision._tag !== "Compile") throw new Error(`refused: ${decision.reasons.join("; ")}`);
+        expect(world.storedPlan(decision.planHash).steps.some((s) => s.guards)).toBe(true);
+      });
+    },
+  );
+
+  it.effect(
+    "[d21.stored-before-compiled] stores the plan before PlanCompiled names its hash, so a queued hash always resolves",
+    () => {
+      const world = precheckWorld();
+      return Effect.gen(function* () {
+        const decision = yield* world.run(yield* world.submitted([withFile("src/a.ts")]));
+        if (decision._tag !== "Compile") throw new Error(`refused: ${decision.reasons.join("; ")}`);
+        expect(world.recorded).toEqual([
+          `put ${decision.planHash}`,
+          `compiled ${decision.planHash}`,
+        ]);
+        expect(world.storedPlan(decision.planHash).steps).toHaveLength(decision.steps);
+      });
+    },
+  );
+
+  it.effect(
+    "[d21.guards-refused] a guard the repo cannot admit is shown in the run, and the plan still compiles",
+    () => {
+      const bad = makeId("grd", "01JZD21D21D21D21D21D21D21D");
+      const world = precheckWorld({ refusedGuards: [bad] });
+      return Effect.gen(function* () {
+        const decision = yield* world.run(yield* world.submitted([withFile("src/a.ts")]));
+        expect(decision).toMatchObject({
+          _tag: "Compile",
+          guardsRefused: [{ guardId: bad, reason: expect.stringMatching(/proposition/) }],
+        });
+      });
+    },
+  );
+
+  it.effect(
+    "[d21.flow-invalid] a base whose flow does not compile is refused with an escalation, and nothing is stored",
+    () => {
+      const base = { ...BASE_FILES, [FLOW]: "{" };
+      const world = precheckWorld({ baseFiles: base });
+      return Effect.gen(function* () {
+        const decision = yield* world.run(
+          yield* world.submitted([{ ...base, "src/a.ts": "changed\n" }]),
+        );
+        expect(decision).toMatchObject({
+          _tag: "Refuse",
+          reasons: [expect.stringMatching(/^precheck:flow-invalid:\.keel\/flow\.json is not JSON/)],
+          nextActions: [{ kind: "escalate", args: { path: FLOW } }],
+        });
+        expect(world.recorded).toEqual([]);
       });
     },
   );
@@ -318,6 +569,7 @@ describe("Precheck's ancestry", () => {
         expect(world.reads).toEqual([
           { method: "isAncestor", ancestor: granted, descendant: work, stopAt: [granted] },
           { method: "diffTrees", base: granted, head: work },
+          { method: "flow", base: granted },
         ]);
       });
     },
@@ -368,6 +620,7 @@ describe("Precheck's ancestry", () => {
         expect(world.reads).toEqual([
           { method: "isAncestor", ancestor: trunk, descendant: merge, stopAt: [granted] },
           { method: "diffTrees", base: trunk, head: merge },
+          { method: "flow", base: trunk },
         ]);
       });
     },

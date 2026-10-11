@@ -3,7 +3,7 @@
 // start KeelVerify instances, and read back what each step persisted.
 //
 //   CLOUDFLARE_ACCOUNT_ID=… node apps/keel-verify/test/live/d1-staging.ts <command> …
-//     upload                         build base, red and canary bundles and put them in R2
+//     upload                         build base, red and canary bundles and the suite plan, and put them in R2
 //     run <variant> <instance-id>    start one KeelVerify run and print its verdict and timings
 //     show <instance-id>...          print a run's verdict and timings again
 //     grep <instance-id>...          grep each instance's persisted output, decoded, for credentials,
@@ -17,9 +17,10 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { L1_SUITE_PLAN } from "@keeltown/core/application/verification";
+import { storedPlanText } from "@keeltown/core/application/verification";
 import { BatchId, CandidateId, ContentHash } from "@keeltown/core/kernel";
-import { Option, Schema } from "effect";
+import { suitePlan } from "@keeltown/testing";
+import { Option, Result, Schema } from "effect";
 import { keelVerifyParams } from "../../../keel/src/rpc/keel-verify.ts";
 import { buildBundle, CANARY_ENV, CANARY_TOKEN, type Variant } from "./bundles.ts";
 
@@ -37,6 +38,9 @@ const wrangler = (...args: string[]) =>
     maxBuffer: 64 * 1024 * 1024,
     env: { ...process.env, npm_config_userconfig: "/dev/null" },
   });
+
+/** The plan every run verifies against: the js-ts suite, stored as Precheck would store it. */
+const PLAN = suitePlan();
 
 const bundles = new Map<Variant, string>();
 const hashOf = async (variant: Variant) => {
@@ -63,6 +67,20 @@ const upload = async () => {
     );
     console.log(JSON.stringify({ variant, bundle: bundle.hash, bytes: bundle.bytes.length }));
   }
+  // KeelVerify runs only a plan it can read back under the job's hash.
+  const file = join(mkdtempSync(join(tmpdir(), "keel-d1-")), "plan.json");
+  writeFileSync(file, Result.getOrThrow(storedPlanText(PLAN)));
+  wrangler(
+    "r2",
+    "object",
+    "put",
+    // PlanStoreR2's key: `plans/<hex>` of the planHash.
+    `${ARCHIVE}/plans/${PLAN.planHash.slice("sha256:".length)}`,
+    "--file",
+    file,
+    "--remote",
+  );
+  console.log(JSON.stringify({ plan: PLAN.planHash }));
 };
 
 const params = async (variant: Variant, id: string) =>
@@ -76,7 +94,7 @@ const params = async (variant: Variant, id: string) =>
       attempt: 1,
       chainEpoch: 0,
     },
-    planHash: L1_SUITE_PLAN.planHash,
+    planHash: PLAN.planHash,
   });
 
 const Step = Schema.Struct({
@@ -144,7 +162,7 @@ const decodedOutput = (output: unknown): unknown => {
 
 /** The head of the runner's persisted stdout (the API keeps about 1 KB of it). */
 const runnerHead = (d: { steps: Step[] }): string => {
-  const runner = d.steps.find((s) => nameOf(s) === L1_SUITE_PLAN.steps[0]?.id);
+  const runner = d.steps.find((s) => nameOf(s) === PLAN.steps[0]?.id);
   const logs = Schema.decodeUnknownOption(RunnerLogs)(decodedOutput(runner?.output));
   return Option.isSome(logs) ? logs.value.logs.stdout : "";
 };
@@ -152,7 +170,7 @@ const runnerHead = (d: { steps: Step[] }): string => {
 const summarise = (id: string, d: { status: string; steps: Step[] }) => {
   const step = (name: string) => d.steps.find((s) => nameOf(s) === name);
   const plan = step("plan");
-  const runner = step(L1_SUITE_PLAN.steps[0]?.id ?? "");
+  const runner = step(PLAN.steps[0]?.id ?? "");
   const verdict = step("verdict");
   return {
     id,

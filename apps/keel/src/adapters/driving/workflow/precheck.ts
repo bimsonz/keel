@@ -1,13 +1,13 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 import { NonRetryableError } from "cloudflare:workflows";
 import {
+  type Ancestry,
   checkAncestry,
   decidePrecheck,
-  diffSubmission,
   PrecheckDecision,
   type PrecheckFindings,
   type PrecheckSubmission,
-  precheckPolicy,
+  precheckReads,
   recordPlan,
   refuseSubmission,
   startPrecheck,
@@ -72,11 +72,13 @@ const done = <A>(settled: Settled<A>): A => {
 /**
  * Precheck, started by `ChangeSubmitted` as `precheck-<eventId>`: refuse a
  * submitted commit that does not descend from the submission's base; diff
- * one that does against that base, refuse guard and protected paths (and,
- * until D2.1, any plan KeelVerify cannot run yet), otherwise compile the
- * Verification Plan. Steps: `start`, `ancestry`, then `diff` and `policy` for
- * a commit on its base, `decide`, then `refuse` or `compile`. Each write is
- * idempotent by this instance's id, so a replayed step commits nothing new.
+ * one that does against that base, refuse guard and protected paths, read the
+ * base's flow and the project's admitted guards, and compile the Verification
+ * Plan under them for the change's subjects, refusing any step KeelVerify
+ * cannot run. Steps: `start`, `ancestry`, then `diff`, `policy`, `flow` and
+ * `guards` for a commit on its base, `decide`, then `refuse` or `compile`
+ * (which stores the plan before recording it). Each write is idempotent by
+ * this instance's id, so a replayed step commits nothing new.
  */
 export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
   override async run(
@@ -101,20 +103,22 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
       const ancestry = done(
         await step.do("ancestry", () => settle(runtime, checkAncestry(workspace, submission))),
       );
+      /** A commit on its base: each of precheckReads, one durable step. */
+      const descended = async (
+        on: Extract<Ancestry, { readonly _tag: "Descends" }>,
+      ): Promise<PrecheckFindings> => {
+        const reads = precheckReads(workspace, submission, on);
+        return {
+          ancestry: on,
+          touched: done(await step.do("diff", () => settle(runtime, reads.touched))),
+          policy: done(await step.do("policy", () => settle(runtime, reads.policy))),
+          flow: done(await step.do("flow", () => settle(runtime, reads.flow))),
+          guards: done(await step.do("guards", () => settle(runtime, reads.guards))),
+          subjects: workspace.subjects,
+        };
+      };
       const findings: PrecheckFindings =
-        ancestry._tag === "Descends"
-          ? {
-              ancestry,
-              touched: done(
-                await step.do("diff", () =>
-                  settle(runtime, diffSubmission(workspace, ancestry.base, submission.commitSha)),
-                ),
-              ),
-              policy: done(
-                await step.do("policy", () => settle(runtime, precheckPolicy(workspace))),
-              ),
-            }
-          : { ancestry };
+        ancestry._tag === "Descends" ? await descended(ancestry) : { ancestry };
       // Persisted as JSON, since a next action's args are open; decoded, so a replay is checked too.
       const decision = Schema.decodeUnknownSync(PrecheckDecision)(
         JSON.parse(

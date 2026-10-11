@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/precheck.test.ts
+# kills: d21.pool.subjects
+# why: The Workflow compiles with no subjects, so the change the real Change DO says relies on a guarded subject is not exposed to its guard
+diff --git a/apps/keel/src/adapters/driving/workflow/precheck.ts b/apps/keel/src/adapters/driving/workflow/precheck.ts
+index e1fa5c4..7f1355d 100644
+--- a/apps/keel/src/adapters/driving/workflow/precheck.ts
++++ b/apps/keel/src/adapters/driving/workflow/precheck.ts
+@@ -114,7 +114,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
+           policy: done(await step.do("policy", () => settle(runtime, reads.policy))),
+           flow: done(await step.do("flow", () => settle(runtime, reads.flow))),
+           guards: done(await step.do("guards", () => settle(runtime, reads.guards))),
+-          subjects: workspace.subjects,
++          subjects: [],
+         };
+       };
+       const findings: PrecheckFindings =

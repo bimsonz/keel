@@ -1,7 +1,7 @@
 import { Clock, Effect } from "effect";
 import type { ContentHash } from "../../domain/kernel/index.ts";
 import type { PlanStep, StepReport } from "../../domain/verification/index.ts";
-import { ProbeRunner } from "../ports/index.ts";
+import { EvidenceStore, ProbeRunner } from "../ports/index.ts";
 import type { StepRunner } from "./run-plan.ts";
 
 /**
@@ -14,10 +14,15 @@ import type { StepRunner } from "./run-plan.ts";
  * The probe's pass and fail are reported as they are. Its n/a is reported as
  * n/a, which `coerce` reads as abstain: the tenet's precondition is gone. A
  * harness error, or a runner that could not run the probe at all, is an
- * infra failure, so it abstains too; neither is ever a pass.
+ * infra failure, so it abstains too; neither is ever a pass. What the run
+ * said (its reason and observations, the predicate and the pinned probe) is
+ * stored as the step's evidence, so a bounce can name the guard and why.
  */
 export const withGuards =
-  <R>(candidate: ContentHash, otherwise: StepRunner<R>): StepRunner<R | ProbeRunner> =>
+  <R>(
+    candidate: ContentHash,
+    otherwise: StepRunner<R>,
+  ): StepRunner<R | ProbeRunner | EvidenceStore> =>
   (step, world) => {
     const guards = step.guards;
     if (guards === undefined) return otherwise(step, world);
@@ -39,15 +44,22 @@ export const withGuards =
           reason: `guards ${guards.predicate} with its admitted probe ${guards.probe}`,
         },
         durationMs: 0,
-        resultRef: guards.probe,
         ...(world === undefined ? {} : { world }),
         ...(failure === undefined ? {} : { failure }),
       });
       const finished = yield* Clock.currentTimeMillis;
       const durationMs = finished - started;
-      if (run._tag === "ran") return { ...report(run.outcome), durationMs };
-      if (run._tag === "harness-error") return { ...report("abstain", "schema"), durationMs };
-      return { ...report("abstain", "unavailable"), durationMs };
+      const resultRef = yield* (yield* EvidenceStore).put({
+        stepId: step.id,
+        outcome: run._tag === "ran" ? run.outcome : "abstain",
+        guard: { predicate: guards.predicate, probe: guards.probe },
+        reason: run.reason,
+        observations: "observations" in run ? [...run.observations] : [],
+      });
+      if (run._tag === "ran") return { ...report(run.outcome), durationMs, resultRef };
+      if (run._tag === "harness-error")
+        return { ...report("abstain", "schema"), durationMs, resultRef };
+      return { ...report("abstain", "unavailable"), durationMs, resultRef };
     });
   };
 

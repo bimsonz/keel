@@ -33,6 +33,7 @@ const CONTRACT_PORTS = [
   "PlanStore",
   "ProbeRunner",
   "ProbeStore",
+  "AdmittedGuards",
   "BatchVerdicts",
   "ChangePrecheck",
   "GuardRepo",

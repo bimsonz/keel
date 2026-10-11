@@ -5,7 +5,6 @@
 import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { batchOf, projectRepos } from "@keeltown/core/application/integration";
-import { L1_SUITE_PLAN } from "@keeltown/core/application/verification";
 import { CommitSha, Instant, makeId, type ProjectId } from "@keeltown/core/kernel";
 import {
   Changes,
@@ -22,6 +21,7 @@ import {
   makeProjectsMemory,
   makeStagingWriterMemory,
   makeTrunkWriterMemory,
+  suitePlan,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
@@ -138,6 +138,9 @@ async function lane(options: { readonly noStaging?: boolean } = {}) {
   return { stub, projectId, laneId, verification, writer, pushCandidate };
 }
 
+/** The plan each queued change was compiled with, as its ChangeQueued names it. */
+const PLAN = suitePlan();
+
 const queued = (laneId: string, n: number) => {
   const changeId = makeId("chg", ulid());
   return {
@@ -149,7 +152,7 @@ const queued = (laneId: string, n: number) => {
     dedupeKey: `change:${changeId}/plan/ChangeQueued#1`,
     affected: [],
     notified: [laneId],
-    payload: { _tag: "ChangeQueued", changeId, laneId },
+    payload: { _tag: "ChangeQueued", changeId, laneId, planHash: PLAN.planHash },
   };
 };
 
@@ -160,7 +163,7 @@ const landing = (job: VerificationJob, instanceId: string, attempt = 0) => ({
   candidateId: job.candidateId,
   verdictId: makeId("vrd", ulid()),
   outcome: "land",
-  planHash: L1_SUITE_PLAN.planHash,
+  planHash: PLAN.planHash,
   evidence: ["suite: 12 passed"],
   failingTests: [],
 });
@@ -302,7 +305,7 @@ describe("the Lane DO", () => {
         candidateId: makeId("cnd", ulid()),
         verdictId: makeId("vrd", ulid()),
         outcome: "land",
-        planHash: L1_SUITE_PLAN.planHash,
+        planHash: PLAN.planHash,
         evidence: [],
         failingTests: [],
       }),

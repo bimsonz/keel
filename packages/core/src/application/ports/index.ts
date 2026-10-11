@@ -3,6 +3,7 @@
  * attached. Driven adapters provide them as Layers; packages/testing provides
  * an in-memory Layer and a contract suite for each.
  */
+export * from "./admitted-guards.ts";
 export * from "./agent-directory.ts";
 export * from "./background.ts";
 export * from "./batch-verdicts.ts";

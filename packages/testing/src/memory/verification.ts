@@ -20,6 +20,8 @@ import {
   type VerificationJob,
 } from "@keeltown/core/domain/verification";
 import {
+  type AdmittedGuardList,
+  AdmittedGuards,
   type BatchVerdict,
   BatchVerdicts,
   ChangePrecheck,
@@ -47,6 +49,7 @@ import {
 import type { ProbeFile, ProbeRun } from "@keeltown/core/application/verification";
 import { Effect, Layer, Result, Schema } from "effect";
 import type {
+  AdmittedGuardsHarness,
   FlowSpecSourceHarness,
   ProbeRunnerHarness,
   ProbeStoreHarness,
@@ -170,6 +173,36 @@ export function makeFlowSpecSourceMemory(): FlowSpecSourceHarness {
 }
 
 /** A deterministic 40-hex commit id per admission. */
+/**
+ * Admitted guards per project, as the guard repo would list them: each
+ * admitted guard as admission wrote it, and each guard whose guard.json could
+ * not be admitted, with its reason.
+ */
+export function makeAdmittedGuardsMemory(): AdmittedGuardsHarness {
+  const projects = new Map<string, AdmittedGuardList>();
+  const of = (projectId: string): AdmittedGuardList =>
+    projects.get(projectId) ?? { admitted: [], refused: [] };
+  return {
+    admit: (projectId, guard) =>
+      Effect.sync(() => {
+        const list = of(projectId);
+        projects.set(projectId, { ...list, admitted: [...list.admitted, guard] });
+      }),
+    plantWithoutProposition: (projectId, guardId) =>
+      Effect.sync(() => {
+        const list = of(projectId);
+        projects.set(projectId, {
+          ...list,
+          refused: [...list.refused, { guardId, reason: "guard.json names no proposition" }],
+        });
+      }),
+    layer: Layer.succeed(
+      AdmittedGuards,
+      AdmittedGuards.of({ list: (projectId) => Effect.sync(() => of(projectId)) }),
+    ),
+  };
+}
+
 const guardCommit = (n: number): string => n.toString(16).padStart(40, "0");
 
 export function makeGuardRepoMemory() {

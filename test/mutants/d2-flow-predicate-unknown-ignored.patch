@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/flow-spec.test.ts
+# kills: flow-spec.predicates
+# why: A predicate Keel does not know is ignored, so a misspelt block silently reads as advise
+diff --git a/packages/core/src/application/verification/flow-spec.ts b/packages/core/src/application/verification/flow-spec.ts
+index 65b09d4..e5af7dd 100644
+--- a/packages/core/src/application/verification/flow-spec.ts
++++ b/packages/core/src/application/verification/flow-spec.ts
+@@ -71,7 +71,7 @@ export const parseFlow = (
+   const { flow, steps, predicates } = decoded.success;
+   const named = Object.keys(Object(Reflect.get(Object(json), "predicates")));
+   const unknown = named.filter((p) => !Predicate.literals.some((known) => known === p));
+-  if (unknown.length > 0)
++  if (unknown.length > 0 && unknown.length < 0)
+     return invalid(
+       `: predicates names ${unknown.join(", ")}, which Keel does not know (it knows ${Predicate.literals.join(", ")})`,
+     );

@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/lane.test.ts -t "d21.requeue-keeps-hash"
+# kills: d21.requeue-keeps-hash
+# why: A requeued change re-enters the queue without the plan its ChangeRequeued names, so a change bounced out of a batch by infra comes back planless and is refused
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index e7935d8..df5a6ee 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -258,11 +258,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+         const requeued = decodeRequeued(event.payload);
+         return holds(tx.store, lane, requeued.changeId)
+           ? undefined
+-          : withPlan(
+-              { ...lane, queue: [requeued.changeId, ...lane.queue] },
+-              requeued.changeId,
+-              requeued.planHash,
+-            );
++          : { ...lane, queue: [requeued.changeId, ...lane.queue] };
+       }
+       case "ChangeWithdrawn":
+       case "ChangeSuperseded": {

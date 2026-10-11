@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/admitted-guards.test.ts -t "admitted-guards.refused"
+# kills: admitted-guards.refused
+# why: A guard.json that cannot be admitted is dropped from the list, so a guard nobody can select vanishes instead of being shown with its reason
+diff --git a/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts b/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
+index c3e2f19..0c467a3 100644
+--- a/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
++++ b/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
+@@ -52,7 +52,7 @@ export const AdmittedGuardsCodeHost = Layer.effect(
+             }
+             const read = readGuardFile(dir.path, utf8.decode(yield* host.readBlob(repo, file.oid)));
+             if (Result.isSuccess(read)) admitted.push(read.success);
+-            else refused.push({ guardId: dir.path, reason: read.failure });
++            else void read.failure;
+           }
+           return { admitted, refused };
+         }).pipe(

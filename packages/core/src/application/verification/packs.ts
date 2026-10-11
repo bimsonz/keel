@@ -1,9 +1,7 @@
-import { Result } from "effect";
-import { CommitSha, contentHashOf } from "../../domain/kernel/index.ts";
+import { contentHashOf } from "../../domain/kernel/index.ts";
 import {
-  compile,
   type FlowDefaults,
-  type FlowPlan,
+  type PlanStep,
   type StepSpec,
 } from "../../domain/verification/index.ts";
 
@@ -120,21 +118,15 @@ export const detectPack = (
       };
 };
 
-/** The base a static plan claims: none. The L1 plan is not compiled per change. */
-const NO_BASE = CommitSha.make("0".repeat(40));
-
-const compiled = compile(
-  undefined,
-  { baseCommit: NO_BASE, touchedPaths: [], subjects: [], facts: {} },
-  JS_TS_SUITE_PACK,
-);
-if (Result.isFailure(compiled)) {
-  throw new Error(`the L1 suite pack does not compile: ${compiled.failure.map(String).join("; ")}`);
-}
+/** The Tier 2 steps KeelVerify has a runner for, by id. Its runner table is keyed by exactly these. */
+export const TIER2_STEP_IDS: readonly string[] = [JS_TS_SUITE.id, WORKER_APP_TYPECHECK.id];
 
 /**
- * The static plan KeelVerify runs at L1: the js-ts suite on the candidate, in
- * Tier 2. KeelVerify refuses a batch whose planHash is anything else. D2.1
- * replaces it with the union of the batch's compiled Verification Plans.
+ * Whether KeelVerify can run the step on a candidate: a guard step (its
+ * pinned probe, on a VerifierDO), or a Tier 2 step it has a runner for.
+ * Nothing else runs yet: not a human step, until rulings reach a running
+ * plan, and not any other Tier 0 or Tier 1 step. Precheck refuses a
+ * plan holding such a step, so no change parks by design.
  */
-export const L1_SUITE_PLAN: FlowPlan = compiled.success;
+export const executable = (step: PlanStep): boolean =>
+  step.guards !== undefined || (step.tier.tier === 2 && TIER2_STEP_IDS.includes(step.id));

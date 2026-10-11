@@ -1,15 +1,18 @@
 import type { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
 import { NonRetryableError } from "cloudflare:workflows";
 import {
-  L1_SUITE_PLAN,
+  candidateRunner,
+  readStoredPlan,
   recordBatchVerdict,
-  runJob,
+  ResolvedPlan,
+  resolvePlan,
+  runPlan,
   SettledVerdict,
+  settleUnresolved,
   settleVerdict,
 } from "@keeltown/core/application/verification";
-import type { VerificationJob } from "@keeltown/core/domain/verification";
-import { Cause, Exit, Option, Schema } from "effect";
-import { keelVerifyRuntime } from "../../../composition/workflow.ts";
+import { Cause, Exit, Option, Result, Schema } from "effect";
+import { durableReport, keelVerifyRuntime } from "../../../composition/workflow.ts";
 import { KeelVerifyJob } from "../../../rpc/index.ts";
 import { keelBundleSource } from "./bundle-source.ts";
 import { CIWorkflow, type CiContext, type CiParams } from "./ci.js";
@@ -26,10 +29,13 @@ const RECORD_RETRIES = {
  * `ci.runner`s on keel-verify's KeelSandbox, hydrated from the candidate's
  * bundle through `getProvider()`, never from git and never with a token.
  *
- * Steps: `plan` (the payload and its plan), the runner's own step (which
- * persists its raw logs, so a runner may hold nothing secret),
- * `<step>:evidence`, `verdict` and `record`. At L1 the plan is static: the
- * js-ts suite in Tier 2.
+ * Steps: `plan` (the payload, and the plan Precheck compiled and stored
+ * under the job's `planHash`), then the plan's own steps as `runPlan`
+ * reaches them: a Tier 2 step is its runner's step (which persists its raw
+ * logs, so a runner may hold nothing secret) and `<step>:evidence`, a guard
+ * step is `guard <step>`; then `verdict` and `record`. A plan the store does
+ * not hold, or holds corrupt, runs nothing and settles park: the lane is
+ * never left waiting on a failed instance.
  */
 export class KeelVerify extends CIWorkflow<Env> {
   static override getProvider() {
@@ -41,14 +47,6 @@ export class KeelVerify extends CIWorkflow<Env> {
     step: WorkflowStep,
     ci: CiContext,
   ): Promise<void> {
-    const encoded = await step.do("plan", async () => {
-      const job = Schema.decodeUnknownOption(KeelVerifyJob)(event.payload);
-      if (Option.isNone(job)) throw new NonRetryableError("not a KeelVerify job");
-      if (job.value.planHash !== L1_SUITE_PLAN.planHash)
-        throw new NonRetryableError(`KeelVerify does not know plan ${job.value.planHash}`);
-      return Schema.encodeSync(KeelVerifyJob)(job.value);
-    });
-    const job = Schema.decodeSync(KeelVerifyJob)(encoded);
     const runtime = keelVerifyRuntime(this.env, {
       // Restated here, not passed through: no runner is ever handed a credential.
       runner: (options) =>
@@ -63,20 +61,44 @@ export class KeelVerify extends CIWorkflow<Env> {
       step,
     });
     try {
-      const verification: VerificationJob = {
-        jobId: job.jobId,
-        bundle: job.bundle,
-        steps: L1_SUITE_PLAN.steps,
-        fence: job.fence,
-      };
-      const results = await runtime.runPromise(runJob(verification));
+      const planned = await step.do("plan", async () => {
+        const job = Schema.decodeUnknownOption(KeelVerifyJob)(event.payload);
+        if (Option.isNone(job)) throw new NonRetryableError("not a KeelVerify job");
+        const resolved = await runtime.runPromise(resolvePlan(job.value.planHash));
+        return {
+          job: Schema.encodeSync(KeelVerifyJob)(job.value),
+          plan: Schema.encodeSync(ResolvedPlan)(resolved),
+        };
+      });
+      const job = Schema.decodeSync(KeelVerifyJob)(planned.job);
+      const resolved = Schema.decodeSync(ResolvedPlan)(planned.plan);
+      // Read back and verified against the job's hash on every replay, not only the first run.
+      const plan =
+        resolved._tag === "Resolved"
+          ? readStoredPlan(job.planHash, resolved.text)
+          : Result.fail(resolved.why);
+      const reports = Result.isSuccess(plan)
+        ? await runtime.runPromise(
+            runPlan(
+              plan.success,
+              candidateRunner(
+                { jobId: job.jobId, bundle: job.bundle, fence: job.fence },
+                durableReport(step),
+              ),
+            ),
+          )
+        : [];
       // Persisted as JSON, since a next action's args are open; decoded, so a replay is checked too.
       const settled = Schema.decodeUnknownSync(SettledVerdict)(
         JSON.parse(
           await step.do("verdict", async () =>
             JSON.stringify(
               Schema.encodeSync(SettledVerdict)(
-                await runtime.runPromise(settleVerdict(L1_SUITE_PLAN, results)),
+                await runtime.runPromise(
+                  Result.isSuccess(plan)
+                    ? settleVerdict(plan.success, reports)
+                    : settleUnresolved(job.planHash, plan.failure),
+                ),
               ),
             ),
           ),

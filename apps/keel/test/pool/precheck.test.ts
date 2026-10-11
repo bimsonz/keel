@@ -1,9 +1,14 @@
 import { introspectWorkflow, introspectWorkflowInstance } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { makeId } from "@keeltown/core/kernel";
-import { Schema } from "effect";
+import { readStoredPlan } from "@keeltown/core/application/verification";
+import { Proposition, SubjectKey } from "@keeltown/core/domain/coordination";
+import type { AdmittedGuard } from "@keeltown/core/domain/verification";
+import { ContentHash, makeId } from "@keeltown/core/kernel";
+import { TEST_GUARD } from "@keeltown/testing";
+import { Result, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
+import { planKey } from "../../src/adapters/driven/r2/plan-store.ts";
 import { PrecheckParams } from "../../src/adapters/driving/workflow/precheck.ts";
 import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
 import { changeUnderTest, ok } from "./change-harness.ts";
@@ -26,11 +31,34 @@ const policy = (protectedPaths: readonly string[]) => ({
   _tag: "Done",
   value: { protectedPaths, guardPaths: GUARDS },
 });
+/** What the flow step answers: the base's root holds only `.keel/flow.json`, when given. */
+const flow = (flowJson?: string) => ({
+  _tag: "Done",
+  value: {
+    _tag: "Read",
+    sources: flowJson === undefined ? { rootPaths: [] } : { rootPaths: [".keel"], flowJson },
+  },
+});
+/** What the guards step answers: these guards admitted, none refused. */
+const guards = (admitted: readonly AdmittedGuard[] = []) => ({
+  _tag: "Done",
+  value: { _tag: "Listed", admitted, refused: [] },
+});
+
+const key = Schema.decodeUnknownSync(SubjectKey);
+/** TEST_GUARD's tenet, on `authz.sessions`, as a premise the change relies on. */
+const SESSIONS = Schema.decodeUnknownSync(Proposition)(TEST_GUARD.tenet.proposition);
+/** An admitted guard on a subject the change neither relies on nor affects. */
+const INVOICES: AdmittedGuard = {
+  guardId: makeId("grd", ulid()),
+  probe: Schema.decodeUnknownSync(ContentHash)(`sha256:${"8".repeat(64)}`),
+  tenet: { proposition: { ...SESSIONS, subject: key("billing.invoice") } },
+};
 
 /** A change declared, pushed and submitted on a Change DO under test; the outbox starts its Precheck. */
-async function submitted() {
+async function submitted(premises: readonly Proposition[] = []) {
   const c = await changeUnderTest();
-  const lease = ok(await c.declare()).change.lease.id;
+  const lease = ok(await c.declare("declare-1", { premises })).change.lease.id;
   const commitSha = await c.push();
   ok(
     decodeExit(
@@ -43,10 +71,12 @@ async function submitted() {
 
 /**
  * Precheck through env.PRECHECK, started by the Change DO's outbox on
- * ChangeSubmitted, against the real Change DO over RPC. The ancestry walk and
- * the diff read the workspace on the code host, which the DO under test keeps
- * in memory, and the Project DO does not answer settings() yet, so those
- * steps are mocked; start, decide and the refusal or plan run for real.
+ * ChangeSubmitted, against the real Change DO over RPC. The ancestry walk,
+ * the diff and the base's flow read the workspace on the code host, which the
+ * DO under test keeps in memory, and the guard repo and the Project DO's
+ * settings() are mocked with them; start, with the change's subjects, decide,
+ * and the refusal or the stored plan run for real. Which commit each read
+ * takes is core's `precheckReads`, proven in the unit suite.
  */
 describe("Precheck", () => {
   it("[d12.pool.compiled] records the plan of a clean submission on the change", async () => {
@@ -55,6 +85,8 @@ describe("Precheck", () => {
       await m.mockStepResult({ name: "ancestry" }, descends(BASE));
       await m.mockStepResult({ name: "diff" }, touched(["src/a.ts"]));
       await m.mockStepResult({ name: "policy" }, policy(["infra/**"]));
+      await m.mockStepResult({ name: "flow" }, flow());
+      await m.mockStepResult({ name: "guards" }, guards());
     });
     const { c } = await submitted();
     await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);
@@ -66,12 +98,44 @@ describe("Precheck", () => {
     expect(types.slice(-3)).toEqual(["PrecheckStarted", "PlanCompiled", "ChangeQueued"]);
   });
 
+  it("[d21.pool.subjects] compiles the change's own subjects against the admitted guards, under the base's policy, and queues the plan it stored", async () => {
+    await using workflows = await introspectWorkflow(env.PRECHECK);
+    await workflows.modifyAll(async (m) => {
+      await m.mockStepResult({ name: "ancestry" }, descends(BASE));
+      await m.mockStepResult({ name: "diff" }, touched(["src/a.ts"]));
+      await m.mockStepResult({ name: "policy" }, policy([]));
+      await m.mockStepResult(
+        { name: "flow" },
+        flow(JSON.stringify({ predicates: { freshness: "block" } })),
+      );
+      await m.mockStepResult({ name: "guards" }, guards([TEST_GUARD, INVOICES]));
+    });
+    const { c } = await submitted([SESSIONS]);
+    await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);
+    await (await workflows.get())[0]?.waitForStatus("complete");
+
+    const log = await c.log();
+    const compiled = log.find((e) => e.type === "PlanCompiled")?.payload;
+    const queued = log.find((e) => e.type === "ChangeQueued")?.payload;
+    const { planHash } = Schema.decodeUnknownSync(Schema.Struct({ planHash: ContentHash }))(
+      compiled,
+    );
+    expect(queued).toMatchObject({ planHash });
+    const text = await (await env.ARCHIVE.get(planKey(planHash)))?.text();
+    const plan = Result.getOrThrow(readStoredPlan(planHash, text ?? ""));
+    expect(plan.steps.flatMap((s) => (s.guards === undefined ? [] : [s.guards]))).toEqual([
+      { predicate: "freshness", policy: "block", probe: TEST_GUARD.probe },
+    ]);
+  });
+
   it("[d12.pool.refused] bounces a change to a guard path, with next actions and a ruling verdict", async () => {
     await using workflows = await introspectWorkflow(env.PRECHECK);
     await workflows.modifyAll(async (m) => {
       await m.mockStepResult({ name: "ancestry" }, descends(BASE));
       await m.mockStepResult({ name: "diff" }, touched([".keel/guards/g1.test.ts", "src/a.ts"]));
       await m.mockStepResult({ name: "policy" }, policy([]));
+      await m.mockStepResult({ name: "flow" }, flow());
+      await m.mockStepResult({ name: "guards" }, guards());
     });
     const { c } = await submitted();
     await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);
@@ -93,6 +157,8 @@ describe("Precheck", () => {
       await m.mockStepResult({ name: "ancestry" }, descends(BASE));
       await m.mockStepResult({ name: "diff" }, touched(["src/a.ts"]));
       await m.mockStepResult({ name: "policy" }, policy([]));
+      await m.mockStepResult({ name: "flow" }, flow());
+      await m.mockStepResult({ name: "guards" }, guards());
     });
     const { c, commitSha } = await submitted();
     await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);

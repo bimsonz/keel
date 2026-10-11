@@ -2,10 +2,10 @@
 # kills: lane.subscriptions
 # why: Members are subscribed unscoped, so every change hears every later batch's events
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index a57774b..69e8c31 100644
+index e7935d8..3975974 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -396,7 +396,7 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
+@@ -475,7 +475,7 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
          (events) => {
            // Subscribed before the append, so BatchFormed itself reaches them.
            for (const member of members)
@@ -13,4 +13,4 @@ index a57774b..69e8c31 100644
 +            tx.outbox.subscribe(`change:${member}`, MEMBER_EVENTS);
            tx.outbox.subscribe(`trunk:${lane.projectId}`, ["BatchVerified"]);
            tx.store.put(BATCH, batchId, encodeBatch(fold(undefined, events, tx.at)));
-           putLane(tx.store, {
+           const planHash = planOf(now, first);

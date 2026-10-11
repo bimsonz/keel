@@ -1,4 +1,5 @@
 import { Effect, Result, Schema } from "effect";
+import { PredicatePolicies, type SubjectKey } from "../../domain/coordination/index.ts";
 import {
   type ChangeId,
   type CommitSha,
@@ -7,6 +8,7 @@ import {
   type VerdictId,
 } from "../../domain/kernel/index.ts";
 import {
+  type AdmittedGuard,
   compile,
   defaultFlowPolicy,
   GUARD_PATHS,
@@ -15,12 +17,24 @@ import {
   type PrecheckPolicy,
   type RefusedPath,
 } from "../../domain/verification/index.ts";
-import { ChangePrecheck, CodeHost, type PrecheckWorkspace, Projects } from "../ports/index.ts";
-import { JS_TS_SUITE_PACK, L1_SUITE_PLAN } from "./packs.ts";
+import {
+  AdmittedGuards,
+  ChangePrecheck,
+  CodeHost,
+  FlowSpecSource,
+  type FlowSources,
+  type GuardRefused,
+  PlanStore,
+  type PrecheckWorkspace,
+  Projects,
+} from "../ports/index.ts";
+import { FLOW_SPEC_PATH, flowSetup } from "./flow-spec.ts";
+import { executable } from "./packs.ts";
+import { readStoredPlan, storedPlanText } from "./plan-codec.ts";
 
 /**
  * Precheck's use-cases, one per Workflow step: start, ancestry, diff, policy,
- * then refuse or compile. Each is safe to replay: the Change DO's writes are
+ * flow, guards, decide, then refuse or compile. Each is safe to replay: the Change DO's writes are
  * idempotent by instance, and the reads answer the same thing twice. What
  * passes between steps is plain data, small enough for a step's output.
  */
@@ -49,6 +63,14 @@ export const PrecheckDecision = Schema.Union([
     planHash: ContentHash,
     steps: Schema.Int,
     costEstimate: Schema.Number,
+    /** The compiled plan, as the plan store keeps it: put before PlanCompiled names its hash. */
+    plan: Schema.String,
+    /** The base's predicate policy, which the plan hash pins and the Change DO applies to a proven conflict. */
+    predicatePolicy: PredicatePolicies,
+    /** Why detection chose the verifier pack. */
+    pack: Schema.String,
+    /** Guards in the guard repo that could not be admitted to the plan, and why: shown, never skipped silently. */
+    guardsRefused: Schema.Array(Schema.Struct({ guardId: Schema.String, reason: Schema.String })),
   }),
 ]);
 export type PrecheckDecision = typeof PrecheckDecision.Type;
@@ -157,14 +179,80 @@ export const precheckPolicy = Effect.fn("verification/precheckPolicy")(function*
   return policy;
 });
 
-const L1_STEPS = new Set(L1_SUITE_PLAN.steps.map((s) => s.id));
+/** The base commit's flow sources, or why they could not be read. */
+export type FlowRead =
+  | { readonly _tag: "Read"; readonly sources: FlowSources }
+  | { readonly _tag: "Unreadable"; readonly reason: string };
+
+/**
+ * What decides the change's checks, read from the submission's base, never
+ * its head: a change cannot edit its own checks. A workspace or commit the
+ * host cannot find is a refusal the agent can act on, never a defect.
+ */
+export const readFlowSources = Effect.fn("verification/readFlowSources")(function* (
+  workspace: PrecheckWorkspace,
+  base: CommitSha,
+) {
+  return yield* (yield* FlowSpecSource).read(workspace.repo, base).pipe(
+    Effect.map((sources): FlowRead => ({ _tag: "Read", sources })),
+    Effect.catchTags({
+      RepoNotFound: (e) =>
+        Effect.succeed<FlowRead>({
+          _tag: "Unreadable",
+          reason: `RepoNotFound ${e.repo.namespace}/${e.repo.name}`,
+        }),
+      ObjectNotFound: (e) =>
+        Effect.succeed<FlowRead>({ _tag: "Unreadable", reason: `ObjectNotFound ${e.oid}` }),
+    }),
+  );
+});
+
+/** The project's admitted guards, or why its guard repo could not be read. */
+export type GuardsRead =
+  | {
+      readonly _tag: "Listed";
+      readonly admitted: readonly AdmittedGuard[];
+      readonly refused: readonly GuardRefused[];
+    }
+  | { readonly _tag: "Unreadable"; readonly reason: string };
+
+/** Every guard the project has admitted, from the guard repo, for compile to select from. */
+export const listGuards = Effect.fn("verification/listGuards")(function* (
+  workspace: PrecheckWorkspace,
+) {
+  return yield* (yield* AdmittedGuards).list(workspace.projectId).pipe(
+    Effect.map((list): GuardsRead => ({ _tag: "Listed", ...list })),
+    Effect.catchTag("GuardsUnreadable", (e) =>
+      Effect.succeed<GuardsRead>({ _tag: "Unreadable", reason: `guards: ${e.reason}` }),
+    ),
+  );
+});
+
+/**
+ * The reads Precheck makes of a commit that descends from its base, one
+ * durable step each, so which commit each reads is decided here and nowhere
+ * else: the diff from the base to the commit, the project's policy, the
+ * base's flow (never the head's) and the project's admitted guards.
+ */
+export const precheckReads = (
+  workspace: PrecheckWorkspace,
+  submission: PrecheckSubmission,
+  ancestry: Extract<Ancestry, { readonly _tag: "Descends" }>,
+) => ({
+  touched: diffSubmission(workspace, ancestry.base, submission.commitSha),
+  policy: precheckPolicy(workspace),
+  flow: readFlowSources(workspace, ancestry.base),
+  guards: listGuards(workspace),
+});
 
 /** A refused path as the verdict's evidence cites it: the rule, the path and the glob that caught it. */
 const reason = (p: RefusedPath) => `precheck:${p.rule}:${p.path} (${p.glob})`;
 
 /**
  * What Precheck's steps found: the ancestry, and, only for a commit that
- * descends from its base, the paths it touches and the project's policy.
+ * descends from its base, the paths it touches, the project's policy, the
+ * base's flow sources, the project's admitted guards and the subjects the
+ * change touches or relies on.
  */
 export type PrecheckFindings =
   | { readonly ancestry: Exclude<Ancestry, { readonly _tag: "Descends" }> }
@@ -172,6 +260,9 @@ export type PrecheckFindings =
       readonly ancestry: Extract<Ancestry, { readonly _tag: "Descends" }>;
       readonly touched: TouchedPaths;
       readonly policy: PrecheckPolicy;
+      readonly flow: FlowRead;
+      readonly guards: GuardsRead;
+      readonly subjects: readonly SubjectKey[];
     };
 
 const unreadable = (why: string): PrecheckDecision => ({
@@ -221,18 +312,33 @@ const ancestryRefusal = (
   };
 };
 
+/** A base whose flow cannot be compiled: the change cannot fix it, since checks come from the base. */
+const brokenFlow = (why: string): PrecheckDecision => ({
+  _tag: "Refuse",
+  reasons: [`precheck:flow-invalid:${why}`],
+  nextActions: [
+    {
+      kind: "escalate",
+      title: `Ask an operator to repair ${FLOW_SPEC_PATH} on trunk: Keel reads a change's checks from its base, and the base's flow does not compile`,
+      args: { path: FLOW_SPEC_PATH },
+    },
+  ],
+});
+
 /**
  * The decision, a pure function of the steps' outputs. A commit that does
  * not descend from its base, could not be read, or names no base is refused
  * before its paths are read. Otherwise refuse guard and protected paths, and
- * a submission the diff could not read, and compile the plan from the base.
- * Until D2.1 runs compiled plans, KeelVerify runs only L1's static plan, so a
- * plan needing any other step (today the human-class gate a flow change adds)
- * is refused rather than let through without it.
+ * a submission the diff, the flow or the guard repo could not read. Then
+ * compile the plan from the base: the project's flow (or its detected pack's)
+ * and its predicate policy, with the admitted guards the change is exposed
+ * to. A plan holding a step KeelVerify cannot run yet (today a human-class
+ * gate, which a flow change adds) is refused rather than let through
+ * without it, or parked by design.
  */
 export const decidePrecheck = (findings: PrecheckFindings): PrecheckDecision => {
   if (!("touched" in findings)) return ancestryRefusal(findings.ancestry);
-  const { ancestry, touched, policy } = findings;
+  const { ancestry, touched, policy, flow, guards, subjects } = findings;
   const baseSha = ancestry.base;
   if (touched._tag === "Unreadable") return unreadable(touched.reason);
   const checked = precheck(touched.paths, policy);
@@ -244,39 +350,54 @@ export const decidePrecheck = (findings: PrecheckFindings): PrecheckDecision => 
       nextActions: checked.failure.nextActions,
     };
   }
+  if (flow._tag === "Unreadable") return unreadable(flow.reason);
+  if (guards._tag === "Unreadable") return unreadable(guards.reason);
+  const setup = flowSetup(flow.sources, baseSha);
+  if (Result.isFailure(setup)) return brokenFlow(setup.failure.reason);
+  const { definition, predicatePolicy, pack } = setup.success;
   const plan = compile(
-    undefined,
-    { baseCommit: baseSha, touchedPaths: checked.success.touched, subjects: [], facts: {} },
-    JS_TS_SUITE_PACK,
+    definition,
+    {
+      baseCommit: baseSha,
+      touchedPaths: checked.success.touched,
+      subjects,
+      facts: {},
+      predicatePolicy,
+      admittedGuards: guards.admitted,
+    },
+    pack.defaults,
     defaultFlowPolicy,
   );
-  // The pack is Keel's own and no project flow is read, so compile cannot refuse it.
-  if (Result.isFailure(plan))
-    throw new Error(
-      `the js-ts pack does not compile: ${plan.failure.map((e) => e._tag).join(", ")}`,
-    );
-  const missing = plan.success.steps.map((s) => s.id).filter((id) => !L1_STEPS.has(id));
+  if (Result.isFailure(plan)) return brokenFlow(plan.failure.map((e) => e._tag).join(", "));
+  const missing = plan.success.steps.filter((s) => !executable(s)).map((s) => s.id);
   const [gap, ...gaps] = missing;
   if (gap !== undefined)
     return {
       _tag: "Refuse",
-      reasons: [`precheck:l1-plan-gap:${gap}`, ...gaps.map((id) => `precheck:l1-plan-gap:${id}`)],
+      reasons: [`precheck:plan-gap:${gap}`, ...gaps.map((id) => `precheck:plan-gap:${id}`)],
       nextActions: [
         {
           kind: "call",
           title: missing.includes(HUMAN_CLASS_STEP)
-            ? "Changes to .keel/flow and .keel/plugins need a ruling, which arrives at L2: split those edits out of this change, then submit again"
-            : `Keel cannot run ${missing.join(", ")} until L2: split out what needs it, then submit again`,
+            ? "Changes to .keel/flow and .keel/plugins need a ruling, which a running plan cannot take yet: split those edits out of this change, then submit again"
+            : `Keel cannot run ${missing.join(", ")} yet: split out what needs it, then submit again`,
           operationId: "submit",
           args: { steps: missing },
         },
       ],
     };
+  const text = storedPlanText(plan.success);
+  // compile stamps the hash it computed, so the plan's own hash cannot lie.
+  if (Result.isFailure(text)) throw new Error(text.failure);
   return {
     _tag: "Compile",
     planHash: plan.success.planHash,
     steps: plan.success.steps.length,
     costEstimate: plan.success.costEstimate,
+    plan: text.success,
+    predicatePolicy,
+    pack: pack.reason,
+    guardsRefused: guards.refused,
   };
 };
 
@@ -293,15 +414,23 @@ export const refuseSubmission = Effect.fn("verification/refuseSubmission")(funct
   return verdictId;
 });
 
-/** Records the compiled plan on the change: PlanCompiled. */
+/**
+ * Stores the compiled plan, then records it on the change: PlanCompiled. The
+ * plan is stored first, so a hash the lane queues always resolves; storing is
+ * content-addressed, so a replay stores the same plan again.
+ */
 export const recordPlan = Effect.fn("verification/recordPlan")(function* (
   submission: PrecheckSubmission,
   decision: Extract<PrecheckDecision, { _tag: "Compile" }>,
 ) {
-  yield* (yield* ChangePrecheck).compiled(submission.changeId, {
+  const plan = readStoredPlan(decision.planHash, decision.plan);
+  if (Result.isFailure(plan)) return yield* Effect.die(new Error(plan.failure));
+  yield* (yield* PlanStore).put(plan.success);
+  return yield* (yield* ChangePrecheck).compiled(submission.changeId, {
     ...call(submission),
     planHash: decision.planHash,
     steps: decision.steps,
     costEstimate: decision.costEstimate,
+    predicatePolicy: decision.predicatePolicy,
   });
 });

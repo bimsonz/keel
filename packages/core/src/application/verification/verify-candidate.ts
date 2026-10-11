@@ -60,14 +60,20 @@ export const SettledVerdict = Schema.Struct({
 });
 export type SettledVerdict = typeof SettledVerdict.Type;
 
-/** How many failures (tests and type errors) a verdict cites by name. */
+/** How many failures (tests, type errors and guards) a verdict cites by name. */
 export const CITED_FAILURES = 20;
 
-/** A failure a verdict cites: a failing test, or an error the typecheck named. */
+/** A failure a verdict cites: a failing test, an error the typecheck named, or a guard whose probe failed. */
 interface Cited {
-  readonly kind: "test" | "type";
+  readonly kind: "test" | "type" | "guard";
   readonly name: string;
 }
+
+const CITED_AS: Record<Cited["kind"], { readonly plural: string; readonly line: string }> = {
+  test: { plural: "failing tests", line: "failed" },
+  type: { plural: "type errors", line: "type error" },
+  guard: { plural: "guarded behaviour", line: "guard failed" },
+};
 
 /** A bounce's remedy, naming what failed when the evidence names anything. */
 const remedy = (cited: readonly Cited[], more: number): NextAction => {
@@ -79,12 +85,14 @@ const remedy = (cited: readonly Cited[], more: number): NextAction => {
     };
   const tests = cited.filter((c) => c.kind === "test").map((c) => c.name);
   const types = cited.filter((c) => c.kind === "type").map((c) => c.name);
-  const what =
-    types.length === 0
-      ? "the failing tests"
-      : tests.length === 0
-        ? "the type errors"
-        : "the failing tests and type errors";
+  const guards = cited.filter((c) => c.kind === "guard").map((c) => c.name);
+  const kinds = (["test", "type", "guard"] as const).filter((k) => cited.some((c) => c.kind === k));
+  const phrases = kinds.map((k) => CITED_AS[k].plural);
+  const what = `the ${
+    phrases.length === 1
+      ? (phrases[0] ?? "")
+      : `${phrases.slice(0, -1).join(", ")} and ${phrases.at(-1) ?? ""}`
+  }`;
   return {
     kind: "call",
     title: `Fix ${what}, push, then submit again: ${cited.map((c) => c.name).join("; ")}${
@@ -94,12 +102,15 @@ const remedy = (cited: readonly Cited[], more: number): NextAction => {
     args: {
       ...(tests.length === 0 ? {} : { failingTests: tests }),
       ...(types.length === 0 ? {} : { typeErrors: types }),
+      ...(guards.length === 0 ? {} : { failingGuards: guards }),
     },
   };
 };
 
-/** What a failing step stored that names its failures: a suite's tests, a typecheck's errors. */
+/** What a failing step stored that names its failures: a suite's tests, a typecheck's errors, a guard's probe. */
 const StoredFailures = Schema.Struct({
+  guard: Schema.optional(Schema.Struct({ predicate: Schema.String, probe: Schema.String })),
+  reason: Schema.optional(Schema.String),
   failing: Schema.optional(
     Schema.Array(Schema.Struct({ file: Schema.String, test: Schema.optional(Schema.String) })),
   ),
@@ -126,7 +137,9 @@ const describe = (r: StepResult): string =>
  * the evidence the outcome rests on: one line per result, then the failing
  * tests and type errors by name, read back from the evidence each failing step
  * stored. `failingTests` names them all, type errors as `file:line:col TScode
- * message`, since the lane attributes a bounce from the first.
+ * message`, since the lane attributes a bounce from the first. A fail whose
+ * evidence is not stored still stands: the verdict cites `evidence missing`
+ * and an ops error is logged, so a lost document never wedges the lane.
  */
 export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
   plan: FlowPlan,
@@ -137,12 +150,22 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
   if (Result.isFailure(decided)) return yield* Effect.die(decided.failure);
   const store = yield* EvidenceStore;
   const failures: Cited[] = [];
+  const missing: string[] = [];
   for (const r of decided.success.evidence) {
     const ref = Schema.decodeUnknownOption(ContentHash)(r.resultRef);
     if (r.outcome !== "fail" || Option.isNone(ref)) continue;
-    const stored = Schema.decodeUnknownOption(StoredFailures)(
-      yield* store.get(ref.value).pipe(Effect.orDie),
+    const document = yield* store.get(ref.value).pipe(
+      Effect.map(Option.some),
+      Effect.catchTag("EvidenceMissing", () => Effect.succeed(Option.none())),
     );
+    if (Option.isNone(document)) {
+      missing.push(ref.value);
+      yield* Effect.logError(
+        `verdict cites evidence that is not stored: ${r.stepId} failed, citing ${ref.value}`,
+      );
+      continue;
+    }
+    const stored = Schema.decodeUnknownOption(StoredFailures)(document.value);
     if (Option.isNone(stored)) continue;
     for (const f of stored.value.failing ?? [])
       failures.push({
@@ -151,6 +174,11 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
       });
     for (const e of stored.value.errors ?? [])
       failures.push({ kind: "type", name: citeDiagnostic(e) });
+    if (stored.value.guard !== undefined)
+      failures.push({
+        kind: "guard",
+        name: `${r.stepId} (${stored.value.guard.predicate}): ${stored.value.reason ?? "its probe failed"}`,
+      });
   }
   const failingTests = failures.map((f) => f.name);
   const cited = failures.slice(0, CITED_FAILURES);
@@ -161,7 +189,8 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
     planHash: decided.success.planHash,
     evidence: [
       ...(decided.success.outcome === "land" ? results : decided.success.evidence).map(describe),
-      ...cited.map((c) => `${c.kind === "test" ? "failed" : "type error"}: ${c.name}`),
+      ...missing.map((ref) => `evidence missing: ${ref}`),
+      ...cited.map((c) => `${CITED_AS[c.kind].line}: ${c.name}`),
       ...(more > 0 ? [`and ${more} more failing`] : []),
     ],
     failingTests,

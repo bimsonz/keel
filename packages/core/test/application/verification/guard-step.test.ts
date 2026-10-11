@@ -1,19 +1,27 @@
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer, Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
-  L1_SUITE_PLAN,
+  JS_TS_SUITE_PACK,
   type ProbeRun,
   type StepRunner,
   withGuards,
 } from "../../../src/application/verification/index.ts";
 import {
+  EvidenceMissing,
+  EvidenceStore,
   ProbeRunner,
   ProbeRunnerUnavailable,
   type ProbeRunRequest,
 } from "../../../src/application/ports/index.ts";
-import { ContentHash } from "../../../src/domain/kernel/index.ts";
+import {
+  CommitSha,
+  ContentHash,
+  contentHashOf,
+  type Json,
+} from "../../../src/domain/kernel/index.ts";
 import {
   coerce,
+  compile,
   type FlowPlan,
   type PlanStep,
   type StepReport,
@@ -24,8 +32,16 @@ const hash = (n: number) =>
 const CANDIDATE = hash(7);
 const PINNED = hash(42);
 
-const [SUITE] = L1_SUITE_PLAN.steps;
-if (SUITE === undefined) throw new Error("L1's plan has a suite step");
+/** The js-ts pack's plan for a change: its one step, the suite. */
+const SUITE_PLAN = Result.getOrThrow(
+  compile(
+    undefined,
+    { baseCommit: CommitSha.make("a".repeat(40)), touchedPaths: [], subjects: [], facts: {} },
+    JS_TS_SUITE_PACK,
+  ),
+);
+const [SUITE] = SUITE_PLAN.steps;
+if (SUITE === undefined) throw new Error("the suite plan has a suite step");
 /** A guard of freshness, running its admitted probe, under its predicate's advise policy. */
 const GUARD: PlanStep = {
   ...SUITE,
@@ -35,7 +51,7 @@ const GUARD: PlanStep = {
   outcomes: ["pass", "fail", "abstain"],
   guards: { predicate: "freshness", policy: "advise", probe: PINNED },
 };
-const PLAN: FlowPlan = { ...L1_SUITE_PLAN, steps: [GUARD, SUITE] };
+const PLAN: FlowPlan = { ...SUITE_PLAN, steps: [GUARD, SUITE] };
 
 /** A runner for every other step: it records that it was asked. */
 const otherwise =
@@ -68,11 +84,31 @@ function guarded(answer: (r: ProbeRunRequest) => ProbeRun | "unavailable") {
         }),
     }),
   );
+  const stored = new Map<ContentHash, Json>();
+  const evidence = Layer.succeed(
+    EvidenceStore,
+    EvidenceStore.of({
+      put: (document) =>
+        Effect.sync(() => {
+          const ref = contentHashOf(document);
+          stored.set(ref, document);
+          return ref;
+        }),
+      get: (ref) => {
+        const document = stored.get(ref);
+        return document === undefined
+          ? Effect.fail(new EvidenceMissing({ hash: ref }))
+          : Effect.succeed(document);
+      },
+    }),
+  );
   const run = (step: PlanStep) =>
     Effect.runPromise(
-      withGuards(CANDIDATE, otherwise(asked))(step, undefined).pipe(Effect.provide(layer)),
+      withGuards(CANDIDATE, otherwise(asked))(step, undefined).pipe(
+        Effect.provide(Layer.mergeAll(layer, evidence)),
+      ),
     );
-  return { requests, asked, run };
+  return { requests, asked, run, stored };
 }
 
 const ran = (outcome: "pass" | "fail" | "n/a"): ProbeRun => ({
@@ -87,13 +123,21 @@ describe("a guard step runs the probe its plan pins", () => {
     const g = guarded(() => ran("pass"));
     const report = await g.run(GUARD);
     expect(g.requests).toEqual([{ probe: PINNED, world: "AB", worldBundle: CANDIDATE, run: 1 }]);
-    expect(report).toMatchObject({
-      stepId: GUARD.id,
-      outcome: "pass",
-      resultRef: PINNED,
-      tier: { tier: 1 },
-    });
+    expect(report).toMatchObject({ stepId: GUARD.id, outcome: "pass", tier: { tier: 1 } });
     expect(g.asked).toEqual([]);
+  });
+
+  it("[guard.evidence] stores what the run said, with the predicate and the pinned probe, as the evidence the report cites", async () => {
+    const g = guarded(() => ran("fail"));
+    const report = await g.run(GUARD);
+    const ref = Schema.decodeUnknownSync(ContentHash)(report.resultRef);
+    expect(g.stored.get(ref)).toEqual({
+      stepId: GUARD.id,
+      outcome: "fail",
+      guard: { predicate: "freshness", probe: PINNED },
+      reason: "fail",
+      observations: ["[probe] x"],
+    });
   });
 
   it("[guard.pinned-probe] hands every step that guards nothing to the plan's other runner", async () => {

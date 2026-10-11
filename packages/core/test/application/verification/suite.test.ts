@@ -1,14 +1,23 @@
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
+  JS_TS_SUITE_PACK,
   judgeSuite,
-  L1_SUITE_PLAN,
   parseSuiteOutput,
   SUITE_PROTOCOL,
   type SuiteOutput,
 } from "../../../src/application/verification/index.ts";
+import { CommitSha } from "../../../src/domain/kernel/index.ts";
+import { compile } from "../../../src/domain/verification/index.ts";
 
-const step = L1_SUITE_PLAN.steps[0];
-if (step === undefined) throw new Error("the L1 plan has no step");
+const step = Result.getOrThrow(
+  compile(
+    undefined,
+    { baseCommit: CommitSha.make("a".repeat(40)), touchedPaths: [], subjects: [], facts: {} },
+    JS_TS_SUITE_PACK,
+  ),
+).steps[0];
+if (step === undefined) throw new Error("the js-ts plan has no step");
 
 const b64 = (text: string) => Buffer.from(text).toString("base64");
 

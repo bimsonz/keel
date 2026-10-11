@@ -35,7 +35,9 @@ import {
 } from "./contracts/workspace-rebaser.ts";
 import {
   type BatchVerdictsHarness,
+  type AdmittedGuardsHarness,
   type ChangePrecheckHarness,
+  describeAdmittedGuardsContract,
   describeBatchVerdictsContract,
   describeBundleStoreContract,
   describeChangePrecheckContract,
@@ -63,8 +65,10 @@ import * as operator from "./memory/operator.ts";
 import * as projectViews from "./memory/project-views.ts";
 import * as storage from "./memory/storage.ts";
 import * as verification from "./memory/verification.ts";
+import { SubjectKey } from "@keeltown/core/domain/coordination";
 import { CommitSha, makeId } from "@keeltown/core/kernel";
 import type {
+  AdmittedGuards,
   AgentDirectory,
   CodeHost,
   BatchVerdicts,
@@ -208,7 +212,7 @@ function memoryChangePrecheckHarness(): ChangePrecheckHarness {
           baseSha: GENESIS,
           grantedSha: GENESIS,
           projectId: freshId("prj"),
-          subjects: [],
+          subjects: [Schema.decodeUnknownSync(SubjectKey)("authz.sessions")],
         };
         memory.submit(changeId, 1, workspace);
         return { changeId, revision: 1, workspace };
@@ -403,6 +407,10 @@ export const PORTS = {
   ChangePrecheck: harnessed<ChangePrecheck, ChangePrecheckHarness>(
     memoryChangePrecheckHarness,
     describeChangePrecheckContract,
+  ),
+  AdmittedGuards: harnessed<AdmittedGuards, AdmittedGuardsHarness>(
+    verification.makeAdmittedGuardsMemory,
+    describeAdmittedGuardsContract,
   ),
   GuardRepo: port(
     () => verification.makeGuardRepoMemory().layer,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-plan.test.ts
+# kills: d21.runs-stored-plan
+# why: A guard step runs outside a durable step, so a Workflow replay runs its probe again and may read a different outcome or duration
+diff --git a/packages/core/src/application/verification/verify-plan.ts b/packages/core/src/application/verification/verify-plan.ts
+index 85eedff..41461d0 100644
+--- a/packages/core/src/application/verification/verify-plan.ts
++++ b/packages/core/src/application/verification/verify-plan.ts
+@@ -133,7 +133,7 @@ export const candidateRunner =
+       const probes = yield* ProbeRunner;
+       const runtime = yield* VerifierRuntime;
+       const evidence = yield* EvidenceStore;
+-      return yield* durable(
++      return yield* ((_name: string, report: Effect.Effect<StepReport>) => report)(
+         `guard ${step.id}`,
+         withGuards(job.bundle, asJob)(step, undefined).pipe(
+           Effect.provideService(ProbeRunner, probes),

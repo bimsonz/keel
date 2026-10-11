@@ -1,15 +1,20 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
-  L1_SUITE_PLAN,
   SUITE_PROTOCOL,
+  TIER2_STEP_IDS,
   TYPECHECK_PROTOCOL,
-  WORKER_APP_PACK,
 } from "@keeltown/core/application/verification";
 import { suiteStdout, typecheckStdout } from "../support-suite-stdout.ts";
-import { compile, type VerificationJob } from "@keeltown/core/domain/verification";
-import { CommitSha, ContentHash } from "@keeltown/core/kernel";
+import type { VerificationJob } from "@keeltown/core/domain/verification";
+import { ContentHash } from "@keeltown/core/kernel";
 import { VerifierRuntime } from "@keeltown/core/ports";
-import { contractJob, makeEvidenceStoreMemory, PORTS } from "@keeltown/testing";
+import {
+  contractJob,
+  makeEvidenceStoreMemory,
+  PORTS,
+  suitePlan,
+  workerAppPlan,
+} from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 import {
   type Durable,
@@ -17,19 +22,15 @@ import {
   type SuiteRunner,
   type SuiteRunnerOptions,
   SuiteRuntimeCi,
+  TIER2_RUNNERS,
   TYPECHECK_COMMAND,
 } from "../../src/adapters/driven/ci/suite-runtime.ts";
 import { checkoutOf, keelBundleSource } from "../../src/adapters/driving/workflow/bundle-source.ts";
 
-const step = L1_SUITE_PLAN.steps[0];
-if (step === undefined) throw new Error("the L1 plan has no step");
-const workerApp = compile(
-  undefined,
-  { baseCommit: CommitSha.make("0".repeat(40)), touchedPaths: [], subjects: [], facts: {} },
-  WORKER_APP_PACK,
-);
-if (workerApp._tag === "Failure") throw new Error("the worker-app pack does not compile");
-const typecheck = workerApp.success.steps.find((s) => s.id === "worker-app.typecheck");
+const SUITE = suitePlan();
+const step = SUITE.steps[0];
+if (step === undefined) throw new Error("the suite plan has no step");
+const typecheck = workerAppPlan().steps.find((s) => s.id === "worker-app.typecheck");
 if (typecheck === undefined) throw new Error("the worker-app plan has no typecheck");
 const TSC_RED = [
   "src/clock.ts(12,14): error TS2322: Type 'string' is not assignable to type 'number'.",
@@ -45,7 +46,7 @@ const runnerStdout = (tests: number, failed: number, tail: string) =>
 const job = (): VerificationJob => ({
   jobId: "job-1",
   bundle: Schema.decodeUnknownSync(ContentHash)(`sha256:${"b".repeat(64)}`),
-  steps: L1_SUITE_PLAN.steps,
+  steps: SUITE.steps,
   fence: contractJob().fence,
 });
 
@@ -283,6 +284,12 @@ describe("the Tier 2 suite runtime", () => {
         });
       }),
   );
+
+  it("[d21.tier2-runners] has a runner for exactly the steps core calls executable in Tier 2", () => {
+    // Precheck refuses a plan whose Tier 2 step core does not list, and the
+    // runtime abstains on a step it has no runner for: the two lists are one.
+    expect(Object.keys(TIER2_RUNNERS).toSorted()).toEqual([...TIER2_STEP_IDS].toSorted());
+  });
 
   it.effect("abstains on a step it has no command for, without starting a runner", () =>
     Effect.gen(function* () {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/keel-verify.test.ts -t d21.plan-corrupt-parks
+# kills: d21.plan-corrupt-parks
+# why: The plan store's read trusts what is filed under a hash without checking it is that plan, checking only the plan's own claim, so another plan filed under it runs in its place
+diff --git a/apps/keel/src/adapters/driven/r2/plan-store.ts b/apps/keel/src/adapters/driven/r2/plan-store.ts
+index 6df91b1..c249a40 100644
+--- a/apps/keel/src/adapters/driven/r2/plan-store.ts
++++ b/apps/keel/src/adapters/driven/r2/plan-store.ts
+@@ -34,7 +34,7 @@ export const PlanStoreR2 = (bucket: R2Bucket) =>
+         }).pipe(
+           Effect.flatMap((text): Effect.Effect<FlowPlan, PlanMissing | PlanCorrupt> => {
+             if (text === undefined) return Effect.fail(new PlanMissing({ hash }));
+-            const read = readStoredPlan(hash, text);
++            const read = readStoredPlan(JSON.parse(text).planHash, text);
+             return Result.isFailure(read)
+               ? Effect.fail(new PlanCorrupt({ hash, reason: read.failure }))
+               : Effect.succeed(read.success);

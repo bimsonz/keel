@@ -14,7 +14,6 @@ import {
   reofferDue,
   reofferVerified,
 } from "@keeltown/core/application/integration";
-import { L1_SUITE_PLAN } from "@keeltown/core/application/verification";
 import type { Change } from "@keeltown/core/domain/coordination";
 import type { VerdictOutcome } from "@keeltown/core/domain/verification";
 import {
@@ -22,6 +21,7 @@ import {
   type CandidateId,
   type ChangeId,
   CommitSha,
+  type ContentHash,
   type EntityRef,
   EventEnvelope,
   Instant,
@@ -50,6 +50,8 @@ import {
   makeManualClock,
   makeProjectsMemory,
   makeStagingWriterMemory,
+  suitePlan,
+  workerAppPlan,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
 import { ulid } from "ulid";
@@ -62,6 +64,9 @@ const AGENT = makeId("agt", "01J9AAAAAAAAAAAAAAAAAAAAAA");
 const FAR = Instant(9_999_999_999_999);
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
 const change = (n: number): ChangeId => makeId("chg", `01J9C${String(n).padStart(21, "0")}`);
+
+/** The plan Precheck compiled for a queued change, as its ChangeQueued names it. */
+const PLAN = suitePlan();
 const changeRef = (id: ChangeId): EntityRef => ({ kind: "change", id });
 
 interface WorldOptions {
@@ -196,7 +201,8 @@ const deliver = (event: EventEnvelope) =>
     );
   });
 
-const queue = (w: World, id: ChangeId) =>
+/** Queues the change with the plan its ChangeQueued names (`null`: an event from before plans were named). */
+const queue = (w: World, id: ChangeId, planHash: ContentHash | null = PLAN.planHash) =>
   Effect.gen(function* () {
     w.changes.set(id, {
       id,
@@ -211,17 +217,23 @@ const queue = (w: World, id: ChangeId) =>
       laneId: LANE,
     });
     return yield* deliver(
-      envelope(changeRef(id), { _tag: "ChangeQueued", changeId: id, laneId: LANE }),
+      envelope(changeRef(id), {
+        _tag: "ChangeQueued",
+        changeId: id,
+        laneId: LANE,
+        ...(planHash === null ? {} : { planHash }),
+      }),
     );
   });
 
-const requeue = (id: ChangeId, batchId: BatchId) =>
+const requeue = (id: ChangeId, batchId: BatchId, planHash: ContentHash = PLAN.planHash) =>
   deliver(
     envelope(changeRef(id), {
       _tag: "ChangeRequeued",
       changeId: id,
       batchId,
       reason: "infra-failure",
+      planHash,
     }),
   );
 
@@ -284,7 +296,7 @@ const verdict = (
   candidateId,
   verdictId: makeId("vrd", ulid()),
   outcome,
-  planHash: L1_SUITE_PLAN.planHash,
+  planHash: PLAN.planHash,
   evidence: [`${outcome}: the suite said so`],
   failingTests: outcome === "bounce" ? ["suite > a test"] : [],
 });
@@ -410,7 +422,7 @@ describe("the Lane", () => {
   );
 
   it.effect(
-    "[lane.verify-start] commits VerificationStarted, then starts KeelVerify once, named by BatchFormed, under L1's plan",
+    "[lane.verify-start] commits VerificationStarted, then starts KeelVerify once, named by BatchFormed, under the member's plan",
     () => {
       const w = world();
       return Effect.gen(function* () {
@@ -423,7 +435,7 @@ describe("the Lane", () => {
           laneId: LANE,
           candidateId,
           fence: { batchId, attempt: 0, chainEpoch: 0 },
-          planHash: L1_SUITE_PLAN.planHash,
+          planHash: PLAN.planHash,
           bundle: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
         });
         expect(w.startedIn).toEqual(["verifying"]);
@@ -820,6 +832,75 @@ describe("the Lane", () => {
             { kind: "wait" },
           ],
         });
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[d21.member-hash] each batch is verified under the plan its member was queued with",
+    () => {
+      const w = world();
+      const other = workerAppPlan();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        yield* queue(w, change(2), other.planHash);
+        const first = yield* toVerifying(w);
+        expect(w.verification.started.get(first.instanceId)?.planHash).toBe(PLAN.planHash);
+        expect(yield* payloads("VerificationStarted")).toEqual([
+          expect.objectContaining({ planHash: PLAN.planHash }),
+        ]);
+        yield* recordVerdict(
+          LANE,
+          verdict(first.batchId, first.candidateId, first.instanceId, "bounce"),
+        );
+        const second = yield* toVerifying(w);
+        expect(w.verification.started.get(second.instanceId)?.planHash).toBe(other.planHash);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[d21.requeue-keeps-hash] a requeued change is verified again under the plan its ChangeRequeued names",
+    () => {
+      const w = world();
+      const recompiled = workerAppPlan();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        const first = yield* toVerifying(w);
+        yield* recordVerdict(
+          LANE,
+          verdict(first.batchId, first.candidateId, first.instanceId, "park"),
+        );
+        yield* requeue(change(1), first.batchId, recompiled.planHash);
+        const again = yield* toVerifying(w);
+        expect(w.verification.started.get(again.instanceId)?.planHash).toBe(recompiled.planHash);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[d21.no-hash-refused] a change queued with no plan is bounced before composition, with the remedy of submitting again",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1), null);
+        expect(yield* laneStep(LANE)).toBe("idle");
+        expect((yield* committed).map((e) => e.type)).toEqual([
+          "BatchFormed",
+          "VerdictIssued",
+          "BatchFailed",
+        ]);
+        expect((yield* payloads("VerdictIssued"))[0]).toMatchObject({
+          outcome: "bounce",
+          evidence: [expect.stringContaining("plan-missing")],
+          nextActions: [{ kind: "call", operationId: "submit", args: { changeId: change(1) } }],
+        });
+        expect((yield* payloads("BatchFailed"))[0]).toMatchObject({ attribution: change(1) });
+        expect(w.verification.started.size).toBe(0);
+        expect(w.bundles.bundled).toEqual([]);
       }).pipe(Effect.provide(w.layer));
     },
   );

@@ -67,6 +67,7 @@ export const getVerdict: (
 
 export * from "./draft-probe.ts";
 export * from "./flow-spec.ts";
+export * from "./guard-file.ts";
 export * from "./guard-step.ts";
 export * from "./packs.ts";
 export * from "./plan-codec.ts";
@@ -81,4 +82,5 @@ export * from "./runner-output.ts";
 export * from "./suite.ts";
 export * from "./typecheck.ts";
 export * from "./verify-candidate.ts";
+export * from "./verify-plan.ts";
 export * from "./world-matrix.ts";

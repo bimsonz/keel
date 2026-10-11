@@ -20,8 +20,9 @@ import type { RepoRef } from "./code-host.ts";
 /**
  * Where Precheck diffs a change: its workspace's repo, its base (the grant's
  * until a rebase moves it), the commit it was granted at (`grantedSha`, its
- * fork point, which never moves), and the project whose settings hold the
- * protected globs.
+ * fork point, which never moves), the project whose settings hold the
+ * protected globs, and the subjects the change declared it touches or relies
+ * on (its premises' and effects'), which compile selects guards by.
  */
 export interface PrecheckWorkspace {
   readonly workspaceId: WorkspaceId;

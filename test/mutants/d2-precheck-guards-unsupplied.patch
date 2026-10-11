@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck.test.ts
+# kills: d21.guards-selected
+# why: Precheck compiles without the admitted guards, so no guard ever runs on a change exposed to it
+diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
+index 88ca4c0..30b552f 100644
+--- a/packages/core/src/application/verification/precheck.ts
++++ b/packages/core/src/application/verification/precheck.ts
+@@ -346,7 +346,6 @@ export const decidePrecheck = (findings: PrecheckFindings): PrecheckDecision =>
+       subjects,
+       facts: {},
+       predicatePolicy,
+-      admittedGuards: guards.admitted,
+     },
+     pack.defaults,
+     defaultFlowPolicy,
