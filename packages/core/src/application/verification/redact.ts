@@ -28,9 +28,11 @@ export const redact = (text: string, options: RedactOptions = {}): string => {
   for (const literal of options.literals ?? []) {
     if (literal.length >= MIN_LITERAL) out = out.split(literal).join("[REDACTED]");
   }
+  // Tokens go first: a host or scheme glued to a token body would otherwise
+  // match from inside it and leave an `art_v1_` prefix TOKEN no longer sees.
   return out
+    .replace(TOKEN, "[REDACTED:token]")
     .replace(REMOTE, "[REDACTED:remote]")
     .replace(HOST, "[REDACTED:host]")
-    .replace(TOKEN, "[REDACTED:token]")
     .replace(EXPIRES, "$1expires=[REDACTED]");
 };

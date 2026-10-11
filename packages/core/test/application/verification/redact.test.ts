@@ -75,4 +75,13 @@ describe("redaction", () => {
       ),
     ).toBe("fetch [REDACTED:remote] token [REDACTED:token]?expires=[REDACTED] done");
   });
+
+  // CI's counterexample to [redact.tokens] (seed 1744722712), pinned.
+  it("[redact.glued] redacts a token with a host or remote glued to its end", () => {
+    const host = "0123456789abcdef0123456789abcdef.artifacts.cloudflare.net";
+    expect(redact(`art_v1_AAAAAAAA${host}`)).toBe("[REDACTED:token]");
+    expect(redact(`art_v1_AAAAAAAAhttps://${host}/git/keel-core/r.git`)).toBe(
+      "[REDACTED:token]://[REDACTED:host]/git/keel-core/r.git",
+    );
+  });
 });

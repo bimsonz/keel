@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/redact.test.ts
+# kills: redact.glued
+# why: Hosts and remotes are redacted before tokens, so a host glued to a token body eats its tail and leaves art_v1_ behind
+diff --git a/packages/core/src/application/verification/redact.ts b/packages/core/src/application/verification/redact.ts
+index a2ba222..722f90d 100644
+--- a/packages/core/src/application/verification/redact.ts
++++ b/packages/core/src/application/verification/redact.ts
+@@ -31,8 +31,8 @@ export const redact = (text: string, options: RedactOptions = {}): string => {
+   // Tokens go first: a host or scheme glued to a token body would otherwise
+   // match from inside it and leave an `art_v1_` prefix TOKEN no longer sees.
+   return out
+-    .replace(TOKEN, "[REDACTED:token]")
+     .replace(REMOTE, "[REDACTED:remote]")
+     .replace(HOST, "[REDACTED:host]")
++    .replace(TOKEN, "[REDACTED:token]")
+     .replace(EXPIRES, "$1expires=[REDACTED]");
+ };
