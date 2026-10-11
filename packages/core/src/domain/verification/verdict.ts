@@ -54,9 +54,11 @@ type Value = {
   readonly outcome?: StepOutcome;
   readonly evidence: readonly StepResult[];
   readonly waiting: readonly string[];
+  /** Guard fails the project's policy turned into advice: every one met, whatever the status. */
+  readonly advisories: readonly StepResult[];
 };
 
-const pass: Value = { status: "pass", evidence: [], waiting: [] };
+const pass: Value = { status: "pass", evidence: [], waiting: [], advisories: [] };
 
 const combine = (values: readonly Value[]): Value => {
   const worst = values.reduce<Status>(
@@ -68,6 +70,7 @@ const combine = (values: readonly Value[]): Value => {
     status: worst,
     evidence: at.flatMap((v) => v.evidence),
     waiting: values.flatMap((v) => v.waiting),
+    advisories: values.flatMap((v) => v.advisories),
   };
 };
 
@@ -108,23 +111,32 @@ const leaf = (ctx: Context, id: string, world: World | undefined): Value => {
   const step = ctx.steps.get(id);
   const optional = step?.optional === true;
   const r = ctx.results.get(resultKey(id, world));
-  if (r === undefined) return optional ? pass : { status: "pending", evidence: [], waiting: [id] };
+  if (r === undefined)
+    return optional ? pass : { status: "pending", evidence: [], waiting: [id], advisories: [] };
+  const as = (status: Status): Value => ({
+    status,
+    outcome: r.outcome,
+    evidence: [r],
+    waiting: [],
+    advisories: [],
+  });
   switch (r.outcome) {
     case "pass":
     case "annotate":
-      return { status: "pass", outcome: r.outcome, evidence: [r], waiting: [] };
+      return as("pass");
     case "fail":
-      if (!canBlock(r.evidenceClass))
-        return { status: "escalate", outcome: r.outcome, evidence: [r], waiting: [] };
-      return ctx.overridden.has(id)
-        ? { status: "pass", outcome: r.outcome, evidence: [r], waiting: [] }
-        : { status: "fail", outcome: r.outcome, evidence: [r], waiting: [] };
+      if (!canBlock(r.evidenceClass)) return as("escalate");
+      if (ctx.overridden.has(id)) return as("pass");
+      // A tenet never blocks by itself: its guard's fail blocks only where the
+      // project chose block. Otherwise the flow reads the step as a pass (a
+      // cascade accepts it), and the fail is kept as advice.
+      return step?.guards !== undefined && step.guards.policy !== "block"
+        ? { ...as("pass"), outcome: "pass", advisories: [r] }
+        : as("fail");
     case "escalate":
-      return { status: "escalate", outcome: r.outcome, evidence: [r], waiting: [] };
+      return as("escalate");
     default:
-      return optional
-        ? { status: "pass", outcome: r.outcome, evidence: [r], waiting: [] }
-        : { status: "escalate", outcome: r.outcome, evidence: [r], waiting: [] };
+      return optional ? as("pass") : as("escalate");
   }
 };
 
@@ -174,18 +186,20 @@ const evaluate = (ctx: Context, flow: Flow, world: World | undefined): Value => 
     case "par":
       return combine(flow.items.map((i) => evaluate(ctx, i, world)));
     case "cascade": {
+      const advisories: StepResult[] = [];
       for (const item of flow.items) {
         const v = evaluate(ctx, item, world);
-        if (v.status === "pending") return v;
-        if (flow.accept.includes(statusOutcome(v))) return v;
+        advisories.push(...v.advisories);
+        if (v.status === "pending" || flow.accept.includes(statusOutcome(v)))
+          return { ...v, advisories };
       }
-      return { status: "escalate", evidence: [], waiting: [] };
+      return { status: "escalate", evidence: [], waiting: [], advisories };
     }
     case "worlds":
       return combine(flow.over.map((w) => evaluate(ctx, flow.body, w)));
     case "when": {
       const v = holds(ctx, flow.condition, world);
-      if (v === "unknown") return { status: "pending", evidence: [], waiting: [] };
+      if (v === "unknown") return { status: "pending", evidence: [], waiting: [], advisories: [] };
       return v ? evaluate(ctx, flow.body, world) : pass;
     }
     default:
@@ -204,6 +218,11 @@ export type Verdict = {
   readonly evidence: readonly StepResult[];
   /** Required steps with no result yet, for a hold. */
   readonly waitingOn: readonly string[];
+  /**
+   * Guard fails that did not fail the verdict, because the project's policy
+   * for the guard's predicate is advise or annotate: lanes warn from them.
+   */
+  readonly advisories: readonly StepResult[];
 };
 
 export type Run = { readonly results: readonly StepResult[]; readonly supersededBy?: ChangeId };
@@ -218,7 +237,7 @@ const verdict1 = (plan: FlowPlan, run: Run): Verdict => {
   const ctx: Context = { plan, steps, results: index(run.results), overridden };
   const base = { version: "verdict/1" as const, planHash: plan.planHash };
   if (run.supersededBy !== undefined)
-    return { ...base, outcome: "supersede", evidence: [], waitingOn: [] };
+    return { ...base, outcome: "supersede", evidence: [], waitingOn: [], advisories: [] };
   const root = evaluate(ctx, plan.flow, undefined);
   const outcome: VerdictOutcome =
     root.status === "fail"
@@ -233,6 +252,7 @@ const verdict1 = (plan: FlowPlan, run: Run): Verdict => {
     outcome,
     evidence: root.evidence,
     waitingOn: [...new Set(root.waiting)].toSorted(),
+    advisories: root.advisories,
   };
 };
 

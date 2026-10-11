@@ -144,6 +144,7 @@ const flush = (trunk: Trunk, command: Extract<PromotionCommand, { _tag: "Flush" 
         groupId: command.groupId,
         expected: trunk.head,
         observed: command.observedHead,
+        reason: "head-moved",
       }),
     ]);
   }
@@ -281,6 +282,7 @@ export const decidePromotion = (
               groupId: wal.groupId,
               expected: wal.composed,
               observed: command.sha,
+              reason: "recompose-mismatch",
             }),
           ]);
 
@@ -308,6 +310,7 @@ export const decidePromotion = (
           groupId: wal.groupId,
           expected: wal.composed,
           observed: command.observed,
+          reason: "readback-mismatch",
         }),
       ]);
 
@@ -483,7 +486,11 @@ export const evolvePromotion = (
         ? {
             ...trunk,
             phase: "frozen",
-            frozen: { expected: event.expected, observed: event.observed },
+            frozen: {
+              expected: event.expected,
+              observed: event.observed,
+              ...(event.reason === undefined ? {} : { reason: event.reason }),
+            },
           }
         : illegal(trunk, event);
     }

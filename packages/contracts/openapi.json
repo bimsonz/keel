@@ -7455,6 +7455,48 @@
           "not": {}
         }
       },
+      "EventPredicatePolicies": {
+        "type": "object",
+        "properties": {
+          "freshness": {
+            "$ref": "#/components/schemas/PredicatePolicy"
+          },
+          "cardinality": {
+            "$ref": "#/components/schemas/PredicatePolicy"
+          },
+          "ordering": {
+            "$ref": "#/components/schemas/PredicatePolicy"
+          },
+          "consistency": {
+            "$ref": "#/components/schemas/PredicatePolicy"
+          },
+          "shape": {
+            "$ref": "#/components/schemas/PredicatePolicy"
+          },
+          "presence": {
+            "$ref": "#/components/schemas/PredicatePolicy"
+          },
+          "authority": {
+            "$ref": "#/components/schemas/PredicatePolicy"
+          },
+          "purity": {
+            "$ref": "#/components/schemas/PredicatePolicy"
+          },
+          "idempotent": {
+            "$ref": "#/components/schemas/PredicatePolicy"
+          },
+          "bound": {
+            "$ref": "#/components/schemas/PredicatePolicy"
+          },
+          "invariant": {
+            "$ref": "#/components/schemas/PredicatePolicy"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A project's predicate policy as composed for one change. A predicate left out is advise."
+      },
       "EventProposition": {
         "type": "object",
         "required": [
@@ -10416,6 +10458,14 @@
           "costEstimate": {
             "type": "number",
             "format": "double"
+          },
+          "predicatePolicy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EventPredicatePolicies"
+              }
+            ],
+            "description": "The predicate policy compiled for the change; the Change DO applies it to a proven conflict."
           }
         },
         "additionalProperties": {
@@ -10555,6 +10605,15 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "PredicatePolicy": {
+        "type": "string",
+        "enum": [
+          "block",
+          "advise",
+          "annotate"
+        ],
+        "description": "What a proven conflict on a predicate does (ADR 0005): block holds the change for a ruling; advise warns; annotate only records."
       },
       "Preflight": {
         "type": "object",
@@ -11287,11 +11346,28 @@
           },
           "observed": {
             "$ref": "#/components/schemas/CommitSha"
+          },
+          "reason": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PromotionFrozenReason"
+              }
+            ],
+            "description": "Always set by the Trunk; optional only so an older event still decodes."
           }
         },
         "additionalProperties": {
           "not": {}
         }
+      },
+      "PromotionFrozenReason": {
+        "type": "string",
+        "enum": [
+          "head-moved",
+          "recompose-mismatch",
+          "readback-mismatch"
+        ],
+        "description": "Why promotion froze: the head moved under the flush, a recompose disagreed with the recorded SHA, or the read-back head was neither the old nor the composed one."
       },
       "PromotionResumed": {
         "type": "object",

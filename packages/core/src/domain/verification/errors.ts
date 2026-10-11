@@ -223,6 +223,19 @@ export type CompileError =
   | WorldNotSupported
   | InvalidBudget;
 
+/**
+ * A batch's member plans cannot run as one: they name the same step at
+ * different versions (`stepId`), or were compiled by different compilers
+ * (`stepId` absent). The Lane runs those members in separate batches.
+ */
+export class UnionVersionConflict extends Schema.TaggedError<UnionVersionConflict>()(
+  "UnionVersionConflict",
+  {
+    stepId: Schema.optional(Schema.NonEmptyString),
+    versions: Schema.Array(Schema.String),
+  },
+) {}
+
 /** The verdict function was asked for a version it does not have. */
 export class UnknownVerdictVersion extends Schema.TaggedError<UnknownVerdictVersion>()(
   "UnknownVerdictVersion",

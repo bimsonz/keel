@@ -579,10 +579,42 @@ describe("trunk promotion", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(drive([...l1Path, readBack(STRAY)]).state?.frozen).toEqual({
       expected: NEW,
       observed: STRAY,
+      reason: "readback-mismatch",
     });
     expect(
       drive([init, enqueue(1, C1), flush([facts(1, C1, "src/a.ts")], STRAY)]).state?.phase,
     ).toBe("frozen");
+  });
+
+  it("[promotion.freeze-says-why] every freeze names its trigger: a moved head at the flush, a recompose that disagrees, a stray head at read-back", () => {
+    const seen = new Set<string>();
+    const why: Readonly<Record<string, string>> = {
+      Flush: "head-moved",
+      Composed: "recompose-mismatch",
+      ReadBack: "readback-mismatch",
+    };
+    fc.assert(
+      fc.property(planArb, (steps) =>
+        run(steps).every((r) =>
+          r.probes.every((p) =>
+            eventsOf(p.result).every((e) => {
+              if (e._tag !== "PromotionFrozen") return true;
+              seen.add(p.command._tag);
+              return (
+                e.reason === why[p.command._tag] &&
+                (p.after === undefined || p.after.frozen?.reason === e.reason)
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+    expect([...seen].toSorted()).toEqual(["Composed", "Flush", "ReadBack"]);
+    const flushed = drive([init, enqueue(1, C1), flush([facts(1, C1, "src/a.ts")], STRAY)]);
+    expect(flushed.state?.frozen?.reason).toBe("head-moved");
+    expect(drive([...l1Path, composedAs([C1], sha(0x3000))]).state?.frozen?.reason).toBe(
+      "recompose-mismatch",
+    );
   });
 
   it("[promotion.frozen-holds] nothing promotes from Frozen until an operator resumes", () => {

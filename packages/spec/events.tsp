@@ -336,6 +336,28 @@ model ChangeDrifted {
   blocking: Drift[];
 }
 
+/** What a proven conflict on a predicate does (ADR 0005): block holds the change for a ruling; advise warns; annotate only records. */
+union PredicatePolicy {
+  block: "block",
+  advise: "advise",
+  annotate: "annotate",
+}
+
+/** A project's predicate policy as composed for one change. A predicate left out is advise. */
+model EventPredicatePolicies {
+  freshness?: PredicatePolicy;
+  cardinality?: PredicatePolicy;
+  ordering?: PredicatePolicy;
+  consistency?: PredicatePolicy;
+  shape?: PredicatePolicy;
+  presence?: PredicatePolicy;
+  authority?: PredicatePolicy;
+  purity?: PredicatePolicy;
+  idempotent?: PredicatePolicy;
+  bound?: PredicatePolicy;
+  invariant?: PredicatePolicy;
+}
+
 model PlanCompiled {
   _tag: "PlanCompiled";
   changeId: ChangeId;
@@ -346,6 +368,9 @@ model PlanCompiled {
   steps: integer;
 
   costEstimate: float64;
+
+  /** The predicate policy compiled for the change; the Change DO applies it to a proven conflict. */
+  predicatePolicy?: EventPredicatePolicies;
 }
 
 model ChangeQueued {
@@ -924,12 +949,22 @@ model PromotionDeclined {
   reverify: ChangeId[];
 }
 
+/** Why promotion froze: the head moved under the flush, a recompose disagreed with the recorded SHA, or the read-back head was neither the old nor the composed one. */
+union PromotionFrozenReason {
+  headMoved: "head-moved",
+  recomposeMismatch: "recompose-mismatch",
+  readbackMismatch: "readback-mismatch",
+}
+
 model PromotionFrozen {
   _tag: "PromotionFrozen";
   projectId: ProjectId;
   groupId: string;
   expected: CommitSha;
   observed: CommitSha;
+
+  /** Always set by the Trunk; optional only so an older event still decodes. */
+  reason?: PromotionFrozenReason;
 }
 
 model PromotionResumed {

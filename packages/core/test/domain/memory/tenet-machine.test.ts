@@ -1,6 +1,7 @@
 import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
+  type PredicatePolicy,
   canonicalJson,
   type Committed,
   IllegalTransition,
@@ -9,8 +10,7 @@ import {
   makeId,
 } from "../../../src/domain/kernel/index.ts";
 import {
-  type BeliefPolicy,
-  type ConflictFacts,
+  type ContestingConflict,
   decideTenet,
   evolveTenet,
   replayTenet,
@@ -55,10 +55,10 @@ const conflict = (
   move?: string,
   parties: readonly string[] = [CHALLENGER, TENET],
   id = CONFLICT,
-): ConflictFacts => ({ id, state, parties, ...(move === undefined ? {} : { move }) });
+): ContestingConflict => ({ id, state, parties, ...(move === undefined ? {} : { move }) });
 const PROVEN = conflict("proven");
 /** What the owning DO looked up: open, settled either way, against someone else, another conflict, or nothing. */
-const CONFLICTS: readonly (ConflictFacts | undefined)[] = [
+const CONFLICTS: readonly (ContestingConflict | undefined)[] = [
   conflict("suspected"),
   PROVEN,
   conflict("probing"),
@@ -75,7 +75,12 @@ const CONFLICTS: readonly (ConflictFacts | undefined)[] = [
   PROVEN,
   PROVEN,
 ];
-const POLICIES: readonly (BeliefPolicy | undefined)[] = [undefined, "block", "advise", "annotate"];
+const POLICIES: readonly (PredicatePolicy | undefined)[] = [
+  undefined,
+  "block",
+  "advise",
+  "annotate",
+];
 
 interface Step {
   readonly mode: "progress" | "any";
@@ -104,9 +109,10 @@ const stepArb: fc.Arbitrary<Step> = fc.record({
 });
 const planArb = fc.array(stepArb, { minLength: 2, maxLength: 12 });
 
-const conflictOf = (step: Step): ConflictFacts | undefined =>
+const conflictOf = (step: Step): ContestingConflict | undefined =>
   CONFLICTS[step.conflict % CONFLICTS.length];
-const policyOf = (step: Step): BeliefPolicy | undefined => POLICIES[step.policy % POLICIES.length];
+const policyOf = (step: Step): PredicatePolicy | undefined =>
+  POLICIES[step.policy % POLICIES.length];
 
 const build = (kind: Kind, step: Step): TenetCommand => {
   const target = step.target === 3 ? OTHER : CONFLICT;
@@ -142,8 +148,8 @@ const build = (kind: Kind, step: Step): TenetCommand => {
 type Facts = {
   readonly now: Instant;
   readonly tenetId: typeof TENET;
-  readonly conflict?: ConflictFacts;
-  readonly policy?: BeliefPolicy;
+  readonly conflict?: ContestingConflict;
+  readonly policy?: PredicatePolicy;
 };
 const machine: Machine<Tenet, TenetCommand, TenetEvent, Facts> = {
   decide: decideTenet,
@@ -151,8 +157,8 @@ const machine: Machine<Tenet, TenetCommand, TenetEvent, Facts> = {
 };
 const factsAt = (
   now: Instant,
-  found: ConflictFacts | undefined,
-  policy: BeliefPolicy | undefined,
+  found: ContestingConflict | undefined,
+  policy: PredicatePolicy | undefined,
 ): Facts => ({
   now,
   tenetId: TENET,
@@ -183,8 +189,8 @@ const OPEN = new Set(["suspected", "probing", "proven", "escalated"]);
 const oracle = (
   before: Tenet | undefined,
   command: TenetCommand,
-  found: ConflictFacts | undefined,
-  policy: BeliefPolicy | undefined,
+  found: ContestingConflict | undefined,
+  policy: PredicatePolicy | undefined,
 ): Key | "refused" => {
   if (before === undefined)
     return command._tag === "Establish" && command.guardIds.length > 0 ? "established" : "refused";
@@ -251,8 +257,8 @@ const said = (r: ReturnType<typeof decideTenet>): string =>
 
 type Driven = readonly (readonly [
   TenetCommand,
-  ConflictFacts | undefined,
-  BeliefPolicy | undefined,
+  ContestingConflict | undefined,
+  PredicatePolicy | undefined,
 ])[];
 const drive = (steps: Driven) => {
   let state: Tenet | undefined;

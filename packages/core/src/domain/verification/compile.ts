@@ -2,7 +2,9 @@ import { Result } from "effect";
 import { subjectsRelated } from "../coordination/index.ts";
 import {
   canBlock,
+  type ContentHash,
   contentHashOf,
+  DEFAULT_PREDICATE_POLICY,
   type EvidenceClass,
   Glob,
   type Json,
@@ -41,12 +43,18 @@ import type {
   FlowDefinition,
   FlowPlan,
   FlowPolicy,
+  PlanPreimage,
   StepSpec,
 } from "./flow.ts";
 import type { PlanStep } from "./plan.ts";
 
-/** Bumped whenever compile's output for the same input changes. Part of every plan hash. */
-export const COMPILER_VERSION = "flow-compiler/1";
+/**
+ * Bumped whenever compile's output for the same input changes. Part of every
+ * plan hash. flow-compiler/2 hashes everything that affects execution,
+ * `humanClass` and each guard's policy included, and records the preimage on
+ * the plan (`compiler`, `versions`) so a stored plan can be rehashed.
+ */
+export const COMPILER_VERSION = "flow-compiler/2";
 
 export const defaultFlowPolicy: FlowPolicy = {
   humanClassPaths: [
@@ -370,6 +378,27 @@ const humanClassStep: StepSpec = {
 const toJson = (value: unknown): Json => JSON.parse(JSON.stringify(value) ?? "null");
 
 /**
+ * A plan's content hash: everything that affects how it runs and what its
+ * verdict says, and nothing else. The cost estimate is advisory and stays
+ * outside, as does the hash itself. A plan read back from storage is genuine
+ * only if this equals its `planHash`.
+ */
+export const planHashOf = (plan: PlanPreimage): ContentHash =>
+  contentHashOf(
+    toJson({
+      compiler: plan.compiler,
+      baseCommit: plan.baseCommit,
+      flow: plan.flow,
+      steps: plan.steps,
+      versions: plan.versions,
+      overrides: plan.overrides,
+      mayskip: plan.mayskip,
+      humanClass: plan.humanClass,
+      ...(plan.members === undefined ? {} : { members: plan.members }),
+    }),
+  );
+
+/**
  * Compiles a change's Verification Plan: a pure function of the flow spec as
  * read from the base commit (`spec`; Keel's `defaults` when the project has
  * none), the change's facts, and policy. Every typing rule is checked on the
@@ -443,6 +472,14 @@ export const compile = (
         outcomes: s.outcomes,
         optional: s.optional,
         ...(w === undefined ? {} : { worlds: w }),
+        ...(s.guards === undefined
+          ? {}
+          : {
+              guards: {
+                predicate: s.guards,
+                policy: facts.predicatePolicy?.[s.guards] ?? DEFAULT_PREDICATE_POLICY,
+              },
+            }),
       },
     ];
   });
@@ -450,30 +487,25 @@ export const compile = (
     (sum, p) => sum + (table.get(p.id)?.budget.usd ?? 0) * Math.max(1, p.worlds?.length ?? 1),
     0,
   );
-  const versions = Object.fromEntries(planned.map((p) => [p.id, table.get(p.id)?.version ?? ""]));
+  const versions = Object.fromEntries(
+    planned.flatMap((p) => {
+      const version = table.get(p.id)?.version;
+      return version === undefined ? [] : [[p.id, version] as const];
+    }),
+  );
   const overrides = Object.fromEntries(
     planned.map((p) => [p.id, table.get(p.id)?.overrides ?? []]),
   );
   const mayskip = Object.fromEntries(planned.map((p) => [p.id, table.get(p.id)?.mayskip ?? []]));
-  const planHash = contentHashOf(
-    toJson({
-      compiler: COMPILER_VERSION,
-      baseCommit: facts.baseCommit,
-      flow: compiled,
-      steps: planned,
-      versions,
-      overrides,
-      mayskip,
-    }),
-  );
-  return Result.succeed({
-    planHash,
-    steps: planned,
-    costEstimate,
-    flow: compiled,
+  const preimage: PlanPreimage = {
+    compiler: COMPILER_VERSION,
     baseCommit: facts.baseCommit,
-    humanClass: touchesFlow.length > 0,
+    flow: compiled,
+    steps: planned,
+    versions,
     overrides,
     mayskip,
-  });
+    humanClass: touchesFlow.length > 0,
+  };
+  return Result.succeed({ ...preimage, planHash: planHashOf(preimage), costEstimate });
 };

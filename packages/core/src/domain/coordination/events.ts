@@ -20,7 +20,7 @@ import {
 import { ChangeOrigin, ParkReason } from "./change.ts";
 import { DerivedEffect, Drift } from "./derivation.ts";
 import { Contradiction, Neighbour, PrecedentRef } from "./preflight.ts";
-import { FootprintEntry, Proposition, SubjectKey } from "./proposition.ts";
+import { FootprintEntry, PredicatePolicies, Proposition, SubjectKey } from "./proposition.ts";
 import { Move } from "./change.ts";
 
 // Changes
@@ -99,6 +99,8 @@ export const PlanCompiled = Schema.TaggedStruct("PlanCompiled", {
   planHash: ContentHash,
   steps: Schema.Int,
   costEstimate: Schema.Finite,
+  /** The predicate policy compiled for the change; the Change DO applies it to a proven conflict. Absent, or a predicate left out, is `advise`. */
+  predicatePolicy: Schema.optional(PredicatePolicies),
 });
 export const ChangeQueued = Schema.TaggedStruct("ChangeQueued", {
   changeId: ChangeId,

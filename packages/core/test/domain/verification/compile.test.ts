@@ -16,6 +16,8 @@ import {
   type FlowDefinition,
   type FlowPlan,
   HUMAN_CLASS_STEP,
+  type PlanPreimage,
+  planHashOf,
   type StepSpec,
 } from "../../../src/domain/verification/index.ts";
 import {
@@ -24,6 +26,7 @@ import {
   type FlowCase,
   factClasses,
   flowCaseArb,
+  guardedCaseArb,
   otherCommit,
 } from "../../arbitraries/flow.ts";
 import { fc } from "../../support/fast-check.ts";
@@ -533,5 +536,99 @@ describe("flow compiler: plans", () => {
       }),
     );
     expect(plan.costEstimate).toBeCloseTo(0.03, 12);
+  });
+});
+
+/** Everything a plan's hash covers, perturbed one field at a time: each must move the hash. */
+const perturbations = (plan: FlowPlan): readonly PlanPreimage[] => {
+  const first = plan.steps[0];
+  const guarded = plan.steps.findIndex((s) => s.guards !== undefined);
+  const flipped = (i: number): FlowPlan["steps"] =>
+    plan.steps.map((s, j) =>
+      j === i && s.guards !== undefined
+        ? {
+            ...s,
+            guards: { ...s.guards, policy: s.guards.policy === "block" ? "advise" : "block" },
+          }
+        : s,
+    );
+  return [
+    { ...plan, humanClass: !plan.humanClass },
+    { ...plan, compiler: "flow-compiler/0" },
+    { ...plan, baseCommit: otherCommit },
+    { ...plan, members: [plan.planHash] },
+    { ...plan, flow: { _tag: "par", items: [plan.flow] } },
+    { ...plan, mayskip: { ...plan.mayskip, extra: ["x"] } },
+    { ...plan, overrides: { ...plan.overrides, extra: ["x"] } },
+    ...(first === undefined
+      ? []
+      : [
+          {
+            ...plan,
+            versions: { ...plan.versions, [first.id]: contentHashOf({ other: first.id }) },
+          },
+          {
+            ...plan,
+            steps: plan.steps.map((s, j) => (j === 0 ? { ...s, because: "changed" } : s)),
+          },
+        ]),
+    ...(guarded === -1 ? [] : [{ ...plan, steps: flipped(guarded) }]),
+  ];
+};
+
+describe("flow-compiler/2: what a plan's hash covers", () => {
+  it("[flow.plan-hash-preimage] a plan rehashes to its own hash, every field that affects execution moves it, and the cost estimate does not", () => {
+    let guards = 0;
+    fc.assert(
+      fc.property(guardedCaseArb(), (c) => {
+        const plan = ok(c);
+        if (plan.steps.some((s) => s.guards !== undefined)) guards++;
+        return (
+          plan.compiler === "flow-compiler/2" &&
+          planHashOf(plan) === plan.planHash &&
+          planHashOf({ ...plan, costEstimate: plan.costEstimate + 1 } as PlanPreimage) ===
+            plan.planHash &&
+          perturbations(plan).every((changed) => planHashOf(changed) !== plan.planHash)
+        );
+      }),
+    );
+    expect(guards).toBeGreaterThan(0);
+    // A change that touches the flow differs from one that doesn't only by its gate, and the hash says so.
+    const plan = ok({
+      spec: single([suiteStep("tests")]).spec,
+      facts: { ...single([suiteStep("tests")]).facts, touchedPaths: [".keel/flow.ts", "src/a.ts"] },
+    });
+    expect(plan.humanClass).toBe(true);
+    expect(planHashOf({ ...plan, humanClass: false })).not.toBe(plan.planHash);
+  });
+
+  it("[flow.guard-policy] a guard step carries its predicate's policy, and a predicate the change's policy leaves out is advise", () => {
+    let defaulted = 0;
+    let named = 0;
+    fc.assert(
+      fc.property(guardedCaseArb(), (c) => {
+        const plan = ok(c);
+        const specs = new Map(c.spec.steps.map((s) => [s.id, s]));
+        return plan.steps.every((p) => {
+          const predicate = specs.get(p.id)?.guards;
+          if (predicate === undefined) return p.guards === undefined;
+          const chosen = c.facts.predicatePolicy?.[predicate];
+          if (chosen === undefined) defaulted++;
+          else named++;
+          return p.guards?.predicate === predicate && p.guards.policy === (chosen ?? "advise");
+        });
+      }),
+    );
+    expect(defaulted).toBeGreaterThan(0);
+    expect(named).toBeGreaterThan(0);
+    const guard = { ...suiteStep("guard"), guards: "freshness" as const };
+    const unset = ok(single([guard]));
+    expect(unset.steps[0]?.guards).toEqual({ predicate: "freshness", policy: "advise" });
+    const blocked = ok({
+      spec: single([guard]).spec,
+      facts: { ...single([guard]).facts, predicatePolicy: { freshness: "block" } },
+    });
+    expect(blocked.steps[0]?.guards).toEqual({ predicate: "freshness", policy: "block" });
+    expect(blocked.planHash).not.toBe(unset.planHash);
   });
 });

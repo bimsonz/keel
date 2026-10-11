@@ -8,7 +8,7 @@ import {
   ProjectId,
   VerdictId,
 } from "../kernel/index.ts";
-import { BatchAttribution, MemberCommit } from "./events.ts";
+import { BatchAttribution, MemberCommit, PromotionFrozenReason } from "./events.ts";
 
 export const CandidateState = Schema.Literals([
   "forming",
@@ -100,6 +100,12 @@ export const Trunk = Schema.Struct({
   /** How many times Keel has advanced trunk since TrunkInitialized; absent in state folded before it was kept. */
   height: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   wal: Schema.optional(PendingGroup),
-  frozen: Schema.optional(Schema.Struct({ expected: CommitSha, observed: CommitSha })),
+  frozen: Schema.optional(
+    Schema.Struct({
+      expected: CommitSha,
+      observed: CommitSha,
+      reason: Schema.optional(PromotionFrozenReason),
+    }),
+  ),
 });
 export type Trunk = typeof Trunk.Type;

@@ -1,5 +1,6 @@
 import { Schema } from "effect";
-import { ContentHash, EvidenceClass, Glob, TierChoice } from "../kernel/index.ts";
+import { Predicate } from "../coordination/index.ts";
+import { PredicatePolicy, ContentHash, EvidenceClass, Glob, TierChoice } from "../kernel/index.ts";
 
 export const StepKind = Schema.Literals([
   "deterministic",
@@ -39,6 +40,12 @@ export const PlanStep = Schema.Struct({
   optional: Schema.optional(Schema.Boolean),
   /** The worlds the step runs in, for world-matrix steps. */
   worlds: Schema.optional(Schema.Array(Schema.Literals(["trunk", "A", "B", "AB"]))),
+  /**
+   * Set when the step is a guard of a tenet on `predicate`: its proof fail
+   * takes the project's policy for that predicate, resolved at compile
+   * (absent there is `advise`). Only under `block` does it fail the verdict.
+   */
+  guards: Schema.optional(Schema.Struct({ predicate: Predicate, policy: PredicatePolicy })),
 });
 export type PlanStep = typeof PlanStep.Type;
 

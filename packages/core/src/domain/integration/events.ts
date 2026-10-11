@@ -120,11 +120,26 @@ export const PromotionDeclined = Schema.TaggedStruct("PromotionDeclined", {
   reason: Schema.Literals(["commutation-failed", "frozen"]),
   reverify: Schema.Array(ChangeId),
 });
+/**
+ * Why promotion froze: the head moved under the flush (`head-moved`), a
+ * recompose disagreed with the SHA already recorded (`recompose-mismatch`), or
+ * the head read back after the push was neither the old nor the composed one
+ * (`readback-mismatch`).
+ */
+export const PromotionFrozenReason = Schema.Literals([
+  "head-moved",
+  "recompose-mismatch",
+  "readback-mismatch",
+]);
+export type PromotionFrozenReason = typeof PromotionFrozenReason.Type;
+
 export const PromotionFrozen = Schema.TaggedStruct("PromotionFrozen", {
   projectId: ProjectId,
   groupId: Schema.String,
   expected: CommitSha,
   observed: CommitSha,
+  /** Always set by the Trunk; optional only so an older event still decodes. */
+  reason: Schema.optional(PromotionFrozenReason),
 });
 export const PromotionResumed = Schema.TaggedStruct("PromotionResumed", {
   projectId: ProjectId,

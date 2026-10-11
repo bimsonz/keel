@@ -15,7 +15,15 @@ import {
   type VerdictOutcome,
   type FlowWorld,
 } from "../../../src/domain/verification/index.ts";
-import { base, emptyDefaults, factClasses, flowCaseArb } from "../../arbitraries/flow.ts";
+import {
+  base,
+  emptyDefaults,
+  type FlowCase,
+  factClasses,
+  flowCaseArb,
+  guardedCaseArb,
+  policyArb,
+} from "../../arbitraries/flow.ts";
 import { fc } from "../../support/fast-check.ts";
 import { SubjectKey } from "../../../src/domain/coordination/index.ts";
 
@@ -52,38 +60,40 @@ const choiceArb: fc.Arbitrary<Choice> = fc.oneof(
 );
 
 /** A compiled plan and coerced results for some of its cells: declared outcomes, infra failures, or nothing yet. */
-const runArb = flowCaseArb().chain((c) => {
-  const plan = Result.getOrThrow(compile(c.spec, c.facts, emptyDefaults));
-  const all = cells(plan);
-  return fc
-    .record({
-      choices: fc.tuple(...all.map(() => choiceArb)),
-      overridePicks: fc.tuple(...all.map(() => fc.boolean())),
-    })
-    .map(({ choices, overridePicks }) => {
-      const results = all.flatMap((cell, i): StepResult[] => {
-        const choice = choices[i] ?? { kind: "missing" };
-        if (choice.kind === "missing") return [];
-        const outcomes = cell.step.outcomes ?? ["abstain"];
-        const overrides =
-          cell.step.kind === "human" && overridePicks[i] === true
-            ? [...(plan.overrides[cell.step.id] ?? [])]
-            : [];
-        const r =
-          choice.kind === "infra"
-            ? report(cell, outcomes[choice.pick % outcomes.length] ?? "abstain", {
-                failure: failures[choice.pick % failures.length] ?? "timeout",
-              })
-            : report(
-                cell,
-                outcomes[choice.pick % outcomes.length] ?? "abstain",
-                overrides.length > 0 ? { overrides } : {},
-              );
-        return [coerce(plan, r)];
+const runArbOf = (cases: fc.Arbitrary<FlowCase>) =>
+  cases.chain((c) => {
+    const plan = Result.getOrThrow(compile(c.spec, c.facts, emptyDefaults));
+    const all = cells(plan);
+    return fc
+      .record({
+        choices: fc.tuple(...all.map(() => choiceArb)),
+        overridePicks: fc.tuple(...all.map(() => fc.boolean())),
+      })
+      .map(({ choices, overridePicks }) => {
+        const results = all.flatMap((cell, i): StepResult[] => {
+          const choice = choices[i] ?? { kind: "missing" };
+          if (choice.kind === "missing") return [];
+          const outcomes = cell.step.outcomes ?? ["abstain"];
+          const overrides =
+            cell.step.kind === "human" && overridePicks[i] === true
+              ? [...(plan.overrides[cell.step.id] ?? [])]
+              : [];
+          const r =
+            choice.kind === "infra"
+              ? report(cell, outcomes[choice.pick % outcomes.length] ?? "abstain", {
+                  failure: failures[choice.pick % failures.length] ?? "timeout",
+                })
+              : report(
+                  cell,
+                  outcomes[choice.pick % outcomes.length] ?? "abstain",
+                  overrides.length > 0 ? { overrides } : {},
+                );
+          return [coerce(plan, r)];
+        });
+        return { plan, results };
       });
-      return { plan, results };
-    });
-});
+  });
+const runArb = runArbOf(flowCaseArb());
 
 const decide = (plan: FlowPlan, run: Run): VerdictOutcome =>
   Result.getOrThrow(verdict(plan, run, "verdict/1")).outcome;
@@ -407,5 +417,119 @@ describe("verdict", () => {
     expect(decide(matrix, { results: [...some, res(matrix, "probe", "fail", "AB")] })).toBe(
       "bounce",
     );
+  });
+});
+
+const withPolicy = (plan: FlowPlan, policy: "block" | undefined): FlowPlan => ({
+  ...plan,
+  steps: plan.steps.map(({ guards, ...step }) =>
+    guards === undefined || policy === undefined
+      ? step
+      : { ...step, guards: { ...guards, policy } },
+  ),
+});
+/**
+ * A witness for the rare case: a seq of proof steps whose first guards a
+ * predicate, under each policy, with each step passing, failing or missing.
+ * Random flows give a non-block guard's proof fail that matters about 6 times
+ * in 300 runs; this adds about one run in twelve.
+ */
+const witnessRunArb = fc
+  .record({
+    n: fc.integer({ min: 1, max: 3 }),
+    policy: fc.option(policyArb, { nil: undefined }),
+    picks: fc.array(fc.constantFrom("pass", "fail", "missing"), { minLength: 3, maxLength: 3 }),
+  })
+  .map(({ n, policy, picks }) => {
+    const steps = Array.from({ length: n }, (_, i) =>
+      specStep(`w${i}`, i === 0 ? { guards: "freshness" } : {}),
+    );
+    const plan = Result.getOrThrow(
+      compile(
+        {
+          commit: base,
+          steps,
+          flow: {
+            _tag: "seq",
+            exitOn: "fail",
+            items: steps.map((s) => ({ _tag: "step" as const, step: s.id })),
+          },
+        },
+        { ...facts, ...(policy === undefined ? {} : { predicatePolicy: { freshness: policy } }) },
+        emptyDefaults,
+      ),
+    );
+    const results = plan.steps.flatMap((step, i): StepResult[] => {
+      const pick = picks[i] ?? "missing";
+      return pick === "missing" ? [] : [coerce(plan, report({ step, world: undefined }, pick))];
+    });
+    return { plan, results };
+  });
+const verdictOf = (plan: FlowPlan, results: readonly StepResult[]) =>
+  Result.getOrThrow(verdict(plan, { results }, "verdict/1"));
+
+describe("verdict: guards take their predicate's policy", () => {
+  it("[verdict.guard-policy] under advise or annotate a guard's proof fail never bounces and is listed as advice; under block it bounces as any proof fail does", () => {
+    let mattered = 0;
+    fc.assert(
+      fc.property(
+        fc.oneof(
+          { weight: 3, arbitrary: runArbOf(guardedCaseArb()) },
+          { weight: 1, arbitrary: witnessRunArb },
+        ),
+        ({ plan, results }) => {
+          const steps = new Map(plan.steps.map((s) => [s.id, s]));
+          const overridden = new Set(
+            results
+              .filter((r) => steps.get(r.stepId)?.kind === "human")
+              .flatMap((r) => r.overrides ?? []),
+          );
+          const advised = (r: StepResult): boolean => {
+            const g = steps.get(r.stepId)?.guards;
+            return (
+              g !== undefined &&
+              g.policy !== "block" &&
+              r.outcome === "fail" &&
+              canBlock(r.evidenceClass) &&
+              !overridden.has(r.stepId)
+            );
+          };
+          const v = verdictOf(plan, results);
+          // The same run with each advised fail read as a pass, on a plan that marks no guard.
+          const w = verdictOf(
+            withPolicy(plan, undefined),
+            results.map((r) => (advised(r) ? { ...r, outcome: "pass" as const } : r)),
+          );
+          const blocked = verdictOf(withPolicy(plan, "block"), results);
+          const unmarked = verdictOf(withPolicy(plan, undefined), results);
+          if (results.some(advised) && blocked.outcome === "bounce" && v.outcome !== "bounce")
+            mattered++;
+          return (
+            v.outcome === w.outcome &&
+            v.waitingOn.join() === w.waitingOn.join() &&
+            (v.outcome !== "bounce" || !v.evidence.some(advised)) &&
+            v.advisories.every(advised) &&
+            blocked.outcome === unmarked.outcome &&
+            blocked.advisories.length === 0
+          );
+        },
+      ),
+    );
+    expect(mattered).toBeGreaterThan(0);
+    const guard = specStep("guard", { guards: "freshness" });
+    const seq: FlowPlan["flow"] = {
+      _tag: "seq",
+      exitOn: "fail",
+      items: [
+        { _tag: "step", step: "guard" },
+        { _tag: "step", step: "suite" },
+      ],
+    };
+    const advise = build([guard, specStep("suite")], seq);
+    const run = [res(advise, "guard", "fail"), res(advise, "suite", "pass")];
+    const advised = verdictOf(advise, run);
+    expect(advised.outcome).toBe("land");
+    expect(advised.advisories.map((r) => r.stepId)).toEqual(["guard"]);
+    expect(verdictOf(withPolicy(advise, "block"), run).outcome).toBe("bounce");
   });
 });

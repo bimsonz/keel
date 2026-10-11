@@ -1,14 +1,16 @@
-import { SubjectKey } from "../../src/domain/coordination/index.ts";
+import { type Predicate, SubjectKey } from "../../src/domain/coordination/index.ts";
 import {
   canBlock,
   CommitSha,
   contentHashOf,
   type EvidenceClass,
   Glob,
+  type PredicatePolicy,
   weakest,
 } from "../../src/domain/kernel/index.ts";
 import type {
   ChangeFacts,
+  Condition,
   Flow,
   FlowDefaults,
   FlowDefinition,
@@ -281,3 +283,69 @@ export const flowCaseArb = (
         },
       };
     });
+
+/** Every step a `when` condition reads. */
+const conditionReads = (flow: Flow, out = new Set<string>()): Set<string> => {
+  const atoms = (c: Condition): void => {
+    if (c._tag === "outcome") out.add(c.step);
+    else if (c._tag === "not") atoms(c.item);
+    else c.items.forEach(atoms);
+  };
+  switch (flow._tag) {
+    case "step":
+      return out;
+    case "seq":
+    case "par":
+    case "cascade":
+      for (const item of flow.items) conditionReads(item, out);
+      return out;
+    case "when":
+      atoms(flow.condition);
+      return conditionReads(flow.body, out);
+    default:
+      return conditionReads(flow.body, out);
+  }
+};
+
+const guardedPredicates: readonly Predicate[] = ["freshness", "authority", "ordering"];
+export const policyArb: fc.Arbitrary<PredicatePolicy> = fc.constantFrom(
+  "block",
+  "advise",
+  "annotate",
+);
+
+/**
+ * A flow case where some steps guard a tenet on a predicate, and the change's
+ * predicate policy names some of those predicates (the rest default). A
+ * guard here is never read by a `when`, so a verdict over it can be compared
+ * with one where its fail is replaced: under advise its outcome stays `fail`
+ * for any condition that reads it.
+ */
+export const guardedCaseArb = (): fc.Arbitrary<FlowCase> =>
+  flowCaseArb().chain((c) =>
+    fc
+      .record({
+        marks: fc.tuple(
+          ...c.spec.steps.map(() =>
+            fc.option(fc.constantFrom(...guardedPredicates), { nil: undefined, freq: 2 }),
+          ),
+        ),
+        policy: fc.record(
+          { freshness: policyArb, authority: policyArb, ordering: policyArb },
+          { requiredKeys: [] },
+        ),
+      })
+      .map(({ marks, policy }) => {
+        const read = conditionReads(c.spec.flow);
+        return {
+          spec: {
+            ...c.spec,
+            steps: c.spec.steps.map((s, i) => {
+              const guards = marks[i];
+              return guards === undefined || read.has(s.id) ? s : { ...s, guards };
+            }),
+          },
+          facts: { ...c.facts, predicatePolicy: policy },
+        };
+      }),
+  );

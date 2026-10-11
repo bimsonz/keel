@@ -1,5 +1,5 @@
 import type { CommitSha, ContentHash, EvidenceClass, Glob, Tier } from "../kernel/index.ts";
-import type { SubjectKey } from "../coordination/index.ts";
+import type { Predicate, PredicatePolicies, SubjectKey } from "../coordination/index.ts";
 import type { FlowWorld } from "./conflict.ts";
 import type { PlanStep, StepKind, StepOutcome, VerificationPlan } from "./plan.ts";
 
@@ -68,6 +68,8 @@ export type StepSpec = {
   /** A tier the project pins, overriding policy. */
   readonly tier?: Tier;
   readonly optional: boolean;
+  /** The step guards a tenet on this predicate (an admitted probe), so its fail takes that predicate's policy. */
+  readonly guards?: Predicate;
 };
 
 /** A project's flow, read from `.keel/flow` at the change's base commit. */
@@ -88,6 +90,12 @@ export type ChangeFacts = {
   readonly subjects: readonly SubjectKey[];
   /** The facts steps may read, with the evidence class each carries. */
   readonly facts: Readonly<Record<string, EvidenceClass>>;
+  /**
+   * The project's predicate policy, composed for the change from its base
+   * commit: per predicate, what a guard's proven fail does. A predicate it
+   * leaves out is `advise` (ADR 0005, decided 11 Oct).
+   */
+  readonly predicatePolicy?: PredicatePolicies;
 };
 
 export type FlowPolicy = {
@@ -103,9 +111,18 @@ export type FlowPlan = VerificationPlan & {
   readonly flow: Flow;
   readonly steps: readonly PlanStep[];
   readonly baseCommit: CommitSha;
+  /** The compiler that produced it (`COMPILER_VERSION`), so a stored plan can be rehashed. */
+  readonly compiler: string;
+  /** Each planned step's content hash (`StepSpec.version`), by step id. */
+  readonly versions: Readonly<Record<string, ContentHash>>;
   /** Set when the change touches the flow itself: a person must rule before it lands. */
   readonly humanClass: boolean;
   /** Step ids whose fails a human step may override, per human step. */
   readonly overrides: Readonly<Record<string, readonly string[]>>;
   readonly mayskip: Readonly<Record<string, readonly string[]>>;
+  /** Set on a batch's union only: the member plans it unions, by planHash, sorted. */
+  readonly members?: readonly ContentHash[];
 };
+
+/** Everything a plan's hash covers: all of the plan but the hash and the advisory cost. */
+export type PlanPreimage = Omit<FlowPlan, "planHash" | "costEstimate">;

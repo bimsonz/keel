@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { Anchor, Citation, Glob } from "../kernel/index.ts";
+import { Anchor, Citation, Glob, PredicatePolicy } from "../kernel/index.ts";
 
 /** The dimension a proposition talks about. Each predicate orders its values on a lattice. */
 export const Predicate = Schema.Literals([
@@ -16,6 +16,28 @@ export const Predicate = Schema.Literals([
   "invariant",
 ]);
 export type Predicate = typeof Predicate.Type;
+
+const policyOf = Schema.optional(PredicatePolicy);
+/**
+ * A project's predicate policy as composed for one change (ADR 0005, decided
+ * 11 Oct): per predicate, what a proven conflict or a failing guard does. A
+ * predicate it leaves out is `advise`. Every predicate has its key: a new
+ * predicate fails to compile here until it does.
+ */
+export const PredicatePolicies = Schema.Struct({
+  freshness: policyOf,
+  cardinality: policyOf,
+  ordering: policyOf,
+  consistency: policyOf,
+  shape: policyOf,
+  presence: policyOf,
+  authority: policyOf,
+  purity: policyOf,
+  idempotent: policyOf,
+  bound: policyOf,
+  invariant: policyOf,
+} satisfies Record<Predicate, typeof policyOf>);
+export type PredicatePolicies = typeof PredicatePolicies.Type;
 
 export const Relation = Schema.Literals(["is", "at-most", "at-least", "not", "before", "after"]);
 export type Relation = typeof Relation.Type;

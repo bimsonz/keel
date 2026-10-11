@@ -1,9 +1,11 @@
 import { Array as Arr, Result, Schema } from "effect";
 import type { Predicate } from "../coordination/index.ts";
 import {
+  type PredicatePolicy,
   type ChangeId,
   type Committed,
   type ConflictId,
+  DEFAULT_PREDICATE_POLICY,
   type DecisionId,
   type GuardId,
   IllegalTransition,
@@ -33,22 +35,10 @@ export const TenetEvent = Schema.Union([
 export type TenetEvent = typeof TenetEvent.Type;
 
 /**
- * What a proven conflict against a predicate's tenet does, as the project
- * composed its beliefs for the change (ADR 0005, decided 11 Oct): `block`
- * holds the challenger for a ruling, `advise` warns both agents and offers the
- * proving test, `annotate` only records it. A tenet never blocks by itself.
- */
-export const BeliefPolicy = Schema.Literals(["block", "advise", "annotate"]);
-export type BeliefPolicy = typeof BeliefPolicy.Type;
-
-/** The policy when the project names none. */
-export const DEFAULT_BELIEF_POLICY: BeliefPolicy = "advise";
-
-/**
  * What the Tenet machine reads of a conflict, looked up by the owning DO.
  * Verification's `Conflict` state has this shape.
  */
-export interface ConflictFacts {
+export interface ContestingConflict {
   readonly id: ConflictId;
   readonly state: string;
   readonly parties: readonly string[];
@@ -77,9 +67,9 @@ export type TenetCommand =
 export interface TenetFacts {
   readonly now: Instant;
   readonly tenetId: TenetId;
-  readonly conflict?: ConflictFacts;
-  /** The predicate's policy, from the beliefs composed for the change; absent is `advise`. */
-  readonly policy?: BeliefPolicy;
+  readonly conflict?: ContestingConflict;
+  /** The predicate's policy, as composed for the change; absent is `advise`. */
+  readonly policy?: PredicatePolicy;
 }
 
 export type TenetRejection = TenetStateRefused;
@@ -102,7 +92,7 @@ const readEscalations: NextAction = {
   operationId: "Operator_listEscalations",
 };
 
-const settledInFavour = (conflict: ConflictFacts): boolean =>
+const settledInFavour = (conflict: ContestingConflict): boolean =>
   conflict.state === "dismissed" ||
   (conflict.state === "resolved" && conflict.move !== undefined && IN_FAVOUR.has(conflict.move));
 
@@ -177,7 +167,7 @@ export const decideTenet = (
             decisionId: command.decisionId,
           }),
         ]);
-      if ((facts.policy ?? DEFAULT_BELIEF_POLICY) === "block")
+      if ((facts.policy ?? DEFAULT_PREDICATE_POLICY) === "block")
         return refuse("ruling-required", readEscalations);
       return conflict?.id === contesting &&
         conflict.state === "proven" &&
