@@ -70,7 +70,19 @@ export class Player {
   constructor(source: ConsoleSource) {
     this.source = source;
     this.#epochMs = Date.parse(source.descriptor.epoch);
-    this.repository = new RepositoryReader(source, () => this.#changed());
+    // The repository is read for the project the address names. Its id is the one the log gave it; a reader
+    // the log is closed to has only the name.
+    this.repository = new RepositoryReader(
+      source,
+      () => this.#changed(),
+      () => {
+        if (this.#scope === null) return undefined;
+        const known = this.projects.named(this.#scope);
+        return known === undefined
+          ? { name: this.#scope }
+          : { id: known.id, name: known.name, visibility: known.visibility };
+      },
+    );
   }
 
   subscribe = (listener: Listener): (() => void) => {

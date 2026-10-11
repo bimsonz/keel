@@ -13,10 +13,16 @@ import type {
   EventRecord,
   LatticeSet,
   NextAction,
+  RepoBlob,
+  RepoCommitDiff,
+  RepoCommitPage,
+  RepoTree,
   TokenResponse,
   VerdictView,
 } from "../../../src/contract/keel/index.ts";
+import { RepoRefused } from "../../../src/source/repository.ts";
 import { LATTICES } from "../lattices.ts";
+import { createMockRepository } from "./repository.ts";
 import { type S1Ruling, S1_CHOICES, generateS1 } from "./s1.ts";
 
 export interface Client {
@@ -92,10 +98,14 @@ export function createFakeKeel(options: {
   clients: Client[];
   seed?: number;
   pageSize?: number;
+  /** Who may read the project's repository with no token. Keel creates a project private. */
+  visibility?: "public" | "private";
 }): FakeKeel {
   const seed = options.seed ?? 42;
   const pageSize = options.pageSize ?? 500;
   let log = generateS1(seed);
+  const repository = createMockRepository(() => log);
+  const visibility = options.visibility ?? "private";
   const escalationId = log.gates[0]?.escalationId ?? "";
   let ruled: { option: string; key: string } | undefined;
   let waiters: (() => void)[] = [];
@@ -152,6 +162,56 @@ export function createFakeKeel(options: {
           expires_in: 3600,
           scope: asked.join(" "),
         } satisfies TokenResponse);
+      }
+
+      // A project's repository is read by anyone where the project is public, and by an observer or an agent
+      // where it is not. To a reader with no token a private project is the same answer as no project at all.
+      const repoRead = /^\/v1\/projects\/([^/]+)\/repo\/(tree|blob|commits)(?:\/([^/]+))?$/.exec(
+        url.pathname,
+      );
+      if (repoRead !== null && request.method === "GET") {
+        const [, projectId = "", what, sha] = repoRead;
+        const anonymous = !request.headers.has("authorization");
+        const reader = anonymous ? [] : scopesOf(request);
+        if (reader === undefined) return problem(401, "auth.invalid_token");
+        if (anonymous && visibility !== "public") return problem(404, "resource.not_found");
+        if (!anonymous && !reader.includes("observer") && !reader.includes("agent:read"))
+          return problem(403, "auth.insufficient_scope");
+        const asked = (name: string): { [key: string]: string } => {
+          const value = url.searchParams.get(name);
+          return value === null ? {} : { [name]: value };
+        };
+        try {
+          if (what === "tree") {
+            const tree: RepoTree = await repository.getTree(projectId, {
+              ...asked("ref"),
+              path: url.searchParams.get("path") ?? "",
+            });
+            return Response.json(tree);
+          }
+          if (what === "blob") {
+            const blob: RepoBlob = await repository.getBlob(projectId, {
+              ...asked("ref"),
+              path: url.searchParams.get("path") ?? "",
+            });
+            return Response.json(blob);
+          }
+          if (sha === undefined) {
+            const limit = Number(url.searchParams.get("limit") ?? "50") || 50;
+            const page: RepoCommitPage = await repository.getCommits(projectId, {
+              ...asked("ref"),
+              ...asked("cursor"),
+              limit,
+            });
+            return Response.json(page);
+          }
+          const commit: RepoCommitDiff = await repository.getCommit(projectId, sha);
+          return Response.json(commit);
+        } catch (error) {
+          return error instanceof RepoRefused
+            ? problem(error.status, error.code)
+            : problem(404, "resource.not_found");
+        }
       }
 
       const scopes = scopesOf(request);

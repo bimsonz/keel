@@ -142,7 +142,7 @@ describe("the repository view", () => {
     ]);
   });
 
-  it("tells history newest first, each commit with the changes it landed, and opens a commit on its diff", async () => {
+  it("[repository.history] tells history newest first, each commit with the change it landed and trunk's height then, and opens a commit on its diff", async () => {
     const player = await playerAt("s1", 700);
     const history = ready(await shown(player, { view: "history", path: "" }));
     const commits = history.view.kind === "history" ? history.view.commits : [];
@@ -191,13 +191,14 @@ describe("the repository view", () => {
       return view.kind === "history"
         ? view.commits.map((commit) =>
             commit.changes.map(
-              (change) => `${change.label} ${change.known ? "known" : "not in this log"}`,
+              // A change this console's log does not have has no number here: Keel's history names it by id.
+              (change) => (change.known ? `${change.label} known` : "not in this log"),
             ),
           )
         : [];
     };
     expect(told(player.world)).toEqual([["#1 known"], ["#2 known"], []]);
-    expect(told(late)).toEqual([["#1 not in this log"], ["#2 not in this log"], []]);
+    expect(told(late)).toEqual([["not in this log"], ["not in this log"], []]);
   });
 
   it("says where trunk is on the code's own page: its latest commit, what that landed, and how many there are", async () => {
@@ -284,7 +285,12 @@ describe("the repository view", () => {
     // Keel answers with the file at once, and with its notes only when let go.
     const slow: typeof source = {
       ...source,
-      getNotes: async (at) => (await held, source.getNotes(at)),
+      getNotes: async (at) => {
+        await held;
+        const notes = await source.getNotes?.(at);
+        if (notes === undefined) throw new Error("this source has no notes");
+        return notes;
+      },
     };
     const player = showing(slow);
     await player.load();
@@ -307,10 +313,9 @@ describe("the repository view", () => {
     const asked: string[] = [];
     const counting: typeof source = {
       ...source,
-      getProject: () => (asked.push("project"), source.getProject()),
-      getTree: (at) => (asked.push(`tree ${at.path}`), source.getTree(at)),
-      getBlob: (at) => (asked.push(`blob ${at.path}`), source.getBlob(at)),
-      getNotes: (at) => (asked.push(`notes ${at.path}`), source.getNotes(at)),
+      getTree: (id, at) => (asked.push(`tree ${at.path}`), source.getTree(id, at)),
+      getBlob: (id, at) => (asked.push(`blob ${at.path}`), source.getBlob(id, at)),
+      getCommits: (id, request) => (asked.push("commits"), source.getCommits(id, request)),
     };
     const player = showing(counting);
     await player.load();
@@ -322,26 +327,33 @@ describe("the repository view", () => {
     // A path is tried as a directory first, and only then as a file. The directories on the way to it are read
     // once each, for the list of files beside it; the root was read already, and is not asked for again.
     expect(asked).toEqual([
-      "project",
+      "commits",
       "tree ",
       "blob README.md",
       "tree src/authz/check.ts",
       "tree src",
       "tree src/authz",
       "blob src/authz/check.ts",
-      "notes src/authz/check.ts",
     ]);
   });
 
-  it("says so, and shows nothing, where Keel does not serve a repository", async () => {
+  it("[repository.unknown] says what it cannot show: a project it cannot look up, and one there is no code for", async () => {
+    // A story with no repository: every read of it fails, and nothing is drawn in its place.
     const swarm = await playerAt("swarm", 30);
-    expect(await shown(swarm, { view: "code", path: "" })).toEqual({ status: "unserved" });
-    // Keel itself, today: its contract has no operation for reading a repository.
-    const live = showing(await createHttpSource({ fetch: emptyLog }));
-    await live.load();
-    expect(await shown(live, { view: "code", path: "" })).toEqual({ status: "unserved" });
-    await expect(live.source.getTree({ path: "" })).rejects.toThrow(
-      "Keel does not serve its repository yet",
+    expect(await shown(swarm, { view: "code", path: "" })).toEqual({ status: "refused" });
+    // A reader Keel's log has named no project to has only the name in the address, and Keel reads a
+    // repository by the project's id: nothing is asked, and the page says which of the two it is.
+    const asked: string[] = [];
+    const live = showing(
+      await createHttpSource({
+        fetch: (input) => {
+          asked.push(typeof input === "string" ? input : "");
+          return emptyLog();
+        },
+      }),
     );
+    await live.load();
+    expect(await shown(live, { view: "code", path: "" })).toEqual({ status: "unknown" });
+    expect(asked.filter((url) => url.includes("/repo/"))).toEqual([]);
   });
 });

@@ -18,8 +18,9 @@ interface Rig {
   post(path: string, body: unknown, headers?: Record<string, string>): Promise<Response>;
 }
 
-function rig(overrides: Partial<Env> = {}): Rig {
+function rig(overrides: Partial<Env> = {}, visibility: "public" | "private" = "private"): Rig {
   const keel = createFakeKeel({
+    visibility,
     clients: [
       { id: "observer", secret: "observer-secret", scopes: ["observer"] },
       { id: "operator", secret: "operator-secret", scopes: ["operator"] },
@@ -291,6 +292,70 @@ describe("reading Keel through the console", () => {
     const response = await r.get("/api/v1/events", AS_PRESENTER);
     expect(response.status).toBe(502);
     expect(calls(r.keel, "/v1/events")).toEqual([]);
+  });
+});
+
+/** Keel's id for the stand-in's one project. */
+const projectOf = (keel: FakeKeel): string =>
+  keel
+    .events()
+    .flatMap((event) => (event.type === "ProjectCreated" ? [event.payload.projectId] : []))[0] ??
+  "";
+
+describe("reading a project's repository through the console", () => {
+  it("[handler.repo-public] reads a public project's code for a visitor with no token, and for nobody a path that is not one of the four reads", async () => {
+    const r = rig({}, "public");
+    const id = projectOf(r.keel);
+    const tree = await r.get(`/api/v1/projects/${id}/repo/tree?path=src%2Fauthz&as=operator`, {
+      cookie: "session=1",
+    });
+    expect(tree.status).toBe(200);
+    expect(await field(tree, "path")).toBe("src/authz");
+    const head =
+      r.keel.events().findLast((event) => event.type === "TrunkInitialized")?.payload.head ?? "";
+    const blob = await r.get(`/api/v1/projects/${id}/repo/blob?path=README.md&ref=${head}`);
+    expect(blob.status).toBe(200);
+    const commits = await r.get(`/api/v1/projects/${id}/repo/commits?limit=1&cursor=0&path=x`);
+    expect(await field(commits, "items")).toHaveLength(1);
+    expect((await r.get(`/api/v1/projects/${id}/repo/commits/${head}`)).status).toBe(200);
+    // Each went to Keel by its own route, with the query its operation has and no other, and with no token.
+    expect(r.keel.calls.map((call) => `${call.path.replace(id, "{id}")}?${call.query}`)).toEqual([
+      "/v1/projects/{id}/repo/tree?path=src%2Fauthz",
+      `/v1/projects/{id}/repo/blob?ref=${head}&path=README.md`,
+      "/v1/projects/{id}/repo/commits?cursor=0&limit=1",
+      `/v1/projects/{id}/repo/commits/${head}?`,
+    ]);
+    expect(r.keel.calls.map((call) => call.authorization)).toEqual(["", "", "", ""]);
+    // Nothing else under a project is read, whoever asks, and Keel is not asked.
+    const asked = r.keel.calls.length;
+    const refused = await Promise.all(
+      [
+        `/api/v1/projects/${id}/settings`,
+        `/api/v1/projects/${id}/repo`,
+        `/api/v1/projects/${id}/repo/tree/extra`,
+        `/api/v1/projects/${id}/repo/commits/not-a-sha`,
+        `/api/v1/projects/${id}/repo/commits/abcd/..%2F..%2Fsettings`,
+        `/api/v1/projects/a%2Fb/repo/tree`,
+        `/api/v1/projects/${id}/repo/refs`,
+      ].map((path) => r.get(path, AS_PRESENTER)),
+    );
+    expect(refused.map((response) => response.status)).toEqual([404, 404, 404, 404, 404, 404, 404]);
+    expect(r.keel.calls).toHaveLength(asked);
+  });
+
+  it("[handler.repo-private] tells a visitor what Keel says of a private project, that there is none, and reads it for the presenter", async () => {
+    const r = rig();
+    const id = projectOf(r.keel);
+    const visitor = await r.get(`/api/v1/projects/${id}/repo/tree?path=`);
+    expect(visitor.status).toBe(404);
+    expect(await field(visitor, "code")).toBe("resource.not_found");
+    expect(calls(r.keel, "/v1/oauth/token")).toEqual([]);
+    const presenter = await r.get(`/api/v1/projects/${id}/repo/tree?path=`, AS_PRESENTER);
+    expect(presenter.status).toBe(200);
+    expect(r.keel.calls.at(-1)?.authorization).toMatch(/^Bearer tok_\d+_observer$/);
+    // A path that is not there is Keel's own answer for it, which is how the page knows to ask for a file.
+    const file = await r.get(`/api/v1/projects/${id}/repo/tree?path=README.md`, AS_PRESENTER);
+    expect([file.status, await field(file, "code")]).toEqual([404, "repo.path_not_found"]);
   });
 });
 

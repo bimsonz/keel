@@ -53,6 +53,13 @@ export default {
         return problem(401, "auth.unauthenticated");
       return Response.json({ items: [], nextCursor: "0" });
     }
+    // One public project's repository, read by anyone.
+    if (url.pathname === "/v1/projects/prj_PUBLIC/repo/tree" && request.method === "GET")
+      return Response.json({
+        commit: "c".repeat(40),
+        path: url.searchParams.get("path") ?? "",
+        entries: [],
+      });
     return problem(404, "resource.not_found");
   },
 };

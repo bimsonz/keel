@@ -282,6 +282,11 @@ export class World {
   unseal: UnsealObservation | undefined;
   /** The project this log is about, once the log has named it. */
   project: { id: string; name: string } | undefined;
+  /**
+   * What each commit on trunk landed, by the commit: Keel's history names a commit's change, and the advance
+   * that put it on trunk is what says how high trunk then stood and whether it was verified.
+   */
+  readonly landed = new Map<string, { changeId?: string; height: number; unverified: boolean }>();
   readonly trunk: TrunkEntry = {
     head: "",
     advances: 0,
@@ -485,6 +490,8 @@ export class World {
       }
       case "TrunkInitialized": {
         this.trunk.head = event.payload.head;
+        // Where trunk starts is a commit that landed no change: its height is none.
+        this.landed.set(event.payload.head, { height: 0, unverified: false });
         break;
       }
       case "ChangeSubmitted": {
@@ -1029,6 +1036,13 @@ export class World {
         // Keel's own count, from the Trunk DO. The console never counts arrivals: it may have started reading
         // mid-log. An advance that does not say its height leaves the count where Keel last put it.
         this.trunk.advances = event.payload.height ?? this.trunk.advances;
+        for (const landing of event.payload.landings) {
+          this.landed.set(landing.commitSha, {
+            changeId: landing.changeId,
+            height: this.trunk.advances,
+            unverified: event.payload.verified === false,
+          });
+        }
         if (event.payload.verified === false) {
           this.trunk.unverifiedAdvances += 1;
           for (const landing of event.payload.landings) {

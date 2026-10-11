@@ -2,10 +2,10 @@
 # kills: handler.wrong-key, console.wrong-key
 # why: a key that is not the presenter's is passed on to Keel as a visitor's read, where it should be refused here
 diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
-index 6ffe5c9..8cd5c2e 100644
+index 9baceeb..e4145dc 100644
 --- a/apps/console/src/worker/handler.ts
 +++ b/apps/console/src/worker/handler.ts
-@@ -113,7 +113,7 @@ async function asker(request: Request, env: Env): Promise<Asker> {
+@@ -132,7 +132,7 @@ async function asker(request: Request, env: Env): Promise<Asker> {
    if (shown === null) return "visitor";
    const key = /^Bearer (.+)$/.exec(shown)?.[1] ?? "";
    if (key === "" || env.CONSOLE_PRESENTER_KEY === "") return "refused";

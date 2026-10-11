@@ -26,7 +26,7 @@ import type {
 } from "../engine/repository.ts";
 import { TRUNK } from "../route.ts";
 import { Link } from "../router.tsx";
-import type { RepoNote } from "../source/repository.ts";
+import type { RepoNote } from "../contract/provisional.ts";
 import type { Mode } from "../theme/mode.ts";
 import { Notice } from "./Frame.tsx";
 import { Markdown } from "./Markdown.tsx";
@@ -289,11 +289,6 @@ function Tree({
                   <FileIcon size={17} />
                 )}
                 <span className="a-mono text-kumo-strong">{entry.name}</span>
-                {entry.size !== undefined && (
-                  <span className="a-num ml-auto text-sm text-kumo-subtle">
-                    {bytes(entry.size)}
-                  </span>
-                )}
               </Link>
             </li>
           ))}
@@ -506,11 +501,20 @@ export function Repository({
   /** Opens or closes a directory in the list of files beside the code. */
   onToggle: (directory: string, open: boolean) => void;
 }) {
-  if (state.status === "unserved") {
+  if (state.status === "unknown") {
     return (
-      <Notice title="Keel does not serve this project's repository yet">
-        When it does, its files, its history and the reasons beside its lines are read here, from
-        Keel. Nothing is shown in their place.
+      <Notice title="This project's code is not shown to visitors yet">
+        Keel reads a public project's code to anyone, by Keel's own id for the project, and has no
+        way yet to find a project by the name in an address. The console knows a project's id from
+        Keel's log, which it reads for whoever opens it with the presenter's key.
+      </Notice>
+    );
+  }
+  if (state.status === "refused") {
+    return (
+      <Notice title="Keel has no code to show here">
+        Keel would not read this project's files for this reader. It answers so for a private
+        project, as for one that is not there, and for a project with nothing on trunk yet.
       </Notice>
     );
   }
@@ -563,11 +567,13 @@ export function Repository({
               Browse the files
             </Link>
           )}
-          {address.view === "code" && address.path === "" && (
-            <div className="ml-auto">
-              <CloneBox url={state.project.cloneUrl} />
-            </div>
-          )}
+          {address.view === "code" &&
+            address.path === "" &&
+            state.project.cloneUrl !== undefined && (
+              <div className="ml-auto">
+                <CloneBox url={state.project.cloneUrl} />
+              </div>
+            )}
         </header>
       )}
 

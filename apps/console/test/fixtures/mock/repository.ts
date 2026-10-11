@@ -8,16 +8,18 @@
 import type { LandedFile, Landing } from "../repo.ts";
 import { sha256Hex } from "../sha256.ts";
 import type {
-  KeelRepository,
-  RepoAt,
   RepoCommit,
   RepoCommitDiff,
   RepoCommitPage,
-  RepoFileDiff,
-  RepoNote,
-  RepoNotes,
-  RepoProject,
+  RepoFileChange,
   RepoTree,
+} from "../../../src/contract/keel/index.ts";
+import type { RepoNote, RepoNotes, RepoProject } from "../../../src/contract/provisional.ts";
+import {
+  type KeelRepository,
+  NO_SUCH_PROJECT,
+  type RepoAt,
+  RepoRefused,
 } from "../../../src/source/repository.ts";
 import type { GeneratedLog } from "./builder.ts";
 
@@ -27,7 +29,7 @@ interface Snapshot {
   index: number;
   files: Map<string, string>;
   anchors: Landing["anchors"];
-  diff: RepoFileDiff[];
+  diff: RepoFileChange[];
 }
 
 interface Derived {
@@ -38,7 +40,18 @@ interface Derived {
 
 const NONE = "this fixture has no repository";
 
-function apply(files: Map<string, string>, changed: readonly LandedFile[]): RepoFileDiff[] {
+/** Who a fixture's commits are by. Keel restacks a change onto trunk as its committer. */
+const keel = (at: string): RepoCommit["author"] => ({
+  name: "Keel",
+  email: "keel@keel.localhost",
+  at,
+});
+
+/** Keel's own codes for a read it refuses. */
+const noRef = (_ref: string): RepoRefused => new RepoRefused("repo.ref_not_found", 404);
+const noPath = (): RepoRefused => new RepoRefused("repo.path_not_found", 404);
+
+function apply(files: Map<string, string>, changed: readonly LandedFile[]): RepoFileChange[] {
   return changed.flatMap((file) => {
     const before = files.get(file.path) ?? null;
     if (before === file.after) return [];
@@ -51,6 +64,7 @@ function apply(files: Map<string, string>, changed: readonly LandedFile[]): Repo
         before,
         after: file.after,
         binary: false,
+        truncated: false,
       },
     ];
   });
@@ -85,10 +99,9 @@ function derive(log: GeneratedLog): Derived | null {
         commit: {
           sha: event.payload.head,
           parents: [],
-          at: event.at,
           message: "Start of trunk",
-          changes: [],
-          height: 0,
+          author: keel(event.at),
+          committer: keel(event.at),
         },
         index,
         files: new Map(files),
@@ -107,22 +120,19 @@ function derive(log: GeneratedLog): Derived | null {
         ...anchors.filter((anchor) => !written.has(anchor.path)),
         ...landings.flatMap((landing) => landing.anchors),
       ];
-      const changes = members.map((member) => ({
-        changeId: member,
-        label: labels.get(member)?.label ?? member.slice(-4),
-      }));
       const said = members
         .map((member) => labels.get(member)?.goal ?? "")
         .filter((goal) => goal !== "");
+      // Keel's history has one commit to a change, carrying the change's id. The log's advance says the rest.
+      const [only] = members;
       snapshots.push({
         commit: {
           sha: event.payload.to,
           parents: [event.payload.from],
-          at: event.at,
           message: said.length > 0 ? said.join("; ") : "Advances not told in this log",
-          changes,
-          ...(event.payload.height === undefined ? {} : { height: event.payload.height }),
-          ...(event.payload.verified === undefined ? {} : { verified: event.payload.verified }),
+          author: keel(event.at),
+          committer: keel(event.at),
+          ...(only === undefined || members.length > 1 ? {} : { changeId: only }),
         },
         index,
         files: new Map(files),
@@ -224,13 +234,18 @@ export function createMockRepository(log: () => GeneratedLog): KeelRepository {
       ref === undefined
         ? snapshots.at(-1)
         : snapshots.find((snapshot) => snapshot.commit.sha === ref);
-    if (found === undefined) throw new Error(`no commit ${ref ?? ""}`);
+    if (found === undefined) throw noRef(ref ?? "");
     return found;
+  };
+  /** A read names its project by Keel's id. Any other is no project, as a private one is. */
+  const inProject = (projectId: string): void => {
+    if (projectId !== current().project.id) throw new RepoRefused(NO_SUCH_PROJECT, 404);
   };
   return {
     getProject: () => answer((): RepoProject => current().project),
-    getTree: (at: RepoAt) =>
+    getTree: (projectId: string, at: RepoAt) =>
       answer((): RepoTree => {
+        inProject(projectId);
         const snapshot = snapshotAt(at.ref);
         const prefix = at.path === "" ? "" : `${at.path}/`;
         const entries = new Map<string, RepoTree["entries"][number]>();
@@ -241,58 +256,75 @@ export function createMockRepository(log: () => GeneratedLog): KeelRepository {
           if (deeper.length > 0)
             entries.set(name, {
               name,
+              path: `${prefix}${name}`,
               kind: "tree",
+              mode: "040000",
               sha: sha256Hex(`${snapshot.commit.sha}:${prefix}${name}`).slice(0, 40),
             });
           else
             entries.set(name, {
               name,
+              path: `${prefix}${name}`,
               kind: "blob",
+              mode: "100644",
               sha: sha256Hex(content).slice(0, 40),
-              size: new TextEncoder().encode(content).length,
             });
         }
-        if (entries.size === 0) throw new Error(`no directory ${at.path}`);
-        return { ref: snapshot.commit.sha, path: at.path, entries: [...entries.values()] };
+        // A tree read of a file's path, or of nothing, is a path that is not there.
+        if (entries.size === 0) throw noPath();
+        return { commit: snapshot.commit.sha, path: at.path, entries: [...entries.values()] };
       }),
-    getBlob: (at: RepoAt) =>
+    getBlob: (projectId: string, at: RepoAt) =>
       answer(() => {
-        const content = snapshotAt(at.ref).files.get(at.path);
-        if (content === undefined) throw new Error(`no file ${at.path}`);
+        inProject(projectId);
+        const snapshot = snapshotAt(at.ref);
+        const content = snapshot.files.get(at.path);
+        if (content === undefined) throw noPath();
         return {
+          commit: snapshot.commit.sha,
           path: at.path,
           sha: sha256Hex(content).slice(0, 40),
+          mode: "100644",
           size: new TextEncoder().encode(content).length,
           binary: false,
-          content,
           truncated: false,
+          content,
         };
       }),
-    getCommits: (request) =>
+    getCommits: (projectId: string, request) =>
       answer((): RepoCommitPage => {
+        inProject(projectId);
         const { snapshots } = current();
         const tip =
           request.ref === undefined
             ? snapshots.length - 1
             : snapshots.findIndex((snapshot) => snapshot.commit.sha === request.ref);
-        if (tip < 0) throw new Error(`no commit ${request.ref ?? ""}`);
+        if (tip < 0) throw noRef(request.ref ?? "");
         // Newest first, from the ref back to the start of trunk.
         const history = snapshots.slice(0, tip + 1).toReversed();
         const start = Number(request.cursor ?? "0") || 0;
         const items = history
           .slice(start, start + (request.limit ?? 50))
           .map((snapshot) => snapshot.commit);
-        return { items, nextCursor: String(start + items.length) };
+        // As Keel's page has it: a cursor only where there is more to read.
+        const next = start + items.length;
+        return { items, ...(next < history.length ? { nextCursor: String(next) } : {}) };
       }),
-    getCommitDiff: (sha: string) =>
+    getCommit: (projectId: string, sha: string) =>
       answer((): RepoCommitDiff => {
+        inProject(projectId);
         const snapshot = snapshotAt(sha);
-        return { commit: snapshot.commit, files: snapshot.diff };
+        const [base] = snapshot.commit.parents;
+        return {
+          commit: snapshot.commit,
+          ...(base === undefined ? {} : { base }),
+          files: snapshot.diff,
+        };
       }),
     getNotes: (at: RepoAt) =>
       answer((): RepoNotes => {
         const snapshot = snapshotAt(at.ref);
-        if (!snapshot.files.has(at.path)) throw new Error(`no file ${at.path}`);
+        if (!snapshot.files.has(at.path)) throw noPath();
         const notes = snapshot.anchors
           .filter((anchor) => anchor.path === at.path)
           .flatMap((anchor) => notesOn(log(), snapshot.index, anchor.subject, anchor.line));

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { type RepoAddress, repositoryOf } from "../../../src/engine/repository.ts";
 import { changePageOf, conflictPageOf } from "../../../src/engine/select.ts";
 import { createHttpSource } from "../../../src/source/http.ts";
 import { createConsole } from "../../../src/worker/handler.ts";
@@ -129,8 +130,9 @@ describe("the HTTP source", () => {
 });
 
 /** The page's source, talking to the real Worker, which talks to a stand-in Keel. */
-function behindTheWorker() {
+function behindTheWorker(visibility: "public" | "private" = "private") {
   const keel = createFakeKeel({
+    visibility,
     clients: [
       { id: "observer", secret: "s1", scopes: ["observer"] },
       { id: "operator", secret: "s2", scopes: ["operator"] },
@@ -219,6 +221,76 @@ describe("who the page reads as", () => {
       "That is not the presenter's key",
     );
     expect(keel.calls).toEqual([]);
+  });
+});
+
+/** Keel's id for the stand-in's one project. */
+const projectOf = (keel: ReturnType<typeof behindTheWorker>["keel"]): string =>
+  keel
+    .events()
+    .flatMap((event) => (event.type === "ProjectCreated" ? [event.payload.projectId] : []))[0] ??
+  "";
+
+describe("a project's code, from the page", () => {
+  it("[http.repo-visitor] reads a public project's code for a visitor, and is told there is none where it is private", async () => {
+    const open = behindTheWorker("public");
+    const visitor = await createHttpSource({ fetch: open.serve });
+    const id = projectOf(open.keel);
+    const root = await visitor.getTree(id, { path: "" });
+    expect(root.entries.map((entry) => entry.name).toSorted()).toEqual([
+      "README.md",
+      "package.json",
+      "src",
+    ]);
+    expect((await visitor.getBlob(id, { path: "README.md" })).content).toContain("#");
+    const history = await visitor.getCommits(id, { limit: 1 });
+    expect(history.items).toHaveLength(1);
+    expect((await visitor.getCommit(id, history.items[0]?.sha ?? "")).commit.sha).toBe(
+      history.items[0]?.sha,
+    );
+    // A file's path read as a directory is refused by Keel's own code for it.
+    await expect(visitor.getTree(id, { path: "README.md" })).rejects.toMatchObject({
+      code: "repo.path_not_found",
+    });
+    expect(open.requests.filter((request) => request.headers.has("authorization"))).toEqual([]);
+    expect(open.keel.calls.every((call) => call.authorization === "")).toBe(true);
+
+    const shut = behindTheWorker();
+    const outsider = await createHttpSource({ fetch: shut.serve });
+    await expect(outsider.getTree(projectOf(shut.keel), { path: "" })).rejects.toMatchObject({
+      code: "resource.not_found",
+      status: 404,
+    });
+  });
+
+  it("[http.repo-presenter] shows the presenter a private project's code: the tree, a file, history joined to the log", async () => {
+    const { serve } = behindTheWorker();
+    const player = showing(await createHttpSource({ fetch: serve, presenterKey: "presenter key" }));
+    await player.load();
+    player.seek(player.end);
+    const look = async (address: RepoAddress) => {
+      for (let turn = 0; turn < 6; turn += 1) {
+        player.repository.want(address, player.world.trunk.head);
+        // oxlint-disable-next-line no-await-in-loop -- each read says what to read next
+        await settled();
+      }
+      return repositoryOf(player.world, player.repository, address);
+    };
+    const code = await look({ view: "code", path: "" });
+    expect(code).toMatchObject({
+      status: "ready",
+      project: { name: "demo", visibility: "private" },
+      ref: { sha: player.world.trunk.head, head: true },
+      view: { kind: "tree" },
+    });
+    // Keel has no clone address to give yet, and the console makes none up.
+    expect(code.status === "ready" && "cloneUrl" in code.project).toBe(false);
+    const file = await look({ view: "code", path: "src/authz/check.ts" });
+    expect(file).toMatchObject({ status: "ready", view: { kind: "file", notes: [] } });
+    const history = await look({ view: "history", path: "" });
+    expect(
+      history.status === "ready" && history.view.kind === "history" && history.view.commits,
+    ).toMatchObject([{ height: 0, message: "Start of trunk", changes: [] }]);
   });
 });
 

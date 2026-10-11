@@ -59,6 +59,31 @@ describe("the console's Worker", () => {
     expect(response.status).toBe(401);
   });
 
+  it("[console.repo] reads a project's code for a visitor with no Authorization, and a private one is Keel's own 404", async () => {
+    const open = await SELF.fetch(
+      `${CONSOLE}/api/v1/projects/prj_PUBLIC/repo/tree?path=src&as=observer`,
+    );
+    expect(open.status).toBe(200);
+    expect(await open.json()).toMatchObject({ path: "src", entries: [] });
+    const shut = await SELF.fetch(`${CONSOLE}/api/v1/projects/prj_PRIVATE/repo/tree?path=`);
+    expect(shut.status).toBe(404);
+    expect(await shut.json()).toMatchObject({ code: "resource.not_found" });
+    expect(await reachedKeel()).toEqual([
+      {
+        method: "GET",
+        path: "/v1/projects/prj_PUBLIC/repo/tree?path=src",
+        host: "keel.localhost",
+        authorization: null,
+      },
+      {
+        method: "GET",
+        path: "/v1/projects/prj_PRIVATE/repo/tree?path=",
+        host: "keel.localhost",
+        authorization: null,
+      },
+    ]);
+  });
+
   it("[console.presenter] reads as the observer for the presenter", async () => {
     const response = await SELF.fetch(`${CONSOLE}/api/v1/events?limit=5`, {
       headers: { authorization: "Bearer test-presenter-key" },

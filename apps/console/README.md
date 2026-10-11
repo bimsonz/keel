@@ -18,7 +18,16 @@ It is a Vite single-page app (React, Tailwind, Cloudflare's Kumo components, Rea
 
 The page never holds a credential for Keel. The Worker holds two: an observer's and an operator's. The observer reads every project, private ones included, so its token is added only to a read that shows the presenter's key; a key that is not the presenter's is refused by the Worker and never reaches Keel. The operator's token is used for exactly one thing: a ruling reaches Keel only through `POST /rule/<capability>`, where the capability is signed by the Worker and names one question.
 
-Keel reads its event log only to an observer today. So a visitor sees a project's frame and, once Keel serves them, its code; Changes, Conflicts, Escalations, Mission Control and Insights say that they are read from the log, and show nothing in its place.
+Keel reads its event log only to an observer today. So Changes, Conflicts, Escalations, Mission Control and Insights tell a visitor that they are read from the log, and show nothing in its place.
+
+## The code
+
+The Code tab is read from Keel's four repository reads (`Repo_getTree`, `Repo_getBlob`, `Repo_listCommits`, `Repo_getCommit`), which Keel answers with no token for a public project.
+
+- A path is a directory or a file, and only Keel knows which: the tree is asked for first, and when Keel answers `repo.path_not_found` the file is.
+- Keel's history gives a commit and the change it carries. The log gives the rest, joined by the commit: the change's `#n`, how high trunk stood once the commit was its head, and whether that advance was verified. When a commit landed is its committer's time, since a change restacked onto trunk keeps its author's own.
+- Keel reads a repository by the project's id, and an address has its name. The console learns ids from the log, so today the presenter sees every project's code, and a visitor is told that the code is not shown to visitors yet. A visitor reads a public project's code once Keel answers a name with an id.
+- Two things the page can show are not Keel's to give yet, and are shown only on a test fixture: the reasons beside a file's lines, and where to clone the project from. Their shapes are in `src/contract/provisional.ts`.
 
 ## Addresses
 
@@ -48,7 +57,7 @@ route  →  pages  →  views  →  engine (playhead, world, projections)  →  
 ```
 
 - `src/contract/keel/` names `@keeltown/contracts`: every request, response, model and event the console reads is Keel's own generated type. `src/contract/events.ts` lays over that the short list of what has been decided and Keel has not built (`Ahead`); `pnpm typecheck` fails there the day Keel builds one.
-- `src/source/http.ts` is Keel as the page reaches it, through the Worker at `/api`. `src/source/repository.ts` is the repository port.
+- `src/source/http.ts` is Keel as the page reaches it, through the Worker at `/api`. `src/source/repository.ts` is the repository port, in Keel's own shapes.
 - `src/engine/` is the playhead and the projections each page reads. `src/views/` draws them and never touches a transport.
 - `src/worker/` is the Worker. `handler.ts` needs nothing of the Workers runtime but fetch and Web Crypto, so it is tested as it is, in Node; `index.ts` is its entry.
 - `test/fixtures/` holds three scripted logs, held to Keel's catalogue and state machines, and a stand-in for Keel's API. They are test code. The page reaches one only in development, through a dynamic import that is not in the build.
@@ -78,7 +87,7 @@ All of these run in the repository's `pnpm check`:
 |---|---|
 | The page's and the Worker's TypeScript projects, and the console's own lint (React and accessibility rules the root lint does not carry, `oxlint.console.json`) | `typecheck` |
 | Unit tests: the engine, the fixtures' conformance to Keel's state machines, the page's source, the Worker's handler against the stand-in Keel | `test/unit`, in the `unit` project |
-| The Worker in workerd, with its real config, the built page as its assets and a stand-in `keel` behind the real service binding: the page for any path; a visitor's read reaching Keel with no `Authorization`; the presenter's reaching it as the observer; a wrong key refused without asking Keel | `test/pool`, project `pool:console` |
+| The Worker in workerd, with its real config, the built page as its assets and a stand-in `keel` behind the real service binding: the page for any path; a visitor's read of the log and of a project's code reaching Keel with no `Authorization`; the presenter's reaching it as the observer; a wrong key refused without asking Keel | `test/pool`, project `pool:console` |
 | The build contains no fixture and no playback control | `scripts/guard-build.ts`, in `deploy:dry` |
 | No retired name for a view comes back | `test/unit/names.test.ts` |
 

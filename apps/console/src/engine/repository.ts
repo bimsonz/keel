@@ -4,15 +4,10 @@
 // that Keel did not answer with.
 
 import type { DiffFile } from "../domain/state.ts";
-import type {
-  KeelRepository,
-  RepoBlob,
-  RepoCommit,
-  RepoCommitDiff,
-  RepoNote,
-  RepoProject,
-  RepoTree,
-} from "../source/repository.ts";
+import type { RepoBlob, RepoCommit, RepoCommitDiff, RepoTree } from "../contract/keel/index.ts";
+import type { RepoNote, RepoProject } from "../contract/provisional.ts";
+import { type KeelRepository, NO_SUCH_PROJECT, RepoRefused } from "../source/repository.ts";
+import type { Visibility } from "./projects.ts";
 import type { World } from "./world.ts";
 
 /** Where in the repository the view is: among its files, or in its history. */
@@ -28,43 +23,70 @@ export interface RepoAddress {
 
 const PAGE = 100;
 
+/** How what was read at trunk's head is kept, where no commit was named and the log has not said where trunk is. */
+const HEAD = "@head";
+
+/** The project being read, as the console knows it apart from Keel's answers about its files. */
+export interface ReadProject {
+  /** Keel's id for it. Absent where the console cannot yet tell which project an address names. */
+  id?: string;
+  name: string;
+  visibility?: Visibility;
+}
+
 /** Reads the repository once for each thing asked, and keeps what Keel answered. */
 export class RepositoryReader {
+  /** What a fixture says the project is, where one does. Keel has no such read yet. */
   project: RepoProject | undefined;
-  /** True once Keel has refused to say what the project is: it does not serve a repository. */
-  unserved = false;
+  /** The projects Keel has answered this reader that there are none such: private ones, or none at all. */
+  readonly #refused = new Set<string>();
   readonly trees = new Map<string, RepoTree>();
   readonly blobs = new Map<string, RepoBlob>();
   readonly notes = new Map<string, RepoNote[]>();
   readonly diffs = new Map<string, RepoCommitDiff>();
   readonly histories = new Map<string, { commits: RepoCommit[]; more: boolean }>();
+  /** The commit each ref read at turned out to be, by Keel's own answer. */
+  readonly resolved = new Map<string, string>();
   /** Asked for, and not there. */
   readonly absent = new Set<string>();
   readonly #asked = new Set<string>();
   readonly #source: KeelRepository;
   readonly #changed: () => void;
+  readonly #project: () => ReadProject | undefined;
 
-  constructor(source: KeelRepository, changed: () => void) {
+  /** `project` says which project the address names right now; the reader asks again when that changes. */
+  constructor(source: KeelRepository, changed: () => void, project: () => ReadProject | undefined) {
     this.#source = source;
     this.#changed = changed;
+    this.#project = project;
   }
 
-  /** The commit an address reads at: the one it names, else trunk's head as the log has it, else the project's own. */
-  refOf(address: RepoAddress, head: string): string | undefined {
-    return address.ref ?? (head === "" ? this.project?.head : head);
+  /** The project being read. */
+  get reading(): ReadProject | undefined {
+    return this.#project();
   }
 
-  /** Ask what the project is: its name, who may read it, where to clone it from. */
+  /** True once Keel has answered that there is no such project for this reader: a private one, or none. */
+  get refused(): boolean {
+    return this.#refused.has(this.#project()?.id ?? "");
+  }
+
+  /** What an address reads at: the ref it names, else trunk's head as the log has it, else wherever Keel says trunk is. */
+  refOf(address: RepoAddress, head: string): string {
+    return address.ref ?? (head === "" ? HEAD : head);
+  }
+
+  /** What is kept is kept by project, so that one project's files are never shown as another's. */
+  keyOf(ref: string, path: string): string {
+    return `${this.#project()?.id ?? ""} ${ref}:${path}`;
+  }
+
+  /** Ask what the project is beyond its name. Only a fixture can say: Keel has no such read yet. */
   wantProject(): void {
-    this.#once(
-      "project",
-      async () => {
-        this.project = await this.#source.getProject();
-      },
-      () => {
-        this.unserved = true;
-      },
-    );
+    if (this.#source.getProject === undefined) return;
+    this.#once("project", async () => {
+      this.project = await this.#source.getProject?.();
+    });
   }
 
   /**
@@ -74,15 +96,20 @@ export class RepositoryReader {
    */
   want(address: RepoAddress, head: string, opened: Iterable<string> = []): void {
     this.wantProject();
+    const id = this.#project()?.id;
+    if (id === undefined) return;
     const ref = this.refOf(address, head);
-    if (ref === undefined) return;
+    const named = ref === HEAD ? {} : { ref };
     // The code's own page says where trunk is: its latest commit, and how many there are.
-    this.#once(`history ${ref}`, async () => {
-      const page = await this.#source.getCommits({ ref, limit: PAGE });
-      this.histories.set(ref, { commits: page.items, more: page.items.length === PAGE });
+    this.#once(`history ${this.keyOf(ref, "")}`, async () => {
+      const page = await this.#source.getCommits(id, { ...named, limit: PAGE });
+      this.histories.set(this.keyOf(ref, ""), {
+        commits: page.items,
+        more: page.nextCursor !== undefined,
+      });
     });
     if (address.view === "code") {
-      this.#wantPath(ref, address.path);
+      this.#wantPath(id, ref, address.path);
       if (address.path !== "") {
         const parts = address.path.split("/");
         for (const directory of [
@@ -90,64 +117,85 @@ export class RepositoryReader {
           ...parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join("/")),
           ...opened,
         ])
-          this.#wantTree(ref, directory);
+          this.#wantTree(id, ref, directory);
       }
       return;
     }
     const sha = address.commit;
     if (sha === undefined) return;
+    const key = this.keyOf("commit", sha);
     this.#once(
-      `commit ${sha}`,
+      `commit ${key}`,
       async () => {
-        this.diffs.set(sha, await this.#source.getCommitDiff(sha));
+        this.diffs.set(key, await this.#source.getCommit(id, sha));
       },
-      () => this.absent.add(`commit ${sha}`),
+      () => this.absent.add(key),
     );
   }
 
   /** A directory known to be one, read for the list of files beside the code. */
-  #wantTree(ref: string, path: string): void {
-    const key = `${ref}:${path}`;
+  #wantTree(id: string, ref: string, path: string): void {
+    const key = this.keyOf(ref, path);
     if (this.trees.has(key)) return;
     this.#once(`tree ${key}`, async () => {
-      this.trees.set(key, await this.#source.getTree({ ref, path }));
+      this.#keep(
+        key,
+        ref,
+        await this.#source.getTree(id, { ...(ref === HEAD ? {} : { ref }), path }),
+      );
     });
   }
 
-  #wantPath(ref: string, path: string): void {
-    const key = `${ref}:${path}`;
-    // A path is a directory or a file, and only Keel knows which. A directory is tried first.
+  #keep(key: string, ref: string, tree: RepoTree): void {
+    this.trees.set(key, tree);
+    this.resolved.set(this.keyOf(ref, ""), tree.commit);
+  }
+
+  #wantPath(id: string, ref: string, path: string): void {
+    const key = this.keyOf(ref, path);
+    const at = { ...(ref === HEAD ? {} : { ref }), path };
+    // A path is a directory or a file, and only Keel knows which. A directory is tried first: Keel answers a
+    // tree read of a file's path with its own code for a path that is not there, and the file is read then.
     this.#once(`path ${key}`, async () => {
       try {
-        this.trees.set(key, await this.#source.getTree({ ref, path }));
+        this.#keep(key, ref, await this.#source.getTree(id, at));
         return;
-      } catch {
-        // Not a directory.
+      } catch (error) {
+        // No such project for this reader is the answer to every read of it. Nothing more is asked.
+        if (error instanceof RepoRefused && error.code === NO_SUCH_PROJECT) {
+          this.#refused.add(id);
+          return;
+        }
       }
       let blob: RepoBlob;
       try {
-        blob = await this.#source.getBlob({ ref, path });
+        blob = await this.#source.getBlob(id, at);
       } catch {
         this.absent.add(key);
         return;
       }
-      // A file whose notes cannot be read is still a file.
-      const notes = await this.#source.getNotes({ ref, path }).then(
-        (answer) => answer.notes,
-        () => [],
-      );
+      // A file whose notes cannot be read is still a file, and Keel has no notes to read yet.
+      const notes =
+        (await this.#source.getNotes?.(at).then(
+          (answer) => answer.notes,
+          () => [],
+        )) ?? [];
       // Both at once: the file is never there to be drawn without the notes that belong beside its lines.
       this.blobs.set(key, blob);
       this.notes.set(key, notes);
+      this.resolved.set(this.keyOf(ref, ""), blob.commit);
     });
     // A directory's README is shown beneath it.
     const readme = this.trees
       .get(key)
       ?.entries.find((entry) => entry.kind === "blob" && /^readme\.md$/i.test(entry.name));
     if (readme === undefined) return;
-    const at = path === "" ? readme.name : `${path}/${readme.name}`;
-    this.#once(`readme ${ref}:${at}`, async () => {
-      this.blobs.set(`${ref}:${at}`, await this.#source.getBlob({ ref, path: at }));
+    const beneath = this.keyOf(ref, readme.path);
+    this.#once(`readme ${beneath}`, async () => {
+      this.blobs.set(
+        beneath,
+        await this.#source.getBlob(id, { ...(ref === HEAD ? {} : { ref }), path: readme.path }),
+      );
     });
   }
 
@@ -206,7 +254,6 @@ export type RepositoryView =
         name: string;
         kind: RepoTree["entries"][number]["kind"];
         path: string;
-        size?: number;
       }[];
       readme?: { path: string; content: string };
     }
@@ -225,12 +272,15 @@ export type RepositoryView =
   | { kind: "commit"; commit: CommitRow; files: DiffFile[]; additions: number; deletions: number };
 
 export type RepositoryState =
-  /** Keel does not serve a repository. */
-  | { status: "unserved" }
+  /** The console cannot tell which project the address names: Keel has no way to look one up by its name yet. */
+  | { status: "unknown" }
+  /** Keel would not read the project's files to this reader: it is private or not there, or its trunk has nothing on it. */
+  | { status: "refused" }
   | { status: "loading" }
   | {
       status: "ready";
-      project: { name: string; visibility: RepoProject["visibility"]; cloneUrl: string };
+      /** `cloneUrl` only where something has said where to clone it from. */
+      project: { name: string; visibility?: Visibility; cloneUrl?: string };
       /** The commit being read, and whether it is trunk's head. */
       ref: { sha: string; head: boolean };
       /** From the root to where the address is. The root's name is the project's. */
@@ -246,18 +296,31 @@ export type RepositoryState =
       view: RepositoryView;
     };
 
+/**
+ * A commit as history shows it. Keel's history gives the commit and the change it carries; the log gives the
+ * rest: the change's number, how high trunk stood once the commit was its head, and whether that was verified.
+ * A commit restacked onto trunk keeps its author's own date, so when it landed is its committer's.
+ */
 function rowOf(world: World, commit: RepoCommit): CommitRow {
+  const landed = world.landed.get(commit.sha);
+  const changeId = commit.changeId ?? landed?.changeId;
+  const change = changeId === undefined ? undefined : world.changes.get(changeId);
   return {
     sha: commit.sha,
-    at: commit.at,
-    message: commit.message,
-    ...(commit.height === undefined ? {} : { height: commit.height }),
-    unverified: commit.verified === false,
-    changes: commit.changes.map((change) => ({
-      id: change.changeId,
-      label: change.label,
-      known: world.changes.has(change.changeId),
-    })),
+    at: commit.committer.at,
+    message: commit.message.split("\n")[0] ?? "",
+    ...(landed === undefined ? {} : { height: landed.height }),
+    unverified: landed?.unverified === true,
+    changes:
+      changeId === undefined
+        ? []
+        : [
+            {
+              id: changeId,
+              label: change?.label ?? changeId.slice(-4),
+              known: change !== undefined,
+            },
+          ],
   };
 }
 
@@ -288,9 +351,10 @@ function viewOf(
 ): RepositoryView {
   if (address.view === "history") {
     if (address.commit !== undefined) {
-      if (reader.absent.has(`commit ${address.commit}`))
+      const commitKey = reader.keyOf("commit", address.commit);
+      if (reader.absent.has(commitKey))
         return { kind: "absent", what: `commit ${address.commit.slice(0, 7)}` };
-      const diff = reader.diffs.get(address.commit);
+      const diff = reader.diffs.get(commitKey);
       if (diff === undefined) return { kind: "loading" };
       const counts = diff.files.map((file) => changedLines(file.before, file.after));
       return {
@@ -305,7 +369,7 @@ function viewOf(
         deletions: counts.reduce((sum, count) => sum + count.deletions, 0),
       };
     }
-    const history = reader.histories.get(ref);
+    const history = reader.histories.get(reader.keyOf(ref, ""));
     return history === undefined
       ? { kind: "loading" }
       : {
@@ -314,21 +378,20 @@ function viewOf(
           more: history.more,
         };
   }
-  const key = `${ref}:${address.path}`;
+  const key = reader.keyOf(ref, address.path);
   if (reader.absent.has(key)) return { kind: "absent", what: address.path };
   const tree = reader.trees.get(key);
   if (tree !== undefined) {
-    const join = (name: string): string => (address.path === "" ? name : `${address.path}/${name}`);
     const entries = inOrder(tree).map((entry) => ({
       name: entry.name,
       kind: entry.kind,
-      path: join(entry.name),
-      ...(entry.size === undefined ? {} : { size: entry.size }),
+      path: entry.path,
     }));
     const named = entries.find(
       (entry) => entry.kind === "blob" && /^readme\.md$/i.test(entry.name),
     );
-    const readme = named === undefined ? undefined : reader.blobs.get(`${ref}:${named.path}`);
+    const readme =
+      named === undefined ? undefined : reader.blobs.get(reader.keyOf(ref, named.path));
     return {
       kind: "tree",
       entries,
@@ -361,7 +424,7 @@ function browserOf(
   path: string,
   browsing: Browsing,
 ): BrowserEntry[] | undefined {
-  const root = reader.trees.get(`${ref}:`);
+  const root = reader.trees.get(reader.keyOf(ref, ""));
   if (root === undefined) return undefined;
   const entries: BrowserEntry[] = [];
   const list = (tree: RepoTree, within: string, depth: number): void => {
@@ -375,7 +438,7 @@ function browserOf(
       const open =
         !browsing.closed.has(at) &&
         (browsing.opened.has(at) || current || path.startsWith(`${at}/`));
-      const inside = open ? reader.trees.get(`${ref}:${at}`) : undefined;
+      const inside = open ? reader.trees.get(reader.keyOf(ref, at)) : undefined;
       entries.push({
         name: entry.name,
         path: at,
@@ -399,24 +462,36 @@ export function repositoryOf(
   address: RepoAddress,
   browsing: Browsing = AS_IT_COMES,
 ): RepositoryState {
-  if (reader.unserved) return { status: "unserved" };
-  const { project } = reader;
+  const reading = reader.reading;
+  if (reading?.id === undefined) return { status: "unknown" };
+  if (reader.refused) return { status: "refused" };
   const ref = reader.refOf(address, world.trunk.head);
-  if (project === undefined || ref === undefined) return { status: "loading" };
-  const head = world.trunk.head === "" ? project.head : world.trunk.head;
+  // The commit being read: the one Keel resolved the ref to, once it has answered anything read at it.
+  const sha = reader.resolved.get(reader.keyOf(ref, "")) ?? (ref === HEAD ? undefined : ref);
   const parts = address.path === "" ? [] : address.path.split("/");
-  const history = reader.histories.get(ref);
+  const history = reader.histories.get(reader.keyOf(ref, ""));
   const [latest] = history?.commits ?? [];
+  const view = viewOf(world, reader, address, ref);
+  // A project whose root cannot be read has no code to show, whatever the reason Keel gave.
+  if (view.kind === "absent" && address.view === "code" && address.path === "")
+    return { status: "refused" };
+  if (sha === undefined) return { status: "loading" };
   const browser =
     address.view === "code" && address.path !== ""
       ? browserOf(reader, ref, address.path, browsing)
       : undefined;
+  const visibility = reader.project?.visibility ?? reading.visibility;
   return {
     status: "ready",
-    project: { name: project.name, visibility: project.visibility, cloneUrl: project.cloneUrl },
-    ref: { sha: ref, head: ref === head },
+    project: {
+      name: reading.name,
+      ...(visibility === undefined ? {} : { visibility }),
+      ...(reader.project === undefined ? {} : { cloneUrl: reader.project.cloneUrl }),
+    },
+    // Where no commit was named, what is read is trunk's head, wherever that is.
+    ref: { sha, head: address.ref === undefined },
     crumbs: [
-      { name: project.name, path: "" },
+      { name: reading.name, path: "" },
       ...parts.map((name, index) => ({ name, path: parts.slice(0, index + 1).join("/") })),
     ],
     ...(latest === undefined ? {} : { latest: rowOf(world, latest) }),
@@ -425,6 +500,6 @@ export function repositoryOf(
       : { commits: { count: history.commits.length, more: history.more } }),
     green: world.trunk.redCount === 0,
     ...(browser === undefined ? {} : { browser }),
-    view: viewOf(world, reader, address, ref),
+    view,
   };
 }

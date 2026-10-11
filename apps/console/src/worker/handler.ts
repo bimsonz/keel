@@ -16,8 +16,11 @@
 import { CAPABILITY_TTL, checkCapability, mintCapability } from "../capability.ts";
 import type {
   Inbox_listEventsInput,
-  Scope as KeelScope,
   Operator_giveRulingInput,
+  Repo_getBlobInput,
+  Repo_getTreeInput,
+  Repo_listCommitsInput,
+  Scope as KeelScope,
   TokenRequest,
   TokenResponse,
   WireOutputs,
@@ -58,6 +61,17 @@ const EVENTS_QUERY = [
   "wait",
 ] as const satisfies readonly (keyof Inbox_listEventsInput)[];
 
+const TREE_QUERY = ["ref", "path"] as const satisfies readonly (keyof Repo_getTreeInput)[];
+const BLOB_QUERY = ["ref", "path"] as const satisfies readonly (keyof Repo_getBlobInput)[];
+const COMMITS_QUERY = [
+  "ref",
+  "cursor",
+  "limit",
+] as const satisfies readonly (keyof Repo_listCommitsInput)[];
+
+/** One of the reads of a project's repository: the project by Keel's id for it, then what is read. */
+const REPO = (rest: string): RegExp => new RegExp(`^/v1/projects/[A-Za-z0-9_]+/repo/${rest}$`);
+
 /**
  * What may be read through the console, and nothing else: each is one of Keel's own operations, the
  * path under /api it is served at, and the query it may carry. An id in a path is one segment of an id's
@@ -67,6 +81,11 @@ const READS: readonly { operation: keyof WireOutputs; path: RegExp; query: reado
   { operation: "Inbox_listEvents", path: /^\/v1\/events$/, query: EVENTS_QUERY },
   { operation: "Lattices_listLattices", path: /^\/v1\/lattices$/, query: [] },
   { operation: "Views_getVerdict", path: /^\/v1\/verdicts\/[A-Za-z0-9_]+$/, query: [] },
+  // A project's repository. Keel answers these with no token for a public project, and for no other.
+  { operation: "Repo_getTree", path: REPO("tree"), query: TREE_QUERY },
+  { operation: "Repo_getBlob", path: REPO("blob"), query: BLOB_QUERY },
+  { operation: "Repo_listCommits", path: REPO("commits"), query: COMMITS_QUERY },
+  { operation: "Repo_getCommit", path: REPO("commits/[0-9a-f]{4,64}"), query: [] },
 ];
 
 /** Keel's code for a request it could not read. On a ruling, that would be this Worker's own mistake. */

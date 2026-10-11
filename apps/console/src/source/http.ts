@@ -18,10 +18,17 @@ import type {
   EventRecord,
   Inbox_listEventsInput,
   LatticeSet,
+  RepoBlob,
+  RepoCommitDiff,
+  RepoCommitPage,
+  RepoTree,
+  Repo_getBlobInput,
+  Repo_getTreeInput,
+  Repo_listCommitsInput,
   RulingRequest,
   VerdictView,
 } from "../contract/keel/index.ts";
-import type { KeelRepository } from "./repository.ts";
+import { type KeelRepository, RepoRefused } from "./repository.ts";
 import type {
   ChangeDiff,
   KeelCommands,
@@ -60,10 +67,6 @@ const FRESH_FOR = 120;
 
 export type HttpSource = KeelEventSource & KeelResources & KeelRepository & KeelCommands;
 
-/** Keel's contract has no operation for reading a repository yet (QUESTIONS.md, R1 to R6). Until it has, nothing is read, and nothing stands in for it. */
-const noRepository = (): Promise<never> =>
-  Promise.reject(new Error("Keel does not serve its repository yet"));
-
 const KNOWN: ReadonlySet<string> = new Set(EVENT_TYPES);
 
 /** What the console's Worker answers besides Keel's own bodies. */
@@ -81,6 +84,16 @@ function toEvent(record: EventRecord): AnyEvent | null {
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a wire boundary: the type was checked by name above
   return record as unknown as AnyEvent;
 }
+
+/** A query string of what was given, by Keel's own names for an operation's inputs. */
+const queryOf = (input: Record<string, string | number | undefined>): string => {
+  const query = new URLSearchParams(
+    Object.entries(input).flatMap(([name, value]) =>
+      value === undefined || value === "" ? [] : [[name, String(value)]],
+    ),
+  ).toString();
+  return query === "" ? "" : `?${query}`;
+};
 
 export async function createHttpSource(options: HttpSourceOptions): Promise<HttpSource> {
   const request = options.fetch ?? fetch;
@@ -121,6 +134,27 @@ export async function createHttpSource(options: HttpSourceOptions): Promise<Http
     if (typeof answer.capability !== "string" || typeof answer.expires !== "number") return null;
     minted.set(escalationId, { capability: answer.capability, expires: answer.expires });
     return answer.capability;
+  };
+
+  /**
+   * One of Keel's reads of a project's repository. Keel says why it refuses one by its own code: no such
+   * project for this reader, no such ref, no such path.
+   */
+  const repo = async <Body>(
+    projectId: string,
+    rest: string,
+    signal?: AbortSignal,
+  ): Promise<Body> => {
+    const response = await read(
+      `/v1/projects/${encodeURIComponent(projectId)}/repo${rest}`,
+      signal,
+    );
+    if (!response.ok) {
+      const refusal: { code?: unknown } = await response.json().catch(() => ({}));
+      throw new RepoRefused(typeof refusal.code === "string" ? refusal.code : "", response.status);
+    }
+    const body: Body = await response.json();
+    return body;
   };
 
   const events = async (asked: ReadRequest): Promise<Page<AnyEvent>> => {
@@ -179,12 +213,26 @@ export async function createHttpSource(options: HttpSourceOptions): Promise<Http
     },
     readObservations: (asked = {}) =>
       Promise.resolve({ items: [], nextCursor: asked.cursor ?? "" }),
-    getProject: noRepository,
-    getTree: noRepository,
-    getBlob: noRepository,
-    getCommits: noRepository,
-    getCommitDiff: noRepository,
-    getNotes: noRepository,
+    getTree: (projectId, at, signal) =>
+      repo<RepoTree>(
+        projectId,
+        `/tree${queryOf({ ...at } satisfies Omit<Repo_getTreeInput, "projectId">)}`,
+        signal,
+      ),
+    getBlob: (projectId, at, signal) =>
+      repo<RepoBlob>(
+        projectId,
+        `/blob${queryOf({ ...at } satisfies Omit<Repo_getBlobInput, "projectId">)}`,
+        signal,
+      ),
+    getCommits: (projectId, asked, signal) =>
+      repo<RepoCommitPage>(
+        projectId,
+        `/commits${queryOf({ ...asked } satisfies Omit<Repo_listCommitsInput, "projectId">)}`,
+        signal,
+      ),
+    getCommit: (projectId, sha, signal) =>
+      repo<RepoCommitDiff>(projectId, `/commits/${encodeURIComponent(sha)}`, signal),
     getDiff: (changeId: string): Promise<ChangeDiff> =>
       Promise.reject(new Error(`the API has no diff endpoint yet (${changeId})`)),
     getProbeSource: (probeId: string): Promise<ProbeSource> =>

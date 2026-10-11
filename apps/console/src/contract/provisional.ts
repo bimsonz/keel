@@ -90,3 +90,38 @@ export interface ProvisionalFields {
     }[];
   };
 }
+
+/**
+ * QUESTIONS R6: the project behind an address, as Keel will give it by name.
+ * Keel's contract does not have it yet. The console takes the clone address from it, and nothing else.
+ */
+export interface RepoProject {
+  id: string;
+  name: string;
+  visibility: "public" | "private";
+  /** Where `git clone` is pointed. */
+  cloneUrl: string;
+  /** Trunk's head, as a commit. */
+  head: string;
+}
+
+/** QUESTIONS R5: why a line is as it is. It waits on `why`, which Keel does not serve yet. */
+export interface RepoNote {
+  /** The lines it is about, first and last, counted from 1. */
+  from: number;
+  to: number;
+  /** The subject those lines anchor. */
+  subject: string;
+  kind: "premise" | "tenet" | "guard" | "decision";
+  /** Keel's short name for the tenet, guard or decision. */
+  label?: string;
+  summary: string;
+  /** For a premise: the change that holds it. */
+  holder?: { changeId: string; label: string };
+}
+
+export interface RepoNotes {
+  path: string;
+  ref: string;
+  notes: RepoNote[];
+}

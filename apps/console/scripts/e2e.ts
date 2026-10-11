@@ -396,7 +396,7 @@ expectEqual(
 expectEqual(
   "code: the root, directories first",
   (await page.locator(".a-tree li").allInnerTexts()).map(squash).join(" | "),
-  "src | package.json 215 B | README.md 507 B",
+  "src | package.json | README.md",
 );
 expectEqual(
   "code: the README, read into headings",
@@ -545,9 +545,7 @@ expectEqual(
 
 // A fixture with no repository says so, and shows nothing in its place.
 await page.goto(at("", "scenario=swarm&t=100&play=0"), { waitUntil: "networkidle" });
-await page
-  .getByRole("heading", { name: "Keel does not serve this project's repository yet" })
-  .waitFor();
+await page.getByRole("heading", { name: "Keel has no code to show here" }).waitFor();
 expectEqual(
   "code: nothing is shown where there is none",
   String(await page.locator(".a-tree, .a-clone").count()),
@@ -1109,7 +1107,7 @@ async function behindTheWorker(context: BrowserContext, shown: string[] = []): P
 }
 
 const NOT_SHOWN = "This page is not shown to visitors yet";
-const NO_REPOSITORY = "Keel does not serve this project's repository yet";
+const NO_CODE_FOR_VISITORS = "This project's code is not shown to visitors yet";
 const OPEN_ON_TABS =
   "Code | Changes 2 open | Conflicts 1 open | Escalations 1 waiting for a person | Mission Control | Insights";
 
@@ -1134,9 +1132,10 @@ expectEqual(
   String(await visitor.getByText("Test fixture").count()),
   "0",
 );
-// Keel's contract has no way to read a repository yet. The built console says so, and shows nothing in its place.
+// Keel reads a repository by the project's id, and a visitor has only the name in the address: Keel has no way
+// yet to find a project by its name. The built console says so, asks Keel nothing, and shows nothing in its place.
 await visitor.goto(`${built}/demo`, { waitUntil: "domcontentloaded" });
-await visitor.getByRole("heading", { name: NO_REPOSITORY }).waitFor();
+await visitor.getByRole("heading", { name: NO_CODE_FOR_VISITORS }).waitFor();
 expectEqual(
   "visitor: no repository is made up",
   String(await visitor.locator(".a-tree, .a-clone, .a-prose").count()),
@@ -1212,8 +1211,20 @@ expectEqual(
   "demo private",
 );
 await presenter.getByRole("list", { name: "Projects" }).getByRole("link", { name: "demo" }).click();
-await presenter.getByRole("heading", { name: NO_REPOSITORY }).waitFor();
+// The project's code, read from Keel's own repository reads: its files, with the README beneath.
+await presenter.locator(".a-prose h2").first().waitFor();
 expectEqual("presenter: a project opens at its own address", pathOf(presenter), "/demo");
+expectEqual(
+  "presenter: the project's files, read from Keel",
+  (await presenter.locator(".a-tree li").allInnerTexts()).map(squash).join(" | "),
+  "src | package.json | README.md",
+);
+// Keel has no clone address to give yet, and the console makes none up.
+expectEqual(
+  "presenter: no clone address is made up",
+  String(await presenter.locator(".a-clone").count()),
+  "0",
+);
 expectEqual(
   "presenter: live, and says so",
   String(await presenter.getByText("Live", { exact: true }).count()),
@@ -1364,12 +1375,16 @@ expectEqual(
   "built: Keel is asked only for what its contract has",
   [
     ...new Set(
-      keel.calls.map((call) => call.path.replace(/\/v1\/verdicts\/.+/, "/v1/verdicts/{id}")),
+      keel.calls.map((call) =>
+        call.path
+          .replace(/\/v1\/verdicts\/.+/, "/v1/verdicts/{id}")
+          .replace(/\/v1\/projects\/[^/]+\//, "/v1/projects/{id}/"),
+      ),
     ),
   ]
     .toSorted()
     .join(" "),
-  "/v1/events /v1/lattices /v1/oauth/token /v1/verdicts/{id}",
+  "/v1/events /v1/lattices /v1/oauth/token /v1/projects/{id}/repo/blob /v1/projects/{id}/repo/commits /v1/projects/{id}/repo/tree /v1/verdicts/{id}",
 );
 // The presenter's page showed its key on every read, and the Worker read Keel as the observer for each: never
 // with the key itself, and never as anything more.

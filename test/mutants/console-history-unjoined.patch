@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/repository.test.ts
+# kills: repository.history
+# why: a commit in history is not joined to the advance that landed it: no height, and never unverified
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 30862d0..4298468 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -1037,7 +1037,7 @@ export class World {
+         // mid-log. An advance that does not say its height leaves the count where Keel last put it.
+         this.trunk.advances = event.payload.height ?? this.trunk.advances;
+         for (const landing of event.payload.landings) {
+-          this.landed.set(landing.commitSha, {
++          this.landed.set(`not ${landing.commitSha}`, {
+             changeId: landing.changeId,
+             height: this.trunk.advances,
+             unverified: event.payload.verified === false,
