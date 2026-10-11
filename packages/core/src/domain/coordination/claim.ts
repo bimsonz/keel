@@ -12,7 +12,7 @@ import type {
   Ordering,
 } from "./lattice.ts";
 import { isInvalidated } from "./lattice.ts";
-import type { Predicate, Proposition, Strength, SubjectKey } from "./proposition.ts";
+import { type Predicate, type Proposition, type Strength, SubjectKey } from "./proposition.ts";
 import { readScope, type Scope, writeScope } from "./scope.ts";
 import { readShape, type Shape } from "./shape.ts";
 
@@ -172,10 +172,10 @@ const readValue = (p: Proposition): Claim | string => {
       if (
         (rel !== "before" && rel !== "after") ||
         typeof v !== "string" ||
-        v === "" ||
+        !EVENT_KEY.test(v) ||
         v === p.subject
       ) {
-        return "ordering takes before/after and another event";
+        return "ordering takes before/after and another event's key";
       }
       return {
         predicate: "ordering",
@@ -267,6 +267,24 @@ const writeValue = (
     default:
       return { relation: claim.relation, value: claim.value };
   }
+};
+
+const SWAPPED = { before: "after", after: "before" } as const;
+
+/**
+ * A proposition in its canonical form.
+ * `a before b` and `b after a` are one proposition: an ordering is written
+ * from the lesser of its two event keys by code point (keys are ASCII, so `<`
+ * is code-point order), swapping before and after when it is rewritten, so
+ * both holders route to one subject and are compared there. Every other field
+ * is kept. Anything else, an unreadable ordering included, comes back as it
+ * is. Applied where propositions enter Keel: at declare and at derive.
+ */
+export const canonicalProposition = (p: Proposition): Proposition => {
+  if (p.predicate !== "ordering" || (p.relation !== "before" && p.relation !== "after")) return p;
+  const other = p.value;
+  if (typeof other !== "string" || !EVENT_KEY.test(other) || other >= p.subject) return p;
+  return { ...p, subject: SubjectKey.make(other), relation: SWAPPED[p.relation], value: p.subject };
 };
 
 export type PropositionDetails = {

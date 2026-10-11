@@ -26,6 +26,7 @@ import {
   isAgentOwned,
   TERMINAL,
 } from "./change.ts";
+import { canonicalProposition } from "./claim.ts";
 import type { DerivedEffect, Drift } from "./derivation.ts";
 import {
   ChangeBlocked,
@@ -301,6 +302,10 @@ const leaseOf = (command: ChangeCommand): LeaseId | undefined => {
   }
 };
 
+/** Propositions in the canonical form they are committed in: declare and derive are where they enter. */
+const canonical = (propositions: readonly Proposition[]): readonly Proposition[] =>
+  propositions.map(canonicalProposition);
+
 const declare = (command: Extract<ChangeCommand, { _tag: "Declare" }>): Decision =>
   Result.succeed([
     IntentDeclared.make({
@@ -311,10 +316,10 @@ const declare = (command: Extract<ChangeCommand, { _tag: "Declare" }>): Decision
       revision: 1,
       goal: command.goal,
       footprint: command.footprint,
-      premises: command.premises,
+      premises: canonical(command.premises),
       ...(command.declaredEffects === undefined
         ? {}
-        : { declaredEffects: command.declaredEffects }),
+        : { declaredEffects: canonical(command.declaredEffects) }),
       leaseId: command.leaseId,
     }),
     preflightIssued(command.changeId, 1, command.preflight),
@@ -389,11 +394,11 @@ export const decideChange = (
           revision: revision + 1,
           ...(command.goal === undefined ? {} : { goal: command.goal }),
           ...(command.footprint === undefined ? {} : { footprint: command.footprint }),
-          premisesAdded: command.premisesAdded,
-          premisesRetracted: command.premisesRetracted,
+          premisesAdded: canonical(command.premisesAdded),
+          premisesRetracted: canonical(command.premisesRetracted),
           ...(command.declaredEffects === undefined
             ? {}
-            : { declaredEffects: command.declaredEffects }),
+            : { declaredEffects: canonical(command.declaredEffects) }),
         }),
         preflightIssued(id, revision + 1, command.preflight),
       ]);
@@ -405,7 +410,7 @@ export const decideChange = (
             IntentRevised.make({
               changeId: id,
               revision: revision + 1,
-              premisesAdded: [command.premise],
+              premisesAdded: [canonicalProposition(command.premise)],
               premisesRetracted: [],
             }),
             preflightIssued(id, revision + 1, command.preflight),
@@ -477,7 +482,10 @@ export const decideChange = (
                   EffectsDerived.make({
                     changeId: id,
                     revision,
-                    effects: command.derivation.effects,
+                    effects: command.derivation.effects.map((effect) => ({
+                      ...effect,
+                      proposition: canonicalProposition(effect.proposition),
+                    })),
                     derivationRef: command.derivation.derivationRef,
                   }),
                 ]),
