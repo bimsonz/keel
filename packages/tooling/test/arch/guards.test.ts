@@ -28,6 +28,15 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
     /runner call leaves sourceControlCredentials unset/,
     /runner options are not an object literal/,
   ],
+  "loader-spec": [
+    /leaves globalOutbound unset/,
+    /sets globalOutbound to something other than the literal null/,
+    /hands the isolate an env/,
+    /spreads an object/,
+    /is not an arrow returning an object literal/,
+    /LOADER is used other than as LOADER\.get/,
+    /LOADER is destructured or passed on/,
+  ],
   "readonly-bundles": [
     /used for something other than get, head or list/,
     /BUNDLES is destructured/,

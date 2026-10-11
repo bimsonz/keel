@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/probe-runner.test.ts
+# kills: tier1.bundler-fenced
+# why: worker-bundler installs a declared dependency from npm inside the VerifierDO, which has outbound fetch
+diff --git a/apps/keel-verify/src/adapters/driving/do/tier1/bundle.ts b/apps/keel-verify/src/adapters/driving/do/tier1/bundle.ts
+index a7428b5..81968f4 100644
+--- a/apps/keel-verify/src/adapters/driving/do/tier1/bundle.ts
++++ b/apps/keel-verify/src/adapters/driving/do/tier1/bundle.ts
+@@ -40,7 +40,6 @@ export async function bundleProbe(worker: ProbeWorker): Promise<BundledProbe> {
+   const { createWorker, hasDependencies, InMemoryFileSystem } =
+     await import("@cloudflare/worker-bundler");
+   const files = new InMemoryFileSystem({ ...worker.files });
+-  if (hasDependencies(files)) throw new BundlerFenced();
+   try {
+     const built = await createWorker({
+       files,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/probe-runner.test.ts
+# kills: tier1.fresh-isolate
+# why: Every run reuses one warm isolate, so module state from an earlier run leaks into the next and calibration runs are not independent
+diff --git a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
+index 104e6d2..3d0cc9f 100644
+--- a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
++++ b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
+@@ -175,7 +175,7 @@ async function withDeadline<T>(ms: number, work: () => Promise<T>): Promise<T> {
+ 
+ /** One run on a fresh isolate (a new random id every time: warm reuse leaks module state), with no network. */
+ async function runIsolate(tier1: Tier1, bundled: BundledProbe) {
+-  const stub = tier1.env.LOADER.get(crypto.randomUUID(), () => ({
++  const stub = tier1.env.LOADER.get("probe", () => ({
+     compatibilityDate: COMPATIBILITY_DATE,
+     mainModule: bundled.mainModule,
+     modules: bundled.modules,

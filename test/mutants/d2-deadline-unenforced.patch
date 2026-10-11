@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/probe-runner.test.ts
+# kills: tier1.deadline
+# why: A probe that never finishes holds its slot and the matrix forever, since cpuMs is not enforced on a fresh isolate
+diff --git a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
+index 104e6d2..9e37e27 100644
+--- a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
++++ b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
+@@ -167,7 +167,7 @@ async function withDeadline<T>(ms: number, work: () => Promise<T>): Promise<T> {
+     );
+   });
+   try {
+-    return await Promise.race([work(), deadline]);
++    return await work();
+   } finally {
+     clearTimeout(timer);
+   }

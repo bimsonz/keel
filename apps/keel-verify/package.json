@@ -13,12 +13,14 @@
   "dependencies": {
     "@cloudflare/ci": "catalog:",
     "@cloudflare/sandbox": "catalog:",
+    "@cloudflare/worker-bundler": "catalog:",
     "@keeltown/core": "workspace:*",
     "@keeltown/runner-protocol": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "catalog:",
+    "@keeltown/testing": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",

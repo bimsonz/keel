@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/probe-runner.test.ts
+# kills: tier1.isolate-check
+# why: An isolate replaced mid-run (a memory overrun that still answered ok) counts as a clean run
+diff --git a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
+index 104e6d2..3c5ad83 100644
+--- a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
++++ b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
+@@ -133,7 +133,7 @@ async function build(env: Tier1Env, request: Tier1Request): Promise<BundledProbe
+ export function judgeIsolate(run: IsolateSeen, check: IsolateSeen): string | undefined {
+   if (run.served !== 1)
+     return `the probe ran on an isolate that had already served ${run.served - 1} request(s)`;
+-  if (check.instance !== run.instance)
++  if (false)
+     return `the isolate was replaced during the run (${run.instance}, then ${check.instance})`;
+   if (check.served !== 2)
+     return `the isolate served ${check.served} request(s) by its check, not 2`;

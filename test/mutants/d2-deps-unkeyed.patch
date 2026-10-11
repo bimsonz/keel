@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/probe-runner.test.ts
+# kills: tier1.deps-keyed
+# why: A deps bundle installed from another lockfile serves the world, so the probe runs against packages the world never resolved
+diff --git a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
+index 104e6d2..c56f01f 100644
+--- a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
++++ b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
+@@ -101,7 +101,7 @@ async function depsFor(
+     throw new Unavailable(`deps/${need.sha256} does not name a bundle`);
+   const deps = await fetchVerified(env, hex, "deps bundle");
+   const lockfile = deps.find((file) => file.path === LOCKFILE);
+-  if (lockfile === undefined || (await sha256Hex(lockfile.bytes)) !== need.sha256)
++  if (lockfile === undefined)
+     throw new Unavailable(
+       `lockfile-diverged: deps bundle ${hex} was not installed from ${LOCKFILE} ${need.sha256}`,
+     );

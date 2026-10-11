@@ -29,6 +29,8 @@ catalog:
   "@cloudflare/sandbox": 0.12.1
   wrangler: 4.149.0
   "@cloudflare/workers-types": 5.20261010.1
+  # Tier 1: bundles a probe over a world inside the VerifierDO (esbuild-wasm); it never installs.
+  "@cloudflare/worker-bundler": 0.2.6
   fast-check: 4.10.2
   # Test-only: the domain machines' XState-format charts; never a runtime (guard xstate-test-only).
   xstate: 5.33.2

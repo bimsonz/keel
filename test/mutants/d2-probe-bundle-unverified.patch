@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/probe-runner.test.ts
+# kills: tier1.bundle-verified
+# why: A bundle is read whatever its bytes hash to, so a probe other than the one the matrix named can run under its hash
+diff --git a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
+index 104e6d2..3b44add 100644
+--- a/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
++++ b/apps/keel-verify/src/adapters/driving/do/tier1/run-probe.ts
+@@ -70,8 +70,6 @@ async function fetchVerified(env: Tier1Env, hex: string, what: string): Promise<
+   const object = await env.BUNDLES.get(key);
+   if (object === null) throw new Unavailable(`${what} ${key} is not in the bundle store`);
+   const bytes = new Uint8Array(await object.arrayBuffer());
+-  if ((await sha256Hex(bytes)) !== hex)
+-    throw new Unavailable(`${what} ${key} does not hash to its key`);
+   try {
+     return await readBundle(bytes);
+   } catch (error) {
