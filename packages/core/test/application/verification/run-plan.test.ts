@@ -266,6 +266,29 @@ describe("run-plan: the compiled plan's flow, executed", () => {
     expect(fails.calls).toEqual(["a"]);
   });
 
+  it("[run-plan.when-demands] a when whose condition reads a step nothing ran yet runs that step first", async () => {
+    // CI seed 94482676: a cascade stopped at s0, so s1 never ran, and a when read s1.
+    const steps = [
+      proofStep("a", { outcomes: ["pass", "annotate", "abstain"] }),
+      proofStep("b"),
+      proofStep("c"),
+    ];
+    const flow = seq(
+      { _tag: "cascade", accept: ["annotate"], items: [leaf("a"), leaf("b")] },
+      { _tag: "when", condition: { _tag: "outcome", step: "b", in: ["abstain"] }, body: leaf("c") },
+    );
+    const plan = handPlan(steps, flow);
+    const answer = (s: PlanStep, w: FlowWorld | undefined) =>
+      report(s, w, s.id === "a" ? "annotate" : s.id === "b" ? "abstain" : "pass");
+    const { calls, runner } = recording(answer);
+    const ran = await run(plan, runner);
+    expect(calls).toEqual(["a", "b", "c"]);
+    expect(verdictOn(plan, ran)).toEqual(
+      verdictOn(plan, await runAll(plan, recording(answer).runner)),
+    );
+    expect(verdictOn(plan, ran).outcome).toBe("land");
+  });
+
   it("[run-plan.worlds] a step under worlds runs once in each world, told which", async () => {
     const plan = handPlan([proofStep("probe", { worlds: ["trunk", "A", "B", "AB"] })], {
       _tag: "worlds",

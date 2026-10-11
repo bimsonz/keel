@@ -80,6 +80,18 @@ const severer = (a: StepResult, b: StepResult): StepResult =>
       ? a
       : b;
 
+/** The steps a condition reads. */
+const conditionSteps = (c: Condition): string[] => {
+  switch (c._tag) {
+    case "outcome":
+      return [c.step];
+    case "not":
+      return conditionSteps(c.item);
+    default:
+      return c.items.flatMap(conditionSteps);
+  }
+};
+
 /** A condition over what has run so far: the same reading `verdict/1` gives it. */
 const holds = (s: State, c: Condition, world: FlowWorld | undefined): boolean | "unknown" => {
   switch (c._tag) {
@@ -213,9 +225,20 @@ const evaluate = <R>(
         { concurrency: "unbounded" },
       ).pipe(Effect.map(combine));
     case "when": {
-      const v = holds(s, flow.condition, world);
-      if (v === "unknown") return Effect.succeed(PENDING);
-      return v ? evaluate(s, runner, flow.body, world, accounts) : Effect.succeed(PASS);
+      // A step the condition reads may not have run (a cascade stopped short of it): run it now,
+      // in each world it runs in, so the condition reads what verdict/1 reads.
+      const demanded = conditionSteps(flow.condition).flatMap((id) =>
+        (s.steps.get(id)?.worlds ?? [undefined]).map(
+          (w) => () => evaluate(s, runner, { _tag: "step", step: id }, w, accounts),
+        ),
+      );
+      return Effect.forEach(demanded, (run) => run(), { discard: true }).pipe(
+        Effect.flatMap(() => {
+          const v = holds(s, flow.condition, world);
+          if (v === "unknown") return Effect.succeed(PENDING);
+          return v ? evaluate(s, runner, flow.body, world, accounts) : Effect.succeed(PASS);
+        }),
+      );
     }
     default:
       return evaluate(s, runner, flow.body, world, [
@@ -245,12 +268,13 @@ const order = (flow: Flow, world: FlowWorld | undefined): string[] => {
  * Runs a compiled plan's flow, reaching exactly the steps `verdict/1` reads:
  * a seq stops at a blocking fail, unless a human step that may override it is
  * still to run; par and worlds run every item at once; a cascade stops at the
- * first outcome it accepts; a when runs its body only if its condition holds
- * over what has already run; a step an earlier result skipped (and was allowed
- * to) never runs. A step a union shares between branches runs once, and every
- * branch reads its result. Once a budget's body has spent more time than its limit,
- * its remaining steps abstain unrun, so the change parks. Each step runs at
- * most once per world, and the reports come back in the flow's order.
+ * first outcome it accepts; a when first runs any step its condition reads
+ * that has not run, then runs its body only if the condition holds; a step an
+ * earlier result skipped (and was allowed to) never runs. A step a union
+ * shares between branches runs once, and every branch reads its result. Once
+ * a budget's body has spent more time than its limit, its remaining steps
+ * abstain unrun, so the change parks. Each step runs at most once per world,
+ * and the reports come back in the flow's order.
  */
 export const runPlan = <R>(
   plan: FlowPlan,

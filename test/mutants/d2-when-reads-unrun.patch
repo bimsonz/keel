@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-plan.test.ts
+# kills: run-plan.when-demands
+# why: A when whose condition reads a step a cascade stopped short of holds the change forever, though every step it needs could run
+diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
+index 504928d..1ea85ff 100644
+--- a/packages/core/src/application/verification/run-plan.ts
++++ b/packages/core/src/application/verification/run-plan.ts
+@@ -232,7 +232,7 @@ const evaluate = <R>(
+           (w) => () => evaluate(s, runner, { _tag: "step", step: id }, w, accounts),
+         ),
+       );
+-      return Effect.forEach(demanded, (run) => run(), { discard: true }).pipe(
++      return Effect.forEach(demanded.slice(0, 0), (run) => run(), { discard: true }).pipe(
+         Effect.flatMap(() => {
+           const v = holds(s, flow.condition, world);
+           if (v === "unknown") return Effect.succeed(PENDING);
