@@ -725,6 +725,25 @@ model VerdictIssued {
   nextActions?: EventNextAction[];
 }
 
+/** One answer a person can give, with what choosing it does. A ruling names it by `id`. */
+model EscalationOption {
+  @minLength(1)
+  id: string;
+
+  label: string;
+  consequence: string;
+}
+
+/** One piece of evidence put before the person, by class. */
+model EscalationEvidence {
+  class: "proof" | "ruling" | "testimony" | "opinion";
+
+  @minLength(1)
+  summary: string;
+
+  ref?: string;
+}
+
 model EscalationRaised {
   _tag: "EscalationRaised";
   escalationId: EscalationId;
@@ -732,9 +751,23 @@ model EscalationRaised {
   @minLength(1)
   question: string;
 
-  options: string[];
-  consequences: string[];
+  /** At least two, with unique ids. */
+  options: EscalationOption[];
+
   about: EntityRef;
+  category:
+    | "permission-semantics"
+    | "destructive-migration"
+    | "ambiguous-requirement"
+    | "unprovable-conflict"
+    | "overrule-request"
+    | "frozen-trunk";
+  evidence: EscalationEvidence[];
+  precedents: DecisionId[];
+
+  /** The option suggested to the person: one of `options`, never applied on a timeout. */
+  @minLength(1)
+  default: string;
 }
 
 model EscalationWithdrawn {
@@ -972,7 +1005,11 @@ model AuditCompleted {
 model RulingGiven {
   _tag: "RulingGiven";
   escalationId: EscalationId;
+
+  /** The id of the option chosen. */
+  @minLength(1)
   option: string;
+
   by: string;
   rationale?: string;
 }
@@ -981,6 +1018,14 @@ model DecisionRecorded {
   _tag: "DecisionRecorded";
   decisionId: DecisionId;
   escalationId: EscalationId;
+
+  /** The id of the option the ruling chose. */
+  @minLength(1)
+  option: string;
+
+  /** The chosen option's label. */
+  summary: string;
+
   scope?: string;
   evidence: string[];
   alternatives: {
