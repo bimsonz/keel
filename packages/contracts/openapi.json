@@ -12431,6 +12431,13 @@
           "verified": {
             "type": "boolean",
             "description": "False when the project's verification is off and the plan was not run. Absent means true."
+          },
+          "nextActions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventNextAction"
+            },
+            "description": "The remedy, named by the issuer; the Change DO copies it onto ChangeBounced."
           }
         },
         "additionalProperties": {

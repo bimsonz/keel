@@ -720,6 +720,9 @@ model VerdictIssued {
 
   /** False when the project's verification is off and the plan was not run. Absent means true. */
   verified?: boolean;
+
+  /** The remedy, named by the issuer; the Change DO copies it onto ChangeBounced. */
+  nextActions?: EventNextAction[];
 }
 
 model EscalationRaised {
