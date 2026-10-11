@@ -171,7 +171,7 @@ for (const e of events) {
     e.project === project.id &&
     e.payload.verified !== false
   )
-    for (const member of e.payload.members) landedBy.set(member, e.payload.to);
+    for (const landing of e.payload.landings) landedBy.set(landing.changeId, landing.commitSha);
 }
 const wanted = project.agents.slice(0, 2).map((a) => a.agentId);
 const landedAgents = new Set([...landedBy.keys()].map((id) => agentOf.get(id)));

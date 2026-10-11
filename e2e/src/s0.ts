@@ -123,6 +123,11 @@ const advancesOf = (events: readonly EventRecord[], projectId: string) =>
     e.project === projectId && e.payload._tag === "TrunkAdvanced" ? [e.payload] : [],
   );
 
+type Advance = ReturnType<typeof advancesOf>[number];
+
+/** The changes an advance landed, from its landing records. */
+const landedIn = (advance: Advance): readonly string[] => advance.landings.map((l) => l.changeId);
+
 const addFile = (agent: string): Work => ({
   goal: `Add ${agent}'s S-0 note for run ${run}`,
   path: `s0/${run}/${agent}.md`,
@@ -234,16 +239,24 @@ async function arms(): Promise<void> {
   const events = await feedSince(from);
   const advances = advancesOf(events, projectId);
   check(
-    !advances.some((a) => a.members.includes(red.changeId)),
+    !advances.some((a) => landedIn(a).includes(red.changeId)),
     "(c) trunk never holds the red change",
-    advances.map((a) => ({ to: a.to, members: a.members, verified: a.verified })),
+    advances.map((a) => ({ to: a.to, landed: landedIn(a), verified: a.verified })),
+  );
+  // Each member lands as its own commit in the composed chain, so the advance's head is the last of them.
+  check(
+    advances.every(
+      (a) => a.landings.length > 0 && a.landings[a.landings.length - 1]?.commitSha === a.to,
+    ),
+    "every advance's head is the commit its last landing names: the landed commits are on trunk",
+    advances.map((a) => ({ to: a.to, commits: a.landings.map((l) => l.commitSha) })),
   );
   check(
     advances.every((a) => a.verified !== false),
     "(c) every advance in the run was verified: the red count is 0",
   );
   if (!control) {
-    const moved = landedIds.filter((id) => advances.some((a) => a.members.includes(id)));
+    const moved = landedIds.filter((id) => advances.some((a) => landedIn(a).includes(id)));
     check(
       moved.length === landedIds.length &&
         new Set(advances.map((a) => a.to)).size >= landedIds.length,
