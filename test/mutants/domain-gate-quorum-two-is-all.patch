@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/opinion-gate.test.ts
+# kills: gate.quorum
+# why: Two of three takes the minimum mass over the asks, so it needs all three votes
+diff --git a/packages/core/src/domain/verification/opinion-gate.ts b/packages/core/src/domain/verification/opinion-gate.ts
+index e8fc437..621f5b2 100644
+--- a/packages/core/src/domain/verification/opinion-gate.ts
++++ b/packages/core/src/domain/verification/opinion-gate.ts
+@@ -56,7 +56,7 @@ type Vote = "contradiction" | "compatible" | "abstain";
+ const voteOf = (ask: OpinionAsk, t: GateThreshold): Vote =>
+   ask.violating >= t.raise ? "contradiction" : ask.compatible >= t.floor ? "compatible" : "abstain";
+ 
+-const quorumOf = (t: GateThreshold): number => (t.quorum === "all" ? ASKS : 2);
++const quorumOf = (t: GateThreshold): number => (t.quorum === "all" ? ASKS : ASKS);
+ 
+ /**
+  * Routes a decision model's answer to one premise question

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/opinion-gate.test.ts
+# kills: gate.defaults
+# why: Freshness raises at 0.60, below S17c's 0.65, so S-1's B-prime at 0.603 is suspected on opinion alone
+diff --git a/packages/core/src/domain/verification/opinion-gate.ts b/packages/core/src/domain/verification/opinion-gate.ts
+index e8fc437..d804200 100644
+--- a/packages/core/src/domain/verification/opinion-gate.ts
++++ b/packages/core/src/domain/verification/opinion-gate.ts
+@@ -101,7 +101,7 @@ export const DEFAULT_GATE: GateTable = {
+     purity: twoOfThree(0.5),
+     idempotent: twoOfThree(0.5),
+     cardinality: twoOfThree(0.5),
+-    freshness: all(0.65),
++    freshness: all(0.6),
+     ordering: twoOfThree(0.7),
+     consistency: all(0.75),
+   },

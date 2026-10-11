@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/opinion-gate.test.ts
+# kills: gate.abstains-escalate
+# why: A missing ask counts as zero mass, so two of three can decide while a truncated ask is ignored
+diff --git a/packages/core/src/domain/verification/opinion-gate.ts b/packages/core/src/domain/verification/opinion-gate.ts
+index e8fc437..e1093d6 100644
+--- a/packages/core/src/domain/verification/opinion-gate.ts
++++ b/packages/core/src/domain/verification/opinion-gate.ts
+@@ -70,8 +70,8 @@ export const gateOpinion = (
+   threshold: GateThreshold,
+ ): GateOutcome => {
+   if (!unit(threshold.raise) || !unit(threshold.floor)) return "escalate";
+-  if (asks.length !== ASKS || !asks.every(validAsk)) return "escalate";
+-  const votes = asks.map((ask) => voteOf(ask, threshold));
++  if (asks.length !== ASKS || !asks.every((a) => a === undefined || validAsk(a))) return "escalate";
++  const votes = asks.map((ask) => voteOf(ask ?? { violating: 0, compatible: 0 }, threshold));
+   const quorum = quorumOf(threshold);
+   if (votes.filter((v) => v === "contradiction").length >= quorum) return "suspect";
+   if (votes.filter((v) => v === "compatible").length >= quorum) return "annotate";

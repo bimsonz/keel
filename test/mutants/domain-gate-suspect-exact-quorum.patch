@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/opinion-gate.test.ts
+# kills: gate.monotone-mass
+# why: Suspect needs exactly the quorum of contradiction votes, so a third one undoes the suspicion
+diff --git a/packages/core/src/domain/verification/opinion-gate.ts b/packages/core/src/domain/verification/opinion-gate.ts
+index e8fc437..67cb3f1 100644
+--- a/packages/core/src/domain/verification/opinion-gate.ts
++++ b/packages/core/src/domain/verification/opinion-gate.ts
+@@ -73,7 +73,7 @@ export const gateOpinion = (
+   if (asks.length !== ASKS || !asks.every(validAsk)) return "escalate";
+   const votes = asks.map((ask) => voteOf(ask, threshold));
+   const quorum = quorumOf(threshold);
+-  if (votes.filter((v) => v === "contradiction").length >= quorum) return "suspect";
++  if (votes.filter((v) => v === "contradiction").length === quorum) return "suspect";
+   if (votes.filter((v) => v === "compatible").length >= quorum) return "annotate";
+   return "escalate";
+ };

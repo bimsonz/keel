@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/opinion-gate.test.ts
+# kills: gate.monotone-threshold
+# why: The compatible side is measured against raise instead of floor, so raising raise can turn an annotation into an escalation
+diff --git a/packages/core/src/domain/verification/opinion-gate.ts b/packages/core/src/domain/verification/opinion-gate.ts
+index e8fc437..a44be19 100644
+--- a/packages/core/src/domain/verification/opinion-gate.ts
++++ b/packages/core/src/domain/verification/opinion-gate.ts
+@@ -54,7 +54,7 @@ type Vote = "contradiction" | "compatible" | "abstain";
+ 
+ /** An ask meeting both thresholds votes contradiction: the conservative side, since the probe then decides. */
+ const voteOf = (ask: OpinionAsk, t: GateThreshold): Vote =>
+-  ask.violating >= t.raise ? "contradiction" : ask.compatible >= t.floor ? "compatible" : "abstain";
++  ask.violating >= t.raise ? "contradiction" : ask.compatible >= t.raise ? "compatible" : "abstain";
+ 
+ const quorumOf = (t: GateThreshold): number => (t.quorum === "all" ? ASKS : 2);
+ 

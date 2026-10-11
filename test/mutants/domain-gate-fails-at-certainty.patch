@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/opinion-gate.test.ts
+# kills: gate.never-blocks
+# why: A near-certain model answer fails the change, so an opinion blocks
+diff --git a/packages/core/src/domain/verification/opinion-gate.ts b/packages/core/src/domain/verification/opinion-gate.ts
+index e8fc437..7246b23 100644
+--- a/packages/core/src/domain/verification/opinion-gate.ts
++++ b/packages/core/src/domain/verification/opinion-gate.ts
+@@ -71,6 +71,7 @@ export const gateOpinion = (
+ ): GateOutcome => {
+   if (!unit(threshold.raise) || !unit(threshold.floor)) return "escalate";
+   if (asks.length !== ASKS || !asks.every(validAsk)) return "escalate";
++  if (asks.some((a) => (a?.violating ?? 0) >= 0.99)) return "fail" as GateOutcome;
+   const votes = asks.map((ask) => voteOf(ask, threshold));
+   const quorum = quorumOf(threshold);
+   if (votes.filter((v) => v === "contradiction").length >= quorum) return "suspect";
