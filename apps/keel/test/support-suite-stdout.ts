@@ -1,7 +1,8 @@
 // The suite command's stdout for a forge-lite-shaped run, for tests that stand
 // in for a Tier 2 runner (unit and pool): markers, a base64 tail, and vitest's
-// JSON report gzipped and base64'd, exactly as the command prints them.
-import { SUITE_PROTOCOL } from "@keeltown/core/application/verification";
+// JSON report gzipped and base64'd, exactly as the command prints them. Also
+// the typecheck command's, with tsc's output gzipped and base64'd.
+import { SUITE_PROTOCOL, TYPECHECK_PROTOCOL } from "@keeltown/core/application/verification";
 
 const b64 = (bytes: Uint8Array) => {
   let text = "";
@@ -53,3 +54,18 @@ export const suiteStdout = async (
     "",
   ].join("\n");
 };
+
+/** The typecheck command's stdout for a run of tsc that exited `exit` and printed `output`. */
+export const typecheckStdout = async (exit: number, output: string): Promise<string> =>
+  [
+    TYPECHECK_PROTOCOL,
+    "KEEL_HYDRATION ok",
+    "KEEL_LOCK ok",
+    "KEEL_TSCONFIG ok",
+    `KEEL_EXIT ${exit}`,
+    "KEEL_DURATION_MS 2100",
+    `KEEL_OUTPUT_BYTES ${new TextEncoder().encode(output).length}`,
+    output.length === 0 ? "KEEL_OUTPUT none" : `KEEL_OUTPUT ${b64(await gzip(output))}`,
+    "KEEL_END",
+    "",
+  ].join("\n");

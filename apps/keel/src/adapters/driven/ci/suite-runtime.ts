@@ -1,11 +1,19 @@
 import {
   JS_TS_SUITE,
   judgeSuite,
+  judgeTypecheck,
   parseSuiteOutput,
+  parseTypecheckOutput,
   redact,
+  type RunnerEvidence,
+  type RunnerJudgement,
   scanCredentials,
   SUITE_PROTOCOL,
   type SuiteJudgement,
+  TYPECHECK_OUTPUT_LIMIT,
+  TYPECHECK_PROTOCOL,
+  type TypecheckJudgement,
+  WORKER_APP_TYPECHECK,
 } from "@keeltown/core/application/verification";
 import type { ContentHash, Json } from "@keeltown/core/kernel";
 import type { PlanStep, StepResult } from "@keeltown/core/domain/verification";
@@ -52,10 +60,40 @@ export const JS_TS_SUITE_COMMAND = [
   "exit 0",
 ].join("\n");
 
-/** The command for each suite step this runtime can run. Any other step abstains here. */
-export const SUITE_COMMANDS: Readonly<Record<string, string>> = {
-  [JS_TS_SUITE.id]: JS_TS_SUITE_COMMAND,
-};
+/**
+ * The worker-app typecheck command (POSIX sh), per TYPECHECK_PROTOCOL. It
+ * hydrates and links the baked dependencies exactly as the suite command does,
+ * then runs the project's own TypeScript (`tsc --noEmit --pretty false`, so
+ * each error is one `file(line,col): error TSnnnn: message` line). tsc's
+ * output goes to a file and only its first TYPECHECK_OUTPUT_LIMIT bytes are
+ * printed, gzipped and base64'd, so nothing it prints can forge a marker.
+ * With no tsconfig.json at the root tsc would only print its help, so the
+ * command says so instead. It always exits 0.
+ */
+export const TYPECHECK_COMMAND = [
+  "set -u",
+  "K=/tmp/keel; rm -rf $K; mkdir -p $K",
+  `echo ${TYPECHECK_PROTOCOL}`,
+  'stop() { echo "KEEL_HYDRATION failed $1"; echo KEEL_END; exit 0; }',
+  HYDRATE_SH,
+  "cd /workspace 2>/dev/null || stop no-workspace",
+  'keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }',
+  `if [ "$(sha256sum pnpm-lock.yaml 2>/dev/null | cut -c1-64)" != "$(cat ${BAKED_DEPS}/.lock-sha 2>/dev/null)" ]; then echo KEEL_LOCK diverged; echo KEEL_END; exit 0; fi`,
+  "echo KEEL_LOCK ok",
+  `ln -sfn ${BAKED_DEPS}/node_modules node_modules`,
+  "if [ ! -f tsconfig.json ]; then echo KEEL_TSCONFIG none; echo KEEL_END; exit 0; fi",
+  "echo KEEL_TSCONFIG ok",
+  "start=$(date +%s%3N)",
+  "node node_modules/typescript/bin/tsc --noEmit --pretty false >$K/tsc.log 2>&1",
+  "code=$?",
+  "end=$(date +%s%3N)",
+  'echo "KEEL_EXIT $code"',
+  'echo "KEEL_DURATION_MS $((end - start))"',
+  `echo "KEEL_OUTPUT_BYTES $(wc -c <$K/tsc.log | tr -d ' ')"`,
+  `if [ -s $K/tsc.log ]; then echo "KEEL_OUTPUT $(head -c ${TYPECHECK_OUTPUT_LIMIT} $K/tsc.log | gzip -c | base64 -w0)"; else echo "KEEL_OUTPUT none"; fi`,
+  "echo KEEL_END",
+  "exit 0",
+].join("\n");
 
 /** What a suite runner is asked: never a credential, one infra retry, bounded time, short-lived snapshots. */
 export interface SuiteRunnerOptions {
@@ -136,13 +174,25 @@ const redactJson = (value: Json, literals: readonly string[]): Json => {
   return value;
 };
 
+/** A failed or retried hydration's diagnosis, decoded from the base64 the runner printed. */
+const diagnosisOf = (output: {
+  readonly _tag: string;
+  readonly diagnosis?: string;
+}): { diagnosis?: string } =>
+  (output._tag === "ran" || output._tag === "hydration-failed") && output.diagnosis !== undefined
+    ? { diagnosis: textOf(output.diagnosis) }
+    : {};
+
+/** A judgement with its evidence redacted, ready to store. */
+export type StorableJudgement = RunnerJudgement<RunnerEvidence> & { readonly document: Json };
+
 /**
- * Reads one runner's stdout into a judgement: parse the in-band report, decode
- * what the runner encoded, scan all of it raw for credentials (any hit
+ * Reads one suite runner's stdout into a judgement: parse the in-band report,
+ * decode what the runner encoded, scan all of it raw for credentials (any hit
  * abstains, and only the counts are kept), judge it, and redact the evidence
  * so it is safe to store. Pure but for decompression.
  */
-export const judgeRunnerOutput = (
+export const judgeSuiteOutput = (
   step: PlanStep,
   stdout: string,
   literals: readonly string[],
@@ -150,11 +200,7 @@ export const judgeRunnerOutput = (
   Effect.gen(function* () {
     const output = parseSuiteOutput(stdout);
     const reportText = output._tag === "ran" ? yield* gunzipText(output.report) : undefined;
-    const diagnosis =
-      (output._tag === "ran" || output._tag === "hydration-failed") &&
-      output.diagnosis !== undefined
-        ? { diagnosis: textOf(output.diagnosis) }
-        : {};
+    const diagnosis = diagnosisOf(output);
     const decoded: { report: unknown; tail: string; diagnosis?: string } = {
       ...(output._tag === "ran"
         ? { report: parseJson(reportText), tail: textOf(output.tail) }
@@ -177,6 +223,44 @@ export const judgeRunnerOutput = (
     return { ...judged, evidence, document: redactJson(evidence, literals) };
   });
 
+/**
+ * Reads one typecheck runner's stdout into a judgement, the same way: parse,
+ * decode tsc's output, scan it all raw, judge, redact. tsc names files
+ * relative to the workspace already.
+ */
+export const judgeTypecheckOutput = (
+  step: PlanStep,
+  stdout: string,
+  literals: readonly string[],
+): Effect.Effect<TypecheckJudgement & { readonly document: Json }> =>
+  Effect.gen(function* () {
+    const output = parseTypecheckOutput(stdout);
+    const text = output._tag === "ran" ? yield* gunzipText(output.output) : undefined;
+    const diagnosis = diagnosisOf(output);
+    const credentialScan = scanCredentials([stdout, text ?? "", diagnosis.diagnosis ?? ""], {
+      literals,
+    });
+    const judged = judgeTypecheck(step, output, { output: text, ...diagnosis, credentialScan });
+    const evidence = { ...judged.evidence, errors: judged.evidence.errors.map((e) => ({ ...e })) };
+    return { ...judged, evidence, document: redactJson(evidence, literals) };
+  });
+
+/** A Tier 2 step this runtime can run: the command a runner executes, and how its stdout is judged. */
+export interface Tier2Runner {
+  readonly command: string;
+  readonly judge: (
+    step: PlanStep,
+    stdout: string,
+    literals: readonly string[],
+  ) => Effect.Effect<StorableJudgement>;
+}
+
+/** Every Tier 2 step this runtime can run, by step id. Any other step abstains here. */
+export const TIER2_RUNNERS: Readonly<Record<string, Tier2Runner>> = {
+  [JS_TS_SUITE.id]: { command: JS_TS_SUITE_COMMAND, judge: judgeSuiteOutput },
+  [WORKER_APP_TYPECHECK.id]: { command: TYPECHECK_COMMAND, judge: judgeTypecheckOutput },
+};
+
 const abstained = (step: PlanStep): StepResult => ({
   stepId: step.id,
   outcome: "abstain",
@@ -186,11 +270,12 @@ const abstained = (step: PlanStep): StepResult => ({
 });
 
 /**
- * `VerifierRuntime` for Tier 2 suites, over the CI engine's runner. Each suite
- * step is one runner (a fresh sandbox hydrated from the job's bundle); its
- * in-band report is parsed and judged, and the judgement's evidence is
- * redacted and stored durably before the result cites it. A runner the engine
- * gave up on abstains, and so does any step this runtime has no command for.
+ * `VerifierRuntime` for Tier 2 steps, over the CI engine's runner. Each step
+ * in TIER2_RUNNERS is one runner (a fresh sandbox hydrated from the job's
+ * bundle); its in-band report is parsed and judged by that step's judge, and
+ * the judgement's evidence is redacted and stored durably before the result
+ * cites it. A runner the engine gave up on abstains, and so does any step this
+ * runtime has no runner for.
  *
  * `literals` are secret values to redact wherever they appear (the account id).
  */
@@ -205,12 +290,12 @@ export const SuiteRuntimeCi = (deps: {
       const evidence = yield* EvidenceStore;
       const runStep = (bundle: ContentHash) => (step: PlanStep) =>
         Effect.gen(function* () {
-          const command = SUITE_COMMANDS[step.id];
-          if (command === undefined || step.tier.tier !== 2) return abstained(step);
+          const tier2 = TIER2_RUNNERS[step.id];
+          if (tier2 === undefined || step.tier.tier !== 2) return abstained(step);
           const stdout = yield* Effect.tryPromise(() =>
             deps.runner({
               name: step.id,
-              command,
+              command: tier2.command,
               env: suiteEnv(bundle),
               config: SUITE_CONFIG,
               cloudflareCredentials: false,
@@ -222,7 +307,7 @@ export const SuiteRuntimeCi = (deps: {
             Effect.catch(() => Effect.succeed(undefined)),
           );
           if (stdout === undefined) return abstained(step);
-          const judged = yield* judgeRunnerOutput(step, stdout, deps.literals);
+          const judged = yield* tier2.judge(step, stdout, deps.literals);
           const resultRef = yield* deps.durable(
             `${step.id}:evidence`,
             evidence.put(judged.document),

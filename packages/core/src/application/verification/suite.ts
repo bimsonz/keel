@@ -1,39 +1,34 @@
 import { Option, Schema } from "effect";
 import type { ContentHash } from "../../domain/kernel/index.ts";
-import type { InfraFailure, PlanStep, StepResult } from "../../domain/verification/index.ts";
-import { type CredentialScan, leaked } from "./redact.ts";
+import type { InfraFailure, PlanStep } from "../../domain/verification/index.ts";
+import type { CredentialScan } from "./redact.ts";
+import {
+  BASE64,
+  finishJudgement,
+  type Hydrated,
+  openRunnerOutput,
+  readExit,
+  type RunnerEvidence,
+  type RunnerJudgement,
+  type RunnerStop,
+  stopped,
+} from "./runner-output.ts";
 
 /**
- * A project suite run in Tier 2, as its runner reports it on stdout. The suite
- * command always exits 0 (a non-zero exit would make @cloudflare/ci retry the
- * step in a fresh sandbox), so the real outcome travels in-band, one line per
- * marker, each exactly once, between `KEEL_SUITE/1` and `KEEL_END`:
+ * A project suite run in Tier 2, as its runner reports it on stdout, per the
+ * shared runner protocol (`runner-output.ts`): after the hydration and lockfile
+ * markers, between `KEEL_SUITE/1` and `KEEL_END`:
  *
- *   KEEL_SUITE/1
- *   KEEL_HYDRATION ok | failed <reason>     the workspace matched the bundle manifest
- *   KEEL_HYDRATION_RETRIED <reason>          the first extract failed for <reason>; one verified refetch hydrated
- *   KEEL_HYDRATION_DIFF <base64>             after a failed extract only: what differed, and a second fetch
- *   KEEL_LOCK ok | diverged                  the lockfile matched the baked dependencies
  *   KEEL_EXIT <n>                            the test runner's exit code
  *   KEEL_DURATION_MS <n>
  *   KEEL_TAIL <base64>                       the last bytes of the runner's console output
  *   KEEL_REPORT <base64 of gzip> | none      vitest's JSON report
- *   KEEL_END
- *
- * Values are base64 on one line, so nothing the tests print can forge a marker.
  */
 export const SUITE_PROTOCOL = "KEEL_SUITE/1";
 
 export type SuiteOutput =
-  | { readonly _tag: "malformed"; readonly reason: string }
-  | {
-      readonly _tag: "hydration-failed";
-      readonly reason: string;
-      /** What the runner found wrong, base64; the doorway decodes it into the evidence. */
-      readonly diagnosis?: string;
-    }
-  | { readonly _tag: "lockfile-diverged" }
-  | {
+  | RunnerStop
+  | ({
       readonly _tag: "ran";
       readonly exit: number;
       readonly durationMs: number;
@@ -41,54 +36,15 @@ export type SuiteOutput =
       readonly tail: string;
       /** The report as base64 of gzip, still encoded; absent when the runner wrote none. */
       readonly report?: string;
-      /** Why the first extract failed, when one verified refetch hydrated the workspace instead. */
-      readonly rehydrated?: string;
-      /** The diagnosis of that first extract, base64. */
-      readonly diagnosis?: string;
-    };
-
-const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+    } & Hydrated);
 
 /** Reads the runner's stdout. Anything but exactly one well-formed run is `malformed`, which abstains. */
 export const parseSuiteOutput = (stdout: string): SuiteOutput => {
-  const lines = stdout.split("\n").filter((l) => l.length > 0);
-  const begin = lines.indexOf(SUITE_PROTOCOL);
-  const end = lines.lastIndexOf("KEEL_END");
-  if (begin === -1 || end === -1 || end < begin)
-    return { _tag: "malformed", reason: "no suite report" };
-  const body = lines.slice(begin + 1, end);
-  const fields = new Map<string, string>();
-  for (const line of body) {
-    const space = line.indexOf(" ");
-    const key = space === -1 ? line : line.slice(0, space);
-    if (!key.startsWith("KEEL_")) continue;
-    if (fields.has(key) || key === "KEEL_SUITE/1" || key === "KEEL_END")
-      return { _tag: "malformed", reason: `${key} appears twice` };
-    fields.set(key, space === -1 ? "" : line.slice(space + 1));
-  }
-  if (lines.filter((l) => l === SUITE_PROTOCOL).length !== 1)
-    return { _tag: "malformed", reason: "more than one suite report" };
-  const hydration = fields.get("KEEL_HYDRATION");
-  if (hydration === undefined) return { _tag: "malformed", reason: "no KEEL_HYDRATION" };
-  const diagnosis = fields.get("KEEL_HYDRATION_DIFF");
-  const diagnosed =
-    diagnosis !== undefined && diagnosis.length > 0 && BASE64.test(diagnosis) ? { diagnosis } : {};
-  if (hydration !== "ok")
-    return {
-      _tag: "hydration-failed",
-      reason: hydration.startsWith("failed ") ? hydration.slice(7) : hydration,
-      ...diagnosed,
-    };
-  const retried = fields.get("KEEL_HYDRATION_RETRIED");
-  const rehydrated = retried === undefined ? {} : { rehydrated: retried, ...diagnosed };
-  const lock = fields.get("KEEL_LOCK");
-  if (lock === "diverged") return { _tag: "lockfile-diverged" };
-  if (lock !== "ok") return { _tag: "malformed", reason: "no KEEL_LOCK" };
-  const exit = Number(fields.get("KEEL_EXIT"));
-  const durationMs = Number(fields.get("KEEL_DURATION_MS"));
-  if (!Number.isInteger(exit) || exit < 0) return { _tag: "malformed", reason: "bad KEEL_EXIT" };
-  if (!Number.isFinite(durationMs) || durationMs < 0)
-    return { _tag: "malformed", reason: "bad KEEL_DURATION_MS" };
+  const opened = openRunnerOutput(stdout, SUITE_PROTOCOL, "suite");
+  if (opened._tag !== "open") return opened;
+  const { fields, hydrated } = opened;
+  const ran = readExit(fields);
+  if ("malformed" in ran) return { _tag: "malformed", reason: ran.malformed };
   const tail = fields.get("KEEL_TAIL") ?? "";
   if (!BASE64.test(tail)) return { _tag: "malformed", reason: "bad KEEL_TAIL" };
   const report = fields.get("KEEL_REPORT");
@@ -97,11 +53,10 @@ export const parseSuiteOutput = (stdout: string): SuiteOutput => {
     return { _tag: "malformed", reason: "bad KEEL_REPORT" };
   return {
     _tag: "ran",
-    exit,
-    durationMs,
+    ...ran,
     tail,
     ...(report === "none" ? {} : { report }),
-    ...rehydrated,
+    ...hydrated,
   };
 };
 
@@ -138,19 +93,9 @@ export interface FailingTest {
 }
 
 /** What a suite step stores as its evidence: counts, failures, and the console tail. Redacted before it is stored. */
-export interface SuiteEvidence {
-  readonly stepId: string;
-  readonly outcome: StepResult["outcome"];
-  readonly why: string;
+export interface SuiteEvidence extends RunnerEvidence {
   readonly totals?: { readonly total: number; readonly passed: number; readonly failed: number };
   readonly failing: readonly FailingTest[];
-  readonly tail: string;
-  /** Why the first extract failed, when a verified refetch hydrated the workspace instead. */
-  readonly rehydrated?: string;
-  /** Why the workspace did not hydrate on its first extract, as the runner diagnosed it. */
-  readonly diagnosis?: string;
-  /** What a scan of the runner's raw output found, as counts only. */
-  readonly credentialScan?: CredentialScan;
 }
 
 /** How many failing tests the evidence names. The full report stays countable from `totals`. */
@@ -173,11 +118,7 @@ const failingOf = (report: VitestReport): FailingTest[] =>
     return tests;
   });
 
-export interface SuiteJudgement {
-  /** A result the verdict can use, with why it abstained when it did. */
-  readonly report: StepResult & { readonly failure?: InfraFailure };
-  readonly evidence: SuiteEvidence;
-}
+export type SuiteJudgement = RunnerJudgement<SuiteEvidence>;
 
 /**
  * Judges one suite run. Only a run that hydrated, ran tests, and agrees with
@@ -204,37 +145,17 @@ export const judgeSuite = (
     readonly credentialScan?: CredentialScan;
   },
   resultRef?: ContentHash,
-): SuiteJudgement => {
-  const scan = decoded.credentialScan;
-  const run = judgeRun(step, output, decoded, resultRef);
-  const judged = {
-    ...run,
-    evidence: {
-      ...run.evidence,
-      ...(output._tag === "ran" && output.rehydrated !== undefined
-        ? { rehydrated: output.rehydrated }
-        : {}),
-      ...(decoded.diagnosis === undefined ? {} : { diagnosis: decoded.diagnosis }),
-    },
-  };
-  if (scan === undefined) return judged;
-  if (!leaked(scan)) return { ...judged, evidence: { ...judged.evidence, credentialScan: scan } };
-  const { failure: _failure, ...report } = judged.report;
-  return {
-    report: { ...report, outcome: "abstain", failure: "schema" },
-    evidence: {
-      ...judged.evidence,
-      outcome: "abstain",
-      why: `credential-leak: the runner's output held ${scan.token} token-shaped strings, ${scan.expiry} expiries, ${scan.remote} remotes, ${scan.host} hosts and ${scan.literal} known secrets`,
-      credentialScan: scan,
-    },
-  };
-};
+): SuiteJudgement =>
+  finishJudgement(
+    judgeRun(step, output, decoded, resultRef),
+    output._tag === "ran" ? output : {},
+    decoded,
+  );
 
 const judgeRun = (
   step: PlanStep,
   output: SuiteOutput,
-  decoded: { readonly report: unknown; readonly tail: string; readonly diagnosis?: string },
+  decoded: { readonly report: unknown; readonly tail: string },
   resultRef?: ContentHash,
 ): SuiteJudgement => {
   const base = {
@@ -252,15 +173,9 @@ const judgeRun = (
     report: { ...base, outcome: "abstain", failure, durationMs },
     evidence: { stepId: step.id, outcome: "abstain", why, failing: [], tail },
   });
-  switch (output._tag) {
-    case "malformed":
-      return abstain("schema", `the runner's output is malformed: ${output.reason}`);
-    case "hydration-failed":
-      return abstain("unavailable", `hydration-failed: ${output.reason}`);
-    case "lockfile-diverged":
-      return abstain("unavailable", "lockfile-diverged: the baked dependencies do not match");
-    default:
-      break;
+  if (output._tag !== "ran") {
+    const { failure, why } = stopped(output);
+    return abstain(failure, why);
   }
   const { report, tail } = decoded;
   const parsed =

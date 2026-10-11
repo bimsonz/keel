@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-candidate.test.ts
+# kills: verify.type-errors-cited
+# why: A bounce never reads a typecheck's errors back from its evidence, so the remedy names nothing to fix
+diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
+index 18cd206..4ace9d1 100644
+--- a/packages/core/src/application/verification/verify-candidate.ts
++++ b/packages/core/src/application/verification/verify-candidate.ts
+@@ -149,8 +149,6 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+         kind: "test",
+         name: f.test === undefined ? f.file : `${f.file} > ${f.test}`,
+       });
+-    for (const e of stored.value.errors ?? [])
+-      failures.push({ kind: "type", name: citeDiagnostic(e) });
+   }
+   const failingTests = failures.map((f) => f.name);
+   const cited = failures.slice(0, CITED_FAILURES);

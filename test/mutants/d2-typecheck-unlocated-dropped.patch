@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/typecheck.test.ts
+# kills: typecheck.errors-fail, typecheck.reads-back
+# why: An error tsc reports with no place (a broken tsconfig) is never read, so it abstains instead of failing
+diff --git a/packages/core/src/application/verification/typecheck.ts b/packages/core/src/application/verification/typecheck.ts
+index 433dd96..f1b0493 100644
+--- a/packages/core/src/application/verification/typecheck.ts
++++ b/packages/core/src/application/verification/typecheck.ts
+@@ -113,7 +113,7 @@ export const readDiagnostics = (
+       });
+       continue;
+     }
+-    const unlocated = UNLOCATED.exec(line);
++    const unlocated = UNLOCATED.exec("");
+     if (unlocated !== null) {
+       const [, code = "", message = ""] = unlocated;
+       diagnostics.push({ code, message: message.slice(0, MAX_MESSAGE) });

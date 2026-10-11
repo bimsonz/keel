@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: runner.typecheck-scan
+# why: KeelVerify scans none of tsc's output, so a token quoted in a type error is judged like any other failure
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index 5301016..aea254b 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -237,7 +237,7 @@ export const judgeTypecheckOutput = (
+     const output = parseTypecheckOutput(stdout);
+     const text = output._tag === "ran" ? yield* gunzipText(output.output) : undefined;
+     const diagnosis = diagnosisOf(output);
+-    const credentialScan = scanCredentials([stdout, text ?? "", diagnosis.diagnosis ?? ""], {
++    const credentialScan = scanCredentials([], {
+       literals,
+     });
+     const judged = judgeTypecheck(step, output, { output: text, ...diagnosis, credentialScan });

@@ -1,8 +1,13 @@
 import { describe, expect, it } from "@effect/vitest";
-import { L1_SUITE_PLAN, SUITE_PROTOCOL } from "@keeltown/core/application/verification";
-import { suiteStdout } from "../support-suite-stdout.ts";
-import type { VerificationJob } from "@keeltown/core/domain/verification";
-import { ContentHash } from "@keeltown/core/kernel";
+import {
+  L1_SUITE_PLAN,
+  SUITE_PROTOCOL,
+  TYPECHECK_PROTOCOL,
+  WORKER_APP_PACK,
+} from "@keeltown/core/application/verification";
+import { suiteStdout, typecheckStdout } from "../support-suite-stdout.ts";
+import { compile, type VerificationJob } from "@keeltown/core/domain/verification";
+import { CommitSha, ContentHash } from "@keeltown/core/kernel";
 import { VerifierRuntime } from "@keeltown/core/ports";
 import { contractJob, makeEvidenceStoreMemory, PORTS } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
@@ -12,11 +17,25 @@ import {
   type SuiteRunner,
   type SuiteRunnerOptions,
   SuiteRuntimeCi,
+  TYPECHECK_COMMAND,
 } from "../../src/adapters/driven/ci/suite-runtime.ts";
 import { checkoutOf, keelBundleSource } from "../../src/adapters/driving/workflow/bundle-source.ts";
 
 const step = L1_SUITE_PLAN.steps[0];
 if (step === undefined) throw new Error("the L1 plan has no step");
+const workerApp = compile(
+  undefined,
+  { baseCommit: CommitSha.make("0".repeat(40)), touchedPaths: [], subjects: [], facts: {} },
+  WORKER_APP_PACK,
+);
+if (workerApp._tag === "Failure") throw new Error("the worker-app pack does not compile");
+const typecheck = workerApp.success.steps.find((s) => s.id === "worker-app.typecheck");
+if (typecheck === undefined) throw new Error("the worker-app plan has no typecheck");
+const TSC_RED = [
+  "src/clock.ts(12,14): error TS2322: Type 'string' is not assignable to type 'number'.",
+  "src/clock.ts(24,5): error TS2322: Type 'string' is not assignable to type 'number'.",
+  "",
+].join("\n");
 const ACCOUNT = "0123456789abcdef0123456789abcdef";
 const TOKEN = "art_v2_x_SECRETsecret123?expires=1760140800";
 
@@ -29,6 +48,8 @@ const job = (): VerificationJob => ({
   steps: L1_SUITE_PLAN.steps,
   fence: contractJob().fence,
 });
+
+const typecheckJob = (): VerificationJob => ({ ...job(), steps: [typecheck] });
 
 /** The runtime over a runner the test scripts, with steps recorded instead of made durable. */
 const runtime = (runner: SuiteRunner) => {
@@ -272,5 +293,82 @@ describe("the Tier 2 suite runtime", () => {
       expect(results.map((r) => r.outcome)).toEqual(["abstain"]);
       expect(rt.calls).toEqual([]);
     }),
+  );
+});
+
+describe("the Tier 2 typecheck", () => {
+  it("prints the typecheck protocol and always exits 0, hydrating and finding a tsconfig before tsc runs", () => {
+    const lines = TYPECHECK_COMMAND.split("\n");
+    expect(lines).toContain(`echo ${TYPECHECK_PROTOCOL}`);
+    expect(lines.at(-1)).toBe("exit 0");
+    expect(TYPECHECK_COMMAND).not.toMatch(/exit [1-9]/);
+    const tsc = lines.findIndex((l) => l.includes("typescript/bin/tsc --noEmit --pretty false"));
+    expect(tsc).toBeGreaterThan(-1);
+    expect(
+      lines.indexOf('keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }'),
+    ).toBeGreaterThan(-1);
+    expect(
+      lines.indexOf('keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }'),
+    ).toBeLessThan(tsc);
+    expect(lines.findIndex((l) => l.includes("KEEL_LOCK diverged"))).toBeLessThan(tsc);
+    expect(lines.findIndex((l) => l.includes("KEEL_TSCONFIG none"))).toBeLessThan(tsc);
+  });
+
+  it.effect(
+    "[runner.typecheck-routed] runs worker-app.typecheck as its own command and fails it naming tsc's errors",
+    () =>
+      Effect.gen(function* () {
+        const stdout = yield* Effect.promise(() => typecheckStdout(1, TSC_RED));
+        const rt = runtime(stdoutRunner(stdout));
+        const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(typecheckJob())).pipe(
+          Effect.provide(rt.layer),
+        );
+        expect(rt.calls.map((c) => [c.name, c.command])).toEqual([
+          [typecheck.id, TYPECHECK_COMMAND],
+        ]);
+        expect(result).toMatchObject({ stepId: typecheck.id, outcome: "fail", durationMs: 2100 });
+        expect(rt.steps).toEqual([`${typecheck.id}:evidence`]);
+        const [stored] = [...rt.store.documents.values()];
+        expect(JSON.parse(String(stored))).toMatchObject({
+          why: "2 type errors",
+          errors: [
+            { file: "src/clock.ts", line: 12, column: 14, code: "TS2322" },
+            { file: "src/clock.ts", line: 24, column: 5, code: "TS2322" },
+          ],
+          credentialScan: { token: 0, expiry: 0, remote: 0, host: 0, literal: 0 },
+        });
+      }),
+  );
+
+  it.effect("passes a clean typecheck", () =>
+    Effect.gen(function* () {
+      const stdout = yield* Effect.promise(() => typecheckStdout(0, ""));
+      const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(typecheckJob())).pipe(
+        Effect.provide(runtime(stdoutRunner(stdout)).layer),
+      );
+      expect(result?.outcome).toBe("pass");
+    }),
+  );
+
+  it.effect(
+    "[runner.typecheck-scan] abstains on a credential in tsc's output, storing it redacted",
+    () =>
+      Effect.gen(function* () {
+        const leak = `src/keel-canary.ts(1,14): error TS2322: Type '"${TOKEN}"' is not assignable to type '1'.\n`;
+        const stdout = yield* Effect.promise(() => typecheckStdout(1, leak));
+        const rt = runtime(stdoutRunner(stdout));
+        const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(typecheckJob())).pipe(
+          Effect.provide(rt.layer),
+        );
+        expect(result?.outcome).toBe("abstain");
+        const stored = String([...rt.store.documents.values()][0]);
+        expect(JSON.parse(stored)).toMatchObject({
+          why: expect.stringMatching(/^credential-leak: /),
+          credentialScan: { token: 1, expiry: 1 },
+        });
+        expect(stored).toContain("src/keel-canary.ts");
+        expect(stored).not.toMatch(/art_v\d+_/);
+        expect(stored).toContain("[REDACTED");
+      }),
   );
 });

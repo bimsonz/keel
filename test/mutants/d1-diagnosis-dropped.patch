@@ -2,15 +2,15 @@
 # kills: suite.diagnosis-kept
 # why: The doorway drops a failed hydration's diagnosis, so the evidence never says why it failed
 diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-index 401cf47..3635669 100644
+index 5301016..da88a1d 100644
 --- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
 +++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-@@ -152,7 +152,7 @@ export const judgeRunnerOutput = (
-     const reportText = output._tag === "ran" ? yield* gunzipText(output.report) : undefined;
-     const diagnosis =
-       (output._tag === "ran" || output._tag === "hydration-failed") &&
--      output.diagnosis !== undefined
-+      output.diagnosis === "never"
-         ? { diagnosis: textOf(output.diagnosis) }
-         : {};
-     const decoded: { report: unknown; tail: string; diagnosis?: string } = {
+@@ -179,7 +179,7 @@ const diagnosisOf = (output: {
+   readonly _tag: string;
+   readonly diagnosis?: string;
+ }): { diagnosis?: string } =>
+-  (output._tag === "ran" || output._tag === "hydration-failed") && output.diagnosis !== undefined
++  (output._tag === "ran" || output._tag === "hydration-failed") && output.diagnosis === "never"
+     ? { diagnosis: textOf(output.diagnosis) }
+     : {};
+ 

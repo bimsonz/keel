@@ -1,6 +1,8 @@
 // forge-lite as candidate bundles, for KeelVerify's live proofs: the base, a seeded
 // failure, and a canary that dumps the runner's environment and plants a
-// token-shaped string. Built with the same writer keel uses.
+// token-shaped string. For the typecheck: two type errors, a type error whose
+// message carries the canary token, and no tsconfig.json. Built with the same
+// writer keel uses.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -14,7 +16,7 @@ export const CANARY_TOKEN = "art_v1_KEELCANARYd1d1d1d1d1d1d1d1d1d1?expires=17601
 /** A start-env style variable planted in a child process, read back from its /proc/self/environ. */
 export const CANARY_ENV = "KEEL_CANARY_ENV=art_v2_x_KEELCANARYenvenvenvenv?expires=1760140800";
 
-export type Variant = "base" | "red" | "canary";
+export type Variant = "base" | "red" | "canary" | "type-red" | "type-canary" | "no-tsconfig";
 
 /** The fixture's tracked files, as a bundle sees them: paths relative to forge-lite. */
 const fixtureFiles = (): BundleFile[] =>
@@ -68,6 +70,24 @@ export const variantFiles = (variant: Variant): BundleFile[] => {
     return replaceIn(base, "src/clock.ts", "this.#now += ms;", "this.#now += 0;");
   if (variant === "canary")
     return [...base, { path: "test/keel-canary.test.ts", bytes: enc.encode(CANARY_TEST) }];
+  // Two errors on two lines of one file: the real clock answers a string, and so does the manual one.
+  if (variant === "type-red")
+    return replaceIn(
+      replaceIn(base, "src/clock.ts", "now: () => Date.now(),", "now: () => String(Date.now()),"),
+      "src/clock.ts",
+      "return this.#now;",
+      "return `${this.#now}`;",
+    );
+  // Assigned to a literal type, tsc quotes the string in its message, so the token reaches the runner's output.
+  if (variant === "type-canary")
+    return [
+      ...base,
+      {
+        path: "src/keel-canary.ts",
+        bytes: enc.encode(`export const canary: 1 = ${JSON.stringify(CANARY_TOKEN)};\n`),
+      },
+    ];
+  if (variant === "no-tsconfig") return base.filter((f) => f.path !== "tsconfig.json");
   return base;
 };
 

@@ -4,9 +4,15 @@ import {
   recordBatchVerdict,
   runJob,
   settleVerdict,
+  WORKER_APP_PACK,
 } from "@keeltown/core/application/verification";
-import { VerifierUnavailable, type VerificationJob } from "@keeltown/core/domain/verification";
-import { ContentHash, makeId } from "@keeltown/core/kernel";
+import {
+  compile,
+  type StepReport,
+  VerifierUnavailable,
+  type VerificationJob,
+} from "@keeltown/core/domain/verification";
+import { CommitSha, ContentHash, makeId } from "@keeltown/core/kernel";
 import { BatchVerdicts, EvidenceStore, VerifierRuntime } from "@keeltown/core/ports";
 import {
   freshId,
@@ -258,4 +264,94 @@ describe("KeelVerify's use-cases", () => {
       expect(types(l)).toHaveLength(0);
     });
   });
+});
+
+describe("a worker app's verdict", () => {
+  const compiled = compile(
+    undefined,
+    { baseCommit: CommitSha.make("0".repeat(40)), touchedPaths: [], subjects: [], facts: {} },
+    WORKER_APP_PACK,
+  );
+  if (compiled._tag === "Failure") throw new Error("the worker-app pack does not compile");
+  const plan = compiled.success;
+  const ERRORS = [
+    {
+      file: "src/clock.ts",
+      line: 12,
+      column: 14,
+      code: "TS2322",
+      message: "Type 'string' is not assignable to type 'number'.",
+    },
+    { code: "TS5058", message: "The specified path does not exist: 'tsconfig.json'." },
+  ];
+
+  /** Settles the plan on a suite and a typecheck outcome, storing what each step would. */
+  const settle = (suite: "pass" | "fail", typecheck: "pass" | "fail") => {
+    const store = makeEvidenceStoreMemory();
+    return Effect.gen(function* () {
+      const evidence = yield* EvidenceStore;
+      const reports: StepReport[] = [];
+      for (const s of plan.steps) {
+        const outcome = s.id === "js-ts.suite" ? suite : typecheck;
+        const stored =
+          s.id === "js-ts.suite"
+            ? {
+                failing:
+                  outcome === "fail" ? [{ file: "test/sessions.test.ts", test: "expire" }] : [],
+              }
+            : { errors: outcome === "fail" ? ERRORS : [] };
+        const resultRef = yield* evidence.put({ stepId: s.id, outcome, ...stored });
+        reports.push({
+          stepId: s.id,
+          outcome,
+          evidenceClass: s.evidenceCeiling,
+          tier: s.tier,
+          durationMs: 1,
+          resultRef,
+        });
+      }
+      return yield* settleVerdict(plan, reports);
+    }).pipe(Effect.provide(Layer.merge(store.layer, makeIdsMemory().layer)));
+  };
+
+  it.effect(
+    "[verify.type-errors-cited] a failing typecheck bounces, citing each type error in the evidence, failingTests and the remedy",
+    () =>
+      Effect.gen(function* () {
+        const settled = yield* settle("pass", "fail");
+        const cited = [
+          "src/clock.ts:12:14 TS2322 Type 'string' is not assignable to type 'number'.",
+          "TS5058 The specified path does not exist: 'tsconfig.json'.",
+        ];
+        expect(settled.outcome).toBe("bounce");
+        expect(settled.failingTests).toEqual(cited);
+        expect(settled.evidence).toEqual(
+          expect.arrayContaining(cited.map((c) => `type error: ${c}`)),
+        );
+        expect(settled.nextActions).toEqual([
+          {
+            kind: "call",
+            title: `Fix the type errors, push, then submit again: ${cited.join("; ")}`,
+            operationId: "submit",
+            args: { typeErrors: cited },
+          },
+        ]);
+      }),
+  );
+
+  it.effect("a bounce on both names the failing tests and the type errors", () =>
+    Effect.gen(function* () {
+      const settled = yield* settle("fail", "fail");
+      const [remedy] = settled.nextActions;
+      expect(remedy?.title).toMatch(/^Fix the failing tests and type errors, push/);
+      expect(remedy?.args).toEqual({
+        failingTests: ["test/sessions.test.ts > expire"],
+        typeErrors: [
+          "src/clock.ts:12:14 TS2322 Type 'string' is not assignable to type 'number'.",
+          "TS5058 The specified path does not exist: 'tsconfig.json'.",
+        ],
+      });
+      expect((yield* settle("pass", "pass")).outcome).toBe("land");
+    }),
+  );
 });

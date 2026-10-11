@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/typecheck.test.ts
+# kills: typecheck.exit-agrees, typecheck.never-passes-errors
+# why: A typecheck that exits 0 passes even when tsc's output reports errors
+diff --git a/packages/core/src/application/verification/typecheck.ts b/packages/core/src/application/verification/typecheck.ts
+index 433dd96..1618094 100644
+--- a/packages/core/src/application/verification/typecheck.ts
++++ b/packages/core/src/application/verification/typecheck.ts
+@@ -223,7 +223,7 @@ const judgeRun = (
+       tail,
+     },
+   });
+-  if (output.exit === 0 && reported === 0) return decide("pass", "tsc reported no errors");
++  if (output.exit === 0) return decide("pass", "tsc reported no errors");
+   if (output.exit !== 0 && diagnostics.length > 0)
+     return decide(
+       "fail",

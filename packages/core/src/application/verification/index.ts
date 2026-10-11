@@ -71,5 +71,7 @@ export * from "./plan-codec.ts";
 export * from "./precheck.ts";
 export * from "./redact.ts";
 export * from "./run-plan.ts";
+export * from "./runner-output.ts";
 export * from "./suite.ts";
+export * from "./typecheck.ts";
 export * from "./verify-candidate.ts";
