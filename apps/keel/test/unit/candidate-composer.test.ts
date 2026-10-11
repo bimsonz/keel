@@ -30,9 +30,7 @@ import {
 } from "../../src/adapters/driven/gitcore/candidate-composer.ts";
 
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
-const AGENT = makeId("agt", "01J9ZZZZZZZZZZZZZZZZZZZZZA");
 const CHANGE = makeId("chg", "01J9ZZZZZZZZZZZZZZZZZZZZZB");
-const OTHER_AGENT = makeId("agt", "01J9ZZZZZZZZZZZZZZZZZZZZZC");
 const OTHER_CHANGE = makeId("chg", "01J9ZZZZZZZZZZZZZZZZZZZZZD");
 const CANDIDATE = makeId("cnd", "01J9ZZZZZZZZZZZZZZZZZZZZZE");
 /** BatchFormed's time, 11 Oct 2026 09:00:00.250 UTC. */
@@ -50,7 +48,6 @@ const REQUEST: CandidateRequest = {
       repo: { namespace: "keel-ws-00", name: "prj-ws-1" },
       base: sha("a"),
       head: sha("b"),
-      author: AGENT,
       title: "Retry the webhook on 503",
     },
     {
@@ -58,7 +55,6 @@ const REQUEST: CandidateRequest = {
       repo: { namespace: "keel-ws-00", name: "prj-ws-2" },
       base: sha("c"),
       head: sha("d"),
-      author: OTHER_AGENT,
       title: "Log the retry count",
     },
   ],
@@ -104,7 +100,7 @@ describe("the GitCore composer's restack", () => {
     });
   });
 
-  it("[composer.keeps-author] the composed commit keeps the submitted commit's author, not the agent's, with Keel as committer", async () => {
+  it("[composer.keeps-author] the composed commit keeps the submitted commit's author, with Keel as committer", async () => {
     const code = makeCodeHostMemory();
     const staging: RepoRef = { namespace: "memory", name: "prj-staging" };
     const workspace: RepoRef = { namespace: "memory", name: "prj-ws-1" };

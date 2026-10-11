@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/trunk.test.ts -t "trunk.do.racers"
+# kills: trunk.do.racers
+# why: Through the real object: racing batches are grouped together instead of FIFO one at a time
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index a2b3860..ab99a71 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -262,7 +262,7 @@ export const flushTrunk = Effect.fn("integration/flushTrunk")(function* (project
+   if (trunk?.phase !== "debouncing") return trunk?.phase;
+   const observedHead = yield* (yield* TrunkWriter).head;
+   const [front] = trunk.queue;
+-  const inputs = front === undefined ? [] : [yield* factsOf(projectId, trunk.head, front)];
++  const inputs = yield* Effect.forEach(trunk.queue, (b) => factsOf(projectId, trunk.head, b));
+   const now = yield* (yield* Clock).now;
+   const groupId = `${front?.batchId ?? "empty"}@${now}`;
+   yield* promote(

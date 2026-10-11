@@ -2,16 +2,14 @@
 # kills: lane.form-base
 # why: The batch forms on the member's own workspace base instead of staging main's head, so a candidate is composed onto a stale trunk
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index a57774b..616071b 100644
+index 12b2f86..9a1f712 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -364,9 +364,9 @@ const afterInfra = (batch: Batch, failures: number): readonly NextAction[] => [
+@@ -400,7 +400,9 @@ const stagingOnTrunk = (lane: Lane) =>
  
- /** Forms a batch of one from the queue's head, on staging main's head. */
+ /** Forms a batch of one from the queue's head, on staging main's head, which is trunk's. */
  const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
--  const base = yield* (yield* CodeHost)
--    .head(projectRepos(lane.projectId).staging, MAIN)
--    .pipe(Effect.orDie);
+-  const base = yield* stagingOnTrunk(lane);
 +  const [head] = lane.queue;
 +  if (head === undefined) return;
 +  const base = (yield* (yield* Changes).workspace(head).pipe(Effect.orDie)).baseSha;

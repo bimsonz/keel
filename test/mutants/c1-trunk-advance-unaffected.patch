@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t trunk.subscribes
+# kills: trunk.subscribes
+# why: Trunk's events name no member change, so each Change DO's scoped subscription never hears the TrunkAdvanced that lands it
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index a2b3860..6a34d2d 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -69,7 +69,7 @@ const draftOf = (event: TrunkEvent): EventDraft => {
+   const payload = encodeEvent(event);
+   if (!isTagged(payload)) throw new Error(`${event._tag} did not encode as a tagged object`);
+   const affected = changesOf(event).map(changeRef);
+-  return affected.length === 0 ? { payload } : { payload, affected };
++  return { payload };
+ };
+ 
+ /** The trunk as its events left it, or undefined before TrunkInitialized. */

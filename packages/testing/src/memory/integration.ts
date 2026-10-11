@@ -46,7 +46,7 @@ export function makeCandidateComposerMemory(options: { readonly refuse?: readonl
             let parent: string = request.base;
             for (const m of request.members) {
               const sha = yield* Effect.promise(() =>
-                sha1([parent, m.changeId, m.head, m.author, m.title, request.at].join("\n")),
+                sha1([parent, m.changeId, m.head, m.title, request.at].join("\n")),
               );
               commits.push({ changeId: m.changeId, sha });
               parent = sha;
@@ -78,13 +78,21 @@ const repoKey = (repo: RepoRef) => `${repo.namespace}/${repo.name}`;
  */
 export function makeTrunkWriterMemory(initial: CommitSha) {
   let current = initial;
+  let dropping = 0;
   const targets = new Map<string, CommitSha>();
+  const pushes: { readonly from: CommitSha; readonly to: CommitSha }[] = [];
   return {
     head: () => current,
     synced: (repo: RepoRef) => targets.get(repoKey(repo)),
+    /** Every push asked for, in order, whatever came of it. */
+    pushes: (): readonly { readonly from: CommitSha; readonly to: CommitSha }[] => [...pushes],
     /** Moves trunk behind the writer's back, to exercise the read-back freeze. */
     interfere: (to: CommitSha) => {
       current = to;
+    },
+    /** The next `n` pushes report success and move nothing: an acknowledgement for a push that was lost. */
+    drop: (n: number) => {
+      dropping = n;
     },
     layer: Layer.succeed(
       TrunkWriter,
@@ -92,8 +100,13 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
         head: Effect.sync(() => current),
         push: (from, to) =>
           Effect.suspend(() => {
+            pushes.push({ from, to });
             if (from !== current)
               return Effect.fail(new UnexpectedHead({ expected: from, observed: current }));
+            if (dropping > 0) {
+              dropping -= 1;
+              return Effect.void;
+            }
             current = to;
             return Effect.void;
           }),

@@ -17,6 +17,7 @@ import {
   decideCandidate,
   evolveCandidate,
   isCandidateTerminal,
+  PromotionDeclined,
   TrunkAdvanced,
 } from "../../domain/integration/index.ts";
 import {
@@ -86,6 +87,8 @@ const ActiveBatch = Schema.Struct({
   bundle: Schema.optional(ContentHash),
   /** KeelVerify's instance exists: the start is retried until it does. */
   started: Schema.optional(Schema.Boolean),
+  /** Trunk declined to promote the green batch: it is invalidated, and its members go back to the queue. */
+  declined: Schema.optional(Schema.Boolean),
 });
 type ActiveBatch = typeof ActiveBatch.Type;
 
@@ -100,6 +103,8 @@ export const Lane = Schema.Struct({
   ),
   /** Each change's consecutive infra failures, their reasons oldest first. */
   infra: Schema.Array(Schema.Struct({ changeId: ChangeId, reasons: Schema.Array(Schema.String) })),
+  /** Trunk's head as the last TrunkAdvanced heard named it: no batch forms on a staging main anywhere else. */
+  trunkHead: Schema.optional(CommitSha),
 });
 export type Lane = typeof Lane.Type;
 
@@ -191,14 +196,16 @@ const holds = (store: Store, lane: Lane, changeId: ChangeId): boolean =>
 const decodeQueued = Schema.decodeUnknownSync(ChangeQueued);
 const decodeRequeued = Schema.decodeUnknownSync(ChangeRequeued);
 const decodeAdvanced = Schema.decodeUnknownSync(TrunkAdvanced);
+const decodeDeclined = Schema.decodeUnknownSync(PromotionDeclined);
 const decodeEnded = Schema.decodeUnknownSync(Schema.Union([ChangeWithdrawn, ChangeSuperseded]));
 
 /**
  * A delivered event, inside the transaction that records it: ChangeQueued
  * joins the queue's back, ChangeRequeued its front (it re-enters with no
  * blame), a change withdrawn or superseded while queued leaves the queue,
- * and TrunkAdvanced is noted for staging to follow. State only: the
- * step commits the events. True when the lane changed.
+ * TrunkAdvanced is noted for staging to follow and names trunk's head, and a
+ * PromotionDeclined of the batch in flight marks it to be invalidated. State
+ * only: the step commits the events. True when the lane changed.
  */
 export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope): boolean => {
   const lane = laneOf(tx.store, laneId) ?? emptyLane(laneId);
@@ -237,7 +244,14 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
                   members: advanced.landings.map((landing) => landing.changeId),
                 },
               ],
+              trunkHead: advanced.to,
             };
+      }
+      case "PromotionDeclined": {
+        const declined = decodeDeclined(event.payload);
+        return lane.active?.batchId === declined.batchId && lane.active.declined !== true
+          ? { ...lane, active: { ...lane.active, declined: true } }
+          : undefined;
       }
       default:
         return undefined;
@@ -362,11 +376,31 @@ const afterInfra = (batch: Batch, failures: number): readonly NextAction[] => [
   { kind: "wait", title: `The operator has been alerted to ${failures} infra failures in a row` },
 ];
 
-/** Forms a batch of one from the queue's head, on staging main's head. */
+/**
+ * Staging main's head, once it is trunk's: a lane that heard trunk advance
+ * moves staging there first (it is staging's one writer), and never forms a
+ * batch on any other head, since trunk would only decline it. A move that
+ * fails is a defect: the step is retried later, and nothing forms meanwhile.
+ */
+const stagingOnTrunk = (lane: Lane) =>
+  Effect.gen(function* () {
+    const staging = projectRepos(lane.projectId).staging;
+    const head = yield* (yield* CodeHost).head(staging, MAIN).pipe(Effect.orDie);
+    const trunk = lane.trunkHead;
+    if (trunk === undefined || head === trunk) return head;
+    const moved = yield* Effect.result((yield* StagingWriter).fastForward(head, trunk));
+    if (Result.isFailure(moved))
+      return yield* Effect.die(
+        new Error(
+          `lane ${lane.laneId} forms nothing: staging is at ${head}, trunk at ${trunk}, and the move failed (${moved.failure._tag})`,
+        ),
+      );
+    return trunk;
+  });
+
+/** Forms a batch of one from the queue's head, on staging main's head, which is trunk's. */
 const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
-  const base = yield* (yield* CodeHost)
-    .head(projectRepos(lane.projectId).staging, MAIN)
-    .pipe(Effect.orDie);
+  const base = yield* stagingOnTrunk(lane);
   const ids = yield* Ids;
   const batchId = yield* ids.next("bat");
   const candidateId = yield* ids.next("cnd");
@@ -466,7 +500,6 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
         repo: workspace.repo,
         base: workspace.baseSha,
         head: change.commitSha,
-        author: change.agentId,
         title: change.intent.goal,
       } satisfies CandidateMember;
     }).pipe(Effect.orDie),
@@ -728,6 +761,23 @@ const followTrunk = Effect.fn("integration/followTrunk")(function* (
   }));
 });
 
+/**
+ * Trunk declined the green batch in flight (its base is no longer trunk's
+ * head, or a freeze stopped its group): it is invalidated, which sends each
+ * member back to the queue through its Change DO's ChangeRequeued, to be
+ * restacked onto trunk's head and verified again.
+ */
+const invalidateBatch = Effect.fn("integration/invalidateBatch")(function* (
+  lane: Lane,
+  batchId: BatchId,
+) {
+  // Only a green batch reaches trunk; one already terminal is just cleared.
+  yield* onBatch(lane.laneId, batchId, `invalidate:${batchId}`, (batch, now) => ({
+    moves: batch.state === "green" ? [{ command: { _tag: "Invalidate" } }] : [],
+    lane: () => ({ ...now, active: undefined }),
+  })).pipe(Effect.orDie);
+});
+
 /** Where a lane stands after a step: nothing to do, or waiting on a verdict, trunk, or the domain. */
 export type LaneStep = "idle" | "waiting";
 
@@ -748,6 +798,10 @@ export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: str
       continue;
     }
     const active = lane.active;
+    if (active?.declined === true) {
+      yield* invalidateBatch(lane, active.batchId);
+      continue;
+    }
     if (active === undefined) {
       if (lane.queue.length === 0) return "idle" satisfies LaneStep;
       yield* formBatch(lane);
@@ -810,10 +864,16 @@ const issuedFor = (verdict: BatchVerdict, batch: Batch, lane: Lane): Issued => {
   const cleared = withoutInfra(lane, batch.members);
   if (verdict.outcome === "land")
     return { outcome: "land", evidence: verdict.evidence, lane: cleared };
+  // KeelVerify's own remedy (what to fix in the failing tests) when it gave one.
+  const verifiersRemedy =
+    verdict.nextActions === undefined || verdict.nextActions.length === 0
+      ? {}
+      : { nextActions: verdict.nextActions };
   if (verdict.outcome === "bounce")
     return {
       outcome: "bounce",
       evidence: verdict.evidence,
+      ...verifiersRemedy,
       attribution: blameOf(batch, verdict.failingTests),
       lane: cleared,
     };
@@ -827,6 +887,7 @@ const issuedFor = (verdict: BatchVerdict, batch: Batch, lane: Lane): Issued => {
     ? {
         outcome: verdict.outcome,
         evidence: verdict.evidence,
+        ...verifiersRemedy,
         attribution: "infra",
         lane: infra.lane,
       }

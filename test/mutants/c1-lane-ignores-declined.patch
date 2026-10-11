@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t lane.declined
+# kills: lane.declined
+# why: The lane ignores trunk's decline, so the green batch is never invalidated and its change is stuck
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 12b2f86..c2d3a4a 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -249,7 +249,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
+       }
+       case "PromotionDeclined": {
+         const declined = decodeDeclined(event.payload);
+-        return lane.active?.batchId === declined.batchId && lane.active.declined !== true
++        return lane.active?.batchId === "never" && lane.active.declined !== true
+           ? { ...lane, active: { ...lane.active, declined: true } }
+           : undefined;
+       }

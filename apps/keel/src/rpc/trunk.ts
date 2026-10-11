@@ -49,8 +49,9 @@ export interface TrunkRpc {
   /**
    * Copies trunk's head into the project's staging and mirror (relaying
    * trunk's pack, so commit ids survive). Idempotent; the Project DO's
-   * createProject calls it after `initialize`, and the Trunk DO runs it after
-   * each TrunkAdvanced, off the promotion path.
+   * createProject calls it once, after `initialize`. After each TrunkAdvanced
+   * the Trunk DO syncs only the mirror, off the promotion path: staging's main
+   * has one writer, the Lane.
    */
   sync(): Promise<ExitJson>;
 }

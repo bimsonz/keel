@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t trunk.resume
+# kills: trunk.resume
+# why: Resume confirms the head trunk knew, not the one it reads, so promotion freezes again at once
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index a2b3860..806a46c 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -349,7 +349,7 @@ export const resumeTrunk = Effect.fn("integration/resumeTrunk")(function* (
+   projectId: ProjectId,
+   by: string,
+ ) {
+-  const head = yield* (yield* TrunkWriter).head;
++  const head = trunkOf(yield* EntityStore, projectId)?.head ?? (yield* (yield* TrunkWriter).head);
+   const now = yield* (yield* Clock).now;
+   yield* promote(projectId, { _tag: "Resume", by, head }, `resume:${by}@${now}`).pipe(
+     Effect.catchTag("PromotionStateRefused", () => Effect.void),

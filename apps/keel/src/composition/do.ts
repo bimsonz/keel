@@ -91,16 +91,21 @@ export function changeServices(env: Env): Layer.Layer<ChangeServices> {
 }
 
 /** The Trunk DO's driven adapters beyond the backbone: the one writer of its project's trunk. */
-export type TrunkServices = TrunkWriter;
+export type TrunkServices = TrunkWriter | CodeHost;
 
 /**
  * The Trunk DO writes and syncs its project's trunk through GitCore over the
- * code host. `projectId` is read lazily, on first use, from the object's name.
+ * code host, and reads each candidate it promotes from staging. `projectId`
+ * is read lazily, on first use, from the object's name.
  */
 export function trunkServices(env: Env, projectId: () => ProjectId): Layer.Layer<TrunkServices> {
-  return Layer.suspend(() =>
-    TrunkWriterGitCore(projectRepos(projectId())).pipe(Layer.provide(codeHostLayer(env))),
-  );
+  return Layer.suspend(() => {
+    const host = codeHostLayer(env);
+    return Layer.merge(
+      host,
+      TrunkWriterGitCore(projectRepos(projectId())).pipe(Layer.provide(host)),
+    );
+  });
 }
 
 /** The Lane DO's driven adapters beyond the backbone: it composes, bundles and verifies its batches. */

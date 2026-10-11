@@ -35,7 +35,9 @@ import {
   CodeHost,
   EntityStore,
   EventOutbox,
+  StagingWriter,
 } from "@keeltown/core/ports";
+import { PushRejected } from "@keeltown/core/domain/integration";
 import {
   makeBatchVerificationMemory,
   makeCandidateBundlesMemory,
@@ -65,6 +67,8 @@ interface WorldOptions {
   readonly bundles?: Layer.Layer<CandidateBundles>;
   readonly verification?: "required" | "off";
   readonly composer?: (inner: Layer.Layer<CandidateComposer>) => Layer.Layer<CandidateComposer>;
+  /** Staging's main refuses every move, as a staging some other writer holds would. */
+  readonly stagingStuck?: boolean;
 }
 
 /** The Lane's ports in memory, staging's main shared by the code host and the StagingWriter. */
@@ -131,7 +135,14 @@ function world(options: WorldOptions = {}) {
     options.composer?.(composer) ?? composer,
     options.bundles ?? bundles.layer,
     recordingVerification,
-    staging.layer,
+    options.stagingStuck === true
+      ? Layer.succeed(
+          StagingWriter,
+          StagingWriter.of({
+            fastForward: () => Effect.fail(new PushRejected({ reason: "stale" })),
+          }),
+        )
+      : staging.layer,
     projects.layer,
     changesLayer,
   );
@@ -557,6 +568,110 @@ describe("the Lane", () => {
           ["BatchVerified", second.batchId],
         ]);
         expect(base).toBeDefined();
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.verdict-next-actions] a bounce carries KeelVerify's own remedy onto the change's VerdictIssued",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        const first = yield* toVerifying(w);
+        const remedy = [
+          { kind: "read" as const, title: "Fix suite > a test: expected 503 to be retried" },
+        ];
+        yield* recordVerdict(LANE, {
+          ...verdict(first.batchId, first.candidateId, first.instanceId, "bounce"),
+          nextActions: remedy,
+        });
+        expect(yield* payloads("VerdictIssued")).toEqual([
+          expect.objectContaining({ outcome: "bounce", nextActions: remedy }),
+        ]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.declined] trunk declining the green batch invalidates it on its members, and the lane forms the next",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        yield* queue(w, change(2));
+        const first = yield* toVerifying(w);
+        yield* recordVerdict(
+          LANE,
+          verdict(first.batchId, first.candidateId, first.instanceId, "land"),
+        );
+        yield* deliver(
+          envelope(
+            { kind: "trunk", id: PROJECT },
+            {
+              _tag: "PromotionDeclined",
+              projectId: PROJECT,
+              batchId: first.batchId,
+              reason: "commutation-failed",
+              reverify: [change(1)],
+            },
+          ),
+        );
+        yield* laneStep(LANE);
+        const invalidated = (yield* committed).filter((e) => e.type === "CandidateInvalidated");
+        expect(invalidated.map((e) => [e.payload, e.affected])).toEqual([
+          [
+            {
+              _tag: "CandidateInvalidated",
+              candidateId: first.candidateId,
+              batchId: first.batchId,
+              reason: "head-moved",
+            },
+            [changeRef(change(1))],
+          ],
+        ]);
+        expect(batchOf(yield* EntityStore, first.batchId)?.state).toBe("invalidated");
+        expect((yield* payloads("BatchFormed")).map((p) => p["members"])).toEqual([
+          [change(1)],
+          [change(2)],
+        ]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.forms-on-trunk-head] a staging that failed to follow trunk is moved to trunk's head before the next batch forms on it",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        // Staging moved some other way, so following trunk's advance from `base` fails.
+        const elsewhere = yield* w.code.fixture.commit(STAGING, MAIN, { "README.md": "other\n" });
+        const landed = sha("e");
+        yield* advance(base, landed, []);
+        yield* queue(w, change(1));
+        yield* laneStep(LANE);
+        expect(w.staging.moved).toEqual([{ from: elsewhere, to: landed }]);
+        expect(yield* payloads("BatchFormed")).toEqual([
+          expect.objectContaining({ members: [change(1)], base: landed }),
+        ]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.no-form-off-trunk] a staging that cannot be moved to trunk's head forms nothing, and the step fails to be retried",
+    () => {
+      const w = world({ stagingStuck: true });
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        yield* advance(base, sha("e"), []);
+        yield* queue(w, change(1));
+        expect(Exit.isFailure(yield* Effect.exit(laneStep(LANE)))).toBe(true);
+        expect(yield* payloads("BatchFormed")).toEqual([]);
+        expect(laneOf(yield* EntityStore, LANE)?.queue).toEqual([change(1)]);
       }).pipe(Effect.provide(w.layer));
     },
   );

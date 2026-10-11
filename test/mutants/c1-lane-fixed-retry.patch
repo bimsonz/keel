@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/lane.test.ts -t "lane.do.backoff"
+# kills: lane.do.backoff
+# why: A failing step is retried on a fixed 1 s loop, logging forever instead of backing off
+diff --git a/apps/keel/src/adapters/driving/do/lane.ts b/apps/keel/src/adapters/driving/do/lane.ts
+index 595a118..093e5bb 100644
+--- a/apps/keel/src/adapters/driving/do/lane.ts
++++ b/apps/keel/src/adapters/driving/do/lane.ts
+@@ -79,7 +79,7 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
+       return;
+     }
+     this.failures += 1;
+-    const delay = redeliveryDelay(this.failures);
++    const delay = redeliveryDelay(1);
+     const line = `lane ${this.laneId} step failed ${this.failures}x, next in ${delay} ms`;
+     // Below the cap a failure is expected to clear (a binding mid-deploy); at the cap a person should look.
+     if (delay >= REDELIVERY_CAP_MS) console.error(line, Cause.pretty(exit.cause));

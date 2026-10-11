@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t trunk.freeze-stale
+# kills: trunk.freeze-stale
+# why: Trunk takes the push's word instead of reading the head back, so a moved trunk advances instead of freezing
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index a2b3860..d59ea8c 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -329,7 +329,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+       return "retry" satisfies PushOutcome;
+     // Stale or an unexpected head: the read-back tells a lost acknowledgement from a moved trunk.
+   }
+-  const observed = yield* writer.head;
++  const observed = target;
+   yield* promote(
+     projectId,
+     { _tag: "ReadBack", observed },

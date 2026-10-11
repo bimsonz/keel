@@ -15,31 +15,49 @@ import {
   makeCodeHostMemory,
   makeProjectsMemory,
   makeStagingWriterMemory,
+  makeTrunkWriterMemory,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
-import type { LaneDO } from "../../src/adapters/driving/do/lane.ts";
+import { LANE_STEP, type LaneDO } from "../../src/adapters/driving/do/lane.ts";
+import type { TrunkDO } from "../../src/adapters/driving/do/trunk.ts";
+import { armedAlarms } from "../../src/adapters/driving/do/alarm.ts";
 import { backbone, type LaneServices } from "../../src/composition/do.ts";
-import { drainOutbox } from "./helpers.ts";
+import { drainAfter, drainOutbox } from "./helpers.ts";
 import { decodeExit, EventCodecs, LaneCodecs } from "../../src/rpc/index.ts";
 
 const MAIN = "refs/heads/main";
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
 
 /** A Lane DO for a fresh project, running on in-memory driven adapters (the pool shares the isolate). */
-async function lane() {
+async function lane(options: { readonly noStaging?: boolean } = {}) {
   const projectId: ProjectId = makeId("prj", ulid());
   const laneId = `lane:${projectId}:main`;
-  const stub = env.LANE.get(env.LANE.idFromName(laneId));
+  const stub = drainAfter(env.LANE.get(env.LANE.idFromName(laneId)));
   const staging = projectRepos(projectId).staging;
   const code = makeCodeHostMemory();
-  await Effect.runPromise(
+  const base = await Effect.runPromise(
     Effect.gen(function* () {
+      if (options.noStaging === true) return undefined;
       yield* (yield* CodeHost).create(staging);
-      yield* code.fixture.commit(staging, MAIN, { "README.md": "keel\n" });
+      return yield* code.fixture.commit(staging, MAIN, { "README.md": "keel\n" });
     }).pipe(Effect.provide(code.layer)),
   );
+  const stagingRefs = () => code.repos.get(`${staging.namespace}/${staging.name}`)?.refs;
+  // The project's trunk, at staging's head, writing through memory: the lane's BatchVerified reaches it.
+  const writer = makeTrunkWriterMemory(base ?? sha("0"));
+  const trunk = drainAfter(env.TRUNK.get(env.TRUNK.idFromName(`trunk:${projectId}`)));
+  if (base !== undefined) {
+    await runInDurableObject(trunk, (instance: TrunkDO, state) => {
+      Reflect.set(
+        instance,
+        "runtime",
+        ManagedRuntime.make(Layer.mergeAll(backbone(state.storage), code.layer, writer.layer)),
+      );
+    });
+    await trunk.initialize(base, "seed");
+  }
   const verification = makeBatchVerificationMemory();
   const projects = makeProjectsMemory();
   projects.setSettings(projectId, {
@@ -82,7 +100,10 @@ async function lane() {
     makeCandidateComposerMemory().layer,
     makeCandidateBundlesMemory().layer,
     verification.layer,
-    makeStagingWriterMemory().layer,
+    makeStagingWriterMemory({
+      get: () => stagingRefs()?.get(MAIN),
+      set: (to) => void stagingRefs()?.set(MAIN, to),
+    }).layer,
     projects.layer,
   );
   await runInDurableObject(stub, (instance: LaneDO, state) => {
@@ -92,7 +113,15 @@ async function lane() {
       ManagedRuntime.make(Layer.mergeAll(backbone(state.storage), driven)),
     );
   });
-  return { stub, projectId, laneId, verification };
+  /** The candidate the composer pushed for `candidateId`: a commit on staging's base at its ref. */
+  const pushCandidate = (candidateId: string) => {
+    const ref = `refs/heads/cand/${candidateId}`;
+    if (base !== undefined) stagingRefs()?.set(ref, base);
+    return Effect.runPromise(
+      code.fixture.commit(staging, ref, { "README.md": "keel\n", "src/retry.ts": "export {};\n" }),
+    );
+  };
+  return { stub, projectId, laneId, verification, writer, pushCandidate };
 }
 
 const queued = (laneId: string, n: number) => {
@@ -111,8 +140,8 @@ const queued = (laneId: string, n: number) => {
 };
 
 describe("the Lane DO", () => {
-  it("[lane.do.flow] a delivered ChangeQueued is batched by the lane's step; a fenced verdict is refused and the right one lands", async () => {
-    const { stub, laneId, verification } = await lane();
+  it("[lane.do.flow] a delivered ChangeQueued is batched by the lane's step; a fenced verdict is refused, and the right one lands through the Trunk", async () => {
+    const { stub, laneId, verification, writer, pushCandidate } = await lane();
     const receipt = decodeExit(EventCodecs.receive, await stub.receive([queued(laneId, 1)]));
     expect(receipt).toEqual(Exit.succeed({ accepted: 1, duplicates: 0, ignored: 0 }));
     // The step is a debounce armed for now; the platform may run it before this line does.
@@ -139,19 +168,59 @@ describe("the Lane DO", () => {
     expect(Exit.isFailure(fenced) ? JSON.stringify(fenced.cause) : "success").toContain(
       "ResultFenced",
     );
+    const tip = await pushCandidate(job.candidateId);
     const landed = decodeExit(
       LaneCodecs.recordVerdict,
       await stub.recordVerdict(command(0, started?.[0] ?? "")),
     );
     expect(landed).toEqual(Exit.void);
-    const batch = await runInDurableObject(stub, (_instance: LaneDO, state) =>
-      ManagedRuntime.make(backbone(state.storage)).runPromise(
-        Effect.map(EntityStore, (store) => batchOf(store, job.fence.batchId)?.state),
-      ),
+    // BatchVerified reaches the Trunk, which lands the candidate; its TrunkAdvanced promotes the batch.
+    const batchState = () =>
+      runInDurableObject(stub, (_instance: LaneDO, state) =>
+        ManagedRuntime.make(backbone(state.storage)).runPromise(
+          Effect.map(EntityStore, (store) => batchOf(store, job.fence.batchId)?.state),
+        ),
+      );
+    await vi.waitFor(
+      async () => {
+        expect(writer.head()).toBe(tip);
+        expect(await batchState()).toBe("promoted");
+      },
+      { timeout: 20_000, interval: 50 },
     );
-    expect(batch).toBe("green");
     // The step and the verdicts committed real events; their flush must not outlive the file.
     await drainOutbox(stub);
+  });
+
+  it("[lane.do.backoff] a step that keeps failing is retried 1 s·2ⁿ later, not on a fixed loop", async () => {
+    // No staging repo: every step dies reading staging's head.
+    const { stub, laneId } = await lane({ noStaging: true });
+    const armedStep = () =>
+      runInDurableObject(stub, (_instance: LaneDO, state) =>
+        armedAlarms(state.storage).find((a) => a.reason === LANE_STEP),
+      );
+    await stub.receive([queued(laneId, 1)]);
+    const failedAt: number[] = [];
+    const delays: number[] = [];
+    for (const wait of [0, 1_000]) {
+      await new Promise((resolve) => setTimeout(resolve, wait));
+      const before = Date.now();
+      await runDurableObjectAlarm(stub);
+      await vi.waitFor(
+        async () => {
+          const armed = await armedStep();
+          expect(armed?.at).toBeGreaterThan(before + 500);
+          failedAt.push(before);
+          delays.push((armed?.at ?? 0) - before);
+        },
+        { timeout: 10_000 },
+      );
+    }
+    // 1 s after the first failure, 2 s after the second (ADR 0009's backoff), each from when it failed.
+    expect(delays[0]).toBeGreaterThanOrEqual(1_000);
+    expect(delays[0]).toBeLessThan(2_000);
+    expect(delays.at(-1)).toBeGreaterThanOrEqual(2_000);
+    expect(failedAt.length).toBeGreaterThanOrEqual(2);
   });
 
   it("[lane.do.composition] the lane's own composition builds from the Worker's bindings", async () => {

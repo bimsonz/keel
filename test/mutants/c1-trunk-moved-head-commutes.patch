@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t trunk.declines-moved-head
+# kills: trunk.declines-moved-head
+# why: A batch verified on a head trunk has moved past is taken as commuting, so an unverified combination would land
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index a2b3860..0265be2 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -247,7 +247,7 @@ const factsOf = (projectId: ProjectId, head: CommitSha, batch: QueuedBatch) =>
+       batchId: batch.batchId,
+       touched: { ...NONE, changes: batch.members, paths: changed.map((c) => c.path) },
+       intervening: NONE,
+-      mergeTreeClean: batch.base === head,
++      mergeTreeClean: true,
+     } satisfies CommutationFacts;
+   });
+ 

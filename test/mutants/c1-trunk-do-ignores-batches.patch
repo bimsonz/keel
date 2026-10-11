@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/trunk.test.ts -t "trunk.do.freeze"
+# kills: trunk.do.freeze
+# why: The Trunk DO acknowledges BatchVerified without queueing it, so nothing is ever promoted
+diff --git a/apps/keel/src/adapters/driving/do/trunk.ts b/apps/keel/src/adapters/driving/do/trunk.ts
+index 720198b..6af1aef 100644
+--- a/apps/keel/src/adapters/driving/do/trunk.ts
++++ b/apps/keel/src/adapters/driving/do/trunk.ts
+@@ -105,7 +105,7 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
+ 
+   /** A delivered BatchVerified joins the queue; redelivery is a no-op. */
+   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
+-    return trunkHeard(tx, this.projectId, event) ? { drafts: [] } : undefined;
++    return event.type === "never" && trunkHeard(tx, this.projectId, event) ? { drafts: [] } : undefined;
+   }
+ 
+   override async receive(envelopes: unknown) {

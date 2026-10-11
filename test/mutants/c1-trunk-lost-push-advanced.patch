@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t trunk.retry-same-sha
+# kills: trunk.retry-same-sha
+# why: A push trunk did not take is reported as an advance, so it is never pushed again and the group stays open forever
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index a2b3860..50f7278 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -337,7 +337,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+   ).pipe(Effect.orDie);
+   const after = trunkOf(yield* EntityStore, projectId);
+   if (after?.phase === "frozen") return "frozen" satisfies PushOutcome;
+-  return after?.phase === "promoting" ? "retry" : "advanced";
++  return after?.phase === "promoting" ? "advanced" : "advanced";
+ });
+ 
+ /**

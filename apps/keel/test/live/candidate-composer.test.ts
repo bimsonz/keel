@@ -30,7 +30,6 @@ const BASE = {
   "docs/old.md": "old\n",
 };
 const ulid = (n: number) => `01JA0000000000000000000${String(n).padStart(3, "0")}`;
-const agentId = (n: number) => makeId("agt", ulid(n));
 const changeId = (n: number) => makeId("chg", ulid(n));
 const candidateId = (n: number) => makeId("cnd", ulid(n));
 
@@ -94,7 +93,6 @@ it("[composer.live] composes a three-change candidate through the binding and pu
         repo: workspaceAt(i),
         base,
         head: heads[i] ?? base,
-        author: agentId(i),
         title: `change ${i}`,
       });
       const request = {

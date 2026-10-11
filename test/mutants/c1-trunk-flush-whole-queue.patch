@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t trunk.racers
+# kills: trunk.racers
+# why: The flush groups every queued batch instead of the front one, so batches verified apart land together, unverified
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index a2b3860..ab99a71 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -262,7 +262,7 @@ export const flushTrunk = Effect.fn("integration/flushTrunk")(function* (project
+   if (trunk?.phase !== "debouncing") return trunk?.phase;
+   const observedHead = yield* (yield* TrunkWriter).head;
+   const [front] = trunk.queue;
+-  const inputs = front === undefined ? [] : [yield* factsOf(projectId, trunk.head, front)];
++  const inputs = yield* Effect.forEach(trunk.queue, (b) => factsOf(projectId, trunk.head, b));
+   const now = yield* (yield* Clock).now;
+   const groupId = `${front?.batchId ?? "empty"}@${now}`;
+   yield* promote(

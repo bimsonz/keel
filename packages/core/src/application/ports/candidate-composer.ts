@@ -1,13 +1,6 @@
 import { Context, type Effect } from "effect";
 import type { CompositionRefused } from "../../domain/integration/index.ts";
-import type {
-  AgentId,
-  CandidateId,
-  ChangeId,
-  CommitSha,
-  Instant,
-  Tier,
-} from "../../domain/kernel/index.ts";
+import type { CandidateId, ChangeId, CommitSha, Instant, Tier } from "../../domain/kernel/index.ts";
 import type { RepoRef } from "./code-host.ts";
 
 /** One queued change: where its commits live, the trunk commit it was made on, and what it lands as. */
@@ -18,8 +11,6 @@ export interface CandidateMember {
   /** Its workspace's head when granted: the base its change is merged against. */
   readonly base: CommitSha;
   readonly head: CommitSha;
-  /** The agent that made the change. Not the git author: the restacked commit keeps its submitted commit's author. */
-  readonly author: AgentId;
   /** The intent's title: its commit's message. */
   readonly title: string;
 }
