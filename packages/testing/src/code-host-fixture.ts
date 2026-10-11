@@ -38,12 +38,14 @@ export class CodeHostFixture extends Context.Service<
     /**
      * Commits `files` as the repo's whole tree on `ref` (a full name such as
      * `refs/heads/main`), parented on the ref's current commit if it has one,
-     * and moves the ref. The repo must exist.
+     * then on each of `merged` in order (commits the repo already holds, as
+     * `git merge` would add them), and moves the ref. The repo must exist.
      */
     readonly commit: (
       repo: RepoRef,
       ref: string,
       files: FixtureFiles,
+      merged?: readonly CommitSha[],
     ) => Effect.Effect<CommitSha, RepoNotFound>;
   }
 >()("keel-testing/CodeHostFixture") {}

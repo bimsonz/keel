@@ -2,13 +2,16 @@ import { CommitSha, Instant } from "@keeltown/core/kernel";
 import {
   CodeHost,
   type CommitInfo,
+  KEEL_TRUNK_REF,
   ObjectNotFound,
   PathNotFound,
   RefNotFound,
   RepoAlreadyExists,
   RepoNotFound,
   type RepoRef,
+  type SyncOutcome,
   type TreeEntry,
+  WorkspaceRebaser,
 } from "@keeltown/core/ports";
 import {
   compareTreeEntries,
@@ -16,6 +19,7 @@ import {
   decodeTree,
   diffTrees,
   type GitObject,
+  isAncestor,
   MissingObject,
   MODE_GITLINK,
   MODE_TREE,
@@ -103,6 +107,12 @@ export function makeCodeHostMemory() {
         ? Promise.resolve(decodeTree(o.body))
         : Promise.reject(new MissingObject(oid));
     },
+    readCommit: (oid: string) => {
+      const o = found.objects.get(oid);
+      return o?.type === "commit"
+        ? Promise.resolve(decodeCommit(o.body))
+        : Promise.reject(new MissingObject(oid));
+    },
   });
   const rootTree = (repo: RepoRef, found: MemoryRepo, commit: string) =>
     Effect.map(object(repo, found, commit, "commit"), (o) => decodeCommit(o.body).tree);
@@ -156,6 +166,10 @@ export function makeCodeHostMemory() {
       }),
     hasCommit: (repo, sha) =>
       Effect.map(find(repo), (found) => found.objects.get(sha)?.type === "commit"),
+    isAncestor: (repo, ancestor, descendant, stopAt) =>
+      Effect.flatMap(find(repo), (found) =>
+        fromGit(repo, () => isAncestor(reader(found), ancestor, descendant, { stopAt })),
+      ),
     readTree: (repo, commit) =>
       Effect.gen(function* () {
         const found = yield* find(repo);
@@ -222,13 +236,13 @@ export function makeCodeHostMemory() {
       scratch += 1;
       return { namespace: "memory", name: `scratch-${scratch}` };
     },
-    commit: (repo, ref, files) =>
+    commit: (repo, ref, files, merged = []) =>
       Effect.gen(function* () {
         const found = yield* find(repo);
         const parent = found.refs.get(ref);
         const { tree, objects } = yield* Effect.promise(() => buildTree(files));
         const { oid, object: commit } = yield* Effect.promise(() =>
-          buildCommit(tree, parent === undefined ? [] : [parent]),
+          buildCommit(tree, [...(parent === undefined ? [] : [parent]), ...merged]),
         );
         for (const [id, o] of objects) found.objects.set(id, o);
         found.objects.set(oid, commit);
@@ -242,5 +256,40 @@ export function makeCodeHostMemory() {
     repos,
     fixture,
     layer: Layer.mergeAll(Layer.succeed(CodeHost, host), Layer.succeed(CodeHostFixture, fixture)),
+  };
+}
+
+/**
+ * WorkspaceRebaser over a memory code host: trunk's objects are copied into
+ * the workspace and its `keel/trunk` moved to the head, as the relay would
+ * leave it. A ref already at the head is `unchanged`; a missing workspace is
+ * `RepoNotFound`. `pushed` records each move in order.
+ */
+export function makeWorkspaceRebaserMemory(
+  code: Pick<ReturnType<typeof makeCodeHostMemory>, "repos">,
+  trunk: RepoRef,
+) {
+  const pushed: { readonly workspace: RepoRef; readonly to: CommitSha }[] = [];
+  return {
+    pushed,
+    layer: Layer.succeed(
+      WorkspaceRebaser,
+      WorkspaceRebaser.of({
+        pushTrunk: (workspace, _base, head) =>
+          Effect.suspend((): Effect.Effect<SyncOutcome, RepoNotFound> => {
+            const target = code.repos.get(repoKey(workspace));
+            if (target === undefined)
+              return Effect.fail(new RepoNotFound({ repo: plain(workspace) }));
+            if (target.refs.get(KEEL_TRUNK_REF) === head) return Effect.succeed("unchanged");
+            const source = code.repos.get(repoKey(trunk));
+            if (source?.objects.get(head)?.type !== "commit")
+              return Effect.die(new Error(`trunk ${repoKey(trunk)} does not hold ${head}`));
+            for (const [id, o] of source.objects) target.objects.set(id, o);
+            target.refs.set(KEEL_TRUNK_REF, head);
+            pushed.push({ workspace, to: head });
+            return Effect.succeed("advanced");
+          }),
+      }),
+    ),
   };
 }

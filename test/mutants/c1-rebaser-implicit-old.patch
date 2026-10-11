@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-rebaser.test.ts -t rebaser.cas
+# kills: rebaser.cas
+# why: keel/trunk is pushed as a new ref whatever it holds, so a second rebase into the same workspace is refused, or a racing one overwritten
+diff --git a/apps/keel/src/adapters/driven/gitcore/workspace-rebaser.ts b/apps/keel/src/adapters/driven/gitcore/workspace-rebaser.ts
+index 496841a..24d73b8 100644
+--- a/apps/keel/src/adapters/driven/gitcore/workspace-rebaser.ts
++++ b/apps/keel/src/adapters/driven/gitcore/workspace-rebaser.ts
+@@ -56,7 +56,7 @@ export const WorkspaceRebaserGitCore = ({ trunk }: { trunk: RepoRef }) =>
+                 try: () =>
+                   relay(source, target, {
+                     ref: KEEL_TRUNK_REF,
+-                    from: held,
++                    from: null,
+                     to: head,
+                     // The workspace holds the change's base, and the trunk it was last given.
+                     haves: held === null ? [base] : [base, held],

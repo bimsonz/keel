@@ -10,6 +10,7 @@ const CONTRACT_PORTS = [
   "TokenIssuer",
   "CodeHost",
   "WorkspacePool",
+  "WorkspaceRebaser",
   "SubjectRegistry",
   "Recall",
   "Notifier",

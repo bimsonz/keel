@@ -35,6 +35,21 @@ const HEAD: FixtureFiles = {
   "new.txt": "new\n",
 };
 
+/**
+ * An agent's merge of trunk, as `git fetch origin keel/trunk && git merge
+ * FETCH_HEAD` leaves it: `work` and `trunk` both on `base`, and `merge`
+ * parented on `work` first and `trunk` second.
+ */
+const mergeHistory = Effect.gen(function* () {
+  const fixture = yield* CodeHostFixture;
+  const repo = yield* freshRepo;
+  const base = yield* fixture.commit(repo, MAIN, { f: "base\n" });
+  const work = yield* fixture.commit(repo, MAIN, { f: "work\n" });
+  const trunk = yield* fixture.commit(repo, "refs/heads/trunk", { f: "trunk\n" }, [base]);
+  const merge = yield* fixture.commit(repo, MAIN, { f: "merged\n" }, [trunk]);
+  return { repo, base, work, trunk, merge };
+});
+
 /** A fresh, created repo. */
 const freshRepo = Effect.gen(function* () {
   const host = yield* CodeHost;
@@ -127,8 +142,9 @@ export function describeCodeHostContract(
             yield* tagOf(host.listDir(ghost, sha, "")),
             yield* tagOf(host.readCommit(ghost, sha)),
             yield* tagOf(host.log(ghost, sha, 5)),
+            yield* tagOf(host.isAncestor(ghost, sha, unknownSha(), [])),
           ];
-          expect(tags).toEqual(Array.from({ length: 11 }, () => "RepoNotFound"));
+          expect(tags).toEqual(Array.from({ length: 12 }, () => "RepoNotFound"));
           expect(yield* Effect.flip(host.head(ghost, MAIN))).toMatchObject({
             repo: { namespace: ghost.namespace, name: ghost.name },
           });
@@ -152,9 +168,10 @@ export function describeCodeHostContract(
             yield* Effect.flip(host.listDir(repo, missing, "")),
             yield* Effect.flip(host.readCommit(repo, missing)),
             yield* Effect.flip(host.log(repo, missing, 5)),
+            yield* Effect.flip(host.isAncestor(repo, known, missing, [])),
           ];
           expect(errors).toMatchObject(
-            Array.from({ length: 7 }, () => ({ _tag: "ObjectNotFound", oid: missing })),
+            Array.from({ length: 8 }, () => ({ _tag: "ObjectNotFound", oid: missing })),
           );
         }).pipe(Effect.provide(make())),
     );
@@ -389,6 +406,34 @@ export function describeCodeHostContract(
             ["new.txt", "deleted", "100644", "-"],
           ]);
           expect(yield* host.diffTrees(repo, head, head)).toEqual([]);
+        }).pipe(Effect.provide(make())),
+    );
+
+    it.live(
+      "[codehost.ancestor-merge] isAncestor reaches trunk's head through the second parent of an agent's merge",
+      () =>
+        Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const { repo, base, work, trunk, merge } = yield* mergeHistory;
+          expect(yield* host.isAncestor(repo, trunk, merge, [base])).toBe(true);
+          expect(yield* host.isAncestor(repo, work, merge, [base])).toBe(true);
+          expect(yield* host.isAncestor(repo, base, merge, [])).toBe(true);
+          expect(yield* host.isAncestor(repo, merge, merge, [])).toBe(true);
+          // Both sides stopped short of base: nothing reaches it.
+          expect(yield* host.isAncestor(repo, base, merge, [work, trunk])).toBe(false);
+        }).pipe(Effect.provide(make())),
+    );
+
+    it.live(
+      "[codehost.ancestor-sibling] isAncestor is false between two commits on one base, and from a commit to its own descendant",
+      () =>
+        Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const { repo, base, work, trunk, merge } = yield* mergeHistory;
+          expect(yield* host.isAncestor(repo, trunk, work, [base])).toBe(false);
+          expect(yield* host.isAncestor(repo, work, trunk, [])).toBe(false);
+          expect(yield* host.isAncestor(repo, merge, base, [])).toBe(false);
+          expect(yield* host.isAncestor(repo, merge, trunk, [])).toBe(false);
         }).pipe(Effect.provide(make())),
     );
 

@@ -1,4 +1,5 @@
 /** Clean-room git algorithms with a small I/O interface; no Effect, no cloudflare:* */
+export * from "./ancestry.ts";
 export * from "./bytes.ts";
 export * from "./compose.ts";
 export * from "./diff.ts";

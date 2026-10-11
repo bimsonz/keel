@@ -14,6 +14,7 @@ import {
   advertisedRefs,
   compareTreeEntries,
   diffTrees,
+  isAncestor,
   MissingObject,
   MODE_GITLINK,
   MODE_TREE,
@@ -243,6 +244,10 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
         ),
       hasCommit: (repo, sha) =>
         onRepo(repo, async (handle) => (await handle.readCommit(sha)) !== null),
+      isAncestor: (repo, ancestor, descendant, stopAt) =>
+        onObjects(repo, (handle) =>
+          isAncestor(objectsOf(handle), ancestor, descendant, { stopAt }),
+        ),
       readTree: (repo, commit) =>
         onObjects(repo, async (handle) =>
           listTree(objectsOf(handle), await rootTree(handle, commit), ""),

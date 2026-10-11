@@ -48,3 +48,4 @@ export * from "./trunks.ts";
 export * from "./verifier-runtime.ts";
 export * from "./work-queue.ts";
 export * from "./workspace-pool.ts";
+export * from "./workspace-rebaser.ts";

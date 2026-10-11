@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/ancestry.test.ts packages/testing/test/ports.test.ts -t "ancestry.differential|ancestry.merge|codehost.ancestor-merge"
+# kills: ancestry.differential, ancestry.merge, codehost.ancestor-merge
+# why: The walk follows first parents only, so an agent's merge of keel/trunk (trunk's head is its second parent) never descends from its new base and every rebased change is refused
+diff --git a/packages/gitcore/src/ancestry.ts b/packages/gitcore/src/ancestry.ts
+index b9fccdb..0f579d2 100644
+--- a/packages/gitcore/src/ancestry.ts
++++ b/packages/gitcore/src/ancestry.ts
+@@ -54,7 +54,7 @@ export async function isAncestor(
+         const oid = chunk[i];
+         if (oid === ancestor) return true;
+         if (oid === undefined || stop.has(oid)) continue;
+-        for (const parent of commit.parents)
++        for (const parent of commit.parents.slice(0, 1))
+           if (!seen.has(parent)) {
+             seen.add(parent);
+             next.push(parent);

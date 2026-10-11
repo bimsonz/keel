@@ -24,7 +24,7 @@ export function artifactsFixture(namespace: string, binding: Artifacts) {
       made.push(repo);
       return repo;
     },
-    commit: (repo, ref, files) =>
+    commit: (repo, ref, files, merged = []) =>
       Effect.tryPromise({
         try: async () => {
           const handle = await binding.get(repo.name);
@@ -36,7 +36,10 @@ export function artifactsFixture(namespace: string, binding: Artifacts) {
             });
             const parent = current?.hash;
             const { tree, objects } = await buildTree(files);
-            const commit = await buildCommit(tree, parent === undefined ? [] : [parent]);
+            const commit = await buildCommit(tree, [
+              ...(parent === undefined ? [] : [parent]),
+              ...merged,
+            ]);
             const [info, token] = await Promise.all([
               handle.info(),
               handle.createToken("write", 600),

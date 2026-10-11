@@ -5,67 +5,18 @@
 import { describe, expect, it } from "@effect/vitest";
 import { CommitSha } from "@keeltown/core/kernel";
 import { CodeHost, type RepoRef, StagingWriter, TrunkWriter } from "@keeltown/core/ports";
-import { concat, dec, FLUSH, pkt, readPkts } from "@keeltown/gitcore";
 import { makeCodeHostMemory } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 import { afterEach, vi } from "vitest";
 import { StagingWriterGitCore } from "../../src/adapters/driven/gitcore/staging-writer.ts";
 import { TrunkWriterGitCore } from "../../src/adapters/driven/gitcore/trunk-writer.ts";
+import { gitServer, PACK, type Reply } from "./git-server.ts";
 
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
 const TRUNK: RepoRef = { namespace: "memory", name: "prj" };
 const STAGING: RepoRef = { namespace: "memory", name: "prj-staging" };
 const FROM = sha("a");
 const TO = sha("b");
-const PACK = concat([new TextEncoder().encode("PACK"), new Uint8Array([0, 0, 0, 2, 0, 0, 0, 0])]);
-
-type Reply = "ok" | "stale" | "busy";
-interface Request {
-  readonly service: "upload-pack" | "receive-pack";
-  readonly repo: string;
-  readonly auth: string | null;
-  readonly lines: readonly string[];
-}
-
-/** A git server that answers upload-pack with `pack` and receive-pack with each scripted reply in turn. */
-function gitServer(replies: Reply[], pack: Uint8Array = PACK) {
-  const requests: Request[] = [];
-  const fetch: typeof globalThis.fetch = async (input, init) => {
-    const url = new URL(
-      typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
-    );
-    const service = url.pathname.endsWith("/git-upload-pack") ? "upload-pack" : "receive-pack";
-    const body = new Uint8Array(await new Response(init?.body).arrayBuffer());
-    const lines: string[] = [];
-    // receive-pack's commands end at the flush, and the raw pack follows; upload-pack's haves follow theirs.
-    for (const line of readPkts(
-      service === "receive-pack" ? body.subarray(0, body.length - PACK.length) : body,
-    ))
-      if (line !== null) lines.push(dec.decode(line).replace(/\n$/, "").split("\0")[0] ?? "");
-    requests.push({
-      service,
-      repo: `${url.host}${url.pathname.replace(/\/git-(upload|receive)-pack$/, "")}`,
-      auth: new Headers(init?.headers).get("Authorization"),
-      lines,
-    });
-    if (service === "upload-pack") {
-      const bands: Uint8Array[] = [];
-      for (let at = 0; at < pack.length; at += 65_000)
-        bands.push(pkt(concat([Uint8Array.of(1), pack.subarray(at, at + 65_000)])));
-      return new Response(concat([pkt("NAK\n"), ...bands, FLUSH]));
-    }
-    const reply = replies.shift() ?? "ok";
-    const report =
-      reply === "busy"
-        ? [pkt("ERR artifacts_git_receive_pack_busy\n")]
-        : [
-            pkt("unpack ok\n"),
-            pkt(reply === "ok" ? "ok refs/heads/main\n" : "ng refs/heads/main stale ref\n"),
-          ];
-    return new Response(concat([...report, FLUSH]));
-  };
-  return { fetch, requests };
-}
 
 /** Trunk and staging in memory, trunk's main at a commit that is not FROM, and every minted token recorded. */
 function host() {

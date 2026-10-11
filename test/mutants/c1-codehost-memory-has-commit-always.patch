@@ -2,16 +2,16 @@
 # kills: codehost.has-commit
 # why: Every commit id reads as present, so submit would accept a commit the workspace never received
 diff --git a/packages/testing/src/memory/code-host.ts b/packages/testing/src/memory/code-host.ts
-index 07763c2..4bccfc3 100644
+index 9036876..5cc9324 100644
 --- a/packages/testing/src/memory/code-host.ts
 +++ b/packages/testing/src/memory/code-host.ts
-@@ -117,8 +117,7 @@ export function makeCodeHostMemory() {
+@@ -164,8 +164,7 @@ export function makeCodeHostMemory() {
            ? Effect.fail(new RefNotFound({ repo: plain(repo), ref }))
            : Effect.succeed(sha);
        }),
 -    hasCommit: (repo, sha) =>
 -      Effect.map(find(repo), (found) => found.objects.get(sha)?.type === "commit"),
 +    hasCommit: (repo) => Effect.map(find(repo), () => true),
-     readTree: (repo, commit) =>
-       Effect.gen(function* () {
-         const found = yield* find(repo);
+     isAncestor: (repo, ancestor, descendant, stopAt) =>
+       Effect.flatMap(find(repo), (found) =>
+         fromGit(repo, () => isAncestor(reader(found), ancestor, descendant, { stopAt })),

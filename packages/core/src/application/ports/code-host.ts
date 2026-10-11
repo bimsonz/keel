@@ -131,6 +131,21 @@ export class CodeHost extends Context.Service<
     ) => Effect.Effect<CommitSha, RepoNotFound | RefNotFound>;
     /** Whether the repo holds this commit: one object read, for the commit-in-workspace check. */
     readonly hasCommit: (repo: RepoRef, sha: CommitSha) => Effect.Effect<boolean, RepoNotFound>;
+    /**
+     * Whether `ancestor` is `descendant` or reachable from it through any
+     * parent (`git merge-base --is-ancestor`): a merge reaches its second
+     * parent, where an agent's merge puts the trunk head it took. The walk
+     * never reads past a commit in `stopAt` (one that cannot lead to the
+     * ancestor, such as a change's grant base when the ancestor is a later
+     * trunk head), though it still finds one that is the ancestor. It fails
+     * closed: a walk past 10,000 commits answers false.
+     */
+    readonly isAncestor: (
+      repo: RepoRef,
+      ancestor: CommitSha,
+      descendant: CommitSha,
+      stopAt: readonly CommitSha[],
+    ) => Effect.Effect<boolean, RepoNotFound | ObjectNotFound>;
     /** The commit's whole tree, recursively, in git order (a tree before what it holds). */
     readonly readTree: (
       repo: RepoRef,

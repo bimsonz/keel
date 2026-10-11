@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/ancestry.test.ts -t ancestry.bound
+# kills: ancestry.bound
+# why: The walk has no bound, so a deep or endless history keeps a Precheck reading commits until the Worker dies instead of refusing
+diff --git a/packages/gitcore/src/ancestry.ts b/packages/gitcore/src/ancestry.ts
+index b9fccdb..c5ee008 100644
+--- a/packages/gitcore/src/ancestry.ts
++++ b/packages/gitcore/src/ancestry.ts
+@@ -44,7 +44,6 @@ export async function isAncestor(
+   let frontier = [descendant];
+   let read = 0;
+   while (frontier.length > 0) {
+-    if (read + frontier.length > limit) return false;
+     read += frontier.length;
+     const next: string[] = [];
+     for (let at = 0; at < frontier.length; at += READS_AT_ONCE) {

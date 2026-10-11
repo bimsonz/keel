@@ -10,6 +10,7 @@ import {
   type OutboxHarness,
 } from "./contracts/index.ts";
 import { describeChangesContract, type ChangesHarness } from "./contracts/changes.ts";
+import type { CodeHostFixture } from "./code-host-fixture.ts";
 import { describeCodeHostContract } from "./contracts/code-host.ts";
 import { describeEnrolmentsContract, type EnrolmentsHarness } from "./contracts/enrolments.ts";
 import { describeEventFeedContract, type EventFeedHarness } from "./contracts/event-feed.ts";
@@ -20,6 +21,10 @@ import {
 import { describeInboxContract, type InboxHarness } from "./contracts/inbox.ts";
 import { describeNotifierContract, type NotifierHarness } from "./contracts/notifier.ts";
 import { describeWorkspacePoolContract, type StockedPool } from "./contracts/workspace-pool.ts";
+import {
+  describeWorkspaceRebaserContract,
+  type WorkspaceRebaserHarness,
+} from "./contracts/workspace-rebaser.ts";
 import {
   type BatchVerdictsHarness,
   type ChangePrecheckHarness,
@@ -51,6 +56,7 @@ import * as verification from "./memory/verification.ts";
 import { CommitSha, makeId } from "@keeltown/core/kernel";
 import type {
   AgentDirectory,
+  CodeHost,
   BatchVerdicts,
   ChangePrecheck,
   Changes,
@@ -63,6 +69,7 @@ import type {
   Notifier,
   Projects,
   ProjectViews,
+  WorkspaceRebaser,
 } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 
@@ -120,6 +127,15 @@ function memoryChangesHarness(): ChangesHarness {
         return sha;
       }),
     lapse: (changeId) => Effect.sync(() => memory.lapse(changeId)),
+  };
+}
+
+function memoryWorkspaceRebaserHarness(): WorkspaceRebaserHarness {
+  const code = codeHost.makeCodeHostMemory();
+  const trunk = code.fixture.scratch();
+  return {
+    trunk,
+    layer: Layer.mergeAll(code.layer, codeHost.makeWorkspaceRebaserMemory(code, trunk).layer),
   };
 }
 
@@ -237,6 +253,10 @@ export const PORTS = {
   ),
   CodeHost: port(() => codeHost.makeCodeHostMemory().layer, describeCodeHostContract),
   WorkspacePool: workspacePool,
+  WorkspaceRebaser: harnessed<
+    WorkspaceRebaser | CodeHost | CodeHostFixture,
+    WorkspaceRebaserHarness
+  >(memoryWorkspaceRebaserHarness, describeWorkspaceRebaserContract),
   Trunks: port(
     () => integration.makeTrunksMemory().layer,
     pending("Trunks", ["initialize", "sync"]),

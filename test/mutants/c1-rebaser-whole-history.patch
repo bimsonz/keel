@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-rebaser.test.ts -t rebaser.cas
+# kills: rebaser.cas
+# why: The first rebase names no haves, so trunk's whole history is relayed into a workspace that already holds it and a large project hits the pack cap
+diff --git a/apps/keel/src/adapters/driven/gitcore/workspace-rebaser.ts b/apps/keel/src/adapters/driven/gitcore/workspace-rebaser.ts
+index 496841a..2291772 100644
+--- a/apps/keel/src/adapters/driven/gitcore/workspace-rebaser.ts
++++ b/apps/keel/src/adapters/driven/gitcore/workspace-rebaser.ts
+@@ -59,7 +59,6 @@ export const WorkspaceRebaserGitCore = ({ trunk }: { trunk: RepoRef }) =>
+                     from: held,
+                     to: head,
+                     // The workspace holds the change's base, and the trunk it was last given.
+-                    haves: held === null ? [base] : [base, held],
+                   }),
+                 catch: (cause) => cause,
+               }).pipe(

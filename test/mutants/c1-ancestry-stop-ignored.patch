@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/ancestry.test.ts packages/testing/test/ports.test.ts -t "ancestry.stop-at|codehost.ancestor-merge"
+# kills: ancestry.stop-at, codehost.ancestor-merge
+# why: stopAt is ignored, so a walk from a change's commit wanders past its grant base down all of trunk's history
+diff --git a/packages/gitcore/src/ancestry.ts b/packages/gitcore/src/ancestry.ts
+index b9fccdb..341db47 100644
+--- a/packages/gitcore/src/ancestry.ts
++++ b/packages/gitcore/src/ancestry.ts
+@@ -53,7 +53,7 @@ export async function isAncestor(
+       for (const [i, commit] of commits.entries()) {
+         const oid = chunk[i];
+         if (oid === ancestor) return true;
+-        if (oid === undefined || stop.has(oid)) continue;
++        if (oid === undefined) continue;
+         for (const parent of commit.parents)
+           if (!seen.has(parent)) {
+             seen.add(parent);

@@ -1,0 +1,21 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/ancestry.test.ts packages/testing/test/ports.test.ts -t "codehost.ancestor-sibling|ancestry.merge"
+# kills: codehost.ancestor-sibling, ancestry.merge
+# why: Ancestry is answered as shared history, so a change that never merged trunk (a sibling of trunk's head on the same base) passes as descending from it
+diff --git a/packages/gitcore/src/ancestry.ts b/packages/gitcore/src/ancestry.ts
+index b9fccdb..f2a6844 100644
+--- a/packages/gitcore/src/ancestry.ts
++++ b/packages/gitcore/src/ancestry.ts
+@@ -1,3 +1,5 @@
++import { mergeBases, type ObjectReader } from "./merge.ts";
++
+ /** The read an ancestry walk needs: a commit's parents. Throws `MissingObject` for an id the store lacks. */
+ export interface CommitReader {
+   readCommit(oid: string): Promise<{ readonly parents: readonly string[] }>;
+@@ -38,6 +40,7 @@ export async function isAncestor(
+   descendant: string,
+   options: AncestryOptions = {},
+ ): Promise<boolean> {
++  if (ancestor !== descendant) return (await mergeBases(r as ObjectReader, ancestor, descendant)).length > 0;
+   const stop = new Set(options.stopAt ?? []);
+   const limit = options.limit ?? MAX_ANCESTRY_WALK;
+   const seen = new Set([descendant]);
