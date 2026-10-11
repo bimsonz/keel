@@ -2,7 +2,7 @@
 # kills: b11.lapse
 # why: the lease deadline is armed whatever the lease's state, so a released or lapsed lease keeps an alarm
 diff --git a/apps/keel/src/adapters/driving/do/change.ts b/apps/keel/src/adapters/driving/do/change.ts
-index 800933e..e3387bb 100644
+index 1cb29d1..f2c8b79 100644
 --- a/apps/keel/src/adapters/driving/do/change.ts
 +++ b/apps/keel/src/adapters/driving/do/change.ts
 @@ -213,7 +213,7 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp

@@ -2,6 +2,7 @@ import { Effect, Result, Schema } from "effect";
 import {
   Change,
   type ChangeCommand,
+  ChangeBounced,
   ChangeEvent,
   ChangeNotFound,
   type ChangeOrigin,
@@ -33,8 +34,10 @@ import {
   type NextAction,
   ProjectId,
   type SketchId,
+  type VerdictId,
   WorkspaceId,
 } from "../../domain/kernel/index.ts";
+import { VerdictIssued } from "../../domain/verification/index.ts";
 import {
   type Clock,
   CodeHost,
@@ -151,6 +154,12 @@ export interface PrecheckStep {
   readonly instanceId: string;
 }
 
+/** Precheck refused the submission: why, and what the agent can do about it (never empty). */
+export interface PrecheckRefusal extends PrecheckStep {
+  readonly reasons: readonly string[];
+  readonly nextActions: readonly NextAction[];
+}
+
 export interface CompiledPlan extends PrecheckStep {
   readonly planHash: ContentHash;
   readonly steps: number;
@@ -166,11 +175,12 @@ const encodeChange = Schema.encodeSync(Change);
 const decodeHeld = Schema.decodeUnknownSync(HeldWorkspace);
 const encodeHeld = Schema.encodeSync(HeldWorkspace);
 const encodeEvent = Schema.encodeSync(ChangeEvent);
+const encodeVerdict = Schema.encodeSync(VerdictIssued);
+const decodeBounced = Schema.decodeUnknownSync(ChangeBounced);
 
 /** As stored: JSON, without the keys an absent optional field leaves undefined. */
 const asStored = (encoded: unknown): Stored => JSON.parse(JSON.stringify(encoded));
-const payloadOf = (event: ChangeEvent): EventDraft["payload"] =>
-  JSON.parse(JSON.stringify(encodeEvent(event)));
+const payloadOf = (encoded: unknown): EventDraft["payload"] => JSON.parse(JSON.stringify(encoded));
 
 const changeRef = (changeId: ChangeId): EntityRef => ({ kind: "change", id: changeId });
 
@@ -247,7 +257,7 @@ const transition = <T extends Tag>(
     }
     for (const payload of decided.success) {
       state = evolveChange(state, { at: tx.at, payload });
-      drafts.push({ payload: payloadOf(payload) });
+      drafts.push({ payload: payloadOf(encodeEvent(payload)) });
     }
   }
   if (state === undefined) throw new Error(`${changeId} has no state after its commands`);
@@ -603,13 +613,15 @@ export const lapseLease: (
 /**
  * One of Precheck's commands: idempotent by `instanceId` (the cause is
  * `<instanceId>:<method>`), and refused when Precheck checked a revision other
- * than the change's current one.
+ * than the change's current one. `before` commits ahead of the change's own
+ * events in the same transaction (a refusal's verdict).
  */
 const precheckCommand = (
   changeId: ChangeId,
   method: string,
   step: PrecheckStep,
   command: ChangeCommand,
+  before: readonly EventDraft[] = [],
 ) =>
   Effect.gen(function* () {
     const committed = yield* commit(
@@ -620,11 +632,11 @@ const precheckCommand = (
           return Result.fail(refused(stored, method));
         return Result.map(
           transition(tx, changeId, ["ChangeNotFound", "ChangeStateRefused"], [command]),
-          asTransition,
+          (decided) => ({ value: decided.change, drafts: [...before, ...decided.drafts] }),
         );
       },
     );
-    return yield* current(changeId, committed);
+    return { events: committed.events, change: yield* current(changeId, committed) };
   });
 
 /** Precheck has started on the submission: commits PrecheckStarted. */
@@ -633,10 +645,11 @@ export const precheckStarted: (
   step: PrecheckStep,
 ) => Effect.Effect<Change, ChangeNotFound | ChangeStateRefused, Clock | EntityStore | EventOutbox> =
   Effect.fn("coordination/precheckStarted")(function* (changeId: ChangeId, step: PrecheckStep) {
-    return yield* precheckCommand(changeId, "precheckStarted", step, {
+    const started = yield* precheckCommand(changeId, "precheckStarted", step, {
       _tag: "StartPrecheck",
       instanceId: step.instanceId,
     });
+    return started.change;
   });
 
 /** Precheck passed and compiled the Verification Plan: commits PlanCompiled. */
@@ -645,11 +658,56 @@ export const planCompiled: (
   plan: CompiledPlan,
 ) => Effect.Effect<Change, ChangeNotFound | ChangeStateRefused, Clock | EntityStore | EventOutbox> =
   Effect.fn("coordination/planCompiled")(function* (changeId: ChangeId, plan: CompiledPlan) {
-    return yield* precheckCommand(changeId, "planCompiled", plan, {
+    const compiled = yield* precheckCommand(changeId, "planCompiled", plan, {
       _tag: "CompilePlan",
       drift: [],
       planHash: plan.planHash,
       steps: plan.steps,
       costEstimate: plan.costEstimate,
     });
+    return compiled.change;
   });
+
+/**
+ * Precheck refused the submission: issues a ruling-class verdict on its own
+ * entity (outcome `bounce`, Precheck's reasons as its evidence, and no plan
+ * hash, because no plan was compiled) and bounces the change naming it, in one
+ * transaction. A replay answers the verdict the first commit issued.
+ */
+export const precheckRefused: (
+  changeId: ChangeId,
+  refusal: PrecheckRefusal,
+) => Effect.Effect<
+  { readonly change: Change; readonly verdictId: VerdictId },
+  ChangeNotFound | ChangeStateRefused,
+  Clock | Ids | EntityStore | EventOutbox
+> = Effect.fn("coordination/precheckRefused")(function* (
+  changeId: ChangeId,
+  refusal: PrecheckRefusal,
+) {
+  const minted = yield* (yield* Ids).next("vrd");
+  const verdict = VerdictIssued.make({
+    verdictId: minted,
+    subject: changeId,
+    outcome: "bounce",
+    evidence: refusal.reasons,
+  });
+  const bounced = yield* precheckCommand(
+    changeId,
+    "precheckRefused",
+    refusal,
+    {
+      _tag: "Bounce",
+      verdictId: minted,
+      reasons: refusal.reasons,
+      nextActions: refusal.nextActions,
+    },
+    [{ entity: { kind: "verdict", id: minted }, payload: payloadOf(encodeVerdict(verdict)) }],
+  );
+  // A replay finds the cause's events on the change, whose ChangeBounced names the verdict it issued.
+  const bounce = bounced.events.find((event) => event.type === "ChangeBounced");
+  return {
+    change: bounced.change,
+    verdictId: bounce === undefined ? minted : decodeBounced(bounce.payload).verdictId,
+  };
+});

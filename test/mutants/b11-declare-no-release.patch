@@ -2,10 +2,10 @@
 # kills: b11.declare-release
 # why: a refused declare keeps the workspace it was granted, so the workspace leaks to a change that never existed
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index abcae74..f9f4dfa 100644
+index 29e615f..51344f2 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -381,7 +381,7 @@ export const declare: (
+@@ -391,7 +391,7 @@ export const declare: (
        tx.outbox.subscribe(`pool:${command.projectId}`, CHANGE_ENDS);
        return Result.succeed(asTransition(decided.success));
      },

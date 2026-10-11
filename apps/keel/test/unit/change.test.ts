@@ -7,6 +7,7 @@ import {
   getChange,
   lapseLease,
   planCompiled,
+  precheckRefused,
   precheckStarted,
   revise,
   submit,
@@ -29,6 +30,7 @@ import {
   AdoptCommand,
   DeclareCommand,
   PlanCompiledCommand,
+  PrecheckRefusedCommand,
   PrecheckStartedCommand,
   ReviseCommand,
   SubmitCommand,
@@ -87,6 +89,23 @@ const pushToWorkspace = Effect.gen(function* () {
   yield* (yield* CodeHost).create(held.repo);
   return yield* (yield* CodeHostFixture).commit(held.repo, "refs/heads/main", { "a.txt": "a" });
 });
+
+const starting = (revision: number, instanceId: string) =>
+  Schema.decodeUnknownSync(PrecheckStartedCommand)({ revision, instanceId });
+
+const refusing = (revision: number, instanceId: string) =>
+  Schema.decodeUnknownSync(PrecheckRefusedCommand)({
+    revision,
+    instanceId,
+    reasons: ["precheck:guard:.keel/guards/x"],
+    nextActions: [
+      {
+        kind: "call",
+        title: "Move the change off the guard paths, then submit it again",
+        operationId: "submit",
+      },
+    ],
+  });
 
 const types = Effect.map(EventOutbox, (outbox) =>
   outbox.log({ kind: "change", id: changeId }).map((event) => event.type),
@@ -374,6 +393,74 @@ describe("Precheck's commands", () => {
       expect((yield* types).filter((type) => type === "PrecheckStarted")).toHaveLength(1);
     }).pipe(Effect.provide(layer));
   });
+});
+
+/** Declares, pushes, submits and starts Precheck instance `instanceId`, leaving the change Deriving. */
+const deriving = (instanceId: string) =>
+  Effect.gen(function* () {
+    const declared = yield* declare(declaring());
+    const sha = yield* pushToWorkspace;
+    yield* submit(changeId, submitting(declared.change.lease.id, sha, "submit-1"));
+    yield* precheckStarted(changeId, starting(1, instanceId));
+    return { lease: declared.change.lease.id, sha };
+  });
+
+describe("a Precheck refusal", () => {
+  it.effect(
+    "[b11.precheck-refused] issues a ruling verdict on its own entity and bounces the change naming it, in one commit",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* deriving("precheck-1");
+        const refusal = refusing(1, "precheck-1");
+        const answered = yield* precheckRefused(changeId, refusal);
+        const replayed = yield* precheckRefused(changeId, refusal);
+        const outbox = yield* EventOutbox;
+        const verdict = outbox.log({ kind: "verdict", id: answered.verdictId });
+        const bounced = outbox.log({ kind: "change", id: changeId }).at(-1);
+
+        expect(answered.change.state).toBe("bounced");
+        expect(replayed.verdictId).toBe(answered.verdictId);
+        expect(verdict.map((event) => [event.type, event.seq])).toEqual([["VerdictIssued", 1]]);
+        expect(verdict[0]?.payload).toEqual({
+          _tag: "VerdictIssued",
+          verdictId: answered.verdictId,
+          subject: changeId,
+          outcome: "bounce",
+          evidence: ["precheck:guard:.keel/guards/x"],
+        });
+        expect(bounced?.type).toBe("ChangeBounced");
+        expect(bounced?.payload).toMatchObject({
+          verdictId: answered.verdictId,
+          reasons: ["precheck:guard:.keel/guards/x"],
+          nextActions: refusal.nextActions,
+        });
+        expect(bounced?.dedupeKey.split("/")[1]).toBe(verdict[0]?.dedupeKey.split("/")[1]);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[b11.precheck-idem] starts a resubmission's own Precheck, while the bounced one's replay commits nothing",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        const { lease, sha } = yield* deriving("precheck-1");
+        yield* precheckRefused(changeId, refusing(1, "precheck-1"));
+        yield* revise(changeId, revising(lease, 1, "revise-1"));
+        yield* submit(changeId, submitting(lease, sha, "submit-2"));
+        const second = yield* precheckStarted(changeId, starting(2, "precheck-2"));
+        const firstReplayed = yield* Effect.exit(
+          precheckStarted(changeId, starting(1, "precheck-1")),
+        );
+
+        expect(second.state).toBe("deriving");
+        expect((yield* types).filter((type) => type === "PrecheckStarted")).toHaveLength(2);
+        expect(Exit.isSuccess(firstReplayed)).toBe(true);
+        expect((yield* types).filter((type) => type === "PrecheckStarted")).toHaveLength(2);
+      }).pipe(Effect.provide(layer));
+    },
+  );
 });
 
 describe("reading a change", () => {

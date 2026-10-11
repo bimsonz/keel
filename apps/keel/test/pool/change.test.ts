@@ -56,6 +56,20 @@ const abandon = async (c: ChangeUnderTest, leaseId: string, key: string) =>
     }),
   );
 
+/** Precheck refusing revision `revision` as instance `instanceId`. */
+const refusing = (revision: number, instanceId: string) => ({
+  revision,
+  instanceId,
+  reasons: ["precheck:protected:src/secret.ts"],
+  nextActions: [
+    {
+      kind: "call" as const,
+      title: "Move the change off the protected paths, then submit it again",
+      operationId: "submit",
+    },
+  ],
+});
+
 /** The lease deadlines the object has armed. */
 const leaseAlarms = (c: ChangeUnderTest) =>
   runInDurableObject(c.stub, (_instance: ChangeDO, state) =>
@@ -83,6 +97,7 @@ const STEPS = [
   "submit-elsewhere",
   "precheck-started",
   "plan-compiled",
+  "precheck-refused",
   "lease-ttl-passes",
   "deadline",
   "adopt",
@@ -116,6 +131,8 @@ async function take(c: ChangeUnderTest, step: Step, i: number, sha: string): Pro
         steps: 1,
         costEstimate: 1,
       }));
+    case "precheck-refused":
+      return void (await c.stub.precheckRefused(refusing(revision, `p${i}`)));
     case "lease-ttl-passes":
       return c.clock.advance(LEASE_TTL_MS);
     case "deadline":
@@ -297,6 +314,28 @@ describe("Precheck and the change", () => {
 
     await vi.waitFor(async () => expect(await introspector.get()).toHaveLength(1), WAIT);
     await expect(env.PRECHECK.get(`precheck-${submitted.eventId}`)).resolves.toBeDefined();
+  });
+});
+
+describe("a Precheck refusal over RPC", () => {
+  it("[b11.precheck-refused] bounces the change and answers the verdict it issued", async () => {
+    const c = await changeUnderTest();
+    const lease = ok(await c.declare()).change.lease.id;
+    ok(await submit(c, lease, await c.push(), "submit-1"));
+    ok(
+      decodeExit(
+        ChangeCodecs.precheckStarted,
+        await c.stub.precheckStarted({ revision: 1, instanceId: "p-1" }),
+      ),
+    );
+    const refused = ok(
+      decodeExit(ChangeCodecs.precheckRefused, await c.stub.precheckRefused(refusing(1, "p-1"))),
+    );
+    const bounced = (await c.log()).at(-1);
+
+    expect(refused.change.state).toBe("bounced");
+    expect(bounced?.payload).toMatchObject({ _tag: "ChangeBounced", verdictId: refused.verdictId });
+    await expectStateIsTheLog(c);
   });
 });
 

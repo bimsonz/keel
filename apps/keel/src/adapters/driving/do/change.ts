@@ -8,13 +8,13 @@ import {
   HeldWorkspace,
   lapseLease,
   planCompiled,
+  precheckRefused,
   precheckStarted,
   revise,
   submissionStatus,
   submit,
 } from "@keeltown/core/application/coordination";
 import { lapsesAt } from "@keeltown/core/domain/coordination";
-import { NotImplemented } from "@keeltown/core/not-implemented";
 import { ChangeId, type EventEnvelope, LeaseId } from "@keeltown/core/kernel";
 import type { SubmissionStatus, Transaction } from "@keeltown/core/ports";
 import { Effect, Exit, Option, Schema } from "effect";
@@ -31,7 +31,7 @@ import {
   DeclareCommand,
   type ExitCodec,
   PlanCompiledCommand,
-  type PrecheckRefusedCommand,
+  PrecheckRefusedCommand,
   PrecheckStartedCommand,
   ReviseCommand,
   SubmitCommand,
@@ -155,12 +155,12 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
     return this.answer(ChangeCodecs.precheckStarted, program);
   }
 
-  async precheckRefused(_command: typeof PrecheckRefusedCommand.Encoded) {
-    // Waits on VerdictIssued.planHash becoming optional: a Precheck ruling names no compiled plan.
-    return this.answer(
-      ChangeCodecs.precheckRefused,
-      Effect.die(new NotImplemented("coordination/precheckRefused")),
+  async precheckRefused(command: typeof PrecheckRefusedCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(PrecheckRefusedCommand, command).pipe(
+      Effect.flatMap((refusal) => precheckRefused(changeId, refusal)),
     );
+    return this.answer(ChangeCodecs.precheckRefused, program);
   }
 
   async planCompiled(command: typeof PlanCompiledCommand.Encoded) {

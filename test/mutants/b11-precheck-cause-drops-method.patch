@@ -2,10 +2,10 @@
 # kills: b11.precheck-idem
 # why: a Precheck command's cause is the instance alone, so the instance's next method reads as a replay of its first and commits nothing
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index abcae74..5a4bf82 100644
+index 29e615f..83f4df0 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -613,7 +613,7 @@ const precheckCommand = (
+@@ -625,7 +625,7 @@ const precheckCommand = (
  ) =>
    Effect.gen(function* () {
      const committed = yield* commit(
