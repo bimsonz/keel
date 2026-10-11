@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/world-matrix.test.ts
+# kills: world-matrix.noop-anchor-ambiguous
+# why: An anchor that occurs more than once still yields A-noop, changing whichever call comes first, so a probe can be admitted against the wrong call
+diff --git a/packages/core/src/application/verification/world-matrix.ts b/packages/core/src/application/verification/world-matrix.ts
+index 6cedecc..6142792 100644
+--- a/packages/core/src/application/verification/world-matrix.ts
++++ b/packages/core/src/application/verification/world-matrix.ts
+@@ -31,7 +31,7 @@ export type NoNoop =
+ export const applyNoop = (text: string, recipe: NoopRecipe): Result.Result<string, NoNoop> => {
+   const count = recipe.anchor.length === 0 ? 0 : text.split(recipe.anchor).length - 1;
+   if (count === 0) return Result.fail({ reason: "anchor-absent", path: recipe.path });
+-  if (count > 1) return Result.fail({ reason: "anchor-ambiguous", path: recipe.path, count });
++  if (count > 1 && count < 0) return Result.fail({ reason: "anchor-ambiguous", path: recipe.path, count });
+   return Result.succeed(text.replace(recipe.anchor, () => recipe.replacement));
+ };
+ 
