@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/histogram.test.ts -t hunks.differential
+# kills: hunks.differential
+# why: A slid group is left at its lowest place instead of rejoining the other file's change, so a replaced line reads as a separate insert and delete
+diff --git a/packages/gitcore/src/histogram.ts b/packages/gitcore/src/histogram.ts
+index 4d0236b..c1170ef 100644
+--- a/packages/gitcore/src/histogram.ts
++++ b/packages/gitcore/src/histogram.ts
+@@ -273,7 +273,7 @@ function compact(x: Side, o: Side, budget: Budget): void {
+         }
+         budget.spend(g.end - g.start + 1);
+       } while (size !== g.end - g.start);
+-      if (g.end !== earliestEnd && endMeetingOther !== -1) {
++      if (g.end !== earliestEnd && endMeetingOther < -1) {
+         while (go.end === go.start) {
+           inSync(slideUp(x, g));
+           inSync(previousGroup(o, go));

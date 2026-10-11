@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/merge-text.test.ts -t mergetext.differential
+# kills: mergetext.differential
+# why: Theirs' hunk is filled from ours' lines, so the merged file loses their change
+diff --git a/packages/gitcore/src/merge-text.ts b/packages/gitcore/src/merge-text.ts
+index 691c1de..5c079ef 100644
+--- a/packages/gitcore/src/merge-text.ts
++++ b/packages/gitcore/src/merge-text.ts
+@@ -71,7 +71,7 @@ export function mergeText(
+       take(o, lines.ours);
+       o = toOurs[++i];
+     } else if (t !== undefined && (o === undefined || t.a + t.aLen < o.a)) {
+-      take(t, lines.theirs);
++      take(t, lines.ours);
+       t = toTheirs[++j];
+     } else {
+       return refused("overlap");

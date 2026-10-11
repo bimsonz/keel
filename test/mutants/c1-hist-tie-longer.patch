@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/histogram.test.ts -t hunks.differential
+# kills: hunks.differential
+# why: An equally long, equally rare run found later replaces the first, so the anchor (and every hunk around it) moves off git's
+diff --git a/packages/gitcore/src/histogram.ts b/packages/gitcore/src/histogram.ts
+index 4d0236b..a53f744 100644
+--- a/packages/gitcore/src/histogram.ts
++++ b/packages/gitcore/src/histogram.ts
+@@ -159,7 +159,7 @@ function anchor(
+         }
+         budget.spend(e1 - s1 + 1);
+         if (bNext <= e2) bNext = e2 + 1;
+-        if (span < e1 - s1 || rc < bestCount) {
++        if (span <= e1 - s1 || rc < bestCount) {
+           best = { a: s1, b: s2, len: e1 - s1 + 1 };
+           span = e1 - s1;
+           bestCount = rc;

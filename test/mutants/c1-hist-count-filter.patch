@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/histogram.test.ts -t hunks.rarer-anchor
+# kills: hunks.rarer-anchor
+# why: Lines more common than the best anchor so far are still tried, so a longer run of common lines beats git's rarer anchor
+diff --git a/packages/gitcore/src/histogram.ts b/packages/gitcore/src/histogram.ts
+index 4d0236b..e948b15 100644
+--- a/packages/gitcore/src/histogram.ts
++++ b/packages/gitcore/src/histogram.ts
+@@ -140,7 +140,7 @@ function anchor(
+     const id = b[bp] ?? -1;
+     const c = count.get(id);
+     if (c !== undefined) common = true;
+-    if (c !== undefined && c <= bestCount) {
++    if (c !== undefined) {
+       for (let as = first.get(id) ?? -1; ;) {
+         let s1 = as;
+         let s2 = bp;

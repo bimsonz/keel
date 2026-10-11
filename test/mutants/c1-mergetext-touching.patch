@@ -1,0 +1,20 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/merge-text.test.ts -t mergetext.differential
+# kills: mergetext.differential
+# why: Hunks of ours and theirs that touch with no base line between them merge, where git reports a conflict
+diff --git a/packages/gitcore/src/merge-text.ts b/packages/gitcore/src/merge-text.ts
+index 691c1de..61fc86e 100644
+--- a/packages/gitcore/src/merge-text.ts
++++ b/packages/gitcore/src/merge-text.ts
+@@ -67,10 +67,10 @@ export function mergeText(
+   let i = 0;
+   let j = 0;
+   for (let o = toOurs[0], t = toTheirs[0]; o !== undefined || t !== undefined;) {
+-    if (o !== undefined && (t === undefined || o.a + o.aLen < t.a)) {
++    if (o !== undefined && (t === undefined || o.a + o.aLen <= t.a)) {
+       take(o, lines.ours);
+       o = toOurs[++i];
+-    } else if (t !== undefined && (o === undefined || t.a + t.aLen < o.a)) {
++    } else if (t !== undefined && (o === undefined || t.a + t.aLen <= o.a)) {
+       take(t, lines.theirs);
+       t = toTheirs[++j];
+     } else {

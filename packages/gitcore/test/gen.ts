@@ -30,6 +30,8 @@ export type Op =
   | { k: "add"; path: string; lines: number[] }
   | { k: "modify"; pick: number; lines: number[] }
   | { k: "edit"; pick: number; at: number; line: number }
+  | { k: "insertLine"; pick: number; at: number; line: number }
+  | { k: "deleteLine"; pick: number; at: number }
   | { k: "delete"; pick: number }
   | { k: "rename"; pick: number; to: string }
   | { k: "nearRename"; pick: number; to: string; at: number; line: number }
@@ -39,12 +41,8 @@ export type Op =
   | { k: "gitlink"; path: string; sha: string };
 
 const pick = fc.nat({ max: 63 });
-const textOps = [
-  {
-    weight: 3,
-    arbitrary: fc.record({ k: fc.constant("add" as const), path: pathArb, lines: linesArb }),
-  },
-  { weight: 2, arbitrary: fc.record({ k: fc.constant("modify" as const), pick, lines: linesArb }) },
+/** Edits within one file: a changed, an inserted or a deleted line. */
+const lineOps = [
   {
     weight: 3,
     arbitrary: fc.record({
@@ -54,6 +52,27 @@ const textOps = [
       line: fc.nat({ max: 23 }),
     }),
   },
+  {
+    weight: 2,
+    arbitrary: fc.record({
+      k: fc.constant("insertLine" as const),
+      pick,
+      at: fc.nat({ max: 23 }),
+      line: fc.nat({ max: 23 }),
+    }),
+  },
+  {
+    weight: 1,
+    arbitrary: fc.record({ k: fc.constant("deleteLine" as const), pick, at: fc.nat({ max: 23 }) }),
+  },
+];
+const textOps = [
+  {
+    weight: 3,
+    arbitrary: fc.record({ k: fc.constant("add" as const), path: pathArb, lines: linesArb }),
+  },
+  { weight: 2, arbitrary: fc.record({ k: fc.constant("modify" as const), pick, lines: linesArb }) },
+  ...lineOps,
   { weight: 2, arbitrary: fc.record({ k: fc.constant("delete" as const), pick }) },
   { weight: 2, arbitrary: fc.record({ k: fc.constant("rename" as const), pick, to: pathArb }) },
   {
@@ -136,11 +155,28 @@ const historyOf = (
     ),
   });
 
+/** Line edits only: both sides change one or two long files, so most cases need a merge by hunk. */
+const lineOpArb: fc.Arbitrary<Op> = fc.oneof(...(lineOps as fc.WeightedArbitrary<Op>[]));
+const sameFileArb: fc.Arbitrary<History> = fc.record({
+  base: fc.array(
+    fc.record({
+      path: fc.constantFrom("x", "a/y"),
+      lines: fc.array(fc.nat({ max: LINES.length - 1 }), { minLength: 8, maxLength: 30 }),
+    }),
+    { minLength: 1, maxLength: 2 },
+  ),
+  shared: fc.constant([]),
+  ours: fc.array(lineOpArb, { minLength: 1, maxLength: 3 }),
+  theirs: fc.array(lineOpArb, { minLength: 1, maxLength: 3 }),
+  crissCross: fc.constant(null),
+});
+
 export const historyArb: fc.Arbitrary<History> = fc.oneof(
-  // Collision-heavy text edits, a sparser mostly-disjoint mix, and everything.
+  // Collision-heavy text edits, a sparser mostly-disjoint mix, everything, and one file edited on both sides.
   { weight: 2, arbitrary: historyOf(textOpArb, 4, 6) },
   { weight: 2, arbitrary: historyOf(textOpArb, 2, 10) },
   { weight: 2, arbitrary: historyOf(anyOpArb, 4, 6) },
+  { weight: 2, arbitrary: sameFileArb },
 );
 
 function setPath(t: TreeModel, path: string, f: FileSpec) {
@@ -178,6 +214,19 @@ export function applyOps(start: TreeModel, ops: readonly Op[]): TreeModel {
         if (p && f && (f.mode === "100644" || f.mode === "100755") && typeof f.data === "string") {
           const ls = f.data.split("\n");
           ls[op.at % Math.max(1, ls.length - 1)] = `${LINES[op.line]} edited`;
+          t.set(p, { mode: f.mode, data: ls.join("\n") });
+        }
+        break;
+      }
+      case "insertLine":
+      case "deleteLine": {
+        const p = at(op.pick);
+        const f = p ? t.get(p) : undefined;
+        if (p && f && (f.mode === "100644" || f.mode === "100755") && typeof f.data === "string") {
+          const ls = f.data.split("\n");
+          const i = op.at % Math.max(1, ls.length - 1);
+          if (op.k === "insertLine") ls.splice(i, 0, `${LINES[op.line]} inserted`);
+          else ls.splice(i, 1);
           t.set(p, { mode: f.mode, data: ls.join("\n") });
         }
         break;

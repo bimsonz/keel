@@ -8,9 +8,10 @@
 // FC_NUM_RUNS sets the number of histories (300 by default) and FC_SEED pins them.
 
 import { afterAll, describe, expect, it } from "vitest";
+import { dec } from "../src/bytes.ts";
 import { mergeCommits, type MergeResult, type RefusalReason } from "../src/merge.ts";
 import { type History, historyArb, planCase } from "./gen.ts";
-import { CatFileReader, fastImport, gitMergeTree, tempRepo } from "./git-harness.ts";
+import { CatFileReader, fastImport, gitMergeTree, git as runGit, tempRepo } from "./git-harness.ts";
 import { fc, PROPERTY_TIMEOUT } from "./support/fast-check.ts";
 
 /** Each history spawns git a few times: a second per case, so a machine at load ~230 still finishes 300 cases. */
@@ -33,6 +34,28 @@ function tipsOf(h: Parameters<typeof planCase>[0]) {
   return { ours: marks.get(plan.oursMark) ?? "", theirs: marks.get(plan.theirsMark) ?? "" };
 }
 
+const textTree = (files: Readonly<Record<string, string>>) =>
+  new Map(Object.entries(files).map(([path, data]) => [path, { mode: "100644" as const, data }]));
+
+/** Imports a base and two commits on it, each a set of text files, and answers the two. */
+function onOneBase(
+  base: Readonly<Record<string, string>>,
+  ours: Readonly<Record<string, string>>,
+  theirs: Readonly<Record<string, string>>,
+) {
+  caseId += 1;
+  const ref = (name: string) => `refs/heads/fixed${caseId}/${name}`;
+  const marks = fastImport(repo.dir, [
+    { mark: 1, ref: ref("base"), parents: [], tree: textTree(base), message: "base\n" },
+    { mark: 2, ref: ref("ours"), parents: [1], tree: textTree(ours), message: "ours\n" },
+    { mark: 3, ref: ref("theirs"), parents: [1], tree: textTree(theirs), message: "theirs\n" },
+  ]);
+  return { ours: marks.get(2) ?? "", theirs: marks.get(3) ?? "" };
+}
+
+const FIVE = "1\n2\n3\n4\n5\n";
+const textAuto = (f: string) => ({ "d/.gitattributes": "* text=auto\n", "d/f": f });
+
 /** A merge's tree, or that it refused. */
 const outcome = (m: MergeResult) => (m.ok ? m.tree : "refused");
 
@@ -43,6 +66,8 @@ interface Tally {
   gitConflicts: number;
   gitCrashes: number;
   cleanButRefused: number;
+  /** Merged with at least one file merged by hunk. */
+  byHunk: number;
   byReason: Partial<Record<RefusalReason, number>>;
 }
 
@@ -53,6 +78,7 @@ const emptyTally = (): Tally => ({
   gitConflicts: 0,
   gitCrashes: 0,
   cleanButRefused: 0,
+  byHunk: 0,
   byReason: {},
 });
 
@@ -77,6 +103,7 @@ async function differential(h: History, tally: Tally): Promise<void> {
   expect(answer, `git ${answer} but GitCore wrote ${merged.tree}`).toBe("clean");
   expect(merged.tree).toBe(git.outcome === "crashed" ? undefined : git.tree);
   tally.identical += 1;
+  if ([...merged.newObjects.values()].some((o) => o.type === "blob")) tally.byHunk += 1;
 }
 
 /**
@@ -132,6 +159,58 @@ describe("mergeCommits", { timeout: PROPERTY_TIMEOUT }, () => {
       expect(tally.byReason).toEqual({ [refused]: 1 });
     },
   );
+
+  it("[merge.content-blob] merges one file both sides changed apart, as git does, and hands back the merged blob", async () => {
+    const { ours, theirs } = onOneBase(
+      { "a/f": FIVE, g: "g\n" },
+      { "a/f": "one\n2\n3\n4\n5\n", g: "g\n" },
+      { "a/f": "1\n2\n3\n4\nfive\n", g: "g\n" },
+    );
+    const merged = await mergeCommits(reader, ours, theirs);
+    const byGit = gitMergeTree(repo.dir, ours, theirs);
+    expect(byGit.outcome).toBe("clean");
+    expect(merged.ok && merged.tree).toBe(byGit.outcome === "clean" && byGit.tree);
+    const blobs = [...(merged.ok ? merged.newObjects.values() : [])].filter(
+      (o) => o.type === "blob",
+    );
+    expect(blobs.map((o) => dec.decode(o.body))).toEqual(["one\n2\n3\n4\nfive\n"]);
+  });
+
+  it.each([
+    ["* merge=union", "* merge=union\n"],
+    ["a path unset -merge", "f -merge\n"],
+    ["the binary macro", "f binary\n"],
+    ["a macro that unsets merge", "[attr]keep -merge\nf keep\n"],
+  ])(
+    "[merge.attributes] refuses a content merge under a .gitattributes with %s",
+    async (_what, rules) => {
+      const at = (f: string) => ({ ".gitattributes": rules, "d/.keep": "", "d/f": f });
+      const { ours, theirs } = onOneBase(
+        at(FIVE),
+        at("one\n2\n3\n4\n5\n"),
+        at("1\n2\n3\n4\nfive\n"),
+      );
+      expect(await mergeCommits(reader, ours, theirs)).toEqual({
+        ok: false,
+        reason: "attributes",
+        path: "d/f",
+      });
+    },
+  );
+
+  it("[merge.attributes] merges under a .gitattributes that names no merge driver, as git does", async () => {
+    const { ours, theirs } = onOneBase(
+      textAuto(FIVE),
+      textAuto("one\n2\n3\n4\n5\n"),
+      textAuto("1\n2\n3\n4\nfive\n"),
+    );
+    const merged = await mergeCommits(reader, ours, theirs);
+    const byGit = gitMergeTree(repo.dir, ours, theirs);
+    expect(merged.ok && merged.tree).toBe(byGit.outcome === "clean" && byGit.tree);
+    expect(runGit(repo.dir, ["cat-file", "-p", `${merged.ok ? merged.tree : ""}:d/f`])).toBe(
+      "one\n2\n3\n4\nfive\n",
+    );
+  });
 
   it(
     "[merge.symmetric] merging theirs into ours gives the same tree, or the same refusal, as ours into theirs",

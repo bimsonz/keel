@@ -4,6 +4,7 @@
 // the binding. Every repo it makes is deleted afterwards.
 import { type CommitSha, Instant, makeId } from "@keeltown/core/kernel";
 import { CandidateComposer, CodeHost, type RepoRef } from "@keeltown/core/ports";
+import { Budget, DIFF_BUDGET, mergeText } from "@keeltown/gitcore";
 import { CodeHostFixture } from "@keeltown/testing";
 import { env } from "cloudflare:workers";
 import { Effect, Layer } from "effect";
@@ -149,8 +150,98 @@ it("[composer.live] composes a three-change candidate through the binding and pu
   expect(report.tree.toSorted()).toEqual(["README.md", "lib", "lib/c.ts", "src", "src/a.ts"]);
   expect(refusal).toMatchObject({
     _tag: "CompositionRefused",
-    reason: "both-modified",
+    reason: "overlap",
     paths: ["src/a.ts"],
   });
   expect(report.refusedRef._tag).toBe("RefNotFound");
+});
+
+/** BASE plus a changelog with a line under Added and one under Fixed. */
+const withChangelog = (added: string, fixed: string) => ({
+  ...BASE,
+  "CHANGELOG.md": `# Changelog\n\n## Unreleased\n\n### Added\n${added}\n### Fixed\n${fixed}\n## 0.1\n`,
+});
+
+/** A file of `lines` lines drawn from `vocab` distinct ones, by a fixed linear congruence. */
+function lowVocabFile(vocab: number, bytes: number, seed: number): string[] {
+  const lines: string[] = [];
+  let state = seed;
+  for (let n = 0; n < bytes;) {
+    state = (state * 1103515245 + 12345) % 2147483648;
+    const line = `line ${state % vocab}\n`;
+    lines.push(line);
+    n += line.length;
+  }
+  return lines;
+}
+
+const encode = (ls: readonly string[]) => new TextEncoder().encode(ls.join(""));
+
+/** Elapsed wall time across synchronous work: workerd's clock moves only at I/O, so it waits on a timer first. */
+async function timed<A>(work: () => A): Promise<{ readonly result: A; readonly ms: number }> {
+  const started = Date.now();
+  const result = work();
+  await new Promise((resolve) => setTimeout(resolve, 1));
+  return { result, ms: Date.now() - started - 1 };
+}
+
+it("[composer.live-hunks] composes two changes to different parts of one file through the binding, and times a 2 MiB merge", async () => {
+  const staging = fixture.fixture.scratch();
+  const workspaces = [0, 1].map(() => fixture.fixture.scratch());
+  const edits = [
+    withChangelog("- added by change 0\n", ""),
+    withChangelog("", "- fixed by change 1\n"),
+  ];
+  const report = await run(
+    Effect.gen(function* () {
+      const codeHost = yield* CodeHost;
+      const compose = (yield* CandidateComposer).compose;
+      const commit = (yield* CodeHostFixture).commit;
+      for (const repo of [staging, ...workspaces]) yield* codeHost.create(repo);
+      const base = yield* commit(staging, MAIN, withChangelog("", ""));
+      const members = [];
+      for (const [i, ws] of workspaces.entries()) {
+        expect(yield* commit(ws, MAIN, withChangelog("", ""))).toBe(base);
+        const head = yield* commit(ws, MAIN, edits[i] ?? {});
+        members.push({ changeId: changeId(10 + i), repo: ws, base, head, title: `change ${i}` });
+      }
+      const composed = yield* compose({
+        candidateId: candidateId(10),
+        staging,
+        base,
+        at: AT,
+        members,
+      });
+      const entries = yield* codeHost.readTree(staging, composed.commitSha);
+      const log = entries.find((e) => e.path === "CHANGELOG.md");
+      const bytes =
+        log === undefined ? new Uint8Array(0) : yield* codeHost.readBlob(staging, log.oid);
+      return { composed, changelog: new TextDecoder().decode(bytes) };
+    }),
+  );
+  const timings: string[] = [];
+  let worst = 0;
+  for (const vocab of [3, 64, 1000]) {
+    const lines = lowVocabFile(vocab, 2 * 1024 * 1024 - 256, vocab);
+    const half = Math.floor(lines.length / 2);
+    const ours = encode(lines.map((l, i) => (i % 9973 === 17 && i < half ? `ours ${i}\n` : l)));
+    const theirs = encode(
+      lines.map((l, i) => (i % 9973 === 17 && i >= half ? `theirs ${i}\n` : l)),
+    );
+    const { result, ms } = await timed(() =>
+      mergeText(encode(lines), ours, theirs, new Budget(DIFF_BUDGET)),
+    );
+    worst = Math.max(worst, ms);
+    timings.push(
+      `vocab ${vocab} (${lines.length} lines): ${result.ok ? "merged" : result.reason} in ${ms} ms`,
+    );
+  }
+  console.log(
+    `LIVE compose by hunk: ${report.composed.commits.length} commits, candidate CHANGELOG.md ${JSON.stringify(report.changelog)}; 2 MiB mergeText in workerd: ${timings.join("; ")}; worst ${worst} ms`,
+  );
+  expect(report.composed.commits).toHaveLength(2);
+  expect(report.changelog).toBe(
+    withChangelog("- added by change 0\n", "- fixed by change 1\n")["CHANGELOG.md"],
+  );
+  expect(worst).toBeLessThan(5_000);
 });
