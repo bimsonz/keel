@@ -687,6 +687,12 @@ const revise = (leaseId: LeaseId, ifMatchRevision: number): ChangeCommand => ({
   premisesRetracted: [],
   preflight,
 });
+const note = (policy: "advise" | "annotate"): ChangeCommand => ({
+  _tag: "NoteConflict",
+  conflictId: makeId("cfl", ulid(9)),
+  predicate: "freshness",
+  policy,
+});
 const withdrawByOperator: ChangeCommand = {
   _tag: "Withdraw",
   authority: { _tag: "Operator", by: "operator:zb" },
@@ -1502,12 +1508,6 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
         ),
       ),
     );
-    const note = (policy: "advise" | "annotate"): ChangeCommand => ({
-      _tag: "NoteConflict",
-      conflictId: makeId("cfl", ulid(9)),
-      predicate: "freshness",
-      policy,
-    });
     const verifying = drive([
       [declare, 0],
       [start, 0],

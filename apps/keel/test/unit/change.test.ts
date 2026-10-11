@@ -430,7 +430,13 @@ describe("a compiled plan", () => {
         expect(compiled).toMatchObject({ state: "queued", laneId: lane });
         expect(replayed).toEqual(compiled);
         expect([plan?.type, queued?.type]).toEqual(["PlanCompiled", "ChangeQueued"]);
-        expect(queued?.payload).toEqual({ _tag: "ChangeQueued", changeId, laneId: lane });
+        // The enqueue carries the plan it was compiled to.
+        expect(queued?.payload).toEqual({
+          _tag: "ChangeQueued",
+          changeId,
+          laneId: lane,
+          planHash: Reflect.get(Object(plan?.payload), "planHash"),
+        });
         expect(queued?.dedupeKey.split("/")[1]).toBe(plan?.dedupeKey.split("/")[1]);
         expect(queued?.notified).toContain(lane);
         for (const type of [

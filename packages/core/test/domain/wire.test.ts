@@ -79,6 +79,14 @@ const guardFailed = (extra: object) => ({
   ...extra,
 });
 const BATCH = { batchId: makeId("bat", ulid(4)) };
+const BY_VERDICT = { verdictId: makeId("vrd", ulid(6)) };
+const BY_CONFLICT = { conflictId: makeId("cfl", ulid(7)) };
+const bounce = (cause: object) => ({
+  _tag: "ChangeBounced",
+  changeId: CHANGE,
+  ...cause,
+  reasons: ["a must premise is contradicted"],
+});
 const CANDIDATE = { candidateId: makeId("cnd", ulid(5)) };
 
 const ANCHOR = { path: "src/authz/cache.ts", commit: CommitSha.make("c".repeat(40)) };
@@ -154,17 +162,9 @@ describe("the wire", () => {
   });
 
   it("[events.bounce-cause] a bounce names exactly one cause, its verdict or its conflict, and that cause survives the wire", () => {
-    const VERDICT = { verdictId: makeId("vrd", ulid(6)) };
-    const CONFLICT = { conflictId: makeId("cfl", ulid(7)) };
-    const bounce = (cause: object) => ({
-      _tag: "ChangeBounced",
-      changeId: CHANGE,
-      ...cause,
-      reasons: ["a must premise is contradicted"],
-    });
     fc.assert(
       fc.property(fc.boolean(), fc.boolean(), (verdict, conflict) => {
-        const sent = bounce({ ...(verdict ? VERDICT : {}), ...(conflict ? CONFLICT : {}) });
+        const sent = bounce({ ...(verdict ? BY_VERDICT : {}), ...(conflict ? BY_CONFLICT : {}) });
         if (verdict === conflict) return !decodes(ChangeBounced)(sent);
         const back = Schema.decodeUnknownSync(ChangeBounced)(
           JSON.parse(
@@ -174,13 +174,13 @@ describe("the wire", () => {
           ),
         );
         return (
-          back.verdictId === (verdict ? VERDICT.verdictId : undefined) &&
-          back.conflictId === (conflict ? CONFLICT.conflictId : undefined)
+          back.verdictId === (verdict ? BY_VERDICT.verdictId : undefined) &&
+          back.conflictId === (conflict ? BY_CONFLICT.conflictId : undefined)
         );
       }),
     );
-    expect(decodes(ChangeBounced)(bounce(CONFLICT))).toBe(true);
-    expect(decodes(ChangeBounced)(bounce({ ...VERDICT, ...CONFLICT }))).toBe(false);
+    expect(decodes(ChangeBounced)(bounce(BY_CONFLICT))).toBe(true);
+    expect(decodes(ChangeBounced)(bounce({ ...BY_VERDICT, ...BY_CONFLICT }))).toBe(false);
     expect(decodes(ChangeBounced)(bounce({}))).toBe(false);
   });
 
