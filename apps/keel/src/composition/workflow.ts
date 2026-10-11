@@ -7,6 +7,9 @@ import type {
   CodeHost,
   EvidenceStore,
   Ids,
+  PlatformFunction,
+  ProbeRunner,
+  ProbeStore,
   Projects,
   VerifierRuntime,
   WorkspacePool,
@@ -19,10 +22,17 @@ import {
 } from "../adapters/driven/ci/suite-runtime.ts";
 import { BatchVerdictsRpc, isLaneNamespace } from "../adapters/driven/do-rpc/batch-verdicts.ts";
 import { ChangePrecheckRpc } from "../adapters/driven/do-rpc/change-precheck.ts";
+import { ProbeRunnerRpc, verifierEntrypoint } from "../adapters/driven/do-rpc/probe-runner.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { EvidenceStoreR2 } from "../adapters/driven/r2/evidence-store.ts";
+import { ProbeStoreR2 } from "../adapters/driven/r2/probe-store.ts";
 import { SystemLive } from "../adapters/driven/system.ts";
+import {
+  modelPins,
+  PlatformFunctionWorkersAI,
+  type StreamingAi,
+} from "../adapters/driven/workers-ai/platform-function.ts";
 import { artifactsLocationHint, codeHostLayer } from "./do.ts";
 
 /**
@@ -89,5 +99,24 @@ export function precheckRuntime(
     env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`));
   return ManagedRuntime.make(
     Layer.mergeAll(ChangePrecheckRpc(env.CHANGE), ProjectsRpc(project), codeHostLayer(env)),
+  );
+}
+
+/**
+ * Probe drafting's driven adapters: each PlatformFunction on the model
+ * PLATFORM_FUNCTION_PINS names, drafted probes kept in BUNDLES, and the world
+ * matrix run on keel-verify's VerifierDOs. The Probe Workflow composes exactly
+ * this; a pin that is missing or not an exact model stops it here.
+ */
+export function probeDraftingLayer(env: {
+  readonly AI: StreamingAi;
+  readonly PLATFORM_FUNCTION_PINS: unknown;
+  readonly BUNDLES: R2Bucket;
+  readonly VERIFIER: Fetcher;
+}): Layer.Layer<PlatformFunction | ProbeStore | ProbeRunner> {
+  return Layer.mergeAll(
+    PlatformFunctionWorkersAI(env.AI, modelPins(env.PLATFORM_FUNCTION_PINS)),
+    ProbeStoreR2(env.BUNDLES),
+    ProbeRunnerRpc(verifierEntrypoint(env.VERIFIER)),
   );
 }

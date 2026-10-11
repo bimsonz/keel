@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe-runner.test.ts -t probe-runner.rpc-unavailable
+# kills: probe-runner.rpc-unavailable
+# why: A keel-verify that never answered becomes a defect instead of ProbeRunnerUnavailable, so a dropped connection fails the draft instead of being retried
+diff --git a/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts b/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts
+index 8844d05..cb2b4d0 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/probe-runner.ts
+@@ -40,7 +40,10 @@ export const ProbeRunnerRpc = (verifier: VerifierEntrypoint) =>
+       run: (request) =>
+         Effect.tryPromise({
+           try: () => verifier.runProbe(encodeRequest(request)),
+-          catch: (error) =>
++          catch: (error) => {
++            throw error;
++          },
++          unused: () =>
+             new ProbeRunnerUnavailable({
+               reason: `keel-verify did not answer: ${error instanceof Error ? error.message : String(error)}`,
+             }),

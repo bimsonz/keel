@@ -14,4 +14,5 @@ export * from "./project.ts";
 export * from "./projector.ts";
 export * from "./subject.ts";
 export * from "./trunk.ts";
+export * from "./verifier.ts";
 export * from "./workspace-pool.ts";

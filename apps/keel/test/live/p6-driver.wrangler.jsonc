@@ -1,0 +1,12 @@
+// Not a deployable: p6-driver.ts, which keel-verify's test/live/p6-staging.ts
+// runs locally with remote bindings. AI is Workers AI; VERIFIER is the
+// deployed keel-verify's entrypoint; BUNDLES is the bundle bucket.
+{
+  "name": "keel-p6-staging-driver",
+  "main": "p6-driver.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "ai": { "binding": "AI", "remote": true },
+  "services": [{ "binding": "VERIFIER", "service": "keel-verify", "remote": true }],
+  "r2_buckets": [{ "binding": "BUNDLES", "bucket_name": "keel-staging-bundles", "remote": true }],
+}
