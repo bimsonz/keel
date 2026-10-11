@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/guards.test.ts
+# kills: guards.tenet-id-optional
+# why: a guard admitted before TenetEstablished must still run where the change is exposed to the proposition it holds
+diff --git a/packages/core/src/domain/verification/guards.ts b/packages/core/src/domain/verification/guards.ts
+index 2eb4958..c1e4a11 100644
+--- a/packages/core/src/domain/verification/guards.ts
++++ b/packages/core/src/domain/verification/guards.ts
+@@ -68,6 +68,7 @@ export const selectGuards = (
+ ): readonly SelectedGuard[] => {
+   const byId = new Map<string, SelectedGuard>();
+   for (const g of admitted) {
++    if (g.tenet.id === undefined) continue;
+     const because = exposedBy(g.tenet.proposition, change);
+     const spec = stepOf(g);
+     const seen = byId.get(spec.id);

@@ -2,12 +2,12 @@
 # kills: guards.canonical
 # why: the steps depend on the set of admitted guards alone; here they follow the order the guards were listed in
 diff --git a/packages/core/src/domain/verification/guards.ts b/packages/core/src/domain/verification/guards.ts
-index 6da8783..73aa2ee 100644
+index 2eb4958..050dda9 100644
 --- a/packages/core/src/domain/verification/guards.ts
 +++ b/packages/core/src/domain/verification/guards.ts
-@@ -75,7 +75,7 @@ export const selectGuards = (
-     if (because.length > 0 && (seen === undefined || spec.version < seen.spec.version))
-       byId.set(spec.id, { spec, because: [`guards tenet ${g.tenet.id}`, ...because] });
+@@ -81,7 +81,7 @@ export const selectGuards = (
+         ],
+       });
    }
 -  return [...byId.values()].toSorted((a, b) => byCodePoint(a.spec.id, b.spec.id));
 +  return [...byId.values()];
