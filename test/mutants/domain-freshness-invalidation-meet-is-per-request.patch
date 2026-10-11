@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: freshness.invalidation-fresh-base
+# why: meet(v, per-request) is taken as per-request, so a per-call cache evicted on an event looks staler than per-call
+diff --git a/packages/core/src/domain/coordination/lattice.ts b/packages/core/src/domain/coordination/lattice.ts
+index 8dc43d9..284ee35 100644
+--- a/packages/core/src/domain/coordination/lattice.ts
++++ b/packages/core/src/domain/coordination/lattice.ts
+@@ -57,7 +57,7 @@ const isTtl = (v: Freshness): v is { readonly ttl: number } => typeof v === "obj
+ 
+ /** meet(v, per-request): per-request sits below everything except per-call. */
+ export const meetPerRequest = (v: Freshness): Freshness =>
+-  v === "per-call" ? "per-call" : "per-request";
++  "per-request";
+ 
+ const freshnessRank = (v: "per-call" | "per-request" | "per-session" | "static"): number =>
+   ({ "per-call": 0, "per-request": 1, "per-session": 2, static: 3 })[v];

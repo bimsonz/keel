@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: freshness.invalidation-never-staler
+# why: A change through an evicting event is taken to be as stale as the cache, so eviction never makes anything fresher
+diff --git a/packages/core/src/domain/coordination/lattice.ts b/packages/core/src/domain/coordination/lattice.ts
+index 8dc43d9..c957518 100644
+--- a/packages/core/src/domain/coordination/lattice.ts
++++ b/packages/core/src/domain/coordination/lattice.ts
+@@ -182,7 +182,7 @@ const invalidationDecision = (
+   if (e.invalidatedOn.length === 0 || (relation !== "is" && relation !== "at-most"))
+     return "overlap";
+   // A change through an evicting event: the effect's own region, each value met with per-request.
+-  const evicted = plainFreshnessDecision(p, { relation, value: meetPerRequest(e.cached) });
++  const evicted = plainFreshnessDecision(p, { relation, value: e.cached });
+   const cached = plainFreshnessDecision(p, { relation, value: e.cached });
+   // Every change evicts: `evicted`. Some change does not: both kinds happen.
+   return evicted === everyChange(evicted, cached) ? evicted : "overlap";

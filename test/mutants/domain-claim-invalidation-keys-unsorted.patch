@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: freshness.invalidation-wire
+# why: The writer keeps the keys in the order given, so one effect has several spellings and the reader refuses some
+diff --git a/packages/core/src/domain/coordination/claim.ts b/packages/core/src/domain/coordination/claim.ts
+index 5ff0851..ea7ed83 100644
+--- a/packages/core/src/domain/coordination/claim.ts
++++ b/packages/core/src/domain/coordination/claim.ts
+@@ -240,7 +240,7 @@ const writeValue = (
+     case "freshness": {
+       const v = claim.value;
+       if (!isInvalidated(v)) return { relation: claim.relation, value: writeFreshness(v) };
+-      const keys = [...new Set(v.invalidatedOn)].toSorted();
++      const keys = [...new Set(v.invalidatedOn)];
+       return {
+         relation: claim.relation,
+         value: `${writeFreshness(v.cached)} invalidated-on ${keys.join(",")}`,

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: freshness.s1-bprime
+# why: The eviction is ignored and the cached staleness compared alone, so S-1's B-prime contradicts instead of needing a probe
+diff --git a/packages/core/src/domain/coordination/lattice.ts b/packages/core/src/domain/coordination/lattice.ts
+index 8dc43d9..d5ed23c 100644
+--- a/packages/core/src/domain/coordination/lattice.ts
++++ b/packages/core/src/domain/coordination/lattice.ts
+@@ -200,7 +200,7 @@ export const freshnessDecision = (
+   if (isInvalidated(premise)) return "overlap";
+   const held = { relation: p.relation, value: premise };
+   return isInvalidated(e.value)
+-    ? invalidationDecision(held, e.relation, e.value)
++    ? plainFreshnessDecision(held, { relation: e.relation, value: e.value.cached })
+     : plainFreshnessDecision(held, { relation: e.relation, value: e.value });
+ };
+ 

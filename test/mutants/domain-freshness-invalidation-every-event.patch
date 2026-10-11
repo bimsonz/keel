@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: freshness.invalidation-sound
+# why: Every change is taken to arrive by an evicting event, so a per-session cache evicted on revoke clears at most per-request without a probe
+diff --git a/packages/core/src/domain/coordination/lattice.ts b/packages/core/src/domain/coordination/lattice.ts
+index 8dc43d9..8fcabbe 100644
+--- a/packages/core/src/domain/coordination/lattice.ts
++++ b/packages/core/src/domain/coordination/lattice.ts
+@@ -185,7 +185,7 @@ const invalidationDecision = (
+   const evicted = plainFreshnessDecision(p, { relation, value: meetPerRequest(e.cached) });
+   const cached = plainFreshnessDecision(p, { relation, value: e.cached });
+   // Every change evicts: `evicted`. Some change does not: both kinds happen.
+-  return evicted === everyChange(evicted, cached) ? evicted : "overlap";
++  return evicted;
+ };
+ 
+ /**

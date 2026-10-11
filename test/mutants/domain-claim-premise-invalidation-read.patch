@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/compare.test.ts
+# kills: freshness.premise-invalidation-refused
+# why: A premise in the invalidation form is read like an effect, so an agent may rely on an eviction it cannot see
+diff --git a/packages/core/src/domain/coordination/claim.ts b/packages/core/src/domain/coordination/claim.ts
+index 5ff0851..854fc92 100644
+--- a/packages/core/src/domain/coordination/claim.ts
++++ b/packages/core/src/domain/coordination/claim.ts
+@@ -219,7 +219,7 @@ export const readClaim = (
+   if (Result.isFailure(scope)) return unreadable(scope.failure);
+   const claim = readValue(p);
+   if (typeof claim === "string") return unreadable(claim);
+-  if (role === "premise" && claim.predicate === "freshness" && isInvalidated(claim.value))
++  if (role === "premise" && claim.predicate === "freshness" && isInvalidated(claim.value) && false)
+     return unreadable("a premise cannot rely on an invalidation: it is an effect form", [
+       statePremiseFreshness,
+     ]);

@@ -2,15 +2,15 @@
 # kills: claim.unreadable-needs-probe
 # why: An unreadable freshness is silently read as static instead of needing a probe
 diff --git a/packages/core/src/domain/coordination/claim.ts b/packages/core/src/domain/coordination/claim.ts
-index 903178c..0cc5416 100644
+index 5ff0851..96d0f69 100644
 --- a/packages/core/src/domain/coordination/claim.ts
 +++ b/packages/core/src/domain/coordination/claim.ts
-@@ -78,7 +78,7 @@ const readValue = (p: Proposition): Claim | string => {
-       if (named !== undefined)
-         return { predicate: "freshness", relation: latticeRel, value: named };
-       return ttl === undefined
--        ? `"${v}" is not a freshness`
-+        ? { predicate: "freshness", relation: latticeRel, value: "static" }
-         : { predicate: "freshness", relation: latticeRel, value: { ttl } };
-     }
-     case "consistency": {
+@@ -96,7 +96,7 @@ const readValue = (p: Proposition): Claim | string => {
+       if (invalidation === null) {
+         const base = readFreshness(v);
+         return base === undefined
+-          ? `"${v}" is not a freshness`
++          ? { predicate: "freshness", relation: latticeRel, value: "static" }
+           : { predicate: "freshness", relation: latticeRel, value: base };
+       }
+       const cached = readFreshness(invalidation[1] ?? "");
