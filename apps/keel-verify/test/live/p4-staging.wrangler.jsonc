@@ -1,0 +1,10 @@
+// Not a deployable: p4-driver.ts, which p4-staging.ts runs locally with
+// remote bindings. VERIFIER is the deployed keel-verify's entrypoint (runProbe
+// is RPC only); BUNDLES is its bundle bucket.
+{
+  "name": "keel-p4-staging-driver",
+  "main": "p4-driver.ts",
+  "compatibility_date": "2026-10-01",
+  "services": [{ "binding": "VERIFIER", "service": "keel-verify", "remote": true }],
+  "r2_buckets": [{ "binding": "BUNDLES", "bucket_name": "keel-staging-bundles", "remote": true }],
+}
