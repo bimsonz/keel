@@ -2,21 +2,22 @@
 # kills: artifacts.no-standing-token
 # why: The day-long write token that create() and fork() return is left active on every pooled repo
 diff --git a/apps/keel/src/adapters/driven/artifacts/code-host.ts b/apps/keel/src/adapters/driven/artifacts/code-host.ts
-index 0ae7032..32d432d 100644
+index 5823c22..ea4a329 100644
 --- a/apps/keel/src/adapters/driven/artifacts/code-host.ts
 +++ b/apps/keel/src/adapters/driven/artifacts/code-host.ts
-@@ -147,14 +147,12 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
-       create: (repo) =>
-         Effect.promise(async () => {
-           const created = await binding(repo).create(repo.name);
--          await revoke(binding(repo), repo.name, created.token);
-           return repo;
-         }),
-       fork: (source, target) =>
-         source.namespace === target.namespace
+@@ -155,7 +155,6 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
+         Effect.tryPromise({
+           try: async () => {
+             const created = await binding(repo).create(repo.name);
+-            await revoke(binding(repo), repo.name, created.token);
+             return repo;
+           },
+           catch: (e) => e,
+@@ -165,7 +164,6 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
            ? onRepo(source, async (handle) => {
-               const forked = await handle.fork(target.name, { defaultBranchOnly: true });
--              await revoke(binding(target), target.name, forked.token);
-               return target;
-             })
-           : Effect.die(
+               try {
+                 const forked = await handle.fork(target.name, { defaultBranchOnly: true });
+-                await revoke(binding(target), target.name, forked.token);
+                 return target;
+               } catch (e) {
+                 if (isRepoAlreadyExists(e)) return TAKEN;
