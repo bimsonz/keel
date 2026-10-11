@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-plan.test.ts
+# kills: run-plan.guard-advised
+# why: An optional advised guard's abstain reads as an optional abstain, not advice, so a cascade accepting pass goes on past it
+diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
+index b2ec8cc..9b6a0bb 100644
+--- a/packages/core/src/application/verification/run-plan.ts
++++ b/packages/core/src/application/verification/run-plan.ts
+@@ -142,10 +142,9 @@ const valueOf = (s: State, step: PlanStep, r: StepResult): Value => {
+     case "escalate":
+       return { status: "escalate", outcome: r.outcome };
+     default:
++      if (step.optional) return { status: "pass", outcome: r.outcome };
+       if (advised) return { status: "pass", outcome: "pass" };
+-      return step.optional
+-        ? { status: "pass", outcome: r.outcome }
+-        : { status: "escalate", outcome: r.outcome };
++      return { status: "escalate", outcome: r.outcome };
+   }
+ };
+ 

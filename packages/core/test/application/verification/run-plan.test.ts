@@ -124,6 +124,10 @@ const recording = (answer: (step: PlanStep, world: FlowWorld | undefined) => Ste
 const demandAnswer = (s: PlanStep, w: FlowWorld | undefined) =>
   report(s, w, s.id === "a" ? "annotate" : s.id === "b" ? "abstain" : "pass");
 
+/** The guard `g` abstains; every other step passes. */
+const abstaining = (s: PlanStep, w: FlowWorld | undefined) =>
+  report(s, w, s.id === "g" ? "abstain" : "pass");
+
 const run = (plan: FlowPlan, runner: StepRunner<never>) => Effect.runPromise(runPlan(plan, runner));
 
 /** Every step of the plan, run in every world it names: what a runner without a flow would do. */
@@ -230,6 +234,31 @@ describe("run-plan: the compiled plan's flow, executed", () => {
     const raw = recording((s, w) => report(s, w, s.id === "g" ? "fail" : "pass"));
     await run(guardPlan(steps, when, "advise"), raw.runner);
     expect(raw.calls).toEqual(["g", "c"]);
+  });
+
+  it("[run-plan.guard-advised] a cascade accepts an advised guard's abstain as a pass, optional or not; under block it goes on", async () => {
+    const cascade: Flow = { _tag: "cascade", accept: ["pass"], items: [leaf("g"), leaf("b")] };
+    for (const optional of [false, true])
+      for (const policy of ["advise", "annotate"] as const) {
+        const steps = [
+          proofStep("g", { guards: { predicate: "freshness", probe: probeOf("g") }, optional }),
+          proofStep("b"),
+        ];
+        const r = recording(abstaining);
+        const plan = guardPlan(steps, cascade, policy);
+        const ran = await run(plan, r.runner);
+        expect(r.calls).toEqual(["g"]);
+        const v = verdictOn(plan, ran);
+        expect(v.outcome).toBe("land");
+        expect(v.advisories.map((a) => a.stepId)).toEqual(["g"]);
+      }
+    const steps = [
+      proofStep("g", { guards: { predicate: "freshness", probe: probeOf("g") } }),
+      proofStep("b"),
+    ];
+    const blocked = recording(abstaining);
+    await run(guardPlan(steps, cascade, "block"), blocked.runner);
+    expect(blocked.calls).toEqual(["g", "b"]);
   });
 
   it("[run-plan.once] no step runs twice in one world", async () => {
