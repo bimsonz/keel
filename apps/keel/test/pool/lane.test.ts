@@ -262,28 +262,26 @@ describe("the Lane DO", () => {
       runInDurableObject(stub, (_instance: LaneDO, state) =>
         armedAlarms(state.storage).find((a) => a.reason === LANE_STEP),
       );
+    const before = Date.now();
     await stub.receive([queued(laneId, 1)]);
-    const failedAt: number[] = [];
-    const delays: number[] = [];
-    for (const wait of [0, 1_000]) {
-      await new Promise((resolve) => setTimeout(resolve, wait));
-      const before = Date.now();
-      await runDurableObjectAlarm(stub);
-      await vi.waitFor(
-        async () => {
-          const armed = await armedStep();
-          expect(armed?.at).toBeGreaterThan(before + 500);
-          failedAt.push(before);
-          delays.push((armed?.at ?? 0) - before);
-        },
-        { timeout: 10_000 },
-      );
-    }
-    // 1 s after the first failure, 2 s after the second (ADR 0009's backoff), each from when it failed.
-    expect(delays[0]).toBeGreaterThanOrEqual(1_000);
-    expect(delays[0]).toBeLessThan(2_000);
-    expect(delays.at(-1)).toBeGreaterThanOrEqual(2_000);
-    expect(failedAt.length).toBeGreaterThanOrEqual(2);
+    // The step is a debounce armed for now; the platform may run it before this line does.
+    await runDurableObjectAlarm(stub);
+    // Each failure re-arms the step from when it ran; the platform runs each alarm when it comes due.
+    const armed: number[] = [];
+    await vi.waitFor(
+      async () => {
+        const at = (await armedStep())?.at;
+        if (at !== undefined && at > before + 500 && !armed.includes(at)) armed.push(at);
+        expect(armed.length).toBeGreaterThanOrEqual(3);
+      },
+      { timeout: 20_000, interval: 25 },
+    );
+    // A failure runs no earlier than its alarm, so each wait is measured from at least the last
+    // one's time, however late the platform ran it: 1 s, then 2 s, then 4 s (ADR 0009's backoff).
+    const [first = 0, second = 0, third = 0] = armed;
+    expect(first - before).toBeGreaterThanOrEqual(1_000);
+    expect(second - first).toBeGreaterThanOrEqual(2_000);
+    expect(third - second).toBeGreaterThanOrEqual(4_000);
   });
 
   it("[lane.do.composition] the lane's own composition builds from the Worker's bindings", async () => {
