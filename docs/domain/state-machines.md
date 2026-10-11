@@ -126,7 +126,7 @@ stateDiagram-v2
 | Verifying | Parked | A human-class conflict or step | — | `ChangeParked {reason: awaiting-ruling}` |
 | Queued | Integrating | Caused by `BatchFormed` | Nothing blocks it, as for queueing; a blocked change refuses the batch and is bounced | `ChangeBatched` |
 | Queued | Bounced | A conflict is proven against the change (caused by `ConflictProven`), or it is blocked when batched | — | `ChangeBounced` |
-| Integrating | Queued | Caused by `BatchFailed {infra}`, `CandidateBisected` or `CandidateInvalidated` | Two infra failures requeue with no blame | `ChangeRequeued` |
+| Integrating | Queued | Caused by `BatchFailed` blaming another member, `infra`, `textual` or `interaction`; by `CandidateBisected`; or by `CandidateInvalidated` | The domain's `redExit` reads the cause from the attribution. Two infra failures requeue with no blame. A member requeued for `textual` or `interaction` runs alone in its next batch (`runsAlone`), so a clash between members ends in one landing and one sole-member failure | `ChangeRequeued {reason}`: `co-member-failed`, `infra-failure`, `textual`, `interaction`, `bisection` or `invalidated` |
 | Integrating | Bounced | Caused by `BatchFailed` attributed to this change | — | `ChangeBounced` |
 | Integrating | Landed | Caused by `TrunkAdvanced` | None: `TrunkAdvanced` is a fact, so landing is never refused. The invariant is enforced before trunk moves: at queueing, by Queued → Bounced, and by the lane pulling a blocked member out before promotion (`CandidateInvalidated`, then `ChangeRequeued {reason: invalidated}`) | `ChangeLanded`, copied from the change's landing in `TrunkAdvanced`: its commit on trunk, the trunk head, its candidate and its proof |
 | Parked (awaiting-ruling) | Verifying | Caused by `RulingGiven` | — | `ChangeResumed` |
@@ -313,11 +313,11 @@ stateDiagram-v2
 |---|---|---|---|---|
 | — | Forming | The lane forms a batch | N = clamp(ln 0.8 / ln(1−p), 1, 16); no two members with an open suspected conflict or opposite effects on one subject; risky changes alone; speculation ≤ 4 deep | `BatchFormed` |
 | Forming | Assembled | GitCore composes the tree (Tier 0), or MergeBox when GitCore refuses (Tier 2) | — | `CandidateAssembled` (with tier and reason) |
-| Forming | Red | GitCore and MergeBox both refuse to compose | — | `BatchFailed`: for a batch of one, attributed to its member, so the change bounces with next actions; for a larger batch, `textual`, then a textual `ConflictSuspected` → `ConflictProven`, owned by the Lane DO |
+| Forming | Red | GitCore and MergeBox both refuse to compose | — | `BatchFailed`: for a batch of one, attributed to its member, so the change bounces with next actions; for a larger batch, `textual`: every member requeues and runs alone next, and the Lane opens no Conflict for it (a proven one would bounce the innocent member too) |
 | Assembled | Verifying | KeelVerify instance created | — | `VerificationStarted` |
 | Assembled | Red | The candidate cannot be bundled (a symlink, a gitlink, an unsafe path) | The blame is a member (the one whose restacked commit introduces the entry) or `infra` (the base already holds it) | `BatchFailed` with that attribution; never bisected |
 | Verifying | Green | The union of the members' plans passes | Results fenced on `(batchId, attempt, chainEpoch)`: a result for another attempt or epoch is refused and never retried | `BatchVerified` (with the members, base and predecessors the Trunk DO needs) |
-| Verifying | Red | A step fails after a flake rerun | Fenced as above; a blamed change is a member | `BatchFailed` (attribution: a change, `interaction`, `infra`, or `unattributed` when several members could be to blame) |
+| Verifying | Red | A step fails after a flake rerun | Fenced as above; a blamed change is a member; `interaction` and `unattributed` need several members (a batch of one's failure is its member's) | `BatchFailed` (attribution: a change, `interaction`, `infra`, or `unattributed` when several members could be to blame) |
 | Red | Bisected | More than one member, and the failure is `unattributed` | — | `CandidateBisected` (new batches) |
 | Green | Promoted | Caused by `TrunkAdvanced` | — | `CandidatePromoted` |
 | Green | Invalidated | Caused by `PromotionDeclined`: trunk moved and the commutation rule fails | — | `CandidateInvalidated` |

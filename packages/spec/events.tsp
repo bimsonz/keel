@@ -400,7 +400,7 @@ model ChangeRequeued {
   _tag: "ChangeRequeued";
   changeId: ChangeId;
   batchId: BatchId;
-  reason: "infra-failure" | "bisection" | "invalidated";
+  reason: "infra-failure" | "bisection" | "invalidated" | "co-member-failed" | "textual" | "interaction";
 }
 
 model ChangeLanded {

@@ -59,6 +59,7 @@ import {
   PlanCompiled,
   PrecheckStarted,
   PreflightIssued,
+  type RequeueReason,
 } from "./events.ts";
 import { reviseIntent } from "./intent.ts";
 import { checkLease, isLapsed, lapsesAt } from "./lease.ts";
@@ -174,7 +175,7 @@ export type ChangeCommand =
   | {
       readonly _tag: "Requeue";
       readonly batchId: BatchId;
-      readonly reason: "infra-failure" | "bisection" | "invalidated";
+      readonly reason: RequeueReason;
     }
   | {
       readonly _tag: "Bounce";

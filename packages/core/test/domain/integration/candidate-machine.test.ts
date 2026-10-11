@@ -338,7 +338,7 @@ const oracle = (before: Batch | undefined, command: CandidateCommand): Key | "re
     case "Failed": {
       const a = command.attribution;
       const valid =
-        a === "interaction" ||
+        (a === "interaction" && before.members.length > 1) ||
         a === "infra" ||
         (a === "unattributed" && before.members.length > 1) ||
         before.members.some((m) => m === a);
@@ -463,6 +463,10 @@ describe("the Candidate machine", { timeout: PROPERTY_TIMEOUT }, () => {
     const l1 = drive([form([A]), assemble, start, verified, { _tag: "Promote", trunkSha: SHA }]);
     expect(l1.state?.state).toBe("promoted");
     expect(drive([form([A]), refuseComposition]).state?.state).toBe("red");
+    // A batch of one's failure is its member's: neither an interaction nor unattributed.
+    expect(failureTag(drive([form([A]), assemble, start, failed("interaction")]).results[3])).toBe(
+      "InvalidBatch",
+    );
   });
 
   it("[candidate.one-terminal] a batch ends at most once, and a terminal batch takes no command", () => {

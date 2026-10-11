@@ -7,3 +7,4 @@ export * from "./commutation.ts";
 export * from "./errors.ts";
 export * from "./events.ts";
 export * from "./promotion-machine.ts";
+export * from "./red-exit.ts";

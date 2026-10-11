@@ -118,10 +118,24 @@ export const ChangeBatched = Schema.TaggedStruct("ChangeBatched", {
   changeId: ChangeId,
   batchId: BatchId,
 });
+/**
+ * Why a change goes back from Integrating to its lane's queue: its batch failed
+ * on infrastructure, was bisected or invalidated, failed on another member,
+ * or its members clashed (`textual`, `interaction`), so each runs alone next.
+ */
+export const RequeueReason = Schema.Literals([
+  "infra-failure",
+  "bisection",
+  "invalidated",
+  "co-member-failed",
+  "textual",
+  "interaction",
+]);
+export type RequeueReason = typeof RequeueReason.Type;
 export const ChangeRequeued = Schema.TaggedStruct("ChangeRequeued", {
   changeId: ChangeId,
   batchId: BatchId,
-  reason: Schema.Literals(["infra-failure", "bisection", "invalidated"]),
+  reason: RequeueReason,
 });
 export const ChangeLanded = Schema.TaggedStruct("ChangeLanded", {
   changeId: ChangeId,

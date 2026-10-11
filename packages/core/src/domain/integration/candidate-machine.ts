@@ -265,7 +265,7 @@ export const decideCandidate = (
             reason: "a textual failure is a refused composition, reported while forming",
           }),
         );
-      if (blamed === "unattributed" && batch.members.length < 2)
+      if ((blamed === "unattributed" || blamed === "interaction") && batch.members.length < 2)
         return Result.fail(
           new InvalidBatch({ batchId, reason: "a one-change batch's failure is that change's" }),
         );

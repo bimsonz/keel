@@ -6758,7 +6758,10 @@
             "enum": [
               "infra-failure",
               "bisection",
-              "invalidated"
+              "invalidated",
+              "co-member-failed",
+              "textual",
+              "interaction"
             ]
           }
         },
