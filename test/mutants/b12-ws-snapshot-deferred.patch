@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/inbox-streams.test.ts
+# kills: b12.ws-snapshot
+# why: the socket is accepted without its snapshot, so a client sees what it missed only when the next notice arrives
+diff --git a/apps/keel/src/adapters/driving/do/agent-session.ts b/apps/keel/src/adapters/driving/do/agent-session.ts
+index 61adda2..f60a766 100644
+--- a/apps/keel/src/adapters/driving/do/agent-session.ts
++++ b/apps/keel/src/adapters/driving/do/agent-session.ts
+@@ -124,7 +124,6 @@ export class AgentSessionDO
+     const { 0: client, 1: socket } = new WebSocketPair();
+     this.ctx.acceptWebSocket(socket);
+     socket.serializeAttachment({ cursor });
+-    this.project(socket, "snapshot");
+     return new Response(null, { status: 101, webSocket: client });
+   }
+ 

@@ -4,7 +4,7 @@ import {
   type AgentDirectory,
   type Changes,
   type Enrolments,
-  type Inbox,
+  Inbox,
   type Notifier,
   type Projects,
   TokenIssuer,
@@ -21,6 +21,7 @@ import { TokenIssuerJose } from "../adapters/driven/jose/token-issuer.ts";
 import { ClockLive, SystemLive } from "../adapters/driven/system.ts";
 import { makeApp } from "../adapters/driving/http/app.ts";
 import type { TokenVerifier, Verification } from "../adapters/driving/http/caller.ts";
+import type { InboxStreams } from "../adapters/driving/http/inbox-streams.ts";
 import { makeHandlers } from "../adapters/driving/http/handlers.ts";
 import { makeRunner, type IsolateServices } from "../adapters/driving/http/run.ts";
 import { makeMcpEndpoint } from "../adapters/driving/mcp/server.ts";
@@ -95,6 +96,23 @@ interface Isolate {
 
 const isolates = new WeakMap<Env, Isolate>();
 
+/**
+ * The agent's live inbox: the SSE loop reads through the Inbox port, and a
+ * socket upgrade goes to the caller's own AgentSession DO, named here from the
+ * principal and nothing else.
+ */
+function inboxStreams(env: Env, runtime: IsolateRuntime): InboxStreams {
+  return {
+    read: (agentId, cursor, waitSeconds, signal) =>
+      runtime.runPromise(
+        Inbox.use((inbox) => inbox.read(agentId, cursor, waitSeconds)),
+        { signal },
+      ),
+    socket: (agentId, request) =>
+      env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)).fetch(request),
+  };
+}
+
 /** The app over a given layer. `isolateFor` caches the production one per Env; pool tests build their own. */
 export function makeIsolate(env: Env, layer: Layer.Layer<IsolateServices>): Isolate {
   const runtime = ManagedRuntime.make(layer);
@@ -104,6 +122,7 @@ export function makeIsolate(env: Env, layer: Layer.Layer<IsolateServices>): Isol
     handlers,
     verify,
     mcp: makeMcpEndpoint(handlers, verify, [env.KEEL_HOST]),
+    streams: inboxStreams(env, runtime),
     rethrowContractDrift: env.KEEL_ENV === "test",
   });
   return { runtime, app };

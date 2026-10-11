@@ -106,6 +106,13 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
     return undefined;
   }
 
+  /**
+   * Runs once a delivery's transactions have returned, whatever they decided:
+   * for what must leave the object only after its state is committed (a
+   * WebSocket send is outside the output gate). The default does nothing.
+   */
+  protected async received(): Promise<void> {}
+
   /** One of the object's own alarms came due. */
   protected async onDeadline(request: AlarmRequest): Promise<void> {
     throw new Error(`${this.constructor.name} armed "${request.reason}" but handles no deadline`);
@@ -140,7 +147,11 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
       }
       return receipt;
     });
-    return this.answer(EventCodecs.receive, program);
+    try {
+      return await this.answer(EventCodecs.receive, program);
+    } finally {
+      await this.received();
+    }
   }
 
   override async alarm(): Promise<void> {

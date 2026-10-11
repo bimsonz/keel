@@ -13,7 +13,7 @@ import {
   Proposition,
   type SketchNotFound,
 } from "@keeltown/core/domain/coordination";
-import type { AgentNotice, IdempotencyConflict, InboxPage } from "@keeltown/core/domain/identity";
+import type { IdempotencyConflict, InboxPage } from "@keeltown/core/domain/identity";
 import {
   type Anchor,
   ChangeId,
@@ -31,6 +31,7 @@ import type {
   StatusResult,
   SubmitResult,
 } from "../../../generated/http/app.gen.ts";
+import { noticeView } from "../notices.ts";
 import type { Caller } from "./caller.ts";
 import { type NextAction, problem, type ProblemBody } from "./problems.ts";
 
@@ -454,19 +455,6 @@ export function statusOk(caller: Caller, status: SubmissionStatus): StatusResult
 
 export function statusError(caller: Caller, error: ChangeNotFound): StatusResult {
   return changeNotFound(caller, error);
-}
-
-/** A notice as the wire carries it, in an inbox page or riding a tool result. */
-export function noticeView(notice: AgentNotice) {
-  return {
-    id: notice.id,
-    at: iso(notice.at),
-    kind: notice.kind,
-    title: notice.title,
-    ...(notice.detail === undefined ? {} : { detail: notice.detail }),
-    ...(notice.ref === undefined ? {} : { ref: notice.ref }),
-    ...(notice.cursor === undefined ? {} : { cursor: notice.cursor }),
-  };
 }
 
 export function inboxOk(page: InboxPage): InboxResult {

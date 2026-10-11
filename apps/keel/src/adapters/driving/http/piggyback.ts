@@ -5,7 +5,7 @@ import type { Operations } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
 import type { ProblemCode } from "./problems.ts";
 import type { Runner } from "./run.ts";
-import { noticeView } from "./work-loop.ts";
+import { noticeView } from "../notices.ts";
 
 type Operation = keyof Operations<Caller>;
 type Answer<K extends Operation> = Awaited<ReturnType<Operations<Caller>[K]>>;

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/inbox-streams.test.ts
+# kills: b12.sse
+# why: the SSE route reads only `?cursor`, so a reconnecting client is sent every notice again from the start
+diff --git a/apps/keel/src/adapters/driving/http/inbox-streams.ts b/apps/keel/src/adapters/driving/http/inbox-streams.ts
+index 63f7133..c523634 100644
+--- a/apps/keel/src/adapters/driving/http/inbox-streams.ts
++++ b/apps/keel/src/adapters/driving/http/inbox-streams.ts
+@@ -53,7 +53,7 @@ export function registerInboxStreams(
+     const { principal } = caller;
+     if (principal === null) return deps.noContext(c);
+     if (isBootstrap(principal)) return confined(caller);
+-    const resumeFrom = c.req.header("last-event-id") ?? c.req.query("cursor");
++    const resumeFrom = c.req.query("cursor");
+     if (resumeFrom !== undefined && !isInboxCursor(resumeFrom)) return badCursor(caller);
+ 
+     const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();

@@ -11,6 +11,7 @@ import {
 } from "../../../generated/http/runtime.gen.ts";
 import type { TokenVerifier } from "./caller.ts";
 import type { Handlers } from "./handlers.ts";
+import { type InboxStreams, registerInboxStreams } from "./inbox-streams.ts";
 import { problemResponse } from "./problems.ts";
 import { routeDeps } from "./route-deps.ts";
 
@@ -18,11 +19,13 @@ export interface AppOptions {
   readonly handlers: Handlers;
   readonly verify: TokenVerifier;
   readonly mcp: (request: Request) => Promise<Response>;
+  /** The agent's live inbox: SSE and WebSocket, outside the spec until the emitter upgrade. */
+  readonly streams: InboxStreams;
   /** Tests rethrow contract drift so it fails loudly; production logs it and answers 500. */
   readonly rethrowContractDrift: boolean;
 }
 
-/** The HTTP doorway: middleware, the generated routes, the MCP endpoint and the document. */
+/** The HTTP doorway: middleware, the generated routes, the agent's inbox streams, the MCP endpoint and the document. */
 export function makeApp(options: AppOptions) {
   const app = new Hono<AppEnv>();
 
@@ -42,6 +45,8 @@ export function makeApp(options: AppOptions) {
   app.get("/healthz", (c) => c.json({ ok: true, service: "keel" }));
   app.get(OPENAPI_DOCUMENT_PATH, (c) => c.json(openApiDocument));
   app.all("/mcp", (c) => options.mcp(c.req.raw));
+  const deps = routeDeps(options.verify);
+  registerInboxStreams(app, deps, options.streams);
 
   app.notFound((c) => problemResponse(404, "resource.not_found", c.get("requestId")));
   app.onError((error, c) => {
@@ -54,5 +59,5 @@ export function makeApp(options: AppOptions) {
     return problemResponse(500, "internal.defect", c.get("requestId") ?? crypto.randomUUID());
   });
 
-  return registerRoutes(app, () => options.handlers, routeDeps(options.verify));
+  return registerRoutes(app, () => options.handlers, deps);
 }

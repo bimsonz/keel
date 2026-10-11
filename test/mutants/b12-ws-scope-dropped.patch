@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/inbox-streams.test.ts
+# kills: b12.ws-scope
+# why: the socket route checks the token but not its scope, so a token without agent:read reads the inbox live
+diff --git a/apps/keel/src/adapters/driving/http/inbox-streams.ts b/apps/keel/src/adapters/driving/http/inbox-streams.ts
+index 63f7133..fb6b036 100644
+--- a/apps/keel/src/adapters/driving/http/inbox-streams.ts
++++ b/apps/keel/src/adapters/driving/http/inbox-streams.ts
+@@ -88,7 +88,7 @@ export function registerInboxStreams(
+     });
+   });
+ 
+-  app.get(INBOX_SOCKET_PATH, authorize, async (c) => {
++  app.get(INBOX_SOCKET_PATH, deps.authorize([{ OAuth2Auth: [] }]), async (c) => {
+     const caller = deps.context(c, "required");
+     if (caller === null) return deps.noContext(c);
+     const { principal } = caller;
