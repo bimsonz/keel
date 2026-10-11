@@ -17,6 +17,7 @@ import {
 } from "../kernel/index.ts";
 import { Move, Predicate } from "../coordination/index.ts";
 import { ConflictKind, ConflictOrigin, Party, World } from "./conflict.ts";
+import { EscalationCategory, EscalationEvidence, EscalationOption } from "./escalation.ts";
 import { VerdictOutcome } from "./plan.ts";
 
 export const ConflictSuspected = Schema.TaggedStruct("ConflictSuspected", {
@@ -149,12 +150,20 @@ export const VerdictIssued = Schema.TaggedStruct("VerdictIssued", {
    */
   nextActions: Schema.optional(Schema.Array(NextAction)),
 });
+/**
+ * A question for a person: at least two options with unique ids, each with its
+ * consequence, the default among them, the evidence by class, and the
+ * precedents that bear on it.
+ */
 export const EscalationRaised = Schema.TaggedStruct("EscalationRaised", {
   escalationId: EscalationId,
   question: Schema.NonEmptyString,
-  options: Schema.Array(Schema.String),
-  consequences: Schema.Array(Schema.String),
+  options: Schema.Array(EscalationOption),
   about: EntityRef,
+  category: EscalationCategory,
+  evidence: Schema.Array(EscalationEvidence),
+  precedents: Schema.Array(DecisionId),
+  default: Schema.NonEmptyString,
 });
 export const EscalationWithdrawn = Schema.TaggedStruct("EscalationWithdrawn", {
   escalationId: EscalationId,

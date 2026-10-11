@@ -379,6 +379,7 @@ The Auditor's full-suite run on each new head is recorded as `AuditCompleted`. O
 
 Owner: the DO that raised it. An Escalation is a question routed to a person, with options and their consequences.
 
+<!-- chart:escalation — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
 stateDiagram-v2
   [*] --> Open: EscalationRaised
@@ -387,14 +388,15 @@ stateDiagram-v2
   Ruled --> [*]
   Withdrawn --> [*]
 ```
+<!-- /chart:escalation -->
 
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
-| — | Open | A human-class conflict or step, an unprovable conflict, an overrule request, a frozen trunk | — | `EscalationRaised` |
-| Open | Ruled | A person answers | Scope `operator` | `RulingGiven`, emitted by the owner; it resumes waiting Workflows through `sendEvent` |
+| — | Open | A human-class conflict or step, an unprovable conflict, an overrule request, a frozen trunk | At least two options with unique ids, and the default among them (otherwise invalid) | `EscalationRaised` |
+| Open | Ruled | A person answers | Scope `operator`; the option is one the escalation offers (otherwise refused, with a next action per valid id) | `RulingGiven`, emitted by the owner; it resumes waiting Workflows through `sendEvent` |
 | Open | Withdrawn | Its subject was resolved some other way | — | `EscalationWithdrawn` |
 
-**Terminal:** Ruled, Withdrawn. The default while Open is *hold*. A ruling produces a Decision.
+**Terminal:** Ruled, Withdrawn: a second ruling, even an identical one, is refused (the doorway's idempotency key covers retries). While Open the owner holds; the default is only a suggestion and is never applied on a timeout. A ruling produces a Decision.
 
 ---
 
@@ -402,6 +404,7 @@ stateDiagram-v2
 
 Owner: Subject DO. A Decision is a recorded ruling. Later changes meet it as a Precedent and record a Stance.
 
+<!-- chart:decision — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
 stateDiagram-v2
   [*] --> Active: DecisionRecorded
@@ -410,12 +413,13 @@ stateDiagram-v2
   Superseded --> [*]
   Overruled --> [*]
 ```
+<!-- /chart:decision -->
 
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
-| — | Active | Caused by `RulingGiven` on an escalation | — | `DecisionRecorded` |
-| Active | Superseded | A later decision with the same or wider scope | — | `DecisionSuperseded` |
-| Active | Overruled | `OverruleRequested`, escalated, and ruled in favour | — | `DecisionOverruled` |
+| — | Active | Caused by `RulingGiven` on an escalation | The escalation is ruled | `DecisionRecorded`: the option chosen, and every other option as a rejected alternative |
+| Active | Superseded | A later decision with the same or wider scope | `scopeCovers(new, old)` in the proposition scope grammar; an absent scope is everywhere | `DecisionSuperseded` |
+| Active | Overruled | `OverruleRequested`, escalated, and ruled in favour | The escalation is ruled `overrule`, and its category is `overrule-request` | `DecisionOverruled` |
 
 **Stances** do not change a Decision's state; each is a fact about a change: `PrecedentSurfaced` (preflight showed it), then `PrecedentFollowed`, `PrecedentDistinguished` or `OverruleRequested`.
 

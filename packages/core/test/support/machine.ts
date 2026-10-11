@@ -61,7 +61,8 @@ export interface Played<S, C, E> {
 export interface Script<S, C, F, Step> {
   readonly start: Instant;
   readonly dt: (step: Step) => number;
-  readonly facts: (now: Instant) => F;
+  /** The facts every command at this step is decided with: the time, and anything the step looks up. */
+  readonly facts: (now: Instant, step: Step) => F;
   /** One command of every kind, for this state and step. */
   readonly every: (state: S | undefined, step: Step) => readonly C[];
   /** The command this step takes. */
@@ -80,7 +81,7 @@ export const play = <S, C, E, F, Step>(
   for (const step of steps) {
     now = Instant(now + script.dt(step));
     const before = state;
-    const facts = script.facts(now);
+    const facts = script.facts(now, step);
     const probes = script.every(before, step).map((c) => attempt(machine, before, c, facts, now));
     const taken = attempt(machine, before, script.choose(before, step), facts, now);
     if (Result.isSuccess(taken.result) && !taken.threw) {

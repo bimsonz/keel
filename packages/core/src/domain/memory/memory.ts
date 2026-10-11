@@ -19,6 +19,8 @@ export type DecisionState = typeof DecisionState.Type;
 export const Decision = Schema.Struct({
   id: DecisionId,
   escalationId: EscalationId,
+  /** The option the ruling chose. */
+  option: Schema.NonEmptyString,
   summary: Schema.String,
   scope: Schema.optional(Schema.String),
   evidence: Schema.Array(Schema.String),
@@ -27,6 +29,8 @@ export const Decision = Schema.Struct({
   ),
   decidedAt: InstantSchema,
   state: DecisionState,
+  /** The decision that superseded or overruled it. */
+  endedBy: Schema.optional(DecisionId),
 });
 export type Decision = typeof Decision.Type;
 

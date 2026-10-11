@@ -7,6 +7,7 @@ import {
   ProbeId,
   VerdictId,
 } from "../kernel/index.ts";
+import { EscalationState } from "../memory/index.ts";
 import { ConflictState } from "./conflict.ts";
 import { ProbeState } from "./probe.ts";
 
@@ -52,7 +53,30 @@ export class VerdictNotFound extends Schema.TaggedError<VerdictNotFound>()("Verd
 
 export class EscalationNotFound extends Schema.TaggedError<EscalationNotFound>()(
   "EscalationNotFound",
-  { escalationId: EscalationId },
+  { escalationId: EscalationId, nextActions: Schema.Array(NextAction) },
+) {}
+
+/** A ruling named an option the escalation does not offer. `nextActions` rules each valid one. */
+export class RulingOptionUnknown extends Schema.TaggedError<RulingOptionUnknown>()(
+  "RulingOptionUnknown",
+  { escalationId: EscalationId, option: Schema.String, nextActions: Schema.Array(NextAction) },
+) {}
+
+/** The escalation is already ruled or withdrawn, or already raised. `nextActions` is never empty. */
+export class EscalationStateRefused extends Schema.TaggedError<EscalationStateRefused>()(
+  "EscalationStateRefused",
+  {
+    escalationId: EscalationId,
+    state: Schema.optional(EscalationState),
+    command: Schema.String,
+    nextActions: Schema.Array(NextAction),
+  },
+) {}
+
+/** An escalation that cannot be raised: fewer than two options, a repeated id, or a default that is not an option. */
+export class InvalidEscalation extends Schema.TaggedError<InvalidEscalation>()(
+  "InvalidEscalation",
+  { escalationId: EscalationId, reason: Schema.String, nextActions: Schema.Array(NextAction) },
 ) {}
 
 /** The move is not allowed for this conflict in its current state. */

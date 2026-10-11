@@ -294,6 +294,34 @@ export const probeChart: Chart = {
   },
 };
 
+// Escalation: the owner holds while it is open; nothing applies the default.
+const e = to("escalation");
+
+export const escalationChart: Chart = {
+  id: "escalation",
+  initial: "open",
+  meta: { createdBy: "EscalationRaised", section: "Escalation" },
+  states: {
+    open: { on: { RulingGiven: e("ruled"), EscalationWithdrawn: e("withdrawn") } },
+    ruled: { type: "final" },
+    withdrawn: { type: "final" },
+  },
+};
+
+// Decision: recorded from a ruling; a precedent's stances never change its state.
+const d = to("decision");
+
+export const decisionChart: Chart = {
+  id: "decision",
+  initial: "active",
+  meta: { createdBy: "DecisionRecorded", section: "Decision" },
+  states: {
+    active: { on: { DecisionSuperseded: d("superseded"), DecisionOverruled: d("overruled") } },
+    superseded: { type: "final" },
+    overruled: { type: "final" },
+  },
+};
+
 export const charts: readonly Chart[] = [
   changeChart,
   leaseChart,
@@ -304,4 +332,6 @@ export const charts: readonly Chart[] = [
   agentChart,
   conflictChart,
   probeChart,
+  escalationChart,
+  decisionChart,
 ];

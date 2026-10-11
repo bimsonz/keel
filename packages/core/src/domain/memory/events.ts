@@ -14,13 +14,19 @@ import { Predicate } from "../coordination/index.ts";
 
 export const RulingGiven = Schema.TaggedStruct("RulingGiven", {
   escalationId: EscalationId,
-  option: Schema.String,
+  /** The id of the option chosen, one of the escalation's. */
+  option: Schema.NonEmptyString,
   by: Schema.String,
   rationale: Schema.optional(Schema.String),
 });
+/** A ruling recorded: the option chosen, the alternatives it rejected (every other option), and the evidence. */
 export const DecisionRecorded = Schema.TaggedStruct("DecisionRecorded", {
   decisionId: DecisionId,
   escalationId: EscalationId,
+  /** The id of the option the ruling chose. */
+  option: Schema.NonEmptyString,
+  /** The chosen option's label. */
+  summary: Schema.String,
   scope: Schema.optional(Schema.String),
   evidence: Schema.Array(Schema.String),
   alternatives: Schema.Array(

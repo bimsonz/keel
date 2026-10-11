@@ -116,7 +116,7 @@ The Project DO (`project:<id>`) holds the subject registry (keys, aliases, ancho
 | `GuardRetired` | Subject DO | `guardId, decisionId` | the guard repo | — | Only a superseding Decision retires a guard |
 | `GuardFailed` | Lane DO or Change DO (fact) | `guardId, batchId?, candidateId?, changeId?, world` (a change, or a batch and its candidate) | the batch, or the change | — | Proof against the candidate, or at Precheck against the change itself; feeds its verdict |
 | `VerdictIssued` | Change DO or Lane DO | `verdictId, subject: changeId\|batchId, outcome: land\|bounce\|park\|hold\|supersede, evidence[], planHash?, verified?, nextActions?` | the change or batch | the agent(s) | Every step result is part of the evidence. `planHash` always resolves to a plan; it is absent only for a Precheck refusal, a ruling-class verdict reached before any plan was compiled. `verified: false` when the project's verification is off and the plan was not run; absent means true. `nextActions` is the remedy, set by the issuer that knows it (the Lane for a refused composition or bundle, KeelVerify for a failing test); the Change DO copies it onto `ChangeBounced` and uses its own default only when it is absent |
-| `EscalationRaised` | the raising DO | `escalationId, question, options[], consequences[], about: entity ref` | — | the escalation inbox | A person is asked; the default while open is *hold* |
+| `EscalationRaised` | the raising DO | `escalationId, question, options: [{id, label, consequence}] (≥ 2, unique ids), about: entity ref, category, evidence: [{class, summary, ref?}], precedents: decisionId[], default: option id` | — | the escalation inbox | A person is asked; while open, its owner holds. The default is a suggestion, never applied on a timeout. `category` is `permission-semantics`, `destructive-migration`, `ambiguous-requirement`, `unprovable-conflict`, `overrule-request` or `frozen-trunk`; Mission Control groups the evidence by class |
 | `EscalationWithdrawn` | the raising DO | `escalationId, reason` | — | the escalation inbox | Its subject was resolved some other way before a ruling |
 
 ## integration
@@ -148,8 +148,8 @@ A **Batch** is a set of Changes verified together; its **Candidate** is the comp
 
 | Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
 |---|---|---|---|---|---|
-| `RulingGiven` | the escalation's raising DO | `escalationId, option, by, rationale?` | the parties | parked changes, waiting Workflows | Resumes Workflows through `sendEvent` |
-| `DecisionRecorded` | Subject DO | `decisionId, escalationId, scope, evidence[], alternatives: [{option, reasonRejected}]` | subjects in scope | Projector | Becomes a precedent for later changes |
+| `RulingGiven` | the escalation's raising DO | `escalationId, option: option id, by, rationale?` | the parties | parked changes, waiting Workflows | Resumes Workflows through `sendEvent`. An option the escalation does not offer is refused, with a next action per valid id; a second ruling is refused |
+| `DecisionRecorded` | Subject DO | `decisionId, escalationId, option, summary, scope?, evidence[], alternatives: [{option, reasonRejected}]` | subjects in scope | Projector | Becomes a precedent for later changes. Recorded only from a ruled escalation: `option` is the one chosen (`summary` its label), `alternatives` every other option with its consequence, `evidence` each item as `class: summary`. An absent scope is everywhere; a later decision supersedes it only over the same or a wider scope |
 | `DecisionSuperseded` | Subject DO | `decisionId, by: decisionId` | subjects in scope | Projector | — |
 | `DecisionOverruled` | Subject DO | `decisionId, by: decisionId, requestedBy: changeId` | subjects in scope | Projector | — |
 | `PrecedentSurfaced` | Subject DO (fact) | `decisionId, changeId` | — | the change's agent | Shown in preflight as dated, scoped evidence |
