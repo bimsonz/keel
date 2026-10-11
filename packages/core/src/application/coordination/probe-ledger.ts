@@ -93,8 +93,8 @@ const viewOf = (store: Store, conflictId: ConflictId): ConflictView | undefined 
  * One decision of the conflict's or its probe's machine, with the other entity
  * as its fact, and every event folded into each entity that takes it (the
  * conflict folds ProbeDrafted and ProbeRan): the two machines in one object,
- * as the domain plays them. Every event lands on the step's entity: a probe
- * step's on the probe, a conflict step's on the conflict.
+ * as the domain plays them. Every event lands on the commit's entity; a
+ * settle after a probe step names the conflict itself (`settleStep`).
  */
 function ledgerStep(
   tx: Transaction,
@@ -134,6 +134,28 @@ function ledgerStep(
 }
 
 /**
+ * The conflict's Settle once a probe step has decided its probe (admitted, or
+ * discarded), in the same transaction, since the Subject DO never hears its
+ * own events. Proven or dismissed lands on the conflict's own entity. A settle
+ * the machine refuses (the probe still pending, or an unprovable probe that
+ * needs an escalation, which T3.5 raises) commits nothing and leaves the
+ * conflict open.
+ */
+function settleStep(
+  tx: Transaction,
+  conflictId: ConflictId,
+): Result.Result<readonly EventDraft[], LedgerRefusal> {
+  const probe = probeOf(tx.store, conflictId);
+  if (probe?.state !== "admitted" && probe?.state !== "discarded") return Result.succeed([]);
+  const settled = ledgerStep(tx, conflictId, { _tag: "Conflict", command: { _tag: "Settle" } });
+  if (Result.isFailure(settled))
+    return settled.failure._tag === "ConflictStateRefused" ? Result.succeed([]) : settled;
+  return Result.succeed(
+    settled.success.map((draft) => ({ ...draft, entity: conflictRef(conflictId) })),
+  );
+}
+
+/**
  * The one probe a conflict's drafting begins, named from the conflict: a
  * conflict is probed once (the machine drafts only for a suspected conflict
  * with no probe), so a repeated draft or failure lands on the same entity and
@@ -142,7 +164,11 @@ function ledgerStep(
 export const probeIdOf = (conflictId: ConflictId): ProbeId =>
   ProbeId.make(`prb_${hashedIdBody(conflictId)}`);
 
-/** Commits one ledger step on `entity` under `cause`; a replay answers the conflict as it stands, a reused cause with another body is an IdempotencyConflict. */
+/**
+ * Commits one ledger step on `entity` under `cause`, and after a probe step
+ * the conflict's settle; a replay answers the conflict as it stands, a reused
+ * cause with another body is an IdempotencyConflict.
+ */
 const ledgerCommit = (
   projectId: ProjectId,
   conflictId: ConflictId,
@@ -153,7 +179,15 @@ const ledgerCommit = (
 ) =>
   Effect.flatMap(
     commit({ entity, cause, fingerprint, project: projectId }, (tx) =>
-      Result.map(ledgerStep(tx, conflictId, step), (drafts) => ({ drafts, value: undefined })),
+      Result.flatMap(ledgerStep(tx, conflictId, step), (drafts) =>
+        Result.map(
+          step._tag === "Probe" ? settleStep(tx, conflictId) : Result.succeed([]),
+          (settled) => ({
+            drafts: [...drafts, ...settled],
+            value: undefined,
+          }),
+        ),
+      ),
     ),
     (committed) =>
       committed.duplicate && !committed.sameCommand
@@ -206,7 +240,8 @@ export const probeDrafted = Effect.fn("coordination/probeDrafted")(function* (
  * draft stayed incomplete, or its repairs ran out): the probe begins and ends
  * discarded as draft-failed, so the conflict never waits on a draft that will
  * not come. Once per conflict, as `probeDrafted`. The reason is kept only in
- * the fingerprint until the domain's ProbeDiscarded carries it.
+ * the fingerprint until the domain's ProbeDiscarded carries it. The conflict
+ * stays open: settling an unprovable probe needs an escalation.
  */
 export const probeDraftFailed = Effect.fn("coordination/probeDraftFailed")(function* (
   projectId: ProjectId,
@@ -226,7 +261,8 @@ export const probeDraftFailed = Effect.fn("coordination/probeDraftFailed")(funct
 
 /**
  * One world-matrix cell of the conflict's probe: ProbeRan, and GuardAdmitted
- * or ProbeDiscarded when the cells decide it. The machine fences it (the
+ * or ProbeDiscarded when the cells decide it, with the conflict settled by
+ * that decision in the same transaction. The machine fences it (the
  * conflict must be probing this probe, the run is 1–3) and keeps it
  * idempotent per (probe, world, run): the same outcome again commits nothing,
  * another is refused `cell-contradicts`.

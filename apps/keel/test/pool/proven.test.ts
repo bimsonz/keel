@@ -2,13 +2,22 @@ import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import {
   PARTY_CONFLICT,
+  probeCellRan,
+  probeDrafted,
   subjectAddress,
   subjectIdOf,
   suspectConflict,
 } from "@keeltown/core/application/coordination";
 import { Proposition, SubjectKey } from "@keeltown/core/domain/coordination";
-import type { ConflictCommand } from "@keeltown/core/domain/verification";
-import { type ChangeId, EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
+import type { ConflictCommand, ProbeOutcome, World } from "@keeltown/core/domain/verification";
+import {
+  type ChangeId,
+  type ConflictId,
+  ContentHash,
+  EventEnvelope,
+  makeId,
+  type ProjectId,
+} from "@keeltown/core/kernel";
 import { EntityStore } from "@keeltown/core/ports";
 import { Effect, Exit, Schema } from "effect";
 import { ulid } from "ulid";
@@ -27,8 +36,11 @@ const PLAN_HASH = `sha256:${"0".repeat(64)}`;
 const premise = (subject: SubjectKey, value: string) =>
   Schema.decodeUnknownSync(Proposition)({ subject, predicate: "freshness", relation: "is", value });
 
-/** Opens a semantic conflict on the subject's real Subject DO, as its fallout does. */
-async function suspect(projectId: ProjectId, parties: readonly ChangeId[]) {
+const subjectOf = (projectId: ProjectId) =>
+  drainAfter(env.SUBJECT.get(env.SUBJECT.idFromName(subjectAddress(projectId, LEAF))));
+
+/** Opens a semantic conflict on the subject's real Subject DO, as its fallout does: the first party's premise against the last's effect. */
+async function suspect(projectId: ProjectId, parties: readonly [ChangeId, ...ChangeId[]]) {
   const conflictId = makeId("cfl", ulid());
   const command: Extract<ConflictCommand, { _tag: "Suspect" }> = {
     _tag: "Suspect",
@@ -37,16 +49,51 @@ async function suspect(projectId: ProjectId, parties: readonly ChangeId[]) {
     subjectId: subjectIdOf(projectId, LEAF),
     predicate: "freshness",
     origin: "fallout",
+    premise: { holder: parties[0], proposition: premise(LEAF, "per-request") },
+    effect: { changeId: parties.at(-1) ?? parties[0], proposition: premise(LEAF, "per-session") },
   };
-  const subject = drainAfter(
-    env.SUBJECT.get(env.SUBJECT.idFromName(subjectAddress(projectId, LEAF))),
-  );
   // Committed through the runtime, so arm the flush as an answered call would.
-  await runInDurableObject(subject, async (instance: SubjectDO) => {
+  await runInDurableObject(subjectOf(projectId), async (instance: SubjectDO) => {
     await instance["runtime"].runPromise(suspectConflict(projectId, conflictId, command));
     await instance["armFlush"]();
   });
   return conflictId;
+}
+
+/** One run that discriminates: passes on trunk and for the holder, fails combined and against the do-nothing mutant. */
+const DISCRIMINATING: readonly (readonly [World, ProbeOutcome])[] = [
+  ["trunk", "pass"],
+  ["A", "pass"],
+  ["AB", "fail"],
+  ["A-noop", "fail"],
+];
+
+/** Proves the conflict for real on its Subject DO: a drafted probe and three discriminating runs, which settle it as proven. */
+async function prove(projectId: ProjectId, conflictId: ConflictId) {
+  await runInDurableObject(subjectOf(projectId), async (instance: SubjectDO) => {
+    await instance["runtime"].runPromise(
+      Effect.gen(function* () {
+        const drafted = yield* probeDrafted(projectId, {
+          conflictId,
+          attempts: 1,
+          bundleHash: ContentHash.make(`sha256:${"a".repeat(64)}`),
+        });
+        const probeId = drafted.probe?.id;
+        if (probeId === undefined) throw new Error("the draft answers its probe");
+        for (const run of [1, 2, 3])
+          for (const [world, outcome] of DISCRIMINATING)
+            yield* probeCellRan(projectId, {
+              conflictId,
+              probeId,
+              world,
+              run,
+              outcome,
+              resultRef: `r2://probe/${run}/${world}`,
+            });
+      }),
+    );
+    await instance["armFlush"]();
+  });
 }
 
 /** What the change's own Change DO keeps of a conflict it is a party to. */
@@ -82,26 +129,6 @@ const batchFormed = (c: ChangeUnderTest) => {
     }),
   );
 };
-
-/** ConflictProven as the conflict's Subject DO delivers it to a party. */
-const proven = (conflictId: string, party: ChangeId) =>
-  Schema.encodeSync(EventEnvelope)(
-    Schema.decodeUnknownSync(EventEnvelope)({
-      eventId: makeId("evt", ulid()),
-      type: "ConflictProven",
-      entity: { kind: "conflict", id: conflictId },
-      seq: 2,
-      at: Date.now(),
-      dedupeKey: `conflict:${conflictId}/proven/ConflictProven#1`,
-      affected: [{ kind: "change", id: party }],
-      notified: [],
-      payload: {
-        _tag: "ConflictProven",
-        conflictId,
-        evidence: { _tag: "probe", probeId: makeId("prb", ulid()) },
-      },
-    }),
-  );
 
 /** Declares, pushes, submits and starts Precheck: the change is deriving, awaiting its plan. */
 async function deriving(c: ChangeUnderTest) {
@@ -173,8 +200,14 @@ describe("a conflict proven against a change", () => {
       },
       { timeout: 15_000, interval: 100 },
     );
-    await blocked.stub.receive([proven(conflictId, blocked.changeId)]);
-    await advised.stub.receive([proven(conflictId, advised.changeId)]);
+    await prove(projectId, conflictId);
+    await vi.waitFor(
+      async () => {
+        expect(await partyRow(blocked, conflictId)).toMatchObject({ state: "proven" });
+        expect(await partyRow(advised, conflictId)).toMatchObject({ state: "proven" });
+      },
+      { timeout: 15_000, interval: 100 },
+    );
 
     const refusedQueue = await compile(blocked, { freshness: "block" });
     const queued = ok(await compile(advised));
@@ -198,7 +231,11 @@ describe("a conflict proven against a change", () => {
       timeout: 15_000,
       interval: 100,
     });
-    await c.stub.receive([proven(conflictId, c.changeId)]);
+    await prove(projectId, conflictId);
+    await vi.waitFor(
+      async () => expect(await partyRow(c, conflictId)).toMatchObject({ state: "proven" }),
+      { timeout: 15_000, interval: 100 },
+    );
     await c.stub.receive([batchFormed(c)]);
 
     expect((await c.current()).state).toBe("queued");

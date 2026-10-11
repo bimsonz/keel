@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel -t "ProbeLedger contract" packages/testing/test/ports.test.ts apps/keel/test/pool/adapters.test.ts
+# kills: b21.settle
+# why: a probe that never discriminates leaves its conflict open for ever instead of dismissing it
+diff --git a/packages/core/src/application/coordination/probe-ledger.ts b/packages/core/src/application/coordination/probe-ledger.ts
+index f19363b..c26a338 100644
+--- a/packages/core/src/application/coordination/probe-ledger.ts
++++ b/packages/core/src/application/coordination/probe-ledger.ts
+@@ -146,7 +146,7 @@ function settleStep(
+   conflictId: ConflictId,
+ ): Result.Result<readonly EventDraft[], LedgerRefusal> {
+   const probe = probeOf(tx.store, conflictId);
+-  if (probe?.state !== "admitted" && probe?.state !== "discarded") return Result.succeed([]);
++  if (probe?.state !== "admitted") return Result.succeed([]);
+   const settled = ledgerStep(tx, conflictId, { _tag: "Conflict", command: { _tag: "Settle" } });
+   if (Result.isFailure(settled))
+     return settled.failure._tag === "ConflictStateRefused" ? Result.succeed([]) : settled;

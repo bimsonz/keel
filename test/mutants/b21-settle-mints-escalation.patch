@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel -t "ProbeLedger contract" packages/testing/test/ports.test.ts apps/keel/test/pool/adapters.test.ts
+# kills: b21.settle
+# why: an unprovable probe escalates on a minted escalation id with no escalation behind it
+diff --git a/packages/core/src/application/coordination/probe-ledger.ts b/packages/core/src/application/coordination/probe-ledger.ts
+index f19363b..6d819c6 100644
+--- a/packages/core/src/application/coordination/probe-ledger.ts
++++ b/packages/core/src/application/coordination/probe-ledger.ts
+@@ -147,7 +147,10 @@ function settleStep(
+ ): Result.Result<readonly EventDraft[], LedgerRefusal> {
+   const probe = probeOf(tx.store, conflictId);
+   if (probe?.state !== "admitted" && probe?.state !== "discarded") return Result.succeed([]);
+-  const settled = ledgerStep(tx, conflictId, { _tag: "Conflict", command: { _tag: "Settle" } });
++  const settled = ledgerStep(tx, conflictId, {
++    _tag: "Conflict",
++    command: { _tag: "Settle", escalationId: `esc_${conflictId.slice(4)}` as never },
++  });
+   if (Result.isFailure(settled))
+     return settled.failure._tag === "ConflictStateRefused" ? Result.succeed([]) : settled;
+   return Result.succeed(

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel -t "ProbeLedger contract" packages/testing/test/ports.test.ts apps/keel/test/pool/adapters.test.ts
+# kills: b21.settle
+# why: the settle's ConflictProven lands on the probe's entity, so the conflict's own log never records its proof
+diff --git a/packages/core/src/application/coordination/probe-ledger.ts b/packages/core/src/application/coordination/probe-ledger.ts
+index f19363b..704741b 100644
+--- a/packages/core/src/application/coordination/probe-ledger.ts
++++ b/packages/core/src/application/coordination/probe-ledger.ts
+@@ -151,7 +151,7 @@ function settleStep(
+   if (Result.isFailure(settled))
+     return settled.failure._tag === "ConflictStateRefused" ? Result.succeed([]) : settled;
+   return Result.succeed(
+-    settled.success.map((draft) => ({ ...draft, entity: conflictRef(conflictId) })),
++    settled.success,
+   );
+ }
+ 

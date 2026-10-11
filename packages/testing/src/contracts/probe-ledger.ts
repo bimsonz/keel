@@ -259,12 +259,83 @@ export function describeProbeLedgerContract(
 
           expect(failed.probe).toMatchObject({ state: "discarded", discarded: "draft-failed" });
           expect(failed.conflict.state).toBe("suspected");
+          expect(types(yield* harness.log(at, { kind: "conflict", id: conflictId }))).toEqual([
+            "ConflictSuspected",
+          ]);
           expect(again).toEqual(failed);
           expect(late._tag).toBe("ProbeStateRefused");
           expect(yield* ledger.conflict(at, conflictId)).toEqual(failed);
           expect(types(yield* harness.log(at, { kind: "probe", id: probeId }))).toEqual([
             "ProbeDiscarded",
           ]);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[b21.settle] an admitted probe proves its conflict, on the conflict's own entity and once, a probe that never discriminates dismisses it, and an unprovable one leaves it open with no escalation minted",
+      () => {
+        const harness = makeHarness();
+        return Effect.gen(function* () {
+          const ledger = yield* ProbeLedger;
+          /** A suspected conflict, drafted, with `runs` of cells recorded; answers it as it then stands and its log. */
+          const settled = (runs: readonly (readonly (readonly [World, ProbeOutcome])[])[]) =>
+            Effect.gen(function* () {
+              const { at, conflictId, suspect } = conflictOn();
+              yield* harness.suspect(at, conflictId, suspect);
+              const drafted = yield* ledger.probeDrafted(at, {
+                conflictId,
+                attempts: 1,
+                bundleHash: BUNDLE,
+              });
+              const probeId: ProbeId | undefined = drafted.probe?.id;
+              if (probeId === undefined) throw new Error("the draft answers its probe");
+              const cell = (run: number, world: World, outcome: ProbeOutcome) =>
+                ledger.probeCellRan(at, {
+                  conflictId,
+                  probeId,
+                  world,
+                  run,
+                  outcome,
+                  resultRef: `r2://probe/${run}/${world}`,
+                });
+              for (const [index, cells] of runs.entries())
+                for (const [world, outcome] of cells) yield* cell(index + 1, world, outcome);
+              // The deciding cell again: a replay commits nothing, so nothing settles twice.
+              const last = runs.at(-1)?.at(-1);
+              if (last !== undefined) yield* cell(runs.length, last[0], last[1]);
+              return {
+                view: yield* ledger.conflict(at, conflictId),
+                conflictLog: yield* harness.log(at, { kind: "conflict", id: conflictId }),
+                probeLog: types(yield* harness.log(at, { kind: "probe", id: probeId })),
+                probeId,
+              };
+            });
+          const blind: readonly (readonly [World, ProbeOutcome])[] = [
+            ["trunk", "pass"],
+            ["A", "pass"],
+            ["AB", "fail"],
+            ["A-noop", "pass"],
+          ];
+
+          const proven = yield* settled([DISCRIMINATING, DISCRIMINATING, DISCRIMINATING]);
+          expect(proven.view.conflict.state).toBe("proven");
+          expect(types(proven.conflictLog)).toEqual(["ConflictSuspected", "ConflictProven"]);
+          expect(proven.conflictLog.at(-1)?.payload).toMatchObject({
+            evidence: { _tag: "probe", probeId: proven.probeId },
+          });
+          expect(proven.probeLog.filter((type) => type.startsWith("Conflict"))).toEqual([]);
+
+          const dismissed = yield* settled([blind]);
+          expect(dismissed.view.probe).toMatchObject({ discarded: "non-discriminating" });
+          expect(dismissed.view.conflict.state).toBe("dismissed");
+          expect(types(dismissed.conflictLog)).toEqual(["ConflictSuspected", "ConflictDismissed"]);
+
+          const unstable = yield* settled([DISCRIMINATING, blind]);
+          expect(unstable.view.probe).toMatchObject({ discarded: "unstable" });
+          expect(unstable.view.conflict).toMatchObject({ state: "probing" });
+          expect(unstable.view.conflict.escalationId).toBeUndefined();
+          expect(types(unstable.conflictLog)).toEqual(["ConflictSuspected"]);
         }).pipe(Effect.provide(harness.layer));
       },
     );
