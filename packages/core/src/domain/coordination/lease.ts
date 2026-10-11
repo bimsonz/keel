@@ -29,6 +29,7 @@ const readChange = (changeId: string): NextAction => ({
 const adoptChange = (changeId: string): NextAction => ({
   kind: "call",
   title: "Adopt the change: adoption issues a new lease and fences the lapsed one",
+  operationId: "adopt",
   args: { changeId },
 });
 

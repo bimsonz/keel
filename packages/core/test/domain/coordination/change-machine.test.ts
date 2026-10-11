@@ -1222,7 +1222,7 @@ describe("the Lease", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(brief(tooLate.results[2])).toEqual({
       tag: "LeaseStale",
       reason: "lapsed",
-      next: ["call"],
+      next: ["adopt"],
     });
   });
 
