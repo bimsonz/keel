@@ -21,15 +21,22 @@ export type ExitCode = 0 | 1 | 2;
 const USAGE = `keeltown <command> [options]
 
   whoami
+  session open [--harness <name>] [--model <id>] [--on-behalf-of <scheme:value>] [--key <idempotency-key>]
   declare --goal <text> [--footprint <path[:edit|create|delete]>]... [--key <idempotency-key>]
+  revise <chg_…> --lease <lse_…> --if-match <revision> [--goal <text>] [--footprint <path[:op]>]... [--add-premise <json>]... [--retract-premise <json>]... [--key <idempotency-key>]
+  rely <chg_…> --lease <lse_…> --premise <json> [--key <idempotency-key>]
+  nearby <chg_…>
   submit --change <chg_…> --commit <sha> --lease <lse_…> [--key <idempotency-key>]
   status <chg_…> [--wait <0-30>]
+  rebase <chg_…> --lease <lse_…> [--key <idempotency-key>]
+  adopt <chg_…> [--key <idempotency-key>]
   abandon <chg_…> [--reason <text>] [--lease <lse_…>] [--key <idempotency-key>]
   inbox [--cursor <cursor>] [--wait <0-30>]
   events [--cursor <cursor>] [--wait <0-30>] [--limit <1-500>]
   project create --name <name> --source <repo> [--key <idempotency-key>]
   agent enrol --name <name> --scope <scope>... [--kind interactive|hosted|human|synthetic] [--project <prj_…>] [--on-behalf-of <scheme:value>] [--key <idempotency-key>]
 
+A premise is a proposition as JSON: {"subject", "predicate", "relation", "value", …}.
 Credentials: KEEL_URL, KEEL_CLIENT_ID and KEEL_CLIENT_SECRET.
 Every command prints Keel's answer; --json prints it as JSON.`;
 
@@ -52,6 +59,12 @@ const OPTIONS = {
   kind: { type: "string" },
   project: { type: "string" },
   "on-behalf-of": { type: "string" },
+  harness: { type: "string" },
+  model: { type: "string" },
+  "if-match": { type: "string" },
+  premise: { type: "string" },
+  "add-premise": { type: "string", multiple: true },
+  "retract-premise": { type: "string", multiple: true },
 } as const;
 
 class UsageError extends Error {}
@@ -80,6 +93,38 @@ function footprintOf(entry: string) {
   return { path, op: known };
 }
 
+/** A proposition, as the SDK takes it (the CLI depends on the SDK alone). */
+type Proposition = Parameters<KeelClient["rely"]>[1]["premise"];
+
+/**
+ * A premise from the command line: a JSON object with a proposition's required
+ * fields. Keel checks the rest (the predicate's and relation's values among them).
+ */
+function propositionOf(text: string): Proposition {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new UsageError(`a premise must be JSON: ${text}`);
+  }
+  if (!isProposition(parsed))
+    throw new UsageError(`a premise needs subject, predicate, relation and value: ${text}`);
+  return parsed;
+}
+
+function isProposition(value: unknown): value is Proposition {
+  const field = (name: string) => Reflect.get(Object(value), name);
+  const scalar = field("value");
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof field("subject") === "string" &&
+    typeof field("predicate") === "string" &&
+    typeof field("relation") === "string" &&
+    (typeof scalar === "string" || typeof scalar === "number" || typeof scalar === "boolean")
+  );
+}
+
 const KINDS = ["interactive", "hosted", "human", "synthetic"] as const;
 const SCOPES = ["agent:work", "agent:read", "operator", "observer"] as const;
 
@@ -96,6 +141,15 @@ async function dispatch(
   switch (command.join(" ")) {
     case "whoami":
       return client.whoami();
+    case "session open":
+      return client.openSession(
+        {
+          ...(values.harness === undefined ? {} : { harness: values.harness }),
+          ...(values.model === undefined ? {} : { model: values.model }),
+          ...(values["on-behalf-of"] === undefined ? {} : { onBehalfOf: values["on-behalf-of"] }),
+        },
+        idempotent,
+      );
     case "declare":
       return client.declare(
         {
@@ -147,6 +201,36 @@ async function dispatch(
     default:
       if (command[0] === "status" && command.length === 2)
         return client.status(required(command[1], "change"), waiting);
+      if (command[0] === "revise" && command.length === 2) {
+        const revision = count(required(values["if-match"], "if-match"), "if-match") ?? 0;
+        return client.revise(
+          required(command[1], "change"),
+          {
+            ...(values.goal === undefined ? {} : { goal: values.goal }),
+            ...(values.footprint === undefined
+              ? {}
+              : { footprint: values.footprint.map(footprintOf) }),
+            premisesAdded: (values["add-premise"] ?? []).map(propositionOf),
+            premisesRetracted: (values["retract-premise"] ?? []).map(propositionOf),
+          },
+          { lease: required(values.lease, "lease"), ifMatch: revision, ...idempotent },
+        );
+      }
+      if (command[0] === "rely" && command.length === 2)
+        return client.rely(
+          required(command[1], "change"),
+          { premise: propositionOf(required(values.premise, "premise")) },
+          { lease: required(values.lease, "lease"), ...idempotent },
+        );
+      if (command[0] === "nearby" && command.length === 2)
+        return client.nearby(required(command[1], "change"));
+      if (command[0] === "rebase" && command.length === 2)
+        return client.rebase(required(command[1], "change"), {
+          lease: required(values.lease, "lease"),
+          ...idempotent,
+        });
+      if (command[0] === "adopt" && command.length === 2)
+        return client.adopt(required(command[1], "change"), idempotent);
       // No --lease is an operator's withdrawal; Keel refuses it to anyone else.
       if (command[0] === "abandon" && command.length === 2)
         return client.abandon(

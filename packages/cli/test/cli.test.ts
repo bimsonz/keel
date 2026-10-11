@@ -35,6 +35,19 @@ const envelope = {
   result: { state: "verifying" },
 };
 
+/** The one request a command made: its URL, method, headers and parsed body. */
+const only = (requests: { url: string; init: RequestInit }[]) => {
+  expect(requests).toHaveLength(1);
+  const [request] = requests;
+  const body = request?.init.body;
+  return {
+    url: request?.url,
+    method: request?.init.method,
+    headers: new Headers(request?.init.headers),
+    body: JSON.parse(typeof body === "string" ? body : "null"),
+  };
+};
+
 describe("keeltown", () => {
   it("[cli.status] waits as asked and prints Keel's answer as JSON with --json", async () => {
     const keel = fakeKeel(() => Response.json(envelope));
@@ -185,6 +198,116 @@ describe("keeltown", () => {
     );
     expect(await run(["abandon"], keel.io)).toBe(2);
     expect(keel.requests).toHaveLength(2);
+  });
+
+  const PREMISE = {
+    subject: "authz.permissions",
+    predicate: "idempotent",
+    relation: "is",
+    value: true,
+  };
+
+  it("[cli.session] opens a session for the harness, model and sponsor given, under the key", async () => {
+    const keel = fakeKeel(() => Response.json({ id: "ses_1" }));
+    const code = await run(
+      [
+        "session",
+        "open",
+        "--harness",
+        "h",
+        "--model",
+        "m",
+        "--on-behalf-of",
+        "human:ada",
+        "--key",
+        "key-0006",
+      ],
+      keel.io,
+    );
+    const sent = only(keel.requests);
+    expect(code).toBe(0);
+    expect(sent).toMatchObject({ url: "https://keel.test/v1/sessions", method: "POST" });
+    expect(sent.headers.get("idempotency-key")).toBe("key-0006");
+    expect(sent.body).toEqual({ harness: "h", model: "m", onBehalfOf: "human:ada" });
+  });
+
+  it("[cli.revise] revises at the revision given, under the lease, with the premises parsed", async () => {
+    const keel = fakeKeel(() => Response.json(envelope));
+    const code = await run(
+      [
+        "revise",
+        "chg_1",
+        "--lease",
+        "lse_1",
+        "--if-match",
+        "3",
+        "--goal",
+        "g2",
+        "--add-premise",
+        JSON.stringify(PREMISE),
+      ],
+      keel.io,
+    );
+    const sent = only(keel.requests);
+    expect(code).toBe(0);
+    expect(sent.url).toBe("https://keel.test/v1/changes/chg_1/revisions");
+    expect(sent.headers.get("if-match")).toBe('"3"');
+    expect(sent.headers.get("keel-lease")).toBe("lse_1");
+    expect(sent.body).toEqual({ goal: "g2", premisesAdded: [PREMISE], premisesRetracted: [] });
+    expect(await run(["revise", "chg_1", "--lease", "lse_1"], keel.io)).toBe(2);
+    expect(
+      await run(
+        ["revise", "chg_1", "--lease", "l", "--if-match", "1", "--add-premise", "{"],
+        keel.io,
+      ),
+    ).toBe(2);
+    expect(keel.requests).toHaveLength(1);
+  });
+
+  it("[cli.rely] relies on the premise given, under the lease", async () => {
+    const keel = fakeKeel(() => Response.json(envelope));
+    const code = await run(
+      ["rely", "chg_1", "--lease", "lse_1", "--premise", JSON.stringify(PREMISE)],
+      keel.io,
+    );
+    const sent = only(keel.requests);
+    expect(code).toBe(0);
+    expect(sent.url).toBe("https://keel.test/v1/changes/chg_1/premises");
+    expect(sent.headers.get("keel-lease")).toBe("lse_1");
+    expect(sent.body).toEqual({ premise: PREMISE });
+  });
+
+  it("[cli.nearby] reads what is near a change", async () => {
+    const keel = fakeKeel(() => Response.json(envelope));
+    expect(await run(["nearby", "chg_1"], keel.io)).toBe(0);
+    expect(only(keel.requests)).toMatchObject({
+      url: "https://keel.test/v1/changes/chg_1/nearby",
+      method: "GET",
+    });
+  });
+
+  it("[cli.rebase] rebases under the lease and key given", async () => {
+    const keel = fakeKeel(() => Response.json(envelope));
+    const code = await run(["rebase", "chg_1", "--lease", "lse_1", "--key", "key-0007"], keel.io);
+    const sent = only(keel.requests);
+    expect(code).toBe(0);
+    expect(sent).toMatchObject({
+      url: "https://keel.test/v1/changes/chg_1/rebase",
+      method: "POST",
+    });
+    expect(sent.headers.get("keel-lease")).toBe("lse_1");
+    expect(sent.headers.get("idempotency-key")).toBe("key-0007");
+    expect(await run(["rebase", "chg_1"], keel.io)).toBe(2);
+  });
+
+  it("[cli.adopt] adopts under the key given, with no lease", async () => {
+    const keel = fakeKeel(() => Response.json(envelope));
+    const code = await run(["adopt", "chg_1", "--key", "key-0008"], keel.io);
+    const sent = only(keel.requests);
+    expect(code).toBe(0);
+    expect(sent).toMatchObject({ url: "https://keel.test/v1/changes/chg_1/adopt", method: "POST" });
+    expect(sent.headers.get("idempotency-key")).toBe("key-0008");
+    expect(sent.headers.has("keel-lease")).toBe(false);
   });
 
   it("refuses a command line it cannot read with usage and exit 2, before calling Keel", async () => {

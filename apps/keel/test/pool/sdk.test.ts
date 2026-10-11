@@ -1,11 +1,13 @@
-import { env } from "cloudflare:workers";
-import { AgentId, CommitSha, Instant, WorkspaceId } from "@keeltown/core/kernel";
+import { env, exports } from "cloudflare:workers";
+import { AgentId, CommitSha, Instant, makeId, WorkspaceId } from "@keeltown/core/kernel";
 import { createKeelClient, KeelProblem } from "@keeltown/sdk";
-import { makeChangesMemory, makeInboxMemory } from "@keeltown/testing";
-import { Schema } from "effect";
+import { hashSecret, makeChangesMemory, makeInboxMemory, sampleProjectId } from "@keeltown/testing";
+import { Exit, Schema } from "effect";
+import { ulid } from "ulid";
 import { describe, expect, it } from "vitest";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
-import { BASE, seedAgent } from "./helpers.ts";
+import { AgentSessionCodecs, decodeExit } from "../../src/rpc/index.ts";
+import { BASE, drainAfter, seedAgent } from "./helpers.ts";
 
 /**
  * The SDK against the real HTTP doorway, auth gate and handler object (over
@@ -33,6 +35,9 @@ async function sdkOver() {
   });
   return { client, changes, inbox, agent, fetch };
 }
+
+/** The deployed fetch handler: the real doorway, gate and DOs. */
+const deployed = async (url: string, init: RequestInit) => exports.default.fetch(url, init);
 
 describe("the SDK over the real doorway", () => {
   it("[a11.sdk] declares, submits, reads status and the inbox, each answer equal to the REST body", async () => {
@@ -81,5 +86,61 @@ describe("the SDK over the real doorway", () => {
       .catch((error: unknown) => error);
     expect(refused).toBeInstanceOf(KeelProblem);
     expect(refused).toMatchObject({ status: 409, code: "change.commit_not_in_workspace" });
+  });
+
+  it("[a11.sdk-session] opens a session through the deployed doorway; a retry under the key answers it, as REST does", async () => {
+    // Enrolled in its own AgentSession DO, as the operator's enrolment does, since only a known agent opens a session.
+    const agentId = makeId("agt", ulid());
+    const clientId = `client-${agentId.toLowerCase()}`;
+    const clientSecret = `secret-${crypto.randomUUID()}`;
+    const enrolled = decodeExit(
+      AgentSessionCodecs.enrol,
+      await drainAfter(
+        env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)),
+      ).enrol({
+        projectId: sampleProjectId,
+        name: "sdk-session-agent",
+        kind: "interactive",
+        scopes: ["agent:read", "agent:work"],
+        onBehalfOf: "github:sponsor",
+        clientId,
+        secretHash: await hashSecret(clientSecret),
+        idempotencyKey: "enrol-1",
+        fingerprint: "enrol-body",
+      }),
+    );
+    expect(Exit.isSuccess(enrolled)).toBe(true);
+    const client = createKeelClient({ baseUrl: BASE, clientId, clientSecret, fetch: deployed });
+
+    const opened = await client.openSession(
+      { harness: "a-harness", model: "a-model" },
+      { idempotencyKey: "sdk-session-0001" },
+    );
+    const rest = await deployed(`${BASE}/v1/sessions`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${await client.token()}`,
+        "content-type": "application/json",
+        "idempotency-key": "sdk-session-0001",
+      },
+      body: JSON.stringify({ harness: "a-harness", model: "a-model" }),
+    });
+
+    expect(opened).toMatchObject({ agentId, onBehalfOf: "github:sponsor" });
+    expect(rest.status).toBe(201);
+    expect(await rest.json()).toEqual(opened);
+    expect((await client.whoami()).result.session).toEqual({ id: opened.id });
+  });
+
+  it("[a11.sdk-nobody] adopts with the SDK's empty body, which the doorway reads as no body", async () => {
+    const { client } = await sdkOver();
+    const declared = await client.declare(
+      { goal: "Cache permission lookups per request", footprint: [], premises: [] },
+      { idempotencyKey: "sdk-declare-0003" },
+    );
+    const refused = await client
+      .adopt(declared.result.change.id, { idempotencyKey: "sdk-adopt-0001" })
+      .catch((error: unknown) => error);
+    expect(refused).toMatchObject({ status: 409, code: "change.lease_not_lapsed" });
   });
 });

@@ -1,10 +1,19 @@
 import type {
   AbandonRequest,
+  ChangeState,
+  ConflictState,
   CreateProjectRequest,
   DeclareRequest,
   EnrolAgentRequest,
+  OpenSessionRequest,
   ProjectSettings,
+  RelyRequest,
+  ResolveRequest,
+  ReviseRequest,
+  RulingRequest,
+  SketchRequest,
   SubmitRequest,
+  SuspendAgentRequest,
   TokenResponse,
   WireOutputs,
 } from "@keeltown/contracts";
@@ -165,6 +174,18 @@ export class KeelClient {
     return this.call("whoami", {}, options);
   }
 
+  /** Opens the agent's session, which becomes its current one. Retry with the same key to reach it. */
+  openSession(
+    request: OpenSessionRequest = {},
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Sessions_openSession"]> {
+    return this.call(
+      "Sessions_openSession",
+      { ...request, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
   /** Declares a change and takes its workspace. Retry with the same key to reach the same change. */
   declare(intent: DeclareRequest, options: Idempotent = {}): Promise<WireOutputs["declare"]> {
     return this.call("declare", { ...intent, "idempotency-key": keyOf(options) }, options);
@@ -198,6 +219,167 @@ export class KeelClient {
     );
   }
 
+  /**
+   * Revises a change's intent under its lease, at the revision last read (its
+   * ETag); another revision is refused with the current one named.
+   */
+  revise(
+    changeId: string,
+    revision: ReviseRequest,
+    options: Idempotent & { readonly lease: string; readonly ifMatch: number },
+  ): Promise<WireOutputs["revise"]> {
+    return this.call(
+      "revise",
+      {
+        ...revision,
+        changeId,
+        "keel-lease": options.lease,
+        "idempotency-key": keyOf(options),
+        "if-match": `"${options.ifMatch}"`,
+      },
+      options,
+    );
+  }
+
+  /** Adds one premise to a change under its lease; relying on a subject subscribes the change to it. */
+  rely(
+    changeId: string,
+    request: RelyRequest,
+    options: Idempotent & { readonly lease: string },
+  ): Promise<WireOutputs["rely"]> {
+    return this.call(
+      "rely",
+      { ...request, changeId, "keel-lease": options.lease, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** What is near a change now: the preflight of its intent as it stands. Commits nothing. */
+  nearby(changeId: string, options?: CallOptions): Promise<WireOutputs["nearby"]> {
+    return this.call("nearby", { changeId }, options);
+  }
+
+  /** Takes over a change whose lease lapsed: a new lease, and a fresh token for its workspace. */
+  adopt(changeId: string, options: Idempotent = {}): Promise<WireOutputs["adopt"]> {
+    return this.call("adopt", { changeId, "idempotency-key": keyOf(options) }, options);
+  }
+
+  /**
+   * After a textual bounce: puts trunk's head on the workspace's `keel/trunk`
+   * and moves the change's base there. Then merge it with git, push and submit.
+   */
+  rebase(
+    changeId: string,
+    options: Idempotent & { readonly lease: string },
+  ): Promise<WireOutputs["rebase"]> {
+    return this.call(
+      "rebase",
+      { changeId, "keel-lease": options.lease, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** A sketch: a workspace for exploring, with no change declared. */
+  sketch(request: SketchRequest = {}, options: Idempotent = {}): Promise<WireOutputs["sketch"]> {
+    return this.call("sketch", { ...request, "idempotency-key": keyOf(options) }, options);
+  }
+
+  /** A fresh token for a workspace the caller holds. */
+  refreshWorkspaceToken(
+    workspaceId: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Workspaces_refreshWorkspaceToken"]> {
+    return this.call(
+      "Workspaces_refreshWorkspaceToken",
+      { workspaceId, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** Gives a workspace back. */
+  releaseWorkspace(
+    workspaceId: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Workspaces_releaseWorkspace"]> {
+    return this.call(
+      "Workspaces_releaseWorkspace",
+      { workspaceId, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** Conflicts, optionally about one change or in one state; pass a page's `nextCursor` for the next. */
+  conflicts(
+    options: CallOptions & {
+      readonly changeId?: string;
+      readonly state?: ConflictState;
+      readonly cursor?: string;
+      readonly limit?: number;
+    } = {},
+  ): Promise<WireOutputs["Conflicts_listConflicts"]> {
+    return this.call(
+      "Conflicts_listConflicts",
+      {
+        changeId: options.changeId,
+        state: options.state,
+        cursor: options.cursor,
+        limit: options.limit,
+      },
+      options,
+    );
+  }
+
+  conflict(
+    conflictId: string,
+    options?: CallOptions,
+  ): Promise<WireOutputs["Conflicts_getConflict"]> {
+    return this.call("Conflicts_getConflict", { conflictId }, options);
+  }
+
+  /** Resolves a conflict by a move, under the lease of the change named in the resolution. */
+  resolve(
+    conflictId: string,
+    resolution: ResolveRequest,
+    options: Idempotent & { readonly lease: string },
+  ): Promise<WireOutputs["resolve"]> {
+    return this.call(
+      "resolve",
+      { ...resolution, conflictId, "keel-lease": options.lease, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** Why a line, a path or a subject is as it is: the decisions and premises behind it. */
+  why(
+    about: { readonly path?: string; readonly line?: number; readonly subject?: string },
+    options?: CallOptions,
+  ): Promise<WireOutputs["why"]> {
+    return this.call(
+      "why",
+      { path: about.path, line: about.line, subject: about.subject },
+      options,
+    );
+  }
+
+  /** Decisions, optionally about one subject; pass a page's `nextCursor` for the next. */
+  decisions(
+    options: CallOptions & {
+      readonly subject?: string;
+      readonly cursor?: string;
+      readonly limit?: number;
+    } = {},
+  ): Promise<WireOutputs["Memory_listDecisions"]> {
+    return this.call(
+      "Memory_listDecisions",
+      { subject: options.subject, cursor: options.cursor, limit: options.limit },
+      options,
+    );
+  }
+
+  decision(decisionId: string, options?: CallOptions): Promise<WireOutputs["Memory_getDecision"]> {
+    return this.call("Memory_getDecision", { decisionId }, options);
+  }
+
   /** Where a change's submission stands; with `wait` (0–30 s), once it moves. */
   status(
     changeId: string,
@@ -228,6 +410,62 @@ export class KeelClient {
     );
   }
 
+  /** Changes, optionally in one state or project; pass a page's `nextCursor` for the next. */
+  changes(
+    options: CallOptions & {
+      readonly state?: ChangeState;
+      readonly project?: string;
+      readonly cursor?: string;
+      readonly limit?: number;
+    } = {},
+  ): Promise<WireOutputs["Changes_listChanges"]> {
+    return this.call(
+      "Changes_listChanges",
+      {
+        state: options.state,
+        project: options.project,
+        cursor: options.cursor,
+        limit: options.limit,
+      },
+      options,
+    );
+  }
+
+  /** Every project's state at the feed's current position, optionally one project's. */
+  snapshot(
+    options: CallOptions & { readonly project?: string } = {},
+  ): Promise<WireOutputs["Inbox_getSnapshot"]> {
+    return this.call("Inbox_getSnapshot", { project: options.project }, options);
+  }
+
+  /** Every predicate's lattice, as the domain publishes it. */
+  lattices(options?: CallOptions): Promise<WireOutputs["Lattices_listLattices"]> {
+    return this.call("Lattices_listLattices", {}, options);
+  }
+
+  verdict(verdictId: string, options?: CallOptions): Promise<WireOutputs["Views_getVerdict"]> {
+    return this.call("Views_getVerdict", { verdictId }, options);
+  }
+
+  candidate(
+    candidateId: string,
+    options?: CallOptions,
+  ): Promise<WireOutputs["Views_getCandidate"]> {
+    return this.call("Views_getCandidate", { candidateId }, options);
+  }
+
+  /** A project's lanes; pass a page's `nextCursor` for the next. */
+  lanes(
+    projectId: string,
+    options: CallOptions & { readonly cursor?: string; readonly limit?: number } = {},
+  ): Promise<WireOutputs["Views_listLanes"]> {
+    return this.call(
+      "Views_listLanes",
+      { projectId, cursor: options.cursor, limit: options.limit },
+      options,
+    );
+  }
+
   change(changeId: string, options?: CallOptions): Promise<WireOutputs["Changes_getChange"]> {
     return this.call("Changes_getChange", { changeId }, options);
   }
@@ -244,6 +482,17 @@ export class KeelClient {
     return this.call(
       "Operator_createProject",
       { ...project, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** Operator: the instance's projects; pass a page's `nextCursor` for the next. */
+  projects(
+    options: CallOptions & { readonly cursor?: string; readonly limit?: number } = {},
+  ): Promise<WireOutputs["Operator_listProjects"]> {
+    return this.call(
+      "Operator_listProjects",
+      { cursor: options.cursor, limit: options.limit },
       options,
     );
   }
@@ -315,6 +564,71 @@ export class KeelClient {
     return this.call(
       "Operator_enrolAgent",
       { ...agent, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** Operator: suspends an agent; its next request is refused until it is reinstated. */
+  suspendAgent(
+    agentId: string,
+    request: SuspendAgentRequest,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Operator_suspendAgent"]> {
+    return this.call(
+      "Operator_suspendAgent",
+      { ...request, agentId, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** Operator: reinstates a suspended agent. */
+  reinstateAgent(
+    agentId: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Operator_reinstateAgent"]> {
+    return this.call(
+      "Operator_reinstateAgent",
+      { agentId, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** Operator: revokes an agent for good; every credential it holds stops working. */
+  revokeAgent(
+    agentId: string,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Operator_revokeAgent"]> {
+    return this.call(
+      "Operator_revokeAgent",
+      { agentId, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /** Operator: escalations, optionally in one state; pass a page's `nextCursor` for the next. */
+  escalations(
+    options: CallOptions & {
+      readonly state?: "open" | "ruled" | "withdrawn";
+      readonly cursor?: string;
+      readonly limit?: number;
+    } = {},
+  ): Promise<WireOutputs["Operator_listEscalations"]> {
+    return this.call(
+      "Operator_listEscalations",
+      { state: options.state, cursor: options.cursor, limit: options.limit },
+      options,
+    );
+  }
+
+  /** Operator: rules on an escalation by one of its option ids. */
+  giveRuling(
+    escalationId: string,
+    ruling: RulingRequest,
+    options: Idempotent = {},
+  ): Promise<WireOutputs["Operator_giveRuling"]> {
+    return this.call(
+      "Operator_giveRuling",
+      { ...ruling, escalationId, "idempotency-key": keyOf(options) },
       options,
     );
   }

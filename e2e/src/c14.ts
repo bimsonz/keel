@@ -130,22 +130,6 @@ function describeAs(dir: string, text: string): void {
   writeFileSync(path, after);
 }
 
-/** The rebase doorway; the SDK has no method for it yet. */
-async function rebase(client: KeelClient, changeId: string, lease: string, idempotencyKey: string) {
-  const response = await fetch(`${keelUrl.replace(/\/+$/, "")}/v1/changes/${changeId}/rebase`, {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      authorization: `Bearer ${await client.token()}`,
-      "keel-lease": lease,
-      "idempotency-key": idempotencyKey,
-    },
-  });
-  if (!response.ok) throw await KeelProblem.from(response);
-  const body: unknown = JSON.parse(await response.text());
-  return Object(Reflect.get(Object(body), "result"));
-}
-
 async function enrolled(operator: KeelClient, name: string, projectId: string) {
   const agent = await operator.enrolAgent(
     { name, kind: "interactive", scopes: ["agent:read", "agent:work"], projectId },
@@ -241,11 +225,12 @@ try {
   );
 
   // (c) rebase, merge keel/trunk, resolve, push, submit again.
-  const rebased = await rebase(second, b.change.id, b.lease.id, `c14:${run}:b:rebase`);
-  const trunkHead = String(Reflect.get(rebased, "base"));
-  console.log(
-    `     rebased: ref ${String(Reflect.get(rebased, "ref"))}, base ${trunkHead.slice(0, 12)}`,
-  );
+  const { result: rebased } = await second.rebase(b.change.id, {
+    lease: b.lease.id,
+    idempotencyKey: `c14:${run}:b:rebase`,
+  });
+  const trunkHead = rebased.base;
+  console.log(`     rebased: ref ${rebased.ref}, base ${trunkHead.slice(0, 12)}`);
   git(dirB, ["fetch", "-q", "origin", "keel/trunk"], tokenB);
   check(git(dirB, ["rev-parse", "FETCH_HEAD"]) === trunkHead, "(c) keel/trunk is trunk's head");
 

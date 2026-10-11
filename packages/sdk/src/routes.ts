@@ -9,10 +9,19 @@ export interface Route {
   readonly headers?: readonly string[];
 }
 
+/** Operations the client never calls by route, each with the reason. */
+export const UNROUTED = {
+  Auth_exchangeToken:
+    "the client's own token exchange: an RFC 6749 form post it makes before any call, not a JSON call",
+} as const;
+
+export type UnroutedOperation = keyof typeof UNROUTED;
+
 /**
- * The operations this client calls, by operation id. A unit test holds each
- * entry equal to the published document (method, path, query and header
- * parameters), so a spec change that moves one fails there, not in production.
+ * Every operation in the published document, by operation id, except those
+ * `UNROUTED` names. A unit test holds this table and the document equal both
+ * ways (method, path, query and header parameters), so a spec change that adds
+ * or moves an operation fails there, not in production.
  */
 export const ROUTES = {
   whoami: { method: "GET", path: "/agents/me" },
@@ -40,7 +49,94 @@ export const ROUTES = {
     query: ["ref", "cursor", "limit"],
   },
   Repo_getCommit: { method: "GET", path: "/projects/{projectId}/repo/commits/{sha}" },
-} as const satisfies Partial<Record<keyof WireOutputs, Route>>;
+  Sessions_openSession: { method: "POST", path: "/sessions", headers: ["idempotency-key"] },
+  Changes_listChanges: {
+    method: "GET",
+    path: "/changes",
+    query: ["state", "project", "cursor", "limit"],
+  },
+  revise: {
+    method: "POST",
+    path: "/changes/{changeId}/revisions",
+    headers: ["keel-lease", "idempotency-key", "if-match"],
+  },
+  rely: {
+    method: "POST",
+    path: "/changes/{changeId}/premises",
+    headers: ["keel-lease", "idempotency-key"],
+  },
+  nearby: { method: "GET", path: "/changes/{changeId}/nearby" },
+  adopt: { method: "POST", path: "/changes/{changeId}/adopt", headers: ["idempotency-key"] },
+  rebase: {
+    method: "POST",
+    path: "/changes/{changeId}/rebase",
+    headers: ["keel-lease", "idempotency-key"],
+  },
+  sketch: { method: "POST", path: "/sketches", headers: ["idempotency-key"] },
+  Workspaces_refreshWorkspaceToken: {
+    method: "POST",
+    path: "/workspaces/{workspaceId}/token",
+    headers: ["idempotency-key"],
+  },
+  Workspaces_releaseWorkspace: {
+    method: "POST",
+    path: "/workspaces/{workspaceId}/release",
+    headers: ["idempotency-key"],
+  },
+  Conflicts_listConflicts: {
+    method: "GET",
+    path: "/conflicts",
+    query: ["changeId", "state", "cursor", "limit"],
+  },
+  Conflicts_getConflict: { method: "GET", path: "/conflicts/{conflictId}" },
+  resolve: {
+    method: "POST",
+    path: "/conflicts/{conflictId}/resolution",
+    headers: ["keel-lease", "idempotency-key"],
+  },
+  why: { method: "GET", path: "/why", query: ["path", "line", "subject"] },
+  Memory_listDecisions: {
+    method: "GET",
+    path: "/decisions",
+    query: ["subject", "cursor", "limit"],
+  },
+  Memory_getDecision: { method: "GET", path: "/decisions/{decisionId}" },
+  Lattices_listLattices: { method: "GET", path: "/lattices" },
+  Inbox_getSnapshot: { method: "GET", path: "/events/snapshot", query: ["project"] },
+  Views_getVerdict: { method: "GET", path: "/verdicts/{verdictId}" },
+  Views_getCandidate: { method: "GET", path: "/candidates/{candidateId}" },
+  Views_listLanes: {
+    method: "GET",
+    path: "/projects/{projectId}/lanes",
+    query: ["cursor", "limit"],
+  },
+  Operator_listProjects: { method: "GET", path: "/projects", query: ["cursor", "limit"] },
+  Operator_suspendAgent: {
+    method: "POST",
+    path: "/agents/{agentId}/suspend",
+    headers: ["idempotency-key"],
+  },
+  Operator_reinstateAgent: {
+    method: "POST",
+    path: "/agents/{agentId}/reinstate",
+    headers: ["idempotency-key"],
+  },
+  Operator_revokeAgent: {
+    method: "POST",
+    path: "/agents/{agentId}/revoke",
+    headers: ["idempotency-key"],
+  },
+  Operator_listEscalations: {
+    method: "GET",
+    path: "/escalations",
+    query: ["state", "cursor", "limit"],
+  },
+  Operator_giveRuling: {
+    method: "POST",
+    path: "/escalations/{escalationId}/ruling",
+    headers: ["idempotency-key"],
+  },
+} as const satisfies Record<Exclude<keyof WireOutputs, UnroutedOperation>, Route>;
 
 export type RoutedOperation = keyof typeof ROUTES;
 
