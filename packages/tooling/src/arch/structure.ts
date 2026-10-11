@@ -84,6 +84,12 @@ function bindingNames(config: unknown): Set<string> {
   return names;
 }
 
+/**
+ * A rate limit's namespace is a number the config chooses, not a resource an
+ * account provisions, so the same one deploys anywhere.
+ */
+const CHOSEN_ID = { path: /^ratelimits\[\d+\]\.namespace_id$/, value: /^\d+$/ };
+
 /** Keys anywhere in the config that hold an account-specific id: `id`, `*_id`. */
 function idFields(value: unknown, path: string, out: { path: string; value: unknown }[]): void {
   if (Array.isArray(value)) {
@@ -93,7 +99,8 @@ function idFields(value: unknown, path: string, out: { path: string; value: unkn
   if (typeof value !== "object" || value === null) return;
   for (const [k, v] of Object.entries(value)) {
     const here = path === "" ? k : `${path}.${k}`;
-    if (k === "id" || k.endsWith("_id")) out.push({ path: here, value: v });
+    const chosen = CHOSEN_ID.path.test(here) && typeof v === "string" && CHOSEN_ID.value.test(v);
+    if ((k === "id" || k.endsWith("_id")) && !chosen) out.push({ path: here, value: v });
     idFields(v, here, out);
   }
 }

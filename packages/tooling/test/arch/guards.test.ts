@@ -70,6 +70,7 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
   R13: [
     /account_id is committed/,
     /database_id holds an account-specific id/,
+    /ratelimits\[0\]\.namespace_id holds an account-specific id/,
     /vars\.KEEL_HOST/,
     /MergeBox\) has no max_instances/,
     /GatedBox\) uses the durable_object policy but is not registered/,

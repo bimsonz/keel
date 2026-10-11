@@ -1,4 +1,4 @@
-// Control for R13: an account id, a real-looking database id, no KEEL_HOST,
+// Control for R13: an account id, a real-looking database id and rate-limit namespace, no KEEL_HOST,
 // a classic container with no max_instances, a durable_object-policy container
 // BoxGate does not know, and no workers_dev / preview_urls.
 {
@@ -8,6 +8,8 @@
   "account_id": "0123456789abcdef0123456789abcdef",
   "vars": {},
   "d1_databases": [{ "binding": "DB", "database_name": "keel", "database_id": "4f1c2a9e-7b3d-4e8a-9c21-5d6e7f8a9b0c" }],
+  // A rate limit's namespace may be a number the config chooses, never anything else.
+  "ratelimits": [{ "name": "LIMIT", "namespace_id": "9d2f0c4e-account-specific", "simple": { "limit": 1, "period": 60 } }],
   "containers": [
     { "class_name": "MergeBox", "image": "./Dockerfile" },
     { "class_name": "GatedBox", "image": "./Dockerfile", "scheduling_policy": "durable_object" }
