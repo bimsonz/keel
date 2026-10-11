@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.decide-evolvable
+# why: decide discards every rejected probe as non-discriminating, though admission says unstable, which evolve refuses
+diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
+index 17d6cab..5148c9d 100644
+--- a/packages/core/src/domain/verification/probe-machine.ts
++++ b/packages/core/src/domain/verification/probe-machine.ts
+@@ -202,7 +202,7 @@ export const decideProbe = (
+             ran,
+             ProbeDiscarded.make({
+               probeId: probe.id,
+-              reason: admission.reason,
++              reason: "non-discriminating",
+               conflictId: probe.conflictId,
+             }),
+           ]);

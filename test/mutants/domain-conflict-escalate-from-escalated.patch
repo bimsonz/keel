@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.decide-evolvable
+# why: decide escalates a conflict that is already escalated, which evolve refuses
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index f813fe9..7d19bd9 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -221,7 +221,7 @@ export const decideConflict = (
+         : refuse("probe-pending", awaitProbe);
+     }
+     case "Escalate":
+-      return conflict.state === "proven"
++      return conflict.state === "proven" || conflict.state === "escalated"
+         ? Result.succeed([
+             ConflictEscalated.make({
+               conflictId: conflict.id,

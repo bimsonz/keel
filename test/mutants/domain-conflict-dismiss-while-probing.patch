@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.transitions
+# why: a lattice ruling dismisses a conflict whose probe is already running
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index f813fe9..f19346d 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -169,7 +169,7 @@ export const decideConflict = (
+           ])
+         : refuse("proof-of-another-kind", awaitProbe);
+     case "Dismiss": {
+-      if (conflict.state !== "suspected") return refuse();
++      if (conflict.state !== "suspected" && conflict.state !== "probing") return refuse();
+       // A refused merge or a failing union has no propositions to compare.
+       if (conflict.subjectId === undefined) return refuse("no-propositions", awaitProbe);
+       // Over an opinion-derived effect the comparison is tainted: it is not a ruling.

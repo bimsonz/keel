@@ -2,15 +2,15 @@
 # kills: probe.na-never-admitted
 # why: n/a in the holder's world is counted as a pass
 diff --git a/packages/core/src/domain/verification/probe.ts b/packages/core/src/domain/verification/probe.ts
-index 7359768..d806ad7 100644
+index f3791f2..0eb89f2 100644
 --- a/packages/core/src/domain/verification/probe.ts
 +++ b/packages/core/src/domain/verification/probe.ts
-@@ -30,7 +30,7 @@ type Run = {
-  * combined world (AB). World B is recorded but does not decide.
+@@ -71,7 +71,7 @@ type Run = {
   */
  const discriminates = (r: Required<Run>): boolean =>
--  (r.trunk === "pass" || r.trunk === "n/a") && r.holder === "pass" && r.combined === "fail";
-+  (r.trunk === "pass" || r.trunk === "n/a") && r.holder !== "fail" && r.combined === "fail";
+   (r.trunk === "pass" || r.trunk === "n/a") &&
+-  r.holder === "pass" &&
++  r.holder !== "fail" &&
+   r.combined === "fail" &&
+   r.noop === "fail";
  
- const complete = (r: Run): r is Required<Run> =>
-   r.trunk !== undefined && r.holder !== undefined && r.combined !== undefined;

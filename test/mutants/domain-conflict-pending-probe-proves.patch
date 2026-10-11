@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.proof-or-ruling
+# why: a probe still calibrating proves its conflict
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index f813fe9..81ec83f 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -193,7 +193,7 @@ export const decideConflict = (
+       )
+         return refuse("no-probe-of-this-conflict");
+       const drafted = conflict.state === "probing";
+-      if (probe.state === "admitted" && drafted)
++      if ((probe.state === "admitted" || probe.state === "calibrating") && drafted)
+         return Result.succeed([
+           ConflictProven.make({
+             conflictId: conflict.id,

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.replay
+# why: evolve records the drafted probe by mutating the conflict it was handed, so an earlier snapshot changes under it
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index f813fe9..2587902 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -283,7 +283,7 @@ export const evolveConflict = (
+       return illegal(conflict, event);
+     case "ProbeDrafted":
+       return conflict.state === "suspected"
+-        ? { ...conflict, state: "probing", probeId: event.probeId }
++        ? Object.assign(conflict, { state: "probing" as const, probeId: event.probeId })
+         : illegal(conflict, event);
+     case "ProbeRan":
+       return conflict.state === "probing" && event.probeId === conflict.probeId

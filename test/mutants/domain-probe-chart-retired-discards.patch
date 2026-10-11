@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.chart
+# why: retiring a guard lands it in Discarded, an edge the chart does not have
+diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
+index 17d6cab..35c2990 100644
+--- a/packages/core/src/domain/verification/probe-machine.ts
++++ b/packages/core/src/domain/verification/probe-machine.ts
+@@ -294,7 +294,7 @@ export const evolveProbe = (state: Probe | undefined, committed: Committed<Probe
+     }
+     case "GuardRetired":
+       return probe.state === "admitted" && event.guardId === probe.guardId
+-        ? { ...probe, state: "retired", retiredBy: event.decisionId }
++        ? { ...probe, state: "discarded", retiredBy: event.decisionId }
+         : illegal(probe, event);
+     default: {
+       const unreachable: never = event;

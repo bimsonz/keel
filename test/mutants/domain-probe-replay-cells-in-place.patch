@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.replay
+# why: evolve appends a cell to the array it was handed, so an earlier snapshot changes under it
+diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
+index 17d6cab..37b0c2a 100644
+--- a/packages/core/src/domain/verification/probe-machine.ts
++++ b/packages/core/src/domain/verification/probe-machine.ts
+@@ -274,7 +274,7 @@ export const evolveProbe = (state: Probe | undefined, committed: Committed<Probe
+         !probe.cells.some((c) => sameCell(c, event))
+         ? {
+             ...probe,
+-            cells: [...probe.cells, { world: event.world, run: event.run, outcome: event.outcome }],
++            cells: ((probe.cells as ProbeCell[]).push({ world: event.world, run: event.run, outcome: event.outcome }), probe.cells),
+           }
+         : illegal(probe, event);
+     case "GuardAdmitted":

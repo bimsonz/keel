@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.transitions
+# why: a fourth calibration run is recorded, where runs are numbered 1 to 3
+diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
+index 17d6cab..effdebf 100644
+--- a/packages/core/src/domain/verification/probe-machine.ts
++++ b/packages/core/src/domain/verification/probe-machine.ts
+@@ -166,7 +166,7 @@ export const decideProbe = (
+       const conflict = facts.conflict;
+       if (conflict?.state !== "probing" || conflict.probeId !== probe.id)
+         return refuse("conflict-not-probing");
+-      if (!Number.isInteger(command.run) || command.run < 1 || command.run > ADMISSION_RUNS)
++      if (!Number.isInteger(command.run) || command.run < 1 || command.run > ADMISSION_RUNS + 1)
+         return refuse("run-out-of-range");
+       const known = probe.cells.find((c) => sameCell(c, command));
+       // A retried step reports the same cell again: nothing to commit. A different answer is not a retry.

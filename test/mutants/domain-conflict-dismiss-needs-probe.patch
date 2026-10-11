@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.dismiss-by-lattice
+# why: a lattice comparison that cannot settle the question dismisses the conflict anyway
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index f813fe9..f73ad5b 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -177,7 +177,7 @@ export const decideConflict = (
+       if (conflict.predicate !== undefined && command.premise.predicate !== conflict.predicate)
+         return refuse("another-predicate");
+       const { outcome } = compare(command.premise, command.effect);
+-      return outcome === "compatible" || outcome === "refines"
++      return outcome === "compatible" || outcome === "refines" || outcome === "needs-probe"
+         ? Result.succeed([
+             ConflictDismissed.make({ conflictId: conflict.id, evidence: `lattice:${outcome}` }),
+           ])
