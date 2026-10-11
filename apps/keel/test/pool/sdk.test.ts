@@ -17,7 +17,11 @@ async function sdkOver() {
   const inbox = makeInboxMemory();
   const { app } = makeIsolate(
     env,
-    isolateLayer(env, { changes: changes.layer, inbox: inbox.layer }),
+    isolateLayer(env, {
+      changes: changes.layer,
+      inbox: inbox.layer,
+      notifier: inbox.notifier,
+    }),
   );
   const fetch = async (url: string, init: RequestInit) => app.fetch(new Request(url, init), env);
   const agent = await seedAgent();

@@ -6,6 +6,7 @@ import type {
   Enrolments,
   Ids,
   Inbox,
+  Notifier,
   Projects,
   TokenIssuer,
 } from "@keeltown/core/ports";
@@ -21,6 +22,7 @@ export type IsolateServices =
   | Ids
   | Changes
   | Inbox
+  | Notifier
   | Projects
   | Enrolments;
 

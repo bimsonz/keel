@@ -2,10 +2,10 @@
 # kills: b11.bootstrap-order
 # why: the pool is configured before trunk is synced, so it forks a mirror that is still empty
 diff --git a/packages/core/src/application/integration/create-project.ts b/packages/core/src/application/integration/create-project.ts
-index a403646..6fed86f 100644
+index b1d28ea..205b932 100644
 --- a/packages/core/src/application/integration/create-project.ts
 +++ b/packages/core/src/application/integration/create-project.ts
-@@ -111,8 +111,8 @@ export const createProject: (
+@@ -112,8 +112,8 @@ export const createProject: (
    const trunks = yield* Trunks;
    // A retry names the same head (trunk was forked once), so only a trunk moved by someone else refuses.
    yield* Effect.orDie(trunks.initialize(projectId, head, command.by));
@@ -14,4 +14,4 @@ index a403646..6fed86f 100644
 +  yield* trunks.sync(projectId);
  
    const committed: Committed<ProjectRecord> = yield* commit(
-     { entity, cause: command.idempotencyKey, fingerprint: command.fingerprint },
+     {

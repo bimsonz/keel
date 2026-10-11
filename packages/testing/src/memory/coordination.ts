@@ -155,19 +155,6 @@ export function makeRecallMemory(registry: ReturnType<typeof makeSubjectRegistry
   };
 }
 
-export function makeNotifierMemory() {
-  const delivered: { readonly agentId: AgentId; readonly notice: AgentNotice }[] = [];
-  return {
-    delivered,
-    layer: Layer.succeed(
-      Notifier,
-      Notifier.of({
-        notify: (agentId, notice) => Effect.sync(() => void delivered.push({ agentId, notice })),
-      }),
-    ),
-  };
-}
-
 const sequentialId = (n: number) => String(n).padStart(26, "0");
 
 /**
@@ -356,12 +343,19 @@ export function makeChangesMemory(options: { readonly capacity?: number } = {}) 
   };
 }
 
+/** Notices with the cursor each sits at: the count read once it is. */
+const withCursors = (notices: readonly AgentNotice[], from: number) =>
+  notices.map((notice, i) => ({ ...notice, cursor: String(from + i + 1) }));
+
 /**
- * Agents' inboxes as lists. `deliver` appends a notice and wakes a waiting
- * read; the cursor is the count already read.
+ * Agents' inboxes as lists, read by `Inbox` and piggybacked by `Notifier`.
+ * `deliver` appends a notice and wakes a waiting read. A cursor is the count
+ * already read; `piggybacked` is the count a tool result carried or a read
+ * returned, so a notice rides at most one result and never one after a read.
  */
 export function makeInboxMemory() {
   const inboxes = new Map<AgentId, AgentNotice[]>();
+  const piggybacked = new Map<AgentId, number>();
   const waiters = makeWaiters<AgentId>();
   const deliver = (agentId: AgentId, notice: AgentNotice): void => {
     inboxes.set(agentId, [...(inboxes.get(agentId) ?? []), notice]);
@@ -369,7 +363,14 @@ export function makeInboxMemory() {
   };
   const page = (agentId: AgentId, from: number) => {
     const notices = inboxes.get(agentId) ?? [];
-    return { notices: notices.slice(from), cursor: String(Math.max(from, notices.length)) };
+    return {
+      notices: withCursors(notices.slice(from), from),
+      cursor: String(Math.max(from, notices.length)),
+    };
+  };
+  const markRead = (agentId: AgentId, upTo: number) => {
+    const read = Math.min(upTo, inboxes.get(agentId)?.length ?? 0);
+    piggybacked.set(agentId, Math.max(piggybacked.get(agentId) ?? 0, read));
   };
   return {
     inboxes,
@@ -381,7 +382,24 @@ export function makeInboxMemory() {
           Effect.gen(function* () {
             const from = cursor === undefined ? 0 : Math.max(0, Number.parseInt(cursor, 10) || 0);
             if (page(agentId, from).notices.length === 0) yield* waiters.wait(agentId, waitSeconds);
-            return page(agentId, from);
+            const read = page(agentId, from);
+            markRead(agentId, Number(read.cursor));
+            return read;
+          }),
+      }),
+    ),
+    notifier: Layer.succeed(
+      Notifier,
+      Notifier.of({
+        take: (agentId, limit) =>
+          Effect.sync(() => {
+            const from = piggybacked.get(agentId) ?? 0;
+            const taken = (inboxes.get(agentId) ?? []).slice(
+              from,
+              from + Math.min(Math.max(limit, 0), 3),
+            );
+            piggybacked.set(agentId, from + taken.length);
+            return withCursors(taken, from);
           }),
       }),
     ),

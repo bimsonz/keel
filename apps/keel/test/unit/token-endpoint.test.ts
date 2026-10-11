@@ -56,6 +56,7 @@ describe("the token endpoint", () => {
     });
     // The first reading stamps the token; every later one is past the next second.
     const clock = steppingClock([1_760_000_000_999, 1_760_000_001_250]);
+    const inbox = makeInboxMemory();
     const runtime = ManagedRuntime.make(
       Layer.mergeAll(
         directory.layer,
@@ -63,7 +64,8 @@ describe("the token endpoint", () => {
         clock,
         makeIdsMemory().layer,
         makeChangesMemory().layer,
-        makeInboxMemory().layer,
+        inbox.layer,
+        inbox.notifier,
         makeProjectsMemory().layer,
         makeEnrolmentsMemory().layer.pipe(Layer.provide(directory.layer)),
       ),

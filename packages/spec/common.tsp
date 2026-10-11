@@ -177,6 +177,13 @@ model ProblemDetails {
   conflict?: ConflictId;
 
   retryAfterMs?: int32;
+
+  /**
+   * Notices that rode this refusal, as they ride a result: an agent's typed
+   * refusals carry them too. Absent on responses that are not the agent's.
+   */
+  @maxItems(3)
+  notices?: Notice[];
 }
 
 @error
@@ -271,6 +278,12 @@ model Notice {
   title: string;
   detail?: string;
   ref?: string;
+
+  /**
+   * The notice's inbox position: reading the inbox from here returns only what
+   * is newer. A notice rides at most one tool result; the inbox keeps them all.
+   */
+  cursor?: string;
 }
 
 model CallCost {

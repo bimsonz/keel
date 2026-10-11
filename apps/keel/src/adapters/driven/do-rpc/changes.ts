@@ -8,6 +8,7 @@ import {
   type EnrolCommand,
   type InboxRead,
   type ReserveChange,
+  type TakeNotices,
   SubmitCommand,
 } from "../../../rpc/index.ts";
 import { callObject, fingerprintOf } from "./answer.ts";
@@ -24,6 +25,7 @@ export interface ChangeStub {
 export interface AgentSessionStub {
   reserveChange(request: typeof ReserveChange.Encoded): Promise<unknown>;
   inbox(request: typeof InboxRead.Encoded): Promise<unknown>;
+  takeNotices(request: typeof TakeNotices.Encoded): Promise<unknown>;
   enrol(command: typeof EnrolCommand.Encoded): Promise<unknown>;
 }
 

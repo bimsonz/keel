@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/notices.test.ts
+# kills: b12.no-self-loop
+# why: the lenient arrival schema drops `actor`, so the receiving AgentSession sees every event as the platform's
+diff --git a/apps/keel/src/rpc/events.ts b/apps/keel/src/rpc/events.ts
+index 80d99c8..8a7f97b 100644
+--- a/apps/keel/src/rpc/events.ts
++++ b/apps/keel/src/rpc/events.ts
+@@ -31,7 +31,6 @@ const ArrivingEnvelope = Schema.Struct({
+   at: Schema.Number,
+   dedupeKey: Schema.NonEmptyString,
+   causation: Schema.optional(Schema.String),
+-  actor: Schema.optional(Schema.String),
+   affected: Schema.optional(Schema.Array(Schema.Unknown)),
+   notified: Schema.optional(Schema.Array(Schema.Unknown)),
+   payload: Schema.Unknown,

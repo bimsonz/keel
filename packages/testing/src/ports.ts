@@ -13,6 +13,7 @@ import { describeChangesContract, type ChangesHarness } from "./contracts/change
 import { describeCodeHostContract } from "./contracts/code-host.ts";
 import { describeEnrolmentsContract, type EnrolmentsHarness } from "./contracts/enrolments.ts";
 import { describeInboxContract, type InboxHarness } from "./contracts/inbox.ts";
+import { describeNotifierContract, type NotifierHarness } from "./contracts/notifier.ts";
 import { describeWorkspacePoolContract, type StockedPool } from "./contracts/workspace-pool.ts";
 import {
   type BatchVerdictsHarness,
@@ -42,6 +43,7 @@ import type {
   Changes,
   Enrolments,
   Inbox,
+  Notifier,
   Projects,
 } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
@@ -106,6 +108,15 @@ function memoryInboxHarness(): InboxHarness {
   const memory = coordination.makeInboxMemory();
   return {
     layer: memory.layer,
+    deliver: (agentId, notice) => Effect.sync(() => memory.deliver(agentId, notice)),
+  };
+}
+
+/** The piggyback and the inbox share one memory, so the suite can check that a read stops a notice riding. */
+function memoryNotifierHarness(): NotifierHarness {
+  const memory = coordination.makeInboxMemory();
+  return {
+    layer: Layer.merge(memory.layer, memory.notifier),
     deliver: (agentId, notice) => Effect.sync(() => memory.deliver(agentId, notice)),
   };
 }
@@ -209,7 +220,10 @@ export const PORTS = {
     () => coordination.makeRecallMemory(coordination.makeSubjectRegistryMemory()).layer,
     pending("Recall", ["nearest"]),
   ),
-  Notifier: port(() => coordination.makeNotifierMemory().layer, pending("Notifier", ["notify"])),
+  Notifier: harnessed<Notifier | Inbox, NotifierHarness>(
+    memoryNotifierHarness,
+    describeNotifierContract,
+  ),
   Changes: harnessed<Changes, ChangesHarness>(memoryChangesHarness, describeChangesContract),
   Inbox: harnessed<Inbox, InboxHarness>(memoryInboxHarness, describeInboxContract),
   Projects: harnessed<Projects, ProjectsHarness>(memoryProjectsHarness, describeProjectsContract),

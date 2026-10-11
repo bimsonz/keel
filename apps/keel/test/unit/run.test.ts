@@ -14,6 +14,7 @@ import { makeRunner } from "../../src/adapters/driving/http/run.ts";
 
 const clock = makeClockMemory().layer;
 const directory = makeAgentDirectoryMemory().layer;
+const inbox = makeInboxMemory();
 const runtime = ManagedRuntime.make(
   Layer.mergeAll(
     directory,
@@ -23,7 +24,8 @@ const runtime = ManagedRuntime.make(
     clock,
     makeIdsMemory().layer,
     makeChangesMemory().layer,
-    makeInboxMemory().layer,
+    inbox.layer,
+    inbox.notifier,
   ),
 );
 const run = makeRunner(runtime);

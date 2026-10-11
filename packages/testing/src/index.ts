@@ -15,4 +15,5 @@ export * from "./contracts/workspace-pool.ts";
 export * from "./contracts/verification.ts";
 export * from "./contracts/enrolments.ts";
 export * from "./contracts/projects.ts";
+export * from "./contracts/notifier.ts";
 export { PORTS, type PortName } from "./ports.ts";

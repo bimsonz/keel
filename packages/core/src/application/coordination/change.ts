@@ -23,7 +23,9 @@ import {
 } from "../../domain/coordination/index.ts";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import {
+  type Actor,
   type AgentId,
+  agentActor,
   type ChangeId,
   CommitSha,
   type ContentHash,
@@ -350,6 +352,7 @@ export const declare: (
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
       fingerprint: command.fingerprint,
+      actor: agentActor(command.agentId),
     },
     (tx) => {
       const decided = transition(
@@ -418,6 +421,7 @@ export const revise: (
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
       fingerprint: fingerprintOf("revise", command),
+      actor: agentActor(command.agentId),
     },
     (tx) =>
       Result.map(
@@ -473,6 +477,7 @@ export const submit: (
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
       fingerprint: fingerprintOf("submit", command),
+      actor: agentActor(command.agentId),
     },
     (tx) =>
       Result.map(
@@ -496,6 +501,12 @@ export const submit: (
   return yield* settled(changeId, command.idempotencyKey, committed);
 });
 
+/** Who withdraws: the agent under its lease, or an operator by name. */
+const withdrawnBy = (command: AbandonChange): Actor =>
+  command.authority._tag === "Operator"
+    ? `operator:${command.authority.by}`
+    : agentActor(command.agentId);
+
 /** Withdraws the change, under its lease or as an operator. The pool collects its workspace by event. */
 export const abandon: (
   changeId: ChangeId,
@@ -510,6 +521,7 @@ export const abandon: (
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
       fingerprint: fingerprintOf("abandon", command),
+      actor: withdrawnBy(command),
     },
     (tx) =>
       Result.map(
@@ -549,6 +561,7 @@ export const adopt: (
       entity: changeRef(changeId),
       cause: command.idempotencyKey,
       fingerprint: fingerprintOf("adopt", command),
+      actor: agentActor(command.agentId),
     },
     (tx) => {
       const before = storedChange(tx.store, changeId);

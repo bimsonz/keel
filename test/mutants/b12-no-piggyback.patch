@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/notices.test.ts
+# kills: b12.piggyback
+# why: the handler object answers without taking notices, so a notice never reaches the agent's next tool result
+diff --git a/apps/keel/src/adapters/driving/http/piggyback.ts b/apps/keel/src/adapters/driving/http/piggyback.ts
+index 4fce8d3..739fcc3 100644
+--- a/apps/keel/src/adapters/driving/http/piggyback.ts
++++ b/apps/keel/src/adapters/driving/http/piggyback.ts
+@@ -75,7 +75,7 @@ export function piggyback<H extends Operations<Caller>>(run: Runner, handlers: H
+       if (
+         typeof operation !== "string" ||
+         typeof handler !== "function" ||
+-        !Object.hasOwn(ENVELOPED, operation)
++        Object.hasOwn(ENVELOPED, operation)
+       )
+         return handler;
+       return async (caller: Caller, ...rest: readonly unknown[]) => {

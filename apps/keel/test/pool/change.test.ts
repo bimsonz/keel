@@ -284,22 +284,27 @@ describe("the lease's deadline", () => {
     const c = await changeUnderTest();
     const lease = ok(await c.declare()).change.lease.id;
     c.clock.advance(LEASE_TTL_MS);
-    // The deadline is 15 minutes away in real time: bring its row to now, so the platform alarm fires it.
-    await runInDurableObject(c.stub, (_instance: ChangeDO, state) =>
-      scheduleAlarm(state.storage, {
-        kind: "deadline",
-        reason: `lease ${lease} lapses`,
-        at: Date.now(),
-      }),
-    );
-    await vi.waitFor(async () => expect((await c.current()).state).toBe("parked"), WAIT);
+    // The deadline is 15 minutes away in real time: bring its row to now, so the platform alarm
+    // fires it. An alarm still finishing the declare's flush re-arms the row from `renewedAt` as
+    // it ends, so the row is brought to now again, in the same turn as the check, until it fires.
+    await vi.waitFor(async () => {
+      await runInDurableObject(c.stub, async (instance: ChangeDO, state) => {
+        if (ok(decodeExit(ChangeCodecs.get, await instance.get())).state === "parked") return;
+        await scheduleAlarm(state.storage, {
+          kind: "deadline",
+          reason: `lease ${lease} lapses`,
+          at: Date.now(),
+        });
+      });
+      expect((await c.current()).state).toBe("parked");
+    }, WAIT);
 
     expect((await c.current()).parkReason).toBe("lease-lapsed");
     expect((await c.log()).map((event) => event.type).slice(-2)).toEqual([
       "LeaseLapsed",
       "ChangeParked",
     ]);
-    expect(await leaseAlarms(c)).toEqual([]);
+    await vi.waitFor(async () => expect(await leaseAlarms(c)).toEqual([]), WAIT);
   });
 
   it("[b11.lapse] commits nothing when it fires on a renewed lease, and re-arms for the renewal", async () => {

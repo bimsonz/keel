@@ -1,5 +1,6 @@
 import { Context, Data, type Effect, Schema } from "effect";
 import {
+  type Actor,
   type EntityRef,
   EventEnvelope,
   type EventId,
@@ -46,6 +47,8 @@ export interface CommitSpec {
   readonly cause: string;
   /** The event that triggered this transition, when another entity's event did. */
   readonly causation?: EventId;
+  /** Whose command this is, copied onto every event it commits. Absent when the platform caused it. */
+  readonly actor?: Actor;
   /** A hash of the command, so a cause reused for a different command can be told apart from a retry. */
   readonly fingerprint?: string;
 }
@@ -207,6 +210,7 @@ export function envelopesFor(
       at,
       dedupeKey: dedupeKeyOf(entity, spec.cause, type, ordinal),
       ...(spec.causation === undefined ? {} : { causation: spec.causation }),
+      ...(spec.actor === undefined ? {} : { actor: spec.actor }),
       affected: draft.affected ?? [],
       notified: subscribers(type),
       payload: draft.payload,

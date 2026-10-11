@@ -3,8 +3,9 @@ import {
   readInbox,
   recordDelivery,
   reserveChange,
+  takeNotices,
 } from "@keeltown/core/application/identity";
-import { AgentNotKnown } from "@keeltown/core/domain/identity";
+import { AgentNotKnown, notifies } from "@keeltown/core/domain/identity";
 import { NotImplemented } from "@keeltown/core/not-implemented";
 import { AgentId, type EventEnvelope } from "@keeltown/core/kernel";
 import { EntityStore, type Transaction } from "@keeltown/core/ports";
@@ -17,6 +18,7 @@ import {
   type OpenSession,
   ReserveChange,
   SessionSnapshot,
+  TakeNotices,
 } from "../../../rpc/index.ts";
 import { type AgentSessionServices, agentSessionServices } from "../../../composition/do.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
@@ -60,10 +62,15 @@ export class AgentSessionDO
     );
   }
 
-  /** Every event delivered to the agent joins its inbox; `answer` then wakes any inbox waiting on it. */
+  /**
+   * Every event delivered to the agent joins its inbox, except one it caused
+   * itself: its own tool result already reported that. `answer` then wakes any
+   * inbox waiting on it.
+   */
   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
-    recordDelivery(tx.store, event);
-    return { entity: { kind: "agent", id: agentIdOf(this.ctx.id.name) }, drafts: [] };
+    const agentId = agentIdOf(this.ctx.id.name);
+    if (notifies(agentId, event)) recordDelivery(tx.store, event);
+    return { entity: { kind: "agent", id: agentId }, drafts: [] };
   }
 
   async reserveChange(request: typeof ReserveChange.Encoded) {
@@ -85,6 +92,15 @@ export class AgentSessionDO
       ),
     );
     return this.answer(AgentSessionCodecs.inbox, program);
+  }
+
+  /** The piggyback: up to 3 notices for the agent's next tool result, each taken once. */
+  async takeNotices(request: typeof TakeNotices.Encoded) {
+    const program = Schema.decodeUnknownEffect(TakeNotices)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ limit }) => takeNotices(limit)),
+    );
+    return this.answer(AgentSessionCodecs.takeNotices, program);
   }
 
   /** Enrols this object's agent: AgentEnrolled committed, then the directory row written, before it answers. */

@@ -1,6 +1,7 @@
 import {
   Agent,
   AgentKind,
+  AgentNotice,
   AgentNotAdmitted,
   AgentNotKnown,
   IdempotencyConflict,
@@ -42,6 +43,9 @@ export const InboxRead = Schema.Struct({
   waitMs: Schema.Int,
 });
 
+/** Take the notices no tool result has carried yet: at most `limit`, and never more than 3. */
+export const TakeNotices = Schema.Struct({ limit: Schema.Int });
+
 /**
  * Enrol the agent this DO is named for. The isolate derives the agent id from
  * the operator and the Idempotency-Key and mints the client secret, sending only
@@ -73,6 +77,7 @@ export const AgentSessionCodecs = {
   ),
   reserveChange: exitCodec(ChangeId, IdempotencyConflict),
   inbox: exitCodec(InboxPage, AgentNotKnown),
+  takeNotices: exitCodec(Schema.Array(AgentNotice), Schema.Never),
   enrol: exitCodec(Agent, IdempotencyConflict),
 };
 
@@ -86,7 +91,18 @@ export interface AgentSessionRpc extends EventReceiverRpc {
    * different fingerprint is an IdempotencyConflict.
    */
   reserveChange(request: typeof ReserveChange.Encoded): Promise<ExitJson>;
-  /** Notices after `cursor`; with `waitMs` > 0, waits for the next one (an in-DO waiter with a deadline). */
+  /**
+   * Notices after `cursor`; with `waitMs` > 0, waits for the next one (an
+   * in-DO waiter with a deadline). The read also marks them read, so none of
+   * them rides a later tool result.
+   */
   inbox(request: typeof InboxRead.Encoded): Promise<ExitJson>;
+  /**
+   * The piggyback: up to `limit` (at most 3) notices no tool result has
+   * carried and no inbox read has returned, oldest first, each with its
+   * cursor. Taking them marks them carried in the same commit, so each rides
+   * at most one tool result. The inbox still holds them all.
+   */
+  takeNotices(request: typeof TakeNotices.Encoded): Promise<ExitJson>;
   enrol(command: typeof EnrolCommand.Encoded): Promise<ExitJson>;
 }

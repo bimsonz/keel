@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/notices.test.ts
+# kills: b12.piggyback
+# why: only success envelopes carry notices, so a typed refusal leaves them for later instead of riding it
+diff --git a/apps/keel/src/adapters/driving/http/piggyback.ts b/apps/keel/src/adapters/driving/http/piggyback.ts
+index 4fce8d3..137ef3f 100644
+--- a/apps/keel/src/adapters/driving/http/piggyback.ts
++++ b/apps/keel/src/adapters/driving/http/piggyback.ts
+@@ -57,7 +57,7 @@ function ridable(answer: unknown): answer is { readonly body: Readonly<Record<st
+   if (!isRecord(answer) || !isRecord(answer.body)) return false;
+   const { code, notices } = answer.body;
+   if (Array.isArray(notices)) return true;
+-  return typeof code === "string" && !DEFECTS.has(code);
++  return typeof code === "string" && !DEFECTS.has(code) && false;
+ }
+ 
+ /**

@@ -3,6 +3,7 @@ import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import { ProjectCreated } from "../../domain/integration/index.ts";
 import {
   type AgentId,
+  agentActor,
   type EntityRef,
   InstantSchema,
   ProjectId,
@@ -124,7 +125,12 @@ export const createProject: (
   yield* (yield* WorkspacePool).configure(projectId, { source: repos.mirror, target: poolTarget });
 
   const committed: Committed<ProjectRecord> = yield* commit(
-    { entity, cause: command.idempotencyKey, fingerprint: command.fingerprint },
+    {
+      entity,
+      cause: command.idempotencyKey,
+      fingerprint: command.fingerprint,
+      actor: agentActor(command.by),
+    },
     (tx) => {
       const record: ProjectRecord = { id: projectId, name: command.name, createdAt: tx.at };
       tx.store.put(PROJECT, projectId, asStored(encodeRecord(record)));

@@ -5,6 +5,7 @@ import {
   type Changes,
   type Enrolments,
   type Inbox,
+  type Notifier,
   type Projects,
   TokenIssuer,
 } from "@keeltown/core/ports";
@@ -14,6 +15,7 @@ import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { EnrolmentsRpc } from "../adapters/driven/do-rpc/enrolments.ts";
 import { InboxRpc } from "../adapters/driven/do-rpc/inbox.ts";
+import { NotifierRpc } from "../adapters/driven/do-rpc/notifier.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { TokenIssuerJose } from "../adapters/driven/jose/token-issuer.ts";
 import { ClockLive, SystemLive } from "../adapters/driven/system.ts";
@@ -44,6 +46,7 @@ export function isolateLayer(
   return Layer.mergeAll(
     overrides.changes ?? ChangesRpc({ change, agentSession }),
     overrides.inbox ?? InboxRpc(agentSession),
+    overrides.notifier ?? NotifierRpc(agentSession),
     overrides.projects ?? ProjectsRpc(project),
     (overrides.enrolments ?? EnrolmentsRpc(agentSession)).pipe(Layer.provide(directory)),
     directory,
@@ -58,6 +61,8 @@ export function isolateLayer(
 export interface IsolateOverrides {
   readonly changes?: Layer.Layer<Changes>;
   readonly inbox?: Layer.Layer<Inbox>;
+  /** The piggyback; pass it with `inbox` when both read one memory. */
+  readonly notifier?: Layer.Layer<Notifier>;
   readonly projects?: Layer.Layer<Projects>;
   /** May need the AgentDirectory, as the in-memory enrolments project into it. */
   readonly enrolments?: Layer.Layer<Enrolments, never, AgentDirectory>;

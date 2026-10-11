@@ -7242,6 +7242,10 @@
           },
           "ref": {
             "type": "string"
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The notice's inbox position: reading the inbox from here returns only what\nis newer. A notice rides at most one tool result; the inbox keeps them all."
           }
         },
         "additionalProperties": {
@@ -7444,6 +7448,14 @@
           "retryAfterMs": {
             "type": "integer",
             "format": "int32"
+          },
+          "notices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notice"
+            },
+            "maxItems": 3,
+            "description": "Notices that rode this refusal, as they ride a result: an agent's typed\nrefusals carry them too. Absent on responses that are not the agent's."
           }
         },
         "additionalProperties": {

@@ -2,10 +2,10 @@
 # kills: b11.racers
 # why: adopt reads the change, awaits a lookup, then decides on that early read, so racing adopters all see a lapsed lease and all win
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 29e615f..1d531c6 100644
+index 6440277..466cfc5 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -543,7 +543,9 @@ export const adopt: (
+@@ -555,7 +555,9 @@ export const adopt: (
    ChangeNotFound | ChangeStateRefused | LeaseNotLapsed | IdempotencyConflict,
    Clock | Ids | EntityStore | EventOutbox
  > = Effect.fn("coordination/adopt")(function* (changeId: ChangeId, command: AdoptChange) {
@@ -15,8 +15,8 @@ index 29e615f..1d531c6 100644
    const committed = yield* commit(
      {
        entity: changeRef(changeId),
-@@ -551,7 +553,8 @@ export const adopt: (
-       fingerprint: fingerprintOf("adopt", command),
+@@ -564,7 +566,8 @@ export const adopt: (
+       actor: agentActor(command.agentId),
      },
      (tx) => {
 -      const before = storedChange(tx.store, changeId);

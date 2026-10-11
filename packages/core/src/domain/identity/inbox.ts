@@ -1,5 +1,12 @@
 import { Schema } from "effect";
-import { EntityRef, EventId, InstantSchema } from "../kernel/index.ts";
+import {
+  type AgentId,
+  agentActor,
+  EntityRef,
+  EventId,
+  type EventEnvelope,
+  InstantSchema,
+} from "../kernel/index.ts";
 
 /** One notice for an agent: what reaches its inbox, its next tool result, or its stream. */
 export const AgentNotice = Schema.Struct({
@@ -9,6 +16,8 @@ export const AgentNotice = Schema.Struct({
   title: Schema.String,
   detail: Schema.optional(Schema.String),
   ref: Schema.optional(Schema.String),
+  /** The notice's inbox position: reading the inbox from here returns only what is newer. */
+  cursor: Schema.optional(Schema.String),
 });
 export type AgentNotice = typeof AgentNotice.Type;
 
@@ -35,11 +44,20 @@ const sentence = (type: string): string => {
   return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
-/** The notice an inbox entry becomes: what happened, and to which entity. */
-export const noticeOf = (entry: InboxEntry): AgentNotice => ({
+/** The notice the inbox entry at `position` becomes: what happened, to which entity, and where it sits. */
+export const noticeOf = (entry: InboxEntry, position: string): AgentNotice => ({
   id: entry.eventId,
   at: entry.at,
   kind: entry.type,
   title: `${sentence(entry.type)}: ${entry.entity.id}`,
   ref: `${entry.entity.kind}:${entry.entity.id}`,
+  cursor: position,
 });
+
+/**
+ * No self-loops: an agent is never notified of an event it caused, because its
+ * own tool result already reported it. So it is never woken by its own push,
+ * and a fix → notice → fix loop cannot form.
+ */
+export const notifies = (agentId: AgentId, event: EventEnvelope): boolean =>
+  event.actor !== agentActor(agentId);

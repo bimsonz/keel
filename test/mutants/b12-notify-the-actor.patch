@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/notices.test.ts
+# kills: b12.no-self-loop
+# why: the AgentSession records every event, its agent's own included, so an agent is woken by its own commands
+diff --git a/apps/keel/src/adapters/driving/do/agent-session.ts b/apps/keel/src/adapters/driving/do/agent-session.ts
+index 697e27f..787605e 100644
+--- a/apps/keel/src/adapters/driving/do/agent-session.ts
++++ b/apps/keel/src/adapters/driving/do/agent-session.ts
+@@ -69,7 +69,7 @@ export class AgentSessionDO
+    */
+   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
+     const agentId = agentIdOf(this.ctx.id.name);
+-    if (notifies(agentId, event)) recordDelivery(tx.store, event);
++    recordDelivery(tx.store, event);
+     return { entity: { kind: "agent", id: agentId }, drafts: [] };
+   }
+ 

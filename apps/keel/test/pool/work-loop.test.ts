@@ -19,7 +19,11 @@ function loop(options: { readonly capacity?: number } = {}) {
   const inbox = makeInboxMemory();
   const { app } = makeIsolate(
     env,
-    isolateLayer(env, { changes: changes.layer, inbox: inbox.layer }),
+    isolateLayer(env, {
+      changes: changes.layer,
+      inbox: inbox.layer,
+      notifier: inbox.notifier,
+    }),
   );
   const via: Fetch = async (url, init) => app.fetch(new Request(url, init), env);
   return { changes, inbox, via };

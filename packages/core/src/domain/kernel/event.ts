@@ -1,7 +1,22 @@
 import type { Result } from "effect";
 import { Schema } from "effect";
 import { EntityRef } from "./entity.ts";
-import { EventId, type Instant, InstantSchema } from "./ids.ts";
+import { AgentId, EventId, type Instant, InstantSchema } from "./ids.ts";
+
+/**
+ * The principal whose command an event records: an agent, or an operator by
+ * name. Absent when the platform caused the event (Precheck, an alarm, a
+ * reaction, the Lane landing a change). An agent is never notified of an event
+ * it caused, because its own tool result already reports it.
+ */
+export const Actor = Schema.Union([
+  Schema.TemplateLiteral(["agent:", AgentId]),
+  Schema.TemplateLiteral(["operator:", Schema.NonEmptyString]),
+]);
+export type Actor = typeof Actor.Type;
+
+/** The actor an agent's own commands commit under. */
+export const agentActor = (agentId: AgentId): Actor => `agent:${agentId}`;
 
 /**
  * The envelope every event is committed in (docs/domain/events.md). The payload
@@ -15,6 +30,7 @@ export const EventEnvelope = Schema.Struct({
   at: InstantSchema,
   dedupeKey: Schema.NonEmptyString,
   causation: Schema.optional(EventId),
+  actor: Schema.optional(Actor),
   affected: Schema.Array(EntityRef),
   notified: Schema.Array(Schema.String),
   payload: Schema.Unknown,

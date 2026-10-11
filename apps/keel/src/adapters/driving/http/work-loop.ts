@@ -13,7 +13,7 @@ import {
   Proposition,
   type SketchNotFound,
 } from "@keeltown/core/domain/coordination";
-import type { IdempotencyConflict, InboxPage } from "@keeltown/core/domain/identity";
+import type { AgentNotice, IdempotencyConflict, InboxPage } from "@keeltown/core/domain/identity";
 import {
   type Anchor,
   ChangeId,
@@ -456,6 +456,19 @@ export function statusError(caller: Caller, error: ChangeNotFound): StatusResult
   return changeNotFound(caller, error);
 }
 
+/** A notice as the wire carries it, in an inbox page or riding a tool result. */
+export function noticeView(notice: AgentNotice) {
+  return {
+    id: notice.id,
+    at: iso(notice.at),
+    kind: notice.kind,
+    title: notice.title,
+    ...(notice.detail === undefined ? {} : { detail: notice.detail }),
+    ...(notice.ref === undefined ? {} : { ref: notice.ref }),
+    ...(notice.cursor === undefined ? {} : { cursor: notice.cursor }),
+  };
+}
+
 export function inboxOk(page: InboxPage): InboxResult {
   return {
     status: 200,
@@ -464,14 +477,7 @@ export function inboxOk(page: InboxPage): InboxResult {
         ? "Nothing new."
         : `${page.notices.length} new notice${page.notices.length === 1 ? "" : "s"}.`,
       {
-        notices: page.notices.map((notice) => ({
-          id: notice.id,
-          at: iso(notice.at),
-          kind: notice.kind,
-          title: notice.title,
-          ...(notice.detail === undefined ? {} : { detail: notice.detail }),
-          ...(notice.ref === undefined ? {} : { ref: notice.ref }),
-        })),
+        notices: page.notices.map(noticeView),
         cursor: page.cursor,
       },
       [
