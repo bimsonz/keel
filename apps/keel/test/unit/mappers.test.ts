@@ -65,7 +65,6 @@ const STUBBED = [
   "why",
   "Memory_listDecisions",
   "Memory_getDecision",
-  "Inbox_listEvents",
   "Views_getVerdict",
   "Views_getCandidate",
   "Views_listLanes",

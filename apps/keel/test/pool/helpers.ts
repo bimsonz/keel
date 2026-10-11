@@ -1,3 +1,4 @@
+import { runInDurableObject } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { env } from "cloudflare:workers";
 import { type Agent, type Scope } from "@keeltown/core/domain/identity";
@@ -7,6 +8,9 @@ import { hashSecret, sampleProjectId } from "@keeltown/testing";
 import { Effect } from "effect";
 import { AgentDirectoryD1 } from "../../src/adapters/driven/d1/agent-directory.ts";
 import { AgentDirectory } from "@keeltown/core/ports";
+import { expect, vi } from "vitest";
+import { armedAlarms } from "../../src/adapters/driving/do/alarm.ts";
+import { OUTBOX_FLUSH, OUTBOX_REDELIVERY } from "../../src/adapters/driving/do/keel-object.ts";
 
 export const BASE = "https://keel.localhost";
 
@@ -119,4 +123,28 @@ export async function mcpResult(response: Response): Promise<Record<string, unkn
     typeof message === "object" && message !== null ? Reflect.get(message, "result") : undefined;
   if (typeof result !== "object" || result === null) throw new Error(`MCP error: ${json}`);
   return Object.fromEntries(Object.entries(result));
+}
+
+/**
+ * Waits until `stub`'s outbox is quiet: nothing owed to any subscriber and no
+ * flush or redelivery armed. Every object owes the Projector a delivery after
+ * each commit, flushed by a debounce a moment later. A test that commits real
+ * events and ends before that flush runs leaves it to outlive the test file,
+ * which fails the run with an unhandled teardown error even when every test
+ * passed. A delivery is deleted only once its subscriber took it, so an empty
+ * table means the last one arrived.
+ */
+export async function drainOutbox(stub: DurableObjectStub): Promise<void> {
+  await vi.waitFor(
+    async () => {
+      const outbox = await runInDurableObject(stub, (_instance: unknown, state) => ({
+        owed: state.storage.sql.exec("SELECT event_id FROM keel_deliveries").toArray().length,
+        armed: armedAlarms(state.storage)
+          .map((alarm) => alarm.reason)
+          .filter((reason) => reason === OUTBOX_FLUSH || reason === OUTBOX_REDELIVERY),
+      }));
+      expect(outbox).toEqual({ owed: 0, armed: [] });
+    },
+    { timeout: 20_000, interval: 25 },
+  );
 }

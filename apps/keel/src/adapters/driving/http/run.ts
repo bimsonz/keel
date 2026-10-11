@@ -4,6 +4,7 @@ import type {
   Changes,
   Clock,
   Enrolments,
+  EventFeed,
   Ids,
   Inbox,
   Notifier,
@@ -21,6 +22,7 @@ export type IsolateServices =
   | Clock
   | Ids
   | Changes
+  | EventFeed
   | Inbox
   | Notifier
   | Projects
