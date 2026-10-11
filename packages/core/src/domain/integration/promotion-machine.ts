@@ -11,7 +11,7 @@ import {
   type ProjectId,
   type VerdictId,
 } from "../kernel/index.ts";
-import type { QueuedBatch, Trunk } from "./batch.ts";
+import { isVerified, type QueuedBatch, type Trunk } from "./batch.ts";
 import { commutation, type Footprints } from "./commutation.ts";
 import { PromotionStateRefused, TrunkNotInitialized } from "./errors.ts";
 import {
@@ -62,6 +62,8 @@ export type PromotionCommand =
       readonly members: readonly ChangeId[];
       readonly base: CommitSha;
       readonly predecessors: readonly ChangeId[];
+      /** The received `BatchVerified.verified`, kept as it came. */
+      readonly verified?: boolean;
     }
   | {
       /** The debounce deadline: decide the group, write the WAL entry. */
@@ -208,6 +210,7 @@ export const decidePromotion = (
               members: command.members,
               base: command.base,
               predecessors: command.predecessors,
+              ...(command.verified === undefined ? {} : { verified: command.verified }),
             }),
           ]);
     }
@@ -245,6 +248,8 @@ export const decidePromotion = (
             groupId: wal.groupId,
             members: wal.batches.flatMap((b) => b.members),
             proofIds: wal.proofIds,
+            // One unverified batch makes the whole advance unverified.
+            ...(wal.batches.every(isVerified) ? {} : { verified: false }),
           }),
         ]);
       }
@@ -332,6 +337,7 @@ export const evolvePromotion = (
         members: event.members,
         base: event.base,
         predecessors: event.predecessors ?? [],
+        ...(event.verified === undefined ? {} : { verified: event.verified }),
       };
       return {
         ...trunk,

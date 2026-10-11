@@ -100,6 +100,11 @@ export const VerdictIssued = Schema.TaggedStruct("VerdictIssued", {
    * before any plan was compiled. Never a fabricated hash.
    */
   planHash: Schema.optional(ContentHash),
+  /**
+   * False when the project's verification is off (`ProjectSettings.verification`):
+   * the verdict was reached without running the plan. Absent means true.
+   */
+  verified: Schema.optional(Schema.Boolean),
 });
 export const EscalationRaised = Schema.TaggedStruct("EscalationRaised", {
   escalationId: EscalationId,

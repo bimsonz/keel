@@ -1,9 +1,14 @@
 import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
+  type Batch,
+  type CandidateCommand,
+  type CandidateEvent,
   commutation,
   type CommutationFacts,
+  decideCandidate,
   decidePromotion,
+  evolveCandidate,
   evolvePromotion,
   type Footprints,
   type PromotionCommand,
@@ -17,6 +22,7 @@ import {
   type ChangeId,
   CommitSha,
   type Committed,
+  ContentHash,
   Glob,
   IllegalTransition,
   Instant,
@@ -78,6 +84,10 @@ const stepArb: fc.Arbitrary<Step> = fc.record({
 
 const planArb = fc.array(stepArb, { minLength: 6, maxLength: 40 });
 
+/** A verdict's `verified` flag by turn: absent, true or false, so replay carries all three. */
+const flagOf = (n: number): { readonly verified?: boolean } =>
+  n % 3 === 0 ? { verified: false } : n % 3 === 1 ? {} : { verified: true };
+
 interface World {
   /** What each batch touched, as its facts will report at the flush. */
   readonly touched: Map<string, string>;
@@ -131,6 +141,7 @@ const build = (
         members: [makeId("chg", ulid(n))],
         base: state?.head ?? H0,
         predecessors,
+        ...flagOf(n),
       };
     }
     case "Flush":
@@ -753,6 +764,115 @@ const promotionTour = (): readonly Fold<Trunk, TrunkEvent>[] => {
   });
   return walkedTour;
 };
+
+/** A verdict's `verified` flag as the Lane DO sets it. */
+type Flag = "absent" | boolean;
+const withFlag = (flag: Flag): { readonly verified?: boolean } =>
+  flag === "absent" ? {} : { verified: flag };
+const flagIn = (x: { readonly verified?: boolean | undefined }): Flag => x.verified ?? "absent";
+const PLAN = ContentHash.make(`sha256:${"0".repeat(64)}`);
+
+/** One batch through the Lane DO's Candidate machine, from its verdict to `BatchVerified`. */
+const verifyBatch = (n: number, flag: Flag) => {
+  const batchId = makeId("bat", ulid(n));
+  const commands: readonly CandidateCommand[] = [
+    {
+      _tag: "Form",
+      laneId: "lane:default",
+      projectId: PROJECT,
+      members: [makeId("chg", ulid(n))],
+      base: H0,
+      predecessors: [],
+      attempt: 1,
+      chainEpoch: 0,
+    },
+    {
+      _tag: "Assemble",
+      candidateId: makeId("cnd", ulid(n)),
+      treeSha: sha(0xb000 + n),
+      composer: "gitcore",
+      tier: 0,
+      tierReason: "clean merge-tree",
+    },
+    { _tag: "StartVerification", instanceId: `verify-${n}`, planHash: PLAN },
+    {
+      _tag: "Verified",
+      verdictId: makeId("vrd", ulid(n)),
+      ...withFlag(flag),
+      attempt: 1,
+      chainEpoch: 0,
+    },
+  ];
+  let batch: Batch | undefined;
+  let last: readonly CandidateEvent[] = [];
+  for (const command of commands) {
+    const decided = decideCandidate(batch, command, { now: T0, batchId });
+    if (Result.isFailure(decided)) return undefined;
+    for (const payload of decided.success) batch = evolveCandidate(batch, { at: T0, payload });
+    last = decided.success;
+  }
+  const event = last[0];
+  return event?._tag === "BatchVerified" ? event : undefined;
+};
+
+/** Verdicts with these flags, verified by the lane, then queued, grouped and advanced by the trunk. */
+const carry = (flags: readonly Flag[]) => {
+  const verified = flags.map((flag, i) => verifyBatch(i + 1, flag));
+  const enqueues = verified.flatMap((e): PromotionCommand[] =>
+    e?.members === undefined || e.base === undefined
+      ? []
+      : [
+          {
+            _tag: "Enqueue",
+            batchId: e.batchId,
+            candidateId: e.candidateId,
+            verdictId: e.verdictId,
+            members: e.members,
+            base: e.base,
+            predecessors: e.predecessors ?? [],
+            ...(e.verified === undefined ? {} : { verified: e.verified }),
+          },
+        ],
+  );
+  // Each batch on a path of its own, so the whole queue commutes into one group.
+  const inputs = enqueues.map((_, i) =>
+    facts(i + 1, makeId("chg", ulid(i + 1)), `src/own-${i}.ts`),
+  );
+  const queued = drive([init, ...enqueues]).state;
+  const grouped = drive([init, ...enqueues, flush(inputs)]).state;
+  const done = drive([init, ...enqueues, flush(inputs), composed, readBack(NEW)]);
+  const advanced = eventsOf(done.results.at(-1) ?? Result.succeed([])).find(
+    (e) => e._tag === "TrunkAdvanced",
+  );
+  return { verified, queued, grouped, advanced };
+};
+
+const carries = (flags: readonly Flag[]): boolean => {
+  const { verified, queued, grouped, advanced } = carry(flags);
+  const same = (got: readonly (Flag | undefined)[]): boolean =>
+    got.length === flags.length && got.every((f, i) => f === flags[i]);
+  return (
+    same(verified.map((e) => (e === undefined ? undefined : flagIn(e)))) &&
+    same((queued?.queue ?? []).map(flagIn)) &&
+    same((grouped?.wal?.batches ?? []).map(flagIn)) &&
+    advanced !== undefined &&
+    flagIn(advanced) === (flags.includes(false) ? false : "absent")
+  );
+};
+
+describe("the verified flag", { timeout: PROPERTY_TIMEOUT }, () => {
+  it("[promotion.verified-carried] a verdict's verified flag reaches BatchVerified, the queue and the WAL unchanged, and one unverified batch makes the advance unverified", () => {
+    const flagArb = fc.constantFrom<Flag>("absent", true, false);
+    fc.assert(
+      fc.property(fc.array(flagArb, { minLength: 1, maxLength: 4 }), (flags) => carries(flags)),
+    );
+    // A mixed group: one unverified batch in a group of verified ones.
+    const mixed = carry([true, false, "absent"]);
+    expect(mixed.verified.map((e) => e?.verified)).toEqual([true, false, undefined]);
+    expect(mixed.advanced).toMatchObject({ _tag: "TrunkAdvanced", verified: false });
+    expect(carry(["absent", true]).advanced).not.toHaveProperty("verified");
+  });
+});
 
 describe("the Promotion chart", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[promotion.chart] every phase change a run makes is an edge of the Promotion chart, and a tour of the machine exercises every edge", () => {

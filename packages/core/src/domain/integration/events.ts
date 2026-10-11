@@ -57,6 +57,8 @@ export const BatchVerified = Schema.TaggedStruct("BatchVerified", {
   members: Schema.optional(Schema.Array(ChangeId)),
   base: Schema.optional(CommitSha),
   predecessors: Schema.optional(Schema.Array(ChangeId)),
+  /** Carried unchanged from the batch's `VerdictIssued.verified`. Absent means true. */
+  verified: Schema.optional(Schema.Boolean),
 });
 export const BatchFailed = Schema.TaggedStruct("BatchFailed", {
   batchId: BatchId,
@@ -86,6 +88,8 @@ export const TrunkAdvanced = Schema.TaggedStruct("TrunkAdvanced", {
   groupId: Schema.String,
   members: Schema.Array(ChangeId),
   proofIds: Schema.Array(Schema.String),
+  /** False when any batch in the group was unverified; absent means every one was verified. */
+  verified: Schema.optional(Schema.Boolean),
 });
 export const PromotionDeclined = Schema.TaggedStruct("PromotionDeclined", {
   projectId: ProjectId,

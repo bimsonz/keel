@@ -71,7 +71,12 @@ export type CandidateCommand =
       readonly instanceId: string;
       readonly planHash: ContentHash;
     }
-  | ({ readonly _tag: "Verified"; readonly verdictId: VerdictId } & Fence)
+  | ({
+      readonly _tag: "Verified";
+      readonly verdictId: VerdictId;
+      /** The verdict's `verified` flag, carried onto `BatchVerified` unchanged. */
+      readonly verified?: boolean;
+    } & Fence)
   | ({
       readonly _tag: "Failed";
       readonly verdictId: VerdictId;
@@ -210,6 +215,7 @@ export const decideCandidate = (
           members: batch.members,
           base: batch.base,
           predecessors: batch.predecessors ?? [],
+          ...(command.verified === undefined ? {} : { verified: command.verified }),
         }),
       ]);
 

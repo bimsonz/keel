@@ -189,7 +189,13 @@ const build = (
     case "StartVerification":
       return { _tag: "StartVerification", instanceId: `verify-${n}`, planHash: PLAN };
     case "Verified":
-      return { _tag: "Verified", verdictId: makeId("vrd", ulid(n)), ...fence };
+      return {
+        _tag: "Verified",
+        verdictId: makeId("vrd", ulid(n)),
+        // The verdict's flag by turn: absent, true or false.
+        ...(n % 3 === 0 ? { verified: false } : n % 3 === 1 ? {} : { verified: true }),
+        ...fence,
+      };
     case "Failed":
       return {
         _tag: "Failed",

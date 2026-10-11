@@ -26,6 +26,7 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 - Errors `ConflictStateRefused` and `ProbeStateRefused` (each with `reason?` and non-empty `nextActions`), and `ProbeNotFound`.
 - Event `ProjectSettingsChanged {projectId, changes: [{field, from, to}], by}` on the `project` entity, committed by the Project DO when an operator changes the project's settings; `from` and `to` are the field's JSON values (catalogue 89 → 90).
 - Event `ProjectCreated {projectId, name, by}` on the `project` entity, committed by the Project DO when a project is created (catalogue 88 → 89).
+- `verified?: boolean` (absent means true) on `VerdictIssued`, `BatchVerified`, `QueuedBatch` and `TrunkAdvanced`, and on the Candidate machine's `Verified` and the Promotion machine's `Enqueue` commands; `isVerified`. With the project's verification off the batch verdict carries `verified: false`; the Candidate and Promotion machines carry it unchanged, and `TrunkAdvanced` carries `verified: false` when any batch in its group was unverified.
 - `EventDraft.entity?`: a draft may name another entity its Durable Object owns (the Change DO's verdicts). That entity gets its own gap-free `seq` and dedupe keys; the default is still `CommitSpec.entity`.
 
 - `WorkspaceGrant.repo: RepoRef`, on the port and on the WorkspacePool RPC's grant: the workspace's repo on the code host. The Change DO keeps it for `hasCommit` and Precheck for `diffTrees`. It is never logged next to the remote.

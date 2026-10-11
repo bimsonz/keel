@@ -67,8 +67,14 @@ export const QueuedBatch = Schema.Struct({
   members: Schema.Array(ChangeId),
   base: CommitSha,
   predecessors: Schema.Array(ChangeId),
+  /** The `BatchVerified.verified` it arrived with. Absent means true. */
+  verified: Schema.optional(Schema.Boolean),
 });
 export type QueuedBatch = typeof QueuedBatch.Type;
+
+/** Whether a verdict, batch or advance was reached by running its plan: only an explicit `false` says no. */
+export const isVerified = (x: { readonly verified?: boolean | undefined }): boolean =>
+  x.verified !== false;
 
 /** The open write-ahead log entry: the group being pushed, and once composed, the one SHA every retry pushes. */
 export const PendingGroup = Schema.Struct({
