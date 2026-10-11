@@ -42,7 +42,7 @@ describe("[b21.contradiction] preflight through the Project DO's index", () => {
 
     expect(first.preflight).toMatchObject({ contradictions: [], suggestedMove: "proceed" });
     expect(second.preflight.contradictions).toEqual([
-      { premise: freshPerRequest, with: cachedPerSession, holder: a.changeId },
+      { premise: freshPerRequest, with: cachedPerSession, holder: a.changeId, withRole: "effect" },
     ]);
     expect(second.preflight.suggestedMove).toBe("refine");
     expect(second.change.state).toBe("working");
@@ -58,7 +58,7 @@ describe("[b21.contradiction] preflight through the Project DO's index", () => {
 
     // `holder` names the premise's holder, A itself; B is the neighbour whose effect it meets.
     expect(second.preflight.contradictions).toEqual([
-      { premise: freshPerRequest, with: cachedPerSession, holder: a.changeId },
+      { premise: freshPerRequest, with: cachedPerSession, holder: a.changeId, withRole: "effect" },
     ]);
     expect(second.preflight.neighbours.map((found) => found.changeId)).toEqual([b.changeId]);
     expect(second.preflight.suggestedMove).toBe("refine");

@@ -95,7 +95,7 @@ describe("[b21.contradiction] A's premise and B's declared effect on one subject
       const second = yield* declared(object(), A, { premises: [freshPerRequest] });
       // `holder` names the premise's holder, A itself; B is the neighbour whose effect it meets.
       expect(second.preflight.contradictions).toEqual([
-        { premise: freshPerRequest, with: cachedPerSession, holder: A },
+        { premise: freshPerRequest, with: cachedPerSession, holder: A, withRole: "effect" },
       ]);
       expect(second.preflight.neighbours.map((found) => found.changeId)).toEqual([B]);
       expect(second.preflight.suggestedMove).toBe("refine");
