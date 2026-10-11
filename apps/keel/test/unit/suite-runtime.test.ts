@@ -115,9 +115,12 @@ describe("the Tier 2 suite runtime", () => {
     expect(lines).toContain(`echo ${SUITE_PROTOCOL}`);
     expect(lines.at(-1)).toBe("exit 0");
     expect(JS_TS_SUITE_COMMAND).not.toMatch(/exit [1-9]/);
-    expect(
-      lines.indexOf('reason=$(keel_verify_bundle) || { hydration_diff; stop "$reason"; }'),
-    ).toBeLessThan(lines.findIndex((l) => l.includes("vitest")));
+    // Hydration is checked, and refetched at most once, before any test runs.
+    const hydrate = lines.indexOf(
+      'keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }',
+    );
+    expect(hydrate).toBeGreaterThan(-1);
+    expect(hydrate).toBeLessThan(lines.findIndex((l) => l.includes("vitest")));
   });
 
   it.effect("passes a green run, storing its evidence durably before citing it", () =>

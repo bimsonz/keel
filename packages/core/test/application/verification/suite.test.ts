@@ -89,6 +89,19 @@ describe("the suite runner's report", () => {
         stdout({ KEEL_HYDRATION_DIFF: b64("entry 3 c.bin missing"), KEEL_HYDRATION: "failed x" }),
       ),
     ).toEqual({ _tag: "hydration-failed", reason: "x", diagnosis: b64("entry 3 c.bin missing") });
+    expect(
+      parseSuiteOutput(
+        stdout({
+          ...ran(0),
+          KEEL_HYDRATION_RETRIED: "hash-mismatch",
+          KEEL_HYDRATION_DIFF: b64("entry 3 c.bin missing"),
+        }),
+      ),
+    ).toMatchObject({
+      _tag: "ran",
+      rehydrated: "hash-mismatch",
+      diagnosis: b64("entry 3 c.bin missing"),
+    });
     // A diagnosis that is not base64 is dropped, never a reason to misread the stop.
     expect(
       parseSuiteOutput(stdout({ KEEL_HYDRATION_DIFF: "not base64!", KEEL_HYDRATION: "failed x" })),
@@ -192,5 +205,16 @@ describe("judging a suite run", () => {
     expect(
       judgeSuite(step, hydration, { report: undefined, tail: "" }).evidence,
     ).not.toHaveProperty("diagnosis");
+  });
+
+  it("keeps a rehydrated run's first failure and its diagnosis in the evidence, beside its outcome", () => {
+    const rehydrated = { ...output(0), rehydrated: "hash-mismatch" };
+    const judged = judgeSuite(step, rehydrated, {
+      report: report(pass(5)),
+      tail: "tail",
+      diagnosis: "entry 3",
+    });
+    expect(judged.report.outcome).toBe("pass");
+    expect(judged.evidence).toMatchObject({ rehydrated: "hash-mismatch", diagnosis: "entry 3" });
   });
 });

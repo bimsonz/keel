@@ -2,15 +2,15 @@
 # kills: suite.diagnosis-kept
 # why: The doorway drops a failed hydration's diagnosis, so the evidence never says why it failed
 diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-index fa27a7f..8a827b5 100644
+index 401cf47..3635669 100644
 --- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
 +++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
-@@ -155,7 +155,7 @@ export const judgeRunnerOutput = (
-     const decoded: { report: unknown; tail: string; diagnosis?: string } =
-       output._tag === "ran"
-         ? { report: parseJson(reportText), tail: textOf(output.tail) }
--        : output._tag === "hydration-failed" && output.diagnosis !== undefined
-+        : output._tag === "hydration-failed" && output.diagnosis === "never"
-           ? { report: undefined, tail: "", diagnosis: textOf(output.diagnosis) }
-           : { report: undefined, tail: "" };
-     const credentialScan = scanCredentials(
+@@ -152,7 +152,7 @@ export const judgeRunnerOutput = (
+     const reportText = output._tag === "ran" ? yield* gunzipText(output.report) : undefined;
+     const diagnosis =
+       (output._tag === "ran" || output._tag === "hydration-failed") &&
+-      output.diagnosis !== undefined
++      output.diagnosis === "never"
+         ? { diagnosis: textOf(output.diagnosis) }
+         : {};
+     const decoded: { report: unknown; tail: string; diagnosis?: string } = {

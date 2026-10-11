@@ -232,3 +232,50 @@ export const DIAGNOSE_BUNDLE_SH = [
   "  diff -rq $r/tree . 2>&1 | head -20 | sed 's/^/vs-refetch /'",
   "}",
 ].join("\n");
+
+/**
+ * A POSIX sh function, `keel_rehydrate_bundle <scratch> <url> <dir>`: one
+ * verified refetch. It downloads the bundle from `url` into `<scratch>`, and
+ * only if the archive's sha256 is the hash the URL names (its content address)
+ * does it clear `dir` and extract into it. Otherwise it leaves `dir` alone,
+ * prints one reason (`no-url`, `fetch-failed`, `archive-hash-mismatch`,
+ * `clear-failed` or `extract-failed`) and returns 1.
+ */
+export const REHYDRATE_BUNDLE_SH = [
+  "keel_rehydrate_bundle() {",
+  "  r=$1/rehydrate; url=$2; dir=$3",
+  "  rm -rf $r; mkdir -p $r",
+  '  [ -n "$url" ] || { echo no-url; return 1; }',
+  '  curl --connect-timeout 10 --max-time 120 --fail --silent --show-error -o $r/bundle.tgz "$url" 2>/dev/null || { echo fetch-failed; return 1; }',
+  '  [ "$(sha256sum $r/bundle.tgz | cut -c1-64)" = "${url##*/}" ] || { echo archive-hash-mismatch; return 1; }',
+  '  find "$dir" -mindepth 1 -delete || { echo clear-failed; return 1; }',
+  '  tar -xzf $r/bundle.tgz --strip-components=1 -C "$dir" || { echo extract-failed; return 1; }',
+  "}",
+].join("\n");
+
+/**
+ * A POSIX sh function, `keel_hydrate <scratch> [url]`, run in the working
+ * directory a runner extracted the bundle into. It prints the suite protocol's
+ * hydration lines and returns 0 when the tree is the bundle's:
+ * - `KEEL_HYDRATION ok` when the tree verifies as extracted;
+ * - otherwise, after diagnosing the tree (DIAGNOSE_BUNDLE_SH), one verified
+ *   refetch (REHYDRATE_BUNDLE_SH). If the refetched tree verifies, it prints
+ *   `KEEL_HYDRATION_RETRIED <first reason>`, then `KEEL_HYDRATION_DIFF`, then
+ *   `KEEL_HYDRATION ok`. The retry line comes first, so it stays inside the
+ *   head of the output that the Workflows API returns;
+ * - if not, `KEEL_HYDRATION_DIFF` and `KEEL_HYDRATION failed <first reason>`,
+ *   returning 1. There is never a second refetch.
+ */
+export const HYDRATE_SH = [
+  VERIFY_BUNDLE_SH,
+  DIAGNOSE_BUNDLE_SH,
+  REHYDRATE_BUNDLE_SH,
+  "keel_hydrate() {",
+  "  if reason=$(keel_verify_bundle); then echo 'KEEL_HYDRATION ok'; return 0; fi",
+  `  diag=$(keel_bundle_diff "$1" "\${2:-}" 2>&1 | head -c 8192 | base64 | tr -d '\\n')`,
+  '  if (keel_rehydrate_bundle "$1" "${2:-}" "$(pwd)" >/dev/null) && keel_verify_bundle >/dev/null; then',
+  '    echo "KEEL_HYDRATION_RETRIED $reason"; echo "KEEL_HYDRATION_DIFF $diag"; echo "KEEL_HYDRATION ok"; return 0',
+  "  fi",
+  '  echo "KEEL_HYDRATION_DIFF $diag"; echo "KEEL_HYDRATION failed $reason"; return 1',
+  "}",
+].join("\n");

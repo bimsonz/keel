@@ -1,7 +1,9 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import {
   appendFileSync,
+  chmodSync,
+  existsSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -17,6 +19,7 @@ import {
   type BundleFile,
   BundleRefused,
   DIAGNOSE_BUNDLE_SH,
+  HYDRATE_SH,
   manifestOf,
   sha256Hex,
   VERIFY_BUNDLE_SH,
@@ -242,5 +245,96 @@ describe("diagnosing a refused tree", () => {
       "workspace files 2 bytes " + String(statSync(join(dir, BUNDLE_MANIFEST)).size + 2),
       "refetch skipped: no url",
     ]);
+  });
+});
+
+const scratchDir = (prefix: string) => {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  dirs.push(dir);
+  return dir;
+};
+
+/** Serves `bytes` as a bundle host would: at a path ending in the hash it is fetched by. */
+const serve = (hash: string, bytes: Uint8Array) => {
+  const dir = scratchDir("keel-served-");
+  writeFileSync(join(dir, hash), bytes);
+  return `file://${join(dir, hash)}`;
+};
+
+/**
+ * Runs `keel_hydrate` in `dir`, as the suite command does, with a `curl` on
+ * PATH that logs each call before running the real one.
+ */
+const hydrate = (dir: string, url: string) => {
+  const bin = scratchDir("keel-bin-");
+  const log = join(bin, "curl.log");
+  const real = execFileSync("sh", ["-c", "command -v curl"], { encoding: "utf8" }).trim();
+  writeFileSync(join(bin, "curl"), `#!/bin/sh\necho "$*" >> ${log}\nexec ${real} "$@"\n`);
+  chmodSync(join(bin, "curl"), 0o755);
+  const run = spawnSync(
+    "sh",
+    ["-c", `${HYDRATE_SH}\nkeel_hydrate "$0" "$1"`, scratchDir("keel-scratch-"), url],
+    { cwd: dir, encoding: "utf8", env: { ...process.env, PATH: `${bin}:${process.env["PATH"]}` } },
+  );
+  const calls = existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean) : [];
+  return {
+    status: run.status,
+    lines: run.stdout.split("\n").filter(Boolean),
+    refetches: calls.filter((c) => c.includes("/rehydrate/")).length,
+  };
+};
+
+const snapshot = (dir: string) =>
+  walk(dir)
+    .toSorted()
+    .map((path) => `${path}:${readFileSync(join(dir, path), "utf8").length}`);
+
+describe("hydrating a runner's workspace", () => {
+  const files = [
+    file("package.json", "{}\n"),
+    file("src/a.ts", "a\n"),
+    file("test/a.test.ts", "t\n"),
+  ];
+
+  it("passes a tree that verifies as extracted, fetching nothing", async () => {
+    const bundle = await writeBundle(files);
+    const result = hydrate(extract(bundle), serve(await sha256Hex(bundle), bundle));
+    expect(result).toEqual({ status: 0, lines: ["KEEL_HYDRATION ok"], refetches: 0 });
+  });
+
+  it("[bundle.rehydrate-verified] refetches a bad tree once by its content address, and says so first", async () => {
+    const bundle = await writeBundle(files);
+    const dir = extract(bundle);
+    rmSync(join(dir, "test/a.test.ts"));
+    const result = hydrate(dir, serve(await sha256Hex(bundle), bundle));
+    expect(result.status).toBe(0);
+    expect(result.lines[0]).toBe("KEEL_HYDRATION_RETRIED hash-mismatch");
+    expect(result.lines[1]).toMatch(/^KEEL_HYDRATION_DIFF [A-Za-z0-9+/]+=*$/);
+    expect(result.lines.slice(2)).toEqual(["KEEL_HYDRATION ok"]);
+    expect(verify(dir)).toEqual({ ok: true, reason: "" });
+  });
+
+  it("[bundle.rehydrate-verified] refuses a refetch that is not the bundle it was addressed by, and leaves the tree alone", async () => {
+    const bundle = await writeBundle(files);
+    const other = await writeBundle([file("package.json", "{}\n"), file("evil.ts", "x\n")]);
+    const dir = extract(bundle);
+    rmSync(join(dir, "test/a.test.ts"));
+    const before = snapshot(dir);
+    // A whole, valid bundle, but not this one: only its sha256 can tell.
+    const result = hydrate(dir, serve(await sha256Hex(bundle), other));
+    expect(result.status).toBe(1);
+    expect(result.lines.at(-1)).toBe("KEEL_HYDRATION failed hash-mismatch");
+    expect(result.lines.some((l) => l.startsWith("KEEL_HYDRATION_RETRIED"))).toBe(false);
+    expect(snapshot(dir)).toEqual(before);
+  });
+
+  it("[bundle.rehydrate-once] never refetches a second time", async () => {
+    const bundle = await writeBundle(files);
+    const dir = extract(bundle);
+    appendFileSync(join(dir, "src/a.ts"), "tampered\n");
+    const result = hydrate(dir, serve(await sha256Hex(bundle), bundle.slice(0, 40)));
+    expect(result.status).toBe(1);
+    expect(result.lines.at(-1)).toBe("KEEL_HYDRATION failed hash-mismatch");
+    expect(result.refetches).toBe(1);
   });
 });

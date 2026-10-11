@@ -132,6 +132,23 @@ const waitForVerdict = async (id: string) => {
   throw new Error(`${id} has no verdict after 4 minutes`);
 };
 
+/** A step's output as the Workflow returned it: the API now sends JSON outputs as strings. */
+const decodedOutput = (output: unknown): unknown => {
+  if (typeof output !== "string") return output ?? null;
+  try {
+    return JSON.parse(output) as unknown;
+  } catch {
+    return output;
+  }
+};
+
+/** The head of the runner's persisted stdout (the API keeps about 1 KB of it). */
+const runnerHead = (d: { steps: Step[] }): string => {
+  const runner = d.steps.find((s) => nameOf(s) === L1_SUITE_PLAN.steps[0]?.id);
+  const logs = Schema.decodeUnknownOption(RunnerLogs)(decodedOutput(runner?.output));
+  return Option.isSome(logs) ? logs.value.logs.stdout : "";
+};
+
 const summarise = (id: string, d: { status: string; steps: Step[] }) => {
   const step = (name: string) => d.steps.find((s) => nameOf(s) === name);
   const plan = step("plan");
@@ -140,7 +157,8 @@ const summarise = (id: string, d: { status: string; steps: Step[] }) => {
   return {
     id,
     status: d.status,
-    verdict: verdict?.output ?? null,
+    verdict: decodedOutput(verdict?.output),
+    rehydrated: runnerHead(d).includes("\nKEEL_HYDRATION_RETRIED "),
     runnerMs: ms(runner),
     verifyMs:
       typeof plan?.start === "string" && typeof verdict?.end === "string"
@@ -157,9 +175,7 @@ const run = async (variant: Variant, id: string) => {
 
 /** Everything a runner's persisted output says, with its encoded fields decoded so a grep can see them. */
 const persisted = (d: { steps: Step[] }) => {
-  const runner = d.steps.find((s) => nameOf(s) === L1_SUITE_PLAN.steps[0]?.id);
-  const logs = Schema.decodeUnknownOption(RunnerLogs)(runner?.output);
-  const stdout = Option.isSome(logs) ? logs.value.logs.stdout : "";
+  const stdout = runnerHead(d);
   const field = (key: string) =>
     stdout
       .split("\n")
@@ -167,16 +183,16 @@ const persisted = (d: { steps: Step[] }) => {
       ?.slice(key.length + 1);
   const tail = Buffer.from(field("KEEL_TAIL") ?? "", "base64").toString("utf8");
   const report = field("KEEL_REPORT");
-  const decoded =
-    report === undefined || report === "none"
-      ? ""
-      : gunzipSync(Buffer.from(report, "base64")).toString("utf8");
-  return [
-    JSON.stringify(runner?.output ?? null),
-    tail,
-    decoded,
-    JSON.stringify(d.steps.map((s) => s.output ?? null)),
-  ].join("\n");
+  const decoded = (() => {
+    if (report === undefined || report === "none") return "";
+    try {
+      return gunzipSync(Buffer.from(report, "base64")).toString("utf8");
+    } catch {
+      // The API keeps about 1 KB of each output, so a report is usually cut: the raw text is still grepped.
+      return "";
+    }
+  })();
+  return [stdout, tail, decoded, JSON.stringify(d.steps.map((s) => s.output ?? null))].join("\n");
 };
 
 const PATTERNS: readonly [string, RegExp][] = [
@@ -202,7 +218,7 @@ const grep = (text: string) =>
   });
 
 const evidenceOf = (d: { steps: Step[] }) => {
-  const ref = d.steps.find((s) => nameOf(s).endsWith(":evidence"))?.output;
+  const ref = decodedOutput(d.steps.find((s) => nameOf(s).endsWith(":evidence"))?.output);
   if (typeof ref !== "string") return "";
   return wrangler(
     "r2",
@@ -284,6 +300,7 @@ else if (command === "series") {
       JSON.stringify({
         i,
         outcome: Option.isSome(outcome) ? outcome.value.outcome : null,
+        rehydrated: row.rehydrated,
         runnerMs: row.runnerMs,
         verifyMs: row.verifyMs,
       }),
@@ -293,6 +310,8 @@ else if (command === "series") {
   console.log(
     JSON.stringify(
       {
+        // A rising count here means the first extract keeps failing, even while verdicts hold.
+        rehydrated: rows.filter((r) => r.rehydrated).length,
         runner: dist(rows.map((r) => r.runnerMs).filter((x): x is number => x !== null)),
         verify: dist(rows.map((r) => r.verifyMs).filter((x): x is number => x !== null)),
       },

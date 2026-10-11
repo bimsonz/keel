@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/bundle.test.ts
+# kills: bundle.rehydrate-once
+# why: A failed refetch is tried again, so a bad bundle host is fetched from twice before the run stops
+diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
+index 1d9d8f2..ebffea6 100644
+--- a/packages/runner-protocol/src/bundle.ts
++++ b/packages/runner-protocol/src/bundle.ts
+@@ -273,7 +273,7 @@ export const HYDRATE_SH = [
+   "keel_hydrate() {",
+   "  if reason=$(keel_verify_bundle); then echo 'KEEL_HYDRATION ok'; return 0; fi",
+   `  diag=$(keel_bundle_diff "$1" "\${2:-}" 2>&1 | head -c 8192 | base64 | tr -d '\\n')`,
+-  '  if (keel_rehydrate_bundle "$1" "${2:-}" "$(pwd)" >/dev/null) && keel_verify_bundle >/dev/null; then',
++  '  if { (keel_rehydrate_bundle "$1" "${2:-}" "$(pwd)" >/dev/null) || (keel_rehydrate_bundle "$1" "${2:-}" "$(pwd)" >/dev/null); } && keel_verify_bundle >/dev/null; then',
+   '    echo "KEEL_HYDRATION_RETRIED $reason"; echo "KEEL_HYDRATION_DIFF $diag"; echo "KEEL_HYDRATION ok"; return 0',
+   "  fi",
+   '  echo "KEEL_HYDRATION_DIFF $diag"; echo "KEEL_HYDRATION failed $reason"; return 1',

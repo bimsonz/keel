@@ -11,7 +11,8 @@ import { type CredentialScan, leaked } from "./redact.ts";
  *
  *   KEEL_SUITE/1
  *   KEEL_HYDRATION ok | failed <reason>     the workspace matched the bundle manifest
- *   KEEL_HYDRATION_DIFF <base64>             on a failure only: what differed, and a second fetch
+ *   KEEL_HYDRATION_RETRIED <reason>          the first extract failed for <reason>; one verified refetch hydrated
+ *   KEEL_HYDRATION_DIFF <base64>             after a failed extract only: what differed, and a second fetch
  *   KEEL_LOCK ok | diverged                  the lockfile matched the baked dependencies
  *   KEEL_EXIT <n>                            the test runner's exit code
  *   KEEL_DURATION_MS <n>
@@ -40,6 +41,10 @@ export type SuiteOutput =
       readonly tail: string;
       /** The report as base64 of gzip, still encoded; absent when the runner wrote none. */
       readonly report?: string;
+      /** Why the first extract failed, when one verified refetch hydrated the workspace instead. */
+      readonly rehydrated?: string;
+      /** The diagnosis of that first extract, base64. */
+      readonly diagnosis?: string;
     };
 
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
@@ -65,16 +70,17 @@ export const parseSuiteOutput = (stdout: string): SuiteOutput => {
     return { _tag: "malformed", reason: "more than one suite report" };
   const hydration = fields.get("KEEL_HYDRATION");
   if (hydration === undefined) return { _tag: "malformed", reason: "no KEEL_HYDRATION" };
-  if (hydration !== "ok") {
-    const diagnosis = fields.get("KEEL_HYDRATION_DIFF");
+  const diagnosis = fields.get("KEEL_HYDRATION_DIFF");
+  const diagnosed =
+    diagnosis !== undefined && diagnosis.length > 0 && BASE64.test(diagnosis) ? { diagnosis } : {};
+  if (hydration !== "ok")
     return {
       _tag: "hydration-failed",
       reason: hydration.startsWith("failed ") ? hydration.slice(7) : hydration,
-      ...(diagnosis !== undefined && diagnosis.length > 0 && BASE64.test(diagnosis)
-        ? { diagnosis }
-        : {}),
+      ...diagnosed,
     };
-  }
+  const retried = fields.get("KEEL_HYDRATION_RETRIED");
+  const rehydrated = retried === undefined ? {} : { rehydrated: retried, ...diagnosed };
   const lock = fields.get("KEEL_LOCK");
   if (lock === "diverged") return { _tag: "lockfile-diverged" };
   if (lock !== "ok") return { _tag: "malformed", reason: "no KEEL_LOCK" };
@@ -89,7 +95,14 @@ export const parseSuiteOutput = (stdout: string): SuiteOutput => {
   if (report === undefined) return { _tag: "malformed", reason: "no KEEL_REPORT" };
   if (report !== "none" && (report.length === 0 || !BASE64.test(report)))
     return { _tag: "malformed", reason: "bad KEEL_REPORT" };
-  return { _tag: "ran", exit, durationMs, tail, ...(report === "none" ? {} : { report }) };
+  return {
+    _tag: "ran",
+    exit,
+    durationMs,
+    tail,
+    ...(report === "none" ? {} : { report }),
+    ...rehydrated,
+  };
 };
 
 // ------------------------------------------------------------------ vitest's JSON report
@@ -132,7 +145,9 @@ export interface SuiteEvidence {
   readonly totals?: { readonly total: number; readonly passed: number; readonly failed: number };
   readonly failing: readonly FailingTest[];
   readonly tail: string;
-  /** Why the workspace did not hydrate, as the runner diagnosed it. */
+  /** Why the first extract failed, when a verified refetch hydrated the workspace instead. */
+  readonly rehydrated?: string;
+  /** Why the workspace did not hydrate on its first extract, as the runner diagnosed it. */
   readonly diagnosis?: string;
   /** What a scan of the runner's raw output found, as counts only. */
   readonly credentialScan?: CredentialScan;
@@ -191,7 +206,17 @@ export const judgeSuite = (
   resultRef?: ContentHash,
 ): SuiteJudgement => {
   const scan = decoded.credentialScan;
-  const judged = judgeRun(step, output, decoded, resultRef);
+  const run = judgeRun(step, output, decoded, resultRef);
+  const judged = {
+    ...run,
+    evidence: {
+      ...run.evidence,
+      ...(output._tag === "ran" && output.rehydrated !== undefined
+        ? { rehydrated: output.rehydrated }
+        : {}),
+      ...(decoded.diagnosis === undefined ? {} : { diagnosis: decoded.diagnosis }),
+    },
+  };
   if (scan === undefined) return judged;
   if (!leaked(scan)) return { ...judged, evidence: { ...judged.evidence, credentialScan: scan } };
   const { failure: _failure, ...report } = judged.report;
@@ -230,12 +255,8 @@ const judgeRun = (
   switch (output._tag) {
     case "malformed":
       return abstain("schema", `the runner's output is malformed: ${output.reason}`);
-    case "hydration-failed": {
-      const judged = abstain("unavailable", `hydration-failed: ${output.reason}`);
-      return decoded.diagnosis === undefined
-        ? judged
-        : { ...judged, evidence: { ...judged.evidence, diagnosis: decoded.diagnosis } };
-    }
+    case "hydration-failed":
+      return abstain("unavailable", `hydration-failed: ${output.reason}`);
     case "lockfile-diverged":
       return abstain("unavailable", "lockfile-diverged: the baked dependencies do not match");
     default:

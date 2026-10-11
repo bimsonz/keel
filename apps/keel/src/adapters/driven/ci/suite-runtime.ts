@@ -10,7 +10,7 @@ import {
 import type { ContentHash, Json } from "@keeltown/core/kernel";
 import type { PlanStep, StepResult } from "@keeltown/core/domain/verification";
 import { EvidenceStore, VerifierRuntime } from "@keeltown/core/ports";
-import { bundleUrl, DIAGNOSE_BUNDLE_SH, VERIFY_BUNDLE_SH } from "@keeltown/runner-protocol";
+import { bundleUrl, HYDRATE_SH } from "@keeltown/runner-protocol";
 import { Effect, Layer } from "effect";
 
 /** Where the ExecBox image bakes the pack's dependencies, with the sha256 of the lockfile they came from. */
@@ -22,8 +22,9 @@ export const BAKED_DEPS = "/opt/forge-deps";
  * in-band per SUITE_PROTOCOL instead:
  * 1. hydration: /workspace must match the bundle's manifest, by hash and by
  *    file count, because the engine never checks its archive checkout. A
- *    mismatch prints `KEEL_HYDRATION_DIFF`, base64 of what differs and of a
- *    second fetch from `$KEEL_BUNDLE_URL` (DIAGNOSE_BUNDLE_SH);
+ *    mismatch is diagnosed (`KEEL_HYDRATION_DIFF`) and refetched once from
+ *    `$KEEL_BUNDLE_URL`, accepted only by its content address
+ *    (`KEEL_HYDRATION_RETRIED`); see HYDRATE_SH;
  * 2. the lockfile must match the baked dependencies, which are linked in;
  * 3. vitest runs with its JSON reporter; its console goes to a file, so test
  *    output can never forge a marker, and only a base64 tail is printed.
@@ -33,12 +34,9 @@ export const JS_TS_SUITE_COMMAND = [
   "K=/tmp/keel; rm -rf $K; mkdir -p $K",
   `echo ${SUITE_PROTOCOL}`,
   'stop() { echo "KEEL_HYDRATION failed $1"; echo KEEL_END; exit 0; }',
-  VERIFY_BUNDLE_SH,
-  DIAGNOSE_BUNDLE_SH,
+  HYDRATE_SH,
   "cd /workspace 2>/dev/null || stop no-workspace",
-  'hydration_diff() { echo "KEEL_HYDRATION_DIFF $(keel_bundle_diff $K "${KEEL_BUNDLE_URL:-}" 2>&1 | head -c 8192 | base64 -w0)"; }',
-  'reason=$(keel_verify_bundle) || { hydration_diff; stop "$reason"; }',
-  "echo KEEL_HYDRATION ok",
+  'keel_hydrate $K "${KEEL_BUNDLE_URL:-}" || { echo KEEL_END; exit 0; }',
   `if [ "$(sha256sum pnpm-lock.yaml 2>/dev/null | cut -c1-64)" != "$(cat ${BAKED_DEPS}/.lock-sha 2>/dev/null)" ]; then echo KEEL_LOCK diverged; echo KEEL_END; exit 0; fi`,
   "echo KEEL_LOCK ok",
   `ln -sfn ${BAKED_DEPS}/node_modules node_modules`,
@@ -152,12 +150,17 @@ export const judgeRunnerOutput = (
   Effect.gen(function* () {
     const output = parseSuiteOutput(stdout);
     const reportText = output._tag === "ran" ? yield* gunzipText(output.report) : undefined;
-    const decoded: { report: unknown; tail: string; diagnosis?: string } =
-      output._tag === "ran"
+    const diagnosis =
+      (output._tag === "ran" || output._tag === "hydration-failed") &&
+      output.diagnosis !== undefined
+        ? { diagnosis: textOf(output.diagnosis) }
+        : {};
+    const decoded: { report: unknown; tail: string; diagnosis?: string } = {
+      ...(output._tag === "ran"
         ? { report: parseJson(reportText), tail: textOf(output.tail) }
-        : output._tag === "hydration-failed" && output.diagnosis !== undefined
-          ? { report: undefined, tail: "", diagnosis: textOf(output.diagnosis) }
-          : { report: undefined, tail: "" };
+        : { report: undefined, tail: "" }),
+      ...diagnosis,
+    };
     const credentialScan = scanCredentials(
       [stdout, decoded.tail, reportText ?? "", decoded.diagnosis ?? ""],
       { literals },

@@ -3,7 +3,7 @@
 // /workspace, then the command. Judges the output with the production parser.
 //
 //   docker build --platform linux/amd64 -t keel-execbox:local apps/keel-verify/containers/sandbox
-//   node apps/keel-verify/test/live/suite-in-docker.ts [base|red|canary|truncated|empty] ...
+//   node apps/keel-verify/test/live/suite-in-docker.ts [base|red|canary|truncated|truncated-twice|empty] ...
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -20,21 +20,25 @@ const IMAGE = process.env["KEEL_EXECBOX_IMAGE"] ?? "keel-execbox:local";
 const step = L1_SUITE_PLAN.steps[0];
 if (step === undefined) throw new Error("the L1 plan has no step");
 
-type Case = Variant | "truncated" | "empty";
+type Case = Variant | "truncated" | "truncated-twice" | "empty";
 
 const run = async (which: Case) => {
-  const bundle = await buildBundle(which === "truncated" || which === "empty" ? "base" : which);
+  const cut = which === "truncated" || which === "truncated-twice";
+  const bundle = await buildBundle(cut || which === "empty" ? "base" : which);
   const dir = mkdtempSync(join(tmpdir(), "keel-d1-"));
   // A truncated bundle stops mid-archive, as a dropped download would; an empty one never arrives.
-  const bytes =
-    which === "truncated"
-      ? bundle.bytes.slice(0, Math.floor(bundle.bytes.length * 0.6))
-      : which === "empty"
-        ? new Uint8Array()
-        : bundle.bytes;
+  const bytes = cut
+    ? bundle.bytes.slice(0, Math.floor(bundle.bytes.length * 0.6))
+    : which === "empty"
+      ? new Uint8Array()
+      : bundle.bytes;
   writeFileSync(join(dir, "bundle.tgz"), bytes);
-  // The whole bundle stays fetchable by its hash, as bundles.keel.internal serves it, for the diagnosis's refetch.
-  writeFileSync(join(dir, bundle.hash.slice(7)), bundle.bytes);
+  // The bundle stays fetchable by its hash, as bundles.keel.internal serves it, for the
+  // diagnosis and the one verified refetch; `truncated-twice` serves the cut bytes again.
+  writeFileSync(
+    join(dir, bundle.hash.slice(7)),
+    which === "truncated-twice" ? bytes : bundle.bytes,
+  );
   const checkout =
     "rm -rf /workspace && mkdir -p /workspace && tar -xz --strip-components=1 -C /workspace -f /in/bundle.tgz; true";
   const started = Date.now();
@@ -74,11 +78,12 @@ const run = async (which: Case) => {
       failingCount: e.failing.length,
       ...(e.diagnosis === undefined ? {} : { diagnosis: e.diagnosis.split("\n") }),
       credentialScan: e.credentialScan ?? null,
+      rehydrated: e.rehydrated ?? null,
     }),
   );
 };
 
-const CASES: readonly Case[] = ["base", "red", "canary", "truncated", "empty"];
+const CASES: readonly Case[] = ["base", "red", "canary", "truncated", "truncated-twice", "empty"];
 const isCase = (arg: string): arg is Case => CASES.some((c) => c === arg);
 const asked = process.argv.slice(2).filter(isCase);
 for (const which of asked.length > 0 ? asked : (["base", "red"] as const)) await run(which);
