@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgs.test.ts
+# kills: orgs.no-address
+# why: a member is handed to the page by their address
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index 667b524..8f84bbe 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -155,7 +155,7 @@ function memberOf(answer: MemberAnswer, reader: Who): Member {
+   return {
+     id: answer.id,
+     role: roleOf(answer.role),
+-    name: answer.user.name,
++    name: (answer.user as { email?: string }).email ?? answer.user.name,
+     ...(typeof handle === "string" && handle !== "" ? { handle } : {}),
+     you: answer.userId === reader.id,
+   };

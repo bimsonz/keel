@@ -3,9 +3,19 @@
 
 import { Button, Input } from "@cloudflare/kumo";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
-import { type Place, hrefOf, nextOf } from "../places.ts";
+import { type Place, hrefOf, nextOf, sentFrom } from "../places.ts";
 import { applyMode } from "../theme/mode.ts";
-import { type Account, NotOpen, type Passkey, type Who, createAccount } from "./account.ts";
+import { Switch } from "../views/Switch.tsx";
+import {
+  type Account,
+  NotOpen,
+  type Org,
+  type Passkey,
+  type Who,
+  createAccount,
+} from "./account.ts";
+import { Invite, NewOrg, OrgPages } from "./OrgPages.tsx";
+import { Card, HANDLE, Refusal, go, useAsking } from "./parts.tsx";
 // oxlint-disable-next-line import/no-unassigned-import -- a stylesheet
 import "../views/tokens.css";
 
@@ -37,51 +47,6 @@ function useReader(account: Account): Reader {
   }, [account]);
   return reader;
 }
-
-/** Runs one thing the reader asked for, and says so if Keel refuses it. */
-function useAsking(): {
-  busy: boolean;
-  refused: string | null;
-  ask: (what: () => Promise<void>) => Promise<void>;
-} {
-  const [busy, setBusy] = useState(false);
-  const [refused, setRefused] = useState<string | null>(null);
-  const ask = useCallback(async (what: () => Promise<void>) => {
-    setBusy(true);
-    setRefused(null);
-    try {
-      await what();
-    } catch (error) {
-      setRefused(error instanceof Error ? error.message : "Keel could not be reached");
-    } finally {
-      setBusy(false);
-    }
-  }, []);
-  return { busy, refused, ask };
-}
-
-function Refusal({ said }: { said: string | null }) {
-  if (said === null) return null;
-  return (
-    <p role="alert" className="text-sm" style={{ color: "var(--a-critical-ink, #f87171)" }}>
-      {said}
-    </p>
-  );
-}
-
-function Card({ title, lede, children }: { title: string; lede?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="mx-auto flex w-full max-w-[420px] flex-col gap-5 px-6 py-14">
-      <div className="flex flex-col gap-1.5">
-        <h1 className="text-[22px] font-semibold text-kumo-strong">{title}</h1>
-        {lede !== undefined && <p className="text-base text-kumo-default">{lede}</p>}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-const go = (address: string): void => window.location.assign(address);
 
 /** Signing in, and signing up: the same three ways, and a new address is signed up by its first code. */
 function SignIn({ account, creating }: { account: Account; creating: boolean }) {
@@ -202,9 +167,6 @@ function SignIn({ account, creating }: { account: Account; creating: boolean }) 
     </Card>
   );
 }
-
-/** A handle is a user's name on this Keel, and the name of their own org. */
-const HANDLE = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/;
 
 function ChooseHandle({ account, who }: { account: Account; who: Who }) {
   const next = nextOf(window.location.search);
@@ -493,17 +455,69 @@ function Device({ account, who, userCode }: { account: Account; who: Who; userCo
   );
 }
 
-function Shell({ reader, children }: { reader: Reader; children: ReactNode }) {
+/** The orgs the reader is in, for the frame's dropdown. Asked for only where the frame names an org. */
+function useOrgs(account: Account, wanted: boolean): Org[] {
+  const [orgs, setOrgs] = useState<Org[]>([]);
+  useEffect(() => {
+    if (!wanted) return undefined;
+    let here = true;
+    const read = async (): Promise<void> => {
+      const held = await account.orgs();
+      if (here) setOrgs(held);
+    };
+    void read();
+    return () => {
+      here = false;
+    };
+  }, [account, wanted]);
+  return orgs;
+}
+
+function Shell({
+  reader,
+  org,
+  orgs,
+  children,
+}: {
+  reader: Reader;
+  /** The org the address names, where it names one. */
+  org?: string | undefined;
+  orgs: Org[];
+  children: ReactNode;
+}) {
   return (
     <div className="a-root flex min-h-screen w-screen flex-col bg-kumo-canvas text-base text-kumo-default">
       <header className="shrink-0 border-b border-kumo-line bg-kumo-base">
         <div className="flex h-12 items-center justify-between px-6">
-          <a href="/" className="flex items-center gap-2.5">
-            <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden>
-              <path d="M2.5 5h15L10 17.5Z" fill="var(--text-color-kumo-strong)" />
-            </svg>
-            <span className="text-base text-kumo-default">Keel</span>
-          </a>
+          <div className="flex items-center gap-2.5">
+            <a href="/" className="flex items-center gap-2.5">
+              <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden>
+                <path d="M2.5 5h15L10 17.5Z" fill="var(--text-color-kumo-strong)" />
+              </svg>
+              <span className="text-base text-kumo-default">Keel</span>
+            </a>
+            {org !== undefined && reader.is === "user" && (
+              <>
+                <span className="text-kumo-inactive">/</span>
+                <a
+                  href={hrefOf({ at: "org", org, tab: "home" })}
+                  className="text-base font-semibold text-kumo-strong hover:underline"
+                >
+                  {org}
+                </a>
+                <Switch
+                  what="org"
+                  here={org}
+                  others={orgs.map((held) => ({
+                    name: held.handle,
+                    href: hrefOf({ at: "org", org: held.handle, tab: "home" }),
+                    ...(held.name === held.handle ? {} : { note: held.name }),
+                  }))}
+                  all={{ label: "New org", href: hrefOf({ at: "new-org" }) }}
+                />
+              </>
+            )}
+          </div>
           {reader.is === "user" && (
             <a
               href={hrefOf({ at: "settings" })}
@@ -527,15 +541,18 @@ export function AccountApp({ place }: { place: Place }) {
       new URLSearchParams(window.location.search).get("theme") === "light" ? "light" : "dark",
     );
   }, []);
-  // A page for a signed-in user sends a visitor to sign in, and brings them back.
-  const here = `${window.location.pathname}${window.location.search}`;
+  // A page for a signed-in user sends a visitor to sign in, and brings them back to it.
+  const sent =
+    reader.is === "visitor"
+      ? sentFrom(place, reader, window.location)
+      : reader.is === "user"
+        ? sentFrom(place, { is: "user", handle: reader.who.handle }, window.location)
+        : null;
   useEffect(() => {
-    if (reader.is === "visitor" && (place.at === "settings" || place.at === "device"))
-      go(hrefOf({ at: "login" }, here));
-    if (reader.is === "user" && place.at === "login") go(nextOf(window.location.search));
-    if (reader.is === "user" && place.at === "signup" && reader.who.handle !== undefined)
-      go(nextOf(window.location.search));
-  }, [here, place.at, reader]);
+    if (sent !== null) go(sent);
+  }, [sent]);
+  const named = reader.is === "user" && reader.who.handle !== undefined;
+  const orgs = useOrgs(account, named && place.at === "org");
 
   let page: ReactNode = null;
   if (reader.is === "closed")
@@ -549,13 +566,23 @@ export function AccountApp({ place }: { place: Place }) {
         </a>
       </Card>
     );
+  else if (sent !== null) page = null;
   else if (reader.is === "visitor" && (place.at === "login" || place.at === "signup"))
     page = <SignIn account={account} creating={place.at === "signup"} />;
-  else if (reader.is === "user" && place.at === "signup" && reader.who.handle === undefined)
+  else if (reader.is === "user" && place.at === "signup")
     page = <ChooseHandle account={account} who={reader.who} />;
   else if (reader.is === "user" && place.at === "settings")
     page = <Settings account={account} who={reader.who} />;
   else if (reader.is === "user" && place.at === "device")
     page = <Device account={account} who={reader.who} userCode={place.userCode} />;
-  return <Shell reader={reader}>{page}</Shell>;
+  else if (reader.is === "user" && place.at === "new-org") page = <NewOrg account={account} />;
+  else if (reader.is === "user" && place.at === "org")
+    page = <OrgPages account={account} who={reader.who} handle={place.org} tab={place.tab} />;
+  else if (reader.is === "user" && place.at === "invite")
+    page = <Invite account={account} who={reader.who} id={place.id} />;
+  return (
+    <Shell reader={reader} org={place.at === "org" ? place.org : undefined} orgs={orgs}>
+      {page}
+    </Shell>
+  );
 }

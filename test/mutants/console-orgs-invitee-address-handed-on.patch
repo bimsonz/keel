@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgs.test.ts
+# kills: orgs.no-address
+# why: an invitation made by handle is handed to the page with the address Keel resolved the handle to
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index 667b524..6cd2d59 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -177,7 +177,7 @@ function invitationOf(answer: InvitationAnswer): Invitation {
+   return {
+     id: answer.id,
+     role: roleOf(answer.role),
+-    to: byHandle ? (answer.handle ?? "") : (answer.email ?? ""),
++    to: answer.email ?? "",
+     expiresAt: new Date(answer.expiresAt).toISOString(),
+   };
+ }

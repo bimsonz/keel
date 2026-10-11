@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts
+# kills: places.sent
+# why: a visitor sent to sign in is not brought back to the page they asked for
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index 876c663..b3f6db8 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -110,7 +110,7 @@ export function sentFrom(
+ ): string | null {
+   const asked = `${here.pathname}${here.search}`;
+   if (reader.is === "visitor")
+-    return place.at === "login" || place.at === "signup" ? null : hrefOf({ at: "login" }, asked);
++    return place.at === "login" || place.at === "signup" ? null : hrefOf({ at: "login" });
+   if (place.at === "login") return nextOf(here.search);
+   if (place.at === "signup") return reader.handle === undefined ? null : nextOf(here.search);
+   // An org's pages are for a user with a name on this Keel: Keel refuses them to one who has not chosen it.

@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgs.test.ts
+# kills: roles.delete
+# why: deleting an org is offered whoever asks and whatever they typed
+diff --git a/apps/console/src/account/roles.ts b/apps/console/src/account/roles.ts
+index d948dd6..19f2736 100644
+--- a/apps/console/src/account/roles.ts
++++ b/apps/console/src/account/roles.ts
+@@ -48,5 +48,5 @@ export function mayDelete(
+   reader: { role: Role; handle?: string | undefined },
+   typed: string,
+ ): boolean {
+-  return reader.role === "owner" && org.handle !== reader.handle && typed === org.handle;
++  return true;
+ }

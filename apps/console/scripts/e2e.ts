@@ -1769,6 +1769,174 @@ expectEqual(
   "string false",
 );
 
+// ─── Orgs: an org's home, making one, its members and invitations, its settings ───
+// An org's pages name the org in their address. Ada has had an org of her own since she chose her handle.
+await person.goto(`${built}/orgs/ada`, { waitUntil: "domcontentloaded" });
+await person.getByRole("heading", { level: 1, name: /^ada/ }).waitFor();
+expectEqual(
+  "orgs: the frame names the org, and who is signed in",
+  squash(await person.locator("header").first().innerText()),
+  "Keel / ada ada",
+);
+await person.goto(`${built}/orgs/ada/settings`, { waitUntil: "domcontentloaded" });
+await person.getByText("This is your own org.").waitFor();
+expectEqual(
+  "orgs: a user's own org is not offered for deleting",
+  String(await person.getByRole("button", { name: "Delete this org" }).count()),
+  "0",
+);
+
+// Making one. A handle in use is refused, and said.
+await person.goto(`${built}/new/org`, { waitUntil: "domcontentloaded" });
+await person.getByLabel("Name").fill("Lovelace");
+await person.getByLabel("Handle").fill("ada");
+await person.getByRole("button", { name: "Make the org" }).click();
+await person.getByText("That handle is taken.").waitFor();
+await person.getByLabel("Handle").fill("lovelace");
+await shot(person, "new-org");
+await person.getByRole("button", { name: "Make the org" }).click();
+await person.getByRole("heading", { level: 1, name: /^Lovelace/ }).waitFor();
+expectEqual(
+  "orgs: made, at an address of its own, and its maker is its owner",
+  `${whereOf(person)} ${squash(await person.getByRole("heading", { level: 1 }).innerText())}`,
+  "/orgs/lovelace Lovelace owner",
+);
+
+// Beside the org's name, the reader's other orgs, a click away: the same dropdown the project's name has.
+await person.getByRole("button", { name: "Switch org" }).click();
+await person.getByRole("menuitem", { name: "New org" }).waitFor();
+expectEqual(
+  "orgs: the frame drops down on the org, to the reader's others and to making one",
+  (await person.getByRole("menuitem").allInnerTexts()).map(squash).toSorted().join(" | "),
+  "New org | ada | lovelace Lovelace",
+);
+await shot(person, "org-switcher");
+await person.getByRole("menuitem", { name: /^ada/ }).click();
+await person.waitForURL(`${built}/orgs/ada`);
+expectEqual("orgs: and goes to the one chosen", whereOf(person), "/orgs/ada");
+
+// A second person signs up, in a browser of her own.
+const second = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+await withIdentity(second, identity, sentToKeel);
+const grace = watch(await second.newPage(), "account, a second user");
+await grace.goto(`${built}/signup`, { waitUntil: "domcontentloaded" });
+await grace.getByLabel("Email").fill("grace@example.com");
+await grace.getByRole("button", { name: "Send a code" }).click();
+await grace.getByLabel("The code sent to grace@example.com").waitFor();
+await grace
+  .getByLabel("The code sent to grace@example.com")
+  .fill(identity.outbox.at(-1)?.otp ?? "");
+await grace.getByRole("button", { name: "Create the account" }).click();
+await grace.getByRole("heading", { name: "Choose your handle" }).waitFor();
+await grace.getByLabel("Handle").fill("grace");
+await grace.getByRole("button", { name: "Take this handle" }).click();
+await grace.waitForURL(`${built}/`);
+
+// Ada invites her by handle. Nobody types another person's address, and none is shown.
+await person.goto(`${built}/orgs/lovelace/members`, { waitUntil: "domcontentloaded" });
+await person.getByLabel("Invite by handle").fill("nobody-here");
+await person.getByRole("button", { name: "Invite", exact: true }).click();
+await person.getByText("Nobody on this Keel has that handle").waitFor();
+await person.getByLabel("Invite by handle").fill("grace");
+await person.getByLabel("Role for the invitation").selectOption("maintainer");
+await person.getByRole("button", { name: "Invite", exact: true }).click();
+const link = person.locator("[data-invitation-link]");
+await link.waitFor();
+const invitation = new URL(await link.innerText());
+expectEqual(
+  "orgs: an invitation has an address of its own, on this console",
+  `${invitation.origin === built} ${/^\/invite\/[\w-]+$/.test(invitation.pathname)}`,
+  "true true",
+);
+expectEqual(
+  "orgs: it is told by the handle it was made to, and no address is on the page",
+  `${squash(await person.getByRole("list", { name: "Invitations not yet answered" }).innerText()).startsWith("grace invited as maintainer")} ${String((await person.content()).includes("@example.com"))}`,
+  "true false",
+);
+await shot(person, "members");
+
+// The link is the invitation's address. A visitor who opens it signs in first, and comes back to it.
+const passerBy = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+await withIdentity(passerBy, identity);
+const stranger = watch(await passerBy.newPage(), "account, a visitor with an invitation's link");
+await stranger.goto(invitation.href, { waitUntil: "domcontentloaded" });
+await stranger.getByRole("heading", { name: "Sign in to Keel" }).waitFor();
+expectEqual(
+  "orgs: a visitor with the link is sent to sign in, and back to the invitation",
+  whereOf(stranger),
+  `/login?next=${encodeURIComponent(invitation.pathname)}`,
+);
+await passerBy.close();
+// Whoever made it is not who it was made to: Keel reads it to her alone.
+await person.goto(invitation.href, { waitUntil: "domcontentloaded" });
+await person.getByRole("heading", { name: "This invitation is not open to you" }).waitFor();
+expectEqual(
+  "orgs: someone else with the link is shown nothing of the invitation",
+  String((await person.locator("main").innerText()).includes("Lovelace")),
+  "false",
+);
+
+await grace.goto(invitation.href, { waitUntil: "domcontentloaded" });
+await grace.getByRole("heading", { name: "Join Lovelace?" }).waitFor();
+await shot(grace, "invite");
+await grace.getByRole("button", { name: "Join" }).click();
+await grace.getByRole("heading", { level: 1, name: /^Lovelace/ }).waitFor();
+expectEqual(
+  "orgs: joined, with the role the invitation gave",
+  `${whereOf(grace)} ${squash(await grace.getByRole("heading", { level: 1 }).innerText())}`,
+  "/orgs/lovelace Lovelace maintainer",
+);
+
+// The owner changes her role, and then removes her.
+await person.goto(`${built}/orgs/lovelace/members`, { waitUntil: "domcontentloaded" });
+const members = person.getByRole("list", { name: "Members of this org" });
+await person.getByLabel("Role of grace").waitFor();
+expectEqual(
+  "orgs: the owner sees both members, by handle, and the second one's role",
+  `${await members.getByRole("listitem").count()} ${await person.getByLabel("Role of grace").inputValue()} ${String((await person.content()).includes("@example.com"))}`,
+  "2 maintainer false",
+);
+await Promise.all([
+  person.waitForResponse((answer) => answer.url().endsWith("/organization/update-member-role")),
+  person.getByLabel("Role of grace").selectOption("member"),
+]);
+await grace.goto(`${built}/orgs/lovelace/members`, { waitUntil: "domcontentloaded" });
+await grace.getByRole("list", { name: "Members of this org" }).waitFor();
+expectEqual(
+  "orgs: made a member, she is one, and is offered no way to invite or remove",
+  `${squash(await grace.getByRole("heading", { level: 1 }).innerText())} ${await grace.getByRole("button", { name: /^(Invite|Remove)$/ }).count()}`,
+  "Lovelace member 0",
+);
+await members.getByRole("button", { name: "Remove" }).click();
+await person.waitForFunction(
+  () => document.querySelectorAll('ul[aria-label="Members of this org"] > li').length === 1,
+);
+await grace.goto(`${built}/orgs/lovelace`, { waitUntil: "domcontentloaded" });
+await grace.getByRole("heading", { name: "There is no org of that name here" }).waitFor();
+expectEqual(
+  "orgs: removed, the org is to her as one that is not there",
+  String(await grace.getByRole("navigation", { name: "Org" }).count()),
+  "0",
+);
+await second.close();
+
+// Deleting an org is deliberate: its handle is typed first.
+await person.goto(`${built}/orgs/lovelace/settings`, { waitUntil: "domcontentloaded" });
+const deleting = person.getByRole("button", { name: "Delete this org" });
+await deleting.waitFor();
+expectEqual(
+  "orgs: deleting waits for the org's handle to be typed",
+  String(await deleting.isDisabled()),
+  "true",
+);
+await person.getByLabel(/^Type lovelace to delete it/).fill("lovelace");
+await shot(person, "org-settings");
+await deleting.click();
+await person.waitForURL(`${built}/settings`);
+await person.goto(`${built}/orgs/lovelace`, { waitUntil: "domcontentloaded" });
+await person.getByRole("heading", { name: "There is no org of that name here" }).waitFor();
+expectEqual("orgs: deleted, it is no longer there", whereOf(person), "/orgs/lovelace");
+
 // Whatever the page asked of Keel, it put no credential of its own on it.
 expectEqual(
   "account: the page sent Keel no Authorization",

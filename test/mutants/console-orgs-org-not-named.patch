@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgs.test.ts
+# kills: orgs.address
+# why: an invitation does not name its org, so it is made in whichever org the session holds as active
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index 667b524..43b1ba7 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -345,7 +345,7 @@ export function createAccount(options: AccountOptions) {
+         taken(
+           await client.$fetch<InvitationAnswer>("/organization/invite-member", {
+             method: "POST",
+-            body: { ...invitee, role, organizationId: org.id },
++            body: { ...invitee, role },
+           }),
+         ),
+       );

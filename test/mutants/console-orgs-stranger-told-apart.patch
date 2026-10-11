@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgs.test.ts
+# kills: orgs.create
+# why: an org the reader is not in is told apart from one that is not there
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index 667b524..781b7c6 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -183,7 +183,7 @@ function invitationOf(answer: InvitationAnswer): Invitation {
+ }
+ 
+ /** Better Auth's answers where there is no such org, or it is not the reader's to see. */
+-const NOT_THEIRS = new Set(["ORGANIZATION_NOT_FOUND", "USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION"]);
++const NOT_THEIRS = new Set(["ORGANIZATION_NOT_FOUND"]);
+ 
+ /** As `taken`, but null where the thing asked for is not there for this reader: a private one and none look the same. */
+ function takenIfTheirs<Data>(result: { data: Data | null; error: Failure | null }): Data | null {

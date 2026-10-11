@@ -1,16 +1,16 @@
-# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/account.test.ts
-# kills: account.cross-site
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/account.test.ts apps/console/test/unit/account/orgs.test.ts
+# kills: account.cross-site, orgs.cross-site
 # why: the stand-in for Keel's identity runs with its origin check off, as Better Auth leaves it under a test runner, so a cross-site call is taken
 diff --git a/apps/console/test/fixtures/identity/standIn.ts b/apps/console/test/fixtures/identity/standIn.ts
-index 56367ca..b2bfebc 100644
+index dad45c4..b32c183 100644
 --- a/apps/console/test/fixtures/identity/standIn.ts
 +++ b/apps/console/test/fixtures/identity/standIn.ts
-@@ -55,7 +55,7 @@ export function createIdentity(origin: string): Identity {
+@@ -57,7 +57,7 @@ export function createIdentity(origin: string): Identity {
      basePath: "/v1/auth",
      trustedOrigins: [origin],
      // Better Auth leaves its origin check off when it finds itself under a test runner. Keel runs with it on.
 -    advanced: { disableOriginCheck: false, disableCSRFCheck: false },
 +    advanced: { disableOriginCheck: true, disableCSRFCheck: true },
-     plugins: [
-       emailOTP({
-         // oxlint-disable-next-line typescript/require-await -- the plugin's own signature
+     hooks: {
+       before: createAuthMiddleware(async (ctx) => {
+         if (ctx.path !== "/organization/invite-member") return undefined;

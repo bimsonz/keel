@@ -1,67 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { NotOpen, Refused, createAccount } from "../../../src/account/account.ts";
-import { type Identity, createIdentity } from "../../fixtures/identity/standIn.ts";
-
-const ORIGIN = "https://keel.example";
-
-interface Cookie {
-  value: string;
-  httpOnly: boolean;
-  sameSite: string;
-}
-
-/**
- * A browser's part in a request: it keeps the cookies it is given and sends them back, and it says which
- * page is asking. What the page's own code put on a request is kept apart from what the browser added.
- */
-function browser(
-  identity: Pick<Identity, "handle">,
-  origin = ORIGIN,
-  jar = new Map<string, Cookie>(),
-) {
-  const fromThePage: Request[] = [];
-  const serve: typeof fetch = async (input, init) => {
-    const asked = new Request(input, init);
-    fromThePage.push(asked.clone());
-    const headers = new Headers(asked.headers);
-    if (jar.size > 0)
-      headers.set("cookie", [...jar].map(([name, cookie]) => `${name}=${cookie.value}`).join("; "));
-    headers.set("origin", origin);
-    const response = await identity.handle(new Request(asked, { headers }));
-    for (const line of response.headers.getSetCookie()) {
-      const [pair = "", ...attributes] = line.split(";").map((part) => part.trim());
-      const name = pair.slice(0, pair.indexOf("="));
-      const value = pair.slice(pair.indexOf("=") + 1);
-      const has = (attribute: string) =>
-        attributes.find((given) => given.toLowerCase().startsWith(attribute));
-      if (value === "" || has("max-age=0") !== undefined) jar.delete(name);
-      else
-        jar.set(name, {
-          value,
-          httpOnly: has("httponly") !== undefined,
-          sameSite: has("samesite=")?.slice("samesite=".length) ?? "",
-        });
-    }
-    return response;
-  };
-  return { serve, jar, fromThePage };
-}
-
-async function signedUp(email = "ada@example.com") {
-  const identity = createIdentity(ORIGIN);
-  const tab = browser(identity);
-  const account = createAccount({ origin: ORIGIN, fetch: tab.serve });
-  await account.sendCode(email);
-  const code = identity.outbox.at(-1)?.otp ?? "";
-  const who = await account.signInWithCode(email, code);
-  return { identity, tab, account, who };
-}
-
-/** The session's token, as the cookie carries it: what must never come back out of this module. */
-function tokenIn(jar: Map<string, Cookie>): string {
-  const session = [...jar].find(([name]) => name.endsWith("session_token"))?.[1];
-  return decodeURIComponent(session?.value ?? "").split(".")[0] ?? "";
-}
+import { createIdentity } from "../../fixtures/identity/standIn.ts";
+import { ORIGIN, browser, signedUp, tokenIn } from "./browser.ts";
 
 describe("who the page is, to Keel", () => {
   it("[account.signup] signs a new address up and in with a code sent to it, and the session is a cookie the page cannot read", async () => {
