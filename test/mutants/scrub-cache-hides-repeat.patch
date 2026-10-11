@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/public-scrub-git.test.ts -t scrub.repeat
+# kills: scrub.repeat
+# why: a forbidden term is cached as clean once seen, so only the first file that names it is reported
+diff --git a/packages/tooling/src/guards/public-scrub.ts b/packages/tooling/src/guards/public-scrub.ts
+index d47ac01..ccb98f8 100644
+--- a/packages/tooling/src/guards/public-scrub.ts
++++ b/packages/tooling/src/guards/public-scrub.ts
+@@ -79,7 +79,7 @@ export function checkPublicScrub(root: string, options: GuardOptions = {}): Guar
+   const reasonFor = (term: string): string | undefined => {
+     if (clean.has(term)) return undefined;
+     const reason = FORBIDDEN_TERMS.get(digest(term));
+-    if (reason === undefined) clean.add(term);
++    clean.add(term);
+     return reason;
+   };
+   for (const file of files) {
