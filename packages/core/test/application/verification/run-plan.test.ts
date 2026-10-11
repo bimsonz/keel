@@ -96,6 +96,10 @@ const recording = (answer: (step: PlanStep, world: FlowWorld | undefined) => Ste
   return { calls, runner };
 };
 
+/** The when-demands case: a annotates, b abstains, c passes. */
+const demandAnswer = (s: PlanStep, w: FlowWorld | undefined) =>
+  report(s, w, s.id === "a" ? "annotate" : s.id === "b" ? "abstain" : "pass");
+
 const run = (plan: FlowPlan, runner: StepRunner<never>) => Effect.runPromise(runPlan(plan, runner));
 
 /** Every step of the plan, run in every world it names: what a runner without a flow would do. */
@@ -278,13 +282,11 @@ describe("run-plan: the compiled plan's flow, executed", () => {
       { _tag: "when", condition: { _tag: "outcome", step: "b", in: ["abstain"] }, body: leaf("c") },
     );
     const plan = handPlan(steps, flow);
-    const answer = (s: PlanStep, w: FlowWorld | undefined) =>
-      report(s, w, s.id === "a" ? "annotate" : s.id === "b" ? "abstain" : "pass");
-    const { calls, runner } = recording(answer);
+    const { calls, runner } = recording(demandAnswer);
     const ran = await run(plan, runner);
     expect(calls).toEqual(["a", "b", "c"]);
     expect(verdictOn(plan, ran)).toEqual(
-      verdictOn(plan, await runAll(plan, recording(answer).runner)),
+      verdictOn(plan, await runAll(plan, recording(demandAnswer).runner)),
     );
     expect(verdictOn(plan, ran).outcome).toBe("land");
   });
