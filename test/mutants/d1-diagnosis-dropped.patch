@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/suite-runtime.test.ts
+# kills: suite.diagnosis-kept
+# why: The doorway drops a failed hydration's diagnosis, so the evidence never says why it failed
+diff --git a/apps/keel/src/adapters/driven/ci/suite-runtime.ts b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+index abd00b8..c47c661 100644
+--- a/apps/keel/src/adapters/driven/ci/suite-runtime.ts
++++ b/apps/keel/src/adapters/driven/ci/suite-runtime.ts
+@@ -145,7 +145,7 @@ export const judgeRunnerOutput = (
+     const decoded =
+       output._tag === "ran"
+         ? { report: yield* gunzipJson(output.report), tail: textOf(output.tail) }
+-        : output._tag === "hydration-failed" && output.diagnosis !== undefined
++        : output._tag === "hydration-failed" && output.diagnosis === "never"
+           ? { report: undefined, tail: "", diagnosis: textOf(output.diagnosis) }
+           : { report: undefined, tail: "" };
+     const judged = judgeSuite(step, output, decoded);

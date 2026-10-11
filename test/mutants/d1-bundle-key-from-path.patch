@@ -1,16 +1,17 @@
 # expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/egress.test.ts
 # why: The bundle host serves whatever key the request path names, not only bundles/<sha256>
 diff --git a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
-index 6d7cff7..45d39f6 100644
+index 019e7f5..30a4c42 100644
 --- a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
 +++ b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
-@@ -18,8 +18,7 @@ export async function serveBundle(request: Request, env: Env): Promise<Response>
+@@ -102,9 +102,8 @@ export async function serveBundle(
    if (request.method !== "GET" && request.method !== "HEAD")
      return new Response("bundles are read-only", { status: 405 });
    const sha256 = new URL(request.url).pathname.replace(/^\/+/, "");
 -  if (!/^[0-9a-f]{64}$/.test(sha256)) return new Response("not a bundle hash", { status: 400 });
+   const started = Date.now();
 -  const object = await env.BUNDLES.get(bundleKey(sha256));
 +  const object = await env.BUNDLES.get(sha256);
    if (object === null) return new Response("no such bundle", { status: 404 });
-   return new Response(request.method === "HEAD" ? null : object.body, {
-     headers: {
+   const body =
+     request.method === "HEAD"

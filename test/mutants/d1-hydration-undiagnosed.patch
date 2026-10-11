@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/bundle.test.ts
+# kills: bundle.diagnose-short, bundle.diagnose-differs
+# why: The hydration diff checks no entry, so a short or corrupt extract is diagnosed as a clean tree
+diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
+index b742385..2501288 100644
+--- a/packages/runner-protocol/src/bundle.ts
++++ b/packages/runner-protocol/src/bundle.ts
+@@ -212,8 +212,8 @@ export const DIAGNOSE_BUNDLE_SH = [
+   "    n=0; bad=0",
+   "    while read -r h p; do",
+   "      n=$((n + 1))",
+-  '      if [ ! -f "$p" ]; then why=missing',
+-  `      elif [ "$(sha256sum "$p" | cut -c1-64)" != "$h" ]; then why="differs $(wc -c < "$p" | tr -d ' ')B"`,
++  '      if false; then why=missing',
++  `      elif false; then why="differs $(wc -c < "$p" | tr -d ' ')B"`,
+   "      else continue; fi",
+   "      bad=$((bad + 1))",
+   '      if [ $bad -le 20 ]; then echo "entry $n $p $why"; fi',

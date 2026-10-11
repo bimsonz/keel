@@ -10,6 +10,7 @@ import type { InfraFailure, PlanStep, StepResult } from "../../domain/verificati
  *
  *   KEEL_SUITE/1
  *   KEEL_HYDRATION ok | failed <reason>     the workspace matched the bundle manifest
+ *   KEEL_HYDRATION_DIFF <base64>             on a failure only: what differed, and a second fetch
  *   KEEL_LOCK ok | diverged                  the lockfile matched the baked dependencies
  *   KEEL_EXIT <n>                            the test runner's exit code
  *   KEEL_DURATION_MS <n>
@@ -23,7 +24,12 @@ export const SUITE_PROTOCOL = "KEEL_SUITE/1";
 
 export type SuiteOutput =
   | { readonly _tag: "malformed"; readonly reason: string }
-  | { readonly _tag: "hydration-failed"; readonly reason: string }
+  | {
+      readonly _tag: "hydration-failed";
+      readonly reason: string;
+      /** What the runner found wrong, base64; the doorway decodes it into the evidence. */
+      readonly diagnosis?: string;
+    }
   | { readonly _tag: "lockfile-diverged" }
   | {
       readonly _tag: "ran";
@@ -58,11 +64,16 @@ export const parseSuiteOutput = (stdout: string): SuiteOutput => {
     return { _tag: "malformed", reason: "more than one suite report" };
   const hydration = fields.get("KEEL_HYDRATION");
   if (hydration === undefined) return { _tag: "malformed", reason: "no KEEL_HYDRATION" };
-  if (hydration !== "ok")
+  if (hydration !== "ok") {
+    const diagnosis = fields.get("KEEL_HYDRATION_DIFF");
     return {
       _tag: "hydration-failed",
       reason: hydration.startsWith("failed ") ? hydration.slice(7) : hydration,
+      ...(diagnosis !== undefined && diagnosis.length > 0 && BASE64.test(diagnosis)
+        ? { diagnosis }
+        : {}),
     };
+  }
   const lock = fields.get("KEEL_LOCK");
   if (lock === "diverged") return { _tag: "lockfile-diverged" };
   if (lock !== "ok") return { _tag: "malformed", reason: "no KEEL_LOCK" };
@@ -120,6 +131,8 @@ export interface SuiteEvidence {
   readonly totals?: { readonly total: number; readonly passed: number; readonly failed: number };
   readonly failing: readonly FailingTest[];
   readonly tail: string;
+  /** Why the workspace did not hydrate, as the runner diagnosed it. */
+  readonly diagnosis?: string;
 }
 
 /** How many failing tests the evidence names. The full report stays countable from `totals`. */
@@ -157,13 +170,14 @@ export interface SuiteJudgement {
  *   or unreadable report), no tests at all, or an exit code the report contradicts.
  *
  * The doorway decodes what the runner encoded: `report` is the report's JSON
- * (undefined when there was none, or it would not decode) and `tail` the
- * console tail as text. `resultRef` is set once the evidence is stored.
+ * (undefined when there was none, or it would not decode), `tail` the console
+ * tail as text, and `diagnosis` a failed hydration's diagnosis as text.
+ * `resultRef` is set once the evidence is stored.
  */
 export const judgeSuite = (
   step: PlanStep,
   output: SuiteOutput,
-  decoded: { readonly report: unknown; readonly tail: string },
+  decoded: { readonly report: unknown; readonly tail: string; readonly diagnosis?: string },
   resultRef?: ContentHash,
 ): SuiteJudgement => {
   const base = {
@@ -184,8 +198,12 @@ export const judgeSuite = (
   switch (output._tag) {
     case "malformed":
       return abstain("schema", `the runner's output is malformed: ${output.reason}`);
-    case "hydration-failed":
-      return abstain("unavailable", `hydration-failed: ${output.reason}`);
+    case "hydration-failed": {
+      const judged = abstain("unavailable", `hydration-failed: ${output.reason}`);
+      return decoded.diagnosis === undefined
+        ? judged
+        : { ...judged, evidence: { ...judged.evidence, diagnosis: decoded.diagnosis } };
+    }
     case "lockfile-diverged":
       return abstain("unavailable", "lockfile-diverged: the baked dependencies do not match");
     default:

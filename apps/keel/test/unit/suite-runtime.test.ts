@@ -59,7 +59,7 @@ PORTS.VerifierRuntime.contract("ci (scripted runner)", () => runtime(stdoutRunne
 
 describe("the Tier 2 suite runtime", () => {
   it.effect(
-    "[runner.no-credentials] asks the engine for a runner with no credential, one retry and only HOME in its env",
+    "[runner.no-credentials] asks the engine for a runner with no credential, one retry, and only HOME and the bundle's URL in its env",
     () =>
       Effect.gen(function* () {
         const rt = runtime(stdoutRunner(""));
@@ -73,7 +73,10 @@ describe("the Tier 2 suite runtime", () => {
           cloudflareCredentials: false,
           sourceControlCredentials: false,
         });
-        expect(options.env).toEqual({ HOME: "/root" });
+        expect(options.env).toEqual({
+          HOME: "/root",
+          KEEL_BUNDLE_URL: `https://bundles.keel.internal/${"b".repeat(64)}`,
+        });
         expect(options.config.retries.limit).toBe(1);
       }),
   );
@@ -112,9 +115,9 @@ describe("the Tier 2 suite runtime", () => {
     expect(lines).toContain(`echo ${SUITE_PROTOCOL}`);
     expect(lines.at(-1)).toBe("exit 0");
     expect(JS_TS_SUITE_COMMAND).not.toMatch(/exit [1-9]/);
-    expect(lines.indexOf('reason=$(keel_verify_bundle) || stop "$reason"')).toBeLessThan(
-      lines.findIndex((l) => l.includes("vitest")),
-    );
+    expect(
+      lines.indexOf('reason=$(keel_verify_bundle) || { hydration_diff; stop "$reason"; }'),
+    ).toBeLessThan(lines.findIndex((l) => l.includes("vitest")));
   });
 
   it.effect("passes a green run, storing its evidence durably before citing it", () =>
@@ -173,6 +176,34 @@ describe("the Tier 2 suite runtime", () => {
           );
           expect(result?.outcome).toBe("abstain");
         }
+      }),
+  );
+
+  it.effect(
+    "[suite.diagnosis-kept] abstains on a failed hydration, keeping the runner's diagnosis, redacted, in the evidence",
+    () =>
+      Effect.gen(function* () {
+        const diagnosis = `entry 7 src/app.ts missing\nrefetch curl 0 http 200 ${TOKEN}\n`;
+        const stdout = [
+          SUITE_PROTOCOL,
+          `KEEL_HYDRATION_DIFF ${Buffer.from(diagnosis).toString("base64")}`,
+          "KEEL_HYDRATION failed hash-mismatch",
+          "KEEL_END",
+          "",
+        ].join("\n");
+        const rt = runtime(stdoutRunner(stdout));
+        const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(job())).pipe(
+          Effect.provide(rt.layer),
+        );
+        expect(result?.outcome).toBe("abstain");
+        const [stored] = [...rt.store.documents.values()];
+        expect(JSON.parse(String(stored))).toMatchObject({
+          why: "hydration-failed: hash-mismatch",
+          diagnosis: expect.stringContaining(
+            "entry 7 src/app.ts missing\nrefetch curl 0 http 200 ",
+          ),
+        });
+        expect(JSON.stringify(stored)).not.toMatch(/art_v\d+_/);
       }),
   );
 

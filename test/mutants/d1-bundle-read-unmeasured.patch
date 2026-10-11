@@ -1,0 +1,25 @@
+# expect-red: pnpm exec vitest run --project pool:keel-verify apps/keel-verify/test/pool/bundle-read.test.ts
+# kills: bundle.served, bundle.checkout
+# why: The bundle handler logs R2's metadata as what it read, and the checkout goes unlogged, so a short read looks whole
+diff --git a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+index 019e7f5..7d1b138 100644
+--- a/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
++++ b/apps/keel-verify/src/adapters/driving/do/keel-sandbox.ts
+@@ -118,6 +118,8 @@ export async function serveBundle(
+               etag: object.etag,
+               size: object.size,
+               ...read,
++              bytesRead: object.size,
++              sha256Read: sha256,
+               ms: Date.now() - started,
+             } satisfies BundleServed),
+           ),
+@@ -132,7 +134,7 @@ export async function serveBundle(
+ }
+ 
+ /** @cloudflare/ci's archive checkout (`curl … '<url>' | tar -xz …`) for a bundle host, capturing the bundle's hash. */
+-const ARCHIVE_CHECKOUT = /https:\/\/[a-z0-9.-]+\.keel\.internal\/([0-9a-f]{64})'? \| tar -xz /;
++const ARCHIVE_CHECKOUT = /https:\/\/[a-z0-9.-]+\.keel\.internal\/([0-9a-f]{64})'? \| tar -xzf /;
+ 
+ /** How much of a checkout's stderr is logged: curl's and tar's last words, never a workspace's worth. */
+ const CHECKOUT_STDERR = 2_000;

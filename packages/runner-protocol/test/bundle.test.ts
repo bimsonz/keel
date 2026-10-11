@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import {
   appendFileSync,
   mkdtempSync,
@@ -15,6 +16,7 @@ import {
   BUNDLE_MANIFEST,
   type BundleFile,
   BundleRefused,
+  DIAGNOSE_BUNDLE_SH,
   manifestOf,
   sha256Hex,
   VERIFY_BUNDLE_SH,
@@ -160,5 +162,85 @@ describe("verifying an extracted bundle", () => {
     }
     rmSync(archive);
     expect(verify(dir).ok).toBe(false);
+  });
+});
+
+/** Runs `keel_bundle_diff` in `dir`, as the suite command does once `keel_verify_bundle` refuses it. */
+const diagnose = (dir: string, url = ""): string[] => {
+  const scratch = mkdtempSync(join(tmpdir(), "keel-diag-"));
+  dirs.push(scratch);
+  return execFileSync(
+    "sh",
+    ["-c", `${VERIFY_BUNDLE_SH}\n${DIAGNOSE_BUNDLE_SH}\nkeel_bundle_diff "$0" "$1"`, scratch, url],
+    { cwd: dir, encoding: "utf8" },
+  )
+    .split("\n")
+    .filter((l) => l.length > 0);
+};
+
+/** Text that gzip cannot shrink much, so cutting an archive in half really loses files. */
+const noise = (bytes: number) => randomBytes(bytes).toString("base64");
+
+describe("diagnosing a refused tree", () => {
+  it("[bundle.diagnose-short] names a short download's missing entries at the archive's end, beside a clean refetch", async () => {
+    const files = [
+      file("a.txt", "a\n"),
+      file("b.bin", noise(30_000)),
+      file("c.bin", noise(30_000)),
+      file("d.bin", noise(30_000)),
+    ];
+    const bundle = await writeBundle(files);
+    const hash = await sha256Hex(bundle);
+    const served = mkdtempSync(join(tmpdir(), "keel-served-"));
+    dirs.push(served);
+    writeFileSync(join(served, hash), bundle);
+    // What GNU tar (the sandbox's) leaves of a download cut inside c.bin: a and b
+    // whole, c cut short, d never reached. bsdtar leaves nothing, so build it.
+    const dir = extract(bundle);
+    rmSync(join(dir, "d.bin"));
+    writeFileSync(join(dir, "c.bin"), readFileSync(join(dir, "c.bin")).subarray(0, 10_000));
+    const out = diagnose(dir, `file://${join(served, hash)}`);
+    const bad = out.flatMap((l) => {
+      const m = /^entry (\d+) (\S+) (missing|differs)/.exec(l);
+      return m === null ? [] : [{ n: Number(m[1]), path: m[2], why: m[3] }];
+    });
+    // A short download loses a run of entries ending with the last one.
+    expect(bad).toEqual([
+      { n: 3, path: "c.bin", why: "differs" },
+      { n: 4, path: "d.bin", why: "missing" },
+    ]);
+    expect(out).toContain("entries 2 of 4 bad");
+    expect(out.find((l) => l.startsWith("refetch curl "))).toMatch(
+      new RegExp(`^refetch curl 0 http \\d+ bytes ${bundle.length} sha256 ${hash} want ${hash}$`),
+    );
+    expect(out).toEqual(
+      expect.arrayContaining(["refetch gzip ok", "refetch tar ok", "refetch verifies ok"]),
+    );
+    expect(out.some((l) => l.startsWith("vs-refetch ") && l.includes("d.bin"))).toBe(true);
+  });
+
+  it("[bundle.diagnose-differs] names a changed file, and a refetch that is itself short", async () => {
+    const files = [file("a.txt", "a\n"), file("b.txt", "b\n"), file("c.bin", noise(30_000))];
+    const bundle = await writeBundle(files);
+    const dir = extract(bundle);
+    appendFileSync(join(dir, "a.txt"), "tampered\n");
+    const served = mkdtempSync(join(tmpdir(), "keel-served-"));
+    dirs.push(served);
+    const hash = await sha256Hex(bundle);
+    writeFileSync(join(served, hash), bundle.slice(0, Math.floor(bundle.length / 2)));
+    const out = diagnose(dir, `file://${join(served, hash)}`);
+    expect(out).toContain("entry 1 a.txt differs 11B");
+    expect(out).toContain("entries 1 of 3 bad");
+    expect(out).toContain("refetch gzip bad");
+    expect(out.find((l) => l.startsWith("refetch verifies "))).toMatch(/^refetch verifies no: /);
+  });
+
+  it("[bundle.diagnose-differs] says when it has no URL to refetch from", async () => {
+    const dir = extract(await writeBundle([file("a.txt", "a\n")]));
+    expect(diagnose(dir)).toEqual([
+      "entries 0 of 1 bad",
+      "workspace files 2 bytes " + String(statSync(join(dir, BUNDLE_MANIFEST)).size + 2),
+      "refetch skipped: no url",
+    ]);
   });
 });

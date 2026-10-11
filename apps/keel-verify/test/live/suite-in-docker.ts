@@ -33,6 +33,8 @@ const run = async (which: Case) => {
         ? new Uint8Array()
         : bundle.bytes;
   writeFileSync(join(dir, "bundle.tgz"), bytes);
+  // The whole bundle stays fetchable by its hash, as bundles.keel.internal serves it, for the diagnosis's refetch.
+  writeFileSync(join(dir, bundle.hash.slice(7)), bundle.bytes);
   const checkout =
     "rm -rf /workspace && mkdir -p /workspace && tar -xz --strip-components=1 -C /workspace -f /in/bundle.tgz; true";
   const started = Date.now();
@@ -47,6 +49,8 @@ const run = async (which: Case) => {
       "sh",
       "-v",
       `${dir}:/in:ro`,
+      "-e",
+      `KEEL_BUNDLE_URL=file:///in/${bundle.hash.slice(7)}`,
       IMAGE,
       "-c",
       `${checkout}\n(${JS_TS_SUITE_COMMAND})`,
@@ -68,6 +72,7 @@ const run = async (which: Case) => {
       totals: e.totals ?? null,
       failing: e.failing.slice(0, 3).map((f) => `${f.file} > ${f.test ?? "(file)"}`),
       failingCount: e.failing.length,
+      ...(e.diagnosis === undefined ? {} : { diagnosis: e.diagnosis.split("\n") }),
     }),
   );
 };

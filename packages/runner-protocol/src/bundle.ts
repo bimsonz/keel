@@ -187,3 +187,48 @@ export const VERIFY_BUNDLE_SH = [
   '  [ "$found" -eq "$listed" ] || { echo "count-$found-of-$listed"; return 1; }',
   "}",
 ].join("\n");
+
+/**
+ * A POSIX sh function, `keel_bundle_diff <scratch> [url]`, that a runner calls
+ * when `keel_verify_bundle` refuses its working directory, to say what went
+ * wrong (it needs `keel_verify_bundle` defined). It prints, one fact a line:
+ * - each bad manifest entry (at most 20) with its 1-based position and whether
+ *   it is `missing` or `differs`, then how many of how many were bad. Entries
+ *   are in archive order, so a short download shows as a run of missing ones
+ *   at the end;
+ * - the working directory's file count and bytes;
+ * - with a URL, a second fetch of the bundle into `<scratch>/refetch`: curl's
+ *   exit and HTTP status, the bytes and sha256 fetched against the hash the URL
+ *   names, `gzip -t`, tar's exit, whether that tree verifies, and how it differs
+ *   from the working directory.
+ *
+ * A clean second fetch beside a bad tree puts the fault in the first fetch or
+ * its extract, not in the bundle.
+ */
+export const DIAGNOSE_BUNDLE_SH = [
+  "keel_bundle_diff() {",
+  `  s=$1; url=\${2:-}; m=${BUNDLE_MANIFEST}`,
+  "  if [ -f $m ]; then",
+  "    n=0; bad=0",
+  "    while read -r h p; do",
+  "      n=$((n + 1))",
+  '      if [ ! -f "$p" ]; then why=missing',
+  `      elif [ "$(sha256sum "$p" | cut -c1-64)" != "$h" ]; then why="differs $(wc -c < "$p" | tr -d ' ')B"`,
+  "      else continue; fi",
+  "      bad=$((bad + 1))",
+  '      if [ $bad -le 20 ]; then echo "entry $n $p $why"; fi',
+  "    done < $m",
+  '    echo "entries $bad of $n bad"',
+  '  else echo "no manifest"; fi',
+  `  echo "workspace files $(find . -type f | wc -l | tr -d ' ') bytes $(find . -type f -exec cat {} + 2>/dev/null | wc -c | tr -d ' ')"`,
+  '  [ -n "$url" ] || { echo "refetch skipped: no url"; return 0; }',
+  "  r=$s/refetch; rm -rf $r; mkdir -p $r/tree",
+  `  http=$(curl --connect-timeout 10 --max-time 60 --silent --show-error -o $r/bundle.tgz -w '%{http_code}' "$url" 2>$r/curl.err); rc=$?`,
+  `  echo "refetch curl $rc http $http bytes $(wc -c < $r/bundle.tgz 2>/dev/null | tr -d ' ') sha256 $(sha256sum $r/bundle.tgz 2>/dev/null | cut -c1-64) want \${url##*/}"`,
+  `  if [ -s $r/curl.err ]; then echo "refetch curl says $(head -c 300 $r/curl.err | tr '\\n' ' ')"; fi`,
+  '  if gzip -t $r/bundle.tgz 2>/dev/null; then echo "refetch gzip ok"; else echo "refetch gzip bad"; fi',
+  `  if tar -xzf $r/bundle.tgz --strip-components=1 -C $r/tree 2>$r/tar.err; then echo "refetch tar ok"; else echo "refetch tar failed $(head -c 300 $r/tar.err | tr '\\n' ' ')"; fi`,
+  '  if v=$(cd $r/tree && keel_verify_bundle); then echo "refetch verifies ok"; else echo "refetch verifies no: $v"; fi',
+  "  diff -rq $r/tree . 2>&1 | head -20 | sed 's/^/vs-refetch /'",
+  "}",
+].join("\n");
