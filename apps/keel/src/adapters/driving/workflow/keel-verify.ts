@@ -4,6 +4,7 @@ import {
   L1_SUITE_PLAN,
   recordBatchVerdict,
   runJob,
+  SettledVerdict,
   settleVerdict,
 } from "@keeltown/core/application/verification";
 import type { VerificationJob } from "@keeltown/core/domain/verification";
@@ -69,8 +70,17 @@ export class KeelVerify extends CIWorkflow<Env> {
         fence: job.fence,
       };
       const results = await runtime.runPromise(runJob(verification));
-      const settled = await step.do("verdict", () =>
-        runtime.runPromise(settleVerdict(L1_SUITE_PLAN, results)),
+      // Persisted as JSON, since a next action's args are open; decoded, so a replay is checked too.
+      const settled = Schema.decodeUnknownSync(SettledVerdict)(
+        JSON.parse(
+          await step.do("verdict", async () =>
+            JSON.stringify(
+              Schema.encodeSync(SettledVerdict)(
+                await runtime.runPromise(settleVerdict(L1_SUITE_PLAN, results)),
+              ),
+            ),
+          ),
+        ),
       );
       // A lane that cannot take the verdict now is retried a few times, not for minutes.
       await step.do("record", RECORD_RETRIES, async () => {

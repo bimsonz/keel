@@ -1,6 +1,12 @@
 import { Context, type Effect } from "effect";
 import type { CandidateNotFound, ResultFenced } from "../../domain/integration/index.ts";
-import type { BatchId, CandidateId, ContentHash, VerdictId } from "../../domain/kernel/index.ts";
+import type {
+  BatchId,
+  CandidateId,
+  ContentHash,
+  NextAction,
+  VerdictId,
+} from "../../domain/kernel/index.ts";
 import type { VerdictOutcome } from "../../domain/verification/index.ts";
 
 /** Which attempt a verification result belongs to, exactly as the Candidate machine fences it. */
@@ -23,6 +29,8 @@ export interface BatchVerdict {
   readonly evidence: readonly string[];
   /** The failing tests' full names, for the lane's attribution. */
   readonly failingTests: readonly string[];
+  /** On a bounce, what the change's agent can do about it: the lane copies them into its VerdictIssued. */
+  readonly nextActions?: readonly NextAction[];
 }
 
 /**

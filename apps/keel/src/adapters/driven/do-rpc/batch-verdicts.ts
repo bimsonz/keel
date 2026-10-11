@@ -29,6 +29,7 @@ export const BatchVerdictsRpc = (lanes: LaneNamespace) =>
               planHash: verdict.planHash,
               evidence: verdict.evidence,
               failingTests: verdict.failingTests,
+              ...(verdict.nextActions === undefined ? {} : { nextActions: verdict.nextActions }),
             }),
           ),
         ).pipe(

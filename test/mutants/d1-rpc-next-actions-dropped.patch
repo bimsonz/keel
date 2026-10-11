@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-candidate.test.ts
+# kills: verify.remedy-over-rpc
+# why: The RPC client drops the remedy, so the Lane never sees it
+diff --git a/apps/keel/src/adapters/driven/do-rpc/batch-verdicts.ts b/apps/keel/src/adapters/driven/do-rpc/batch-verdicts.ts
+index 831bee8..25bbc76 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/batch-verdicts.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/batch-verdicts.ts
+@@ -29,7 +29,6 @@ export const BatchVerdictsRpc = (lanes: LaneNamespace) =>
+               planHash: verdict.planHash,
+               evidence: verdict.evidence,
+               failingTests: verdict.failingTests,
+-              ...(verdict.nextActions === undefined ? {} : { nextActions: verdict.nextActions }),
+             }),
+           ),
+         ).pipe(

@@ -1,6 +1,6 @@
 import { Batch, CandidateNotFound, ResultFenced } from "@keeltown/core/domain/integration";
 import { VerdictOutcome } from "@keeltown/core/domain/verification";
-import { BatchId, CandidateId, ContentHash, VerdictId } from "@keeltown/core/kernel";
+import { BatchId, CandidateId, ContentHash, NextAction, VerdictId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { exitCodec, type ExitJson } from "./exit.ts";
 
@@ -20,6 +20,8 @@ export const RecordVerdictCommand = Schema.Struct({
   planHash: ContentHash,
   evidence: Schema.Array(Schema.String),
   failingTests: Schema.Array(Schema.String),
+  /** On a bounce, the remedy KeelVerify read from the evidence, for the lane's VerdictIssued. Absent otherwise. */
+  nextActions: Schema.optionalKey(Schema.Array(NextAction)),
 });
 export type RecordVerdictCommand = typeof RecordVerdictCommand.Type;
 

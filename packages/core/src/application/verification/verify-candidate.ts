@@ -1,11 +1,11 @@
 import { Effect, Option, Result, Schema } from "effect";
-import { type CandidateId, ContentHash, type VerdictId } from "../../domain/kernel/index.ts";
+import { type CandidateId, ContentHash, NextAction, VerdictId } from "../../domain/kernel/index.ts";
 import {
   coerce,
   type FlowPlan,
   type StepReport,
   type StepResult,
-  type VerdictOutcome,
+  VerdictOutcome,
   type VerificationJob,
   verdict,
 } from "../../domain/verification/index.ts";
@@ -43,17 +43,41 @@ export const runJob = Effect.fn("verification/runJob")(function* (job: Verificat
   );
 });
 
-/** A verdict, small enough for a Workflow step's output, with the lines that cite its evidence. */
-export interface SettledVerdict {
-  readonly verdictId: VerdictId;
-  readonly outcome: VerdictOutcome;
-  readonly planHash: ContentHash;
-  readonly evidence: readonly string[];
-  readonly failingTests: readonly string[];
-}
+/**
+ * A verdict, small enough for a Workflow step's output, with the lines that
+ * cite its evidence. A schema, because a next action's args are open: the step
+ * persists it as JSON and decodes it on replay.
+ */
+export const SettledVerdict = Schema.Struct({
+  verdictId: VerdictId,
+  outcome: VerdictOutcome,
+  planHash: ContentHash,
+  evidence: Schema.Array(Schema.String),
+  failingTests: Schema.Array(Schema.String),
+  /** On a bounce, the remedy: fix what failed, push, and submit again. Empty otherwise. */
+  nextActions: Schema.Array(NextAction),
+});
+export type SettledVerdict = typeof SettledVerdict.Type;
 
 /** How many failing tests a verdict cites by name. */
 export const CITED_FAILURES = 20;
+
+/** A bounce's remedy, naming the failing tests when the evidence names any. */
+const remedy = (cited: readonly string[], more: number): NextAction =>
+  cited.length === 0
+    ? {
+        kind: "call",
+        title: "Fix what the verdict's evidence cites, push, then submit again",
+        operationId: "submit",
+      }
+    : {
+        kind: "call",
+        title: `Fix the failing tests, push, then submit again: ${cited.join("; ")}${
+          more > 0 ? ` and ${more} more` : ""
+        }`,
+        operationId: "submit",
+        args: { failingTests: cited },
+      };
 
 const StoredFailures = Schema.Struct({
   failing: Schema.Array(
@@ -102,6 +126,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
       ...(more > 0 ? [`and ${more} more failing`] : []),
     ],
     failingTests,
+    nextActions: decided.success.outcome === "bounce" ? [remedy(cited, more)] : [],
   };
   return settled;
 });
@@ -124,5 +149,6 @@ export const recordBatchVerdict = Effect.fn("verification/recordBatchVerdict")(f
     planHash: input.settled.planHash,
     evidence: input.settled.evidence,
     failingTests: input.settled.failingTests,
+    ...(input.settled.nextActions.length === 0 ? {} : { nextActions: input.settled.nextActions }),
   });
 });

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/verify-candidate.test.ts
+# kills: verify.bounce-remedy
+# why: A bounce carries no remedy, so the agent gets only the generic default
+diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
+index 11a2449..b96da91 100644
+--- a/packages/core/src/application/verification/verify-candidate.ts
++++ b/packages/core/src/application/verification/verify-candidate.ts
+@@ -126,7 +126,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+       ...(more > 0 ? [`and ${more} more failing`] : []),
+     ],
+     failingTests,
+-    nextActions: decided.success.outcome === "bounce" ? [remedy(cited, more)] : [],
++    nextActions: [],
+   };
+   return settled;
+ });

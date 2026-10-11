@@ -6,15 +6,18 @@ import {
   settleVerdict,
 } from "@keeltown/core/application/verification";
 import { VerifierUnavailable, type VerificationJob } from "@keeltown/core/domain/verification";
-import { ContentHash } from "@keeltown/core/kernel";
-import { EvidenceStore, VerifierRuntime } from "@keeltown/core/ports";
+import { ContentHash, makeId } from "@keeltown/core/kernel";
+import { BatchVerdicts, EvidenceStore, VerifierRuntime } from "@keeltown/core/ports";
 import {
   freshId,
   makeBatchVerdictsMemory,
   makeEvidenceStoreMemory,
   makeIdsMemory,
 } from "@keeltown/testing";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Exit, Layer, Schema } from "effect";
+import { BatchVerdictsRpc } from "../../src/adapters/driven/do-rpc/batch-verdicts.ts";
+import { encodeExit } from "../../src/rpc/exit.ts";
+import { LaneCodecs, RecordVerdictCommand } from "../../src/rpc/lane.ts";
 
 const step = L1_SUITE_PLAN.steps[0];
 if (step === undefined) throw new Error("the L1 plan has no step");
@@ -140,6 +143,75 @@ describe("KeelVerify's use-cases", () => {
           `"attribution":"${change}"`,
         );
       });
+    },
+  );
+
+  it.effect(
+    "[verify.bounce-remedy] a bounce carries the remedy, naming the failing tests, and the lane receives it; a land carries none",
+    () => {
+      const red = lane();
+      const green = lane();
+      return Effect.gen(function* () {
+        const { settled } = yield* verify("fail", red);
+        expect(settled.nextActions).toEqual([
+          {
+            kind: "call",
+            title:
+              "Fix the failing tests, push, then submit again: test/sessions.test.ts > sessions expire; test/broken.test.ts",
+            operationId: "submit",
+            args: {
+              failingTests: ["test/sessions.test.ts > sessions expire", "test/broken.test.ts"],
+            },
+          },
+        ]);
+        expect(red.recorded.map((r) => r.verdict.nextActions)).toEqual([settled.nextActions]);
+        const landed = yield* verify("pass", green);
+        expect(landed.settled.nextActions).toEqual([]);
+        expect(green.recorded.map((r) => r.verdict.nextActions)).toEqual([undefined]);
+      });
+    },
+  );
+
+  it.effect(
+    "[verify.remedy-over-rpc] the Lane's recordVerdict receives the remedy in its command",
+    () => {
+      const sent: unknown[] = [];
+      const lanes = {
+        idFromName: (name: string): DurableObjectId => ({
+          name,
+          toString: () => name,
+          equals: (other) => other.toString() === name,
+        }),
+        get: () => ({
+          recordVerdict: async (command: unknown) => {
+            sent.push(command);
+            return encodeExit(LaneCodecs.recordVerdict, Exit.void);
+          },
+        }),
+      };
+      const nextActions = [
+        {
+          kind: "call" as const,
+          title: "Fix the failing tests",
+          operationId: "submit",
+          args: { failingTests: ["t"] },
+        },
+      ];
+      return Effect.gen(function* () {
+        yield* (yield* BatchVerdicts).record("lane:prj:default", {
+          instanceId: "keel-verify-evt9",
+          fence,
+          candidateId,
+          verdictId: makeId("vrd", "01JZD9D9D9D9D9D9D9D9D9D9D9"),
+          outcome: "bounce",
+          planHash: L1_SUITE_PLAN.planHash,
+          evidence: ["js-ts.suite: fail"],
+          failingTests: ["t"],
+          nextActions,
+        });
+        const [command] = sent.map((c) => Schema.decodeUnknownSync(RecordVerdictCommand)(c));
+        expect(command?.nextActions).toEqual(nextActions);
+      }).pipe(Effect.provide(BatchVerdictsRpc(lanes)));
     },
   );
 

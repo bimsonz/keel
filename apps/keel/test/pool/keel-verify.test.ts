@@ -1,18 +1,11 @@
 import { introspectWorkflowInstance } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { L1_SUITE_PLAN } from "@keeltown/core/application/verification";
+import { L1_SUITE_PLAN, SettledVerdict } from "@keeltown/core/application/verification";
 import { BatchId, CandidateId, ContentHash } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { type KeelVerifyJob, keelVerifyParams } from "../../src/rpc/index.ts";
 import { suiteStdout } from "../support-suite-stdout.ts";
-
-const SettledShape = Schema.Struct({
-  outcome: Schema.String,
-  planHash: Schema.String,
-  evidence: Schema.Array(Schema.String),
-  failingTests: Schema.Array(Schema.String),
-});
 
 const job = (overrides: Partial<KeelVerifyJob> = {}): KeelVerifyJob => ({
   jobId: "job-pool",
@@ -44,7 +37,8 @@ const run = async (id: string, stdout: string, params = keelVerifyParams(job()))
   await env.CI_WORKFLOW.create({ id, params });
   const verdict = await instance.waitForStepResult({ name: "verdict" });
   await instance.waitForStatus("complete");
-  return Schema.decodeUnknownSync(SettledShape)(verdict);
+  // The step persists the verdict as JSON, since a next action's args are open.
+  return Schema.decodeUnknownSync(SettledVerdict)(JSON.parse(String(verdict)));
 };
 
 /**
@@ -76,6 +70,18 @@ describe("KeelVerify", () => {
       "test/sessions.test.ts > sessions test 1",
     ]);
     expect(verdict.evidence).toContain("failed: test/sessions.test.ts > sessions test 0");
+    expect(verdict.nextActions).toEqual([
+      expect.objectContaining({
+        kind: "call",
+        operationId: "submit",
+        args: {
+          failingTests: [
+            "test/sessions.test.ts > sessions test 0",
+            "test/sessions.test.ts > sessions test 1",
+          ],
+        },
+      }),
+    ]);
   });
 
   it("parks a run whose report says nothing, rather than landing it", async () => {
