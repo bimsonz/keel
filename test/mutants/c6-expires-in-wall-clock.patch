@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/token-endpoint.test.ts -t "c6.expires-in"
+# kills: c6.expires-in
+# why: expires_in is re-derived from the wall clock instead of the lifetime the token was issued with
+diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
+index 8d6ea03..9ef26b4 100644
+--- a/apps/keel/src/adapters/driving/http/mappers.ts
++++ b/apps/keel/src/adapters/driving/http/mappers.ts
+@@ -101,7 +101,7 @@ export function tokenOk(granted: GrantedToken): Auth_exchangeTokenResult {
+     body: {
+       access_token: granted.token,
+       token_type: "Bearer",
+-      expires_in: granted.expiresInSeconds,
++      expires_in: Math.max(0, Math.ceil((granted.expiresAt - Date.now()) / 1000)),
+       scope: granted.scopes.join(" "),
+     },
+   };
