@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/change.test.ts -t "deadline"
+# kills: b11.lapse
+# why: the alarm handler runs only the backbone's own reasons, so a due lease deadline is dropped and the change never parks
+diff --git a/apps/keel/src/adapters/driving/do/keel-object.ts b/apps/keel/src/adapters/driving/do/keel-object.ts
+index 1d456f5..26d0d10 100644
+--- a/apps/keel/src/adapters/driving/do/keel-object.ts
++++ b/apps/keel/src/adapters/driving/do/keel-object.ts
+@@ -166,8 +166,6 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
+       if (request.reason === OUTBOX_FLUSH || request.reason === OUTBOX_REDELIVERY) {
+         if (!flushed) await this.flush();
+         flushed = true;
+-      } else {
+-        await this.onDeadline(request);
+       }
+     }
+     this.waiters.wake();
