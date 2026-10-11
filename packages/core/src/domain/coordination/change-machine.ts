@@ -726,7 +726,7 @@ const illegal = (state: Change | undefined, event: ChangeEvent): never => {
   );
 };
 
-type Optional = "parkReason" | "escalationId" | "batchId" | "laneId";
+type Optional = "parkReason" | "escalationId" | "batchId" | "laneId" | "predicatePolicy";
 
 /** The change in `next`, without the fields that only hold in the state it leaves. */
 const moveTo = (change: Change, next: ChangeState, drop: readonly Optional[] = []): Change => {
@@ -814,7 +814,13 @@ export const evolveChange = (
       return from("deriving") ? moveTo(change, "drifted") : illegal(change, event);
     case "PlanCompiled":
       return from("deriving")
-        ? { ...moveTo(change, "verifying"), planHash: event.planHash }
+        ? {
+            ...moveTo(change, "verifying", ["predicatePolicy"]),
+            planHash: event.planHash,
+            ...(event.predicatePolicy === undefined
+              ? {}
+              : { predicatePolicy: event.predicatePolicy }),
+          }
         : illegal(change, event);
     case "ChangeQueued":
       return from("verifying")

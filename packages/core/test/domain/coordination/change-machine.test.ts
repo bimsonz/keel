@@ -1561,6 +1561,47 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
     });
   });
 
+  it("[change.plan-policy-folded] a change carries the predicate policy of the plan it was last compiled to: none before any plan, and none once a plan is compiled without one", () => {
+    fc.assert(
+      fc.property(planArb, (plan) => {
+        let latest: string | undefined;
+        return run(plan).records.every((r) => {
+          if (r.threw) return true;
+          if (r.result !== undefined && Result.isSuccess(r.result)) {
+            for (const e of r.result.success) {
+              if (e._tag === "PlanCompiled") latest = JSON.stringify(e.predicatePolicy);
+            }
+          }
+          return JSON.stringify(r.after?.predicatePolicy) === latest;
+        });
+      }),
+    );
+    const policy = { freshness: "block" } as const;
+    const compiled = [
+      [declare, 0],
+      [start, 0],
+      [submit, 0],
+      [precheck, 0],
+      [{ ...compile, predicatePolicy: policy }, 0],
+    ] as const;
+    expect(drive(compiled).state?.predicatePolicy).toEqual(policy);
+    // It stays with the change to the end, as the plan's hash does.
+    expect(drive([...compiled, [queue, 0], [batch, 0], [land, 0]]).state).toMatchObject({
+      state: "landed",
+      predicatePolicy: policy,
+    });
+    // A plan compiled with no policy leaves none: the earlier plan's is gone.
+    const recompiled = drive([
+      ...compiled,
+      [bounce, 0],
+      [submit, 0],
+      [precheck, 0],
+      [compile, 0],
+    ]).state;
+    expect(recompiled?.state).toBe("verifying");
+    expect(recompiled).not.toHaveProperty("predicatePolicy");
+  });
+
   it("[change.queued-plan-hash] every enqueue, first or after a requeue, carries the hash of the plan the change was last compiled to", () => {
     fc.assert(
       fc.property(planArb, (plan) => {

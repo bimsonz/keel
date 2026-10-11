@@ -11,7 +11,7 @@ import {
   SketchId,
   WorkspaceId,
 } from "../kernel/index.ts";
-import { FootprintEntry, Proposition } from "./proposition.ts";
+import { FootprintEntry, PredicatePolicies, Proposition } from "./proposition.ts";
 
 export const ChangeState = Schema.Literals([
   "declared",
@@ -98,6 +98,8 @@ export const Change = Schema.Struct({
   escalationId: Schema.optional(EscalationId),
   /** The plan it was last compiled to (PlanCompiled), carried onto ChangeQueued and ChangeRequeued. */
   planHash: Schema.optional(ContentHash),
+  /** That plan's predicate policy (PlanCompiled), applied to a proven conflict. Absent, or a predicate left out, is `advise`. */
+  predicatePolicy: Schema.optional(PredicatePolicies),
 });
 export type Change = typeof Change.Type;
 
