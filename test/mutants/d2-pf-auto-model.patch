@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/platform-function.test.ts -t pf.unpinned
+# kills: pf.unpinned
+# why: A function with no pin runs on cloudflare/auto, a model nobody chose, instead of abstaining
+diff --git a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+index aa90a92..0388202 100644
+--- a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
++++ b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+@@ -149,7 +149,7 @@ export const PlatformFunctionWorkersAI = (
+     PlatformFunction,
+     PlatformFunction.of({
+       call: (call) => {
+-        const model = pins[call.name];
++        const model = pins[call.name] ?? "cloudflare/auto";
+         if (model === undefined) return Effect.fail(abstain("unavailable"));
+         return Effect.tryPromise({
+           try: (signal) => complete(ai, model, call, signal),

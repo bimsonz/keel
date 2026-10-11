@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts -t model-pins
+# why: A Worker that binds AI deploys with no model pins, or pins to cloudflare/auto, and neither the guard nor deploy.ts stops it
+diff --git a/packages/tooling/src/guards/model-pins.ts b/packages/tooling/src/guards/model-pins.ts
+index 7697300..5f9a976 100644
+--- a/packages/tooling/src/guards/model-pins.ts
++++ b/packages/tooling/src/guards/model-pins.ts
+@@ -18,7 +18,7 @@ const EXACT_MODEL = /^@cf\/[\w.-]+\/[\w.-]+$/;
+  */
+ export function pinProblems(config: unknown): string[] {
+   if (config === null || typeof config !== "object") return ["does not parse as JSONC"];
+-  if (Reflect.get(config, "ai") === undefined) return [];
++  if (Reflect.get(config, "ai") !== null) return [];
+   const pins: unknown = Reflect.get(Object(Reflect.get(config, "vars")), "PLATFORM_FUNCTION_PINS");
+   if (pins === undefined)
+     return [

@@ -1,0 +1,8 @@
+// Control for the model-pins guard: pins that name no exact model.
+{
+  "name": "keel",
+  "ai": { "binding": "AI" },
+  "vars": {
+    "PLATFORM_FUNCTION_PINS": { "keel.probe.freshness": "cloudflare/auto", "keel.probe.free-form": 7 },
+  },
+}

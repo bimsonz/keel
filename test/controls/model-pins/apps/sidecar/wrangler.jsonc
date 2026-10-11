@@ -1,0 +1,6 @@
+// Control for the model-pins guard: a Worker that binds AI with no pins at all.
+{
+  "name": "sidecar",
+  "ai": { "binding": "AI" },
+  "vars": {},
+}

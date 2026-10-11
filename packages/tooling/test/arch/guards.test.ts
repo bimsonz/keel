@@ -22,6 +22,11 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
     /ChangeTeleported .* missing from the catalogue/,
   ],
   "lint-config": [/nested \.oxlintrc\.json/],
+  "model-pins": [
+    /binds AI but declares no vars\.PLATFORM_FUNCTION_PINS/,
+    /pins keel\.probe\.freshness to "cloudflare\/auto", not an exact @cf\/ model id/,
+    /pins keel\.probe\.free-form to 7, not an exact @cf\/ model id/,
+  ],
   "runner-credentials": [
     /cloudflareCredentials hands a credential/,
     /sourceControlCredentials hands a credential/,

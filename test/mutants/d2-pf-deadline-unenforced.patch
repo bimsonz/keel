@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/platform-function.test.ts -t pf.deadline
+# kills: pf.deadline
+# why: A stream that never ends holds the caller far past the deadline instead of abstaining as a timeout
+diff --git a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+index aa90a92..7f34a13 100644
+--- a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
++++ b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+@@ -156,7 +156,7 @@ export const PlatformFunctionWorkersAI = (
+           catch: (error) => error,
+         }).pipe(
+           Effect.timeoutOrElse({
+-            duration: deadlineMs,
++            duration: deadlineMs * 1000,
+             orElse: () => Effect.fail(abstain("timeout")),
+           }),
+           Effect.catch((error) =>

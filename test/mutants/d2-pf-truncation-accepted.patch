@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/platform-function.test.ts -t pf.truncated
+# kills: pf.truncated
+# why: A reply cut at the token limit is parsed and answered as if the model had finished
+diff --git a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+index aa90a92..6794660 100644
+--- a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
++++ b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+@@ -122,7 +122,7 @@ async function complete(
+   } catch (error) {
+     throw abstain(error instanceof SyntaxError ? "schema" : reasonOf(error));
+   }
+-  if (read.truncated) throw abstain("truncated");
++  if (read.truncated && read.text === "") throw abstain("truncated");
+   try {
+     return JSON.parse(read.text);
+   } catch {

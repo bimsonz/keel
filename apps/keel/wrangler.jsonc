@@ -21,6 +21,8 @@
     "ARTIFACTS_LOCATION_HINT": "wnam",
     // How many ready workspaces a new project's pool keeps forked ahead of declares.
     "POOL_TARGET": "4",
+    // Each PlatformFunction's model, by exact id: never cloudflare/auto.
+    "PLATFORM_FUNCTION_PINS": { "keel.probe.freshness": "@cf/moonshotai/kimi-k2.7-code" },
   },
   "secrets": {
     // KEEL_SIGNING_KEY: an Ed25519 private key, as a JWK, that signs agents' bearer tokens.

@@ -26,6 +26,7 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { applyEdits, modify, parse, type ParseError, printParseErrorCode } from "jsonc-parser";
+import { pinProblems } from "../packages/tooling/src/guards/model-pins.ts";
 import { accountId, cloudflare, root, wrangler } from "./env.ts";
 
 const USAGE =
@@ -193,6 +194,11 @@ function render(
     set(["vars", "KEEL_API_HOST"], `keel.${subdomain}.workers.dev`);
 
   const rendered = parseConfig(text, `apps/${dir}/wrangler.deploy.jsonc`);
+  const pins = pinProblems(rendered);
+  if (pins.length > 0)
+    throw new Error(
+      `${source}: ${pins.join("; ")}. Refusing to deploy: a PlatformFunction would run on no model, or one nobody chose.`,
+    );
   const leftover = SENTINEL.exec(JSON.stringify(rendered));
   if (leftover !== null) {
     throw new Error(

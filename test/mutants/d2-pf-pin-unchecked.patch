@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/platform-function.test.ts -t pf.pins
+# kills: pf.pins
+# why: Config may pin a function to cloudflare/auto or any string, and the composition accepts it
+diff --git a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+index aa90a92..66c6aef 100644
+--- a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
++++ b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+@@ -20,7 +20,7 @@ export const modelPins = (raw: unknown): ModelPins => {
+     throw new Error("PLATFORM_FUNCTION_PINS is not an object of function → model id");
+   const pins: Record<string, string> = {};
+   for (const [fn, model] of Object.entries(raw)) {
+-    if (typeof model !== "string" || !/^@cf\/[\w.-]+\/[\w.-]+$/.test(model))
++    if (typeof model !== "string")
+       throw new Error(
+         `PLATFORM_FUNCTION_PINS.${fn} is not an exact @cf/ model id: ${String(model)}`,
+       );

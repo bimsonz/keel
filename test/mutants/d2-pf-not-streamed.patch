@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/platform-function.test.ts -t pf.streams-json
+# kills: pf.streams-json
+# why: The model is called synchronously, which times out at about 235 s for a reasoning model and cannot queue
+diff --git a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+index aa90a92..69389c4 100644
+--- a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
++++ b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+@@ -110,7 +110,7 @@ async function complete(
+       ],
+       response_format: { type: "json_schema", json_schema: call.outputSchema },
+       max_tokens: 4096,
+-      stream: true,
++      stream: false,
+     });
+   } catch (error) {
+     throw abstain(reasonOf(error));
