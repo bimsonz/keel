@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adapters.test.ts -t a11s
+# kills: a11s.directory-sponsor
+# why: the D1 projection never stores the sponsor
+diff --git a/apps/keel/src/adapters/driven/d1/agent-directory.ts b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+index ae4ec44..3d52f7f 100644
+--- a/apps/keel/src/adapters/driven/d1/agent-directory.ts
++++ b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+@@ -109,7 +109,7 @@ export function AgentDirectoryD1(db: D1Database) {
+                 agent.name,
+                 agent.kind,
+                 JSON.stringify(agent.scopes),
+-                agent.onBehalfOf ?? null,
++                null,
+                 agent.state,
+                 agent.revocationEpoch,
+                 agent.createdAt,

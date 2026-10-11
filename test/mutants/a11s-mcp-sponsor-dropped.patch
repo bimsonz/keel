@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/whoami.test.ts -t a11s
+# kills: a11s.whoami
+# why: the MCP doorway drops the sponsor carrying the principal through AuthInfo, so MCP differs from REST
+diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+index 22d546b..4532387 100644
+--- a/apps/keel/src/adapters/driving/mcp/server.ts
++++ b/apps/keel/src/adapters/driving/mcp/server.ts
+@@ -99,7 +99,6 @@ export function makeMcpEndpoint(
+             agentId: principal.agentId,
+             projectId: principal.projectId,
+             revocationEpoch: principal.revocationEpoch,
+-            ...(principal.onBehalfOf === undefined ? {} : { onBehalfOf: principal.onBehalfOf }),
+           },
+         };
+       },
