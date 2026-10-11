@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.member-management
+# why: a maintainer can't remove a member: managing members is kept to owners
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index ecf4ccf..b5e8565 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -118,7 +118,7 @@ export const NON_SPEC_ACTIONS = {
+   SetHandle: rule("Self", "handle"),
+   CreateOrg: rule("Instance", "user"),
+   /** Invite, remove, or move a member between member and maintainer. */
+-  ManageMembers: rule("Org", "maintain"),
++  ManageMembers: rule("Org", "own"),
+   /** Make or unmake an owner. */
+   ManageOwners: rule("Org", "own"),
+   DeleteOrg: rule("Org", "own"),
