@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/operator.test.ts -t "a11b.conflict"
+# kills: a11b.conflict
+# why: a reused key on createProject answers 404 instead of 409 request.idempotency_conflict
+diff --git a/apps/keel/src/adapters/driving/http/operator.ts b/apps/keel/src/adapters/driving/http/operator.ts
+index f03a226..431da0b 100644
+--- a/apps/keel/src/adapters/driving/http/operator.ts
++++ b/apps/keel/src/adapters/driving/http/operator.ts
+@@ -62,7 +62,10 @@ export function createProjectError(
+ ): Operator_createProjectResult {
+   switch (error._tag) {
+     case "IdempotencyConflict":
+-      return conflict(caller, error, "Operator_createProject", "project");
++      return {
++        status: 404,
++        body: problem(404, "resource.not_found", caller.requestId, { detail: error.idempotencyKey }),
++      };
+     case "RepoNotFound":
+       return {
+         status: 404,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/operator.test.ts -t "a11b.scope"
+# kills: a11b.scope
+# why: the REST gate admits an agent token to operator operations
+diff --git a/apps/keel/src/adapters/driving/http/route-deps.ts b/apps/keel/src/adapters/driving/http/route-deps.ts
+index e0dc54d..f3cef83 100644
+--- a/apps/keel/src/adapters/driving/http/route-deps.ts
++++ b/apps/keel/src/adapters/driving/http/route-deps.ts
+@@ -69,7 +69,7 @@ export function routeDeps(verify: TokenVerifier): RouteDeps<AppEnv, Caller> {
+             });
+       }
+       const { principal } = verification;
+-      if (!satisfies(requirements, principal)) {
++      if (false && !satisfies(requirements, principal)) {
+         return problemResponse(403, "auth.insufficient_scope", requestId, {
+           detail: `This operation requires one of: ${requirements.map((r) => Object.values(r).flat().join(" + ")).join(", ")}.`,
+         });

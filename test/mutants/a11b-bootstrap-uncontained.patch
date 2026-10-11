@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/operator.test.ts -t "a11b.confined"
+# kills: a11b.confined
+# why: the bootstrap credential may also create projects, so least privilege is gone
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index fc50962..8c6a1f4 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -53,6 +53,7 @@ const decodeScopes = Schema.decodeUnknownOption(Schema.Array(Scope));
+ export const BOOTSTRAP_MAY_CALL: ReadonlySet<string> = new Set([
+   "Auth_exchangeToken",
+   "Operator_enrolAgent",
++  "Operator_createProject",
+ ]);
+ 
+ /**
