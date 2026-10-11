@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/preflight.test.ts
+# kills: preflight.neighbour-proceeds
+# why: overlap is not conflict, so a neighbour alone proceeds; here any neighbour coordinates
+diff --git a/packages/core/src/domain/coordination/preflight.ts b/packages/core/src/domain/coordination/preflight.ts
+index 09f806d..f5bf64b 100644
+--- a/packages/core/src/domain/coordination/preflight.ts
++++ b/packages/core/src/domain/coordination/preflight.ts
+@@ -118,6 +118,6 @@ export const preflight = (
+       suggestedMove: "distinguish",
+       basis: { _tag: "precedent", decisionId: decided.ref.decisionId },
+     };
+-  if (contradictions.length > 0) return { ...listed, suggestedMove: "coordinate", basis: cites(0) };
++  if (contradictions.length > 0 || neighbours.length > 0) return { ...listed, suggestedMove: "coordinate", basis: cites(0) };
+   return { ...listed, suggestedMove: "proceed" };
+ };

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/preflight.test.ts
+# kills: preflight.direction
+# why: a live change's must premise contradicted by my effect means I refine; here the premise's holder is read the wrong way round
+diff --git a/packages/core/src/domain/coordination/preflight.ts b/packages/core/src/domain/coordination/preflight.ts
+index 09f806d..ce04a86 100644
+--- a/packages/core/src/domain/coordination/preflight.ts
++++ b/packages/core/src/domain/coordination/preflight.ts
+@@ -105,7 +105,7 @@ export const preflight = (
+     contradictions,
+     precedents: precedents.map((p) => p.ref),
+   };
+-  const breaks = contradictions.findIndex((c) => c.holder !== self && isMust(c.premise));
++  const breaks = contradictions.findIndex((c) => c.holder === self && isMust(c.premise));
+   if (breaks !== -1) return { ...listed, suggestedMove: "refine", basis: cites(breaks) };
+   const broken = contradictions.findIndex(
+     (c) => c.holder === self && (c.withRole ?? "effect") === "effect" && isMust(c.premise),

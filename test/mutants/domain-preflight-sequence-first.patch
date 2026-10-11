@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/preflight.test.ts
+# kills: preflight.move-table
+# why: the change that would break another refines before one that would be broken sequences; here sequence is checked first
+diff --git a/packages/core/src/domain/coordination/preflight.ts b/packages/core/src/domain/coordination/preflight.ts
+index 09f806d..f93f94d 100644
+--- a/packages/core/src/domain/coordination/preflight.ts
++++ b/packages/core/src/domain/coordination/preflight.ts
+@@ -106,7 +106,7 @@ export const preflight = (
+     precedents: precedents.map((p) => p.ref),
+   };
+   const breaks = contradictions.findIndex((c) => c.holder !== self && isMust(c.premise));
+-  if (breaks !== -1) return { ...listed, suggestedMove: "refine", basis: cites(breaks) };
++  if (breaks !== -1 && !contradictions.some((c) => c.holder === self && (c.withRole ?? "effect") === "effect" && isMust(c.premise))) return { ...listed, suggestedMove: "refine", basis: cites(breaks) };
+   const broken = contradictions.findIndex(
+     (c) => c.holder === self && (c.withRole ?? "effect") === "effect" && isMust(c.premise),
+   );

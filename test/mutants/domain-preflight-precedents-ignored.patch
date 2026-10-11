@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/preflight.test.ts
+# kills: preflight.precedent-distinguish
+# why: an intent contradicting what a precedent upheld must distinguish; here precedents are listed but never compared
+diff --git a/packages/core/src/domain/coordination/preflight.ts b/packages/core/src/domain/coordination/preflight.ts
+index 09f806d..ca9feb9 100644
+--- a/packages/core/src/domain/coordination/preflight.ts
++++ b/packages/core/src/domain/coordination/preflight.ts
+@@ -111,7 +111,7 @@ export const preflight = (
+     (c) => c.holder === self && (c.withRole ?? "effect") === "effect" && isMust(c.premise),
+   );
+   if (broken !== -1) return { ...listed, suggestedMove: "sequence", basis: cites(broken) };
+-  const decided = precedents.find((p) => contradictsPrecedent(intent, p));
++  const decided = precedents.find(() => false);
+   if (decided !== undefined)
+     return {
+       ...listed,

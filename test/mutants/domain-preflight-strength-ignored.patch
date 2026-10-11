@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/preflight.test.ts
+# kills: preflight.must-outranks-should
+# why: a should premise only coordinates; here every premise counts as must, so a should premise refines or sequences
+diff --git a/packages/core/src/domain/coordination/preflight.ts b/packages/core/src/domain/coordination/preflight.ts
+index 09f806d..f4e5270 100644
+--- a/packages/core/src/domain/coordination/preflight.ts
++++ b/packages/core/src/domain/coordination/preflight.ts
+@@ -64,7 +64,7 @@ export type ScopedPrecedent = {
+   readonly holds: readonly Proposition[];
+ };
+ 
+-const isMust = (p: Proposition): boolean => (p.strength ?? "must") === "must";
++const isMust = (_p: Proposition): boolean => true;
+ 
+ /** Whether the intent contradicts a proposition the decision upheld: a premise it breaks, or an effect it can't rely on. */
+ const contradictsPrecedent = (intent: Intent, precedent: ScopedPrecedent): boolean =>
