@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
@@ -39,6 +40,27 @@ export function walk(root: string, options: WalkOptions): string[] {
   };
   visit(root);
   return out.toSorted();
+}
+
+/**
+ * The files git would publish from `root`, relative to it: every tracked file,
+ * and every untracked one no ignore rule covers (what `git add -A` stages).
+ * Null when `root` is in no work tree, as in a `git archive` export, where
+ * every file present is published. Any other git failure throws, so a guard
+ * never reads less than it should because git broke.
+ */
+export function publishable(root: string): ReadonlySet<string> | null {
+  const listed = spawnSync(
+    "git",
+    ["-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+    { encoding: "utf8", maxBuffer: 1 << 28 },
+  );
+  if (listed.error !== undefined) throw listed.error;
+  if (listed.status !== 0) {
+    if (listed.status === 128 && /not a git repository/.test(listed.stderr)) return null;
+    throw new Error(`git ls-files failed in ${root}: ${listed.stderr.trim()}`);
+  }
+  return new Set(listed.stdout.split("\0").filter((path) => path !== ""));
 }
 
 export function read(root: string, rel: string): string {

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { type GuardOptions, type GuardResult, type Violation, withVacuityCheck } from "../guard.ts";
-import { matchingLines, read, walk } from "../scan.ts";
+import { matchingLines, publishable, read, walk } from "../scan.ts";
 
 export const PUBLIC_SCRUB = "public-scrub";
 
@@ -64,7 +64,11 @@ function secretsFromEnvironment(): { value: string; name: string }[] {
 }
 
 export function checkPublicScrub(root: string, options: GuardOptions = {}): GuardResult {
-  const files = walk(root, { keep: TEXT, skip: options.skip ?? ["test/controls"] });
+  // Only what git would publish: a gitignored file never leaves this machine.
+  const published = publishable(root);
+  const files = walk(root, { keep: TEXT, skip: options.skip ?? ["test/controls"] }).filter(
+    (file) => published === null || published.has(file),
+  );
   const secrets = secretsFromEnvironment();
   const violations: Violation[] = [];
   for (const file of files) {
