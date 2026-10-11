@@ -396,6 +396,28 @@ describe("the Trunk's promotion", () => {
   );
 
   it.effect(
+    "[trunk.front-only] with several batches queued on trunk's head, a flush starts the front one alone, and the rest wait behind it",
+    () => {
+      const w = promotion();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        const tip = yield* w.composed(1, base);
+        for (const n of [2, 3]) yield* w.composed(n, base);
+        for (const n of [1, 2, 3]) yield* deliver(verified(n, base));
+        expect(yield* flushTrunk(PROJECT)).toBe("promoting");
+        const started = (yield* trunkLog).filter((e) => e.type === "PromotionStarted");
+        expect(started.map((e) => fieldOf(e, "batches"))).toEqual([[batch(1)]]);
+        expect(yield* pushPromotion(PROJECT)).toBe("advanced");
+        expect(w.writer.head()).toBe(tip);
+        expect(trunkOf(yield* EntityStore, PROJECT)?.queue.map((b) => b.batchId)).toEqual([
+          batch(2),
+          batch(3),
+        ]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
     "[trunk.resume] an operator's resume releases a freeze at trunk's head as it reads now, and the next batch on it lands",
     () => {
       const w = promotion();

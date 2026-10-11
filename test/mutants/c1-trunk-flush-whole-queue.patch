@@ -1,5 +1,5 @@
-# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t trunk.racers
-# kills: trunk.racers
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t trunk.front-only
+# kills: trunk.front-only
 # why: The flush groups every queued batch instead of the front one, so batches verified apart land together, unverified
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
 index a2b3860..ab99a71 100644
