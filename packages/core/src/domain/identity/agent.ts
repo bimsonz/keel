@@ -1,7 +1,11 @@
 import { Schema } from "effect";
 import { AgentId, InstantSchema, ProjectId, type SessionId } from "../kernel/index.ts";
 
-export const AgentKind = Schema.Literals(["interactive", "hosted", "human"]);
+/**
+ * `interactive`: an agent a person drives; `hosted`: one Keel's operator runs;
+ * `human`: a person; `synthetic`: the load generator's agents, enrolled by the operator.
+ */
+export const AgentKind = Schema.Literals(["interactive", "hosted", "human", "synthetic"]);
 export type AgentKind = typeof AgentKind.Type;
 
 export const Scope = Schema.Literals(["agent:work", "agent:read", "operator", "observer"]);

@@ -155,6 +155,18 @@ export function describeAgentDirectoryContract(
           expect(Option.map(found, (agent) => "onBehalfOf" in agent)).toEqual(Option.some(false));
         }).pipe(Effect.provide(make())),
     );
+    it.effect("[a11e.synthetic] returns a synthetic agent, the load generator's, exactly", () =>
+      Effect.gen(function* () {
+        const directory = yield* AgentDirectory;
+        const agent = { ...sampleAgent, id: freshAgentId(), kind: "synthetic" as const };
+        yield* directory.upsert(agent, {
+          clientId: `client-${agent.id}`,
+          agentId: agent.id,
+          secretHash: `sha256:${"a".repeat(64)}`,
+        });
+        expect(yield* directory.findAgent(agent.id)).toEqual(Option.some(agent));
+      }).pipe(Effect.provide(make())),
+    );
     it.effect("replaces an agent on a second upsert, so a revocation epoch bump is visible", () =>
       Effect.gen(function* () {
         const directory = yield* AgentDirectory;

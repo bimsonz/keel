@@ -11,6 +11,9 @@ union AgentKind {
   interactive: "interactive",
   hosted: "hosted",
   human: "human",
+
+  /** The load generator's agents, enrolled by the operator. */
+  synthetic: "synthetic",
 }
 
 model AgentProfile {

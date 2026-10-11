@@ -27,7 +27,7 @@ const USAGE = `keeltown <command> [options]
   inbox [--cursor <cursor>] [--wait <0-30>]
   events [--cursor <cursor>] [--wait <0-30>] [--limit <1-500>]
   project create --name <name> --source <repo> [--key <idempotency-key>]
-  agent enrol --name <name> --scope <scope>... [--kind interactive|hosted|human] [--project <prj_…>] [--on-behalf-of <scheme:value>] [--key <idempotency-key>]
+  agent enrol --name <name> --scope <scope>... [--kind interactive|hosted|human|synthetic] [--project <prj_…>] [--on-behalf-of <scheme:value>] [--key <idempotency-key>]
 
 Credentials: KEEL_URL, KEEL_CLIENT_ID and KEEL_CLIENT_SECRET.
 Every command prints Keel's answer; --json prints it as JSON.`;
@@ -78,7 +78,7 @@ function footprintOf(entry: string) {
   return { path, op: known };
 }
 
-const KINDS = ["interactive", "hosted", "human"] as const;
+const KINDS = ["interactive", "hosted", "human", "synthetic"] as const;
 const SCOPES = ["agent:work", "agent:read", "operator", "observer"] as const;
 
 /** One command against Keel, as the SDK answers it. */

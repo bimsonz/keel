@@ -283,6 +283,27 @@ describe("project bootstrap", () => {
     expect(refused.body.issues?.map((issue) => issue.path.join("."))).toContain("onBehalfOf");
   });
 
+  it("[a11e.synthetic-rest] enrols a synthetic agent whose credential exchanges at once", async () => {
+    const { via } = operatorApp();
+    const enrolled = await call(
+      via,
+      await operatorToken(via),
+      "POST",
+      "/agents",
+      { name: "load-1", kind: "synthetic", scopes: ["agent:read", "agent:work"] },
+      key("agt"),
+    );
+    expect(enrolled.status).toBe(201);
+    expect(enrolled.body.agent).toMatchObject({ kind: "synthetic" });
+    const me = await call(
+      via,
+      await tokenOf(enrolled.body.clientId, enrolled.body.clientSecret),
+      "GET",
+      "/agents/me",
+    );
+    expect(me.body.result.agent).toMatchObject({ id: enrolled.body.agent.id, kind: "synthetic" });
+  });
+
   it("[a11b.scope] refuses an agent's token both operator operations", async () => {
     const { via } = operatorApp();
     const agent = await tokenFor(await seedAgent());
