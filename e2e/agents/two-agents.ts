@@ -125,7 +125,15 @@ async function runAgent(agent: keyof typeof TASKS, index: number, dir: string): 
   const child = spawn(cli.command, cli.args.map(fill), {
     cwd: scratch,
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    // An agent commits as itself, never as whoever runs this script.
+    env: {
+      ...process.env,
+      GIT_TERMINAL_PROMPT: "0",
+      GIT_AUTHOR_NAME: agent,
+      GIT_AUTHOR_EMAIL: `${agent}@agents.keel.invalid`,
+      GIT_COMMITTER_NAME: agent,
+      GIT_COMMITTER_EMAIL: `${agent}@agents.keel.invalid`,
+    },
   });
   child.stdout.pipe(out);
   child.stderr.pipe(out);
