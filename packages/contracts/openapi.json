@@ -6924,7 +6924,7 @@
       },
       "EventActor": {
         "type": "string",
-        "pattern": "^(agent:agt_[0-9A-HJKMNP-TV-Z]{26}|operator:.*)$",
+        "pattern": "^(agent:agt_[0-9A-HJKMNP-TV-Z]{26}|operator:.+)$",
         "description": "The principal whose command caused an event: `agent:<agent id>` or `operator:<by>`."
       },
       "EventAnchor": {

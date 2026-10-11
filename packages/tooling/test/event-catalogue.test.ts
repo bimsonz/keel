@@ -442,6 +442,8 @@ describe("the event catalogue: core's Effect Schemas and the spec's KeelEvent", 
     expect(actor.test("agent:agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0")).toBe(true);
     expect(actor.test("operator:agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0")).toBe(true);
     expect(actor.test("agent:someone")).toBe(false);
+    // Core's Actor is `operator:${NonEmptyString}`: an operator always has a name.
+    expect(actor.test("operator:")).toBe(false);
   });
 
   it("compiles core's events as Schema.toJsonSchemaDocument does, before the rewrites", () => {
