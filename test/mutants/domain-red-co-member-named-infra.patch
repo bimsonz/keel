@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/red-exit.test.ts
+# kills: red.reason-names-cause
+# why: a co-member's failure is requeued as infra, so three batch-mates' failures bounce an innocent change
+diff --git a/packages/core/src/domain/integration/red-exit.ts b/packages/core/src/domain/integration/red-exit.ts
+index 2f428a4..068ff7a 100644
+--- a/packages/core/src/domain/integration/red-exit.ts
++++ b/packages/core/src/domain/integration/red-exit.ts
+@@ -30,7 +30,7 @@ export const redExit = (attribution: BatchAttribution, member: ChangeId): RedExi
+     case "unattributed":
+       return { _tag: "Bisection" };
+     default:
+-      return attribution === member ? { _tag: "Bounce" } : requeue("co-member-failed");
++      return attribution === member ? { _tag: "Bounce" } : requeue("infra-failure");
+   }
+ };
+ 

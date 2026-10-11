@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/red-exit.test.ts
+# kills: red.reason-names-cause
+# why: an infrastructure failure is requeued as a co-member's failure, hiding an infra loop from the Lane's count
+diff --git a/packages/core/src/domain/integration/red-exit.ts b/packages/core/src/domain/integration/red-exit.ts
+index 2f428a4..c38c15d 100644
+--- a/packages/core/src/domain/integration/red-exit.ts
++++ b/packages/core/src/domain/integration/red-exit.ts
+@@ -22,7 +22,7 @@ const requeue = (reason: RequeueReason): RedExit => ({ _tag: "Requeue", reason }
+ export const redExit = (attribution: BatchAttribution, member: ChangeId): RedExit => {
+   switch (attribution) {
+     case "infra":
+-      return requeue("infra-failure");
++      return requeue("co-member-failed");
+     case "textual":
+       return requeue("textual");
+     case "interaction":

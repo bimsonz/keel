@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/red-exit.test.ts
+# kills: red.only-blamed-bounces
+# why: an infrastructure failure bounces every member, though none is to blame
+diff --git a/packages/core/src/domain/integration/red-exit.ts b/packages/core/src/domain/integration/red-exit.ts
+index 2f428a4..5e4fd1c 100644
+--- a/packages/core/src/domain/integration/red-exit.ts
++++ b/packages/core/src/domain/integration/red-exit.ts
+@@ -22,7 +22,7 @@ const requeue = (reason: RequeueReason): RedExit => ({ _tag: "Requeue", reason }
+ export const redExit = (attribution: BatchAttribution, member: ChangeId): RedExit => {
+   switch (attribution) {
+     case "infra":
+-      return requeue("infra-failure");
++      return { _tag: "Bounce" };
+     case "textual":
+       return requeue("textual");
+     case "interaction":
