@@ -1,6 +1,6 @@
 // What every operator script needs: the repo root, the account, and a token,
 // all taken from the operator's environment and wrangler login, never a file.
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { join } from "node:path";
 
 export const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -41,6 +41,21 @@ export function accountId(): string {
     );
   }
   return id;
+}
+
+/** The one site an environment serves (`keel.town`), from its Terraform output. */
+export function siteHost(environment: string): string {
+  const run = spawnSync(
+    "terraform",
+    [`-chdir=${join(root, "infra", environment)}`, "output", "-raw", "keel_host"],
+    { encoding: "utf8" },
+  );
+  const host = run.stdout.trim();
+  if (run.status !== 0 || host === "" || host.includes("\n"))
+    throw new Error(
+      `terraform output keel_host failed for ${environment}; run \`node scripts/tf.ts ${environment} apply\`:\n${run.stderr}`,
+    );
+  return host;
 }
 
 let token: string | undefined;

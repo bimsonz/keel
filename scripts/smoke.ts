@@ -3,14 +3,14 @@
 // "who am I?" over REST and over MCP, and requires the two surfaces to agree
 // for each agent and to disagree across agents (so the comparison can fail).
 // The rows are deleted afterwards, whatever happened. KEEL_URL overrides the
-// workers.dev URL; `--repeat N` also times N more rounds for the first agent.
+// site URL; `--repeat N` also times N more rounds for the first agent.
 import { isDeepStrictEqual } from "node:util";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { clientFor, readSeeded } from "../e2e/src/lib/seeded.ts";
 import { workLoopSmoke } from "../e2e/src/smoke/work-loop.ts";
 import { whoamiSmoke, type WhoamiSmokeResult } from "../e2e/src/smoke/whoami.ts";
-import { cloudflare, root, wrangler } from "./env.ts";
+import { root, siteHost, wrangler } from "./env.ts";
 
 const environment = process.argv[2] ?? "staging";
 const repeatAt = process.argv.indexOf("--repeat");
@@ -65,8 +65,7 @@ async function seed(name: string): Promise<Seeded> {
   return { id, clientId, clientSecret };
 }
 
-const subdomain = Reflect.get(Object(await cloudflare("GET", "/workers/subdomain")), "subdomain");
-const keelUrl = process.env["KEEL_URL"] ?? `https://keel.${String(subdomain)}.workers.dev`;
+const keelUrl = process.env["KEEL_URL"] ?? `https://${siteHost(environment)}`;
 const seeded: Seeded[] = [];
 let failures = 0;
 const check = (ok: boolean, what: string) => {

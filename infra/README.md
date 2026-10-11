@@ -16,9 +16,13 @@ pnpm deploy:staging                  # keel-verify, D1 migrations, keel, console
 pnpm smoke                           # whoami over REST and MCP, live
 ```
 
-`scripts/deploy.ts` writes a gitignored `apps/<app>/wrangler.deploy.jsonc` per Worker, filling the sentinel ids from `terraform output` and `KEEL_HOST` from the account's `workers.dev` subdomain. It refuses to deploy when an output is missing, when a sentinel survives rendering, or when a bound R2 bucket or D1 database does not exist, and it passes `--no-x-provision --no-x-auto-create`, because wrangler 4.149 otherwise creates missing resources itself. `--check` renders and checks without deploying. Secrets: `CLOUDFLARE_ACCOUNT_ID` on every deploy; `KEEL_SIGNING_KEY` only when the Worker has none, since a new key invalidates every issued token. On macOS the container build runs with a `PATH` that hides `docker-credential-osxkeychain` and an empty `DOCKER_CONFIG` (spike S4).
+`scripts/deploy.ts` writes a gitignored `apps/<app>/wrangler.deploy.jsonc` per Worker, filling the sentinel ids from `terraform output`, and `KEEL_HOST` (and the console's `KEEL_API_HOST`) from its `keel_host` output: the one site, `keel.town`. It refuses to deploy when an output is missing, when a sentinel survives rendering, or when a bound R2 bucket or D1 database does not exist, and it passes `--no-x-provision --no-x-auto-create`, because wrangler 4.149 otherwise creates missing resources itself. `--check` renders and checks without deploying. Secrets: `CLOUDFLARE_ACCOUNT_ID` on every deploy; `KEEL_SIGNING_KEY` only when the Worker has none, since a new key invalidates every issued token. On macOS the container build runs with a `PATH` that hides `docker-credential-osxkeychain` and an empty `DOCKER_CONFIG` (spike S4).
 
 `scripts/tf.ts` authenticates Terraform with a short-lived token from your wrangler login (`wrangler auth token`); no credential is written to a file.
+
+## The site
+
+`routing.tf` serves everything from one host, `var.host` (`keel.town`), so a session cookie is first-party everywhere. The console is the apex origin through a Workers Custom Domain, which keeps its DNS record and certificate; Workers routes put Keel in front of it for `/v1/*` and `/mcp*` (the agent front door's paths join them as they are built). A route allows only a trailing wildcard, so the clone route `/<org>/<project>.git/...` reaches Keel through the console, which forwards only `info/refs` and `git-upload-pack` over its service binding. There is one environment: whatever is deployed here is production.
 
 ## State
 

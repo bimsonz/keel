@@ -18,7 +18,7 @@
 // reaches the same ids. A credential the file already holds is kept while it
 // still exchanges for a token, because replaying an enrolment re-issues its
 // secret and would void the copy a deployed console holds; one that no longer
-// works is re-issued under the same key. KEEL_URL overrides the workers.dev URL.
+// works is re-issued under the same key. KEEL_URL overrides the site URL.
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -33,7 +33,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { KeelClient, KeelProblem } from "../packages/sdk/src/index.ts";
-import { cloudflare, root, wrangler } from "./env.ts";
+import { root, siteHost, wrangler } from "./env.ts";
 
 const environment = process.argv[2] ?? "staging";
 const agentsAt = process.argv.indexOf("--agents");
@@ -224,8 +224,7 @@ async function enrol(
   };
 }
 
-const subdomain = Reflect.get(Object(await cloudflare("GET", "/workers/subdomain")), "subdomain");
-const keelUrl = process.env["KEEL_URL"] ?? `https://keel.${String(subdomain)}.workers.dev`;
+const keelUrl = process.env["KEEL_URL"] ?? `https://${siteHost(environment)}`;
 
 try {
   const fixtureSha = seedFixture();

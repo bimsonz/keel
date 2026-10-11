@@ -9,3 +9,9 @@ variable "environment" {
   type        = string
   default     = "staging"
 }
+
+variable "host" {
+  description = "The one site Keel serves: the console at its apex, Keel's API and MCP under it."
+  type        = string
+  default     = "keel.town"
+}
