@@ -10,3 +10,4 @@ export * from "./probe.ts";
 export * from "./probe-machine.ts";
 export * from "./verdict.ts";
 export * from "./precheck.ts";
+export * from "./opinion-gate.ts";
