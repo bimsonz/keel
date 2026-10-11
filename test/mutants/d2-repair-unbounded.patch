@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/draft-probe.test.ts -t draft.bounded
+# kills: draft.bounded
+# why: The repair loop is not bounded by DRAFT_REPAIRS, so a model that never fills the template right is called again and again
+diff --git a/packages/core/src/application/verification/draft-probe.ts b/packages/core/src/application/verification/draft-probe.ts
+index 4c8bd3a..37654d4 100644
+--- a/packages/core/src/application/verification/draft-probe.ts
++++ b/packages/core/src/application/verification/draft-probe.ts
+@@ -154,7 +154,7 @@ export const draftProbe = <S>(
+     const model = yield* PlatformFunction;
+     const store = yield* ProbeStore;
+     const feedback: string[] = [];
+-    for (let attempt = 1; attempt <= 1 + DRAFT_REPAIRS; attempt++) {
++    for (let attempt = 1; attempt <= 10 + DRAFT_REPAIRS; attempt++) {
+       const reply = yield* model
+         .call({
+           name: template.fn,

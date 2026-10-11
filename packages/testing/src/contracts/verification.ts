@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
   L1_SUITE_PLAN,
+  type ProbeFile,
   storedPlanText,
   WORKER_APP_PACK,
 } from "@keeltown/core/application/verification";
@@ -29,6 +30,7 @@ import {
   type PrecheckWorkspace,
   ProbeRunner,
   type ProbeRunRequest,
+  ProbeStore,
   type RepoRef,
   VerifierRuntime,
 } from "@keeltown/core/ports";
@@ -201,6 +203,56 @@ export function describePlanStoreContract(adapter: string, make: () => PlanStore
         expect((yield* Effect.flip(store.get(plan.planHash)))._tag).toBe("PlanMissing");
       }).pipe(Effect.provide(harness.layer));
     });
+  });
+}
+
+export interface ProbeStoreHarness {
+  readonly layer: Layer.Layer<ProbeStore>;
+  /** The files stored under a hash, as a VerifierDO would read them back; none when nothing is. */
+  readonly read: (hash: ContentHash) => Effect.Effect<readonly ProbeFile[] | undefined>;
+}
+
+const byPath = (files: readonly ProbeFile[]) =>
+  files.toSorted((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+
+/** A probe of two files, one carrying `marker`. */
+const probeFiles = (marker: string): ProbeFile[] => [
+  { path: ".keel/freshness.test.ts", text: `import { it } from "vitest";\n// ${marker}\n` },
+  {
+    path: ".keel/support/actors.ts",
+    text: `export const marker = ${JSON.stringify(marker)};\n`,
+  },
+];
+
+export function describeProbeStoreContract(adapter: string, make: () => ProbeStoreHarness) {
+  describe(`ProbeStore contract: ${adapter}`, () => {
+    it.effect(
+      "[probe-store.round-trip] keeps a probe's files under a content hash and reads them back",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const put = probeFiles(random(8));
+          const hash = yield* (yield* ProbeStore).put(put);
+          expect(hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+          const read = yield* harness.read(hash);
+          expect(read === undefined ? undefined : byPath(read)).toEqual(byPath(put));
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[probe-store.stable] the same files in any order answer one hash, and other text another",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const store = yield* ProbeStore;
+          const marker = random(8);
+          const hash = yield* store.put(probeFiles(marker));
+          expect(yield* store.put(probeFiles(marker).toReversed())).toBe(hash);
+          expect(yield* store.put(probeFiles(`${marker}!`))).not.toBe(hash);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
   });
 }
 

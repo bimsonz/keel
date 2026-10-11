@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/draft-probe.test.ts -t draft.slot-repair
+# kills: draft.slot-repair
+# why: Slots the template refused are rendered and run anyway, so a bad slot reaches the world matrix
+diff --git a/packages/core/src/application/verification/draft-probe.ts b/packages/core/src/application/verification/draft-probe.ts
+index 4c8bd3a..5b145ae 100644
+--- a/packages/core/src/application/verification/draft-probe.ts
++++ b/packages/core/src/application/verification/draft-probe.ts
+@@ -176,6 +176,7 @@ export const draftProbe = <S>(
+       const slots = template.validate(reply.value);
+       if (Result.isFailure(slots)) {
+         feedback.push(`attempt ${attempt}: slots: ${slots.failure}`);
++        yield* runMatrix(yield* store.put(template.render(reply.value as S)), worlds, ADMISSION_RUNS);
+         continue;
+       }
+       const probe = yield* store.put(template.render(slots.success));

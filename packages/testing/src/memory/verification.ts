@@ -40,12 +40,17 @@ import {
   ProbeRunner,
   type ProbeRunRequest,
   ProbeRunnerUnavailable,
+  ProbeStore,
   type Ruling,
   VerifierRuntime,
 } from "@keeltown/core/ports";
-import type { ProbeRun } from "@keeltown/core/application/verification";
+import type { ProbeFile, ProbeRun } from "@keeltown/core/application/verification";
 import { Effect, Layer, Result, Schema } from "effect";
-import type { FlowSpecSourceHarness, ProbeRunnerHarness } from "../contracts/verification.ts";
+import type {
+  FlowSpecSourceHarness,
+  ProbeRunnerHarness,
+  ProbeStoreHarness,
+} from "../contracts/verification.ts";
 import { makeEventOutboxMemory } from "./event-outbox.ts";
 import { makeClockMemory } from "./identity.ts";
 
@@ -443,4 +448,38 @@ export function memoryProbeRunnerHarness(): ProbeRunnerHarness {
       : { _tag: "ran", outcome, reason: outcome, observations: ["observed"] };
   });
   return { layer: runner.layer, prepared };
+}
+
+/**
+ * Probes kept as files, under the sha256 of their canonical JSON (the files
+ * sorted by path), so the hash is as stable as a bundle's.
+ */
+export function makeProbeStoreMemory(): ProbeStoreHarness & {
+  readonly stored: ReadonlyMap<string, readonly ProbeFile[]>;
+} {
+  const stored = new Map<string, readonly ProbeFile[]>();
+  return {
+    stored,
+    read: (hash) => Effect.sync(() => stored.get(hash)),
+    layer: Layer.succeed(
+      ProbeStore,
+      ProbeStore.of({
+        put: (files) =>
+          Effect.promise(async () => {
+            const sorted = files.toSorted((a, b) =>
+              a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
+            );
+            const canonical = new TextEncoder().encode(
+              JSON.stringify(sorted.map((f) => [f.path, f.text])),
+            );
+            const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", canonical));
+            const hash = Schema.decodeUnknownSync(ContentHash)(
+              `sha256:${[...digest].map((b) => b.toString(16).padStart(2, "0")).join("")}`,
+            );
+            stored.set(hash, sorted);
+            return hash;
+          }),
+      }),
+    ),
+  };
 }

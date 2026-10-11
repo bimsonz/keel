@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/draft-probe.test.ts -t draft.identical-fail-repair
+# kills: draft.identical-fail-repair
+# why: A probe that breaks the same way in every world (its own setup) reads as a plain non-discriminating fail and is discarded instead of repaired
+diff --git a/packages/core/src/application/verification/draft-probe.ts b/packages/core/src/application/verification/draft-probe.ts
+index 4c8bd3a..cca9cc2 100644
+--- a/packages/core/src/application/verification/draft-probe.ts
++++ b/packages/core/src/application/verification/draft-probe.ts
+@@ -185,7 +185,7 @@ export const draftProbe = <S>(
+         continue;
+       }
+       const identical = identicalFailure(cells);
+-      if (identical !== undefined) {
++      if (identical !== undefined && attempt < 0) {
+         feedback.push(
+           `attempt ${attempt}: non-discriminating: every world failed with ${JSON.stringify(identical)}`,
+         );

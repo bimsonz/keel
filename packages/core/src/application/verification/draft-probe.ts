@@ -1,0 +1,211 @@
+import { Effect, Result } from "effect";
+import type { Proposition } from "../../domain/coordination/index.ts";
+import type { ContentHash } from "../../domain/kernel/index.ts";
+import { ADMISSION_RUNS, admit, type World } from "../../domain/verification/index.ts";
+import {
+  PlatformFunction,
+  type ProbeRunner,
+  type ProbeRunnerUnavailable,
+  ProbeStore,
+} from "../ports/index.ts";
+import type { ProbeTemplate } from "./probe-templates/template.ts";
+import { type MatrixCell, type MatrixHarnessError, runMatrix } from "./run-matrix.ts";
+import { MATRIX_WORLDS } from "./world-matrix.ts";
+
+/**
+ * Repairs after the first draft (spike S26): at most 1 + DRAFT_REPAIRS model
+ * calls. Probe drafting is Keel's only repair loop, and it is bounded.
+ */
+export const DRAFT_REPAIRS = 3;
+
+/** What a draft is drafted from: the disagreement, and the code it is about. */
+export interface DraftContext {
+  /** What the premise-holder (A) relies on. */
+  readonly premise: Proposition;
+  /** What the other change (B) derives, which contradicts it. */
+  readonly effect: Proposition;
+  /** The code the premise is about, as anchors name it. */
+  readonly anchors: readonly string[];
+  /** The project's source, whole: a pruned file set broke every draft in setup (S26). */
+  readonly source: readonly { readonly path: string; readonly text: string }[];
+  /** Each change's hunks against trunk. */
+  readonly hunks: { readonly A: string; readonly B: string };
+}
+
+/** How drafting ended. Only an admitted probe goes on; any other end escalates its conflict. */
+export type DraftOutcome =
+  | {
+      readonly _tag: "Admitted";
+      readonly probe: ContentHash;
+      readonly cells: readonly MatrixCell[];
+      readonly attempts: number;
+    }
+  | {
+      readonly _tag: "Discarded";
+      readonly reason: "non-discriminating" | "unstable" | "incomplete" | "repairs-exhausted";
+      readonly attempts: number;
+      /** What every failed attempt was told, in order. */
+      readonly feedback: readonly string[];
+      readonly cells?: readonly MatrixCell[];
+    }
+  | { readonly _tag: "Abstained"; readonly reason: string; readonly attempts: number };
+
+const ADMISSION_RULE = `The probe runs in five worlds, each on a fresh isolate with no network: trunk (neither change), A (the
+premise-holder's change alone), B (the other change alone), AB (both), and A-noop (A with the anchored call made a
+statement that does nothing). It is admitted only if, on each of ${ADMISSION_RUNS} runs, it passes or reports n/a on
+trunk, passes in A, fails in AB, and fails in A-noop. B is recorded but does not decide. A probe that passes in A-noop
+never tested the premise, and is never admitted.`;
+
+const NA_RULE = `n/a means the behaviour the premise is about is absent in that world (for example, there is no revoke
+route): the probe throws Error("probe not applicable: <why>"). Anything else that goes wrong is a failure.`;
+
+const PROBE_CONTRACT = `The probe is one vitest file with exactly one test. It must log at least one observation line that
+starts with "[probe]" before it decides. Only describe, it, and expect(x).toBe, toEqual, toMatch and toThrow are
+available. Its harness reports pass, fail or n/a; a probe that breaks the harness (no observation, two tests, an
+unsupported matcher, a module that does not bundle) is a harness error, which is never a result.`;
+
+/**
+ * The single prompt a draft or repair is given: the disagreement, the rules,
+ * the code, the template's own instructions, and, on a repair, what every
+ * earlier attempt was told, which is only ever deterministic text.
+ */
+export const draftPrompt = <S>(
+  template: ProbeTemplate<S>,
+  context: DraftContext,
+  feedback: readonly string[],
+): string =>
+  [
+    `## The disagreement`,
+    `Change A relies on: ${JSON.stringify(context.premise)}`,
+    `Change B derives: ${JSON.stringify(context.effect)}`,
+    `Anchors: ${context.anchors.join(", ")}`,
+    `## Worlds and admission`,
+    ADMISSION_RULE,
+    `## n/a`,
+    NA_RULE,
+    `## The probe contract`,
+    PROBE_CONTRACT,
+    `## Change A's hunks`,
+    context.hunks.A,
+    `## Change B's hunks`,
+    context.hunks.B,
+    `## The project's source`,
+    ...context.source.map((f) => `### ${f.path}\n\`\`\`\n${f.text}\n\`\`\``),
+    template.instructions,
+    ...(feedback.length === 0
+      ? []
+      : [
+          `## Your earlier replies failed`,
+          `Fix what each line says, and reply with the whole JSON object again.`,
+          ...feedback.map((line) => `- ${line}`),
+        ]),
+  ].join("\n\n");
+
+/** Harness errors, one line per distinct reason, naming every world#run that gave it. */
+const harnessFeedback = (attempt: number, errors: readonly MatrixHarnessError[]): string[] => {
+  const byReason = new Map<string, string[]>();
+  for (const e of errors)
+    byReason.set(e.reason, [...(byReason.get(e.reason) ?? []), `${e.world}#${e.run}`]);
+  return [...byReason].map(
+    ([reason, where]) => `attempt ${attempt}: harness error in ${where.join(", ")}: ${reason}`,
+  );
+};
+
+/**
+ * The reason every world failed with, when on some run all five failed alike:
+ * the probe broke on something every world shares (its own setup), so it never
+ * reached the premise. Read as a plain fail, that would never be repaired.
+ */
+const identicalFailure = (cells: readonly MatrixCell[]): string | undefined => {
+  for (let run = 1; run <= ADMISSION_RUNS; run++) {
+    const here = MATRIX_WORLDS.map((world: World) =>
+      cells.find((c) => c.run === run && c.world === world),
+    );
+    const [first] = here;
+    if (
+      first !== undefined &&
+      here.every((c) => c !== undefined && c.outcome === "fail" && c.reason === first.reason)
+    )
+      return first.reason;
+  }
+  return undefined;
+};
+
+/**
+ * Drafts a probe from a template (spike S26): the model fills the template's
+ * slots, Keel renders and stores the probe, and the world matrix runs it
+ * ADMISSION_RUNS times. A reply that fails the template's check, a harness
+ * error, or a failure identical in every world is repaired, at most
+ * DRAFT_REPAIRS times, from deterministic text only: never from the model's
+ * own rationale. An admitted probe ends it; any other matrix result is
+ * discarded as admission judged it, and an abstaining model ends it too.
+ * A runner that cannot run at all fails, for the caller to retry.
+ */
+export const draftProbe = <S>(
+  template: ProbeTemplate<S>,
+  context: DraftContext,
+  worlds: Readonly<Record<World, ContentHash>>,
+): Effect.Effect<
+  DraftOutcome,
+  ProbeRunnerUnavailable,
+  PlatformFunction | ProbeStore | ProbeRunner
+> =>
+  Effect.gen(function* () {
+    const model = yield* PlatformFunction;
+    const store = yield* ProbeStore;
+    const feedback: string[] = [];
+    for (let attempt = 1; attempt <= 1 + DRAFT_REPAIRS; attempt++) {
+      const reply = yield* model
+        .call({
+          name: template.fn,
+          input: { prompt: draftPrompt(template, context, feedback) },
+          outputSchema: template.schema,
+        })
+        .pipe(
+          Effect.map((value) => ({ _tag: "Replied", value }) as const),
+          Effect.catchTag("ModelAbstained", (e) =>
+            Effect.succeed({ _tag: "Abstained", reason: e.reason } as const),
+          ),
+        );
+      if (reply._tag === "Abstained")
+        return {
+          _tag: "Abstained",
+          reason: reply.reason,
+          attempts: attempt,
+        } satisfies DraftOutcome;
+      const slots = template.validate(reply.value);
+      if (Result.isFailure(slots)) {
+        feedback.push(`attempt ${attempt}: slots: ${slots.failure}`);
+        continue;
+      }
+      const probe = yield* store.put(template.render(slots.success));
+      const { cells, harnessErrors } = yield* runMatrix(probe, worlds, ADMISSION_RUNS);
+      if (harnessErrors.length > 0) {
+        feedback.push(...harnessFeedback(attempt, harnessErrors));
+        continue;
+      }
+      const identical = identicalFailure(cells);
+      if (identical !== undefined) {
+        feedback.push(
+          `attempt ${attempt}: non-discriminating: every world failed with ${JSON.stringify(identical)}`,
+        );
+        continue;
+      }
+      const admission = admit(cells);
+      if (admission._tag === "admitted")
+        return { _tag: "Admitted", probe, cells, attempts: attempt } satisfies DraftOutcome;
+      return {
+        _tag: "Discarded",
+        reason: admission._tag === "rejected" ? admission.reason : "incomplete",
+        attempts: attempt,
+        feedback,
+        cells,
+      } satisfies DraftOutcome;
+    }
+    return {
+      _tag: "Discarded",
+      reason: "repairs-exhausted",
+      attempts: 1 + DRAFT_REPAIRS,
+      feedback,
+    } satisfies DraftOutcome;
+  }).pipe(Effect.withSpan("verification/draftProbe"));

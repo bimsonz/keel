@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/draft-probe.test.ts -t draft.feedback-deterministic
+# kills: draft.feedback-deterministic
+# why: A repair is fed the model's own rationale, so the loop is steered by model prose instead of deterministic error text
+diff --git a/packages/core/src/application/verification/draft-probe.ts b/packages/core/src/application/verification/draft-probe.ts
+index 4c8bd3a..8ff6163 100644
+--- a/packages/core/src/application/verification/draft-probe.ts
++++ b/packages/core/src/application/verification/draft-probe.ts
+@@ -187,7 +187,7 @@ export const draftProbe = <S>(
+       const identical = identicalFailure(cells);
+       if (identical !== undefined) {
+         feedback.push(
+-          `attempt ${attempt}: non-discriminating: every world failed with ${JSON.stringify(identical)}`,
++          `attempt ${attempt}: non-discriminating: every world failed with ${JSON.stringify(identical)} (you said: ${String(Reflect.get(Object(slots.success), "rationale"))})`,
+         );
+         continue;
+       }

@@ -65,12 +65,14 @@ export const getVerdict: (
   verdictId: VerdictId,
 ) => Effect.Effect<VerdictView, VerdictNotFound, EntityStore> = stub("verification/getVerdict");
 
+export * from "./draft-probe.ts";
 export * from "./flow-spec.ts";
 export * from "./packs.ts";
 export * from "./plan-codec.ts";
 export * from "./precheck.ts";
 export * from "./probe-run.ts";
 export * from "./probe-templates/freshness.ts";
+export * from "./probe-templates/template.ts";
 export * from "./redact.ts";
 export * from "./run-matrix.ts";
 export * from "./run-plan.ts";

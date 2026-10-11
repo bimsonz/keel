@@ -1,5 +1,6 @@
 import { Result } from "effect";
 import type { NoopRecipe } from "../world-matrix.ts";
+import type { ProbeTemplate } from "./template.ts";
 
 /**
  * The freshness probe template (spike S26): a subject calls on its session,
@@ -245,3 +246,13 @@ export const freshnessNoop = (anchor: {
   anchor: anchor.call,
   replacement: "void 0; /* A-noop: the anchored call does nothing */",
 });
+
+/** The freshness template, as draftProbe fills it: one probe file, `.keel/freshness.test.ts`. */
+export const FRESHNESS_TEMPLATE: ProbeTemplate<FreshnessSlots> = {
+  id: "freshness/1",
+  fn: "keel.probe.freshness",
+  schema: FRESHNESS_SCHEMA,
+  instructions: FRESHNESS_PROMPT,
+  validate: validateSlots,
+  render: (slots) => [{ path: ".keel/freshness.test.ts", text: renderFreshness(slots) }],
+};

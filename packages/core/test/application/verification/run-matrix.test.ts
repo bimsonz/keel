@@ -103,7 +103,8 @@ describe("running a probe across the world matrix", () => {
           const expected = [1, 2, 3].flatMap((run) =>
             MATRIX_WORLDS.flatMap((world) => {
               const a = at(world, run);
-              return a === "harness" ? [] : [{ world, run, outcome: a }];
+              // Each cell keeps the reason its probe gave (here, the outcome's name).
+              return a === "harness" ? [] : [{ world, run, outcome: a, reason: a }];
             }),
           );
           expect(cells).toEqual(expected);

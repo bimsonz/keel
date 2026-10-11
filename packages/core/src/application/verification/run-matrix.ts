@@ -4,6 +4,11 @@ import { ADMISSION_RUNS, type ProbeCell, type World } from "../../domain/verific
 import { ProbeRunner } from "../ports/index.ts";
 import { MATRIX_WORLDS } from "./world-matrix.ts";
 
+/** A cell with the reason the probe gave for it: the text a failure identical in every world is fed back as. */
+export interface MatrixCell extends ProbeCell {
+  readonly reason: string;
+}
+
 /** A run the probe's harness broke on: never a cell, and the deterministic text a repair is given. */
 export interface MatrixHarnessError {
   readonly world: World;
@@ -24,7 +29,7 @@ export const runMatrix = Effect.fn("verification/runMatrix")(function* (
   runs: number = ADMISSION_RUNS,
 ) {
   const runner = yield* ProbeRunner;
-  const cells: ProbeCell[] = [];
+  const cells: MatrixCell[] = [];
   const harnessErrors: MatrixHarnessError[] = [];
   for (let run = 1; run <= runs; run++) {
     const answers = yield* Effect.forEach(
@@ -36,7 +41,8 @@ export const runMatrix = Effect.fn("verification/runMatrix")(function* (
       { concurrency: "unbounded" },
     );
     for (const { world, answer } of answers) {
-      if (answer._tag === "ran") cells.push({ world, run, outcome: answer.outcome });
+      if (answer._tag === "ran")
+        cells.push({ world, run, outcome: answer.outcome, reason: answer.reason });
       else harnessErrors.push({ world, run, reason: answer.reason });
     }
   }

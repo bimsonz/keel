@@ -39,10 +39,12 @@ import {
   describeFlowSpecSourceContract,
   describePlanStoreContract,
   describeProbeRunnerContract,
+  describeProbeStoreContract,
   describeVerifierRuntimeContract,
   type FlowSpecSourceHarness,
   type PlanStoreHarness,
   type ProbeRunnerHarness,
+  type ProbeStoreHarness,
   freshId,
 } from "./contracts/verification.ts";
 import { describeProjectsContract, type ProjectsHarness } from "./contracts/projects.ts";
@@ -69,6 +71,7 @@ import type {
   FlowSpecSource,
   PlanStore,
   ProbeRunner,
+  ProbeStore,
   Inbox,
   LiveChanges,
   Notifier,
@@ -357,6 +360,10 @@ export const PORTS = {
   ProbeRunner: harnessed<ProbeRunner, ProbeRunnerHarness>(
     verification.memoryProbeRunnerHarness,
     describeProbeRunnerContract,
+  ),
+  ProbeStore: harnessed<ProbeStore, ProbeStoreHarness>(
+    verification.makeProbeStoreMemory,
+    describeProbeStoreContract,
   ),
   BatchVerdicts: harnessed<BatchVerdicts, BatchVerdictsHarness>(
     memoryBatchVerdictsHarness,

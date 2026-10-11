@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/draft-probe.test.ts -t draft.abstained
+# kills: draft.abstained
+# why: An abstaining model is asked again as though it had replied, spending repairs on a timeout instead of escalating
+diff --git a/packages/core/src/application/verification/draft-probe.ts b/packages/core/src/application/verification/draft-probe.ts
+index 4c8bd3a..5dfb99a 100644
+--- a/packages/core/src/application/verification/draft-probe.ts
++++ b/packages/core/src/application/verification/draft-probe.ts
+@@ -167,7 +167,7 @@ export const draftProbe = <S>(
+             Effect.succeed({ _tag: "Abstained", reason: e.reason } as const),
+           ),
+         );
+-      if (reply._tag === "Abstained")
++      if (reply._tag === "Abstained" && attempt > DRAFT_REPAIRS)
+         return {
+           _tag: "Abstained",
+           reason: reply.reason,

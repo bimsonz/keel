@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/draft-probe.test.ts -t draft.harness-repair
+# kills: draft.harness-repair
+# why: Harness errors in a world that does not decide admission are ignored, so a probe that broke its harness can be admitted
+diff --git a/packages/core/src/application/verification/draft-probe.ts b/packages/core/src/application/verification/draft-probe.ts
+index 4c8bd3a..8c8854a 100644
+--- a/packages/core/src/application/verification/draft-probe.ts
++++ b/packages/core/src/application/verification/draft-probe.ts
+@@ -180,7 +180,7 @@ export const draftProbe = <S>(
+       }
+       const probe = yield* store.put(template.render(slots.success));
+       const { cells, harnessErrors } = yield* runMatrix(probe, worlds, ADMISSION_RUNS);
+-      if (harnessErrors.length > 0) {
++      if (harnessErrors.length > 99) {
+         feedback.push(...harnessFeedback(attempt, harnessErrors));
+         continue;
+       }
