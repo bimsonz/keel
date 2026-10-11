@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "repo.access"
+# kills: repo.access
+# why: an agent reads every project's code, not only its own
+diff --git a/packages/core/src/application/integration/repo.ts b/packages/core/src/application/integration/repo.ts
+index c851135..a255e4b 100644
+--- a/packages/core/src/application/integration/repo.ts
++++ b/packages/core/src/application/integration/repo.ts
+@@ -52,7 +52,7 @@ export const repoAccess = (
+     principal !== null &&
+     (principal.scopes.includes("observer") ||
+       principal.scopes.includes("operator") ||
+-      (principal.projectId === projectId && principal.scopes.includes("agent:read")))
++      principal.scopes.includes("agent:read"))
+   )
+     return trunk;
+   return Projects.use((projects) => projects.settings(projectId)).pipe(

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "repo.change-id"
+# kills: repo.change-id
+# why: a landed commit no longer names its change
+diff --git a/apps/keel/src/adapters/driving/http/repo.ts b/apps/keel/src/adapters/driving/http/repo.ts
+index 6db3fb8..33dd4bd 100644
+--- a/apps/keel/src/adapters/driving/http/repo.ts
++++ b/apps/keel/src/adapters/driving/http/repo.ts
+@@ -126,7 +126,7 @@ const wireCommit = (c: CommitInfo) => {
+     message: c.message,
+     author: identity(c.author),
+     committer: identity(c.committer),
+-    ...(changeId === undefined ? {} : { changeId }),
++    ...(changeId === undefined ? {} : {}),
+   };
+ };
+ 

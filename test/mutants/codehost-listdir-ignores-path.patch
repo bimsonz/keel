@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t "codehost.list-dir"
+# kills: codehost.list-dir
+# why: listDir lists the root whatever path is asked for
+diff --git a/packages/testing/src/memory/code-host.ts b/packages/testing/src/memory/code-host.ts
+index a8e0dfc..160e58e 100644
+--- a/packages/testing/src/memory/code-host.ts
++++ b/packages/testing/src/memory/code-host.ts
+@@ -172,7 +172,7 @@ export function makeCodeHostMemory() {
+         const found = yield* find(repo);
+         let tree = yield* rootTree(repo, found, commit);
+         const missing = new PathNotFound({ repo: plain(repo), commit, path });
+-        for (const name of path === "" ? [] : path.split("/")) {
++        for (const name of path.split("/").slice(0, 0)) {
+           const entry = decodeTree((yield* object(repo, found, tree, "tree")).body).find(
+             (e) => e.name === name,
+           );

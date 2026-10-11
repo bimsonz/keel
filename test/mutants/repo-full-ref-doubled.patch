@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "repo.tree"
+# kills: repo.tree
+# why: a full ref is read as a branch name, refs/heads/refs/heads/main
+diff --git a/packages/core/src/application/integration/repo.ts b/packages/core/src/application/integration/repo.ts
+index c851135..767ffcb 100644
+--- a/packages/core/src/application/integration/repo.ts
++++ b/packages/core/src/application/integration/repo.ts
+@@ -76,7 +76,7 @@ const resolve = (repo: RepoRef, ref: string | undefined) =>
+       return (yield* host.hasCommit(repo, sha.value))
+         ? sha.value
+         : yield* Effect.fail(new RefNotFound({ repo, ref: wanted }));
+-    return yield* host.head(repo, wanted.startsWith("refs/") ? wanted : `${BRANCH}${wanted}`);
++    return yield* host.head(repo, `${BRANCH}${wanted}`);
+   });
+ 
+ /** An object the trunk lacks, asked for by its id, is a ref that names nothing. */

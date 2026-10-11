@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "repo.commits-cursor"
+# kills: repo.commits-cursor
+# why: the next page starts at this page's last commit, so pages overlap
+diff --git a/packages/core/src/application/integration/repo.ts b/packages/core/src/application/integration/repo.ts
+index c851135..9e73f08 100644
+--- a/packages/core/src/application/integration/repo.ts
++++ b/packages/core/src/application/integration/repo.ts
+@@ -176,7 +176,7 @@ export const listRepoCommits = (
+     const chain = yield* host
+       .log(repo, from, limit + 1)
+       .pipe(Effect.catchTag("ObjectNotFound", refMissing(repo, from)));
+-    const next = chain[limit]?.sha;
++    const next = chain[limit - 1]?.sha;
+     return { commits: chain.slice(0, limit), ...(next === undefined ? {} : { next }) };
+   }).pipe(Effect.catchTag("RepoNotFound", projectMissing(projectId)));
+ 

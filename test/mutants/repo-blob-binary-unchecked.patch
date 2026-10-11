@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "repo.blob"
+# kills: repo.blob
+# why: a binary file is served as text
+diff --git a/packages/core/src/application/integration/repo.ts b/packages/core/src/application/integration/repo.ts
+index c851135..1faa474 100644
+--- a/packages/core/src/application/integration/repo.ts
++++ b/packages/core/src/application/integration/repo.ts
+@@ -138,7 +138,7 @@ export const readRepoBlob = (
+     const bytes = yield* host
+       .readBlob(repo, entry.oid)
+       .pipe(Effect.catchTag("ObjectNotFound", Effect.die));
+-    const binary = isBinary(bytes);
++    const binary = false;
+     const truncated = bytes.byteLength > MAX_INLINE_BYTES;
+     return {
+       commit,

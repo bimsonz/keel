@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "repo.diff"
+# kills: repo.diff
+# why: a root commit's diff lists no files
+diff --git a/packages/core/src/application/integration/repo.ts b/packages/core/src/application/integration/repo.ts
+index c851135..457f7ee 100644
+--- a/packages/core/src/application/integration/repo.ts
++++ b/packages/core/src/application/integration/repo.ts
+@@ -250,7 +250,7 @@ export const readRepoCommit = (
+     const changes =
+       base === undefined
+         ? (yield* host.readTree(repo, sha).pipe(Effect.catchTag("ObjectNotFound", Effect.die)))
+-            .filter((e) => e.type !== "tree")
++            .filter(() => false)
+             .map((e): TreeChange => ({
+               path: e.path,
+               change: "added",

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/client.test.ts -t "sdk.public"
+# kills: sdk.public
+# why: a client with no credentials asks for a token before every call
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index 0d48a78..382169f 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -122,7 +122,7 @@ export class KeelClient {
+         ...(request.body === undefined ? {} : { body: request.body }),
+         ...(options.signal === undefined ? {} : { signal: options.signal }),
+       });
+-    const credentialed = "clientId" in this.#options;
++    const credentialed = true;
+     let response = await send(credentialed ? await this.token() : undefined);
+     if (credentialed && response.status === 401)
+       response = await send(await this.token({ fresh: true }));

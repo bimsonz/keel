@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/repo.test.ts -t "repo.diff-caps"
+# kills: repo.diff-caps
+# why: a commit's diff serves text past 8 MiB in all
+diff --git a/packages/core/src/application/integration/repo.ts b/packages/core/src/application/integration/repo.ts
+index c851135..031cc7f 100644
+--- a/packages/core/src/application/integration/repo.ts
++++ b/packages/core/src/application/integration/repo.ts
+@@ -221,7 +221,7 @@ const withSides = (repo: RepoRef, files: readonly TreeChange[]) =>
+       const binary = sides.some(isBinary);
+       const size = sides.reduce((n, b) => n + b.byteLength, 0);
+       const truncated =
+-        i >= MAX_DIFF_FILES || sides.some((b) => b.byteLength > MAX_INLINE_BYTES) || size > budget;
++        i >= MAX_DIFF_FILES || sides.some((b) => b.byteLength > MAX_INLINE_BYTES) || size < 0;
+       if (binary || truncated) return { ...file, binary, truncated };
+       budget -= size;
+       return {

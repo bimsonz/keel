@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t "codehost.log"
+# kills: codehost.log
+# why: log walks from the branch head, not from the commit asked for
+diff --git a/packages/testing/src/memory/code-host.ts b/packages/testing/src/memory/code-host.ts
+index a8e0dfc..1aca43a 100644
+--- a/packages/testing/src/memory/code-host.ts
++++ b/packages/testing/src/memory/code-host.ts
+@@ -199,7 +199,7 @@ export function makeCodeHostMemory() {
+       Effect.gen(function* () {
+         const found = yield* find(repo);
+         const out: CommitInfo[] = [];
+-        let next: string | undefined = from;
++        let next: string | undefined = found.refs.get("refs/heads/main") ?? from;
+         while (next !== undefined && out.length < limit) {
+           const commit = commitInfo(next, (yield* object(repo, found, next, "commit")).body);
+           out.push(commit);
