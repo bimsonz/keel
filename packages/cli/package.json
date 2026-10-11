@@ -4,6 +4,9 @@
   "private": true,
   "description": "The keeltown command-line client",
   "license": "MIT",
+  "bin": {
+    "keeltown": "./src/bin.ts"
+  },
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -11,7 +14,12 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
+  "dependencies": {
+    "@keeltown/sdk": "workspace:*"
+  },
   "devDependencies": {
-    "typescript": "catalog:"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

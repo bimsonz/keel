@@ -189,6 +189,9 @@ importers:
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.0.2(effect@4.0.2)(vitest@5.0.3(@types/node@22.20.5)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(yaml@2.9.1)))
+      '@keeltown/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       '@keeltown/testing':
         specifier: workspace:*
         version: link:../../packages/testing
@@ -258,10 +261,20 @@ importers:
         version: 7.0.2
 
   packages/cli:
+    dependencies:
+      '@keeltown/sdk':
+        specifier: workspace:*
+        version: link:../sdk
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.20.5
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.3(@types/node@22.20.5)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(yaml@2.9.1))
 
   packages/contracts:
     devDependencies:
@@ -323,10 +336,17 @@ importers:
         version: 5.0.3(@types/node@22.20.5)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(yaml@2.9.1))
 
   packages/sdk:
+    dependencies:
+      '@keeltown/contracts':
+        specifier: workspace:*
+        version: link:../contracts
     devDependencies:
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.3(@types/node@22.20.5)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(yaml@2.9.1))
 
   packages/spec:
     dependencies:

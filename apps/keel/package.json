@@ -30,6 +30,7 @@
   "devDependencies": {
     "@cloudflare/vitest-plugin": "catalog:",
     "@effect/vitest": "catalog:",
+    "@keeltown/sdk": "workspace:*",
     "@keeltown/testing": "workspace:*",
     "fast-check": "catalog:",
     "typescript": "catalog:",

@@ -87,6 +87,12 @@ Read `node_modules/effect/ai-docs` first, then [docs/effect.md](docs/effect.md) 
 4. **Handler.** Replace the operation's stub in the handler object. REST and MCP share it. Done when the pool test calls the real fetch handler, and the MCP tool result equals the REST body.
 5. **Control.** Break it once on purpose (wrong status, dropped error tag) and watch the suite go **red**, then revert.
 
+## The SDK and the CLI
+
+- `@keeltown/contracts` is generated: `openapi.json` and the wire types in `src/generated/requests.gen.ts` (no imports). Public code (console, examples, CLI, e2e) types itself from these, never from core (R9).
+- `@keeltown/sdk` calls the operations in `packages/sdk/src/routes.ts`. To give it another operation, add its route (the `[sdk.routes]` test holds it to the document) and, if agents call it often, a convenience method. It has no runtime dependencies and runs wherever `fetch` is global.
+- `@keeltown/cli` (`keeltown`) uses the SDK only. Node runs its TypeScript directly, so the SDK and the CLI keep to erasable syntax (`erasableSyntaxOnly`).
+
 ## Secrets and credentials
 
 - `keel` requires three secrets: `KEEL_SIGNING_KEY` (the Ed25519 JWK that signs bearer tokens), `CLOUDFLARE_ACCOUNT_ID` (read by `@cloudflare/ci`; a secret so it is never committed) and `KEEL_BOOTSTRAP_SECRET` (Terraform's `bootstrap_secret` output). `scripts/deploy.ts` sets all three.

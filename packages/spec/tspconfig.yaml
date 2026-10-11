@@ -9,6 +9,10 @@ options:
   typespec-hono:
     emitter-output-dir: "{project-root}/../../apps/keel/src/generated/http"
     seal-object-schemas: true
+    # The wire types, with no imports: what @keeltown/contracts publishes to the SDK,
+    # the CLI and the console. wire-contract.gen.ts pairs them with the Zod above.
+    contracts-output-dir: "{project-root}/../contracts/src/generated"
+    contracts-package: "@keeltown/contracts"
   # typespec-http-mcp 0.1 runs typespec-http-zod 0.26 and typespec-hono 0.24 runs
   # 0.27, so they write to separate directories rather than sharing schemas.gen.ts.
   typespec-http-mcp:

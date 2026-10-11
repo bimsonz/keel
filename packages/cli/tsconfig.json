@@ -1,4 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
+  // Node runs the CLI; fetch and Response come from its globals (DOM lib for their types).
+  "compilerOptions": {
+    "erasableSyntaxOnly": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
   "include": ["src/**/*.ts", "test/**/*.ts"]
 }

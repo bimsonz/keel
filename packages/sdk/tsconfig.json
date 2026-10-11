@@ -1,4 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
+  // fetch, Request and Response: the client runs wherever they are global (Node, browsers, Workers).
+  "compilerOptions": { "erasableSyntaxOnly": true, "lib": ["ES2023", "DOM", "DOM.Iterable"] },
   "include": ["src/**/*.ts", "test/**/*.ts"]
 }
