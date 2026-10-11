@@ -284,6 +284,18 @@ export interface ChangePageState {
     evidence: EvidenceItem[];
   };
   conflict?: { id: string; label: string; state: ConflictState; with: string; summary: string };
+  /**
+   * While it stands bounced: the conflict it bounced on, where Keel named one. A project that blocks on a proven
+   * conflict bounces the change on the conflict itself, and no verdict is issued for that.
+   */
+  bounce?: { at: string; conflict?: { id: string; label: string } };
+  /** Conflicts Keel proved against it and let it go on from: the project advises or annotates on that predicate. */
+  noted: {
+    conflict: { id: string; label: string };
+    predicate: string;
+    policy: "advise" | "annotate";
+    at: string;
+  }[];
   escalation?: {
     id: string;
     label: string;

@@ -153,6 +153,8 @@ function standing(state: ChangePageState): string {
   if (change.state === "landed") return "Landed on trunk";
   if (change.state === "withdrawn") return "Withdrawn";
   if (escalation?.state === "open") return `Parked: waiting for a ruling on ${escalation.label}`;
+  if (state.bounce?.conflict !== undefined)
+    return `Bounced on conflict ${state.bounce.conflict.label}`;
   if (verdict === undefined) return "No verdict yet";
   if (verdict.outcome === "land") return "Verified: cleared to land";
   return OUTCOME_WORD[verdict.outcome];
@@ -252,9 +254,20 @@ export function Change({
                   {standing(state)}
                 </h2>
                 <p className="text-lg text-kumo-default">
-                  {verdict === undefined
-                    ? `The change is ${change.state}. Keel has not issued a verdict yet.`
-                    : `${verdict.summary}.`}
+                  {state.bounce?.conflict !== undefined ? (
+                    <>
+                      Keel proved{" "}
+                      <ConflictLink id={state.bounce.conflict.id} className="a-link">
+                        conflict {state.bounce.conflict.label}
+                      </ConflictLink>{" "}
+                      against this change, and this project blocks a change on a proven conflict. It
+                      bounced on the conflict, not on a verdict.
+                    </>
+                  ) : verdict === undefined ? (
+                    `The change is ${change.state}. Keel has not issued a verdict yet.`
+                  ) : (
+                    `${verdict.summary}.`
+                  )}
                 </p>
                 {verdict !== undefined && (
                   <p className="text-sm text-kumo-subtle">
@@ -508,6 +521,25 @@ export function Change({
                   {conflict.summary !== "" && (
                     <span className="leading-snug">{conflict.summary}</span>
                   )}
+                </Tied>
+              )}
+              {state.noted.length > 0 && (
+                <Tied title="Noted">
+                  {state.noted.map((note) => (
+                    <span key={note.conflict.id} className="flex flex-wrap items-center gap-2">
+                      <ConflictLink id={note.conflict.id} className="a-link font-semibold">
+                        {note.conflict.label}
+                      </ConflictLink>
+                      <span className="a-chip" data-tone="quiet">
+                        {note.policy}
+                      </span>
+                      <span className="text-kumo-subtle">on {note.predicate}</span>
+                    </span>
+                  ))}
+                  <span className="leading-snug">
+                    Proven against this change, which went on: the project does not block on{" "}
+                    {state.noted.length === 1 ? "that predicate" : "those predicates"}.
+                  </span>
                 </Tied>
               )}
               {escalation !== undefined && (

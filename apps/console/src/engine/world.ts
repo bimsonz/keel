@@ -91,6 +91,10 @@ export interface ChangeEntry {
   conflictIds: string[];
   /** Each time a guard failed in this change's own plan: Keel's fact, with the revision it was at. */
   guardFailures: { guardId: string; revision: number; at: string }[];
+  /** Its latest bounce, and the one thing Keel named as its cause: a verdict, or a conflict proven against it. */
+  bounce?: { at: string; verdictId?: string; conflictId?: string };
+  /** Conflicts Keel proved against it and did not stop it for: the project's policy for the predicate was not to block. */
+  noted: { conflictId: string; predicate: Predicate; policy: "advise" | "annotate"; at: string }[];
   /** Decisions surfaced to it, each dated, and the stance it went on to take. */
   precedents: {
     decisionId: string;
@@ -429,6 +433,7 @@ export class World {
           unverified: false,
           conflictIds: [],
           guardFailures: [],
+          noted: [],
           precedents: [],
         });
         break;
@@ -574,6 +579,15 @@ export class World {
       case "ChangeBounced": {
         const change = this.#change(event.payload.changeId, "bounced");
         if (change !== undefined) {
+          const { verdictId, conflictId } = event.payload;
+          change.bounce = {
+            at: event.at,
+            ...(verdictId === undefined ? {} : { verdictId }),
+            ...(conflictId === undefined ? {} : { conflictId }),
+          };
+          // A bounce on a conflict ties the change to it, whether or not the change was one of its two sides.
+          if (conflictId !== undefined && !change.conflictIds.includes(conflictId))
+            change.conflictIds.push(conflictId);
           this.#note(
             this.#conflictOf(change.id),
             event,
@@ -582,6 +596,14 @@ export class World {
             event.payload.nextActions?.[0]?.title,
           );
         }
+        break;
+      }
+      case "ConflictNoted": {
+        const change = this.changes.get(event.payload.changeId);
+        if (change === undefined) break;
+        const { conflictId, predicate, policy } = event.payload;
+        change.noted.push({ conflictId, predicate, policy, at: event.at });
+        this.#note(conflictId, event, t, `Noted against ${change.label}`, `policy: ${policy}`);
         break;
       }
       case "ChangeParked": {

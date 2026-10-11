@@ -558,8 +558,14 @@ export function changePageOf(
   const change = world.changes.get(changeId);
   if (change === undefined) return null;
   const by = world.agents.get(change.agentId);
-  const verdict = world.verdicts.get(change.verdictIds.at(-1) ?? "");
-  const conflict = world.conflicts.get(change.conflictIds.at(-1) ?? "");
+  const bounce = change.state === "bounced" ? change.bounce : undefined;
+  const cause = world.conflicts.get(bounce?.conflictId ?? "");
+  // A change bounced on a conflict was given no verdict for it: an earlier one is not this bounce's.
+  const verdict =
+    bounce?.conflictId === undefined
+      ? world.verdicts.get(change.verdictIds.at(-1) ?? "")
+      : undefined;
+  const conflict = cause ?? world.conflicts.get(change.conflictIds.at(-1) ?? "");
   const escalation =
     change.escalationId === undefined ? undefined : world.escalations.get(change.escalationId);
   const diff = resources.diffs.get(change.id);
@@ -642,6 +648,27 @@ export function changePageOf(
             summary: conflict.summary,
           },
         }),
+    ...(bounce === undefined
+      ? {}
+      : {
+          bounce: {
+            at: bounce.at,
+            ...(cause === undefined ? {} : { conflict: { id: cause.id, label: cause.label } }),
+          },
+        }),
+    noted: change.noted.flatMap((note) => {
+      const about = world.conflicts.get(note.conflictId);
+      return about === undefined
+        ? []
+        : [
+            {
+              conflict: { id: about.id, label: about.label },
+              predicate: note.predicate,
+              policy: note.policy,
+              at: note.at,
+            },
+          ];
+    }),
     ...(escalation === undefined
       ? {}
       : {
