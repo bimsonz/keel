@@ -1084,6 +1084,9 @@ model TenetEstablished {
   predicate: MFP.Predicate;
   value: string | float64 | boolean;
   changeId: ChangeId;
+
+  /** At least one: a tenet is a landed effect backed by a guard. */
+  @minItems(1)
   guardIds: GuardId[];
 }
 
@@ -1099,11 +1102,18 @@ model TenetReaffirmed {
   conflictId: ConflictId;
 }
 
+/**
+ * A tenet trunk no longer holds: `changeId` landed against it. `conflictId` is
+ * the conflict that contested it. `decisionId` is present when a ruling
+ * retracted it; without one, the conflict was proven and the project's policy
+ * for the predicate let the change land (advise or annotate).
+ */
 model TenetRetracted {
   _tag: "TenetRetracted";
   tenetId: TenetId;
   changeId: ChangeId;
-  decisionId: DecisionId;
+  conflictId: ConflictId;
+  decisionId?: DecisionId;
 }
 
 model TenetSuperseded {

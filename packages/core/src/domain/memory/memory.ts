@@ -1,6 +1,8 @@
 import { Schema } from "effect";
 import {
   AgentId,
+  ChangeId,
+  ConflictId,
   DecisionId,
   EscalationId,
   GuardId,
@@ -50,6 +52,12 @@ export const Tenet = Schema.Struct({
   value: Schema.Union([Schema.String, Schema.Finite, Schema.Boolean]),
   guards: Schema.NonEmptyArray(GuardId),
   state: TenetState,
+  /** The conflict contesting it, from `TenetContested` until it is reaffirmed; kept once it is retracted. */
+  conflictId: Schema.optional(ConflictId),
+  /** What ended it: the landing change that retracted it, or the tenet that superseded it. */
+  endedBy: Schema.optional(Schema.Union([ChangeId, TenetId])),
+  /** The ruling it was retracted on, when a ruling did it rather than proof. */
+  decisionId: Schema.optional(DecisionId),
 });
 export type Tenet = typeof Tenet.Type;
 

@@ -322,6 +322,21 @@ export const decisionChart: Chart = {
   },
 };
 
+// Tenet: only retraction reads the project's policy, and both its paths share one edge.
+const t = to("tenet");
+
+export const tenetChart: Chart = {
+  id: "tenet",
+  initial: "established",
+  meta: { createdBy: "TenetEstablished", section: "Tenet" },
+  states: {
+    established: { on: { TenetContested: t("contested"), TenetSuperseded: t("superseded") } },
+    contested: { on: { TenetReaffirmed: t("established"), TenetRetracted: t("retracted") } },
+    retracted: { type: "final" },
+    superseded: { type: "final" },
+  },
+};
+
 export const charts: readonly Chart[] = [
   changeChart,
   leaseChart,
@@ -334,4 +349,5 @@ export const charts: readonly Chart[] = [
   probeChart,
   escalationChart,
   decisionChart,
+  tenetChart,
 ];

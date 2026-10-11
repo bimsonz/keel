@@ -12285,7 +12285,9 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/GuardId"
-            }
+            },
+            "minItems": 1,
+            "description": "At least one: a tenet is a landed effect backed by a guard."
           }
         },
         "additionalProperties": {
@@ -12327,7 +12329,7 @@
           "_tag",
           "tenetId",
           "changeId",
-          "decisionId"
+          "conflictId"
         ],
         "properties": {
           "_tag": {
@@ -12342,13 +12344,17 @@
           "changeId": {
             "$ref": "#/components/schemas/ChangeId"
           },
+          "conflictId": {
+            "$ref": "#/components/schemas/ConflictId"
+          },
           "decisionId": {
             "$ref": "#/components/schemas/DecisionId"
           }
         },
         "additionalProperties": {
           "not": {}
-        }
+        },
+        "description": "A tenet trunk no longer holds: `changeId` landed against it. `conflictId` is\nthe conflict that contested it. `decisionId` is present when a ruling\nretracted it; without one, the conflict was proven and the project's policy\nfor the predicate let the change land (advise or annotate)."
       },
       "TenetSuperseded": {
         "type": "object",

@@ -1,6 +1,6 @@
 import { Schema } from "effect";
-import { DecisionId, NextAction, SessionId } from "../kernel/index.ts";
-import { DecisionState } from "./memory.ts";
+import { DecisionId, NextAction, SessionId, TenetId } from "../kernel/index.ts";
+import { DecisionState, TenetState } from "./memory.ts";
 
 export class DecisionNotFound extends Schema.TaggedError<DecisionNotFound>()("DecisionNotFound", {
   decisionId: DecisionId,
@@ -12,6 +12,18 @@ export class DecisionStateRefused extends Schema.TaggedError<DecisionStateRefuse
   {
     decisionId: DecisionId,
     state: Schema.optional(DecisionState),
+    command: Schema.String,
+    reason: Schema.optional(Schema.String),
+    nextActions: Schema.Array(NextAction),
+  },
+) {}
+
+/** The tenet's state, or the conflict, ruling or policy it needs, does not take the command. `nextActions` is never empty. */
+export class TenetStateRefused extends Schema.TaggedError<TenetStateRefused>()(
+  "TenetStateRefused",
+  {
+    tenetId: TenetId,
+    state: Schema.optional(TenetState),
     command: Schema.String,
     reason: Schema.optional(Schema.String),
     nextActions: Schema.Array(NextAction),

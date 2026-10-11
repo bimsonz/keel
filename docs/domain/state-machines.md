@@ -433,26 +433,31 @@ stateDiagram-v2
 
 Owner: Subject DO. A Tenet is a belief trunk currently holds: an effect that has landed and is backed by at least one guard.
 
+<!-- chart:tenet — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
 stateDiagram-v2
   [*] --> Established: TenetEstablished
   Established --> Contested: TenetContested
+  Established --> Superseded: TenetSuperseded
   Contested --> Established: TenetReaffirmed
   Contested --> Retracted: TenetRetracted
-  Established --> Superseded: TenetSuperseded
   Retracted --> [*]
   Superseded --> [*]
 ```
+<!-- /chart:tenet -->
 
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
-| — | Established | Caused by `ChangeLanded` | The landed effect is backed by at least one admitted guard | `TenetEstablished` |
-| Established | Contested | A change's effect contradicts the tenet | — | `ConflictSuspected` (tenet as party), then `TenetContested` |
-| Contested | Established | The conflict is dismissed or resolved in the tenet's favour | — | `TenetReaffirmed` |
-| Contested | Retracted | A ruled change lands that removes the belief | A ruling, never opinion | `TenetRetracted` |
+| — | Established | Caused by `ChangeLanded` | The landed effect is backed by at least one admitted guard (otherwise refused, `unguarded`) | `TenetEstablished` |
+| Established | Contested | A change's effect contradicts the tenet | The conflict is open (suspected, probing, proven or escalated) and names the tenet as a party | `ConflictSuspected` (tenet as party), then `TenetContested` |
+| Contested | Established | The contesting conflict is dismissed, or resolved by `distinguish` or `yield` | Any other state or move is refused (`conflict-unsettled`) | `TenetReaffirmed` |
+| Contested | Retracted | A change lands against the tenet, on a ruling | A `decisionId`, under any policy | `TenetRetracted` (with `decisionId`) |
+| Contested | Retracted | A change lands against the tenet, on proof, where the predicate's policy is `advise` or `annotate` (absent is `advise`) | The contesting conflict is `proven` and the landing change is a party; under `block` a ruling is required (`ruling-required`); opinion never retracts (`not-proven`) | `TenetRetracted` (citing the conflict) |
 | Established | Superseded | A new tenet on the same `(subject, predicate)` replaces it | — | `TenetSuperseded` |
 
 **Terminal:** Retracted, Superseded.
+
+**Policy** (ADR 0005, decided 11 Oct): a project composes its beliefs per change, like flows, and chooses per predicate whether a proven conflict `block`s, `advise`s or `annotate`s; the default is `advise`. Only retraction reads it: under `block` the challenger waits for a ruling, so a tenet leaves Contested only by a ruling or by being reaffirmed; under `advise` or `annotate` the challenger may land, so trunk no longer holds the belief and the proof retracts it, citing the conflict. A tenet never blocks by itself.
 
 **Invariant:** new code that calls a symbol carrying a tenet is subscribed to that tenet automatically (an implied premise).
 

@@ -66,7 +66,8 @@ export const TenetEstablished = Schema.TaggedStruct("TenetEstablished", {
   predicate: Predicate,
   value: Schema.Union([Schema.String, Schema.Finite, Schema.Boolean]),
   changeId: ChangeId,
-  guardIds: Schema.Array(GuardId),
+  /** At least one: a tenet is a landed effect backed by a guard. */
+  guardIds: Schema.Array(GuardId).check(Schema.isMinLength(1)),
 });
 export const TenetContested = Schema.TaggedStruct("TenetContested", {
   tenetId: TenetId,
@@ -76,10 +77,17 @@ export const TenetReaffirmed = Schema.TaggedStruct("TenetReaffirmed", {
   tenetId: TenetId,
   conflictId: ConflictId,
 });
+/**
+ * A tenet trunk no longer holds: `changeId` landed against it. `conflictId` is
+ * the conflict that contested it. `decisionId` is present when a ruling
+ * retracted it; without one, the conflict was proven and the project's policy
+ * for the predicate let the change land (advise or annotate).
+ */
 export const TenetRetracted = Schema.TaggedStruct("TenetRetracted", {
   tenetId: TenetId,
   changeId: ChangeId,
-  decisionId: DecisionId,
+  conflictId: ConflictId,
+  decisionId: Schema.optional(DecisionId),
 });
 export const TenetSuperseded = Schema.TaggedStruct("TenetSuperseded", {
   tenetId: TenetId,
