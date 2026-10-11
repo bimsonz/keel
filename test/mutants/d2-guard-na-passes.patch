@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/guard-step.test.ts -t guard.na-abstains
+# kills: guard.na-abstains
+# why: A guard whose precondition is gone (the probe's n/a) reads as a pass, so a change that removed the tenet's behaviour lands as though it held
+diff --git a/packages/core/src/application/verification/guard-step.ts b/packages/core/src/application/verification/guard-step.ts
+index 6bf7747..46075a3 100644
+--- a/packages/core/src/application/verification/guard-step.ts
++++ b/packages/core/src/application/verification/guard-step.ts
+@@ -45,7 +45,7 @@ export const withGuards =
+       });
+       const finished = yield* Clock.currentTimeMillis;
+       const durationMs = finished - started;
+-      if (run._tag === "ran") return { ...report(run.outcome), durationMs };
++      if (run._tag === "ran") return { ...report(run.outcome === "n/a" ? "pass" : run.outcome), durationMs };
+       if (run._tag === "harness-error") return { ...report("abstain", "schema"), durationMs };
+       return { ...report("abstain", "unavailable"), durationMs };
+     });

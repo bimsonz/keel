@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/guard-step.test.ts -t guard.infra-abstains
+# kills: guard.infra-abstains
+# why: A guard whose probe broke its harness reads as a pass, so a broken guard never stops anything
+diff --git a/packages/core/src/application/verification/guard-step.ts b/packages/core/src/application/verification/guard-step.ts
+index 6bf7747..1bd6261 100644
+--- a/packages/core/src/application/verification/guard-step.ts
++++ b/packages/core/src/application/verification/guard-step.ts
+@@ -46,7 +46,7 @@ export const withGuards =
+       const finished = yield* Clock.currentTimeMillis;
+       const durationMs = finished - started;
+       if (run._tag === "ran") return { ...report(run.outcome), durationMs };
+-      if (run._tag === "harness-error") return { ...report("abstain", "schema"), durationMs };
++      if (run._tag === "harness-error") return { ...report("pass"), durationMs };
+       return { ...report("abstain", "unavailable"), durationMs };
+     });
+   };

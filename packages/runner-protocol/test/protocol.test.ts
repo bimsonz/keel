@@ -23,6 +23,15 @@ const messages = [
         tierReason: "worker-native tests",
         outcomes: ["pass", "fail", "abstain"],
       },
+      {
+        stepId: "keel.guard.freshness",
+        kind: "probe",
+        runs: hash,
+        tier: 1,
+        tierReason: "the admitted probe of a freshness tenet",
+        outcomes: ["pass", "fail", "abstain"],
+        guards: { predicate: "freshness", probe: `sha256:${"cd".repeat(32)}` },
+      },
     ],
     budget: { cpuMs: 30_000, wallMs: 60_000, subrequests: 0 },
   },
@@ -83,6 +92,31 @@ describe("runner protocol v0", () => {
     expect(() =>
       Schema.decodeUnknownSync(codec)({ ...messages[5], protocol: "keel-runner/1" }),
     ).toThrow(/keel-runner/);
+  });
+
+  it("[protocol.guard-pinned] refuses a guard step whose probe is not a content hash", () => {
+    const guard = (probe: string) => ({
+      _tag: "JobSubmitted",
+      protocol: PROTOCOL_VERSION,
+      jobId: "job-2",
+      attempt: 1,
+      fence,
+      bundle: { hash, r2Key: "bundles/job-2" },
+      steps: [
+        {
+          stepId: "keel.guard.freshness",
+          kind: "probe",
+          runs: hash,
+          tier: 1,
+          tierReason: "the admitted probe of a freshness tenet",
+          outcomes: ["pass", "fail", "abstain"],
+          guards: { predicate: "freshness", probe },
+        },
+      ],
+      budget: { cpuMs: 30_000, wallMs: 60_000, subrequests: 0 },
+    });
+    expect(Schema.decodeUnknownExit(RunnerMessage)(guard(hash))._tag).toBe("Success");
+    expect(Schema.decodeUnknownExit(RunnerMessage)(guard(".keel/guards/g1"))._tag).toBe("Failure");
   });
 
   it("refuses a step outcome outside the declared set", () => {

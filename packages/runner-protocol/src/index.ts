@@ -45,6 +45,12 @@ export const StepSpec = Schema.Struct({
   tier: Tier,
   tierReason: Schema.NonEmptyString,
   outcomes: Schema.Array(Schema.String),
+  /**
+   * Set when the step guards a tenet on `predicate`, as the plan's step does:
+   * the runner runs the admitted probe `probe` pins, fetched by that hash and
+   * checked against it, never the candidate's own `.keel/guards/` copy.
+   */
+  guards: Schema.optional(Schema.Struct({ predicate: Schema.NonEmptyString, probe: Hash })),
 });
 export type StepSpec = typeof StepSpec.Type;
 

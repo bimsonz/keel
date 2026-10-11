@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/guard-step.test.ts -t guard.pinned-probe
+# kills: guard.pinned-probe
+# why: A guard step runs something other than the probe its plan pins, so the tenet it guards is never what is checked
+diff --git a/packages/core/src/application/verification/guard-step.ts b/packages/core/src/application/verification/guard-step.ts
+index 6bf7747..a0c7d56 100644
+--- a/packages/core/src/application/verification/guard-step.ts
++++ b/packages/core/src/application/verification/guard-step.ts
+@@ -24,7 +24,7 @@ export const withGuards =
+     return Effect.gen(function* () {
+       const started = yield* Clock.currentTimeMillis;
+       const run = yield* (yield* ProbeRunner)
+-        .run({ probe: guards.probe, world: world ?? "AB", worldBundle: candidate, run: 1 })
++        .run({ probe: candidate, world: world ?? "AB", worldBundle: candidate, run: 1 })
+         .pipe(
+           Effect.catchTag("ProbeRunnerUnavailable", (e) =>
+             Effect.succeed({ _tag: "unavailable", reason: e.reason } as const),
