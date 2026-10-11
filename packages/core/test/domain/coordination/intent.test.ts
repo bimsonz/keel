@@ -130,7 +130,9 @@ const changeIn = (state: "working" | "drifted" | "bounced", intent: Intent): Cha
 describe("reviseIntent", () => {
   it("[intent.revise] a revision replaces what it gives, keeps what it doesn't, retracts by value, adds each premise once, and mutates nothing", () => {
     fc.assert(
-      fc.property(pairArb, ({ intent, revision }) => {
+      fc.property(pairArb, (generated) => {
+        // A fresh copy each run: a fold that mutates its input must not grow fast-check's own values while it shrinks.
+        const { intent, revision } = copy(generated);
         const before = canonical({ intent, revision });
         const revised = reviseIntent(intent, revision);
         return (
@@ -194,7 +196,8 @@ describe("reviseIntent", () => {
       fc.property(
         pairArb,
         fc.constantFrom("working" as const, "drifted" as const, "bounced" as const),
-        ({ intent, revision }, state) => {
+        (generated, state) => {
+          const { intent, revision } = copy(generated);
           const event = IntentRevised.make({ changeId: CHANGE, ...revision });
           const evolved = evolveChange(changeIn(state, intent), { at: T0, payload: event });
           return (
