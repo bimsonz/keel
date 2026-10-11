@@ -1,6 +1,7 @@
 import { Effect, Option, Result, Schema } from "effect";
 import {
   type Blockers,
+  canonicalProposition,
   Change,
   type ChangeCommand,
   ChangeBounced,
@@ -327,6 +328,14 @@ function issuedPreflight(events: readonly EventEnvelope[]): Preflight {
   return decodePreflight(issued.payload);
 }
 
+/**
+ * Propositions in the canonical form the Change machine commits them in (an
+ * ordering written from its lesser event), so the intent a command leaves is
+ * preflighted, and its subjects subscribed, as it will be stored.
+ */
+const canonical = (propositions: readonly Proposition[]): readonly Proposition[] =>
+  propositions.map(canonicalProposition);
+
 /** The project's live changes, read once before a command's commit; none for a change that holds no workspace. */
 const liveOf = (projectId: ProjectId | undefined) =>
   projectId === undefined
@@ -537,10 +546,10 @@ export const declare: (
         revision: 1,
         goal: command.goal,
         footprint: command.footprint,
-        premises: command.premises,
+        premises: canonical(command.premises),
         ...(command.declaredEffects === undefined
           ? {}
-          : { declaredEffects: command.declaredEffects }),
+          : { declaredEffects: canonical(command.declaredEffects) }),
       };
       const { preflight } = preflightFor(changeId, intent, live);
       const decided = transition(
@@ -698,7 +707,7 @@ export const rely: (
         command.leaseId,
       );
       if (Result.isFailure(decided)) return Result.fail(decided.failure);
-      subscribeSubjects(tx, changeId, { premises: [command.premise] });
+      subscribeSubjects(tx, changeId, { premises: canonical([command.premise]) });
       return Result.succeed(asTransition(decided.success));
     },
   );
@@ -726,7 +735,7 @@ export const nearby: (
 
 /**
  * The intent a revision would leave: the change's stored intent revised as
- * asked. Undefined for a change with no state, which the domain refuses
+ * asked, its propositions canonical as the machine will commit them. Undefined for a change with no state, which the domain refuses
  * before its preflight matters.
  */
 function intentAfter(
@@ -736,7 +745,15 @@ function intentAfter(
 ): Intent | undefined {
   const change = storedChange(tx.store, changeId);
   if (change === undefined) return undefined;
-  return reviseIntent(change.intent, { ...revision, revision: change.intent.revision + 1 });
+  return reviseIntent(change.intent, {
+    ...revision,
+    premisesAdded: canonical(revision.premisesAdded),
+    premisesRetracted: canonical(revision.premisesRetracted),
+    ...(revision.declaredEffects === undefined
+      ? {}
+      : { declaredEffects: canonical(revision.declaredEffects) }),
+    revision: change.intent.revision + 1,
+  });
 }
 
 /** The preflight of an intent against the project's live changes; nothing to find for a change with no state. */

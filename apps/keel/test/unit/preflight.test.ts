@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { declare, revise } from "@keeltown/core/application/coordination";
+import { declare, rely, revise } from "@keeltown/core/application/coordination";
 import { Proposition } from "@keeltown/core/domain/coordination";
 import { type ChangeId, CommitSha, makeId } from "@keeltown/core/kernel";
 import { EventOutbox } from "@keeltown/core/ports";
@@ -123,5 +123,61 @@ describe("[b21.revise-preflight] a revision's preflight reads the intent it leav
       expect(revised.preflight.contradictions.map((found) => found.holder)).toEqual([A]);
       expect(revised.preflight.suggestedMove).toBe("refine");
     }),
+  );
+});
+
+/** A's effect: deploys run before migrations, written from the lesser event, as stored. */
+const deployBeforeMigrate = Schema.decodeUnknownSync(Proposition)({
+  subject: "deploy",
+  predicate: "ordering",
+  relation: "before",
+  value: "migrate",
+});
+/** B's premise, written from the other event: migrations run before deploys, i.e. deploy after migrate. */
+const migrateBeforeDeploy = Schema.decodeUnknownSync(Proposition)({
+  subject: "migrate",
+  predicate: "ordering",
+  relation: "before",
+  value: "deploy",
+});
+
+describe("[b21.canonical] an ordering written from either event is compared and subscribed as one", () => {
+  it.effect(
+    "[b21.canonical] B's declared premise, written from the other event, meets A's held ordering, and B subscribes the canonical subject",
+    () =>
+      Effect.gen(function* () {
+        const { object, declared } = project();
+        yield* declared(object(), A, { declaredEffects: [deployBeforeMigrate] });
+        const layerB = object();
+        const second = yield* declared(layerB, B, { premises: [migrateBeforeDeploy] });
+        expect(second.preflight.contradictions.map((found) => found.holder)).toEqual([B]);
+        expect(second.preflight.suggestedMove).toBe("refine");
+        const hearing = yield* Effect.map(EventOutbox, (outbox) =>
+          outbox
+            .subscribers("IntentRevised", { entity: { kind: "change", id: B }, affected: [] })
+            .filter((subscriber) => subscriber.startsWith("subj:")),
+        ).pipe(Effect.provide(layerB));
+        expect(hearing).toEqual([`subj:${sampleProjectId}:deploy`]);
+      }),
+  );
+
+  it.effect(
+    "[b21.canonical] B's relied premise, written from the other event, meets A's held ordering",
+    () =>
+      Effect.gen(function* () {
+        const { object, declared } = project();
+        yield* declared(object(), A, { declaredEffects: [deployBeforeMigrate] });
+        const layerB = object();
+        const before = yield* declared(layerB, B, {});
+        expect(before.preflight.contradictions).toEqual([]);
+        const relied = yield* rely(B, {
+          agentId: agentB,
+          leaseId: before.change.lease.id,
+          premise: migrateBeforeDeploy,
+          idempotencyKey: "rely-b",
+        }).pipe(Effect.provide(layerB));
+        expect(relied.preflight.contradictions.map((found) => found.holder)).toEqual([B]);
+        expect(relied.change.intent.premises.map((premise) => premise.subject)).toEqual(["deploy"]);
+      }),
   );
 });
