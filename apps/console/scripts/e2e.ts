@@ -1966,6 +1966,82 @@ expectEqual(
 );
 await lobby.close();
 
+// A Keel that cannot send email yet offers a passkey and nothing else: keel.town as it first served identity. A
+// new person signs up there with a handle and a passkey made on their own device, and is asked for no address.
+const passkeysAlone = createIdentity(built, { emailCodes: false });
+const door = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const sentAtTheDoor: Sent[] = [];
+await withIdentity(door, passkeysAlone, sentAtTheDoor);
+const newcomer = watch(await door.newPage(), "account, on a Keel with passkeys alone");
+const authenticator = await door.newCDPSession(newcomer);
+await authenticator.send("WebAuthn.enable");
+await authenticator.send("WebAuthn.addVirtualAuthenticator", {
+  options: {
+    protocol: "ctap2",
+    transport: "internal",
+    hasResidentKey: true,
+    hasUserVerification: true,
+    isUserVerified: true,
+    automaticPresenceSimulation: true,
+  },
+});
+await newcomer.goto(`${built}/signup`, { waitUntil: "domcontentloaded" });
+await newcomer.getByLabel("Handle").waitFor();
+// The page has asked Keel which ways in it offers, and Keel has not said: so a passkey, and no other.
+while (!sentAtTheDoor.some((request) => request.path === "/v1/auth/methods"))
+  // oxlint-disable-next-line no-await-in-loop -- waiting on the page's own request
+  await new Promise((resolve) => setTimeout(resolve, 50));
+await newcomer.waitForTimeout(300);
+expectEqual(
+  "passkey sign-up: no way in is shown that this Keel does not offer",
+  `${await newcomer.getByLabel("Email").count()} ${await newcomer.getByRole("button", { name: "Continue with GitHub" }).count()}`,
+  "0 0",
+);
+await newcomer.getByLabel("Handle").fill("Alan Turing");
+expectEqual(
+  "passkey sign-up: a handle that is not one is not taken",
+  String(
+    await newcomer.getByRole("button", { name: "Create your account with a passkey" }).isDisabled(),
+  ),
+  "true",
+);
+await newcomer.getByLabel("Handle").fill("turing");
+await shot(newcomer, "signup-passkey");
+await newcomer.getByRole("button", { name: "Create your account with a passkey" }).click();
+await newcomer.waitForURL(`${built}/`);
+await newcomer.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
+await newcomer.getByRole("heading", { name: "Your account" }).waitFor();
+await newcomer.getByRole("list", { name: "Your passkeys" }).getByRole("listitem").first().waitFor();
+expectEqual(
+  "passkey sign-up: signed up and in, by a handle and a passkey, and no address is shown",
+  `${squash(await newcomer.locator("header").first().innerText())} | ${squash(await newcomer.locator("main header").innerText())} | ${await newcomer.getByRole("list", { name: "Your passkeys" }).getByRole("listitem").count()} | ${String((await newcomer.content()).includes("keel.invalid"))}`,
+  "Keel turing | Your account turing | 1 | false",
+);
+await newcomer.goto(`${built}/orgs/turing`, { waitUntil: "domcontentloaded" });
+await newcomer.getByRole("heading", { level: 1, name: /^turing/ }).waitFor();
+expectEqual(
+  "passkey sign-up: their own org is there, named by the handle",
+  squash(await newcomer.getByRole("heading", { level: 1 }).innerText()),
+  "turing owner",
+);
+await newcomer.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
+await newcomer.getByRole("button", { name: "Sign out", exact: true }).click();
+await newcomer.waitForURL(`${built}/`);
+await newcomer.goto(`${built}/login?next=%2Fsettings`, { waitUntil: "domcontentloaded" });
+await newcomer.getByRole("button", { name: "Sign in with a passkey" }).click();
+await newcomer.getByRole("heading", { name: "Your account" }).waitFor();
+expectEqual(
+  "passkey sign-up: signed back in with the same passkey",
+  squash(await newcomer.locator("header").first().innerText()),
+  "Keel turing",
+);
+expectEqual(
+  "passkey sign-up: the page sent Keel no Authorization",
+  String(sentAtTheDoor.filter((request) => request.authorization !== undefined).length),
+  "0",
+);
+await door.close();
+
 // Where Keel serves no identity yet, the pages say so, and take nobody for a visitor to be signed up.
 const early = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 await withIdentity(early, {

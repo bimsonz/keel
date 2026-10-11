@@ -26,7 +26,7 @@ Keel's users sign up and sign in through Better Auth, which Keel mounts at `/v1/
 
 | Address | What it is |
 |---|---|
-| `/signup`, `/login` | A passkey, GitHub, or a code sent by email. A new address is signed up by its first code, and then chooses a handle: its name on this Keel, and the name of its own org |
+| `/signup`, `/login` | A passkey, always: a new person signs up with a handle and a passkey made on their own device, and is asked for no address. A code sent by email and GitHub are shown only where this Keel offers them; someone who signs up by one of those chooses their handle next. The handle is their name on this Keel, and the name of their own org |
 | `/settings` | The user's passkeys, and signing out here or everywhere else |
 | `/device` | Approving a terminal that is running `keeltown login`, by the code it shows |
 | `/orgs/<org>` | An org's home: its members, and its projects once Keel says which org a project is in. It moves to `/<org>` when an org's handle becomes the first segment of an address |
@@ -42,8 +42,10 @@ Keel's users sign up and sign in through Better Auth, which Keel mounts at `/v1/
 - **Roles are Keel's three**: owner, maintainer and member (`src/account/roles.ts`). A maintainer does everything but delete the org and make or unmake an owner. Keel decides; a page only keeps from offering what Keel would refuse.
 - **The frame is a code host's**: `Keel / <org>`, where the name is a link and has a dropdown beside it to the reader's other orgs, the same one a project's name has (`src/views/Switch.tsx`).
 - **An org that is not the reader's is told as one that is not there**, and so is an invitation made to someone else.
+- **The page shows no way in that Keel would refuse.** It asks Keel which it offers besides a passkey (`GET /v1/auth/methods`), and a Keel that does not say offers a passkey alone.
+- **A user who signed up with a passkey has no address.** Keel keeps one for them in a domain that can never receive mail, and `account.ts` hands no such address to a page.
 - **Where Keel serves no identity yet**, these pages say that signing in is not open, and show no form.
-- **In tests the real Better Auth stands in for Keel's** (`test/fixtures/identity/standIn.ts`), with the plugins Keel uses and its origin check on, so nothing imitates a route by hand. The browser checks sign up, add a passkey with Chrome's own virtual authenticator, sign out and sign back in with it. Then, with a second person in a browser of her own: make an org, invite her by handle, join by the invitation's link, change her role, remove her, and delete the org. The stand-in has Keel's roles, makes a user's own org when their handle is first set, and resolves a handle to its user for an invitation, as Keel does.
+- **In tests the real Better Auth stands in for Keel's** (`test/fixtures/identity/standIn.ts`), with the plugins Keel uses and its origin check on, so nothing imitates a route by hand. The browser checks sign up, add a passkey with Chrome's own virtual authenticator, sign out and sign back in with it. On a stand-in that offers passkeys alone, as keel.town first did, they sign up with a handle and a passkey and nothing else. Then, with a second person in a browser of her own: make an org, invite her by handle, join by the invitation's link, change her role, remove her, and delete the org. The stand-in has Keel's roles, makes a user's own org when their handle is first set, and resolves a handle to its user for an invitation, as Keel does.
 
 ## The code
 

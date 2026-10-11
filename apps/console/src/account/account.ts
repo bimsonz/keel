@@ -16,7 +16,8 @@ import { type Role, ac, roleOf, roles } from "./roles.ts";
 /** The user who is signed in. */
 export interface Who {
   id: string;
-  email: string;
+  /** The user's address, where they have one. Someone who signed up with a passkey alone has none. */
+  email?: string;
   name: string;
   /** The name of the user's own org, once chosen. */
   handle?: string;
@@ -72,6 +73,12 @@ export interface Invited {
   by?: string;
 }
 
+/** The ways in that this Keel offers besides a passkey, which it always does. */
+export interface Methods {
+  emailCode: boolean;
+  github: boolean;
+}
+
 /** Who to invite: a user of this Keel by their handle, or someone by an address the reader types. */
 export type Invitee = { handle: string } | { email: string };
 
@@ -124,9 +131,11 @@ function whoOf(user: {
   name: string;
   username?: string | null | undefined;
 }): Who {
+  // Keel gives a user with no address one that can never receive mail (RFC 6761). It is not an address to show.
+  const placeholder = user.email.toLowerCase().endsWith(".invalid");
   return {
     id: user.id,
-    email: user.email,
+    ...(placeholder ? {} : { email: user.email }),
     name: user.name,
     ...(typeof user.username === "string" && user.username !== "" ? { handle: user.username } : {}),
   };
@@ -191,6 +200,11 @@ function takenIfTheirs<Data>(result: { data: Data | null; error: Failure | null 
   return taken(result);
 }
 
+/** What a signed-in user is called on a page: their handle, or before they have one their address or name. */
+export function nameOf(who: Who): string {
+  return who.handle ?? who.email ?? who.name;
+}
+
 export type Account = ReturnType<typeof createAccount>;
 
 export function createAccount(options: AccountOptions) {
@@ -212,6 +226,33 @@ export function createAccount(options: AccountOptions) {
     async who(): Promise<Who | null> {
       const answer = taken(await client.getSession());
       return answer === null ? null : whoOf(answer.user);
+    },
+
+    /**
+     * Which ways in Keel offers besides a passkey. A Keel that does not say offers a passkey alone: a page shows
+     * no way in that Keel would refuse.
+     */
+    async methods(): Promise<Methods> {
+      const answer = await client.$fetch<Partial<Methods>>("/methods", { method: "GET" });
+      if (answer.error?.status === 404) return { emailCode: false, github: false };
+      const offered = taken(answer);
+      return { emailCode: offered.emailCode === true, github: offered.github === true };
+    },
+
+    /**
+     * Signs a new person up with a passkey made on this device, and in. The handle is theirs from the start: Keel
+     * makes the user only once the passkey verifies.
+     */
+    async signUpWithPasskey(handle: string): Promise<Who> {
+      const answer = await client.passkey.addPasskey({
+        name: handle,
+        context: handle,
+        createSession: true,
+      });
+      if (answer.error !== null) throw refusal(answer.error);
+      const who = await this.who();
+      if (who === null) throw new Refused("", "The passkey was made and no session came back");
+      return who;
     },
 
     /** Sends a code to an address. A new address is signed up by the same code. */

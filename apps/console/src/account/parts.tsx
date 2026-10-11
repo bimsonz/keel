@@ -3,7 +3,7 @@
 import { type ReactNode, useCallback, useState } from "react";
 
 /** A handle is a user's name on this Keel, or an org's: the first segment of every address under it. */
-export const HANDLE = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/;
+export const HANDLE = /^[a-z0-9](?:-?[a-z0-9]){0,38}$/;
 
 /** Runs one thing the reader asked for, and says so if Keel refuses it. */
 export function useAsking(): {

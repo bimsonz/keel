@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/account.test.ts
+# kills: account.methods
+# why: where Keel does not say which ways in it offers, the page offers them all, and Keel refuses the ones it has not got
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index d254bb8..ca8983d 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -234,7 +234,7 @@ export function createAccount(options: AccountOptions) {
+      */
+     async methods(): Promise<Methods> {
+       const answer = await client.$fetch<Partial<Methods>>("/methods", { method: "GET" });
+-      if (answer.error?.status === 404) return { emailCode: false, github: false };
++      if (answer.error?.status === 404) return { emailCode: true, github: true };
+       const offered = taken(answer);
+       return { emailCode: offered.emailCode === true, github: offered.github === true };
+     },

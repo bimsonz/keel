@@ -2,10 +2,10 @@
 # kills: account.no-token
 # why: what Keel answers about a session is handed to the page as it came, with the session's token in it
 diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
-index dcd6290..a2b0916 100644
+index d254bb8..e012475 100644
 --- a/apps/console/src/account/account.ts
 +++ b/apps/console/src/account/account.ts
-@@ -98,7 +98,7 @@ export function createAccount(options: AccountOptions) {
+@@ -225,7 +225,7 @@ export function createAccount(options: AccountOptions) {
      /** Who is signed in, or null for a visitor. */
      async who(): Promise<Who | null> {
        const answer = taken(await client.getSession());
@@ -13,4 +13,4 @@ index dcd6290..a2b0916 100644
 +      return answer === null ? null : { ...whoOf(answer.user), ...answer.session };
      },
  
-     /** Sends a code to an address. A new address is signed up by the same code. */
+     /**

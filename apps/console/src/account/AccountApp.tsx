@@ -8,11 +8,13 @@ import { applyMode } from "../theme/mode.ts";
 import { Switch } from "../views/Switch.tsx";
 import {
   type Account,
+  type Methods,
   NotOpen,
   type Org,
   type Passkey,
   type Who,
   createAccount,
+  nameOf,
 } from "./account.ts";
 import { Invite, NewOrg, OrgPages } from "./OrgPages.tsx";
 import { Card, HANDLE, Refusal, go, useAsking } from "./parts.tsx";
@@ -48,16 +50,74 @@ function useReader(account: Account): Reader {
   return reader;
 }
 
-/** Signing in, and signing up: the same three ways, and a new address is signed up by its first code. */
-function SignIn({ account, creating }: { account: Account; creating: boolean }) {
-  const next = nextOf(window.location.search);
+/** A handle, as it is typed: what is wrong with it, said under the field. */
+function handleError(handle: string, taken: boolean): { error: string } | Record<string, never> {
+  if (taken) return { error: "That handle is taken." };
+  if (handle !== "" && !HANDLE.test(handle))
+    return { error: "Lower-case letters, digits and single hyphens, and no hyphen at either end." };
+  return {};
+}
+
+/** Signing up with a passkey: a handle, and a passkey made on this device. Keel asks for nothing else. */
+function PasskeySignUp({ account, next }: { account: Account; next: string }) {
+  const [handle, setHandle] = useState("");
+  const [taken, setTaken] = useState(false);
+  const { busy, refused, ask } = useAsking();
+  const create = (event: FormEvent) => {
+    event.preventDefault();
+    void ask(async () => {
+      if (!(await account.handleIsFree(handle))) {
+        setTaken(true);
+        return;
+      }
+      await account.signUpWithPasskey(handle);
+      go(next);
+    });
+  };
+  return (
+    <form className="flex flex-col gap-3" onSubmit={create}>
+      <Input
+        label="Handle"
+        name="handle"
+        autoComplete="username"
+        autoCapitalize="none"
+        spellCheck={false}
+        required
+        value={handle}
+        description={`Your name on this Keel, and the name of your own org: ${window.location.host}/${handle === "" ? "your-handle" : handle}`}
+        {...handleError(handle, taken)}
+        onChange={(event) => {
+          setTaken(false);
+          setHandle(event.target.value.toLowerCase());
+        }}
+      />
+      <Button
+        className="w-full justify-center"
+        type="submit"
+        variant="primary"
+        disabled={busy || !HANDLE.test(handle)}
+      >
+        Create your account with a passkey
+      </Button>
+      <Refusal said={refused} />
+    </form>
+  );
+}
+
+/** A code sent by email: for a new address it signs up, and the handle is chosen next. */
+function EmailCode({
+  account,
+  creating,
+  onward,
+}: {
+  account: Account;
+  creating: boolean;
+  onward: string;
+}) {
   const [email, setEmail] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const { busy, refused, ask } = useAsking();
-  // A new user chooses a handle before anything else: it names their own org.
-  const onward = creating ? hrefOf({ at: "signup" }, next) : next;
-
   const send = (event: FormEvent) => {
     event.preventDefault();
     void ask(async () => {
@@ -72,48 +132,8 @@ function SignIn({ account, creating }: { account: Account; creating: boolean }) 
       go(onward);
     });
   };
-
   return (
-    <Card
-      title={creating ? "Create your account" : "Sign in to Keel"}
-      lede={
-        creating
-          ? "An account is a person's. Agents get their own credentials, from the person who sponsors them."
-          : undefined
-      }
-    >
-      <div className="flex flex-col gap-2.5">
-        {!creating && (
-          <Button
-            className="w-full justify-center"
-            variant="primary"
-            disabled={busy}
-            onClick={() =>
-              void ask(async () => {
-                await account.signInWithPasskey();
-                go(next);
-              })
-            }
-          >
-            Sign in with a passkey
-          </Button>
-        )}
-        <Button
-          className="w-full justify-center"
-          variant="secondary"
-          disabled={busy}
-          onClick={() =>
-            void ask(() => account.signInWithGitHub(`${window.location.origin}${onward}`))
-          }
-        >
-          Continue with GitHub
-        </Button>
-      </div>
-      <div className="flex items-center gap-3 text-sm text-kumo-subtle">
-        <span className="h-px flex-1 bg-kumo-line" />
-        or with a code sent by email
-        <span className="h-px flex-1 bg-kumo-line" />
-      </div>
+    <>
       {sentTo === null ? (
         <form className="flex flex-col gap-3" onSubmit={send}>
           <Input
@@ -128,7 +148,7 @@ function SignIn({ account, creating }: { account: Account; creating: boolean }) 
           <Button
             className="w-full justify-center"
             type="submit"
-            variant={creating ? "primary" : "secondary"}
+            variant="secondary"
             disabled={busy}
           >
             Send a code
@@ -158,6 +178,76 @@ function SignIn({ account, creating }: { account: Account; creating: boolean }) 
         </form>
       )}
       <Refusal said={refused} />
+    </>
+  );
+}
+
+/**
+ * Signing in, and signing up. A passkey is always a way in. A code by email and GitHub are shown where this Keel
+ * offers them, and nowhere else: no button is put up for Keel to refuse.
+ */
+function SignIn({
+  account,
+  creating,
+  methods,
+}: {
+  account: Account;
+  creating: boolean;
+  methods: Methods;
+}) {
+  const next = nextOf(window.location.search);
+  const { busy, refused, ask } = useAsking();
+  // Someone who signs up by a code or with GitHub chooses a handle before anything else: it names their own org.
+  const onward = creating ? hrefOf({ at: "signup" }, next) : next;
+  return (
+    <Card
+      title={creating ? "Create your account" : "Sign in to Keel"}
+      lede={
+        creating
+          ? "An account is a person's. Agents get their own credentials, from the person who sponsors them."
+          : undefined
+      }
+    >
+      {creating ? (
+        <PasskeySignUp account={account} next={next} />
+      ) : (
+        <Button
+          className="w-full justify-center"
+          variant="primary"
+          disabled={busy}
+          onClick={() =>
+            void ask(async () => {
+              await account.signInWithPasskey();
+              go(next);
+            })
+          }
+        >
+          Sign in with a passkey
+        </Button>
+      )}
+      {methods.github && (
+        <Button
+          className="w-full justify-center"
+          variant="secondary"
+          disabled={busy}
+          onClick={() =>
+            void ask(() => account.signInWithGitHub(`${window.location.origin}${onward}`))
+          }
+        >
+          Continue with GitHub
+        </Button>
+      )}
+      <Refusal said={refused} />
+      {methods.emailCode && (
+        <>
+          <div className="flex items-center gap-3 text-sm text-kumo-subtle">
+            <span className="h-px flex-1 bg-kumo-line" />
+            or with a code sent by email
+            <span className="h-px flex-1 bg-kumo-line" />
+          </div>
+          <EmailCode account={account} creating={creating} onward={onward} />
+        </>
+      )}
       <p className="text-sm text-kumo-subtle">
         {creating ? "Already have an account? " : "New to Keel? "}
         <a className="a-link" href={hrefOf({ at: creating ? "login" : "signup" }, next)}>
@@ -188,7 +278,7 @@ function ChooseHandle({ account, who }: { account: Account; who: Who }) {
   return (
     <Card
       title="Choose your handle"
-      lede={`You are signed in as ${who.email}. Your handle is your name on this Keel, and the name of your own org: your projects live under it.`}
+      lede={`${who.email === undefined ? "You are signed in" : `You are signed in as ${who.email}`}. Your handle is your name on this Keel, and the name of your own org: your projects live under it.`}
     >
       <form className="flex flex-col gap-3" onSubmit={choose}>
         <Input
@@ -200,11 +290,7 @@ function ChooseHandle({ account, who }: { account: Account; who: Who }) {
           required
           value={handle}
           description={`${window.location.host}/${handle === "" ? "your-handle" : handle}`}
-          {...(taken
-            ? { error: "That handle is taken." }
-            : handle !== "" && !wellFormed
-              ? { error: "Lower-case letters, digits and hyphens, and no hyphen at either end." }
-              : {})}
+          {...handleError(handle, taken)}
           onChange={(event) => {
             setTaken(false);
             setHandle(event.target.value.toLowerCase());
@@ -309,7 +395,7 @@ function Settings({ account, who }: { account: Account; who: Who }) {
       <header className="flex flex-col gap-1">
         <h1 className="text-[22px] font-semibold text-kumo-strong">Your account</h1>
         <p className="text-base text-kumo-default">
-          {who.handle === undefined ? who.email : `${who.handle} · ${who.email}`}
+          {[who.handle, who.email].filter((part) => part !== undefined).join(" · ")}
         </p>
       </header>
       <Passkeys account={account} />
@@ -409,7 +495,7 @@ function Device({ account, who, userCode }: { account: Account; who: Who; userCo
         title={answer === "approved" ? "The terminal is signed in" : "The terminal was refused"}
         lede={
           answer === "approved"
-            ? `It is signed in as ${who.handle ?? who.email}. Go back to it.`
+            ? `It is signed in as ${nameOf(who)}. Go back to it.`
             : "Nothing was signed in. The code is of no more use."
         }
       >
@@ -419,7 +505,7 @@ function Device({ account, who, userCode }: { account: Account; who: Who; userCo
   return (
     <Card
       title="Sign a terminal in as you?"
-      lede={`A terminal is showing the code below. Approving it signs that terminal in as ${who.handle ?? who.email}, with everything you may do. Approve it only if the code is the one on your own screen.`}
+      lede={`A terminal is showing the code below. Approving it signs that terminal in as ${nameOf(who)}, with everything you may do. Approve it only if the code is the one on your own screen.`}
     >
       <p className="a-mono text-center text-[28px] tracking-widest text-kumo-strong" data-user-code>
         {userCode}
@@ -473,6 +559,24 @@ function useOrgs(account: Account, wanted: boolean): Org[] {
   return orgs;
 }
 
+/** Which ways in Keel offers, asked once a visitor is at a page that signs in. Until Keel answers: a passkey. */
+function useMethods(account: Account, wanted: boolean): Methods {
+  const [methods, setMethods] = useState<Methods>({ emailCode: false, github: false });
+  useEffect(() => {
+    if (!wanted) return undefined;
+    let here = true;
+    const read = async (): Promise<void> => {
+      const offered = await account.methods();
+      if (here) setMethods(offered);
+    };
+    void read();
+    return () => {
+      here = false;
+    };
+  }, [account, wanted]);
+  return methods;
+}
+
 function Shell({
   reader,
   org,
@@ -523,7 +627,7 @@ function Shell({
               href={hrefOf({ at: "settings" })}
               className="text-sm text-kumo-default hover:underline"
             >
-              {reader.who.handle ?? reader.who.email}
+              {nameOf(reader.who)}
             </a>
           )}
         </div>
@@ -553,6 +657,8 @@ export function AccountApp({ place }: { place: Place }) {
   }, [sent]);
   const named = reader.is === "user" && reader.who.handle !== undefined;
   const orgs = useOrgs(account, named && place.at === "org");
+  const signingIn = reader.is === "visitor" && (place.at === "login" || place.at === "signup");
+  const methods = useMethods(account, signingIn);
 
   let page: ReactNode = null;
   if (reader.is === "closed")
@@ -568,7 +674,7 @@ export function AccountApp({ place }: { place: Place }) {
     );
   else if (sent !== null) page = null;
   else if (reader.is === "visitor" && (place.at === "login" || place.at === "signup"))
-    page = <SignIn account={account} creating={place.at === "signup"} />;
+    page = <SignIn account={account} creating={place.at === "signup"} methods={methods} />;
   else if (reader.is === "user" && place.at === "signup")
     page = <ChooseHandle account={account} who={reader.who} />;
   else if (reader.is === "user" && place.at === "settings")

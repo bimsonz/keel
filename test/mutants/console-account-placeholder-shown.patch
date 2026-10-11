@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/account.test.ts
+# kills: account.placeholder
+# why: the address Keel keeps for a user who has none is handed to the page as their email
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index d254bb8..3dbdb7c 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -132,7 +132,7 @@ function whoOf(user: {
+   username?: string | null | undefined;
+ }): Who {
+   // Keel gives a user with no address one that can never receive mail (RFC 6761). It is not an address to show.
+-  const placeholder = user.email.toLowerCase().endsWith(".invalid");
++  const placeholder = false;
+   return {
+     id: user.id,
+     ...(placeholder ? {} : { email: user.email }),

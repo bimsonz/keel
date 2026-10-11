@@ -4,7 +4,16 @@
 import { Button, Input } from "@cloudflare/kumo";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
 import { type OrgTab, hrefOf } from "../places.ts";
-import type { Account, Invitation, Invited, Member, Org, OrgPage, Who } from "./account.ts";
+import {
+  type Account,
+  type Invitation,
+  type Invited,
+  type Member,
+  type Org,
+  type OrgPage,
+  type Who,
+  nameOf,
+} from "./account.ts";
 import { Card, HANDLE, Refusal, go, useAsking } from "./parts.tsx";
 import { ROLES, type Role, givable, manages, mayDelete } from "./roles.ts";
 
@@ -534,7 +543,10 @@ export function NewOrg({ account }: { account: Account }) {
           {...(taken
             ? { error: "That handle is taken." }
             : handle !== "" && !wellFormed
-              ? { error: "Lower-case letters, digits and hyphens, and no hyphen at either end." }
+              ? {
+                  error:
+                    "Lower-case letters, digits and single hyphens, and no hyphen at either end.",
+                }
               : {})}
           onChange={(event) => {
             setTaken(false);
@@ -582,7 +594,7 @@ export function Invite({ account, who, id }: { account: Account; who: Who; id: s
     return (
       <Card
         title="This invitation is not open to you"
-        lede={`It was made to someone else, or it has been answered or withdrawn. You are signed in as ${who.handle ?? who.email}.`}
+        lede={`It was made to someone else, or it has been answered or withdrawn. You are signed in as ${nameOf(who)}.`}
       >
         {null}
       </Card>
@@ -590,7 +602,7 @@ export function Invite({ account, who, id }: { account: Account; who: Who; id: s
   return (
     <Card
       title={`Join ${invited.org.name}?`}
-      lede={`${invited.by === undefined ? "You are invited" : `${invited.by} invites you`} to the org ${invited.org.handle} on this Keel, as ${invited.role === "owner" ? "an owner" : `a ${invited.role}`}. You would join as ${who.handle ?? who.email}.`}
+      lede={`${invited.by === undefined ? "You are invited" : `${invited.by} invites you`} to the org ${invited.org.handle} on this Keel, as ${invited.role === "owner" ? "an owner" : `a ${invited.role}`}. You would join as ${nameOf(who)}.`}
     >
       <div className="flex gap-2">
         <Button

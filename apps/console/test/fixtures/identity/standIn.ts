@@ -5,7 +5,7 @@
 import { passkey } from "@better-auth/passkey";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthEndpoint, createAuthMiddleware } from "better-auth/api";
 import {
   admin,
   bearer,
@@ -47,7 +47,19 @@ function tables(): Record<string, unknown[]> {
   };
 }
 
-export function createIdentity(origin: string): Identity {
+export interface IdentityOptions {
+  /**
+   * Whether this Keel can send an email, and so offers a code by email. A Keel that cannot signs a new person up
+   * by passkey alone, and says nothing of which ways in it offers: keel.town as it first served identity.
+   */
+  emailCodes?: boolean;
+}
+
+/** A passkey-first user has no address, so Better Auth is given one that can never receive mail (RFC 6761). */
+const PLACEHOLDER = "users.keel.invalid";
+
+export function createIdentity(origin: string, options: IdentityOptions = {}): Identity {
+  const emailCodes = options.emailCodes ?? true;
   const outbox: Sent[] = [];
   const requests: Request[] = [];
   const auth = betterAuth({
@@ -97,33 +109,69 @@ export function createIdentity(origin: string): Identity {
     },
     databaseHooks: {
       user: {
-        update: {
-          // Keel makes a user's own org when their handle is first set, and names it by the handle.
-          async after(user) {
-            // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the username plugin's field
-            const handle = (user as { username?: string | null }).username;
-            if (typeof handle !== "string" || handle === "") return;
-            const context = await auth.$context;
-            const held = await context.adapter.findOne({
-              model: "organization",
-              where: [{ field: "slug", value: handle }],
-            });
-            if (held !== null) return;
-            await auth.api.createOrganization({
-              body: { name: handle, slug: handle, userId: user.id },
-            });
-          },
-        },
+        // Keel makes a user's own org when their handle is first set, and names it by the handle: when the user
+        // is made, for one who signs up with a passkey, and when they choose it, for one who signed up by a code.
+        create: { after: (user) => personalOrg(user) },
+        update: { after: (user) => personalOrg(user) },
       },
     },
     plugins: [
-      emailOTP({
-        // oxlint-disable-next-line typescript/require-await -- the plugin's own signature
-        async sendVerificationOTP(sent) {
-          outbox.push(sent);
+      ...(emailCodes
+        ? [
+            emailOTP({
+              // oxlint-disable-next-line typescript/require-await -- the plugin's own signature
+              async sendVerificationOTP(sent) {
+                outbox.push(sent);
+              },
+            }),
+            // Which ways in this Keel offers besides a passkey, for a page to show those and no others.
+            {
+              id: "methods",
+              endpoints: {
+                methods: createAuthEndpoint("/methods", { method: "GET" }, (ctx) =>
+                  ctx.json({ emailCode: true, github: false }),
+                ),
+              },
+            },
+          ]
+        : []),
+      passkey({
+        rpID: new URL(origin).hostname,
+        rpName: "Keel",
+        origin,
+        // Passkey-first sign-up, as Keel has it: the handle chosen names a user made only once the passkey verifies.
+        registration: {
+          requireSession: false,
+          // oxlint-disable-next-line typescript/require-await -- the plugin's own signature
+          resolveUser: async ({ context }) => {
+            if (typeof context !== "string" || context === "")
+              throw new APIError("BAD_REQUEST", {
+                code: "HANDLE_REQUIRED",
+                message: "Choose a handle to sign up with a passkey",
+              });
+            return { id: crypto.randomUUID(), name: context };
+          },
+          afterVerification: async ({ ctx, user, context }) => {
+            if ((await ctx.context.internalAdapter.findUserById(user.id)) !== null) return {};
+            if (typeof context !== "string")
+              throw new APIError("BAD_REQUEST", {
+                code: "HANDLE_REQUIRED",
+                message: "Choose a handle",
+              });
+            const created = await ctx.context.internalAdapter.createUser(
+              {
+                email: `${context}@${PLACEHOLDER}`,
+                emailVerified: false,
+                name: context,
+                username: context,
+                displayUsername: context,
+              },
+              { method: "passkey" },
+            );
+            return { userId: created.id };
+          },
         },
       }),
-      passkey({ rpID: new URL(origin).hostname, rpName: "Keel", origin }),
       deviceAuthorization({ verificationUri: `${origin}/device` }),
       bearer(),
       organization({
@@ -138,6 +186,18 @@ export function createIdentity(origin: string): Identity {
       username(),
     ],
   });
+  const personalOrg = async (user: { id: string }): Promise<void> => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the username plugin's field
+    const handle = (user as { username?: string | null }).username;
+    if (typeof handle !== "string" || handle === "") return;
+    const context = await auth.$context;
+    const held = await context.adapter.findOne({
+      model: "organization",
+      where: [{ field: "slug", value: handle }],
+    });
+    if (held !== null) return;
+    await auth.api.createOrganization({ body: { name: handle, slug: handle, userId: user.id } });
+  };
   return {
     outbox,
     requests,

@@ -2,10 +2,10 @@
 # kills: orgs.create
 # why: an org the reader is not in is told apart from one that is not there
 diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
-index 667b524..781b7c6 100644
+index d254bb8..faa59e6 100644
 --- a/apps/console/src/account/account.ts
 +++ b/apps/console/src/account/account.ts
-@@ -183,7 +183,7 @@ function invitationOf(answer: InvitationAnswer): Invitation {
+@@ -192,7 +192,7 @@ function invitationOf(answer: InvitationAnswer): Invitation {
  }
  
  /** Better Auth's answers where there is no such org, or it is not the reader's to see. */

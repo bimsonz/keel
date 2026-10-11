@@ -80,6 +80,28 @@ describe("who the page is, to Keel", () => {
     await expect(account.who()).rejects.toThrow(NotOpen);
   });
 
+  it("[account.methods] offers a passkey alone where Keel does not say what else it offers, and what Keel says where it does", async () => {
+    // keel.town as it first served identity: passkeys, no email to send a code by, and no list of ways in.
+    const bare = createIdentity(ORIGIN, { emailCodes: false });
+    const visitor = createAccount({ origin: ORIGIN, fetch: browser(bare).serve });
+    expect(await visitor.who()).toBeNull();
+    expect(await visitor.methods()).toEqual({ emailCode: false, github: false });
+    // A Keel that can send email says so, and says nothing of a GitHub it has not been given.
+    const full = createAccount({ origin: ORIGIN, fetch: browser(createIdentity(ORIGIN)).serve });
+    expect(await full.methods()).toEqual({ emailCode: true, github: false });
+  });
+
+  it("[account.placeholder] gives a page no address for a user who has none, though Keel keeps one that can never receive mail", async () => {
+    // A user who signed up with a passkey alone is kept by Keel under an address in a domain that does not exist.
+    const { tab, account, who } = await signedUp("ada@users.keel.invalid");
+    const raw = await tab.serve(`${ORIGIN}/v1/auth/get-session`);
+    expect(await raw.text()).toContain("ada@users.keel.invalid");
+    expect(who).toEqual({ id: who.id, name: "" });
+    expect(JSON.stringify(await account.who())).not.toContain("keel.invalid");
+    // An address a person can be reached at is theirs to see.
+    expect((await signedUp("grace@example.com")).who.email).toBe("grace@example.com");
+  });
+
   it("[account.handle] takes a handle that is free, once, and it is then the user's", async () => {
     const { account, who } = await signedUp();
     expect(who.handle).toBeUndefined();
