@@ -1,0 +1,39 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/event-catalogue.test.ts -t "events.conform"
+# kills: events.conform
+# why: the spec drops IntentDeclared.leaseId (and the regenerated document with it), so consumers stop seeing a field core still sends
+diff --git a/packages/contracts/openapi.json b/packages/contracts/openapi.json
+index 5166a82..3dfbbfc 100644
+--- a/packages/contracts/openapi.json
++++ b/packages/contracts/openapi.json
+@@ -7388,8 +7388,7 @@
+           "revision",
+           "goal",
+           "footprint",
+-          "premises",
+-          "leaseId"
++          "premises"
+         ],
+         "properties": {
+           "_tag": {
+@@ -7434,9 +7433,6 @@
+             "items": {
+               "$ref": "#/components/schemas/EventProposition"
+             }
+-          },
+-          "leaseId": {
+-            "$ref": "#/components/schemas/LeaseId"
+           }
+         },
+         "additionalProperties": {
+diff --git a/packages/spec/events.tsp b/packages/spec/events.tsp
+index 4ccc758..6b51a11 100644
+--- a/packages/spec/events.tsp
++++ b/packages/spec/events.tsp
+@@ -221,7 +221,6 @@ model IntentDeclared {
+   footprint: MFP.FootprintEntry[];
+   premises: EventProposition[];
+   declaredEffects?: EventProposition[];
+-  leaseId: LeaseId;
+ }
+ 
+ model PreflightIssued {

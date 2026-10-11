@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/event-catalogue.test.ts -t "events.conform"
+# kills: events.conform
+# why: core's LeaseId admits I, L, O and U, which a ULID never holds, while the spec's LeaseId still refuses them
+diff --git a/packages/core/src/domain/kernel/ids.ts b/packages/core/src/domain/kernel/ids.ts
+index 782db26..c84fccd 100644
+--- a/packages/core/src/domain/kernel/ids.ts
++++ b/packages/core/src/domain/kernel/ids.ts
+@@ -70,7 +70,9 @@ export const GuardId = prefixed("grd").pipe(Schema.brand("GuardId"));
+ export type GuardId = typeof GuardId.Type;
+ export const TenetId = prefixed("tnt").pipe(Schema.brand("TenetId"));
+ export type TenetId = typeof TenetId.Type;
+-export const LeaseId = prefixed("lse").pipe(Schema.brand("LeaseId"));
++export const LeaseId = Schema.String.check(Schema.isPattern(/^lse_[0-9A-Z]{26}$/)).pipe(
++  Schema.brand("LeaseId"),
++);
+ export type LeaseId = typeof LeaseId.Type;
+ export const EscalationId = prefixed("esc").pipe(Schema.brand("EscalationId"));
+ export type EscalationId = typeof EscalationId.Type;
