@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.verified-carried
+# why: The Candidate machine drops the verdict's verified flag at BatchVerified, so an unverified batch reaches trunk as verified
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index a0f2d1f..76d3659 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -215,7 +215,6 @@ export const decideCandidate = (
+           members: batch.members,
+           base: batch.base,
+           predecessors: batch.predecessors ?? [],
+-          ...(command.verified === undefined ? {} : { verified: command.verified }),
+         }),
+       ]);
+ 

@@ -2,10 +2,10 @@
 # kills: promotion.replay
 # why: evolve appends a batch's members to the predecessors array it received, rewriting the recorded BatchVerified
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index b565488..a28cb2f 100644
+index 8012526..aa92e69 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -331,7 +331,9 @@ export const evolvePromotion = (
+@@ -336,7 +336,9 @@ export const evolvePromotion = (
          verdictId: event.verdictId,
          members: event.members,
          base: event.base,
@@ -13,6 +13,6 @@ index b565488..a28cb2f 100644
 +        predecessors:
 +          ((event.predecessors as ChangeId[] | undefined)?.push(...event.members),
 +          event.predecessors ?? []),
+         ...(event.verified === undefined ? {} : { verified: event.verified }),
        };
        return {
-         ...trunk,
