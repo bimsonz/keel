@@ -419,6 +419,31 @@ describe("the event catalogue: core's Effect Schemas and the spec's KeelEvent", 
     expect(differences).toEqual([]);
   });
 
+  it("[events.envelope] publishes EventRecord's optional actor, project and label; a label is D-n, G-n, C-n, E-n, P-n or a change's #n", () => {
+    const record = at(schemas, "EventRecord");
+    const field = (name: string) => {
+      const property = at(record, "properties", name);
+      return isRecord(property) ? singleAllOf(dropAnnotations(property)) : property;
+    };
+    expect(field("actor")).toEqual({ $ref: "#/components/schemas/EventActor" });
+    expect(field("project")).toEqual({ $ref: "#/components/schemas/ProjectId" });
+    expect(field("label")).toEqual({ $ref: "#/components/schemas/EventLabel" });
+    const required = at(record, "required");
+    expect(Array.isArray(required) ? required : []).not.toEqual(expect.arrayContaining(["actor"]));
+    const pattern = (name: string) => new RegExp(String(at(schemas, name, "pattern")), "u");
+    const label = pattern("EventLabel");
+    expect(
+      ["D-1", "G-12", "C-3", "E-4", "P-50", "#1", "#27"].filter((l) => !label.test(l)),
+    ).toEqual([]);
+    expect(["#0", "D-0", "X-1", "#", "d-1", "#1a", "D-1 "].filter((l) => label.test(l))).toEqual(
+      [],
+    );
+    const actor = pattern("EventActor");
+    expect(actor.test("agent:agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0")).toBe(true);
+    expect(actor.test("operator:agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0")).toBe(true);
+    expect(actor.test("agent:someone")).toBe(false);
+  });
+
   it("compiles core's events as Schema.toJsonSchemaDocument does, before the rewrites", () => {
     for (const [name, event] of events) {
       const lowered = SchemaRepresentation.toRepresentation(event.ast);

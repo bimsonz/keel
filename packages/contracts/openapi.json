@@ -7058,8 +7058,8 @@
       },
       "EventLabel": {
         "type": "string",
-        "pattern": "^[DGCEP]-[1-9][0-9]*$",
-        "description": "A short label for the entity an event created, numbered per project and kind:\n`D-n` decisions, `G-n` guards, `C-n` conflicts, `E-n` escalations, `P-n` probes."
+        "pattern": "^([DGCEP]-[1-9][0-9]*|#[1-9][0-9]*)$",
+        "description": "A short label for the entity an event created, numbered per project and kind:\n`D-n` decisions, `G-n` guards, `C-n` conflicts, `E-n` escalations, `P-n`\nprobes, and `#n` changes."
       },
       "EventMessageCitation": {
         "type": "object",

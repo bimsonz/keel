@@ -23,9 +23,10 @@ scalar EventActor extends string;
 
 /**
  * A short label for the entity an event created, numbered per project and kind:
- * `D-n` decisions, `G-n` guards, `C-n` conflicts, `E-n` escalations, `P-n` probes.
+ * `D-n` decisions, `G-n` guards, `C-n` conflicts, `E-n` escalations, `P-n`
+ * probes, and `#n` changes.
  */
-@pattern("^[DGCEP]-[1-9][0-9]*$")
+@pattern("^([DGCEP]-[1-9][0-9]*|#[1-9][0-9]*)$")
 scalar EventLabel extends string;
 
 /** One entry of the operation log, as published. */
