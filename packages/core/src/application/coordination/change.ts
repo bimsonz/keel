@@ -29,6 +29,7 @@ import {
   BatchFormed,
   CandidateBisected,
   CandidateInvalidated,
+  type PushRejected,
   TrunkAdvanced,
 } from "../../domain/integration/index.ts";
 import {
@@ -51,7 +52,7 @@ import {
 } from "../../domain/kernel/index.ts";
 import { VerdictIssued } from "../../domain/verification/index.ts";
 import {
-  type Clock,
+  Clock,
   CodeHost,
   commit,
   type Committed,
@@ -65,8 +66,12 @@ import {
   type SubmissionStatus,
   type Transaction,
   type Transition,
+  KEEL_TRUNK_REF,
+  type PackTooLarge,
+  Trunks,
   WorkspacePool,
   type WorkspaceGrant,
+  WorkspaceRebaser,
 } from "../ports/index.ts";
 
 /**
@@ -82,14 +87,28 @@ export const CHANGE = "change";
 /** Where it keeps the workspace the change holds, beside the change and outside the domain's Change. */
 export const CHANGE_WORKSPACE = "change-workspace";
 
-/** The workspace a change holds: Precheck diffs `repo` against `baseSha`, and reads `projectId`'s settings. */
+/**
+ * The workspace a change holds, the commit it was granted at, and its
+ * project. `grantedSha` is the fork point and never moves; the change's base
+ * is the domain Change's `baseSha`, which a rebase moves. It is stored under
+ * `baseSha`, its name before rebases existed, so changes already stored decode.
+ */
 export const HeldWorkspace = Schema.Struct({
   workspaceId: WorkspaceId,
   repo: Schema.Struct({ namespace: Schema.String, name: Schema.String }),
-  baseSha: CommitSha,
+  grantedSha: CommitSha,
   projectId: ProjectId,
-});
+}).pipe(Schema.encodeKeys({ grantedSha: "baseSha" }));
 export type HeldWorkspace = typeof HeldWorkspace.Type;
+
+/**
+ * What Precheck and the Lane read of a change's workspace: Precheck diffs
+ * `repo` against `baseSha` (the change's base), stops an ancestry walk at
+ * `grantedSha`, and reads `projectId`'s settings.
+ */
+export interface WorkspaceView extends HeldWorkspace {
+  readonly baseSha: CommitSha;
+}
 
 /** At L1 no premise is compared yet, so preflight finds nothing and suggests proceeding. */
 export const L1_PREFLIGHT: Preflight = {
@@ -177,6 +196,19 @@ export interface AbandonChange {
   readonly authority: WithdrawAuthority;
   readonly reason?: string | undefined;
   readonly idempotencyKey: string;
+}
+
+export interface RebaseChange {
+  readonly agentId: AgentId;
+  readonly leaseId: LeaseId;
+  readonly idempotencyKey: string;
+}
+
+/** What rebasing answers: the change on its new base, and the workspace branch holding that base, to fetch and merge. */
+export interface RebasedChange {
+  readonly change: Change;
+  readonly ref: typeof KEEL_TRUNK_REF;
+  readonly base: CommitSha;
 }
 
 export interface AdoptChange {
@@ -383,13 +415,14 @@ export const submissionStatus: (
 /** The workspace the change holds, for Precheck's diff. ChangeStateRefused before it holds one. */
 export const changeWorkspace: (
   changeId: ChangeId,
-) => Effect.Effect<HeldWorkspace, ChangeNotFound | ChangeStateRefused, EntityStore> = Effect.fn(
+) => Effect.Effect<WorkspaceView, ChangeNotFound | ChangeStateRefused, EntityStore> = Effect.fn(
   "coordination/changeWorkspace",
 )(function* (changeId: ChangeId) {
   const change = yield* getChange(changeId);
   const held = heldWorkspace(yield* EntityStore, changeId);
-  if (held === undefined) return yield* refused(change, "workspace");
-  return held;
+  if (held === undefined || change.baseSha === undefined)
+    return yield* refused(change, "workspace");
+  return { ...held, baseSha: change.baseSha };
 });
 
 /** Gives a grant back unless the change holds it: `grant` is idempotent per holder, so a live change's own workspace stays. */
@@ -456,7 +489,7 @@ export const declare: (
         encodeHeld({
           workspaceId: grant.workspaceId,
           repo: { namespace: grant.repo.namespace, name: grant.repo.name },
-          baseSha: grant.baseSha,
+          grantedSha: grant.baseSha,
           projectId: command.projectId,
         }),
       );
@@ -684,6 +717,81 @@ export const adopt: (
   // The pool finds the workspace this change holds and only mints a token: it cannot run out.
   const grant = yield* (yield* WorkspacePool).grant(held.projectId, changeId).pipe(Effect.orDie);
   return { change, grant };
+});
+
+/**
+ * Moves a change onto trunk's head, so an agent bounced on a textual conflict
+ * can merge the trunk it must now build on. The domain decides Rebase first,
+ * without committing (the lease, the state, `from` == the change's base), so
+ * a refused call pushes nothing. Only then is trunk's head (from the Trunk
+ * DO, never the mirror, which lags) put on the workspace's `keel/trunk`, and
+ * ChangeRebased committed. A retry of a committed key pushes nothing again.
+ */
+export const rebaseChange: (
+  changeId: ChangeId,
+  command: RebaseChange,
+) => Effect.Effect<
+  RebasedChange,
+  | ChangeNotFound
+  | LeaseStale
+  | ChangeStateRefused
+  | IdempotencyConflict
+  | PushRejected
+  | PackTooLarge,
+  Clock | EntityStore | EventOutbox | Trunks | WorkspaceRebaser
+> = Effect.fn("coordination/rebaseChange")(function* (changeId: ChangeId, command: RebaseChange) {
+  const fingerprint = fingerprintOf("rebase", command);
+  const answer = (change: Change): Effect.Effect<RebasedChange, ChangeStateRefused> =>
+    change.baseSha === undefined
+      ? refused(change, "rebase")
+      : Effect.succeed({ change, ref: KEEL_TRUNK_REF, base: change.baseSha });
+  const prior = (yield* EventOutbox).committed(changeRef(changeId), command.idempotencyKey);
+  if (prior !== undefined)
+    return yield* prior.fingerprint === fingerprint
+      ? Effect.flatMap(getChange(changeId), answer)
+      : Effect.fail(new IdempotencyConflict({ idempotencyKey: command.idempotencyKey }));
+
+  const change = yield* getChange(changeId);
+  const held = heldWorkspace(yield* EntityStore, changeId);
+  if (held === undefined || change.baseSha === undefined) return yield* refused(change, "rebase");
+  const from = change.baseSha;
+  const onto = yield* (yield* Trunks).head(held.projectId);
+  const rebase: ChangeCommand = { _tag: "Rebase", leaseId: command.leaseId, from, onto };
+  const decided = decideChange(change, rebase, { now: yield* (yield* Clock).now, changeId });
+  if (Result.isFailure(decided)) {
+    const refusal = decided.failure;
+    if (isOneOf(["ChangeNotFound", "LeaseStale", "ChangeStateRefused"], refusal))
+      return yield* Effect.fail(refusal);
+    return yield* Effect.die(
+      new Error(`Rebase was refused with ${refusal._tag}`, { cause: refusal }),
+    );
+  }
+
+  // A live change's own workspace repo always exists: its absence is a defect.
+  yield* (yield* WorkspaceRebaser)
+    .pushTrunk(held.projectId, held.repo, from, onto)
+    .pipe(Effect.catchTag("RepoNotFound", Effect.die));
+  const committed = yield* commit(
+    {
+      entity: changeRef(changeId),
+      cause: command.idempotencyKey,
+      fingerprint,
+      actor: agentActor(command.agentId),
+      project: held.projectId,
+    },
+    (tx) =>
+      Result.map(
+        transition(
+          tx,
+          changeId,
+          ["ChangeNotFound", "LeaseStale", "ChangeStateRefused"],
+          [rebase],
+          command.leaseId,
+        ),
+        asTransition,
+      ),
+  );
+  return yield* answer(yield* settled(changeId, command.idempotencyKey, committed));
 });
 
 /**

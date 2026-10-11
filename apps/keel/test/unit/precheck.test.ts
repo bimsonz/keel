@@ -62,6 +62,7 @@ function precheckWorld(options: { readonly protectedPaths?: readonly string[] } 
         workspaceId: makeId("wsp", "01JZD12D12D12D12D12D12D12D"),
         repo,
         baseSha,
+        grantedSha: baseSha,
         projectId,
       };
       changes.submit(changeId, 1, workspace);

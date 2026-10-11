@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/rebase.test.ts -t rebase.held-stored
+# kills: rebase.held-stored
+# why: The grant's commit is stored under a new key, so every change stored before the rename fails to decode its workspace
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index e3214e6..79591e6 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -98,7 +98,7 @@ export const HeldWorkspace = Schema.Struct({
+   repo: Schema.Struct({ namespace: Schema.String, name: Schema.String }),
+   grantedSha: CommitSha,
+   projectId: ProjectId,
+-}).pipe(Schema.encodeKeys({ grantedSha: "baseSha" }));
++});
+ export type HeldWorkspace = typeof HeldWorkspace.Type;
+ 
+ /**

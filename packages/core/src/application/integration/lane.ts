@@ -339,7 +339,7 @@ const onBatch = (
   });
 
 /** A call on the change, naming it when the batch is of one: the remedy a lane-issued bounce names. */
-const remedy = (batch: Batch, operationId: "submit" | "revise", title: string): NextAction => {
+const remedy = (batch: Batch, operationId: "submit" | "rebase", title: string): NextAction => {
   const [sole] = batch.members;
   return {
     kind: "call",
@@ -476,11 +476,17 @@ const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
               evidence: [
                 `composition-refused: ${refused.reason} ${refused.paths.join(" ")}`.trimEnd(),
               ],
+              // Trunk moved under the change: rebase puts trunk's head on the workspace's keel/trunk, and the agent merges it (never a force push).
               nextActions: [
                 remedy(
                   batch,
-                  "revise",
-                  `Revise the change onto trunk ${batch.base} and resolve ${refused.paths.join(", ") || "the conflict"}`,
+                  "rebase",
+                  `Rebase the change onto trunk's head (it was ${batch.base} at this bounce): Keel puts it on your workspace's keel/trunk branch`,
+                ),
+                remedy(
+                  batch,
+                  "submit",
+                  `Then run git fetch origin keel/trunk && git merge FETCH_HEAD, resolve ${refused.paths.join(", ") || "the conflict"}, push, and submit again`,
                 ),
               ],
             }),

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import type { ProjectId } from "@keeltown/core/kernel";
 import { CodeHost, KEEL_TRUNK_REF, type RepoRef, WorkspaceRebaser } from "@keeltown/core/ports";
 import { Effect, type Layer } from "effect";
 import { CodeHostFixture } from "../code-host-fixture.ts";
@@ -6,11 +7,13 @@ import { CodeHostFixture } from "../code-host-fixture.ts";
 const MAIN = "refs/heads/main";
 
 /**
- * A rebaser reading `trunk`, beside the code host it writes through and a
- * fixture to seed it. `trunk` is a name no test has used: the suite creates it.
+ * A rebaser that finds `projectId`'s trunk at `trunk`, beside the code host it
+ * writes through and a fixture to seed it. `trunk` is a name no test has used:
+ * the suite creates it.
  */
 export interface WorkspaceRebaserHarness {
   readonly layer: Layer.Layer<WorkspaceRebaser | CodeHost | CodeHostFixture>;
+  readonly projectId: ProjectId;
   readonly trunk: RepoRef;
 }
 
@@ -22,7 +25,7 @@ export function describeWorkspaceRebaserContract(
     it.live(
       "[rebaser.contract.push] trunk's head lands on the workspace's keel/trunk and nowhere else; again is unchanged; a later head moves it on",
       () => {
-        const { layer, trunk } = make();
+        const { layer, projectId, trunk } = make();
         return Effect.gen(function* () {
           const host = yield* CodeHost;
           const fixture = yield* CodeHostFixture;
@@ -34,17 +37,17 @@ export function describeWorkspaceRebaserContract(
           const work = yield* fixture.commit(workspace, MAIN, { "README.md": "base\n", w: "1\n" });
           const landed = yield* fixture.commit(trunk, MAIN, { "README.md": "landed\n" });
 
-          expect(yield* rebaser.pushTrunk(workspace, base, landed)).toBe("advanced");
+          expect(yield* rebaser.pushTrunk(projectId, workspace, base, landed)).toBe("advanced");
           expect(yield* host.head(workspace, KEEL_TRUNK_REF)).toBe(landed);
           expect(yield* host.readTree(workspace, landed)).toEqual(
             yield* host.readTree(trunk, landed),
           );
           expect(yield* host.head(workspace, MAIN)).toBe(work);
           expect(yield* host.head(trunk, MAIN)).toBe(landed);
-          expect(yield* rebaser.pushTrunk(workspace, base, landed)).toBe("unchanged");
+          expect(yield* rebaser.pushTrunk(projectId, workspace, base, landed)).toBe("unchanged");
 
           const later = yield* fixture.commit(trunk, MAIN, { "README.md": "later\n" });
-          expect(yield* rebaser.pushTrunk(workspace, base, later)).toBe("advanced");
+          expect(yield* rebaser.pushTrunk(projectId, workspace, base, later)).toBe("advanced");
           expect(yield* host.head(workspace, KEEL_TRUNK_REF)).toBe(later);
           expect(yield* host.head(workspace, MAIN)).toBe(work);
 
@@ -61,7 +64,7 @@ export function describeWorkspaceRebaserContract(
     );
 
     it.live("[rebaser.contract.missing] a workspace that is gone fails RepoNotFound", () => {
-      const { layer, trunk } = make();
+      const { layer, projectId, trunk } = make();
       return Effect.gen(function* () {
         const host = yield* CodeHost;
         const fixture = yield* CodeHostFixture;
@@ -69,7 +72,7 @@ export function describeWorkspaceRebaserContract(
         yield* host.create(trunk);
         const head = yield* fixture.commit(trunk, MAIN, { "README.md": "base\n" });
         const gone = fixture.scratch();
-        expect(yield* Effect.flip(rebaser.pushTrunk(gone, head, head))).toMatchObject({
+        expect(yield* Effect.flip(rebaser.pushTrunk(projectId, gone, head, head))).toMatchObject({
           _tag: "RepoNotFound",
           repo: { namespace: gone.namespace, name: gone.name },
         });

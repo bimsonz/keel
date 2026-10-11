@@ -57,11 +57,12 @@ const grant = {
   baseSha: "0".repeat(40),
   repo: { namespace: "keel-ws-00", name: "wsp-01jz8pt2c4e6g8j0m2n4q6s8v4" },
 };
-/** What the change's DO answers for `workspace()`: its repo and the base it was granted at. */
+/** What the change's DO answers for `workspace()`: its repo, its base, and the commit it was granted at. */
 const granted = {
   workspaceId: grant.workspaceId,
   repo: grant.repo,
   baseSha: grant.baseSha,
+  grantedSha: grant.baseSha,
   projectId: "prj_01JZ8PT2C4E6G8J0M2N4Q6S8V5",
 };
 const input = {

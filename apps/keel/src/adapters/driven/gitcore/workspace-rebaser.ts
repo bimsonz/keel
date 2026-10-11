@@ -1,4 +1,5 @@
-import type { CommitSha } from "@keeltown/core/kernel";
+import { projectRepos } from "@keeltown/core/application/integration";
+import type { CommitSha, ProjectId } from "@keeltown/core/kernel";
 import { PushRejected } from "@keeltown/core/domain/integration";
 import {
   CodeHost,
@@ -16,14 +17,17 @@ import { TOKEN_TTL_SECONDS, tooLarge } from "./trunk-writer.ts";
 const STALE_RETRIES = 3;
 
 /**
- * WorkspaceRebaser over GitCore and the code host: trunk's pack for the head
- * is relayed into the workspace's `keel/trunk`, with that ref's current value
- * as the explicit old one, so a ref that moved meanwhile refuses it and is
- * read again. It reads trunk and writes the workspace, each with a token
- * minted for the call; neither the tokens nor the remotes, which carry the
- * account id, are ever put in an error or a log.
+ * WorkspaceRebaser over GitCore and the code host: the project's trunk pack
+ * for the head is relayed into the workspace's `keel/trunk`, with that ref's
+ * current value as the explicit old one, so a ref that moved meanwhile
+ * refuses it and is read again. It reads trunk and writes the workspace, each
+ * with a token minted for the call; neither the tokens nor the remotes, which
+ * carry the account id, are ever put in an error or a log. `trunkOf` finds a
+ * project's trunk (`projectRepos` unless a test names its own).
  */
-export const WorkspaceRebaserGitCore = ({ trunk }: { trunk: RepoRef }) =>
+export const WorkspaceRebaserGitCore = (
+  trunkOf: (projectId: ProjectId) => RepoRef = (projectId) => projectRepos(projectId).trunk,
+) =>
   Layer.effect(
     WorkspaceRebaser,
     Effect.gen(function* () {
@@ -43,12 +47,12 @@ export const WorkspaceRebaserGitCore = ({ trunk }: { trunk: RepoRef }) =>
         );
 
       return WorkspaceRebaser.of({
-        pushTrunk: (workspace, base, head) =>
+        pushTrunk: (projectId, workspace, base, head) =>
           Effect.gen(function* () {
             for (let attempt = 0; attempt <= STALE_RETRIES; attempt += 1) {
               const held = yield* heldBy(workspace);
               if (held === head) return "unchanged" satisfies SyncOutcome;
-              const source = yield* remoteOf(trunk, "read").pipe(
+              const source = yield* remoteOf(trunkOf(projectId), "read").pipe(
                 Effect.catchTag("RepoNotFound", Effect.die),
               );
               const target = yield* remoteOf(workspace, "write");

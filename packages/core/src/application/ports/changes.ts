@@ -46,11 +46,15 @@ export interface SubmissionStatus {
   readonly remedy?: Remedy;
 }
 
-/** Where a change's commits live: its workspace repo and the trunk commit it was granted at. */
+/**
+ * Where a change's commits live: its workspace repo, its base (the grant's
+ * until a rebase moves it) and the trunk commit it was granted at, which never moves.
+ */
 export interface ChangeWorkspace {
   readonly workspaceId: WorkspaceId;
   readonly repo: RepoRef;
   readonly baseSha: CommitSha;
+  readonly grantedSha: CommitSha;
   readonly projectId: ProjectId;
 }
 

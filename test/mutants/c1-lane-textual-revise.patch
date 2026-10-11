@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t lane.composition-refused
+# kills: lane.composition-refused
+# why: A textual bounce names revise, which edits only the intent, so the bounced change has no way onto trunk's head
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index ec79219..d2d3833 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -480,7 +480,7 @@ const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
+               nextActions: [
+                 remedy(
+                   batch,
+-                  "rebase",
++                  "revise",
+                   `Rebase the change onto trunk's head (it was ${batch.base} at this bounce): Keel puts it on your workspace's keel/trunk branch`,
+                 ),
+                 remedy(

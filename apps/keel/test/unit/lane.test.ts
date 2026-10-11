@@ -107,6 +107,7 @@ function world(options: WorldOptions = {}) {
           workspaceId: makeId("wsp", ulid()),
           repo: { namespace: "memory", name: `ws-${id}` },
           baseSha: sha("0"),
+          grantedSha: sha("0"),
           projectId: PROJECT,
         }),
       declare: () => Effect.die(new Error("the Lane never declares")),
@@ -509,7 +510,7 @@ describe("the Lane", () => {
   );
 
   it.effect(
-    "[lane.composition-refused] a refused composition bounces its change with the reason and a remedy, and never bundles or verifies",
+    "[lane.composition-refused] a refused composition bounces its change with the reason and the rebase-then-merge remedy, and never bundles or verifies",
     () => {
       const w = world({ refuseCompose: [change(1)] });
       return Effect.gen(function* () {
@@ -528,9 +529,15 @@ describe("the Lane", () => {
           nextActions: [
             {
               kind: "call",
-              operationId: "revise",
+              operationId: "rebase",
               args: { changeId: change(1) },
               title: expect.stringContaining(base),
+            },
+            {
+              kind: "call",
+              operationId: "submit",
+              args: { changeId: change(1) },
+              title: expect.stringContaining("git fetch origin keel/trunk && git merge FETCH_HEAD"),
             },
           ],
         });

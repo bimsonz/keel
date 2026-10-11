@@ -95,6 +95,7 @@ async function lane(options: { readonly noStaging?: boolean } = {}) {
           workspaceId: makeId("wsp", ulid()),
           repo: { namespace: "memory", name: `ws-${id}` },
           baseSha: sha("0"),
+          grantedSha: sha("0"),
           projectId,
         }),
       declare: () => Effect.die(new Error("the Lane never declares")),

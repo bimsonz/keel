@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/rebase.test.ts -t rebase.moves-base
+# kills: rebase.moves-base
+# why: keel/trunk is pushed but ChangeRebased is never committed, so Precheck still judges the merge against the old base
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index e3214e6..1ddb87f 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -785,7 +785,7 @@ export const rebaseChange: (
+           tx,
+           changeId,
+           ["ChangeNotFound", "LeaseStale", "ChangeStateRefused"],
+-          [rebase],
++          [],
+           command.leaseId,
+         ),
+         asTransition,

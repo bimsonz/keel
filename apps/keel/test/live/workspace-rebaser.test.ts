@@ -1,6 +1,7 @@
 // WorkspaceRebaser against Artifacts itself, on scratch repos in the staging
 // workspace namespace: the contract, then what an agent's `git fetch origin
 // keel/trunk` sees after a rebase. Every repo it makes is deleted afterwards.
+import { makeId } from "@keeltown/core/kernel";
 import { CodeHost, KEEL_TRUNK_REF, WorkspaceRebaser } from "@keeltown/core/ports";
 import { CodeHostFixture, PORTS } from "@keeltown/testing";
 import { advertisedRefs } from "@keeltown/gitcore";
@@ -23,9 +24,10 @@ afterAll(async () => {
 const harness = () => {
   const trunk = fixture.fixture.scratch();
   return {
+    projectId: makeId("prj", "01KRBSRCNTRCT0000000000000"),
     trunk,
     layer: Layer.mergeAll(
-      WorkspaceRebaserGitCore({ trunk }).pipe(Layer.provide(host)),
+      WorkspaceRebaserGitCore(() => trunk).pipe(Layer.provide(host)),
       host,
       fixture.layer,
     ),
@@ -35,7 +37,7 @@ const harness = () => {
 PORTS.WorkspaceRebaser.contract("artifacts (keel-ws-00)", harness);
 
 it("[rebaser.live] a workspace forked before trunk moved advertises trunk's head as keel/trunk, which its clone can read", async () => {
-  const { trunk, layer } = harness();
+  const { projectId, trunk, layer } = harness();
   const report = await Effect.runPromise(
     Effect.gen(function* () {
       const codeHost = yield* CodeHost;
@@ -46,7 +48,7 @@ it("[rebaser.live] a workspace forked before trunk moved advertises trunk's head
       const workspace = yield* codeHost.fork(trunk, fixture.fixture.scratch());
       const landed = yield* commit(trunk, MAIN, { "README.md": "landed\n", "src/a.ts": "a\n" });
       const started = Date.now();
-      const outcome = yield* rebaser.pushTrunk(workspace, base, landed);
+      const outcome = yield* rebaser.pushTrunk(projectId, workspace, base, landed);
       const ms = Date.now() - started;
       // What `git fetch origin keel/trunk` asks for: the workspace's advertisement, with a clone's read token.
       const info = yield* codeHost.info(workspace);

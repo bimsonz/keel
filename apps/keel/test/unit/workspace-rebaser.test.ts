@@ -4,7 +4,7 @@
 // explicit old one. Artifacts' own compare-and-swap is proven live
 // ([rebaser.live]); this proves what the adapter asks it to compare.
 import { describe, expect, it } from "@effect/vitest";
-import { CommitSha } from "@keeltown/core/kernel";
+import { CommitSha, makeId } from "@keeltown/core/kernel";
 import { CodeHost, KEEL_TRUNK_REF, type RepoRef, WorkspaceRebaser } from "@keeltown/core/ports";
 import { makeCodeHostMemory } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
@@ -13,6 +13,7 @@ import { WorkspaceRebaserGitCore } from "../../src/adapters/driven/gitcore/works
 import { gitServer, type Reply } from "./git-server.ts";
 
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
+const PROJECT = makeId("prj", "01KRBSRCNTRCT0000000000000");
 const TRUNK: RepoRef = { namespace: "memory", name: "prj" };
 const WORKSPACE: RepoRef = { namespace: "memory", name: "prj-ws-01" };
 const BASE = sha("a");
@@ -37,7 +38,7 @@ function rebasing(replies: Reply[]) {
       }),
     ),
   ).pipe(Layer.provide(code.layer));
-  const layer = WorkspaceRebaserGitCore({ trunk: TRUNK }).pipe(Layer.provide(spied));
+  const layer = WorkspaceRebaserGitCore(() => TRUNK).pipe(Layer.provide(spied));
   const seeded = Effect.gen(function* () {
     const h = yield* CodeHost;
     yield* h.create(TRUNK);
@@ -46,7 +47,7 @@ function rebasing(replies: Reply[]) {
   /** The workspace's keel/trunk at a commit of its own: a trunk given by an earlier rebase. */
   const given = code.fixture.commit(WORKSPACE, KEEL_TRUNK_REF, { "README.md": "given\n" });
   const pushTo = (head: CommitSha) =>
-    Effect.flatMap(WorkspaceRebaser, (r) => r.pushTrunk(WORKSPACE, BASE, head)).pipe(
+    Effect.flatMap(WorkspaceRebaser, (r) => r.pushTrunk(PROJECT, WORKSPACE, BASE, head)).pipe(
       Effect.provide(layer),
     );
   return { server, minted, seeded, given, pushTo, push: pushTo(HEAD) };

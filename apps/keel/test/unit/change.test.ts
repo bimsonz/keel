@@ -143,6 +143,7 @@ describe("declare", () => {
           workspaceId: declared.grant.workspaceId,
           repo: declared.grant.repo,
           baseSha: BASE,
+          grantedSha: BASE,
           projectId: sampleProjectId,
         });
         expect(yield* types).toEqual(["IntentDeclared", "PreflightIssued", "ChangeStarted"]);

@@ -1,0 +1,29 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/rebase.test.ts -t rebase.decides-first
+# kills: rebase.decides-first
+# why: Trunk is pushed into the workspace before the domain decides, so a stale lease or a submitted change still rewrites keel/trunk
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index e3214e6..12b83af 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -756,6 +756,10 @@ export const rebaseChange: (
+   if (held === undefined || change.baseSha === undefined) return yield* refused(change, "rebase");
+   const from = change.baseSha;
+   const onto = yield* (yield* Trunks).head(held.projectId);
++  // A live change's own workspace repo always exists: its absence is a defect.
++  yield* (yield* WorkspaceRebaser)
++    .pushTrunk(held.projectId, held.repo, from, onto)
++    .pipe(Effect.catchTag("RepoNotFound", Effect.die));
+   const rebase: ChangeCommand = { _tag: "Rebase", leaseId: command.leaseId, from, onto };
+   const decided = decideChange(change, rebase, { now: yield* (yield* Clock).now, changeId });
+   if (Result.isFailure(decided)) {
+@@ -767,10 +771,6 @@ export const rebaseChange: (
+     );
+   }
+ 
+-  // A live change's own workspace repo always exists: its absence is a defect.
+-  yield* (yield* WorkspaceRebaser)
+-    .pushTrunk(held.projectId, held.repo, from, onto)
+-    .pipe(Effect.catchTag("RepoNotFound", Effect.die));
+   const committed = yield* commit(
+     {
+       entity: changeRef(changeId),

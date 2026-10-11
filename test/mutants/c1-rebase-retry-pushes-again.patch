@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/rebase.test.ts -t rebase.retry
+# kills: rebase.retry
+# why: A retried rebase is decided afresh on the moved base, so the agent's retry of a rebase that succeeded is refused
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index e3214e6..7c3530d 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -745,11 +745,6 @@ export const rebaseChange: (
+     change.baseSha === undefined
+       ? refused(change, "rebase")
+       : Effect.succeed({ change, ref: KEEL_TRUNK_REF, base: change.baseSha });
+-  const prior = (yield* EventOutbox).committed(changeRef(changeId), command.idempotencyKey);
+-  if (prior !== undefined)
+-    return yield* prior.fingerprint === fingerprint
+-      ? Effect.flatMap(getChange(changeId), answer)
+-      : Effect.fail(new IdempotencyConflict({ idempotencyKey: command.idempotencyKey }));
+ 
+   const change = yield* getChange(changeId);
+   const held = heldWorkspace(yield* EntityStore, changeId);

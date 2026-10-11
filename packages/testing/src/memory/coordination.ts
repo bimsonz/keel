@@ -429,6 +429,7 @@ export function makeChangesMemory(
               workspaceId,
               repo: { namespace: "memory", name: workspaceId },
               baseSha: MEMORY_BASE,
+              grantedSha: MEMORY_BASE,
               projectId: options.projectId ?? MEMORY_PROJECT,
             };
           }),

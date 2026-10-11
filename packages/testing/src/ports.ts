@@ -137,8 +137,9 @@ function memoryWorkspaceRebaserHarness(): WorkspaceRebaserHarness {
   const code = codeHost.makeCodeHostMemory();
   const trunk = code.fixture.scratch();
   return {
+    projectId: makeId("prj", "01KRBSRCNTRCT0000000000000"),
     trunk,
-    layer: Layer.mergeAll(code.layer, codeHost.makeWorkspaceRebaserMemory(code, trunk).layer),
+    layer: Layer.mergeAll(code.layer, codeHost.makeWorkspaceRebaserMemory(code, () => trunk).layer),
   };
 }
 
@@ -193,6 +194,7 @@ function memoryChangePrecheckHarness(): ChangePrecheckHarness {
           workspaceId: makeId("wsp", changeId.slice(4)),
           repo: { namespace: "keel-ws-00", name: `ws-${changeId.slice(4).toLowerCase()}` },
           baseSha: GENESIS,
+          grantedSha: GENESIS,
           projectId: freshId("prj"),
         };
         memory.submit(changeId, 1, workspace);

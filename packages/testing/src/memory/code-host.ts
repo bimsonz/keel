@@ -1,4 +1,5 @@
-import { CommitSha, Instant } from "@keeltown/core/kernel";
+import { projectRepos } from "@keeltown/core/application/integration";
+import { CommitSha, Instant, type ProjectId } from "@keeltown/core/kernel";
 import {
   CodeHost,
   type CommitInfo,
@@ -260,14 +261,15 @@ export function makeCodeHostMemory() {
 }
 
 /**
- * WorkspaceRebaser over a memory code host: trunk's objects are copied into
+ * WorkspaceRebaser over a memory code host: the project's trunk objects (its
+ * trunk found by `trunkOf`, `projectRepos` by default) are copied into
  * the workspace and its `keel/trunk` moved to the head, as the relay would
  * leave it. A ref already at the head is `unchanged`; a missing workspace is
  * `RepoNotFound`. `pushed` records each move in order.
  */
 export function makeWorkspaceRebaserMemory(
   code: Pick<ReturnType<typeof makeCodeHostMemory>, "repos">,
-  trunk: RepoRef,
+  trunkOf: (projectId: ProjectId) => RepoRef = (projectId) => projectRepos(projectId).trunk,
 ) {
   const pushed: { readonly workspace: RepoRef; readonly to: CommitSha }[] = [];
   return {
@@ -275,12 +277,13 @@ export function makeWorkspaceRebaserMemory(
     layer: Layer.succeed(
       WorkspaceRebaser,
       WorkspaceRebaser.of({
-        pushTrunk: (workspace, _base, head) =>
+        pushTrunk: (projectId, workspace, _base, head) =>
           Effect.suspend((): Effect.Effect<SyncOutcome, RepoNotFound> => {
             const target = code.repos.get(repoKey(workspace));
             if (target === undefined)
               return Effect.fail(new RepoNotFound({ repo: plain(workspace) }));
             if (target.refs.get(KEEL_TRUNK_REF) === head) return Effect.succeed("unchanged");
+            const trunk = trunkOf(projectId);
             const source = code.repos.get(repoKey(trunk));
             if (source?.objects.get(head)?.type !== "commit")
               return Effect.die(new Error(`trunk ${repoKey(trunk)} does not hold ${head}`));

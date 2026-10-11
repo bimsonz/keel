@@ -12,14 +12,16 @@ import type {
 import type { RepoRef } from "./code-host.ts";
 
 /**
- * Where Precheck diffs a change: its workspace's repo, the base it was granted
- * at (`WorkspaceGranted.baseSha`, so a mirror that lags trunk never loses the
- * base), and the project whose settings hold the protected globs.
+ * Where Precheck diffs a change: its workspace's repo, its base (the grant's
+ * until a rebase moves it), the commit it was granted at (`grantedSha`, its
+ * fork point, which never moves), and the project whose settings hold the
+ * protected globs.
  */
 export interface PrecheckWorkspace {
   readonly workspaceId: WorkspaceId;
   readonly repo: RepoRef;
   readonly baseSha: CommitSha;
+  readonly grantedSha: CommitSha;
   readonly projectId: ProjectId;
 }
 

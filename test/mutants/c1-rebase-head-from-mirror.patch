@@ -1,0 +1,26 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/rebase.test.ts -t "rebase.head-from-trunk|rebase.moves-base"
+# kills: rebase.head-from-trunk, rebase.moves-base
+# why: The rebase reads trunk's head from the mirror, which lags, so the change is rebased onto a trunk it already had and bounces again
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index e3214e6..80688fb 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -24,6 +24,7 @@ import {
+   type WithdrawAuthority,
+ } from "../../domain/coordination/index.ts";
+ import { IdempotencyConflict } from "../../domain/identity/index.ts";
++import { projectRepos } from "../integration/project-repos.ts";
+ import {
+   BatchFailed,
+   BatchFormed,
+@@ -755,7 +756,9 @@ export const rebaseChange: (
+   const held = heldWorkspace(yield* EntityStore, changeId);
+   if (held === undefined || change.baseSha === undefined) return yield* refused(change, "rebase");
+   const from = change.baseSha;
+-  const onto = yield* (yield* Trunks).head(held.projectId);
++  const onto = yield* (yield* CodeHost)
++    .head(projectRepos(held.projectId).mirror, "refs/heads/main")
++    .pipe(Effect.orDie);
+   const rebase: ChangeCommand = { _tag: "Rebase", leaseId: command.leaseId, from, onto };
+   const decided = decideChange(change, rebase, { now: yield* (yield* Clock).now, changeId });
+   if (Result.isFailure(decided)) {

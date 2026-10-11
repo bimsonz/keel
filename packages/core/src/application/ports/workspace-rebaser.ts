@@ -1,6 +1,6 @@
 import { Context, type Effect } from "effect";
 import type { PushRejected } from "../../domain/integration/index.ts";
-import type { CommitSha } from "../../domain/kernel/index.ts";
+import type { CommitSha, ProjectId } from "../../domain/kernel/index.ts";
 import type { RepoNotFound, RepoRef } from "./code-host.ts";
 import type { PackTooLarge, SyncOutcome } from "./trunk-writer.ts";
 
@@ -20,7 +20,7 @@ export class WorkspaceRebaser extends Context.Service<
   WorkspaceRebaser,
   {
     /**
-     * Relays trunk's `head` into the workspace's `KEEL_TRUNK_REF`, with the
+     * Relays `projectId`'s trunk at `head` into the workspace's `KEEL_TRUNK_REF`, with the
      * ref's current value (zero when it has none) as the explicit old value
      * and `base` (the change's base, which the workspace holds) among the
      * haves, so only what lies past it is sent. A ref already at `head` is
@@ -29,6 +29,7 @@ export class WorkspaceRebaser extends Context.Service<
      * busy. Nothing moved in either case.
      */
     readonly pushTrunk: (
+      projectId: ProjectId,
       workspace: RepoRef,
       base: CommitSha,
       head: CommitSha,

@@ -119,14 +119,16 @@ export const SubmissionStatus = Schema.Struct({
 });
 
 /**
- * Where Precheck diffs a change: its workspace repo, the base it was granted
- * at (`WorkspaceGranted.baseSha`, so a mirror that lags trunk never loses the
- * base), and the project whose settings hold `protectedPaths`.
+ * Where Precheck diffs a change: its workspace repo; its base (the change's
+ * own `baseSha`: the grant's until a rebase moves it); the commit it was
+ * granted at (`grantedSha`, its fork point, which never moves, so an ancestry
+ * walk can stop there); and the project whose settings hold `protectedPaths`.
  */
 export const ChangeWorkspace = Schema.Struct({
   workspaceId: WorkspaceId,
   repo: RepoRef,
   baseSha: CommitSha,
+  grantedSha: CommitSha,
   projectId: ProjectId,
 });
 export type ChangeWorkspace = typeof ChangeWorkspace.Type;
