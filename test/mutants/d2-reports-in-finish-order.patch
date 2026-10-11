@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-plan.test.ts
+# kills: run-plan.flow-order
+# why: Reports come back in the order runners finished, so a replay can order them differently
+diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
+index 5106de1..0fda715 100644
+--- a/packages/core/src/application/verification/run-plan.ts
++++ b/packages/core/src/application/verification/run-plan.ts
+@@ -267,7 +267,7 @@ export const runPlan = <R>(
+   };
+   return evaluate(s, runner, plan.flow, undefined, []).pipe(
+     Effect.map(() =>
+-      [...new Set(order(plan.flow, undefined))].flatMap((key) => {
++      [...s.reports.keys()].flatMap((key) => {
+         const report = s.reports.get(key);
+         return report === undefined ? [] : [report];
+       }),

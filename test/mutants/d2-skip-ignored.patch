@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-plan.test.ts
+# kills: run-plan.skips
+# why: A step an earlier result was allowed to skip runs anyway
+diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
+index 5106de1..6ebf4cd 100644
+--- a/packages/core/src/application/verification/run-plan.ts
++++ b/packages/core/src/application/verification/run-plan.ts
+@@ -159,7 +159,6 @@ const evaluate = <R>(
+       if (running !== undefined)
+         return Deferred.await(running).pipe(Effect.map((r) => valueOf(s, step, r)));
+       // Only optional steps can be skipped (coerce drops any other skip), and verdict/1 passes them.
+-      if (s.skipped.has(step.id)) return Effect.succeed(PASS);
+       const started = Deferred.makeUnsafe<StepResult>();
+       s.running.set(key, started);
+       const spent = accounts.some((a) => a.spentMs > a.limit.cpuMs);

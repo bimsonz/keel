@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-plan.test.ts
+# kills: run-plan.seq-stops
+# why: A seq keeps running after a blocking fail, spending containers on a change already bounced
+diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
+index 5106de1..48d8502 100644
+--- a/packages/core/src/application/verification/run-plan.ts
++++ b/packages/core/src/application/verification/run-plan.ts
+@@ -189,7 +189,6 @@ const evaluate = <R>(
+         for (const item of flow.items) {
+           const v = yield* evaluate(s, runner, item, world, accounts);
+           values.push(v);
+-          if (v.status === "fail" && v.overridable !== true) break;
+         }
+         return combine(values);
+       });

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-plan.test.ts
+# kills: run-plan.cascade-stops
+# why: A cascade runs every item even after one it accepts
+diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
+index 5106de1..e388b47 100644
+--- a/packages/core/src/application/verification/run-plan.ts
++++ b/packages/core/src/application/verification/run-plan.ts
+@@ -203,7 +203,6 @@ const evaluate = <R>(
+         for (const item of flow.items) {
+           const v = yield* evaluate(s, runner, item, world, accounts);
+           if (v.status === "pending") return v;
+-          if (flow.accept.includes(statusOutcome(v))) return v;
+         }
+         return { status: "escalate" } satisfies Value;
+       });

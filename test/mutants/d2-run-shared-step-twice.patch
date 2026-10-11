@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-plan.test.ts
+# kills: run-plan.shared-once
+# why: A step two union branches share runs once per branch, so a member suite runs twice
+diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
+index 5106de1..2fef50c 100644
+--- a/packages/core/src/application/verification/run-plan.ts
++++ b/packages/core/src/application/verification/run-plan.ts
+@@ -155,9 +155,6 @@ const evaluate = <R>(
+       const seen = s.results.get(key);
+       if (seen !== undefined) return Effect.succeed(valueOf(s, step, seen));
+       // A union shares steps between its members' branches: a step runs once, and every branch reads it.
+-      const running = s.running.get(key);
+-      if (running !== undefined)
+-        return Deferred.await(running).pipe(Effect.map((r) => valueOf(s, step, r)));
+       // Only optional steps can be skipped (coerce drops any other skip), and verdict/1 passes them.
+       if (s.skipped.has(step.id)) return Effect.succeed(PASS);
+       const started = Deferred.makeUnsafe<StepResult>();

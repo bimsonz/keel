@@ -68,5 +68,6 @@ export const getVerdict: (
 export * from "./packs.ts";
 export * from "./precheck.ts";
 export * from "./redact.ts";
+export * from "./run-plan.ts";
 export * from "./suite.ts";
 export * from "./verify-candidate.ts";

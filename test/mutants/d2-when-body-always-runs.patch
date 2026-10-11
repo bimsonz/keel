@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-plan.test.ts
+# kills: run-plan.when
+# why: A when runs its body whether or not its condition holds
+diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
+index 5106de1..615dba1 100644
+--- a/packages/core/src/application/verification/run-plan.ts
++++ b/packages/core/src/application/verification/run-plan.ts
+@@ -215,7 +215,7 @@ const evaluate = <R>(
+     case "when": {
+       const v = holds(s, flow.condition, world);
+       if (v === "unknown") return Effect.succeed(PENDING);
+-      return v ? evaluate(s, runner, flow.body, world, accounts) : Effect.succeed(PASS);
++      return evaluate(s, runner, flow.body, world, accounts);
+     }
+     default:
+       return evaluate(s, runner, flow.body, world, [
