@@ -3,6 +3,8 @@ import {
   Agent,
   AgentEvent,
   type AgentKind,
+  BOOTSTRAP_AGENT_ID,
+  BOOTSTRAP_CLIENT_ID,
   decideAgent,
   evolveAgent,
   IdempotencyConflict,
@@ -51,12 +53,20 @@ const asStored = (encoded: unknown): Stored => JSON.parse(JSON.stringify(encoded
  * the same key and body answers the same agent and writes the row again with
  * the replay's secret hash, which replaces the old one. A crash between the
  * commit and the row leaves the row to that retry.
+ *
+ * The bootstrap identity is never enrolled: its agent id or its client id is a
+ * defect, refused before anything is committed or written, on a replay too.
+ * The isolate derives neither, so only a bug or a forged call sends one.
  */
 export const enrol: (
   agentId: AgentId,
   command: EnrolAgent,
 ) => Effect.Effect<Agent, IdempotencyConflict, Clock | EntityStore | EventOutbox | AgentDirectory> =
   Effect.fn("identity/enrol")(function* (agentId: AgentId, command: EnrolAgent) {
+    if (agentId === BOOTSTRAP_AGENT_ID || command.clientId === BOOTSTRAP_CLIENT_ID)
+      return yield* Effect.die(
+        new Error(`the bootstrap identity is never enrolled (${agentId}, ${command.clientId})`),
+      );
     const committed = yield* commit(
       {
         entity: { kind: "agent", id: agentId },

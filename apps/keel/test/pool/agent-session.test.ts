@@ -1,8 +1,10 @@
+import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
+import { BOOTSTRAP_AGENT_ID, BOOTSTRAP_CLIENT_ID } from "@keeltown/core/domain/identity";
 import { type AgentId, type EntityRef, EventEnvelope, makeId } from "@keeltown/core/kernel";
 import { hashSecret, sampleProjectId } from "@keeltown/testing";
-import { Exit, Schema } from "effect";
+import { Cause, Exit, Schema } from "effect";
 import { ulid } from "ulid";
 import { AgentSessionCodecs, decodeExit } from "../../src/rpc/index.ts";
 import { drainAfter, exchange } from "./helpers.ts";
@@ -113,5 +115,35 @@ describe("enrolling an agent over RPC", () => {
     expect(replayed.agent).toEqual(first.agent);
     expect((await exchange(first)).status).toBe(401);
     expect((await exchange(replayed)).status).toBe(200);
+  });
+
+  it("[b11.enrol-bootstrap] refuses the bootstrap identity as a defect, committing nothing and writing no row", async () => {
+    const session = agentStub(BOOTSTRAP_AGENT_ID);
+    const enrolling = {
+      projectId: sampleProjectId,
+      name: "pool-agent",
+      kind: "interactive" as const,
+      scopes: ["operator" as const],
+      clientId: BOOTSTRAP_CLIENT_ID,
+      secretHash: await hashSecret("not-the-bootstrap-secret"),
+      idempotencyKey: "enrol-1",
+      fingerprint: "enrol-body",
+    };
+    const answers = [await session.enrol(enrolling), await session.enrol(enrolling)];
+
+    for (const answer of answers) {
+      const exit = decodeExit(AgentSessionCodecs.enrol, answer);
+      expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true);
+    }
+    const events = await runInDurableObject(session, (_instance, state) =>
+      state.storage.sql.exec("SELECT COUNT(*) AS n FROM keel_events").one(),
+    );
+    expect(events["n"]).toBe(0);
+    const rows = await env.DB.prepare(
+      "SELECT (SELECT COUNT(*) FROM agents WHERE id = ?) + (SELECT COUNT(*) FROM credentials WHERE client_id = ?) AS n",
+    )
+      .bind(BOOTSTRAP_AGENT_ID, BOOTSTRAP_CLIENT_ID)
+      .first<{ n: number }>();
+    expect(rows?.n).toBe(0);
   });
 });

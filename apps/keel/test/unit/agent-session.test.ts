@@ -6,6 +6,7 @@ import {
   RESERVATION_TTL_MS,
   reserveChange,
 } from "@keeltown/core/application/identity";
+import { BOOTSTRAP_AGENT_ID, BOOTSTRAP_CLIENT_ID } from "@keeltown/core/domain/identity";
 import { AgentId, EventEnvelope } from "@keeltown/core/kernel";
 import { EntityStore, EventOutbox } from "@keeltown/core/ports";
 import {
@@ -15,7 +16,7 @@ import {
   makeManualClock,
   sampleProjectId,
 } from "@keeltown/testing";
-import { Effect, Exit, Layer, Schema } from "effect";
+import { Cause, Effect, Exit, Layer, Schema } from "effect";
 
 const agentId = Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 
@@ -169,4 +170,58 @@ describe("enrol", () => {
       }).pipe(Effect.provide(layer));
     },
   );
+
+  describe("[b11.enrol-bootstrap] never enrols the bootstrap identity", () => {
+    const ordinary = enrolling("enrol-1", "body-1", "sha256:aa");
+    const cases = [
+      { name: "its agent id", enrolled: BOOTSTRAP_AGENT_ID, command: ordinary },
+      {
+        name: "its client id",
+        enrolled: agentId,
+        command: { ...ordinary, clientId: BOOTSTRAP_CLIENT_ID },
+      },
+    ];
+
+    for (const { name, enrolled, command } of cases)
+      it.effect(
+        `refuses ${name} as a defect before committing or writing the directory, on a replay too`,
+        () => {
+          const directory = makeAgentDirectoryMemory();
+          const layer = Layer.mergeAll(
+            makeEventOutboxMemory().layer,
+            makeManualClock().layer,
+            directory.layer,
+          );
+          return Effect.gen(function* () {
+            const first = yield* Effect.exit(enrol(enrolled, command));
+            const replayed = yield* Effect.exit(enrol(enrolled, command));
+
+            for (const exit of [first, replayed]) {
+              expect(Exit.isFailure(exit) && Cause.hasDies(exit.cause)).toBe(true);
+              expect(Exit.isFailure(exit) && Cause.pretty(exit.cause)).toContain(
+                "the bootstrap identity is never enrolled",
+              );
+            }
+            expect((yield* EventOutbox).log({ kind: "agent", id: enrolled })).toEqual([]);
+            expect((yield* EntityStore).get("agent", enrolled)).toBeUndefined();
+            expect([...directory.agents.keys(), ...directory.credentials.keys()]).toEqual([]);
+          }).pipe(Effect.provide(layer));
+        },
+      );
+
+    it.effect("enrols the same command under an ordinary id and client", () => {
+      const directory = makeAgentDirectoryMemory();
+      const layer = Layer.mergeAll(
+        makeEventOutboxMemory().layer,
+        makeManualClock().layer,
+        directory.layer,
+      );
+      return Effect.gen(function* () {
+        const agent = yield* enrol(agentId, ordinary);
+
+        expect(agent.id).toBe(agentId);
+        expect(directory.agents.get(agentId)).toEqual(agent);
+      }).pipe(Effect.provide(layer));
+    });
+  });
 });
