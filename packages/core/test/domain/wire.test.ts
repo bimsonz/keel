@@ -127,7 +127,7 @@ describe("the wire", () => {
     expect(decodesGuard(guardFailed(CANDIDATE))).toBe(false);
   });
 
-  it("[derivation.record-shape] a derived effect's method fixes its evidence class and probability: an extractor rules with no p, a decision model is opinion with p in [0, 1]", () => {
+  it("[derivation.record-shape] a derived effect's method fixes its evidence class and probability: an extractor rules and carries no p, a decision model is opinion with p in [0, 1]", () => {
     const decodesEffect = decodes(DerivedEffect);
     expect(decodesEffect(effect({ method: "extractor", evidenceClass: "ruling" }))).toBe(true);
     expect(decodesEffect(effect({ method: "clef", evidenceClass: "opinion", p: 0.603 }))).toBe(
@@ -136,7 +136,6 @@ describe("the wire", () => {
     expect(decodesEffect(effect({ method: "code-model", evidenceClass: "opinion" }))).toBe(true);
     const refused = [
       effect({ method: "extractor", evidenceClass: "proof" }),
-      effect({ method: "extractor", evidenceClass: "ruling", p: 0.9 }),
       effect({ method: "clef", evidenceClass: "opinion" }),
       effect({ method: "clef", evidenceClass: "ruling", p: 0.9 }),
       effect({ method: "clef", evidenceClass: "opinion", p: 1.2 }),
@@ -145,5 +144,10 @@ describe("the wire", () => {
       { ...effect({ method: "extractor", evidenceClass: "ruling" }), anchors: [] },
     ];
     expect(refused.filter(decodesEffect)).toEqual([]);
+    // An extractor has no probability: one given is dropped at decode, never carried.
+    const ruled = Schema.decodeUnknownSync(DerivedEffect)(
+      effect({ method: "extractor", evidenceClass: "ruling", p: 0.9 }),
+    );
+    expect(ruled).not.toHaveProperty("p");
   });
 });

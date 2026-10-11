@@ -19,7 +19,7 @@ namespace Keel;
 // `EventSubjectKey` and `EventNeighbour` (no length cap on a subject key),
 // `EventContradiction` (through the proposition), `EventPrecedentRef` (`decidedAt`
 // in epoch milliseconds, not a date-time), `EventNextAction` (a non-empty title,
-// no `notBefore`) and `EventDerivedEffect` (one shape, not MFP's three by method).
+// no `notBefore`) and `EventDerivedEffect` (Keel's derivation record, a union by method).
 
 // ─── Shared shapes ──────────────────────────────────────────────────────────
 
@@ -172,27 +172,64 @@ model EventPrecedentRef {
   scope?: string;
 }
 
-/** How an effect was found. An extractor's finding is proof; a model's is opinion. */
-union DerivationMethod {
-  extractor: "extractor",
-  clef: "clef",
-  codeModel: "code-model",
-}
-
-/** What a change alters, as Keel derived it from the diff. */
-model EventDerivedEffect {
+/** Found by a deterministic extractor: a ruling, never proof (an extractor executes nothing), with no probability. */
+model EventExtractedEffect {
   proposition: EventProposition;
-  method: DerivationMethod;
-  evidenceClass: MFP.EvidenceClass;
+  method: "extractor";
+  evidenceClass: "ruling";
 
-  /** The model's probability, when a model answered. */
-  p?: float64;
-
+  @minItems(1)
   anchors: EventAnchor[];
+
   declared: boolean;
 
   /** A premise or tenet this effect contradicts, by reference. */
   contradicts?: string;
+}
+
+/** Answered by a decision model: opinion, always with its probability. */
+model EventDecisionModelEffect {
+  proposition: EventProposition;
+  method: "clef";
+  evidenceClass: "opinion";
+
+  @minValue(0)
+  @maxValue(1)
+  p: float64;
+
+  @minItems(1)
+  anchors: EventAnchor[];
+
+  declared: boolean;
+
+  /** A premise or tenet this effect contradicts, by reference. */
+  contradicts?: string;
+}
+
+/** Proposed by a code model: opinion, with its probability when the model gave one. */
+model EventCodeModelEffect {
+  proposition: EventProposition;
+  method: "code-model";
+  evidenceClass: "opinion";
+
+  @minValue(0)
+  @maxValue(1)
+  p?: float64;
+
+  @minItems(1)
+  anchors: EventAnchor[];
+
+  declared: boolean;
+
+  /** A premise or tenet this effect contradicts, by reference. */
+  contradicts?: string;
+}
+
+/** What a change alters, as Keel derived it from the diff: the method fixes the evidence class and the probability. */
+union EventDerivedEffect {
+  extracted: EventExtractedEffect,
+  decisionModel: EventDecisionModelEffect,
+  codeModel: EventCodeModelEffect,
 }
 
 union DriftClass {
@@ -570,6 +607,32 @@ model ProbeRan {
   resultRef: string;
 }
 
+/** A project suite's cell in a conflict's world matrix: a fact of the conflict, which stays Probing. An n/a cell says why. */
+model WorldCheckRan {
+  _tag: "WorldCheckRan";
+  conflictId: ConflictId;
+  world: World;
+
+  @pattern("^suite:chg_[0-9A-HJKMNP-TV-Z]{26}$")
+  check: string;
+
+  @minValue(1)
+  @maxValue(3)
+  run: integer;
+
+  outcome: "pass" | "fail" | "n/a";
+  counts?: WorldCheckCounts;
+
+  @minLength(1)
+  reason?: string;
+}
+
+model WorldCheckCounts {
+  @minValue(0) passed: integer;
+  @minValue(0) failed: integer;
+  @minValue(0) skipped: integer;
+}
+
 model ProbeDiscarded {
   _tag: "ProbeDiscarded";
   probeId: ProbeId;
@@ -635,11 +698,13 @@ model GuardRetired {
   decisionId: DecisionId;
 }
 
+/** Against a batch's candidate at the Lane DO, or at Precheck against the change itself: a change, or a batch and its candidate. */
 model GuardFailed {
   _tag: "GuardFailed";
   guardId: GuardId;
-  batchId: BatchId;
-  candidateId: CandidateId;
+  batchId?: BatchId;
+  candidateId?: CandidateId;
+  changeId?: ChangeId;
   world: World;
 }
 
@@ -787,6 +852,10 @@ model TrunkAdvanced {
 
   /** False when any batch in the group was unverified; absent means every one was verified. */
   verified?: boolean;
+
+  /** Trunk's height after this advance: TrunkInitialized is height 0, and each advance adds 1. */
+  @minValue(1)
+  height?: integer;
 }
 
 model PromotionDeclined {
@@ -1090,6 +1159,7 @@ union KeelEvent {
   ConflictSuspected,
   ProbeDrafted,
   ProbeRan,
+  WorldCheckRan,
   ProbeDiscarded,
   ConflictProven,
   ConflictDismissed,

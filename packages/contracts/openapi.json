@@ -6570,15 +6570,6 @@
           "not": {}
         }
       },
-      "DerivationMethod": {
-        "type": "string",
-        "enum": [
-          "extractor",
-          "clef",
-          "code-model"
-        ],
-        "description": "How an effect was found. An extractor's finding is proof; a model's is opinion."
-      },
       "Drift": {
         "type": "object",
         "required": [
@@ -6985,6 +6976,57 @@
         ],
         "description": "What a claim rests on: a numbered session message, a code anchor, or an MFP record."
       },
+      "EventCodeModelEffect": {
+        "type": "object",
+        "required": [
+          "proposition",
+          "method",
+          "evidenceClass",
+          "anchors",
+          "declared"
+        ],
+        "properties": {
+          "proposition": {
+            "$ref": "#/components/schemas/EventProposition"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "code-model"
+            ]
+          },
+          "evidenceClass": {
+            "type": "string",
+            "enum": [
+              "opinion"
+            ]
+          },
+          "p": {
+            "type": "number",
+            "format": "double",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventAnchor"
+            },
+            "minItems": 1
+          },
+          "declared": {
+            "type": "boolean"
+          },
+          "contradicts": {
+            "type": "string",
+            "description": "A premise or tenet this effect contradicts, by reference."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Proposed by a code model: opinion, with its probability when the model gave one."
+      },
       "EventContradiction": {
         "type": "object",
         "required": [
@@ -7009,7 +7051,73 @@
         },
         "description": "A premise of this change that contradicts another change's premise, or a tenet."
       },
+      "EventDecisionModelEffect": {
+        "type": "object",
+        "required": [
+          "proposition",
+          "method",
+          "evidenceClass",
+          "p",
+          "anchors",
+          "declared"
+        ],
+        "properties": {
+          "proposition": {
+            "$ref": "#/components/schemas/EventProposition"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "clef"
+            ]
+          },
+          "evidenceClass": {
+            "type": "string",
+            "enum": [
+              "opinion"
+            ]
+          },
+          "p": {
+            "type": "number",
+            "format": "double",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventAnchor"
+            },
+            "minItems": 1
+          },
+          "declared": {
+            "type": "boolean"
+          },
+          "contradicts": {
+            "type": "string",
+            "description": "A premise or tenet this effect contradicts, by reference."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Answered by a decision model: opinion, always with its probability."
+      },
       "EventDerivedEffect": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/EventExtractedEffect"
+          },
+          {
+            "$ref": "#/components/schemas/EventDecisionModelEffect"
+          },
+          {
+            "$ref": "#/components/schemas/EventCodeModelEffect"
+          }
+        ],
+        "description": "What a change alters, as Keel derived it from the diff: the method fixes the evidence class and the probability."
+      },
+      "EventExtractedEffect": {
         "type": "object",
         "required": [
           "proposition",
@@ -7023,21 +7131,23 @@
             "$ref": "#/components/schemas/EventProposition"
           },
           "method": {
-            "$ref": "#/components/schemas/DerivationMethod"
+            "type": "string",
+            "enum": [
+              "extractor"
+            ]
           },
           "evidenceClass": {
-            "$ref": "#/components/schemas/MFP.EvidenceClass"
-          },
-          "p": {
-            "type": "number",
-            "format": "double",
-            "description": "The model's probability, when a model answered."
+            "type": "string",
+            "enum": [
+              "ruling"
+            ]
           },
           "anchors": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/EventAnchor"
-            }
+            },
+            "minItems": 1
           },
           "declared": {
             "type": "boolean"
@@ -7050,7 +7160,7 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "What a change alters, as Keel derived it from the diff."
+        "description": "Found by a deterministic extractor: a ruling, never proof (an extractor executes nothing), with no probability."
       },
       "EventId": {
         "type": "string",
@@ -7456,8 +7566,6 @@
         "required": [
           "_tag",
           "guardId",
-          "batchId",
-          "candidateId",
           "world"
         ],
         "properties": {
@@ -7476,13 +7584,17 @@
           "candidateId": {
             "$ref": "#/components/schemas/CandidateId"
           },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
           "world": {
             "$ref": "#/components/schemas/World"
           }
         },
         "additionalProperties": {
           "not": {}
-        }
+        },
+        "description": "Against a batch's candidate at the Lane DO, or at Precheck against the change itself: a change, or a batch and its candidate."
       },
       "GuardId": {
         "type": "string",
@@ -7890,6 +8002,9 @@
           },
           {
             "$ref": "#/components/schemas/ProbeRan"
+          },
+          {
+            "$ref": "#/components/schemas/WorldCheckRan"
           },
           {
             "$ref": "#/components/schemas/ProbeDiscarded"
@@ -12171,6 +12286,11 @@
           "verified": {
             "type": "boolean",
             "description": "False when any batch in the group was unverified; absent means every one was verified."
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Trunk's height after this advance: TrunkInitialized is height 0, and each advance adds 1."
           }
         },
         "additionalProperties": {
@@ -12769,6 +12889,84 @@
           "A-noop"
         ],
         "description": "One combination of changes evaluated together, or `A-noop`: the premise\nholder's world with the premised behaviour removed. A probe that passes there\ndoes not test the premise, so it is never admitted."
+      },
+      "WorldCheckCounts": {
+        "type": "object",
+        "required": [
+          "passed",
+          "failed",
+          "skipped"
+        ],
+        "properties": {
+          "passed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "skipped": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "WorldCheckRan": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "conflictId",
+          "world",
+          "check",
+          "run",
+          "outcome"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "WorldCheckRan"
+            ]
+          },
+          "conflictId": {
+            "$ref": "#/components/schemas/ConflictId"
+          },
+          "world": {
+            "$ref": "#/components/schemas/World"
+          },
+          "check": {
+            "type": "string",
+            "pattern": "^suite:chg_[0-9A-HJKMNP-TV-Z]{26}$"
+          },
+          "run": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "n/a"
+            ]
+          },
+          "counts": {
+            "$ref": "#/components/schemas/WorldCheckCounts"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A project suite's cell in a conflict's world matrix: a fact of the conflict, which stays Probing. An n/a cell says why."
       }
     },
     "securitySchemes": {

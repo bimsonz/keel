@@ -28,8 +28,6 @@ export const ExtractedEffect = Schema.Struct({
   ...derivedFields,
   method: Schema.Literal("extractor"),
   evidenceClass: Schema.Literal("ruling"),
-  /** An extractor has no probability to give. */
-  p: Schema.optional(Schema.Never),
 });
 /** Answered by a decision model: opinion, always with its probability. */
 export const DecisionModelEffect = Schema.Struct({
