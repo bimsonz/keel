@@ -729,9 +729,8 @@ const passUnverified = Effect.fn("integration/passUnverified")(function* (
 
 /**
  * Follows one trunk advance: a green batch whose members it landed is
- * Promoted, then staging main moves `from → to`. A staging that moved some
- * other way, or a pack too large to relay, is logged and left: the next batch
- * forms on whatever staging holds, and a lagging base is the Trunk's restack.
+ * Promoted. Staging is left where it is: `stagingOnTrunk`, staging's one
+ * mover, takes it to the head the lane heard before the next batch forms.
  */
 const followTrunk = Effect.fn("integration/followTrunk")(function* (
   lane: Lane,
@@ -744,17 +743,6 @@ const followTrunk = Effect.fn("integration/followTrunk")(function* (
       moves: [{ command: { _tag: "Promote", trunkSha: advance.to } }],
       lane: () => ({ ...withoutInfra(now, batch.members), active: undefined }),
     })).pipe(Effect.orDie);
-  const moved = yield* Effect.result((yield* StagingWriter).fastForward(advance.from, advance.to));
-  if (Result.isFailure(moved)) {
-    const failure = moved.failure;
-    if (failure._tag === "PushRejected" && failure.reason === "busy") {
-      yield* Effect.die(new Error(`staging stayed busy following ${advance.to}`));
-      return;
-    }
-    yield* Effect.logWarning(
-      `lane ${lane.laneId} left staging behind trunk ${advance.to}: ${failure._tag}`,
-    );
-  }
   yield* noteLane(lane, `followed:${advance.from}..${advance.to}`, (now) => ({
     ...now,
     advances: now.advances.filter((a) => a.from !== advance.from || a.to !== advance.to),

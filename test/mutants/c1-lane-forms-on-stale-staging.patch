@@ -1,8 +1,8 @@
-# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.forms-on-trunk-head|lane.no-form-off-trunk"
-# kills: lane.forms-on-trunk-head, lane.no-form-off-trunk
-# why: The lane forms on whatever staging holds, so a staging left behind trunk makes every batch one trunk will decline
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.forms-on-trunk-head|lane.no-form-off-trunk|lane.staging-ff"
+# kills: lane.forms-on-trunk-head, lane.no-form-off-trunk, lane.staging-ff
+# why: Staging never moves to the trunk head the lane heard, so every batch after an advance forms on a base trunk will decline
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 12b2f86..f60ee7d 100644
+index fbfdabd..dbcd179 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
 @@ -387,7 +387,7 @@ const stagingOnTrunk = (lane: Lane) =>
@@ -10,7 +10,7 @@ index 12b2f86..f60ee7d 100644
      const head = yield* (yield* CodeHost).head(staging, MAIN).pipe(Effect.orDie);
      const trunk = lane.trunkHead;
 -    if (trunk === undefined || head === trunk) return head;
-+    if (trunk !== undefined || head === trunk) return head;
++    if (trunk === undefined || head.length > 0) return head;
      const moved = yield* Effect.result((yield* StagingWriter).fastForward(head, trunk));
      if (Result.isFailure(moved))
        return yield* Effect.die(

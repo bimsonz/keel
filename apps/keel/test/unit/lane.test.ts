@@ -643,12 +643,12 @@ describe("the Lane", () => {
   );
 
   it.effect(
-    "[lane.forms-on-trunk-head] a staging that failed to follow trunk is moved to trunk's head before the next batch forms on it",
+    "[lane.forms-on-trunk-head] a staging off the trunk head the lane heard is moved there from wherever it is before the next batch forms on it",
     () => {
       const w = world();
       return Effect.gen(function* () {
         const base = yield* w.seeded;
-        // Staging moved some other way, so following trunk's advance from `base` fails.
+        // Staging moved some other way: the move starts from where it is, not from the advance's `from`.
         const elsewhere = yield* w.code.fixture.commit(STAGING, MAIN, { "README.md": "other\n" });
         const landed = sha("e");
         yield* advance(base, landed, []);
@@ -678,7 +678,7 @@ describe("the Lane", () => {
   );
 
   it.effect(
-    "[lane.staging-ff] trunk's advance promotes the green batch and moves staging after it, so the next batch forms on the new head",
+    "[lane.staging-ff] trunk's advance promotes the green batch, and the next batch moves staging onto the new head before forming on it",
     () => {
       const w = world();
       return Effect.gen(function* () {
