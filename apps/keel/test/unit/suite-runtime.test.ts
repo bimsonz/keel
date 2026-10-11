@@ -139,8 +139,23 @@ describe("the Tier 2 suite runtime", () => {
     }),
   );
 
+  it.effect("fails a red run with no credential in it, and keeps a clean scan as evidence", () =>
+    Effect.gen(function* () {
+      const stdout = yield* Effect.promise(() => suiteStdout(5, 2));
+      const rt = runtime(stdoutRunner(stdout));
+      const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(job())).pipe(
+        Effect.provide(rt.layer),
+      );
+      expect(result?.outcome).toBe("fail");
+      const [stored] = [...rt.store.documents.values()];
+      expect(JSON.parse(String(stored))).toMatchObject({
+        credentialScan: { token: 0, expiry: 0, remote: 0, host: 0, literal: 0 },
+      });
+    }),
+  );
+
   it.effect(
-    "fails a red run, and stores evidence with every token and the account id redacted",
+    "[runner.credential-scan] abstains on a run whose raw output holds a credential, keeping only counts and redacted evidence",
     () =>
       Effect.gen(function* () {
         const stdout = yield* Effect.promise(() =>
@@ -150,13 +165,54 @@ describe("the Tier 2 suite runtime", () => {
         const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(job())).pipe(
           Effect.provide(rt.layer),
         );
-        expect(result?.outcome).toBe("fail");
-        const stored = JSON.stringify([...rt.store.documents.values()]);
+        expect(result?.outcome).toBe("abstain");
+        const [document] = [...rt.store.documents.values()];
+        const stored = String(document);
+        expect(JSON.parse(stored)).toMatchObject({
+          outcome: "abstain",
+          why: expect.stringMatching(/^credential-leak: /),
+          credentialScan: { remote: 1 },
+        });
+        const { credentialScan: scan } = Schema.decodeUnknownSync(
+          Schema.Struct({
+            credentialScan: Schema.Struct({ token: Schema.Number, literal: Schema.Number }),
+          }),
+        )(JSON.parse(stored));
+        // The tail's token and each failing test's message (2 tests): in the decoded tail and report.
+        expect(scan.token).toBeGreaterThanOrEqual(3);
+        expect(scan.literal).toBeGreaterThanOrEqual(3);
         expect(stored).toContain("test/sessions.test.ts");
         expect(stored).not.toContain("/workspace/");
         expect(stored).not.toMatch(/art_v\d+_|artifacts\.cloudflare\.net/);
         expect(stored).not.toContain(ACCOUNT);
         expect(stored).toContain("[REDACTED");
+      }),
+  );
+
+  it.effect(
+    "[runner.credential-scan] catches the staging canary's thrown dump: two token-shaped strings, two expiries, no account id",
+    () =>
+      Effect.gen(function* () {
+        const dump = [
+          "== exec env ==",
+          "HOME=/root",
+          "== planted child environ ==",
+          "KEEL_CANARY_ENV=art_v2_x_KEELCANARYenvenvenvenv?expires=1760140800",
+          "== canary ==",
+          "art_v1_KEELCANARYd1d1d1d1d1d1d1d1d1d1?expires=1760140800",
+        ].join("\n");
+        const stdout = yield* Effect.promise(() =>
+          suiteStdout(1, 1, { tail: "1 failed", message: `Error: ${dump}` }),
+        );
+        const rt = runtime(stdoutRunner(stdout));
+        const [result] = yield* Effect.flatMap(VerifierRuntime, (v) => v.run(job())).pipe(
+          Effect.provide(rt.layer),
+        );
+        expect(result?.outcome).toBe("abstain");
+        const [document] = [...rt.store.documents.values()];
+        expect(JSON.parse(String(document))).toMatchObject({
+          credentialScan: { token: 2, expiry: 2, remote: 0, host: 0, literal: 0 },
+        });
       }),
   );
 
@@ -180,10 +236,10 @@ describe("the Tier 2 suite runtime", () => {
   );
 
   it.effect(
-    "[suite.diagnosis-kept] abstains on a failed hydration, keeping the runner's diagnosis, redacted, in the evidence",
+    "[suite.diagnosis-kept] abstains on a failed hydration, keeping the runner's diagnosis in the evidence",
     () =>
       Effect.gen(function* () {
-        const diagnosis = `entry 7 src/app.ts missing\nrefetch curl 0 http 200 ${TOKEN}\n`;
+        const diagnosis = "entry 7 src/app.ts missing\nrefetch curl 0 http 200\n";
         const stdout = [
           SUITE_PROTOCOL,
           `KEEL_HYDRATION_DIFF ${Buffer.from(diagnosis).toString("base64")}`,
@@ -199,11 +255,8 @@ describe("the Tier 2 suite runtime", () => {
         const [stored] = [...rt.store.documents.values()];
         expect(JSON.parse(String(stored))).toMatchObject({
           why: "hydration-failed: hash-mismatch",
-          diagnosis: expect.stringContaining(
-            "entry 7 src/app.ts missing\nrefetch curl 0 http 200 ",
-          ),
+          diagnosis,
         });
-        expect(JSON.stringify(stored)).not.toMatch(/art_v\d+_/);
       }),
   );
 

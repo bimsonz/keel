@@ -1,6 +1,7 @@
 import { Option, Schema } from "effect";
 import type { ContentHash } from "../../domain/kernel/index.ts";
 import type { InfraFailure, PlanStep, StepResult } from "../../domain/verification/index.ts";
+import { type CredentialScan, leaked } from "./redact.ts";
 
 /**
  * A project suite run in Tier 2, as its runner reports it on stdout. The suite
@@ -133,6 +134,8 @@ export interface SuiteEvidence {
   readonly tail: string;
   /** Why the workspace did not hydrate, as the runner diagnosed it. */
   readonly diagnosis?: string;
+  /** What a scan of the runner's raw output found, as counts only. */
+  readonly credentialScan?: CredentialScan;
 }
 
 /** How many failing tests the evidence names. The full report stays countable from `totals`. */
@@ -172,9 +175,38 @@ export interface SuiteJudgement {
  * The doorway decodes what the runner encoded: `report` is the report's JSON
  * (undefined when there was none, or it would not decode), `tail` the console
  * tail as text, and `diagnosis` a failed hydration's diagnosis as text.
- * `resultRef` is set once the evidence is stored.
+ * `credentialScan` is its scan of all of that, raw: any hit abstains as
+ * `credential-leak`, whatever the tests did, and the counts are kept in the
+ * evidence either way. `resultRef` is set once the evidence is stored.
  */
 export const judgeSuite = (
+  step: PlanStep,
+  output: SuiteOutput,
+  decoded: {
+    readonly report: unknown;
+    readonly tail: string;
+    readonly diagnosis?: string;
+    readonly credentialScan?: CredentialScan;
+  },
+  resultRef?: ContentHash,
+): SuiteJudgement => {
+  const scan = decoded.credentialScan;
+  const judged = judgeRun(step, output, decoded, resultRef);
+  if (scan === undefined) return judged;
+  if (!leaked(scan)) return { ...judged, evidence: { ...judged.evidence, credentialScan: scan } };
+  const { failure: _failure, ...report } = judged.report;
+  return {
+    report: { ...report, outcome: "abstain", failure: "schema" },
+    evidence: {
+      ...judged.evidence,
+      outcome: "abstain",
+      why: `credential-leak: the runner's output held ${scan.token} token-shaped strings, ${scan.expiry} expiries, ${scan.remote} remotes, ${scan.host} hosts and ${scan.literal} known secrets`,
+      credentialScan: scan,
+    },
+  };
+};
+
+const judgeRun = (
   step: PlanStep,
   output: SuiteOutput,
   decoded: { readonly report: unknown; readonly tail: string; readonly diagnosis?: string },

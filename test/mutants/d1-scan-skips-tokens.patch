@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/redact.test.ts
+# kills: redact.scan-finds
+# why: The credential scan never counts tokens, so a bare art_v1_ token without an expiry scans clean
+diff --git a/packages/core/src/application/verification/redact.ts b/packages/core/src/application/verification/redact.ts
+index 28801ba..a17332b 100644
+--- a/packages/core/src/application/verification/redact.ts
++++ b/packages/core/src/application/verification/redact.ts
+@@ -50,7 +50,7 @@ export const scanCredentials = (
+   texts: readonly string[],
+   options: RedactOptions = {},
+ ): CredentialScan => ({
+-  token: count(texts, TOKEN),
++  token: 0,
+   expiry: count(texts, EXPIRES),
+   remote: count(texts, REMOTE),
+   host: count(texts, HOST),

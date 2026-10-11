@@ -23,6 +23,49 @@ export interface RedactOptions {
   readonly literals?: readonly string[];
 }
 
+/**
+ * How many credential-shaped strings a runner's raw output held, per pattern,
+ * counting every occurrence. A runner holds no credential, so any count above
+ * zero means one reached it: the step abstains (`credential-leak`), and only
+ * these counts, never the matches, are kept as evidence.
+ */
+export type CredentialScan = {
+  /** `art_v<n>_…` tokens. */
+  readonly token: number;
+  /** `expires=` parameters, the tail of a token URL. */
+  readonly expiry: number;
+  /** Artifacts remotes (`<scheme>://…artifacts.cloudflare.net…`). */
+  readonly remote: number;
+  /** Artifacts hosts, which carry the account id. */
+  readonly host: number;
+  /** The caller's literal secrets, such as the account id. */
+  readonly literal: number;
+};
+
+const count = (texts: readonly string[], pattern: RegExp): number =>
+  texts.reduce((n, text) => n + (text.match(pattern)?.length ?? 0), 0);
+
+/** Scans raw text with redaction's own patterns, before anything is redacted or written. */
+export const scanCredentials = (
+  texts: readonly string[],
+  options: RedactOptions = {},
+): CredentialScan => ({
+  token: count(texts, TOKEN),
+  expiry: count(texts, EXPIRES),
+  remote: count(texts, REMOTE),
+  host: count(texts, HOST),
+  literal: (options.literals ?? [])
+    .filter((literal) => literal.length >= MIN_LITERAL)
+    .reduce(
+      (n, literal) => n + texts.reduce((m, text) => m + text.split(literal).length - 1, 0),
+      0,
+    ),
+});
+
+/** Whether a scan found anything at all. */
+export const leaked = (scan: CredentialScan): boolean =>
+  scan.token + scan.expiry + scan.remote + scan.host + scan.literal > 0;
+
 export const redact = (text: string, options: RedactOptions = {}): string => {
   let out = text;
   for (const literal of options.literals ?? []) {

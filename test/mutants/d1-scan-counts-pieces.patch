@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/redact.test.ts
+# kills: redact.scan-clean
+# why: The scan counts the pieces around a literal instead of its occurrences, so clean output reads as a leak
+diff --git a/packages/core/src/application/verification/redact.ts b/packages/core/src/application/verification/redact.ts
+index 28801ba..5defbf1 100644
+--- a/packages/core/src/application/verification/redact.ts
++++ b/packages/core/src/application/verification/redact.ts
+@@ -57,7 +57,7 @@ export const scanCredentials = (
+   literal: (options.literals ?? [])
+     .filter((literal) => literal.length >= MIN_LITERAL)
+     .reduce(
+-      (n, literal) => n + texts.reduce((m, text) => m + text.split(literal).length - 1, 0),
++      (n, literal) => n + texts.reduce((m, text) => m + text.split(literal).length, 0),
+       0,
+     ),
+ });

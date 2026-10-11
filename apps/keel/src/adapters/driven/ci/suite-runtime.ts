@@ -3,6 +3,7 @@ import {
   judgeSuite,
   parseSuiteOutput,
   redact,
+  scanCredentials,
   SUITE_PROTOCOL,
   type SuiteJudgement,
 } from "@keeltown/core/application/verification";
@@ -108,19 +109,26 @@ export type Durable = (
 const bytesOf = (b64: string): Uint8Array => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 const textOf = (b64: string): string => new TextDecoder().decode(bytesOf(b64));
 
-const gunzipJson = (b64: string | undefined): Effect.Effect<unknown> =>
+const gunzipText = (b64: string | undefined): Effect.Effect<string | undefined> =>
   b64 === undefined
     ? Effect.succeed(undefined)
     : Effect.promise(async () => {
         try {
           const stream = new Blob([bytesOf(b64).slice()]).stream();
-          return JSON.parse(
-            await new Response(stream.pipeThrough(new DecompressionStream("gzip"))).text(),
-          ) as unknown;
+          return await new Response(stream.pipeThrough(new DecompressionStream("gzip"))).text();
         } catch {
           return undefined;
         }
       });
+
+const parseJson = (text: string | undefined): unknown => {
+  if (text === undefined) return undefined;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+};
 
 const redactJson = (value: Json, literals: readonly string[]): Json => {
   if (typeof value === "string") return redact(value, { literals });
@@ -132,8 +140,9 @@ const redactJson = (value: Json, literals: readonly string[]): Json => {
 
 /**
  * Reads one runner's stdout into a judgement: parse the in-band report, decode
- * what the runner encoded, judge it, and redact the evidence so it is safe to
- * store. Pure but for decompression.
+ * what the runner encoded, scan all of it raw for credentials (any hit
+ * abstains, and only the counts are kept), judge it, and redact the evidence
+ * so it is safe to store. Pure but for decompression.
  */
 export const judgeRunnerOutput = (
   step: PlanStep,
@@ -142,13 +151,18 @@ export const judgeRunnerOutput = (
 ): Effect.Effect<SuiteJudgement & { readonly document: Json }> =>
   Effect.gen(function* () {
     const output = parseSuiteOutput(stdout);
-    const decoded =
+    const reportText = output._tag === "ran" ? yield* gunzipText(output.report) : undefined;
+    const decoded: { report: unknown; tail: string; diagnosis?: string } =
       output._tag === "ran"
-        ? { report: yield* gunzipJson(output.report), tail: textOf(output.tail) }
+        ? { report: parseJson(reportText), tail: textOf(output.tail) }
         : output._tag === "hydration-failed" && output.diagnosis !== undefined
           ? { report: undefined, tail: "", diagnosis: textOf(output.diagnosis) }
           : { report: undefined, tail: "" };
-    const judged = judgeSuite(step, output, decoded);
+    const credentialScan = scanCredentials(
+      [stdout, decoded.tail, reportText ?? "", decoded.diagnosis ?? ""],
+      { literals },
+    );
+    const judged = judgeSuite(step, output, { ...decoded, credentialScan });
     // vitest names files absolutely; cite them relative to the candidate's root.
     const evidence = {
       ...judged.evidence,

@@ -39,10 +39,10 @@ const replaceIn = (files: BundleFile[], path: string, from: string, to: string):
     return { ...f, bytes: enc.encode(text.replace(from, to)) };
   });
 
-/** A test that fails on purpose so vitest keeps its output: the env, PID 1's environ, a planted env and the canary. */
+/** A test that fails on purpose with the env, PID 1's environ, a planted env and the canary as its error, so the report keeps them. */
 const CANARY_TEST = `import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { expect, it } from "vitest";
+import { it } from "vitest";
 
 it("dumps the runner's environment for the credential proof", () => {
   const environ = (path: string) => readFileSync(path, "utf8").split("\\0").filter(Boolean).join("\\n");
@@ -56,7 +56,8 @@ it("dumps the runner's environment for the credential proof", () => {
     "== planted child environ ==", planted,
     "== canary ==", ${JSON.stringify(CANARY_TOKEN)},
   ].join("\\n");
-  expect(dump).toBe("no dump: this test fails on purpose so its output is kept");
+  // Thrown whole, so the report carries the dump uncut (an expect would elide it).
+  throw new Error(dump);
 });
 `;
 

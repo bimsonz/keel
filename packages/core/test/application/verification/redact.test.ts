@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { redact } from "../../../src/application/verification/index.ts";
+import { leaked, redact, scanCredentials } from "../../../src/application/verification/index.ts";
 import { fc } from "../../support/fast-check.ts";
 
 const TOKEN_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.~+/=-";
@@ -83,5 +83,48 @@ describe("redaction", () => {
     expect(redact(`art_v1_AAAAAAAAhttps://${host}/git/keel-core/r.git`)).toBe(
       "[REDACTED:token]://[REDACTED:host]/git/keel-core/r.git",
     );
+  });
+});
+
+describe("scanning raw output for credentials", () => {
+  it("[redact.scan-finds] counts every credential redaction would remove, before anything is written", () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.tuple(noise, secret), { minLength: 1, maxLength: 4 }),
+        noise,
+        hex(32),
+        (parts, end, account) => {
+          const text = parts.map(([n, s]) => `${n}${s}`).join("") + end;
+          const scan = scanCredentials([text, `and ${account}`], { literals: [account] });
+          expect(leaked(scan)).toBe(true);
+          expect(scan.literal).toBeGreaterThanOrEqual(1);
+          // Each secret registers on its own; glued together, two tokens may count as one.
+          for (const [n, secretText] of parts)
+            expect(leaked(scanCredentials([`${n}${secretText}${end}`]))).toBe(true);
+        },
+      ),
+    );
+  });
+
+  it("[redact.scan-clean] finds nothing in text without a credential shape", () => {
+    fc.assert(
+      fc.property(fc.array(noise, { maxLength: 3 }), hex(32), (texts, account) => {
+        fc.pre(texts.every((t) => !t.includes(account)));
+        const scan = scanCredentials(texts, { literals: [account] });
+        expect(scan).toEqual({ token: 0, expiry: 0, remote: 0, host: 0, literal: 0 });
+        expect(leaked(scan)).toBe(false);
+      }),
+    );
+  });
+
+  it("counts each occurrence, across every text", () => {
+    const canary = "art_v1_KEELCANARYd1d1d1d1?expires=1760140800";
+    expect(scanCredentials([`${canary} ${canary}`, `env=${canary}`])).toEqual({
+      token: 3,
+      expiry: 3,
+      remote: 0,
+      host: 0,
+      literal: 0,
+    });
   });
 });

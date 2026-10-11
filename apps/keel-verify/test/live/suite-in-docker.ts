@@ -73,6 +73,7 @@ const run = async (which: Case) => {
       failing: e.failing.slice(0, 3).map((f) => `${f.file} > ${f.test ?? "(file)"}`),
       failingCount: e.failing.length,
       ...(e.diagnosis === undefined ? {} : { diagnosis: e.diagnosis.split("\n") }),
+      credentialScan: e.credentialScan ?? null,
     }),
   );
 };

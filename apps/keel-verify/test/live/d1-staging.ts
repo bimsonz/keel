@@ -6,7 +6,8 @@
 //     upload                         build base, red and canary bundles and put them in R2
 //     run <variant> <instance-id>    start one KeelVerify run and print its verdict and timings
 //     show <instance-id>...          print a run's verdict and timings again
-//     grep <instance-id>...          grep each instance's persisted output, decoded, for credentials
+//     grep <instance-id>...          grep each instance's persisted output, decoded, for credentials,
+//                                    and print the in-Worker credential scan its evidence records
 //     series <n> <prefix>            n sequential base runs, then the timing distribution
 //
 // There is no Lane DO answering recordVerdict yet, so each run's
@@ -213,6 +214,22 @@ const evidenceOf = (d: { steps: Step[] }) => {
   );
 };
 
+const Scanned = Schema.Struct({
+  outcome: Schema.String,
+  why: Schema.String,
+  credentialScan: Schema.optional(Schema.Record(Schema.String, Schema.Number)),
+});
+
+/** What KeelVerify's in-Worker scan of the raw runner output found, as the evidence records it. */
+const scanOf = (evidence: string) => {
+  try {
+    const e = Schema.decodeUnknownOption(Scanned)(JSON.parse(evidence));
+    return Option.isSome(e) ? e.value : null;
+  } catch {
+    return null;
+  }
+};
+
 /** A distribution of durations, in milliseconds. */
 const dist = (xs: number[]) => {
   const s = xs.toSorted((a, b) => a - b);
@@ -238,12 +255,14 @@ else if (command === "show")
 else if (command === "grep")
   for (const id of args) {
     const d = describe(id);
+    const evidence = evidenceOf(d);
     console.log(
       JSON.stringify(
         {
           id,
           persisted: grep(persisted(d)),
-          evidence: grep(evidenceOf(d)),
+          evidence: grep(evidence),
+          scan: scanOf(evidence),
           planted: { token: CANARY_TOKEN, env: CANARY_ENV },
         },
         null,
