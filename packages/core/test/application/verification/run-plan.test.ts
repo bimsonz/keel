@@ -178,6 +178,16 @@ describe("run-plan: the compiled plan's flow, executed", () => {
         expect(verdictOn(plan, ran)).toEqual(verdictOn(plan, await runAll(plan, runner)));
       }),
     );
+    // The rare shape, pinned: an advised guard's fail ahead of a failing step; the run must reach the bounce.
+    const steps = [
+      proofStep("g", { guards: { predicate: "freshness", probe: probeOf("g") } }),
+      proofStep("b"),
+    ];
+    const plan = guardPlan(steps, seq(leaf("g"), leaf("b")), "advise");
+    const failing = recording((s, w) => report(s, w, "fail")).runner;
+    const ran = verdictOn(plan, await run(plan, failing));
+    expect(ran.outcome).toBe("bounce");
+    expect(ran).toEqual(verdictOn(plan, await runAll(plan, failing)));
   });
 
   it("[run-plan.guard-advised] a seq goes on past an advised or annotated guard's fail, and stops at a blocked one", async () => {

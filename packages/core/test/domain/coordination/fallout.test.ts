@@ -150,6 +150,14 @@ describe("fallout", () => {
     );
     const decoy = fallout(changeIds[1]!, cacheEffect("per-request", false), [premiseA], []);
     expect(decoy.map((f) => f._tag)).toEqual(["suspect"]);
+    // The rare branch, pinned: an effect on a descendant refines a premise on its ancestor.
+    const broad: HeldPremise = {
+      ...premiseA,
+      proposition: { ...premiseA.proposition, subject: key("authz") },
+    };
+    const perCall = cacheEffect("per-call", false);
+    expect(compare(broad.proposition, perCall.proposition).outcome).toBe("refines");
+    expect(fallout(changeIds[1]!, perCall, [broad], []).map((f) => f._tag)).toEqual(["suspect"]);
   });
 
   it("[fallout.should-premise-only-suspect] contradicting a should premise is suspect, never a conflict", () => {
