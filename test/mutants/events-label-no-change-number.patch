@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/event-catalogue.test.ts -t events.envelope
+# kills: events.envelope
+# why: the published label refuses a change's #n
+# regen
+diff --git a/packages/spec/inbox.tsp b/packages/spec/inbox.tsp
+index f2a8895..02d886e 100644
+--- a/packages/spec/inbox.tsp
++++ b/packages/spec/inbox.tsp
+@@ -26,7 +26,7 @@ scalar EventActor extends string;
+  * `D-n` decisions, `G-n` guards, `C-n` conflicts, `E-n` escalations, `P-n`
+  * probes, and `#n` changes.
+  */
+-@pattern("^([DGCEP]-[1-9][0-9]*|#[1-9][0-9]*)$")
++@pattern("^[DGCEP]-[1-9][0-9]*$")
+ scalar EventLabel extends string;
+ 
+ /** One entry of the operation log, as published. */
