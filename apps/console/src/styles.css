@@ -1,0 +1,32 @@
+@source "../node_modules/@cloudflare/kumo/dist/**/*.{js,jsx,ts,tsx}";
+@import "@cloudflare/kumo/styles/tailwind";
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-kumo-canvas);
+  color: var(--text-color-kumo-default);
+}
+
+/*
+ * Roles every direction shares. A direction may restate a value for its own
+ * surfaces, but never the meaning: see docs/brief.md, "Encodings".
+ */
+:root {
+  /* A person is being asked something. Reserved: nothing else is this colour. */
+  --mc-needs-person: #f6821f;
+  --mc-pass: var(--color-kumo-success);
+  --mc-fail: var(--color-kumo-danger);
+  /* Kumo's warning is orange, the same hue as needs-a-person, so suspected is a yellow of its own. */
+  --mc-suspected: light-dark(oklch(72% 0.15 90), oklch(82% 0.16 92));
+  /* Orange is 2.6:1 on white: fine for marks, too weak for text. */
+  --mc-needs-person-ink: light-dark(oklch(52% 0.15 50), #f6821f);
+  /* n/a is neutral ink. It is never the pass colour. */
+  --mc-na: var(--text-color-kumo-inactive);
+}

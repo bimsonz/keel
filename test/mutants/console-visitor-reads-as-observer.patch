@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:console apps/console/test/unit/worker/handler.test.ts apps/console/test/pool/console.test.ts
+# kills: handler.anonymous, console.anonymous
+# why: the Worker adds the observer's token to a visitor's read, so anyone reads every private project
+diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
+index 6ffe5c9..e7cd913 100644
+--- a/apps/console/src/worker/handler.ts
++++ b/apps/console/src/worker/handler.ts
+@@ -191,7 +191,7 @@ export function createConsole(now: () => number = Date.now): Console {
+     // Nothing of the browser's request crosses but its query: not its headers, not its cookies. A visitor's
+     // read carries no token, so Keel answers it as it answers anyone: for a public project, and no other.
+     const response =
+-      from === "presenter"
++      from !== "refused"
+         ? await asKeel(
+             env,
+             "observer",

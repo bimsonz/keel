@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/projects.test.ts
+# kills: player.unread
+# why: one entry of Keel's log that cannot be folded stops the console, where it should be left out and counted
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index 6f3c4f1..db88597 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -138,7 +138,7 @@ export class Player {
+    * being shown. A fixture's log is this console's own, so a fault folding one is a fault here, and is thrown.
+    */
+   #fold(event: AnyEvent, at: number): void {
+-    if (!this.live) {
++    if (this.live) {
+       this.world.apply(event, at);
+       return;
+     }

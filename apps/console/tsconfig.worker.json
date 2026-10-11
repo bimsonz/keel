@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // The Worker as workerd runs it: no DOM, and Env as wrangler generates it.
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["./worker-configuration.d.ts", "@cloudflare/vitest-plugin/types"]
+  },
+  "include": ["src/worker", "test/pool", "vitest.config.ts"]
+}

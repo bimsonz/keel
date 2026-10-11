@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:console apps/console/test/unit/worker/handler.test.ts apps/console/test/pool/console.test.ts
+# kills: handler.wrong-key, console.wrong-key
+# why: a key that is not the presenter's is passed on to Keel as a visitor's read, where it should be refused here
+diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
+index 6ffe5c9..8cd5c2e 100644
+--- a/apps/console/src/worker/handler.ts
++++ b/apps/console/src/worker/handler.ts
+@@ -113,7 +113,7 @@ async function asker(request: Request, env: Env): Promise<Asker> {
+   if (shown === null) return "visitor";
+   const key = /^Bearer (.+)$/.exec(shown)?.[1] ?? "";
+   if (key === "" || env.CONSOLE_PRESENTER_KEY === "") return "refused";
+-  return (await same(key, env.CONSOLE_PRESENTER_KEY)) ? "presenter" : "refused";
++  return (await same(key, env.CONSOLE_PRESENTER_KEY)) ? "presenter" : "visitor";
+ }
+ 
+ const unreachable = (): Response =>

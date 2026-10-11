@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/projects.test.ts
+# kills: projects.named
+# why: a project whose trunk advanced unverified is listed as any other
+diff --git a/apps/console/src/engine/projects.ts b/apps/console/src/engine/projects.ts
+index 46977cd..f34fedc 100644
+--- a/apps/console/src/engine/projects.ts
++++ b/apps/console/src/engine/projects.ts
+@@ -41,7 +41,7 @@ export class Projects {
+     if (event.type === "TrunkAdvanced" && event.payload.verified === false) {
+       const entry = this.#byId.get(projectOf(event) ?? "");
+       if (entry === undefined || entry.unverified) return false;
+-      entry.unverified = true;
++      entry.unverified = false;
+       return true;
+     }
+     if (event.type === "ProjectSettingsChanged") {

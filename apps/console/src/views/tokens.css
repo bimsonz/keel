@@ -1,0 +1,1538 @@
+/*
+ * Direction A · Control room. Everything here is scoped to the direction, and
+ * every colour is a Kumo token or a light-dark() pair, so `data-mode` drives
+ * both themes.
+ */
+:root {
+  /* Agent and workspace marks on the canvas: neutral ink, two weights. */
+  --a-mark: light-dark(oklch(42% 0 0), oklch(78% 0 0));
+  --a-mark-quiet: light-dark(oklch(74% 0 0), oklch(44% 0 0));
+  --a-rail: light-dark(oklch(84% 0 0), oklch(34% 0 0));
+  --a-group: light-dark(oklch(96.2% 0 0), oklch(14% 0 0));
+
+  /*
+   * Suspected. Kumo's warning token sits on the same hue as Cloudflare orange,
+   * which the brief reserves for "a person is being asked". So this direction
+   * moves suspected to yellow; the meaning is unchanged.
+   */
+  --a-suspected: light-dark(oklch(76% 0.16 88), oklch(82% 0.16 92));
+  --a-suspected-ink: light-dark(oklch(45% 0.1 80), oklch(86% 0.14 92));
+  --a-suspected-tint: light-dark(oklch(96% 0.05 95), oklch(30% 0.05 90 / 0.55));
+
+  --a-person: var(--mc-needs-person);
+  --a-person-ink: light-dark(oklch(50% 0.15 50), oklch(80% 0.15 62));
+  --a-person-tint: light-dark(oklch(96.5% 0.03 62), oklch(30% 0.06 55 / 0.5));
+
+  --a-pass: var(--color-kumo-success);
+  --a-pass-ink: var(--text-color-kumo-success);
+  --a-pass-tint: var(--color-kumo-success-tint);
+  --a-fail: var(--color-kumo-danger);
+  --a-fail-ink: var(--text-color-kumo-danger);
+  --a-fail-tint: var(--color-kumo-danger-tint);
+
+  /* n/a is neutral ink: readable, never the pass colour. */
+  --a-na-ink: var(--text-color-kumo-subtle);
+  --a-na-line: light-dark(oklch(72% 0 0), oklch(46% 0 0));
+
+  /* Execution tier: one hue, heavier as cost rises. */
+  --a-tier-0: light-dark(oklch(93% 0.012 255), oklch(30% 0.02 255));
+  --a-tier-0-ink: light-dark(oklch(36% 0.03 255), oklch(86% 0.02 255));
+  --a-tier-1: light-dark(oklch(80% 0.035 255), oklch(46% 0.05 255));
+  --a-tier-1-ink: light-dark(oklch(24% 0.04 255), oklch(97% 0.01 255));
+  --a-tier-2: light-dark(oklch(42% 0.07 255), oklch(84% 0.05 255));
+  --a-tier-2-ink: light-dark(oklch(98% 0.005 255), oklch(20% 0.04 255));
+}
+
+:root .a-root {
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+:root .a-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.94em;
+}
+
+:root .a-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Chrome ─────────────────────────────────────────────────────────────── */
+
+:root .a-person-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: var(--a-person);
+  color: oklch(18% 0.03 55);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Chips that carry state: always an icon and a word ──────────────────── */
+
+:root .a-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--color-kumo-line);
+  border-radius: 6px;
+  background: var(--color-kumo-base);
+  color: var(--text-color-kumo-default);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+:root .a-chip[data-tone="suspected"] {
+  border-color: var(--a-suspected);
+  background: var(--a-suspected-tint);
+  color: var(--a-suspected-ink);
+}
+
+:root .a-chip[data-tone="proven"] {
+  border-color: var(--a-fail);
+  background: var(--a-fail-tint);
+  color: var(--a-fail-ink);
+}
+
+:root .a-chip[data-tone="guarded"] {
+  border-color: color-mix(in oklab, var(--a-pass) 55%, transparent);
+  color: var(--a-pass-ink);
+}
+
+:root .a-chip[data-tone="person"] {
+  border-color: var(--a-person);
+  background: var(--a-person-tint);
+  color: var(--a-person-ink);
+}
+
+:root .a-chip[data-tone="quiet"] {
+  color: var(--text-color-kumo-subtle);
+}
+
+/* ── Outcome marks ──────────────────────────────────────────────────────── */
+
+:root .a-run {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+:root .a-run[data-outcome="pass"] {
+  border-color: color-mix(in oklab, var(--a-pass) 55%, transparent);
+  background: var(--a-pass-tint);
+  color: var(--a-pass-ink);
+}
+
+:root .a-run[data-outcome="fail"] {
+  border-color: var(--a-fail);
+  background: var(--a-fail);
+  color: oklch(99% 0 0);
+}
+
+/* In the control world a probe is meant to fail: a cross, in plain ink. The critical colour is kept for the cell that decides. */
+:root .a-run[data-outcome="fail"][data-control="true"] {
+  border-color: var(--a-na-line);
+  background: transparent;
+  color: var(--text-color-kumo-default);
+}
+
+/* n/a: hollow, hatched, and spelled out. */
+:root .a-run[data-outcome="n/a"],
+:root .a-na {
+  border: 1.5px dashed var(--a-na-line);
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 5px,
+    color-mix(in oklab, var(--a-na-line) 38%, transparent) 5px 6px
+  );
+  color: var(--a-na-ink);
+}
+
+:root .a-run[data-outcome="running"] {
+  border-color: var(--color-kumo-interact);
+  background: var(--color-kumo-base);
+  color: var(--text-color-kumo-default);
+}
+
+:root .a-run[data-outcome="pending"] {
+  border-color: var(--color-kumo-line);
+  background: transparent;
+}
+
+:root .a-na {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@keyframes a-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+:root .a-spin {
+  animation: a-spin 1.1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root .a-spin {
+    animation: none;
+  }
+}
+
+/* ── Tier badge ─────────────────────────────────────────────────────────── */
+
+:root .a-tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px 0 6px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+:root .a-tier > b {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+:root .a-tier[data-tier="0"] {
+  background: var(--a-tier-0);
+  color: var(--a-tier-0-ink);
+}
+
+:root .a-tier[data-tier="1"] {
+  background: var(--a-tier-1);
+  color: var(--a-tier-1-ink);
+}
+
+:root .a-tier[data-tier="2"] {
+  background: var(--a-tier-2);
+  color: var(--a-tier-2-ink);
+}
+
+:root .a-tier[data-tier="none"] {
+  padding: 0 8px;
+  border: 1px dashed var(--color-kumo-line);
+  color: var(--text-color-kumo-subtle);
+}
+
+/* ── Panels ─────────────────────────────────────────────────────────────── */
+
+:root .a-panel {
+  border: 1px solid var(--color-kumo-line);
+  border-radius: 10px;
+  background: var(--color-kumo-base);
+}
+
+:root .a-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--color-kumo-hairline);
+}
+
+:root .a-h {
+  color: var(--text-color-kumo-strong);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ── The world matrix ───────────────────────────────────────────────────── */
+
+:root .a-matrix {
+  width: 100%;
+  height: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+:root .a-matrix th,
+:root .a-matrix td {
+  padding: 0 18px;
+  border-bottom: 1px solid var(--color-kumo-hairline);
+  border-left: 1px solid var(--color-kumo-hairline);
+  text-align: left;
+  vertical-align: middle;
+}
+
+:root .a-matrix tr > :first-child {
+  border-left: 0;
+}
+
+:root .a-matrix tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+:root .a-matrix thead th {
+  height: 42px;
+  background: var(--color-kumo-elevated);
+  color: var(--text-color-kumo-subtle);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+:root .a-matrix tr[data-world="trunk"] > *,
+:root .a-matrix tr[data-world="A-noop"] > * {
+  background: var(--color-kumo-elevated);
+}
+
+/* The one cell that decides the conflict, and the only critical colour on the page. */
+:root .a-matrix td[data-decides="true"] {
+  background: var(--a-fail-tint);
+  box-shadow: inset 0 0 0 2px var(--a-fail);
+}
+
+/* ── Timeline strip ─────────────────────────────────────────────────────── */
+
+:root .a-tl-dot {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--text-color-kumo-subtle);
+  border-radius: 50%;
+  background: var(--color-kumo-base);
+}
+
+:root .a-tl-item[data-now="true"] .a-tl-dot {
+  border-color: var(--text-color-kumo-strong);
+  background: var(--text-color-kumo-strong);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--text-color-kumo-strong) 14%, transparent);
+}
+
+/* ── A change ───────────────────────────────────────────────────────────── */
+
+:root .a-verdict {
+  border: 1px solid var(--color-kumo-line);
+  border-radius: 10px;
+  background: var(--color-kumo-base);
+}
+
+:root .a-verdict[data-tone="person"] {
+  border-color: var(--a-person);
+  background: var(--a-person-tint);
+}
+
+:root .a-drift-high {
+  border: 1px solid var(--a-fail);
+  border-radius: 8px;
+  background: var(--a-fail-tint);
+}
+
+:root .a-note {
+  margin: 6px 12px 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-kumo-line);
+  border-radius: 8px;
+  background: var(--color-kumo-base);
+  color: var(--text-color-kumo-default);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+:root .a-scroll {
+  scrollbar-width: thin;
+}
+
+/* The code viewer renders in a shadow root: only custom properties reach it. */
+:root .a-code {
+  --diffs-font-size: 13px;
+  --diffs-line-height: 19px;
+  --diffs-font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+:root .a-code-tight {
+  --diffs-line-height: 18px;
+}
+
+:root .a-chip[data-wrap="true"] {
+  height: auto;
+  padding: 3px 7px;
+  line-height: 1.25;
+  white-space: normal;
+  align-items: flex-start;
+}
+
+/* ── Transport ── */
+:root .a-transport-button,
+:root .a-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--color-kumo-line);
+  background: var(--color-kumo-control);
+  color: var(--text-color-kumo-strong);
+  transition: background-color 150ms ease-out;
+}
+
+:root .a-transport-button:hover,
+:root .a-icon-button:hover {
+  background: var(--color-kumo-tint);
+}
+
+:root .a-rate {
+  padding: 0 9px;
+  height: 28px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-color-kumo-subtle);
+  background: var(--color-kumo-control);
+}
+
+:root .a-rate + .a-rate {
+  border-left: 1px solid var(--color-kumo-line);
+}
+
+:root .a-rate[aria-pressed="true"] {
+  background: var(--color-kumo-fill);
+  color: var(--text-color-kumo-strong);
+  font-weight: 600;
+}
+
+:root .a-transport-button:focus-visible,
+:root .a-icon-button:focus-visible,
+:root .a-rate:focus-visible,
+:root .a-scrub:focus-visible {
+  outline: 2px solid var(--color-kumo-brand);
+  outline-offset: 1px;
+}
+
+:root .a-scrub {
+  accent-color: var(--text-color-kumo-strong);
+}
+
+/* ── An escalation ── */
+:root .a-question {
+  border: 1px solid var(--a-person);
+  border-radius: 12px;
+  background: var(--color-kumo-base);
+}
+
+:root .a-option {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-kumo-line);
+  border-radius: 10px;
+  background: var(--color-kumo-control);
+  text-align: left;
+  transition:
+    border-color 150ms ease-out,
+    background-color 150ms ease-out;
+}
+
+:root .a-option:hover:not(:disabled) {
+  border-color: var(--color-kumo-brand);
+  background: var(--color-kumo-tint);
+}
+
+:root .a-option:focus-visible {
+  outline: 2px solid var(--color-kumo-brand);
+  outline-offset: 2px;
+}
+
+:root .a-option:disabled {
+  opacity: 0.6;
+}
+
+:root .a-option[aria-busy="true"] {
+  border-color: var(--color-kumo-brand);
+  opacity: 1;
+}
+
+/* ── Verification Plan graph ── */
+:root .a-plan-graph {
+  --xy-background-color: transparent;
+  --xy-edge-stroke: var(--color-kumo-interact);
+  --xy-edge-stroke-width: 1.5;
+  --xy-handle-background-color: transparent;
+  --xy-handle-border-color: transparent;
+}
+
+:root .a-plan-graph .react-flow__handle {
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+  opacity: 0;
+}
+
+:root .a-step {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 214px;
+  height: 124px;
+  padding: 9px 11px;
+  border: 1px solid var(--color-kumo-line);
+  border-radius: 10px;
+  background: var(--color-kumo-base);
+  font-size: 14px;
+}
+
+:root .a-step[data-outcome="pending"] {
+  opacity: 0.55;
+}
+
+:root .a-step[data-outcome="running"] {
+  border-color: var(--text-color-kumo-strong);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--text-color-kumo-strong) 14%, transparent);
+}
+
+:root .a-step[data-outcome="fail"] {
+  border-color: var(--a-fail);
+  background: var(--a-fail-tint);
+}
+
+:root .a-step[data-outcome="waiting"] {
+  border-color: var(--a-person);
+  background: var(--a-person-tint);
+}
+
+:root .a-step-waiting {
+  color: var(--a-person-ink);
+}
+
+:root .a-step-because {
+  overflow: hidden;
+  color: var(--text-color-kumo-subtle);
+  font-size: 13px;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+:root .a-step-frame {
+  width: 100%;
+  height: 100%;
+  border: 1px dashed var(--color-kumo-interact);
+  border-radius: 12px;
+  padding: 5px 12px;
+  font-size: 13px;
+  color: var(--text-color-kumo-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root .a-plan-graph .react-flow__edge.animated path {
+    animation: none;
+  }
+}
+
+/* ── Mission Control's graph ── */
+:root .a-mission-graph {
+  --xy-background-color: transparent;
+  --xy-edge-stroke-width: 1.5;
+  --xy-handle-background-color: transparent;
+  --xy-handle-border-color: transparent;
+  --xy-edge-label-background-color: var(--color-kumo-canvas);
+}
+
+:root .a-mission-graph .react-flow__handle {
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+  opacity: 0;
+}
+
+/* A node that has to move makes one short, straight move. Nothing drifts. */
+:root .a-mission-graph .react-flow__node {
+  transition: transform 240ms ease-out;
+}
+
+:root .a-fn {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 232px;
+  padding: 9px 12px;
+  border: 1px solid var(--color-kumo-line);
+  border-radius: 10px;
+  background: var(--color-kumo-base);
+  font-size: 14px;
+  line-height: 1.3;
+  animation: a-fn-arrive 220ms ease-out;
+}
+
+@keyframes a-fn-arrive {
+  from {
+    opacity: 0;
+  }
+}
+
+:root .a-fn[data-kind="agent"],
+:root .a-fn[data-kind="guard"] {
+  justify-content: center;
+}
+
+:root .a-fn[data-kind="stack"] {
+  border-style: dashed;
+  background: transparent;
+}
+
+/* React Flow turns pointer events off for nodes that cannot be dragged or selected. These ones open something. */
+:root .a-fn[data-open="true"] {
+  cursor: pointer;
+  pointer-events: all;
+}
+
+:root .a-fn[data-open="true"]:hover {
+  border-color: var(--text-color-kumo-subtle);
+}
+
+:root .a-fn[data-open="true"]:focus-visible {
+  outline: 2px solid var(--color-kumo-brand);
+  outline-offset: 2px;
+}
+
+:root .a-fn[data-tone="suspected"] {
+  border-color: var(--a-suspected);
+}
+
+:root .a-fn[data-tone="proven"] {
+  border-color: var(--a-fail);
+}
+
+:root .a-fn[data-tone="pass"] {
+  border-color: color-mix(in oklab, var(--a-pass) 60%, transparent);
+}
+
+/* Orange is the question itself. What waits on it gets the outline, not the fill. */
+:root .a-fn[data-tone="person"] {
+  border-color: var(--a-person);
+}
+
+:root .a-fn[data-kind="escalation"][data-tone="person"] {
+  background: var(--a-person-tint);
+}
+
+:root .a-fn-kind {
+  font-size: 12px;
+  color: var(--text-color-kumo-subtle);
+}
+
+:root .a-fn-clamp {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+:root .a-mission-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  font-size: 13px;
+  color: var(--text-color-kumo-subtle);
+}
+
+:root .a-mission-key i {
+  display: inline-block;
+  width: 22px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-top: 2px solid var(--color-kumo-interact);
+}
+
+:root .a-mission-key i[data-line="dashed"] {
+  border-top-style: dashed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root .a-mission-graph .react-flow__node {
+    transition: none;
+  }
+
+  :root .a-fn {
+    animation: none;
+  }
+}
+
+/* ── The review funnel ── */
+:root .a-funnel {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+:root .a-funnel th,
+:root .a-funnel td {
+  padding: 16px 24px;
+  text-align: left;
+  vertical-align: top;
+}
+
+:root .a-funnel .text-right {
+  text-align: right;
+}
+
+:root .a-funnel thead th {
+  padding-block: 12px;
+  border-bottom: 1px solid var(--color-kumo-hairline);
+  color: var(--text-color-kumo-subtle);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+:root .a-funnel tbody tr + tr {
+  border-top: 1px solid var(--color-kumo-hairline);
+}
+
+:root .a-funnel tbody th {
+  width: 36%;
+}
+
+:root .a-funnel tbody td:nth-child(3) {
+  width: 30%;
+}
+
+:root .a-funnel tbody tr[data-waiting] {
+  background: var(--a-person-tint);
+}
+
+/* One bar per level: what it settled, what is still with it, what it passed on. */
+:root .a-funnel-bar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  margin-top: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+:root .a-funnel-bar i {
+  min-width: 3px;
+  flex-basis: 0;
+}
+
+:root .a-funnel-bar i[data-part="settled"] {
+  background: var(--a-mark);
+}
+
+:root .a-funnel-bar i[data-part="passed"] {
+  background: var(--a-rail);
+}
+
+:root .a-funnel-bar i[data-part="open"] {
+  background: repeating-linear-gradient(135deg, var(--a-mark) 0 2px, transparent 2px 5px);
+}
+
+:root .a-funnel-bar i[data-part="open"][data-person] {
+  background: var(--a-person);
+}
+
+:root .a-funnel-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 400;
+}
+
+:root .a-funnel-key i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 8px;
+  border-radius: 2px;
+}
+
+:root .a-funnel-key i[data-part="settled"] {
+  background: var(--a-mark);
+}
+
+:root .a-funnel-key i[data-part="passed"] {
+  background: var(--a-rail);
+}
+
+:root .a-funnel-key i[data-part="open"] {
+  background: repeating-linear-gradient(135deg, var(--a-mark) 0 2px, transparent 2px 5px);
+}
+
+:root .a-funnel-bar[data-empty] {
+  border: 1px dashed var(--a-na-line);
+}
+
+:root .a-funnel-bar[data-empty="unreported"] {
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 5px,
+    color-mix(in oklab, var(--a-na-line) 38%, transparent) 5px 6px
+  );
+}
+
+/* ── The benchmark ── */
+:root .a-score {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+:root .a-score th,
+:root .a-score td {
+  padding: 10px 24px;
+  text-align: left;
+  vertical-align: top;
+}
+
+:root .a-score td.text-right {
+  text-align: right;
+}
+
+:root .a-score thead th {
+  border-bottom: 1px solid var(--color-kumo-hairline);
+  color: var(--text-color-kumo-subtle);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+:root .a-score tbody tr + tr {
+  border-top: 1px solid var(--color-kumo-hairline);
+}
+
+:root .a-score tbody th {
+  white-space: nowrap;
+}
+
+:root .a-score tbody td:nth-child(4) {
+  width: 34%;
+}
+
+/* A miss is the one row that must not be skimmed past. */
+:root .a-score tbody tr[data-outcome="missed"],
+:root .a-score tbody tr[data-outcome="false-positive"] {
+  background: var(--a-fail-tint);
+}
+
+/* ── A subject, open beside the graph ── */
+:root .a-subject {
+  flex-shrink: 0;
+  width: 420px;
+  overflow-y: auto;
+  border-left: 1px solid var(--color-kumo-line);
+  background: var(--color-kumo-base);
+}
+
+:root .a-subject-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: calc(100% + 16px);
+  margin-inline: -8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+:root .a-subject-row:hover {
+  background: var(--color-kumo-tint);
+}
+
+:root .a-subject-row:focus-visible {
+  outline: 2px solid var(--color-kumo-brand);
+  outline-offset: 1px;
+}
+
+:root .a-fn[data-selected="true"] {
+  outline: 2px solid var(--color-kumo-brand);
+  outline-offset: 2px;
+}
+
+/* ── An escalation on a phone ── */
+:root .a-phone {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 100%;
+  padding: 16px 16px 32px;
+  overflow-y: auto;
+  background: var(--color-kumo-canvas);
+  color: var(--text-color-kumo-default);
+  font-size: 16px;
+}
+
+/* A thumb needs more room than a pointer. */
+:root .a-phone .a-option {
+  min-height: 64px;
+  padding: 16px;
+}
+
+/* ── The repository ─────────────────────────────────────────────────────── */
+
+:root .a-clone {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  border: 1px solid var(--color-kumo-line);
+  border-radius: 8px;
+  background: var(--color-kumo-control);
+  font-size: 13px;
+}
+
+:root .a-clone code {
+  padding: 0 10px;
+  color: var(--text-color-kumo-strong);
+  user-select: all;
+  white-space: nowrap;
+}
+
+:root .a-clone button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  padding: 0 10px;
+  border-left: 1px solid var(--color-kumo-line);
+  color: var(--text-color-kumo-default);
+  font-weight: 500;
+}
+
+:root .a-clone button:hover {
+  color: var(--text-color-kumo-strong);
+}
+
+:root .a-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-kumo-line);
+}
+
+:root .a-tabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: -1px;
+  padding: 8px 12px;
+  border-bottom: 2px solid transparent;
+  color: var(--text-color-kumo-default);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+:root .a-tabs a:hover {
+  color: var(--text-color-kumo-strong);
+}
+
+:root .a-tabs a[aria-current] {
+  border-bottom-color: var(--color-kumo-brand);
+  color: var(--text-color-kumo-strong);
+}
+
+:root .a-tree,
+:root .a-history {
+  border: 1px solid var(--color-kumo-line);
+  border-radius: 10px;
+  background: var(--color-kumo-base);
+  overflow: hidden;
+}
+
+:root .a-tree li + li,
+:root .a-history li + li {
+  border-top: 1px solid var(--color-kumo-hairline);
+}
+
+:root .a-tree a {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  color: var(--text-color-kumo-subtle);
+  font-size: 14px;
+  text-align: left;
+}
+
+:root .a-tree a:hover {
+  background: var(--color-kumo-tint);
+}
+
+:root .a-tree a:focus-visible,
+:root .a-tabs a:focus-visible,
+:root .a-clone button:focus-visible {
+  outline: 2px solid var(--color-kumo-brand);
+  outline-offset: -2px;
+}
+
+:root .a-history li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+/* A README, read into blocks and drawn as ordinary text. */
+:root .a-prose {
+  max-width: 78ch;
+  color: var(--text-color-kumo-default);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+:root .a-prose > * + * {
+  margin-top: 0.85em;
+}
+
+:root .a-prose h1,
+:root .a-prose h2,
+:root .a-prose h3,
+:root .a-prose h4,
+:root .a-prose h5,
+:root .a-prose h6 {
+  color: var(--text-color-kumo-strong);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+:root .a-prose h1 {
+  font-size: 24px;
+}
+
+:root .a-prose h2 {
+  margin-top: 1.5em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--color-kumo-hairline);
+  font-size: 19px;
+}
+
+:root .a-prose h3 {
+  font-size: 16px;
+}
+
+:root .a-prose ul,
+:root .a-prose ol {
+  padding-left: 1.4em;
+}
+
+:root .a-prose ul {
+  list-style: disc;
+}
+
+:root .a-prose ol {
+  list-style: decimal;
+}
+
+:root .a-prose li + li {
+  margin-top: 0.3em;
+}
+
+:root .a-prose code {
+  padding: 0.1em 0.35em;
+  border-radius: 5px;
+  background: var(--color-kumo-control);
+  color: var(--text-color-kumo-strong);
+  font-family: var(--a-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  font-size: 0.9em;
+}
+
+:root .a-prose pre {
+  overflow-x: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--color-kumo-hairline);
+  border-radius: 8px;
+  background: var(--color-kumo-control);
+}
+
+:root .a-prose pre code {
+  padding: 0;
+  background: none;
+  font-size: 13px;
+}
+
+:root .a-prose a {
+  color: var(--text-color-kumo-link);
+  text-decoration: underline;
+}
+
+:root .a-prose blockquote {
+  padding-left: 14px;
+  border-left: 3px solid var(--color-kumo-line);
+  color: var(--text-color-kumo-subtle);
+}
+
+:root .a-prose hr {
+  border-top: 1px solid var(--color-kumo-hairline);
+}
+
+/* What a file's own header says of it, at the right. */
+:root .a-file-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--text-color-kumo-subtle);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 13px;
+}
+
+/* ── The frame: the project, and its tabs ───────────────────────────────── */
+
+/* The frame's own tabs sit on the header's edge, so they draw no line of their own. */
+:root .a-tabs-frame {
+  border-bottom: 0;
+}
+
+:root .a-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--color-kumo-fill);
+  color: var(--text-color-kumo-default);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+:root .a-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--a-pass);
+}
+
+:root .a-link {
+  color: var(--text-color-kumo-link);
+}
+
+:root .a-link:hover,
+:root .a-link-quiet:hover {
+  text-decoration: underline;
+}
+
+/* A link in a line of quiet text: it reads as the text does, and is found by its underline on hover. */
+:root .a-link-quiet {
+  color: var(--text-color-kumo-default);
+}
+
+:root .a-link:focus-visible,
+:root .a-link-quiet:focus-visible,
+:root .a-list-title a:focus-visible,
+:root .a-filters a:focus-visible,
+:root .a-submenu a:focus-visible {
+  outline: 2px solid var(--color-kumo-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── A list: changes, conflicts, escalations ────────────────────────────── */
+
+:root .a-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+:root .a-filters a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--text-color-kumo-default);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+:root .a-filters a > span {
+  color: var(--text-color-kumo-subtle);
+  font-weight: 400;
+}
+
+:root .a-filters a:hover {
+  background: var(--color-kumo-tint);
+}
+
+:root .a-filters a[aria-current="true"] {
+  background: var(--color-kumo-fill);
+  color: var(--text-color-kumo-strong);
+  font-weight: 600;
+}
+
+:root .a-list {
+  border: 1px solid var(--color-kumo-line);
+  border-radius: 10px;
+  background: var(--color-kumo-base);
+  overflow: hidden;
+}
+
+:root .a-list > li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+:root .a-list > li + li {
+  border-top: 1px solid var(--color-kumo-hairline);
+}
+
+:root .a-list-mark {
+  display: flex;
+  padding-top: 2px;
+}
+
+:root .a-list-title {
+  color: var(--text-color-kumo-strong);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+:root .a-list-title a:hover {
+  color: var(--text-color-kumo-link);
+}
+
+/* ── One thing: a change, a conflict, an escalation ─────────────────────── */
+
+/* Keel's short name for the thing, after its title and quieter than it. */
+:root .a-detail-label {
+  color: var(--text-color-kumo-subtle);
+  font-weight: 400;
+}
+
+:root .a-side {
+  display: flex;
+  flex-direction: column;
+}
+
+:root .a-side > section {
+  padding: 14px 0;
+}
+
+:root .a-side > section:first-child {
+  padding-top: 0;
+}
+
+:root .a-side > section + section {
+  border-top: 1px solid var(--color-kumo-hairline);
+}
+
+:root .a-side h2 {
+  padding-bottom: 6px;
+  color: var(--text-color-kumo-subtle);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+:root .a-timeline > li {
+  display: grid;
+  grid-template-columns: 9px 64px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 16px;
+  font-size: 14px;
+}
+
+:root .a-timeline > li + li {
+  border-top: 1px solid var(--color-kumo-hairline);
+}
+
+/* ── Trunk's numbers ────────────────────────────────────────────────────── */
+
+/* It is never cut short: where the row is too narrow for it and what follows, what follows goes beneath. */
+:root .a-trunk-line {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 28px;
+  height: 44px;
+  padding: 0 24px;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+:root .a-trunk-line > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+:root .a-trunk-line dt {
+  color: var(--text-color-kumo-subtle);
+}
+
+:root .a-trunk-line dd {
+  color: var(--text-color-kumo-strong);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+:root .a-stats {
+  width: 100%;
+  border: 1px solid var(--color-kumo-line);
+  border-radius: 10px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--color-kumo-base);
+  overflow: hidden;
+}
+
+:root .a-stats th,
+:root .a-stats td {
+  padding: 14px 18px;
+  border-top: 1px solid var(--color-kumo-hairline);
+  text-align: left;
+  vertical-align: baseline;
+}
+
+:root .a-stats tr:first-child > * {
+  border-top: 0;
+}
+
+:root .a-stats th {
+  width: 280px;
+  color: var(--text-color-kumo-default);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+:root .a-stats td:nth-child(2) {
+  width: 220px;
+  color: var(--text-color-kumo-strong);
+  font-size: 22px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+:root .a-stats td:last-child {
+  color: var(--text-color-kumo-subtle);
+  font-size: 14px;
+}
+
+/* ── Insights: the pages beside each other ──────────────────────────────── */
+
+:root .a-submenu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 10px;
+  border-right: 1px solid var(--color-kumo-line);
+}
+
+:root .a-submenu a {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--text-color-kumo-default);
+  font-size: 14px;
+}
+
+:root .a-submenu a:hover {
+  background: var(--color-kumo-tint);
+}
+
+:root .a-submenu a[aria-current="page"] {
+  background: var(--color-kumo-fill);
+  color: var(--text-color-kumo-strong);
+  font-weight: 600;
+}
+
+/* ── Where the code stands: the bar above a directory's files ───────────── */
+
+:root .a-latest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 16px;
+  border: 1px solid var(--color-kumo-line);
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  background: var(--color-kumo-elevated);
+  font-size: 14px;
+}
+
+:root .a-latest + .a-tree {
+  border-radius: 0 0 10px 10px;
+}
+
+/* ── Mission Control: lanes, and the columns' names above them ─────────── */
+
+/* The page scrolls. The graph inside it neither pans nor zooms. */
+:root .a-mission {
+  height: 100%;
+  overflow: auto;
+}
+
+/* The names of the columns stay put while the lanes go by beneath them. */
+:root .a-mission-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  height: 34px;
+  border-bottom: 1px solid var(--color-kumo-line);
+  background: var(--color-kumo-canvas);
+}
+
+:root .a-mission-head > span {
+  position: absolute;
+  top: 0;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  color: var(--text-color-kumo-subtle);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+:root .a-mission-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 20px 20px;
+}
+
+/* A lane's band: the rule above it, and the control that opens or closes it. */
+:root .a-lane {
+  display: flex;
+  width: 100%;
+  border-top: 1px solid var(--color-kumo-hairline);
+  font-size: 14px;
+}
+
+:root .a-lane[data-open="false"] {
+  align-items: center;
+  gap: 16px;
+  padding-right: 24px;
+  cursor: pointer;
+  pointer-events: all;
+}
+
+:root .a-lane[data-open="false"]:hover {
+  background: var(--color-kumo-tint);
+}
+
+:root .a-lane-toggle {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 43px;
+  color: var(--text-color-kumo-subtle);
+}
+
+:root button.a-lane-toggle {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+:root button.a-lane-toggle:hover {
+  color: var(--text-color-kumo-strong);
+}
+
+:root .a-lane:focus-visible,
+:root button.a-lane-toggle:focus-visible {
+  outline: 2px solid var(--color-kumo-brand);
+  outline-offset: -2px;
+}
+
+/* ── The files beside the code ──────────────────────────────────────────── */
+
+:root .a-files {
+  flex-shrink: 0;
+  width: 304px;
+  height: 100%;
+  padding: 14px 8px;
+  overflow-y: auto;
+  border-right: 1px solid var(--color-kumo-line);
+  background: var(--color-kumo-base);
+  font-size: 14px;
+}
+
+:root .a-files li {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  border-radius: 6px;
+}
+
+:root .a-files li:hover {
+  background: var(--color-kumo-tint);
+}
+
+:root .a-files li[data-current="true"] {
+  background: var(--color-kumo-fill);
+}
+
+:root .a-files a {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 100%;
+  color: var(--text-color-kumo-default);
+}
+
+:root .a-files a svg {
+  flex-shrink: 0;
+  color: var(--text-color-kumo-subtle);
+}
+
+:root .a-files a[aria-current="page"] {
+  color: var(--text-color-kumo-strong);
+  font-weight: 600;
+}
+
+:root .a-files-toggle {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: var(--text-color-kumo-subtle);
+}
+
+:root button.a-files-toggle:hover {
+  background: var(--color-kumo-fill-hover);
+  color: var(--text-color-kumo-strong);
+}
+
+:root .a-files a:focus-visible,
+:root button.a-files-toggle:focus-visible {
+  outline: 2px solid var(--color-kumo-brand);
+  outline-offset: -2px;
+  border-radius: 4px;
+}

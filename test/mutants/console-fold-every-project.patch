@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/projects.test.ts
+# kills: projects.scoped, projects.rescoped
+# why: every project's events are folded into the one being shown
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index 6f3c4f1..b084485 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -239,7 +239,7 @@ export class Player {
+       if (!eventDue && !observationDue) break;
+       if (eventDue && (!observationDue || eventAt <= observationAt)) {
+         const event = this.#events[this.#nextEvent];
+-        if (event !== undefined && this.#shown(event)) this.#fold(event, eventAt);
++        if (event !== undefined) this.#fold(event, eventAt);
+         this.#nextEvent += 1;
+       } else {
+         const observation = this.#observations[this.#nextObservation];

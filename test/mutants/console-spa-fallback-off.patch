@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project pool:console apps/console/test/pool/console.test.ts
+# why: a path that is not a file is a 404, so no address in a project opens
+diff --git a/apps/console/wrangler.jsonc b/apps/console/wrangler.jsonc
+index 374a224..0210fee 100644
+--- a/apps/console/wrangler.jsonc
++++ b/apps/console/wrangler.jsonc
+@@ -14,7 +14,6 @@
+   "assets": {
+     "directory": "./dist",
+     "binding": "ASSETS",
+-    "not_found_handling": "single-page-application",
+     // Only these reach the Worker's code. Everything else is a file or the page.
+     "run_worker_first": ["/api/*", "/rule/*", "/present/*", "/healthz"],
+   },

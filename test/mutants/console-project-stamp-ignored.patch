@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/projects.test.ts
+# kills: projects.of
+# why: an event's project is taken from its payload, whatever Keel stamped on it
+diff --git a/apps/console/src/engine/projects.ts b/apps/console/src/engine/projects.ts
+index 46977cd..f2492c9 100644
+--- a/apps/console/src/engine/projects.ts
++++ b/apps/console/src/engine/projects.ts
+@@ -21,7 +21,6 @@ export interface ProjectEntry {
+ 
+ /** The project an event belongs to: the one Keel stamped on it, or failing that the one its own payload names. */
+ export function projectOf(event: AnyEvent): string | undefined {
+-  if (event.project !== undefined) return event.project;
+   const named: unknown = "projectId" in event.payload ? event.payload.projectId : undefined;
+   return typeof named === "string" ? named : undefined;
+ }

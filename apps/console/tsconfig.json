@@ -1,8 +1,15 @@
 {
   "extends": "../../tsconfig.base.json",
+  // The page, its tests, the fixtures and the scripts: everything that may see the DOM.
+  // The Worker's entry and its workerd tests are tsconfig.worker.json's.
   "compilerOptions": {
-    "lib": ["ES2023"],
-    "types": ["./worker-configuration.d.ts", "@cloudflare/vitest-plugin/types"]
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    // Node runs the scripts directly, stripping types: only erasable syntax.
+    "erasableSyntaxOnly": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "types": ["vite/client"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "vitest.config.ts"]
+  "include": ["src", "test/unit", "test/fixtures", "scripts", "vite.config.ts"],
+  "exclude": ["src/worker/index.ts"]
 }

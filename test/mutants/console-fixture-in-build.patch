@@ -1,0 +1,15 @@
+# expect-red: pnpm --dir apps/console run deploy:dry
+# why: the built console can be asked for a test fixture: guard-build must refuse the build
+diff --git a/apps/console/src/App.tsx b/apps/console/src/App.tsx
+index 867d999..eba9744 100644
+--- a/apps/console/src/App.tsx
++++ b/apps/console/src/App.tsx
+@@ -241,7 +241,7 @@ export function App() {
+     const start = async (): Promise<void> => {
+       // The console reads Keel. A scripted fixture can stand in for it in development, for tests and for
+       // working on a view; it is not in the built console, so this branch is gone from the build.
+-      const fixture = import.meta.env.DEV ? params.get("scenario") : null;
++      const fixture = params.get("scenario");
+       const created = new Player(
+         fixture === null
+           ? await createHttpSource({ ...presenterKey(), ...linkedCapability(params) })

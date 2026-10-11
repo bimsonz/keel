@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.visitor
+# why: a visitor Keel will not read its log to gets no console at all
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index bf74826..bd0a6ed 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -156,7 +156,6 @@ export async function createHttpSource(options: HttpSourceOptions): Promise<Http
+   // also where a visitor learns the log is not theirs: the console stands all the same, with what Keel does
+   // read to anyone.
+   const first = await events({}).catch((error: unknown) => {
+-    if (error instanceof LogClosed) return null;
+     throw error;
+   });
+   let firstPage: Page<AnyEvent> | null = first;

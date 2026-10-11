@@ -2,17 +2,40 @@
   "name": "@keeltown/console",
   "version": "0.0.0",
   "private": true,
-  "description": "Mission Control",
+  "description": "The Keel console: a project's code, changes, conflicts, escalations and Mission Control",
   "license": "MIT",
   "type": "module",
   "scripts": {
     "gen": "wrangler types --include-runtime=true --strict-vars=false",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "deploy:dry": "wrangler deploy --dry-run --outdir .wrangler/dry-run"
+    "dev": "vite",
+    "build": "vite build",
+    "lint:page": "oxlint -c oxlint.console.json src test scripts",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.worker.json && pnpm run lint:page",
+    "guard:build": "node scripts/guard-build.ts",
+    "deploy:dry": "vite build && node scripts/guard-build.ts && wrangler deploy --dry-run --outdir .wrangler/dry-run"
+  },
+  "dependencies": {
+    "@cloudflare/kumo": "catalog:",
+    "@phosphor-icons/react": "catalog:",
+    "@pierre/diffs": "catalog:",
+    "@xyflow/react": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "uqr": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "catalog:",
+    "@keeltown/contracts": "workspace:*",
+    "@tailwindcss/vite": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "tailwindcss": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"
   }

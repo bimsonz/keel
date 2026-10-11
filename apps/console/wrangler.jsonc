@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "keel-console",
-  "main": "src/index.ts",
+  "main": "src/worker/index.ts",
   // One compatibility date across every Worker in the repo (rule R13).
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -9,10 +9,21 @@
   "workers_dev": true,
   "preview_urls": false,
   "observability": { "enabled": true },
+  // The built page (`vite build`). Every place in the console is a path under a project, so a path
+  // that is not a file is the page, one with a dot in it included (/keel/blob/trunk/src/index.ts).
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Only these reach the Worker's code. Everything else is a file or the page.
+    "run_worker_first": ["/api/*", "/rule/*", "/present/*", "/healthz"],
+  },
+  // Keel is reached Worker to Worker: no public hop, no CORS, and no token in a browser.
+  "services": [{ "binding": "KEEL", "service": "keel" }],
   "vars": {
     // The public host this Worker answers on. scripts/deploy.ts overrides it per environment.
     "KEEL_HOST": "keel-console.localhost",
-    // Keel's public host, which the console names in links and clone addresses. Set per environment too.
+    // Keel's public host: requests over the KEEL binding are addressed to it. Set per environment too.
     "KEEL_API_HOST": "keel.localhost",
   },
   "secrets": {
