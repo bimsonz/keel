@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-plan.test.ts
+# kills: run-plan.guard-policy, run-plan.guard-advised
+# why: An advised guard's fail blocks the flow, so a seq stops at it and a cascade refuses it, though the verdict reads it as a pass
+diff --git a/packages/core/src/application/verification/run-plan.ts b/packages/core/src/application/verification/run-plan.ts
+index c3be6a8..999a5b7 100644
+--- a/packages/core/src/application/verification/run-plan.ts
++++ b/packages/core/src/application/verification/run-plan.ts
+@@ -128,8 +128,6 @@ const valueOf = (s: State, step: PlanStep, r: StepResult): Value => {
+       // A guard's fail blocks only where its predicate's policy is block. Under
+       // advise or annotate its parents read it as a pass, so a seq goes on and
+       // a cascade accepts it; a `when` still reads the raw fail.
+-      if (step.guards !== undefined && step.guards.policy !== "block")
+-        return { status: "pass", outcome: "pass" };
+       const overriders = Object.entries(s.plan.overrides)
+         .filter(([id, targets]) => s.steps.get(id)?.kind === "human" && targets.includes(step.id))
+         .map(([id]) => id);

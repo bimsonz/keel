@@ -13,7 +13,14 @@ import {
   type StepSpec,
   verdict,
 } from "../../../src/domain/verification/index.ts";
-import { base, emptyDefaults, type FlowCase, flowCaseArb } from "../../arbitraries/flow.ts";
+import type { PredicatePolicy } from "../../../src/domain/kernel/index.ts";
+import {
+  base,
+  emptyDefaults,
+  type FlowCase,
+  flowCaseArb,
+  guardedCaseArb,
+} from "../../arbitraries/flow.ts";
 import { fc } from "../../support/fast-check.ts";
 
 const planOf = (c: FlowCase): FlowPlan =>
@@ -25,6 +32,22 @@ const handPlan = (steps: readonly StepSpec[], flow: Flow): FlowPlan =>
     compile(
       { commit: base, flow, steps },
       { baseCommit: base, touchedPaths: ["src/a.ts"], subjects: [], facts: {} },
+      emptyDefaults,
+    ),
+  );
+
+/** A hand-written plan whose `g` guards a tenet on freshness, under the project's `policy` for it. */
+const guardPlan = (steps: readonly StepSpec[], flow: Flow, policy: PredicatePolicy): FlowPlan =>
+  Result.getOrThrow(
+    compile(
+      { commit: base, flow, steps },
+      {
+        baseCommit: base,
+        touchedPaths: ["src/a.ts"],
+        subjects: [],
+        facts: {},
+        predicatePolicy: { freshness: policy },
+      },
       emptyDefaults,
     ),
   );
@@ -143,6 +166,52 @@ describe("run-plan: the compiled plan's flow, executed", () => {
         expect(verdictOn(plan, ran)).toEqual(verdictOn(plan, all));
       }),
     );
+  });
+
+  it("[run-plan.guard-policy] with guards under any policy, running the flow gives the verdict running every step would, advisories too", async () => {
+    await fc.assert(
+      fc.asyncProperty(guardedCaseArb(), fc.nat(), async (c, salt) => {
+        const plan = planOf(c);
+        const runner = scripted(salt);
+        const ran = await run(plan, runner);
+        expect(verdictOn(plan, ran)).toEqual(verdictOn(plan, await runAll(plan, runner)));
+      }),
+    );
+  });
+
+  it("[run-plan.guard-advised] a seq goes on past an advised or annotated guard's fail, and stops at a blocked one", async () => {
+    const steps = [proofStep("g", { guards: "freshness" }), proofStep("b")];
+    const flow = seq(leaf("g"), leaf("b"));
+    for (const policy of ["advise", "annotate"] as const) {
+      const r = recording((s, w) => report(s, w, s.id === "g" ? "fail" : "pass"));
+      const plan = guardPlan(steps, flow, policy);
+      const ran = await run(plan, r.runner);
+      expect(r.calls).toEqual(["g", "b"]);
+      const v = verdictOn(plan, ran);
+      expect(v.outcome).toBe("land");
+      expect(v.advisories.map((a) => a.stepId)).toEqual(["g"]);
+    }
+    const blocked = recording((s, w) => report(s, w, s.id === "g" ? "fail" : "pass"));
+    const plan = guardPlan(steps, flow, "block");
+    const ran = await run(plan, blocked.runner);
+    expect(blocked.calls).toEqual(["g"]);
+    expect(verdictOn(plan, ran).outcome).toBe("bounce");
+  });
+
+  it("[run-plan.guard-advised] a cascade accepts an advised guard's fail as a pass; a when still reads it as a fail", async () => {
+    const steps = [proofStep("g", { guards: "freshness" }), proofStep("b"), proofStep("c")];
+    const cascade: Flow = { _tag: "cascade", accept: ["pass"], items: [leaf("g"), leaf("b")] };
+    const accepted = recording((s, w) => report(s, w, s.id === "g" ? "fail" : "pass"));
+    await run(guardPlan(steps, cascade, "advise"), accepted.runner);
+    expect(accepted.calls).toEqual(["g"]);
+    const when = seq(leaf("g"), {
+      _tag: "when",
+      condition: { _tag: "outcome", step: "g", in: ["fail"] },
+      body: leaf("c"),
+    });
+    const raw = recording((s, w) => report(s, w, s.id === "g" ? "fail" : "pass"));
+    await run(guardPlan(steps, when, "advise"), raw.runner);
+    expect(raw.calls).toEqual(["g", "c"]);
   });
 
   it("[run-plan.once] no step runs twice in one world", async () => {

@@ -125,6 +125,11 @@ const valueOf = (s: State, step: PlanStep, r: StepResult): Value => {
     case "fail": {
       if (!canBlock(r.evidenceClass)) return { status: "escalate", outcome: r.outcome };
       if (s.overridden.has(step.id)) return { status: "pass", outcome: r.outcome };
+      // A guard's fail blocks only where its predicate's policy is block. Under
+      // advise or annotate its parents read it as a pass, so a seq goes on and
+      // a cascade accepts it; a `when` still reads the raw fail.
+      if (step.guards !== undefined && step.guards.policy !== "block")
+        return { status: "pass", outcome: "pass" };
       const overriders = Object.entries(s.plan.overrides)
         .filter(([id, targets]) => s.steps.get(id)?.kind === "human" && targets.includes(step.id))
         .map(([id]) => id);
@@ -267,7 +272,8 @@ const order = (flow: Flow, world: FlowWorld | undefined): string[] => {
 /**
  * Runs a compiled plan's flow, reaching exactly the steps `verdict/1` reads:
  * a seq stops at a blocking fail, unless a human step that may override it is
- * still to run; par and worlds run every item at once; a cascade stops at the
+ * still to run (a guard's fail blocks only under its predicate's `block`
+ * policy; under advise or annotate it reads as a pass, as the verdict reads it); par and worlds run every item at once; a cascade stops at the
  * first outcome it accepts; a when first runs any step its condition reads
  * that has not run, then runs its body only if the condition holds; a step an
  * earlier result skipped (and was allowed to) never runs. A step a union
