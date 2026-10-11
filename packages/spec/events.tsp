@@ -771,6 +771,24 @@ model ConflictSuspected {
 
   /** Absent means `fallout`; `opinion` is a decision model's suspicion, which only a probe or a person settles. */
   origin?: "fallout" | "opinion";
+
+  /** The premise at stake, and its holder. Without it and `effect`, no probe is drafted: the conflict escalates as unprovable. */
+  premise?: SuspectPremise;
+
+  /** The effect against the premise, and the change making it. */
+  effect?: SuspectEffect;
+}
+
+/** The premise a semantic conflict puts at stake, and the change holding it. */
+model SuspectPremise {
+  holder: ChangeId;
+  proposition: EventProposition;
+}
+
+/** The effect that contradicts the premise, and the change making it. */
+model SuspectEffect {
+  changeId: ChangeId;
+  proposition: EventProposition;
 }
 
 model ProbeDrafted {
@@ -797,7 +815,8 @@ model WorldCheckRan {
   conflictId: ConflictId;
   world: World;
 
-  @pattern("^suite:chg_[0-9A-HJKMNP-TV-Z]{26}$")
+  /** `suite:trunk`, the project's suite on trunk, or `suite:<changeId>`, a change's own. */
+  @pattern("^suite:(?:trunk|chg_[0-9A-HJKMNP-TV-Z]{26})$")
   check: string;
 
   @minValue(1)

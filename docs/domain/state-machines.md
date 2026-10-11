@@ -230,7 +230,7 @@ stateDiagram-v2
 | Suspected | Proven | Proof without a probe: a merge GitCore and MergeBox both refuse (textual), a failing guard (precedent), or a batch whose union fails while every subset passes (interaction) | The proof matches the kind | `ConflictProven` |
 | Suspected | Dismissed | A deterministic lattice comparison shows the propositions are compatible (a ruling) | `decide` compares the premise and the effect itself: compatible or refines. Never for a conflict a decision model raised (`origin: opinion`), because a comparison over an opinion-derived effect is tainted, not a ruling | `ConflictDismissed` |
 | Suspected | Probing | A probe compiles and runs | — | `ProbeDrafted` |
-| Suspected | Escalated | Three drafts fail: the conflict is unprovable | The settle names the escalation it opened; without one it is refused (`escalation-required`). A settle that proves or dismisses needs none | `ProbeDiscarded {draft-failed}`, then `ConflictEscalated {reason: unprovable}` |
+| Suspected | Escalated | Every draft fails (four at most), or the conflict names no premise and effect to probe: it is unprovable | The settle names the escalation it opened; without one it is refused (`escalation-required`). A settle that proves or dismisses needs none | `ProbeDiscarded {draft-failed}`, then `ConflictEscalated {reason: unprovable}` |
 | Probing | Probing | One world-matrix cell completes | — | `ProbeRan` |
 | Probing | Probing | A project suite's cell of the matrix (`suite:<changeId>`, any world, run 1–3) completes | The same cell again commits nothing; a different answer for it is refused; an n/a cell says why | `WorldCheckRan` |
 | Probing | Proven | The probe discriminates | It passes on trunk (or does not apply), passes in the premise-holder's world, fails in the combined world and fails in A-noop, three runs in a row | `GuardAdmitted`, then `ConflictProven` |
@@ -252,7 +252,7 @@ stateDiagram-v2
 
 Owner: the DO that owns the probe's conflict. If a probe proves the disagreement it is admitted as a Guard in the guard repo, which agents cannot write to.
 
-**A probe entity begins with its first event:** `ProbeDrafted` (a draft compiled and ran) or `ProbeDiscarded {draft-failed}` (three drafts failed). Drafting and its bounded repair loop (≤ 3 attempts, driven by deterministic error text) are a phase inside one Workflow step, not a persisted state, so replay rebuilds a probe exactly from its events.
+**A probe entity begins with its first event:** `ProbeDrafted` (a draft compiled and ran) or `ProbeDiscarded {draft-failed}` (every draft failed). Drafting and its bounded repair loop (≤ 4 attempts: the first draft and three repairs, driven by deterministic error text) are a phase inside one Workflow step, not a persisted state, so replay rebuilds a probe exactly from its events.
 
 <!-- chart:probe — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
@@ -270,8 +270,8 @@ stateDiagram-v2
 
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
-| — | Calibrating | A draft compiles and runs | Attempts ≤ 3 | `ProbeDrafted` |
-| — | Discarded | Three drafts failed | — | `ProbeDiscarded {reason: draft-failed}` |
+| — | Calibrating | A draft compiles and runs | Attempts ≤ 4; the conflict names the premise at stake and the effect against it (else refused `no-propositions`: a probe is never guessed, so the drafter reports the draft failed) | `ProbeDrafted` |
+| — | Discarded | Every draft failed, or there was nothing to draft against | — | `ProbeDiscarded {reason: draft-failed}` |
 | Calibrating | Calibrating | One world-matrix cell (trunk, A, B, AB or A-noop; run 1–3) completes | Its conflict is Probing it. The same cell again is a retry and commits nothing; a different answer for it is refused | `ProbeRan` |
 | Calibrating | Admitted | Computed from the `ProbeRan` cells | Passes on trunk (or does not apply), passes in the premise-holder's world, fails in the combined world, **fails in A-noop**, stable over 3 runs | `GuardAdmitted` |
 | Calibrating | Discarded | Not discriminating, or unstable | — | `ProbeDiscarded` |

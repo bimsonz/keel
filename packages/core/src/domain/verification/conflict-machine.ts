@@ -12,7 +12,15 @@ import {
   type SubjectId,
 } from "../kernel/index.ts";
 import { compare, type Move, type Predicate, type Proposition } from "../coordination/index.ts";
-import type { Conflict, ConflictKind, ConflictOrigin, Party, World } from "./conflict.ts";
+import type {
+  Conflict,
+  ConflictKind,
+  ConflictOrigin,
+  Party,
+  SuspectEffect,
+  SuspectPremise,
+  World,
+} from "./conflict.ts";
 import { ConflictNotFound, ConflictStateRefused } from "./errors.ts";
 import {
   ConflictDismissed,
@@ -57,6 +65,9 @@ export type ConflictCommand =
       readonly subjectId?: SubjectId;
       readonly predicate?: Predicate;
       readonly origin?: ConflictOrigin;
+      /** The premise at stake and the effect against it; a probe is drafted only when both are given. */
+      readonly premise?: SuspectPremise;
+      readonly effect?: SuspectEffect;
     }
   | { readonly _tag: "Prove"; readonly evidence: ProofWithoutProbe }
   /** A ruling: `decide` compares the two itself, and only a compatible or refining effect dismisses. */
@@ -169,6 +180,8 @@ export const decideConflict = (
             ...(command.subjectId === undefined ? {} : { subjectId: command.subjectId }),
             ...(command.predicate === undefined ? {} : { predicate: command.predicate }),
             ...(command.origin === undefined ? {} : { origin: command.origin }),
+            ...(command.premise === undefined ? {} : { premise: command.premise }),
+            ...(command.effect === undefined ? {} : { effect: command.effect }),
           }),
         ])
       : Result.fail(
@@ -326,6 +339,8 @@ export const evolveConflict = (
           ...(event.subjectId === undefined ? {} : { subjectId: event.subjectId }),
           ...(event.predicate === undefined ? {} : { predicate: event.predicate }),
           ...(event.origin === undefined ? {} : { origin: event.origin }),
+          ...(event.premise === undefined ? {} : { premise: event.premise }),
+          ...(event.effect === undefined ? {} : { effect: event.effect }),
           openedAt: committed.at,
         }
       : illegal(state, event);

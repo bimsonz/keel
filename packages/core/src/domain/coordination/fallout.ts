@@ -1,6 +1,6 @@
 import type { ChangeId } from "../kernel/index.ts";
 import { type Comparison, compare } from "./compare.ts";
-import type { DerivedEffect } from "./derivation.ts";
+import type { JudgedEffect } from "./derivation.ts";
 import type { GuardedTenet, HeldPremise } from "./graph.ts";
 import type { Proposition } from "./proposition.ts";
 import { readScope, scopesIntersect } from "./scope.ts";
@@ -58,7 +58,7 @@ const proximity = (relied: Proposition, effect: Proposition): NotifyReason | und
 const classify = (
   target: FalloutTarget,
   relied: Proposition,
-  effect: DerivedEffect,
+  effect: JudgedEffect,
   binding: boolean,
 ): Fallout | undefined => {
   const comparison = compare(relied, effect.proposition);
@@ -90,7 +90,7 @@ const classify = (
  */
 export const fallout = (
   change: ChangeId,
-  effect: DerivedEffect,
+  effect: JudgedEffect,
   premises: readonly HeldPremise[],
   tenets: readonly GuardedTenet[],
 ): readonly Fallout[] => [

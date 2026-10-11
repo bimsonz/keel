@@ -6,6 +6,7 @@ import {
   admit,
   type ConflictCommand,
   ConflictEvent,
+  decideConflict,
   type ProbeCommand,
   replayConflict,
 } from "../../../src/domain/verification/index.ts";
@@ -78,6 +79,8 @@ const suspectSemantic = {
   parties: [CHANGE_A, TENET],
   subjectId: SUBJECT,
   predicate: "freshness",
+  premise: { holder: CHANGE_A, proposition: PREMISE },
+  effect: { changeId: CHANGE_B, proposition: EFFECTS[0] ?? PREMISE },
 } as const satisfies ConflictCommand;
 const draft = P({ _tag: "Draft", conflictId: CONFLICT, attempts: 1, bundleHash: BUNDLE });
 const outcomesFor = { trunk: "pass", A: "pass", B: "n/a", AB: "fail", "A-noop": "fail" } as const;
@@ -417,5 +420,43 @@ describe("the Conflict chart", { timeout: PROPERTY_TIMEOUT }, () => {
     const walked: readonly Fold<Ledger, LedgerEvent>[] = ledgerTour();
     expect(offChart(conflictChart, walked, conflictView)).toEqual([]);
     expect(uncovered(conflictChart, walked, conflictView)).toEqual([]);
+  });
+});
+
+const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+
+describe("a suspicion's propositions", () => {
+  it("[conflict.suspect-propositions] Suspect's premise and effect reach ConflictSuspected and the Conflict, through the wire; none given, none appears", () => {
+    const premise = { holder: CHANGE_A, proposition: PREMISE };
+    const effect = { changeId: CHANGE_B, proposition: EFFECTS[0] ?? PREMISE };
+    fc.assert(
+      fc.property(fc.boolean(), fc.boolean(), (withPremise, withEffect) => {
+        const { premise: _p, effect: _e, ...bare } = suspectSemantic;
+        const command: ConflictCommand = {
+          ...bare,
+          ...(withPremise ? { premise } : {}),
+          ...(withEffect ? { effect } : {}),
+        };
+        const decided = decideConflict(undefined, command, { now: T0, conflictId: CONFLICT });
+        if (Result.isFailure(decided)) return false;
+        const conflict = replayConflict(
+          throughTheWire(
+            ConflictEvent,
+            decided.success.map((payload) => ({ at: T0, payload })),
+          ),
+        );
+        return (
+          conflict !== undefined &&
+          same(conflict.premise, withPremise ? premise : undefined) &&
+          same(conflict.effect, withEffect ? effect : undefined) &&
+          "premise" in conflict === withPremise &&
+          "effect" in conflict === withEffect
+        );
+      }),
+    );
+    const decided = decideConflict(undefined, suspectSemantic, { now: T0, conflictId: CONFLICT });
+    expect(Result.isSuccess(decided) && decided.success).toMatchObject([
+      { _tag: "ConflictSuspected", premise, effect },
+    ]);
   });
 });

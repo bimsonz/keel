@@ -16,7 +16,14 @@ import {
   VerdictId,
 } from "../kernel/index.ts";
 import { Move, Predicate } from "../coordination/index.ts";
-import { ConflictKind, ConflictOrigin, Party, World } from "./conflict.ts";
+import {
+  ConflictKind,
+  ConflictOrigin,
+  Party,
+  SuspectEffect,
+  SuspectPremise,
+  World,
+} from "./conflict.ts";
 import { EscalationCategory, EscalationEvidence, EscalationOption } from "./escalation.ts";
 import { VerdictOutcome } from "./plan.ts";
 
@@ -28,6 +35,10 @@ export const ConflictSuspected = Schema.TaggedStruct("ConflictSuspected", {
   predicate: Schema.optional(Predicate),
   /** Absent means `fallout`; `opinion` is a decision model's suspicion, which only a probe or a person settles. */
   origin: Schema.optional(ConflictOrigin),
+  /** The premise at stake, and its holder. Without it and `effect`, no probe is drafted: the conflict escalates as unprovable. */
+  premise: Schema.optional(SuspectPremise),
+  /** The effect against the premise, and the change making it. */
+  effect: Schema.optional(SuspectEffect),
 });
 export const ProbeDrafted = Schema.TaggedStruct("ProbeDrafted", {
   probeId: ProbeId,
@@ -43,9 +54,12 @@ export const ProbeRan = Schema.TaggedStruct("ProbeRan", {
   outcome: Schema.Literals(["pass", "fail", "n/a"]),
   resultRef: Schema.String,
 });
-/** A suite's run in one world of a conflict's matrix: `suite:<changeId>`, run 1 to 3. */
+/**
+ * A suite's run in one world of a conflict's matrix, run 1 to 3: `suite:trunk`,
+ * the project's suite on trunk, or `suite:<changeId>`, a change's own.
+ */
 export const WorldCheck = Schema.String.check(
-  Schema.isPattern(new RegExp(`^suite:${idPattern("chg").source.slice(1)}`)),
+  Schema.isPattern(new RegExp(`^suite:(?:trunk|${idPattern("chg").source.slice(1, -1)})$`)),
 );
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 /**

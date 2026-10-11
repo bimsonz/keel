@@ -8048,6 +8048,22 @@
               "opinion"
             ],
             "description": "Absent means `fallout`; `opinion` is a decision model's suspicion, which only a probe or a person settles."
+          },
+          "premise": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SuspectPremise"
+              }
+            ],
+            "description": "The premise at stake, and its holder. Without it and `effect`, no probe is drafted: the conflict escalates as unprovable."
+          },
+          "effect": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SuspectEffect"
+              }
+            ],
+            "description": "The effect against the premise, and the change making it."
           }
         },
         "additionalProperties": {
@@ -15054,6 +15070,44 @@
           "not": {}
         }
       },
+      "SuspectEffect": {
+        "type": "object",
+        "required": [
+          "changeId",
+          "proposition"
+        ],
+        "properties": {
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "proposition": {
+            "$ref": "#/components/schemas/EventProposition"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The effect that contradicts the premise, and the change making it."
+      },
+      "SuspectPremise": {
+        "type": "object",
+        "required": [
+          "holder",
+          "proposition"
+        ],
+        "properties": {
+          "holder": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "proposition": {
+            "$ref": "#/components/schemas/EventProposition"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The premise a semantic conflict puts at stake, and the change holding it."
+      },
       "SuspendAgentRequest": {
         "type": "object",
         "required": [
@@ -16117,7 +16171,8 @@
           },
           "check": {
             "type": "string",
-            "pattern": "^suite:chg_[0-9A-HJKMNP-TV-Z]{26}$"
+            "pattern": "^suite:(?:trunk|chg_[0-9A-HJKMNP-TV-Z]{26})$",
+            "description": "`suite:trunk`, the project's suite on trunk, or `suite:<changeId>`, a change's own."
           },
           "run": {
             "type": "integer",

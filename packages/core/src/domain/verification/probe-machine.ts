@@ -91,6 +91,16 @@ const redraft: NextAction = {
   title: `Escalate the conflict as unprovable: a probe gets at most ${MAX_DRAFT_ATTEMPTS} drafts`,
 };
 
+/** Whether the conflict names the premise at stake and the effect against it: what a probe drafts against. */
+const probeable = (conflict: Conflict | undefined): boolean =>
+  conflict?.premise !== undefined && conflict.effect !== undefined;
+
+const unguessed: NextAction = {
+  kind: "escalate",
+  title:
+    "Report the draft failed: the conflict names no premise and effect to probe, so it escalates as unprovable",
+};
+
 const awaitsDraft = (conflict: Conflict | undefined, conflictId: ConflictId): boolean =>
   conflict !== undefined &&
   conflict.id === conflictId &&
@@ -123,6 +133,15 @@ export const decideProbe = (
           command: command._tag,
           reason: "conflict-not-awaiting-a-probe",
           nextActions: [readFirst],
+        }),
+      );
+    if (command._tag === "Draft" && !probeable(facts.conflict))
+      return Result.fail(
+        new ProbeStateRefused({
+          probeId: facts.probeId,
+          command: command._tag,
+          reason: "no-propositions",
+          nextActions: [unguessed],
         }),
       );
     switch (command._tag) {

@@ -152,6 +152,32 @@ describe("the wire", () => {
     expect(decodesCheck(check("pass", { check: "probe:prb_1" }))).toBe(false);
   });
 
+  it("[events.world-check-id] a suite cell is the project's suite on trunk or a change's own, and nothing else", () => {
+    const decodesCheck = decodes(WorldCheckRan);
+    fc.assert(
+      fc.property(
+        fc.oneof(
+          fc.constant({ id: "suite:trunk", ok: true }),
+          fc.nat({ max: 999 }).map((n) => ({ id: `suite:${makeId("chg", ulid(n))}`, ok: true })),
+          fc
+            .constantFrom(
+              "suite:",
+              "trunk",
+              "suite:trunks",
+              "suite:trunk:x",
+              `suite:${makeId("prj", ulid(1))}`,
+              `suite:${CHANGE}x`,
+              `probe:${CHANGE}`,
+            )
+            .map((id) => ({ id, ok: false })),
+        ),
+        ({ id, ok }) => decodesCheck(check("pass", { check: id })) === ok,
+      ),
+    );
+    expect(decodesCheck(check("pass", { check: "suite:trunk" }))).toBe(true);
+    expect(decodesCheck(check("pass", { check: `suite:${CHANGE}` }))).toBe(true);
+  });
+
   it("[events.guard-failed-shape] a guard fails against a change, or against a batch and its candidate", () => {
     const decodesGuard = decodes(GuardFailed);
     expect(decodesGuard(guardFailed({ changeId: CHANGE }))).toBe(true);

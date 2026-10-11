@@ -5,8 +5,10 @@ import {
   admit,
   type ConflictCommand,
   type DraftFailure,
+  MAX_DRAFT_ATTEMPTS,
   type ProbeCommand,
   ProbeDiscarded,
+  ProbeStateRefused,
   ProbeEvent,
   replayProbe,
 } from "../../../src/domain/verification/index.ts";
@@ -16,9 +18,11 @@ import { fc } from "../../support/fast-check.ts";
 import {
   BUNDLE,
   CHANGE_A,
+  CHANGE_B,
   comparableProbe,
   CONFLICT,
   DECISION,
+  EFFECTS,
   ESCALATION,
   eventsIn,
   GUARD,
@@ -28,6 +32,7 @@ import {
   ledgerMachine,
   ledgerTour,
   planArb,
+  PREMISE,
   probeLog,
   probeOracle,
   type Record_,
@@ -74,6 +79,8 @@ const suspect = C({
   parties: [CHANGE_A, TENET],
   subjectId: SUBJECT,
   predicate: "freshness",
+  premise: { holder: CHANGE_A, proposition: PREMISE },
+  effect: { changeId: CHANGE_B, proposition: EFFECTS[0] ?? PREMISE },
 });
 const draft = (attempts = 1) =>
   P({ _tag: "Draft", conflictId: CONFLICT, attempts, bundleHash: BUNDLE });
@@ -116,9 +123,9 @@ describe("the Probe → Guard machine", { timeout: PROPERTY_TIMEOUT }, () => {
     // Calibration runs are numbered 1 to 3: a fourth is refused.
     const extra = drive([suspect, draft(), record(4, "A")]);
     expect(Result.isFailure(extra.results[2] ?? Result.succeed([]))).toBe(true);
-    // A probe drafts only for a suspected conflict, and gets at most three drafts.
+    // A probe drafts only for a suspected conflict, and gets at most four drafts.
     expect(Result.isFailure(drive([draft()]).results[0] ?? Result.succeed([]))).toBe(true);
-    expect(Result.isFailure(drive([suspect, draft(4)]).results[1] ?? Result.succeed([]))).toBe(
+    expect(Result.isFailure(drive([suspect, draft(5)]).results[1] ?? Result.succeed([]))).toBe(
       true,
     );
     // A retried cell commits nothing; a contradicting one is refused.
@@ -314,5 +321,51 @@ describe("a probe whose drafts failed", () => {
     expect(results[1] === undefined ? [] : eventsIn(results[1])).toMatchObject([
       { _tag: "ProbeDiscarded", reason: "draft-failed", detail: "truncated" },
     ]);
+  });
+});
+
+const withPropositions = (premise: boolean, effect: boolean) => {
+  const { command } = suspect;
+  if (command._tag !== "Suspect") return suspect;
+  const { premise: p, effect: e, ...bare } = command;
+  return C({ ...bare, ...(premise ? { premise: p } : {}), ...(effect ? { effect: e } : {}) });
+};
+const refusalOf = (r: ReturnType<typeof ledgerMachine.decide> | undefined) =>
+  r !== undefined && Result.isFailure(r) ? r.failure : undefined;
+
+describe("drafting a probe", () => {
+  it("[probe.unguessed] a probe is drafted only for a conflict naming both the premise and the effect; otherwise it escalates unprovable", () => {
+    fc.assert(
+      fc.property(fc.boolean(), fc.boolean(), (premise, effect) => {
+        const { results } = drive([withPropositions(premise, effect), draft()]);
+        const refusal = refusalOf(results[1]);
+        if (premise && effect) return tagsOf(results[1]).join() === "ProbeDrafted";
+        return (
+          refusal instanceof ProbeStateRefused &&
+          refusal.reason === "no-propositions" &&
+          refusal.nextActions.some((n) => n.kind === "escalate")
+        );
+      }),
+    );
+    const { results } = drive([withPropositions(true, false), draft()]);
+    expect(refusalOf(results[1])).toMatchObject({ reason: "no-propositions" });
+    const failed = drive([
+      withPropositions(false, false),
+      P({ _tag: "DraftFailed", conflictId: CONFLICT }),
+    ]);
+    expect(tagsOf(failed.results[1])).toEqual(["ProbeDiscarded"]);
+  });
+
+  it("[probe.draft-budget] a probe gets four drafts, the first and three repairs, and no more", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: -1, max: 7 }), (attempts) => {
+        const { results } = drive([suspect, draft(attempts)]);
+        const admitted = tagsOf(results[1]).join() === "ProbeDrafted";
+        return admitted === (attempts >= 1 && attempts <= 4);
+      }),
+    );
+    expect(MAX_DRAFT_ATTEMPTS).toBe(4);
+    expect(tagsOf(drive([suspect, draft(4)]).results[1])).toEqual(["ProbeDrafted"]);
+    expect(tagsOf(drive([suspect, draft(5)]).results[1])).toEqual([]);
   });
 });

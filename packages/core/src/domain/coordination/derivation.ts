@@ -52,6 +52,33 @@ export const CodeModelEffect = Schema.Struct({
 export const DerivedEffect = Schema.Union([ExtractedEffect, DecisionModelEffect, CodeModelEffect]);
 export type DerivedEffect = typeof DerivedEffect.Type;
 
+/**
+ * An effect the change's agent declared, judged by fallout as a derived one is:
+ * testimony, a claim from outside Keel, so it never blocks on its own. Not a
+ * DerivedEffect: EffectsDerived and drift never carry it. Its anchors are its
+ * proposition's own, and may be none.
+ */
+export const DeclaredEffect = Schema.Struct({
+  proposition: Proposition,
+  anchors: Schema.Array(Anchor),
+  declared: Schema.Literal(true),
+  method: Schema.Literal("declared"),
+  evidenceClass: Schema.Literal("testimony"),
+});
+export type DeclaredEffect = typeof DeclaredEffect.Type;
+
+/** A declared effect, as fallout judges it. */
+export const declaredEffect = (proposition: Proposition): DeclaredEffect => ({
+  proposition,
+  anchors: proposition.anchors ?? [],
+  declared: true,
+  method: "declared",
+  evidenceClass: "testimony",
+});
+
+/** What fallout judges: an effect Keel derived, or one the agent declared. */
+export type JudgedEffect = DerivedEffect | DeclaredEffect;
+
 export const DriftClass = Schema.Literals(["footprint", "undeclared-effect", "silent-retraction"]);
 export type DriftClass = typeof DriftClass.Type;
 

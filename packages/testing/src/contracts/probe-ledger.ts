@@ -57,6 +57,24 @@ function conflictOn() {
     subjectId: makeId("sub", ulid()),
     predicate: "freshness",
     origin: "fallout",
+    premise: {
+      holder,
+      proposition: {
+        subject: at.key,
+        predicate: "freshness",
+        relation: "at-most",
+        value: "per-request",
+      },
+    },
+    effect: {
+      changeId: other,
+      proposition: {
+        subject: at.key,
+        predicate: "freshness",
+        relation: "is",
+        value: "per-session",
+      },
+    },
   };
   return { at, conflictId, holder, suspect };
 }

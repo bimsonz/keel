@@ -9,9 +9,21 @@ import {
   SubjectId,
   TenetId,
 } from "../kernel/index.ts";
-import { Move, Predicate } from "../coordination/index.ts";
+import { Move, Predicate, Proposition } from "../coordination/index.ts";
 
 /** Footprint overlap is not a kind: proximity is exposure and never opens a conflict. */
+/**
+ * The premise a semantic conflict puts at stake, and the change holding it: what
+ * a probe drafts against. A conflict without it is escalated as unprovable,
+ * never guessed.
+ */
+export const SuspectPremise = Schema.Struct({ holder: ChangeId, proposition: Proposition });
+export type SuspectPremise = typeof SuspectPremise.Type;
+
+/** The effect that contradicts the premise, and the change making it. */
+export const SuspectEffect = Schema.Struct({ changeId: ChangeId, proposition: Proposition });
+export type SuspectEffect = typeof SuspectEffect.Type;
+
 export const ConflictKind = Schema.Literals(["textual", "semantic", "precedent", "interaction"]);
 export type ConflictKind = typeof ConflictKind.Type;
 
@@ -62,6 +74,9 @@ export const Conflict = Schema.Struct({
   openedAt: InstantSchema,
   /** Absent means `fallout`. */
   origin: Schema.optional(ConflictOrigin),
+  /** The premise at stake and the effect against it: a probe is drafted only when both are known. */
+  premise: Schema.optional(SuspectPremise),
+  effect: Schema.optional(SuspectEffect),
   /** The probe drafted for it, from `ProbeDrafted` on. */
   probeId: Schema.optional(ProbeId),
   escalationId: Schema.optional(EscalationId),

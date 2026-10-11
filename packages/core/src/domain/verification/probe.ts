@@ -24,8 +24,11 @@ export type ProbeCell = typeof ProbeCell.Type;
 /** How many consecutive discriminating runs admission needs; calibration runs are numbered 1 to this. */
 export const ADMISSION_RUNS = 3;
 
-/** How many drafts a probe gets before its conflict is unprovable (the bounded repair loop). */
-export const MAX_DRAFT_ATTEMPTS = 3;
+/**
+ * How many drafts a probe gets before its conflict is unprovable (the bounded
+ * repair loop): the first draft and three repairs, as `DRAFT_REPAIRS` sets them.
+ */
+export const MAX_DRAFT_ATTEMPTS = 4;
 
 export const ProbeState = Schema.Literals(["calibrating", "admitted", "discarded", "retired"]);
 export type ProbeState = typeof ProbeState.Type;

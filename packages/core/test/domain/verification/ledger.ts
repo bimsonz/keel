@@ -159,6 +159,8 @@ export interface Plan {
   readonly kind: ConflictKind;
   readonly origin: ConflictOrigin;
   readonly fault: Fault;
+  /** Which of the premise at stake and the effect against it the suspicion names; a probe is drafted only with both. */
+  readonly propositions: "both" | "premise" | "effect" | "none";
   readonly attempts: number;
   readonly matrix: readonly RunCells[];
   readonly steps: readonly Step[];
@@ -208,6 +210,13 @@ export const planArb: fc.Arbitrary<Plan> = fc.record({
         "subject-flip" as const,
         "no-predicate" as const,
       ),
+    },
+  ),
+  propositions: fc.oneof(
+    { weight: 9, arbitrary: fc.constant("both" as const) },
+    {
+      weight: 1,
+      arbitrary: fc.constantFrom("premise" as const, "effect" as const, "none" as const),
     },
   ),
   attempts: fc.oneof(
@@ -269,6 +278,12 @@ const suspect = (plan: Plan): ConflictCommand => {
       ? { predicate: "freshness" as const }
       : {}),
     ...(plan.origin === "fallout" ? {} : { origin: plan.origin }),
+    ...(plan.propositions === "both" || plan.propositions === "premise"
+      ? { premise: { holder: CHANGE_A, proposition: PREMISE } }
+      : {}),
+    ...(plan.propositions === "both" || plan.propositions === "effect"
+      ? { effect: { changeId: CHANGE_B, proposition: EFFECTS[0] ?? PREMISE } }
+      : {}),
   };
 };
 
@@ -521,8 +536,12 @@ export const probeOracle = (
   const probe = before?.probe;
   if (probe === undefined) {
     const awaiting = conflict?.state === "suspected" && conflict.probeId === undefined;
+    const probeable = conflict?.premise !== undefined && conflict.effect !== undefined;
     if (command._tag === "Draft")
-      return awaiting && command.attempts >= 1 && command.attempts <= MAX_DRAFT_ATTEMPTS
+      return awaiting &&
+        probeable &&
+        command.attempts >= 1 &&
+        command.attempts <= MAX_DRAFT_ATTEMPTS
         ? "calibrating"
         : "refused";
     return command._tag === "DraftFailed" && awaiting ? "discarded" : "refused";
@@ -601,6 +620,7 @@ const TOUR_PLANS: readonly Plan[] = (
     kind,
     origin: "fallout",
     fault: "none",
+    propositions: "both",
     attempts: 1,
     matrix,
     steps: [],

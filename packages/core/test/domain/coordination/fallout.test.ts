@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   compare,
+  declaredEffect,
   type DerivedEffect,
   exposure,
   fallout,
@@ -200,6 +201,26 @@ describe("fallout", () => {
     );
     const [silent] = fallout(changeIds[1]!, cacheEffect("per-session", false), [premiseA], []);
     expect(silent?._tag === "conflict" && silent.silentRetraction).toBe(true);
+  });
+
+  it("[fallout.declared] a declared effect falls out as the same effect derived and declared would, and is never a silent retraction", () => {
+    let conflicts = 0;
+    fc.assert(
+      fc.property(graphArb, ({ change, effect, premises, tenets }) => {
+        const declared = fallout(change, declaredEffect(effect.proposition), premises, tenets);
+        const derived = fallout(change, { ...effect, declared: true }, premises, tenets);
+        conflicts += declared.filter((f) => f._tag === "conflict").length;
+        return (
+          JSON.stringify(declared) === JSON.stringify(derived) &&
+          declared.every((f) => f._tag !== "conflict" || !f.silentRetraction)
+        );
+      }),
+    );
+    expect(conflicts).toBeGreaterThan(0);
+    const said = declaredEffect(cacheEffect("per-session", false).proposition);
+    expect(said).toMatchObject({ method: "declared", evidenceClass: "testimony", declared: true });
+    const [conflict] = fallout(changeIds[1]!, said, [premiseA], []);
+    expect(conflict?._tag === "conflict" && conflict.silentRetraction).toBe(false);
   });
 
   it("[fallout.proximity-only-notifies] notify comes only from proximity, and every nearby unrelated clause is notified", () => {
