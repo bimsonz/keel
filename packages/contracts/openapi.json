@@ -4599,6 +4599,47 @@
         },
         "description": "Every work-loop response: the result, plus what the agent should know and do next."
       },
+      "AgentEnrolled": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "agentId",
+          "projectId",
+          "name",
+          "kind",
+          "scopes"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AgentEnrolled"
+            ]
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AgentKind"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "AgentId": {
         "type": "string",
         "pattern": "^agt_[0-9A-HJKMNP-TV-Z]{26}$"
@@ -4669,6 +4710,290 @@
           "not": {}
         }
       },
+      "AgentReinstated": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "agentId",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AgentReinstated"
+            ]
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "by": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "AgentRevoked": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "agentId",
+          "revocationEpoch",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AgentRevoked"
+            ]
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "revocationEpoch": {
+            "type": "integer"
+          },
+          "by": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "AgentSuspended": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "agentId",
+          "reason",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AgentSuspended"
+            ]
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "by": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "AuditCompleted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "head",
+          "outcome",
+          "suspects",
+          "runRef"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AuditCompleted"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "head": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "green",
+              "red"
+            ]
+          },
+          "suspects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeId"
+            }
+          },
+          "runRef": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "BatchAttribution": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          {
+            "type": "string",
+            "enum": [
+              "textual",
+              "interaction",
+              "infra",
+              "unattributed"
+            ]
+          }
+        ],
+        "description": "Who a failed batch is blamed on: one member, a refused composition\n(`textual`), every subset passing while the union fails (`interaction`), the\ninfrastructure (`infra`), or nobody yet (`unattributed`)."
+      },
+      "BatchFailed": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "batchId",
+          "verdictId",
+          "attribution"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "BatchFailed"
+            ]
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          },
+          "candidateId": {
+            "$ref": "#/components/schemas/CandidateId"
+          },
+          "verdictId": {
+            "$ref": "#/components/schemas/VerdictId"
+          },
+          "attribution": {
+            "$ref": "#/components/schemas/BatchAttribution"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "BatchFormed": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "batchId",
+          "laneId",
+          "members",
+          "base",
+          "attempt",
+          "chainEpoch"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "BatchFormed"
+            ]
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          },
+          "laneId": {
+            "type": "string"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeId"
+            }
+          },
+          "base": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "attempt": {
+            "type": "integer"
+          },
+          "chainEpoch": {
+            "type": "integer"
+          },
+          "projectId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectId"
+              }
+            ],
+            "description": "Optional only so events from before it was added still decode; the Lane always sets it."
+          },
+          "predecessors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeId"
+            },
+            "description": "Changes the batch was verified on top of that trunk does not hold yet (its speculation chain)."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "BatchId": {
+        "type": "string",
+        "pattern": "^bat_[0-9A-HJKMNP-TV-Z]{26}$"
+      },
+      "BatchVerified": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "batchId",
+          "candidateId",
+          "verdictId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "BatchVerified"
+            ]
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          },
+          "candidateId": {
+            "$ref": "#/components/schemas/CandidateId"
+          },
+          "verdictId": {
+            "$ref": "#/components/schemas/VerdictId"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeId"
+            },
+            "description": "What the Trunk DO needs to promote the batch: optional only so older events still decode."
+          },
+          "base": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "predecessors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeId"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "CallCost": {
         "type": "object",
         "properties": {
@@ -4690,9 +5015,147 @@
           "not": {}
         }
       },
+      "CandidateAssembled": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "candidateId",
+          "batchId",
+          "treeSha",
+          "composer",
+          "tier",
+          "tierReason"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "CandidateAssembled"
+            ]
+          },
+          "candidateId": {
+            "$ref": "#/components/schemas/CandidateId"
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          },
+          "treeSha": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "composer": {
+            "type": "string",
+            "enum": [
+              "gitcore",
+              "mergebox"
+            ]
+          },
+          "tier": {
+            "$ref": "#/components/schemas/Tier"
+          },
+          "tierReason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "CandidateBisected": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "candidateId",
+          "batchId",
+          "into"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "CandidateBisected"
+            ]
+          },
+          "candidateId": {
+            "$ref": "#/components/schemas/CandidateId"
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          },
+          "into": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchId"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "CandidateId": {
         "type": "string",
         "pattern": "^cnd_[0-9A-HJKMNP-TV-Z]{26}$"
+      },
+      "CandidateInvalidated": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "candidateId",
+          "batchId",
+          "reason"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "CandidateInvalidated"
+            ]
+          },
+          "candidateId": {
+            "$ref": "#/components/schemas/CandidateId"
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "head-moved"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "CandidatePromoted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "candidateId",
+          "batchId",
+          "trunkSha"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "CandidatePromoted"
+            ]
+          },
+          "candidateId": {
+            "$ref": "#/components/schemas/CandidateId"
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          },
+          "trunkSha": {
+            "$ref": "#/components/schemas/CommitSha"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "CandidateView": {
         "type": "object",
@@ -4792,9 +5255,333 @@
           "not": {}
         }
       },
+      "ChangeAdopted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "previousAgentId",
+          "agentId",
+          "leaseId",
+          "briefRef"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ChangeAdopted"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "previousAgentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "leaseId": {
+            "$ref": "#/components/schemas/LeaseId"
+          },
+          "briefRef": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ChangeBatched": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "batchId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ChangeBatched"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ChangeBounced": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "verdictId",
+          "reasons"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ChangeBounced"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "verdictId": {
+            "$ref": "#/components/schemas/VerdictId"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nextActions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventNextAction"
+            },
+            "description": "Always set, never empty; optional only so events committed before it was added still decode."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ChangeDrifted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "revision",
+          "blocking"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ChangeDrifted"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "blocking": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Drift"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "ChangeId": {
         "type": "string",
         "pattern": "^chg_[0-9A-HJKMNP-TV-Z]{26}$"
+      },
+      "ChangeLanded": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "commitSha",
+          "trunkSha",
+          "candidateId",
+          "proofId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ChangeLanded"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "commitSha": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "trunkSha": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "candidateId": {
+            "$ref": "#/components/schemas/CandidateId"
+          },
+          "proofId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ChangeOrigin": {
+        "type": "string",
+        "enum": [
+          "agent",
+          "auditor",
+          "operator"
+        ]
+      },
+      "ChangeParked": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "reason"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ChangeParked"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/ParkReason"
+          },
+          "escalationId": {
+            "$ref": "#/components/schemas/EscalationId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ChangeQueued": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "laneId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ChangeQueued"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "laneId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ChangeRequeued": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "batchId",
+          "reason"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ChangeRequeued"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "infra-failure",
+              "bisection",
+              "invalidated"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ChangeResumed": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "decisionId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ChangeResumed"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "decisionId": {
+            "$ref": "#/components/schemas/DecisionId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ChangeStarted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "workspaceId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ChangeStarted"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "workspaceId": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "baseSha": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The workspace's head when granted: the change's base. Always set; optional only so older events still decode."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Declared → Working: the pool granted a workspace, or the promoted sketch's workspace was reassigned."
       },
       "ChangeState": {
         "type": "string",
@@ -4814,10 +5601,157 @@
           "superseded"
         ]
       },
+      "ChangeSubmitted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "revision",
+          "commitSha",
+          "workspaceId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ChangeSubmitted"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "commitSha": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "workspaceId": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ChangeSuperseded": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ChangeSuperseded"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "by": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "decisionId": {
+            "$ref": "#/components/schemas/DecisionId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ChangeWithdrawn": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ChangeWithdrawn"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "by": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "CommitSha": {
         "type": "string",
         "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
         "description": "A git object id: 40 hexadecimal characters (SHA-1) or 64 (SHA-256)."
+      },
+      "ConflictDismissed": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "conflictId",
+          "evidence"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ConflictDismissed"
+            ]
+          },
+          "conflictId": {
+            "$ref": "#/components/schemas/ConflictId"
+          },
+          "evidence": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ConflictEscalated": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "conflictId",
+          "escalationId",
+          "reason"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ConflictEscalated"
+            ]
+          },
+          "conflictId": {
+            "$ref": "#/components/schemas/ConflictId"
+          },
+          "escalationId": {
+            "$ref": "#/components/schemas/EscalationId"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "human-class",
+              "unprovable"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "ConflictId": {
         "type": "string",
@@ -4853,6 +5787,123 @@
           "not": {}
         }
       },
+      "ConflictProven": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "conflictId",
+          "evidence"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ConflictProven"
+            ]
+          },
+          "conflictId": {
+            "$ref": "#/components/schemas/ConflictId"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "_tag": {
+                    "type": "string",
+                    "enum": [
+                      "probe"
+                    ]
+                  },
+                  "probeId": {
+                    "$ref": "#/components/schemas/ProbeId"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "probeId"
+                ],
+                "additionalProperties": {
+                  "not": {}
+                }
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "_tag": {
+                    "type": "string",
+                    "enum": [
+                      "guard"
+                    ]
+                  },
+                  "guardId": {
+                    "$ref": "#/components/schemas/GuardId"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "guardId"
+                ],
+                "additionalProperties": {
+                  "not": {}
+                }
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "_tag": {
+                    "type": "string",
+                    "enum": [
+                      "merge-refused"
+                    ]
+                  },
+                  "batchId": {
+                    "$ref": "#/components/schemas/BatchId"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "batchId"
+                ],
+                "additionalProperties": {
+                  "not": {}
+                }
+              }
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ConflictResolved": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "conflictId",
+          "move"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ConflictResolved"
+            ]
+          },
+          "conflictId": {
+            "$ref": "#/components/schemas/ConflictId"
+          },
+          "move": {
+            "$ref": "#/components/schemas/Move"
+          },
+          "decisionId": {
+            "$ref": "#/components/schemas/DecisionId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "ConflictState": {
         "type": "string",
         "enum": [
@@ -4863,6 +5914,44 @@
           "escalated",
           "resolved"
         ]
+      },
+      "ConflictSuspected": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "conflictId",
+          "kind",
+          "parties"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ConflictSuspected"
+            ]
+          },
+          "conflictId": {
+            "$ref": "#/components/schemas/ConflictId"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ConflictKind"
+          },
+          "parties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Party"
+            }
+          },
+          "subjectId": {
+            "$ref": "#/components/schemas/SubjectId"
+          },
+          "predicate": {
+            "$ref": "#/components/schemas/MFP.Predicate"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "ConflictView": {
         "type": "object",
@@ -4900,6 +5989,11 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "ContentHash": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "description": "A content address: `sha256:` and 64 lowercase hex digits. Bundles and plans are named by one."
       },
       "Contradiction": {
         "type": "object",
@@ -4950,6 +6044,35 @@
         "type": "string",
         "pattern": "^dec_[0-9A-HJKMNP-TV-Z]{26}$"
       },
+      "DecisionOverruled": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "decisionId",
+          "by",
+          "requestedBy"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "DecisionOverruled"
+            ]
+          },
+          "decisionId": {
+            "$ref": "#/components/schemas/DecisionId"
+          },
+          "by": {
+            "$ref": "#/components/schemas/DecisionId"
+          },
+          "requestedBy": {
+            "$ref": "#/components/schemas/ChangeId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "DecisionPage": {
         "type": "object",
         "required": [
@@ -4965,6 +6088,88 @@
           "nextCursor": {
             "type": "string",
             "description": "Absent on the last page."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "DecisionRecorded": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "decisionId",
+          "escalationId",
+          "evidence",
+          "alternatives"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "DecisionRecorded"
+            ]
+          },
+          "decisionId": {
+            "$ref": "#/components/schemas/DecisionId"
+          },
+          "escalationId": {
+            "$ref": "#/components/schemas/EscalationId"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "alternatives": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "option": {
+                  "type": "string"
+                },
+                "reasonRejected": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "option",
+                "reasonRejected"
+              ],
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "DecisionSuperseded": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "decisionId",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "DecisionSuperseded"
+            ]
+          },
+          "decisionId": {
+            "$ref": "#/components/schemas/DecisionId"
+          },
+          "by": {
+            "$ref": "#/components/schemas/DecisionId"
           }
         },
         "additionalProperties": {
@@ -5129,6 +6334,197 @@
         },
         "description": "Every work-loop response: the result, plus what the agent should know and do next."
       },
+      "DeployTarget": {
+        "type": "string",
+        "enum": [
+          "isolate-preview",
+          "workers-previews",
+          "versions",
+          "workers-for-platforms",
+          "r2",
+          "container-image",
+          "iac",
+          "external"
+        ]
+      },
+      "DeploymentId": {
+        "type": "string",
+        "pattern": "^dpl_[0-9A-HJKMNP-TV-Z]{26}$"
+      },
+      "DeploymentPromoted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "deploymentId",
+          "trunkSha",
+          "adapter",
+          "stage"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "DeploymentPromoted"
+            ]
+          },
+          "deploymentId": {
+            "$ref": "#/components/schemas/DeploymentId"
+          },
+          "trunkSha": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "adapter": {
+            "$ref": "#/components/schemas/DeployTarget"
+          },
+          "stage": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "DeploymentRolledBack": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "deploymentId",
+          "to",
+          "reason"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "DeploymentRolledBack"
+            ]
+          },
+          "deploymentId": {
+            "$ref": "#/components/schemas/DeploymentId"
+          },
+          "to": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "DerivationMethod": {
+        "type": "string",
+        "enum": [
+          "extractor",
+          "clef",
+          "code-model"
+        ],
+        "description": "How an effect was found. An extractor's finding is proof; a model's is opinion."
+      },
+      "Drift": {
+        "type": "object",
+        "required": [
+          "class",
+          "severity",
+          "detail"
+        ],
+        "properties": {
+          "class": {
+            "$ref": "#/components/schemas/DriftClass"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "DriftClass": {
+        "type": "string",
+        "enum": [
+          "footprint",
+          "undeclared-effect",
+          "silent-retraction"
+        ]
+      },
+      "DriftDetected": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "revision",
+          "drift"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "DriftDetected"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "drift": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Drift"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "EffectsDerived": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "revision",
+          "effects",
+          "derivationRef"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "EffectsDerived"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventDerivedEffect"
+            }
+          },
+          "derivationRef": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "EnrolAgentRequest": {
         "type": "object",
         "required": [
@@ -5194,6 +6590,48 @@
           "not": {}
         }
       },
+      "EntityKind": {
+        "type": "string",
+        "enum": [
+          "agent",
+          "session",
+          "change",
+          "subject",
+          "sketch",
+          "workspace",
+          "conflict",
+          "probe",
+          "guard",
+          "verdict",
+          "batch",
+          "candidate",
+          "project",
+          "trunk",
+          "decision",
+          "tenet",
+          "escalation",
+          "deployment"
+        ]
+      },
+      "EntityRef": {
+        "type": "object",
+        "required": [
+          "kind",
+          "id"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/EntityKind"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An entity a Durable Object owns."
+      },
       "EscalationId": {
         "type": "string",
         "pattern": "^esc_[0-9A-HJKMNP-TV-Z]{26}$"
@@ -5213,6 +6651,50 @@
           "nextCursor": {
             "type": "string",
             "description": "Absent on the last page."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "EscalationRaised": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "escalationId",
+          "question",
+          "options",
+          "consequences",
+          "about"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "EscalationRaised"
+            ]
+          },
+          "escalationId": {
+            "$ref": "#/components/schemas/EscalationId"
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "consequences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "about": {
+            "$ref": "#/components/schemas/EntityRef"
           }
         },
         "additionalProperties": {
@@ -5258,14 +6740,261 @@
           "not": {}
         }
       },
+      "EscalationWithdrawn": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "escalationId",
+          "reason"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "EscalationWithdrawn"
+            ]
+          },
+          "escalationId": {
+            "$ref": "#/components/schemas/EscalationId"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "EventAnchor": {
+        "type": "object",
+        "required": [
+          "path",
+          "commit"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "commit": {
+            "$ref": "#/components/schemas/CommitSha"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A code symbol pinned to a commit."
+      },
+      "EventAnchorCitation": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "anchor"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "anchor"
+            ]
+          },
+          "anchor": {
+            "$ref": "#/components/schemas/EventAnchor"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "EventCitation": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/EventMessageCitation"
+          },
+          {
+            "$ref": "#/components/schemas/EventAnchorCitation"
+          },
+          {
+            "$ref": "#/components/schemas/EventRecordCitation"
+          }
+        ],
+        "description": "What a claim rests on: a numbered session message, a code anchor, or an MFP record."
+      },
+      "EventContradiction": {
+        "type": "object",
+        "required": [
+          "premise",
+          "with",
+          "holder"
+        ],
+        "properties": {
+          "premise": {
+            "$ref": "#/components/schemas/EventProposition"
+          },
+          "with": {
+            "$ref": "#/components/schemas/EventProposition"
+          },
+          "holder": {
+            "type": "string",
+            "description": "The change or tenet holding the other proposition."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A premise of this change that contradicts another change's premise, or a tenet."
+      },
+      "EventDerivedEffect": {
+        "type": "object",
+        "required": [
+          "proposition",
+          "method",
+          "evidenceClass",
+          "anchors",
+          "declared"
+        ],
+        "properties": {
+          "proposition": {
+            "$ref": "#/components/schemas/EventProposition"
+          },
+          "method": {
+            "$ref": "#/components/schemas/DerivationMethod"
+          },
+          "evidenceClass": {
+            "$ref": "#/components/schemas/MFP.EvidenceClass"
+          },
+          "p": {
+            "type": "number",
+            "format": "double",
+            "description": "The model's probability, when a model answered."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventAnchor"
+            }
+          },
+          "declared": {
+            "type": "boolean"
+          },
+          "contradicts": {
+            "type": "string",
+            "description": "A premise or tenet this effect contradicts, by reference."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "What a change alters, as Keel derived it from the diff."
+      },
       "EventId": {
         "type": "string",
         "pattern": "^evt_[0-9A-HJKMNP-TV-Z]{26}$"
       },
+      "EventMessageCitation": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "session",
+          "seq"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "message"
+            ]
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionId"
+          },
+          "seq": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A numbered session message."
+      },
+      "EventNeighbour": {
+        "type": "object",
+        "required": [
+          "changeId",
+          "goal",
+          "subjects",
+          "overlap"
+        ],
+        "properties": {
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventSubjectKey"
+            }
+          },
+          "overlap": {
+            "type": "string",
+            "enum": [
+              "subject",
+              "footprint"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Another change near this one. Footprint overlap is exposure: it never opens a conflict."
+      },
+      "EventNextAction": {
+        "type": "object",
+        "required": [
+          "kind",
+          "title"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "call",
+              "wait",
+              "read",
+              "escalate"
+            ],
+            "description": "`call` an operation, `wait` and retry, `read` something first, or `escalate` to a person."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operationId": {
+            "type": "string",
+            "description": "The operation to call, for `call` and `read`."
+          },
+          "args": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Arguments to pass to it, pre-filled."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "What an agent can do next, attached to every bounce."
+      },
       "EventPage": {
         "type": "object",
         "required": [
-          "items"
+          "items",
+          "nextCursor"
         ],
         "properties": {
           "items": {
@@ -5276,12 +7005,107 @@
           },
           "nextCursor": {
             "type": "string",
-            "description": "Absent on the last page."
+            "description": "The cursor just after the last item returned. Always present, even on the\nlast page: pass it back as `cursor` to read only what is newer."
           }
         },
         "additionalProperties": {
           "not": {}
         }
+      },
+      "EventPrecedentRef": {
+        "type": "object",
+        "required": [
+          "decisionId",
+          "summary",
+          "decidedAt"
+        ],
+        "properties": {
+          "decisionId": {
+            "$ref": "#/components/schemas/DecisionId"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "decidedAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "scope": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "EventProposition": {
+        "type": "object",
+        "required": [
+          "subject",
+          "predicate",
+          "relation",
+          "value"
+        ],
+        "properties": {
+          "subject": {
+            "$ref": "#/components/schemas/EventSubjectKey"
+          },
+          "predicate": {
+            "$ref": "#/components/schemas/MFP.Predicate"
+          },
+          "relation": {
+            "$ref": "#/components/schemas/MFP.Relation"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number",
+                "format": "double"
+              },
+              {
+                "type": "boolean"
+              }
+            ],
+            "description": "Read on the predicate's lattice, as in `MFP.Proposition.value`."
+          },
+          "unit": {
+            "type": "string",
+            "description": "The unit of a `bound` value, e.g. `ms`."
+          },
+          "scope": {
+            "type": "string",
+            "description": "`;`-separated `key:value` pairs, e.g. `env:prod|staging;tenant:t1`. Absent means everywhere."
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventAnchor"
+            }
+          },
+          "gloss": {
+            "type": "string"
+          },
+          "strength": {
+            "type": "string",
+            "enum": [
+              "must",
+              "should"
+            ],
+            "description": "The holder's declared kind of reliance, not a confidence."
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventCitation"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A typed statement about a subject: a premise a change relies on, or an effect it causes."
       },
       "EventRecord": {
         "type": "object",
@@ -5327,14 +7151,46 @@
             "format": "date-time"
           },
           "payload": {
-            "type": "object",
-            "additionalProperties": {}
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/KeelEvent"
+              }
+            ],
+            "description": "The event itself; `type` is its `_tag`."
           }
         },
         "additionalProperties": {
           "not": {}
         },
         "description": "One entry of the operation log, as published."
+      },
+      "EventRecordCitation": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "id"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "record"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An MFP record, by id."
+      },
+      "EventSubjectKey": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+        "description": "A subject key as events carry it: the API's `SubjectKey` without its length cap."
       },
       "Finding": {
         "type": "object",
@@ -5370,6 +7226,101 @@
           "not": {}
         },
         "description": "Something Keel found that the agent should know about."
+      },
+      "GuardAdmitted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "guardId",
+          "probeId",
+          "conflictId",
+          "runs"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "GuardAdmitted"
+            ]
+          },
+          "guardId": {
+            "$ref": "#/components/schemas/GuardId"
+          },
+          "probeId": {
+            "$ref": "#/components/schemas/ProbeId"
+          },
+          "conflictId": {
+            "$ref": "#/components/schemas/ConflictId"
+          },
+          "runs": {
+            "type": "integer"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "GuardFailed": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "guardId",
+          "batchId",
+          "candidateId",
+          "world"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "GuardFailed"
+            ]
+          },
+          "guardId": {
+            "$ref": "#/components/schemas/GuardId"
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          },
+          "candidateId": {
+            "$ref": "#/components/schemas/CandidateId"
+          },
+          "world": {
+            "$ref": "#/components/schemas/World"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "GuardId": {
+        "type": "string",
+        "pattern": "^grd_[0-9A-HJKMNP-TV-Z]{26}$"
+      },
+      "GuardRetired": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "guardId",
+          "decisionId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "GuardRetired"
+            ]
+          },
+          "guardId": {
+            "$ref": "#/components/schemas/GuardId"
+          },
+          "decisionId": {
+            "$ref": "#/components/schemas/DecisionId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "InboxEnvelope": {
         "type": "object",
@@ -5444,6 +7395,130 @@
           "not": {}
         }
       },
+      "Instant": {
+        "type": "number",
+        "format": "double",
+        "description": "A point in time, as milliseconds since the Unix epoch: how events carry time."
+      },
+      "IntentDeclared": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "agentId",
+          "origin",
+          "revision",
+          "goal",
+          "footprint",
+          "premises",
+          "leaseId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "IntentDeclared"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/ChangeOrigin"
+          },
+          "sketchId": {
+            "$ref": "#/components/schemas/SketchId"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 1
+          },
+          "footprint": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.FootprintEntry"
+            }
+          },
+          "premises": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventProposition"
+            }
+          },
+          "declaredEffects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventProposition"
+            }
+          },
+          "leaseId": {
+            "$ref": "#/components/schemas/LeaseId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "IntentRevised": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "revision",
+          "premisesAdded",
+          "premisesRetracted"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "IntentRevised"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "footprint": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.FootprintEntry"
+            }
+          },
+          "premisesAdded": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventProposition"
+            }
+          },
+          "premisesRetracted": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventProposition"
+            }
+          },
+          "declaredEffects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventProposition"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "Issue": {
         "type": "object",
         "required": [
@@ -5499,6 +7574,275 @@
           "not": {}
         },
         "description": "OAuth2 client credentials. A client exchanges its id and secret at the token\nendpoint for a short-lived Ed25519-signed JWT carrying its scopes."
+      },
+      "KeelEvent": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/AgentEnrolled"
+          },
+          {
+            "$ref": "#/components/schemas/AgentSuspended"
+          },
+          {
+            "$ref": "#/components/schemas/AgentReinstated"
+          },
+          {
+            "$ref": "#/components/schemas/AgentRevoked"
+          },
+          {
+            "$ref": "#/components/schemas/IntentDeclared"
+          },
+          {
+            "$ref": "#/components/schemas/PreflightIssued"
+          },
+          {
+            "$ref": "#/components/schemas/IntentRevised"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeStarted"
+          },
+          {
+            "$ref": "#/components/schemas/PremiseRelied"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeSubmitted"
+          },
+          {
+            "$ref": "#/components/schemas/PrecheckStarted"
+          },
+          {
+            "$ref": "#/components/schemas/EffectsDerived"
+          },
+          {
+            "$ref": "#/components/schemas/DriftDetected"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeDrifted"
+          },
+          {
+            "$ref": "#/components/schemas/PlanCompiled"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeQueued"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeBatched"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeRequeued"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeLanded"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeBounced"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeParked"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeResumed"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeAdopted"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeWithdrawn"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeSuperseded"
+          },
+          {
+            "$ref": "#/components/schemas/LeaseLapsed"
+          },
+          {
+            "$ref": "#/components/schemas/SubjectMinted"
+          },
+          {
+            "$ref": "#/components/schemas/PremiseSuspected"
+          },
+          {
+            "$ref": "#/components/schemas/PremiseReaffirmed"
+          },
+          {
+            "$ref": "#/components/schemas/SketchOpened"
+          },
+          {
+            "$ref": "#/components/schemas/SketchPromoted"
+          },
+          {
+            "$ref": "#/components/schemas/SketchExpired"
+          },
+          {
+            "$ref": "#/components/schemas/SketchDiscarded"
+          },
+          {
+            "$ref": "#/components/schemas/WorkspaceForked"
+          },
+          {
+            "$ref": "#/components/schemas/WorkspaceGranted"
+          },
+          {
+            "$ref": "#/components/schemas/WorkspaceReassigned"
+          },
+          {
+            "$ref": "#/components/schemas/WorkspacePushed"
+          },
+          {
+            "$ref": "#/components/schemas/WorkspaceCollected"
+          },
+          {
+            "$ref": "#/components/schemas/ConflictSuspected"
+          },
+          {
+            "$ref": "#/components/schemas/ProbeDrafted"
+          },
+          {
+            "$ref": "#/components/schemas/ProbeRan"
+          },
+          {
+            "$ref": "#/components/schemas/ProbeDiscarded"
+          },
+          {
+            "$ref": "#/components/schemas/ConflictProven"
+          },
+          {
+            "$ref": "#/components/schemas/ConflictDismissed"
+          },
+          {
+            "$ref": "#/components/schemas/ConflictEscalated"
+          },
+          {
+            "$ref": "#/components/schemas/ConflictResolved"
+          },
+          {
+            "$ref": "#/components/schemas/GuardAdmitted"
+          },
+          {
+            "$ref": "#/components/schemas/GuardRetired"
+          },
+          {
+            "$ref": "#/components/schemas/GuardFailed"
+          },
+          {
+            "$ref": "#/components/schemas/VerdictIssued"
+          },
+          {
+            "$ref": "#/components/schemas/EscalationRaised"
+          },
+          {
+            "$ref": "#/components/schemas/EscalationWithdrawn"
+          },
+          {
+            "$ref": "#/components/schemas/BatchFormed"
+          },
+          {
+            "$ref": "#/components/schemas/CandidateAssembled"
+          },
+          {
+            "$ref": "#/components/schemas/VerificationStarted"
+          },
+          {
+            "$ref": "#/components/schemas/BatchVerified"
+          },
+          {
+            "$ref": "#/components/schemas/BatchFailed"
+          },
+          {
+            "$ref": "#/components/schemas/CandidateBisected"
+          },
+          {
+            "$ref": "#/components/schemas/CandidateInvalidated"
+          },
+          {
+            "$ref": "#/components/schemas/CandidatePromoted"
+          },
+          {
+            "$ref": "#/components/schemas/TrunkAdvanced"
+          },
+          {
+            "$ref": "#/components/schemas/PromotionDeclined"
+          },
+          {
+            "$ref": "#/components/schemas/PromotionFrozen"
+          },
+          {
+            "$ref": "#/components/schemas/PromotionResumed"
+          },
+          {
+            "$ref": "#/components/schemas/TrunkInitialized"
+          },
+          {
+            "$ref": "#/components/schemas/PromotionStarted"
+          },
+          {
+            "$ref": "#/components/schemas/PromotionComposed"
+          },
+          {
+            "$ref": "#/components/schemas/AuditCompleted"
+          },
+          {
+            "$ref": "#/components/schemas/RulingGiven"
+          },
+          {
+            "$ref": "#/components/schemas/DecisionRecorded"
+          },
+          {
+            "$ref": "#/components/schemas/DecisionSuperseded"
+          },
+          {
+            "$ref": "#/components/schemas/DecisionOverruled"
+          },
+          {
+            "$ref": "#/components/schemas/PrecedentSurfaced"
+          },
+          {
+            "$ref": "#/components/schemas/PrecedentFollowed"
+          },
+          {
+            "$ref": "#/components/schemas/PrecedentDistinguished"
+          },
+          {
+            "$ref": "#/components/schemas/OverruleRequested"
+          },
+          {
+            "$ref": "#/components/schemas/TenetEstablished"
+          },
+          {
+            "$ref": "#/components/schemas/TenetContested"
+          },
+          {
+            "$ref": "#/components/schemas/TenetReaffirmed"
+          },
+          {
+            "$ref": "#/components/schemas/TenetRetracted"
+          },
+          {
+            "$ref": "#/components/schemas/TenetSuperseded"
+          },
+          {
+            "$ref": "#/components/schemas/SessionOpened"
+          },
+          {
+            "$ref": "#/components/schemas/MessagesCaptured"
+          },
+          {
+            "$ref": "#/components/schemas/SessionRedacted"
+          },
+          {
+            "$ref": "#/components/schemas/PreviewDeployed"
+          },
+          {
+            "$ref": "#/components/schemas/PreviewTornDown"
+          },
+          {
+            "$ref": "#/components/schemas/DeploymentPromoted"
+          },
+          {
+            "$ref": "#/components/schemas/DeploymentRolledBack"
+          }
+        ],
+        "description": "Any event in the catalogue. `_tag` names it."
       },
       "LanePage": {
         "type": "object",
@@ -5577,6 +7921,35 @@
       "LeaseId": {
         "type": "string",
         "pattern": "^lse_[0-9A-HJKMNP-TV-Z]{26}$"
+      },
+      "LeaseLapsed": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "leaseId",
+          "renewedAt"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "LeaseLapsed"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "leaseId": {
+            "$ref": "#/components/schemas/LeaseId"
+          },
+          "renewedAt": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "MFP.Actor": {
         "type": "object",
@@ -7068,6 +9441,39 @@
         },
         "description": "The fields every record carries."
       },
+      "MessagesCaptured": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "sessionId",
+          "fromSeq",
+          "toSeq",
+          "bundleRef"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "MessagesCaptured"
+            ]
+          },
+          "sessionId": {
+            "$ref": "#/components/schemas/SessionId"
+          },
+          "fromSeq": {
+            "type": "integer"
+          },
+          "toSeq": {
+            "type": "integer"
+          },
+          "bundleRef": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "Move": {
         "type": "string",
         "enum": [
@@ -7309,6 +9715,146 @@
           "not": {}
         }
       },
+      "OverruleRequested": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "decisionId",
+          "changeId",
+          "argument"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "OverruleRequested"
+            ]
+          },
+          "decisionId": {
+            "$ref": "#/components/schemas/DecisionId"
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "argument": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ParkReason": {
+        "type": "string",
+        "enum": [
+          "awaiting-ruling",
+          "lease-lapsed"
+        ]
+      },
+      "Party": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          {
+            "$ref": "#/components/schemas/TenetId"
+          }
+        ],
+        "description": "A party to a conflict: a change, or a tenet."
+      },
+      "PlanCompiled": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "revision",
+          "planHash",
+          "steps",
+          "costEstimate"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PlanCompiled"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "planHash": {
+            "$ref": "#/components/schemas/ContentHash"
+          },
+          "steps": {
+            "type": "integer",
+            "description": "How many steps the plan has."
+          },
+          "costEstimate": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "PrecedentDistinguished": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "decisionId",
+          "changeId",
+          "distinction"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PrecedentDistinguished"
+            ]
+          },
+          "decisionId": {
+            "$ref": "#/components/schemas/DecisionId"
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "distinction": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "PrecedentFollowed": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "decisionId",
+          "changeId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PrecedentFollowed"
+            ]
+          },
+          "decisionId": {
+            "$ref": "#/components/schemas/DecisionId"
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "PrecedentRef": {
         "type": "object",
         "required": [
@@ -7328,6 +9874,60 @@
             "format": "date-time"
           },
           "scope": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "PrecedentSurfaced": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "decisionId",
+          "changeId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PrecedentSurfaced"
+            ]
+          },
+          "decisionId": {
+            "$ref": "#/components/schemas/DecisionId"
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "PrecheckStarted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "revision",
+          "instanceId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PrecheckStarted"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "instanceId": {
             "type": "string"
           }
         },
@@ -7371,9 +9971,328 @@
         },
         "description": "What Keel tells an agent as soon as it declares an intent."
       },
+      "PreflightIssued": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "revision",
+          "neighbours",
+          "contradictions",
+          "precedents",
+          "suggestedMove"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PreflightIssued"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "neighbours": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventNeighbour"
+            }
+          },
+          "contradictions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventContradiction"
+            }
+          },
+          "precedents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventPrecedentRef"
+            }
+          },
+          "suggestedMove": {
+            "$ref": "#/components/schemas/Move"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "PremiseReaffirmed": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "subjectId",
+          "changeId",
+          "premise"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PremiseReaffirmed"
+            ]
+          },
+          "subjectId": {
+            "$ref": "#/components/schemas/SubjectId"
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "premise": {
+            "$ref": "#/components/schemas/EventProposition"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "PremiseRelied": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "subjectId",
+          "changeId",
+          "premise"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PremiseRelied"
+            ]
+          },
+          "subjectId": {
+            "$ref": "#/components/schemas/SubjectId"
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "premise": {
+            "$ref": "#/components/schemas/EventProposition"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "PremiseSuspected": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "subjectId",
+          "changeId",
+          "premise",
+          "cause"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PremiseSuspected"
+            ]
+          },
+          "subjectId": {
+            "$ref": "#/components/schemas/SubjectId"
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "premise": {
+            "$ref": "#/components/schemas/EventProposition"
+          },
+          "cause": {
+            "type": "object",
+            "properties": {
+              "changeId": {
+                "$ref": "#/components/schemas/ChangeId"
+              },
+              "effect": {
+                "$ref": "#/components/schemas/EventProposition"
+              }
+            },
+            "required": [
+              "changeId",
+              "effect"
+            ],
+            "additionalProperties": {
+              "not": {}
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "PreviewDeployed": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "deploymentId",
+          "world",
+          "adapter",
+          "url"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PreviewDeployed"
+            ]
+          },
+          "deploymentId": {
+            "$ref": "#/components/schemas/DeploymentId"
+          },
+          "world": {
+            "type": "string"
+          },
+          "adapter": {
+            "$ref": "#/components/schemas/DeployTarget"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "PreviewTornDown": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "deploymentId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PreviewTornDown"
+            ]
+          },
+          "deploymentId": {
+            "$ref": "#/components/schemas/DeploymentId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ProbeDiscarded": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "probeId",
+          "reason"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ProbeDiscarded"
+            ]
+          },
+          "probeId": {
+            "$ref": "#/components/schemas/ProbeId"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "non-discriminating",
+              "unstable",
+              "draft-failed"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ProbeDrafted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "probeId",
+          "conflictId",
+          "attempts",
+          "bundleHash"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ProbeDrafted"
+            ]
+          },
+          "probeId": {
+            "$ref": "#/components/schemas/ProbeId"
+          },
+          "conflictId": {
+            "$ref": "#/components/schemas/ConflictId"
+          },
+          "attempts": {
+            "type": "integer"
+          },
+          "bundleHash": {
+            "$ref": "#/components/schemas/ContentHash"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "ProbeId": {
         "type": "string",
         "pattern": "^prb_[0-9A-HJKMNP-TV-Z]{26}$"
+      },
+      "ProbeRan": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "probeId",
+          "conflictId",
+          "world",
+          "run",
+          "outcome",
+          "resultRef"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ProbeRan"
+            ]
+          },
+          "probeId": {
+            "$ref": "#/components/schemas/ProbeId"
+          },
+          "conflictId": {
+            "$ref": "#/components/schemas/ConflictId"
+          },
+          "world": {
+            "$ref": "#/components/schemas/World"
+          },
+          "run": {
+            "type": "integer"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "n/a"
+            ]
+          },
+          "resultRef": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "ProblemCode": {
         "type": "string",
@@ -7542,6 +10461,198 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "PromotionComposed": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "groupId",
+          "sha"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PromotionComposed"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "groupId": {
+            "type": "string"
+          },
+          "sha": {
+            "$ref": "#/components/schemas/CommitSha"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The group's composed commit, recorded before the first push: every retry pushes this SHA."
+      },
+      "PromotionDeclined": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "batchId",
+          "reason",
+          "reverify"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PromotionDeclined"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "commutation-failed",
+              "frozen"
+            ],
+            "description": "`frozen`: the batch was in the group a freeze stopped, and the operator's resume drops it."
+          },
+          "reverify": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeId"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "PromotionFrozen": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "groupId",
+          "expected",
+          "observed"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PromotionFrozen"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "groupId": {
+            "type": "string"
+          },
+          "expected": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "observed": {
+            "$ref": "#/components/schemas/CommitSha"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "PromotionResumed": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PromotionResumed"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "by": {
+            "type": "string"
+          },
+          "head": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The head the operator confirms trunk is at; optional only so older events still decode."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "PromotionStarted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "groupId",
+          "old",
+          "members",
+          "batches",
+          "proofIds",
+          "committerTime"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "PromotionStarted"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "groupId": {
+            "type": "string"
+          },
+          "old": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeId"
+            }
+          },
+          "batches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BatchId"
+            }
+          },
+          "proofIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "committerTime": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The write-ahead log entry (ADR 0003): the group about to be pushed, written before the compose."
       },
       "Relied": {
         "type": "object",
@@ -7822,6 +10933,38 @@
         },
         "description": "Every work-loop response: the result, plus what the agent should know and do next."
       },
+      "RulingGiven": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "escalationId",
+          "option",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "RulingGiven"
+            ]
+          },
+          "escalationId": {
+            "$ref": "#/components/schemas/EscalationId"
+          },
+          "option": {
+            "type": "string"
+          },
+          "by": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "RulingRequest": {
         "type": "object",
         "required": [
@@ -7884,6 +11027,84 @@
         "type": "string",
         "pattern": "^ses_[0-9A-HJKMNP-TV-Z]{26}$"
       },
+      "SessionOpened": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "sessionId",
+          "agentId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "SessionOpened"
+            ]
+          },
+          "sessionId": {
+            "$ref": "#/components/schemas/SessionId"
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "harness": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "SessionRedacted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "sessionId",
+          "ranges",
+          "reason"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "SessionRedacted"
+            ]
+          },
+          "sessionId": {
+            "$ref": "#/components/schemas/SessionId"
+          },
+          "ranges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fromSeq": {
+                  "type": "integer"
+                },
+                "toSeq": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "fromSeq",
+                "toSeq"
+              ],
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "SessionRef": {
         "type": "object",
         "required": [
@@ -7892,6 +11113,31 @@
         "properties": {
           "id": {
             "$ref": "#/components/schemas/SessionId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "SketchDiscarded": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "sketchId",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "SketchDiscarded"
+            ]
+          },
+          "sketchId": {
+            "$ref": "#/components/schemas/SketchId"
+          },
+          "by": {
+            "type": "string"
           }
         },
         "additionalProperties": {
@@ -7949,9 +11195,88 @@
         },
         "description": "Every work-loop response: the result, plus what the agent should know and do next."
       },
+      "SketchExpired": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "sketchId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "SketchExpired"
+            ]
+          },
+          "sketchId": {
+            "$ref": "#/components/schemas/SketchId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "SketchId": {
         "type": "string",
         "pattern": "^sk_[0-9A-HJKMNP-TV-Z]{26}$"
+      },
+      "SketchOpened": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "sketchId",
+          "agentId",
+          "workspaceId",
+          "expiresAt"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "SketchOpened"
+            ]
+          },
+          "sketchId": {
+            "$ref": "#/components/schemas/SketchId"
+          },
+          "agentId": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "workspaceId": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "expiresAt": {
+            "$ref": "#/components/schemas/Instant"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "SketchPromoted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "sketchId",
+          "changeId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "SketchPromoted"
+            ]
+          },
+          "sketchId": {
+            "$ref": "#/components/schemas/SketchId"
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "SketchRequest": {
         "type": "object",
@@ -8003,6 +11328,51 @@
         "maxLength": 200,
         "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$",
         "description": "A subject key, e.g. `authz.permission-evaluation`."
+      },
+      "SubjectMinted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "subjectId",
+          "key",
+          "anchors",
+          "gloss",
+          "mintedBy"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "SubjectMinted"
+            ]
+          },
+          "subjectId": {
+            "$ref": "#/components/schemas/SubjectId"
+          },
+          "key": {
+            "$ref": "#/components/schemas/EventSubjectKey"
+          },
+          "anchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventAnchor"
+            }
+          },
+          "gloss": {
+            "type": "string"
+          },
+          "mintedBy": {
+            "type": "string",
+            "enum": [
+              "scan",
+              "clef",
+              "agent"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "Submission": {
         "type": "object",
@@ -8113,6 +11483,178 @@
           "not": {}
         }
       },
+      "TenetContested": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "tenetId",
+          "conflictId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "TenetContested"
+            ]
+          },
+          "tenetId": {
+            "$ref": "#/components/schemas/TenetId"
+          },
+          "conflictId": {
+            "$ref": "#/components/schemas/ConflictId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "TenetEstablished": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "tenetId",
+          "subjectId",
+          "predicate",
+          "value",
+          "changeId",
+          "guardIds"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "TenetEstablished"
+            ]
+          },
+          "tenetId": {
+            "$ref": "#/components/schemas/TenetId"
+          },
+          "subjectId": {
+            "$ref": "#/components/schemas/SubjectId"
+          },
+          "predicate": {
+            "$ref": "#/components/schemas/MFP.Predicate"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number",
+                "format": "double"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "guardIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GuardId"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "TenetId": {
+        "type": "string",
+        "pattern": "^tnt_[0-9A-HJKMNP-TV-Z]{26}$"
+      },
+      "TenetReaffirmed": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "tenetId",
+          "conflictId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "TenetReaffirmed"
+            ]
+          },
+          "tenetId": {
+            "$ref": "#/components/schemas/TenetId"
+          },
+          "conflictId": {
+            "$ref": "#/components/schemas/ConflictId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "TenetRetracted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "tenetId",
+          "changeId",
+          "decisionId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "TenetRetracted"
+            ]
+          },
+          "tenetId": {
+            "$ref": "#/components/schemas/TenetId"
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "decisionId": {
+            "$ref": "#/components/schemas/DecisionId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "TenetSuperseded": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "tenetId",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "TenetSuperseded"
+            ]
+          },
+          "tenetId": {
+            "$ref": "#/components/schemas/TenetId"
+          },
+          "by": {
+            "$ref": "#/components/schemas/TenetId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "Tier": {
+        "type": "number",
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "description": "Where a step runs: 0 pure git inside a Durable Object, 1 a throwaway isolate, 2 a container."
+      },
       "TokenRequest": {
         "type": "object",
         "required": [
@@ -8175,6 +11717,83 @@
           "not": {}
         }
       },
+      "TrunkAdvanced": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "from",
+          "to",
+          "groupId",
+          "members",
+          "proofIds"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "TrunkAdvanced"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "from": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "to": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "groupId": {
+            "type": "string"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeId"
+            }
+          },
+          "proofIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "TrunkInitialized": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "head",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "TrunkInitialized"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "head": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "by": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The trunk's first known head, from the project's seed or an operator. Nothing promotes before it."
+      },
       "TrunkView": {
         "type": "object",
         "required": [
@@ -8212,6 +11831,57 @@
         "type": "string",
         "pattern": "^vrd_[0-9A-HJKMNP-TV-Z]{26}$"
       },
+      "VerdictIssued": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "verdictId",
+          "subject",
+          "outcome",
+          "evidence"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "VerdictIssued"
+            ]
+          },
+          "verdictId": {
+            "$ref": "#/components/schemas/VerdictId"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChangeId"
+              },
+              {
+                "$ref": "#/components/schemas/BatchId"
+              }
+            ]
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/VerdictOutcome"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "planHash": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContentHash"
+              }
+            ],
+            "description": "The plan the verdict was reached under. Absent means no plan, never a fabricated hash."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "VerdictOutcome": {
         "type": "string",
         "enum": [
@@ -8246,6 +11916,39 @@
           "issuedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "VerificationStarted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "candidateId",
+          "batchId",
+          "instanceId",
+          "planHash"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "VerificationStarted"
+            ]
+          },
+          "candidateId": {
+            "$ref": "#/components/schemas/CandidateId"
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          },
+          "instanceId": {
+            "type": "string"
+          },
+          "planHash": {
+            "$ref": "#/components/schemas/ContentHash"
           }
         },
         "additionalProperties": {
@@ -8453,9 +12156,172 @@
         },
         "description": "The throwaway repo a change or sketch is worked in, and how to push to it."
       },
+      "WorkspaceCollected": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "workspaceId",
+          "reason"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "WorkspaceCollected"
+            ]
+          },
+          "workspaceId": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "landed",
+              "withdrawn",
+              "expired"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "WorkspaceForked": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "workspaceId",
+          "repo",
+          "sourceRepo"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "WorkspaceForked"
+            ]
+          },
+          "workspaceId": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "repo": {
+            "type": "string"
+          },
+          "sourceRepo": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "WorkspaceGranted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "workspaceId",
+          "holder",
+          "expiresAt",
+          "baseSha"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "WorkspaceGranted"
+            ]
+          },
+          "workspaceId": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "holder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChangeId"
+              },
+              {
+                "$ref": "#/components/schemas/SketchId"
+              }
+            ]
+          },
+          "expiresAt": {
+            "$ref": "#/components/schemas/Instant"
+          },
+          "baseSha": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The workspace's head when granted: the change's base."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "WorkspaceId": {
         "type": "string",
         "pattern": "^wsp_[0-9A-HJKMNP-TV-Z]{26}$"
+      },
+      "WorkspacePushed": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "workspaceId",
+          "ref",
+          "sha"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "WorkspacePushed"
+            ]
+          },
+          "workspaceId": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "sha": {
+            "$ref": "#/components/schemas/CommitSha"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "WorkspaceReassigned": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "workspaceId",
+          "sketchId",
+          "changeId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "WorkspaceReassigned"
+            ]
+          },
+          "workspaceId": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "sketchId": {
+            "$ref": "#/components/schemas/SketchId"
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A promoted sketch's workspace passes to the change it became."
       },
       "WorkspaceReleased": {
         "type": "object",
@@ -8475,6 +12341,16 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "World": {
+        "type": "string",
+        "enum": [
+          "trunk",
+          "A",
+          "B",
+          "AB"
+        ],
+        "description": "One combination of changes evaluated together."
       }
     },
     "securitySchemes": {

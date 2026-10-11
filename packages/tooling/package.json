@@ -17,7 +17,10 @@
     "oxc-parser": "catalog:"
   },
   "devDependencies": {
+    "@keeltown/contracts": "workspace:*",
+    "@keeltown/core": "workspace:*",
     "@types/node": "catalog:",
+    "effect": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

@@ -11,6 +11,7 @@ import "./workspaces.tsp";
 import "./submissions.tsp";
 import "./conflicts.tsp";
 import "./memory.tsp";
+import "./events.tsp";
 import "./inbox.tsp";
 import "./views.tsp";
 import "./operator.tsp";

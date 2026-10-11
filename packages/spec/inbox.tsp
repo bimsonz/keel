@@ -1,6 +1,7 @@
 import "@typespec/http";
 import "@typespec/openapi";
 import "./common.tsp";
+import "./events.tsp";
 
 using Http;
 using OpenAPI;
@@ -26,10 +27,20 @@ model EventRecord {
   };
   seq: int32;
   at: utcDateTime;
-  payload: Record<unknown>;
+
+  /** The event itself; `type` is its `_tag`. */
+  payload: KeelEvent;
 }
 
-model EventPage is Page<EventRecord>;
+model EventPage {
+  items: EventRecord[];
+
+  /**
+   * The cursor just after the last item returned. Always present, even on the
+   * last page: pass it back as `cursor` to read only what is newer.
+   */
+  nextCursor: string;
+}
 
 @tag("Inbox")
 interface Inbox {

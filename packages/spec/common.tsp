@@ -54,6 +54,18 @@ scalar EventId extends string;
 @pattern("^prj_[0-9A-HJKMNP-TV-Z]{26}$")
 scalar ProjectId extends string;
 
+@pattern("^bat_[0-9A-HJKMNP-TV-Z]{26}$")
+scalar BatchId extends string;
+
+@pattern("^grd_[0-9A-HJKMNP-TV-Z]{26}$")
+scalar GuardId extends string;
+
+@pattern("^tnt_[0-9A-HJKMNP-TV-Z]{26}$")
+scalar TenetId extends string;
+
+@pattern("^dpl_[0-9A-HJKMNP-TV-Z]{26}$")
+scalar DeploymentId extends string;
+
 /**
  * A sponsor: the human an agent acts on behalf of, accountable for its changes
  * and the first person an escalation goes to. A `scheme:value` address, e.g.
@@ -66,6 +78,10 @@ scalar Sponsor extends string;
 /** A git object id: 40 hexadecimal characters (SHA-1) or 64 (SHA-256). */
 @pattern("^([0-9a-f]{40}|[0-9a-f]{64})$")
 scalar CommitSha extends string;
+
+/** A content address: `sha256:` and 64 lowercase hex digits. Bundles and plans are named by one. */
+@pattern("^sha256:[0-9a-f]{64}$")
+scalar ContentHash extends string;
 
 /** A subject key, e.g. `authz.permission-evaluation`. */
 @pattern("^[a-z0-9]+(?:[.-][a-z0-9]+)*$")

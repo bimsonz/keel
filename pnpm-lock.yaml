@@ -413,9 +413,18 @@ importers:
         specifier: 'catalog:'
         version: 0.153.0
     devDependencies:
+      '@keeltown/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@keeltown/core':
+        specifier: workspace:*
+        version: link:../core
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.5
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.2
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

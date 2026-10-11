@@ -1,0 +1,1096 @@
+import "@typespec/http";
+import "@bimsonz/mfp";
+import "./common.tsp";
+import "./models.tsp";
+import "./agents.tsp";
+
+namespace Keel;
+
+// The event catalogue (docs/domain/events.md) as published in `EventRecord.payload`:
+// one model per event, named as the event, each mirroring the JSON form of its
+// schema in `packages/core/src/domain/<context>/events.ts`. The conformance test
+// `packages/tooling/test/event-catalogue.test.ts` keeps the two equal.
+//
+// Shapes the API already publishes are reused where core's match them exactly
+// (`MFP.FootprintEntry`, `Move`, `Scope`, the id scalars). Where they differ, an
+// `Event*` model carries core's shape and the published one keeps its own:
+// `EventProposition` (subject a key, not any string; `_tag` citations, not `kind`;
+// no default strength), `EventAnchor` (a commit SHA, not any 4+ characters),
+// `EventSubjectKey` and `EventNeighbour` (no length cap on a subject key),
+// `EventContradiction` (through the proposition), `EventPrecedentRef` (`decidedAt`
+// in epoch milliseconds, not a date-time), `EventNextAction` (a non-empty title,
+// no `notBefore`) and `EventDerivedEffect` (one shape, not MFP's three by method).
+
+// ─── Shared shapes ──────────────────────────────────────────────────────────
+
+/** A point in time, as milliseconds since the Unix epoch: how events carry time. */
+scalar Instant extends float64;
+
+/** A subject key as events carry it: the API's `SubjectKey` without its length cap. */
+@pattern("^[a-z0-9]+(?:[.-][a-z0-9]+)*$")
+scalar EventSubjectKey extends string;
+
+/** A code symbol pinned to a commit. */
+model EventAnchor {
+  @minLength(1)
+  path: string;
+
+  symbol?: string;
+  commit: CommitSha;
+}
+
+/** A numbered session message. */
+model EventMessageCitation {
+  _tag: "message";
+  session: SessionId;
+  seq: integer;
+}
+
+model EventAnchorCitation {
+  _tag: "anchor";
+  anchor: EventAnchor;
+}
+
+/** An MFP record, by id. */
+model EventRecordCitation {
+  _tag: "record";
+
+  @minLength(1)
+  id: string;
+}
+
+/** What a claim rests on: a numbered session message, a code anchor, or an MFP record. */
+union EventCitation {
+  message: EventMessageCitation,
+  anchor: EventAnchorCitation,
+  record: EventRecordCitation,
+}
+
+/** A typed statement about a subject: a premise a change relies on, or an effect it causes. */
+model EventProposition {
+  subject: EventSubjectKey;
+  predicate: MFP.Predicate;
+  relation: MFP.Relation;
+
+  /** Read on the predicate's lattice, as in `MFP.Proposition.value`. */
+  value: string | float64 | boolean;
+
+  /** The unit of a `bound` value, e.g. `ms`. */
+  unit?: string;
+
+  /** `;`-separated `key:value` pairs, e.g. `env:prod|staging;tenant:t1`. Absent means everywhere. */
+  scope?: string;
+
+  anchors?: EventAnchor[];
+  gloss?: string;
+
+  /** The holder's declared kind of reliance, not a confidence. */
+  strength?: "must" | "should";
+
+  cites?: EventCitation[];
+}
+
+/** What an agent can do next, attached to every bounce. */
+model EventNextAction {
+  /** `call` an operation, `wait` and retry, `read` something first, or `escalate` to a person. */
+  kind: "call" | "wait" | "read" | "escalate";
+
+  @minLength(1)
+  title: string;
+
+  /** The operation to call, for `call` and `read`. */
+  operationId?: string;
+
+  /** Arguments to pass to it, pre-filled. */
+  args?: Record<unknown>;
+}
+
+union EntityKind {
+  agent: "agent",
+  session: "session",
+  change: "change",
+  subject: "subject",
+  sketch: "sketch",
+  workspace: "workspace",
+  conflict: "conflict",
+  probe: "probe",
+  guard: "guard",
+  verdict: "verdict",
+  batch: "batch",
+  candidate: "candidate",
+  project: "project",
+
+  /** The Trunk DO's promotion state, keyed by project (`trunk:<projectId>`). */
+  trunk: "trunk",
+
+  decision: "decision",
+  tenet: "tenet",
+  escalation: "escalation",
+  deployment: "deployment",
+}
+
+/** An entity a Durable Object owns. */
+model EntityRef {
+  kind: EntityKind;
+  id: string;
+}
+
+// ─── Coordination ───────────────────────────────────────────────────────────
+
+union ChangeOrigin {
+  agent: "agent",
+  auditor: "auditor",
+  operator: "operator",
+}
+
+union ParkReason {
+  awaitingRuling: "awaiting-ruling",
+  leaseLapsed: "lease-lapsed",
+}
+
+/** Another change near this one. Footprint overlap is exposure: it never opens a conflict. */
+model EventNeighbour {
+  changeId: ChangeId;
+  goal: string;
+  subjects: EventSubjectKey[];
+  overlap: "subject" | "footprint";
+}
+
+/** A premise of this change that contradicts another change's premise, or a tenet. */
+model EventContradiction {
+  premise: EventProposition;
+  with: EventProposition;
+
+  /** The change or tenet holding the other proposition. */
+  holder: string;
+}
+
+model EventPrecedentRef {
+  decisionId: DecisionId;
+  summary: string;
+  decidedAt: Instant;
+  scope?: string;
+}
+
+/** How an effect was found. An extractor's finding is proof; a model's is opinion. */
+union DerivationMethod {
+  extractor: "extractor",
+  clef: "clef",
+  codeModel: "code-model",
+}
+
+/** What a change alters, as Keel derived it from the diff. */
+model EventDerivedEffect {
+  proposition: EventProposition;
+  method: DerivationMethod;
+  evidenceClass: MFP.EvidenceClass;
+
+  /** The model's probability, when a model answered. */
+  p?: float64;
+
+  anchors: EventAnchor[];
+  declared: boolean;
+
+  /** A premise or tenet this effect contradicts, by reference. */
+  contradicts?: string;
+}
+
+union DriftClass {
+  footprint: "footprint",
+  undeclaredEffect: "undeclared-effect",
+  silentRetraction: "silent-retraction",
+}
+
+model Drift {
+  class: DriftClass;
+  severity: "low" | "medium" | "high";
+  detail: string;
+}
+
+model IntentDeclared {
+  _tag: "IntentDeclared";
+  changeId: ChangeId;
+  agentId: AgentId;
+  origin: ChangeOrigin;
+  sketchId?: SketchId;
+  revision: integer;
+
+  @minLength(1)
+  goal: string;
+
+  footprint: MFP.FootprintEntry[];
+  premises: EventProposition[];
+  declaredEffects?: EventProposition[];
+  leaseId: LeaseId;
+}
+
+model PreflightIssued {
+  _tag: "PreflightIssued";
+  changeId: ChangeId;
+  revision: integer;
+  neighbours: EventNeighbour[];
+  contradictions: EventContradiction[];
+  precedents: EventPrecedentRef[];
+  suggestedMove: Move;
+}
+
+model IntentRevised {
+  _tag: "IntentRevised";
+  changeId: ChangeId;
+  revision: integer;
+  goal?: string;
+  footprint?: MFP.FootprintEntry[];
+  premisesAdded: EventProposition[];
+  premisesRetracted: EventProposition[];
+  declaredEffects?: EventProposition[];
+}
+
+/** Declared → Working: the pool granted a workspace, or the promoted sketch's workspace was reassigned. */
+model ChangeStarted {
+  _tag: "ChangeStarted";
+  changeId: ChangeId;
+  workspaceId: WorkspaceId;
+
+  /** The workspace's head when granted: the change's base. Always set; optional only so older events still decode. */
+  baseSha?: CommitSha;
+}
+
+model PremiseRelied {
+  _tag: "PremiseRelied";
+  subjectId: SubjectId;
+  changeId: ChangeId;
+  premise: EventProposition;
+}
+
+model ChangeSubmitted {
+  _tag: "ChangeSubmitted";
+  changeId: ChangeId;
+  revision: integer;
+  commitSha: CommitSha;
+  workspaceId: WorkspaceId;
+}
+
+model PrecheckStarted {
+  _tag: "PrecheckStarted";
+  changeId: ChangeId;
+  revision: integer;
+  instanceId: string;
+}
+
+model EffectsDerived {
+  _tag: "EffectsDerived";
+  changeId: ChangeId;
+  revision: integer;
+  effects: EventDerivedEffect[];
+  derivationRef: string;
+}
+
+model DriftDetected {
+  _tag: "DriftDetected";
+  changeId: ChangeId;
+  revision: integer;
+  drift: Drift[];
+}
+
+model ChangeDrifted {
+  _tag: "ChangeDrifted";
+  changeId: ChangeId;
+  revision: integer;
+  blocking: Drift[];
+}
+
+model PlanCompiled {
+  _tag: "PlanCompiled";
+  changeId: ChangeId;
+  revision: integer;
+  planHash: ContentHash;
+
+  /** How many steps the plan has. */
+  steps: integer;
+
+  costEstimate: float64;
+}
+
+model ChangeQueued {
+  _tag: "ChangeQueued";
+  changeId: ChangeId;
+  laneId: string;
+}
+
+model ChangeBatched {
+  _tag: "ChangeBatched";
+  changeId: ChangeId;
+  batchId: BatchId;
+}
+
+model ChangeRequeued {
+  _tag: "ChangeRequeued";
+  changeId: ChangeId;
+  batchId: BatchId;
+  reason: "infra-failure" | "bisection" | "invalidated";
+}
+
+model ChangeLanded {
+  _tag: "ChangeLanded";
+  changeId: ChangeId;
+  commitSha: CommitSha;
+  trunkSha: CommitSha;
+  candidateId: CandidateId;
+  proofId: string;
+}
+
+model ChangeBounced {
+  _tag: "ChangeBounced";
+  changeId: ChangeId;
+  verdictId: VerdictId;
+  reasons: string[];
+
+  /** Always set, never empty; optional only so events committed before it was added still decode. */
+  nextActions?: EventNextAction[];
+}
+
+model ChangeParked {
+  _tag: "ChangeParked";
+  changeId: ChangeId;
+  reason: ParkReason;
+  escalationId?: EscalationId;
+}
+
+model ChangeResumed {
+  _tag: "ChangeResumed";
+  changeId: ChangeId;
+  decisionId: DecisionId;
+}
+
+model ChangeAdopted {
+  _tag: "ChangeAdopted";
+  changeId: ChangeId;
+  previousAgentId: AgentId;
+  agentId: AgentId;
+  leaseId: LeaseId;
+  briefRef: string;
+}
+
+model ChangeWithdrawn {
+  _tag: "ChangeWithdrawn";
+  changeId: ChangeId;
+  by: string;
+  reason?: string;
+}
+
+model ChangeSuperseded {
+  _tag: "ChangeSuperseded";
+  changeId: ChangeId;
+  by: ChangeId;
+  decisionId?: DecisionId;
+}
+
+model LeaseLapsed {
+  _tag: "LeaseLapsed";
+  changeId: ChangeId;
+  leaseId: LeaseId;
+  renewedAt: Instant;
+}
+
+model SubjectMinted {
+  _tag: "SubjectMinted";
+  subjectId: SubjectId;
+  key: EventSubjectKey;
+  anchors: EventAnchor[];
+  gloss: string;
+  mintedBy: "scan" | "clef" | "agent";
+}
+
+model PremiseSuspected {
+  _tag: "PremiseSuspected";
+  subjectId: SubjectId;
+  changeId: ChangeId;
+  premise: EventProposition;
+  cause: {
+    changeId: ChangeId;
+    effect: EventProposition;
+  };
+}
+
+model PremiseReaffirmed {
+  _tag: "PremiseReaffirmed";
+  subjectId: SubjectId;
+  changeId: ChangeId;
+  premise: EventProposition;
+}
+
+model SketchOpened {
+  _tag: "SketchOpened";
+  sketchId: SketchId;
+  agentId: AgentId;
+  workspaceId: WorkspaceId;
+  expiresAt: Instant;
+}
+
+model SketchPromoted {
+  _tag: "SketchPromoted";
+  sketchId: SketchId;
+  changeId: ChangeId;
+}
+
+model SketchExpired {
+  _tag: "SketchExpired";
+  sketchId: SketchId;
+}
+
+model SketchDiscarded {
+  _tag: "SketchDiscarded";
+  sketchId: SketchId;
+  by: string;
+}
+
+model WorkspaceForked {
+  _tag: "WorkspaceForked";
+  workspaceId: WorkspaceId;
+  repo: string;
+  sourceRepo: string;
+}
+
+model WorkspaceGranted {
+  _tag: "WorkspaceGranted";
+  workspaceId: WorkspaceId;
+  holder: ChangeId | SketchId;
+  expiresAt: Instant;
+
+  /** The workspace's head when granted: the change's base. */
+  baseSha: CommitSha;
+}
+
+/** A promoted sketch's workspace passes to the change it became. */
+model WorkspaceReassigned {
+  _tag: "WorkspaceReassigned";
+  workspaceId: WorkspaceId;
+  sketchId: SketchId;
+  changeId: ChangeId;
+}
+
+model WorkspacePushed {
+  _tag: "WorkspacePushed";
+  workspaceId: WorkspaceId;
+  ref: string;
+  sha: CommitSha;
+}
+
+model WorkspaceCollected {
+  _tag: "WorkspaceCollected";
+  workspaceId: WorkspaceId;
+  reason: "landed" | "withdrawn" | "expired";
+}
+
+// ─── Identity ───────────────────────────────────────────────────────────────
+
+model AgentEnrolled {
+  _tag: "AgentEnrolled";
+  agentId: AgentId;
+  projectId: ProjectId;
+
+  @minLength(1)
+  name: string;
+
+  kind: AgentKind;
+  scopes: Scope[];
+}
+
+model AgentSuspended {
+  _tag: "AgentSuspended";
+  agentId: AgentId;
+  reason: string;
+  by: string;
+}
+
+model AgentReinstated {
+  _tag: "AgentReinstated";
+  agentId: AgentId;
+  by: string;
+}
+
+model AgentRevoked {
+  _tag: "AgentRevoked";
+  agentId: AgentId;
+  revocationEpoch: integer;
+  by: string;
+}
+
+// ─── Verification ───────────────────────────────────────────────────────────
+
+/** A party to a conflict: a change, or a tenet. */
+union Party {
+  ChangeId,
+  TenetId,
+}
+
+/** One combination of changes evaluated together. */
+union World {
+  trunk: "trunk",
+  a: "A",
+  b: "B",
+  ab: "AB",
+}
+
+model ConflictSuspected {
+  _tag: "ConflictSuspected";
+  conflictId: ConflictId;
+  kind: ConflictKind;
+  parties: Party[];
+  subjectId?: SubjectId;
+  predicate?: MFP.Predicate;
+}
+
+model ProbeDrafted {
+  _tag: "ProbeDrafted";
+  probeId: ProbeId;
+  conflictId: ConflictId;
+  attempts: integer;
+  bundleHash: ContentHash;
+}
+
+model ProbeRan {
+  _tag: "ProbeRan";
+  probeId: ProbeId;
+  conflictId: ConflictId;
+  world: World;
+  run: integer;
+  outcome: "pass" | "fail" | "n/a";
+  resultRef: string;
+}
+
+model ProbeDiscarded {
+  _tag: "ProbeDiscarded";
+  probeId: ProbeId;
+  reason: "non-discriminating" | "unstable" | "draft-failed";
+}
+
+model ConflictProven {
+  _tag: "ConflictProven";
+  conflictId: ConflictId;
+  evidence:
+    | {
+        _tag: "probe";
+        probeId: ProbeId;
+      }
+    | {
+        _tag: "guard";
+        guardId: GuardId;
+      }
+    | {
+        _tag: "merge-refused";
+        batchId: BatchId;
+      };
+}
+
+model ConflictDismissed {
+  _tag: "ConflictDismissed";
+  conflictId: ConflictId;
+  evidence: string;
+}
+
+model ConflictEscalated {
+  _tag: "ConflictEscalated";
+  conflictId: ConflictId;
+  escalationId: EscalationId;
+  reason: "human-class" | "unprovable";
+}
+
+model ConflictResolved {
+  _tag: "ConflictResolved";
+  conflictId: ConflictId;
+  move: Move;
+  decisionId?: DecisionId;
+}
+
+model GuardAdmitted {
+  _tag: "GuardAdmitted";
+  guardId: GuardId;
+  probeId: ProbeId;
+  conflictId: ConflictId;
+  runs: integer;
+}
+
+model GuardRetired {
+  _tag: "GuardRetired";
+  guardId: GuardId;
+  decisionId: DecisionId;
+}
+
+model GuardFailed {
+  _tag: "GuardFailed";
+  guardId: GuardId;
+  batchId: BatchId;
+  candidateId: CandidateId;
+  world: World;
+}
+
+model VerdictIssued {
+  _tag: "VerdictIssued";
+  verdictId: VerdictId;
+  subject: ChangeId | BatchId;
+  outcome: VerdictOutcome;
+  evidence: string[];
+
+  /** The plan the verdict was reached under. Absent means no plan, never a fabricated hash. */
+  planHash?: ContentHash;
+}
+
+model EscalationRaised {
+  _tag: "EscalationRaised";
+  escalationId: EscalationId;
+
+  @minLength(1)
+  question: string;
+
+  options: string[];
+  consequences: string[];
+  about: EntityRef;
+}
+
+model EscalationWithdrawn {
+  _tag: "EscalationWithdrawn";
+  escalationId: EscalationId;
+  reason: string;
+}
+
+// ─── Integration ────────────────────────────────────────────────────────────
+
+/** Where a step runs: 0 pure git inside a Durable Object, 1 a throwaway isolate, 2 a container. */
+union Tier {
+  0,
+  1,
+  2,
+}
+
+/**
+ * Who a failed batch is blamed on: one member, a refused composition
+ * (`textual`), every subset passing while the union fails (`interaction`), the
+ * infrastructure (`infra`), or nobody yet (`unattributed`).
+ */
+union BatchAttribution {
+  ChangeId,
+  "textual",
+  "interaction",
+  "infra",
+  "unattributed",
+}
+
+model BatchFormed {
+  _tag: "BatchFormed";
+  batchId: BatchId;
+  laneId: string;
+  members: ChangeId[];
+  base: CommitSha;
+  attempt: integer;
+  chainEpoch: integer;
+
+  /** Optional only so events from before it was added still decode; the Lane always sets it. */
+  projectId?: ProjectId;
+
+  /** Changes the batch was verified on top of that trunk does not hold yet (its speculation chain). */
+  predecessors?: ChangeId[];
+}
+
+model CandidateAssembled {
+  _tag: "CandidateAssembled";
+  candidateId: CandidateId;
+  batchId: BatchId;
+  treeSha: CommitSha;
+  composer: "gitcore" | "mergebox";
+  tier: Tier;
+  tierReason: string;
+}
+
+model VerificationStarted {
+  _tag: "VerificationStarted";
+  candidateId: CandidateId;
+  batchId: BatchId;
+  instanceId: string;
+  planHash: ContentHash;
+}
+
+model BatchVerified {
+  _tag: "BatchVerified";
+  batchId: BatchId;
+  candidateId: CandidateId;
+  verdictId: VerdictId;
+
+  /** What the Trunk DO needs to promote the batch: optional only so older events still decode. */
+  members?: ChangeId[];
+
+  base?: CommitSha;
+  predecessors?: ChangeId[];
+}
+
+model BatchFailed {
+  _tag: "BatchFailed";
+  batchId: BatchId;
+  candidateId?: CandidateId;
+  verdictId: VerdictId;
+  attribution: BatchAttribution;
+}
+
+model CandidateBisected {
+  _tag: "CandidateBisected";
+  candidateId: CandidateId;
+  batchId: BatchId;
+  into: BatchId[];
+}
+
+model CandidateInvalidated {
+  _tag: "CandidateInvalidated";
+  candidateId: CandidateId;
+  batchId: BatchId;
+  reason: "head-moved";
+}
+
+model CandidatePromoted {
+  _tag: "CandidatePromoted";
+  candidateId: CandidateId;
+  batchId: BatchId;
+  trunkSha: CommitSha;
+}
+
+model TrunkAdvanced {
+  _tag: "TrunkAdvanced";
+  projectId: ProjectId;
+  from: CommitSha;
+  to: CommitSha;
+  groupId: string;
+  members: ChangeId[];
+  proofIds: string[];
+}
+
+model PromotionDeclined {
+  _tag: "PromotionDeclined";
+  projectId: ProjectId;
+  batchId: BatchId;
+
+  /** `frozen`: the batch was in the group a freeze stopped, and the operator's resume drops it. */
+  reason: "commutation-failed" | "frozen";
+
+  reverify: ChangeId[];
+}
+
+model PromotionFrozen {
+  _tag: "PromotionFrozen";
+  projectId: ProjectId;
+  groupId: string;
+  expected: CommitSha;
+  observed: CommitSha;
+}
+
+model PromotionResumed {
+  _tag: "PromotionResumed";
+  projectId: ProjectId;
+  by: string;
+
+  /** The head the operator confirms trunk is at; optional only so older events still decode. */
+  head?: CommitSha;
+}
+
+/** The trunk's first known head, from the project's seed or an operator. Nothing promotes before it. */
+model TrunkInitialized {
+  _tag: "TrunkInitialized";
+  projectId: ProjectId;
+  head: CommitSha;
+  by: string;
+}
+
+/** The write-ahead log entry (ADR 0003): the group about to be pushed, written before the compose. */
+model PromotionStarted {
+  _tag: "PromotionStarted";
+  projectId: ProjectId;
+  groupId: string;
+  old: CommitSha;
+  members: ChangeId[];
+  batches: BatchId[];
+  proofIds: string[];
+  committerTime: Instant;
+}
+
+/** The group's composed commit, recorded before the first push: every retry pushes this SHA. */
+model PromotionComposed {
+  _tag: "PromotionComposed";
+  projectId: ProjectId;
+  groupId: string;
+  sha: CommitSha;
+}
+
+model AuditCompleted {
+  _tag: "AuditCompleted";
+  projectId: ProjectId;
+  head: CommitSha;
+  outcome: "green" | "red";
+  suspects: ChangeId[];
+  runRef: string;
+}
+
+// ─── Memory ─────────────────────────────────────────────────────────────────
+
+model RulingGiven {
+  _tag: "RulingGiven";
+  escalationId: EscalationId;
+  option: string;
+  by: string;
+  rationale?: string;
+}
+
+model DecisionRecorded {
+  _tag: "DecisionRecorded";
+  decisionId: DecisionId;
+  escalationId: EscalationId;
+  scope?: string;
+  evidence: string[];
+  alternatives: {
+    option: string;
+    reasonRejected: string;
+  }[];
+}
+
+model DecisionSuperseded {
+  _tag: "DecisionSuperseded";
+  decisionId: DecisionId;
+  by: DecisionId;
+}
+
+model DecisionOverruled {
+  _tag: "DecisionOverruled";
+  decisionId: DecisionId;
+  by: DecisionId;
+  requestedBy: ChangeId;
+}
+
+model PrecedentSurfaced {
+  _tag: "PrecedentSurfaced";
+  decisionId: DecisionId;
+  changeId: ChangeId;
+}
+
+model PrecedentFollowed {
+  _tag: "PrecedentFollowed";
+  decisionId: DecisionId;
+  changeId: ChangeId;
+}
+
+model PrecedentDistinguished {
+  _tag: "PrecedentDistinguished";
+  decisionId: DecisionId;
+  changeId: ChangeId;
+  distinction: string;
+}
+
+model OverruleRequested {
+  _tag: "OverruleRequested";
+  decisionId: DecisionId;
+  changeId: ChangeId;
+  argument: string;
+}
+
+model TenetEstablished {
+  _tag: "TenetEstablished";
+  tenetId: TenetId;
+  subjectId: SubjectId;
+  predicate: MFP.Predicate;
+  value: string | float64 | boolean;
+  changeId: ChangeId;
+  guardIds: GuardId[];
+}
+
+model TenetContested {
+  _tag: "TenetContested";
+  tenetId: TenetId;
+  conflictId: ConflictId;
+}
+
+model TenetReaffirmed {
+  _tag: "TenetReaffirmed";
+  tenetId: TenetId;
+  conflictId: ConflictId;
+}
+
+model TenetRetracted {
+  _tag: "TenetRetracted";
+  tenetId: TenetId;
+  changeId: ChangeId;
+  decisionId: DecisionId;
+}
+
+model TenetSuperseded {
+  _tag: "TenetSuperseded";
+  tenetId: TenetId;
+  by: TenetId;
+}
+
+model SessionOpened {
+  _tag: "SessionOpened";
+  sessionId: SessionId;
+  agentId: AgentId;
+  harness?: string;
+  `model`?: string;
+}
+
+model MessagesCaptured {
+  _tag: "MessagesCaptured";
+  sessionId: SessionId;
+  fromSeq: integer;
+  toSeq: integer;
+  bundleRef: string;
+}
+
+model SessionRedacted {
+  _tag: "SessionRedacted";
+  sessionId: SessionId;
+  ranges: {
+    fromSeq: integer;
+    toSeq: integer;
+  }[];
+  reason: string;
+}
+
+// ─── Delivery ───────────────────────────────────────────────────────────────
+
+union DeployTarget {
+  isolatePreview: "isolate-preview",
+  workersPreviews: "workers-previews",
+  versions: "versions",
+  workersForPlatforms: "workers-for-platforms",
+  r2: "r2",
+  containerImage: "container-image",
+  iac: "iac",
+  external: "external",
+}
+
+model PreviewDeployed {
+  _tag: "PreviewDeployed";
+  deploymentId: DeploymentId;
+  world: string;
+  adapter: DeployTarget;
+  url: string;
+}
+
+model PreviewTornDown {
+  _tag: "PreviewTornDown";
+  deploymentId: DeploymentId;
+}
+
+model DeploymentPromoted {
+  _tag: "DeploymentPromoted";
+  deploymentId: DeploymentId;
+  trunkSha: CommitSha;
+  adapter: DeployTarget;
+  stage: string;
+}
+
+model DeploymentRolledBack {
+  _tag: "DeploymentRolledBack";
+  deploymentId: DeploymentId;
+  to: string;
+  reason: string;
+}
+
+// ─── The catalogue ──────────────────────────────────────────────────────────
+
+/** Any event in the catalogue. `_tag` names it. */
+union KeelEvent {
+  // Identity
+  AgentEnrolled,
+  AgentSuspended,
+  AgentReinstated,
+  AgentRevoked,
+
+  // Coordination
+  IntentDeclared,
+  PreflightIssued,
+  IntentRevised,
+  ChangeStarted,
+  PremiseRelied,
+  ChangeSubmitted,
+  PrecheckStarted,
+  EffectsDerived,
+  DriftDetected,
+  ChangeDrifted,
+  PlanCompiled,
+  ChangeQueued,
+  ChangeBatched,
+  ChangeRequeued,
+  ChangeLanded,
+  ChangeBounced,
+  ChangeParked,
+  ChangeResumed,
+  ChangeAdopted,
+  ChangeWithdrawn,
+  ChangeSuperseded,
+  LeaseLapsed,
+  SubjectMinted,
+  PremiseSuspected,
+  PremiseReaffirmed,
+  SketchOpened,
+  SketchPromoted,
+  SketchExpired,
+  SketchDiscarded,
+  WorkspaceForked,
+  WorkspaceGranted,
+  WorkspaceReassigned,
+  WorkspacePushed,
+  WorkspaceCollected,
+
+  // Verification
+  ConflictSuspected,
+  ProbeDrafted,
+  ProbeRan,
+  ProbeDiscarded,
+  ConflictProven,
+  ConflictDismissed,
+  ConflictEscalated,
+  ConflictResolved,
+  GuardAdmitted,
+  GuardRetired,
+  GuardFailed,
+  VerdictIssued,
+  EscalationRaised,
+  EscalationWithdrawn,
+
+  // Integration
+  BatchFormed,
+  CandidateAssembled,
+  VerificationStarted,
+  BatchVerified,
+  BatchFailed,
+  CandidateBisected,
+  CandidateInvalidated,
+  CandidatePromoted,
+  TrunkAdvanced,
+  PromotionDeclined,
+  PromotionFrozen,
+  PromotionResumed,
+  TrunkInitialized,
+  PromotionStarted,
+  PromotionComposed,
+  AuditCompleted,
+
+  // Memory
+  RulingGiven,
+  DecisionRecorded,
+  DecisionSuperseded,
+  DecisionOverruled,
+  PrecedentSurfaced,
+  PrecedentFollowed,
+  PrecedentDistinguished,
+  OverruleRequested,
+  TenetEstablished,
+  TenetContested,
+  TenetReaffirmed,
+  TenetRetracted,
+  TenetSuperseded,
+  SessionOpened,
+  MessagesCaptured,
+  SessionRedacted,
+
+  // Delivery
+  PreviewDeployed,
+  PreviewTornDown,
+  DeploymentPromoted,
+  DeploymentRolledBack,
+}
