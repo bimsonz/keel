@@ -14,6 +14,7 @@ import {
   type StagingWriter,
   type TrunkWriter,
   type Trunks,
+  type WorkspaceRebaser,
   type WorkspacePool,
 } from "@keeltown/core/ports";
 import { projectRepos } from "@keeltown/core/application/integration";
@@ -30,6 +31,7 @@ import { CandidateBundlesGitCore } from "../adapters/driven/gitcore/candidate-bu
 import { CandidateComposerGitCore } from "../adapters/driven/gitcore/candidate-composer.ts";
 import { StagingWriterGitCore } from "../adapters/driven/gitcore/staging-writer.ts";
 import { TrunkWriterGitCore } from "../adapters/driven/gitcore/trunk-writer.ts";
+import { WorkspaceRebaserGitCore } from "../adapters/driven/gitcore/workspace-rebaser.ts";
 import { BundleStoreR2 } from "../adapters/driven/r2/bundle-store.ts";
 import { BatchVerificationWorkflow } from "../adapters/driven/workflow/batch-verification.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
@@ -77,16 +79,21 @@ export function projectServices(env: Env): Layer.Layer<ProjectServices> {
 }
 
 /** The Change DO's driven adapters beyond the backbone. */
-export type ChangeServices = WorkspacePool | CodeHost;
+export type ChangeServices = WorkspacePool | CodeHost | Trunks | WorkspaceRebaser;
 
 /**
  * The Change DO takes its workspace from its project's WorkspacePool DO and
- * asks the code host whether a submitted commit is in it.
+ * asks the code host whether a submitted commit is in it. A rebase reads
+ * trunk's head from the Trunk DO and relays trunk into the workspace's
+ * keel/trunk; it never holds a trunk write token.
  */
 export function changeServices(env: Env): Layer.Layer<ChangeServices> {
+  const host = codeHostLayer(env);
   return Layer.mergeAll(
     WorkspacePoolRpc(env.WORKSPACE_POOL, artifactsLocationHint(env)),
-    codeHostLayer(env),
+    host,
+    TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
+    WorkspaceRebaserGitCore().pipe(Layer.provide(host)),
   );
 }
 

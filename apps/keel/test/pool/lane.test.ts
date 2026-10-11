@@ -77,6 +77,7 @@ async function lane(options: { readonly noStaging?: boolean } = {}) {
     Changes,
     Changes.of({
       adopt: () => Effect.die(new Error("the Lane never adopts")),
+      rebase: () => Effect.die(new Error("the Lane never rebases")),
       get: (id) =>
         Effect.succeed({
           id,

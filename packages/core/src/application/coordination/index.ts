@@ -74,6 +74,9 @@ export interface SubmitInput extends LeasedCall {
   readonly commitSha: CommitSha;
 }
 
+/** Move a change onto trunk's head, after a textual bounce: the caller holds its lease. */
+export type RebaseInput = LeasedCall;
+
 export interface Revised {
   readonly change: Change;
   readonly preflight: Preflight;

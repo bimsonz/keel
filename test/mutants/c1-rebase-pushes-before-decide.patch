@@ -5,7 +5,7 @@ diff --git a/packages/core/src/application/coordination/change.ts b/packages/cor
 index e3214e6..12b83af 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -756,6 +756,10 @@ export const rebaseChange: (
+@@ -756,6 +756,10 @@ export const rebase: (
    if (held === undefined || change.baseSha === undefined) return yield* refused(change, "rebase");
    const from = change.baseSha;
    const onto = yield* (yield* Trunks).head(held.projectId);
@@ -13,10 +13,10 @@ index e3214e6..12b83af 100644
 +  yield* (yield* WorkspaceRebaser)
 +    .pushTrunk(held.projectId, held.repo, from, onto)
 +    .pipe(Effect.catchTag("RepoNotFound", Effect.die));
-   const rebase: ChangeCommand = { _tag: "Rebase", leaseId: command.leaseId, from, onto };
-   const decided = decideChange(change, rebase, { now: yield* (yield* Clock).now, changeId });
+   const rebasing: ChangeCommand = { _tag: "Rebase", leaseId: command.leaseId, from, onto };
+   const decided = decideChange(change, rebasing, { now: yield* (yield* Clock).now, changeId });
    if (Result.isFailure(decided)) {
-@@ -767,10 +771,6 @@ export const rebaseChange: (
+@@ -767,10 +771,6 @@ export const rebase: (
      );
    }
  

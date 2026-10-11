@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/rebase.test.ts -t rebase.problems
+# kills: rebase.problems
+# why: A busy workspace answers 409 with no Retry-After, so an agent treats a transient refusal as final
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index 18f1d14..30acd28 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -530,9 +530,8 @@ export function rebaseError(
+       };
+     case "PushRejected":
+       return {
+-        status: 503,
+-        headers: { "retry-after": 5 },
+-        body: problem(503, "workspace.busy", caller.requestId, {
++        status: 409,
++        body: problem(409, "workspace.busy", caller.requestId, {
+           detail: `Trunk could not be put on the workspace's keel/trunk (${error.reason}); nothing moved.`,
+           nextActions: [
+             { kind: "call", title: "Rebase again in a few seconds", operationId: "rebase" },

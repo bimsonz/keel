@@ -97,6 +97,7 @@ function world(options: WorldOptions = {}) {
     Changes,
     Changes.of({
       adopt: () => Effect.die(new Error("the Lane never adopts")),
+      rebase: () => Effect.die(new Error("the Lane never rebases")),
       get: (id) =>
         Effect.suspend(() => {
           const found = changes.get(id);

@@ -15,6 +15,8 @@ import {
   SketchNotFound,
 } from "@keeltown/core/domain/coordination";
 import { IdempotencyConflict } from "@keeltown/core/domain/identity";
+import { PushRejected } from "@keeltown/core/domain/integration";
+import { PackTooLarge } from "./trunk.ts";
 import {
   AgentId,
   ChangeId,
@@ -62,6 +64,14 @@ export const SubmitCommand = Schema.Struct({
   idempotencyKey: Schema.String,
 });
 export type SubmitCommand = typeof SubmitCommand.Type;
+
+/** Move a change onto trunk's head under its lease, after a textual bounce. */
+export const RebaseCommand = Schema.Struct({
+  agentId: AgentId,
+  leaseId: LeaseId,
+  idempotencyKey: Schema.String,
+});
+export type RebaseCommand = typeof RebaseCommand.Type;
 
 /** Revise a change's intent under its lease. `ifMatchRevision` is the revision the caller last read (If-Match). */
 export const ReviseCommand = Schema.Struct({
@@ -198,6 +208,22 @@ export const ChangeCodecs = {
       IdempotencyConflict,
     ]),
   ),
+  // PushRejected: the workspace stayed busy or kept moving; PackTooLarge: trunk's new history is over the relay cap.
+  rebase: exitCodec(
+    Schema.Struct({
+      change: Change,
+      ref: Schema.Literal("refs/heads/keel/trunk"),
+      base: CommitSha,
+    }),
+    Schema.Union([
+      ChangeNotFound,
+      LeaseStale,
+      ChangeStateRefused,
+      IdempotencyConflict,
+      PushRejected,
+      PackTooLarge,
+    ]),
+  ),
   abandon: exitCodec(Change, Mutation),
   // LeaseNotLapsed: adoption needs a Lapsed lease. `grant` re-mints the held workspace's token.
   adopt: exitCodec(
@@ -229,6 +255,8 @@ export interface ChangeRpc extends EventReceiverRpc {
   declare(command: typeof DeclareCommand.Encoded): Promise<ExitJson>;
   revise(command: typeof ReviseCommand.Encoded): Promise<ExitJson>;
   submit(command: typeof SubmitCommand.Encoded): Promise<ExitJson>;
+  /** Puts trunk's head on the workspace's keel/trunk and moves the change's base there. */
+  rebase(command: typeof RebaseCommand.Encoded): Promise<ExitJson>;
   abandon(command: typeof AbandonCommand.Encoded): Promise<ExitJson>;
   adopt(command: typeof AdoptCommand.Encoded): Promise<ExitJson>;
   /**

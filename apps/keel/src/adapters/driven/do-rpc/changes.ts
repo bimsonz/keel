@@ -1,8 +1,9 @@
 import type { AgentId, ChangeId } from "@keeltown/core/kernel";
-import { Changes } from "@keeltown/core/ports";
+import { Changes, PackTooLarge } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 import {
   AdoptCommand,
+  RebaseCommand,
   AgentSessionCodecs,
   ChangeCodecs,
   DeclareCommand,
@@ -20,6 +21,7 @@ export interface ChangeStub {
   declare(command: typeof DeclareCommand.Encoded): Promise<unknown>;
   submit(command: typeof SubmitCommand.Encoded): Promise<unknown>;
   adopt(command: typeof AdoptCommand.Encoded): Promise<unknown>;
+  rebase(command: typeof RebaseCommand.Encoded): Promise<unknown>;
   get(): Promise<unknown>;
   submission(waitMs: number): Promise<unknown>;
   workspace(): Promise<unknown>;
@@ -43,6 +45,7 @@ export interface ChangeObjects {
 const encodeDeclare = Schema.encodeSync(DeclareCommand);
 const encodeSubmit = Schema.encodeSync(SubmitCommand);
 const encodeAdopt = Schema.encodeSync(AdoptCommand);
+const encodeRebase = Schema.encodeSync(RebaseCommand);
 
 /**
  * `Changes` over Durable Object RPC. A declare first asks the agent's
@@ -116,6 +119,21 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
         ).pipe(
           Effect.map(({ change, grant }) =>
             grant === undefined ? { change } : { change, workspace: grant },
+          ),
+        ),
+      rebase: (principal, input) =>
+        callObject(ChangeCodecs.rebase, () =>
+          objects.change(input.changeId).rebase(
+            encodeRebase({
+              agentId: principal.agentId,
+              leaseId: input.lease,
+              idempotencyKey: input.idempotencyKey,
+            }),
+          ),
+        ).pipe(
+          // The RPC carries PackTooLarge by shape (rule R15); the port's is its class.
+          Effect.catchTag("PackTooLarge", (e) =>
+            Effect.fail(new PackTooLarge({ repo: e.repo, bytes: e.bytes, limit: e.limit })),
           ),
         ),
       get: (changeId) => callObject(ChangeCodecs.get, () => objects.change(changeId).get()),

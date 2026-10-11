@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project 'pool:*' apps/keel/test/pool/rebase.test.ts -t rebase.rest
+# kills: rebase.rest
+# why: The RPC adapter sends something other than the caller's Keel-Lease as the lease, so every rebase over REST and MCP is refused as stale
+diff --git a/apps/keel/src/adapters/driven/do-rpc/changes.ts b/apps/keel/src/adapters/driven/do-rpc/changes.ts
+index 575af6e..969e4a8 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/changes.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/changes.ts
+@@ -126,7 +126,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
+           objects.change(input.changeId).rebase(
+             encodeRebase({
+               agentId: principal.agentId,
+-              leaseId: input.lease,
++              leaseId: input.changeId,
+               idempotencyKey: input.idempotencyKey,
+             }),
+           ),

@@ -727,7 +727,7 @@ export const adopt: (
  * DO, never the mirror, which lags) put on the workspace's `keel/trunk`, and
  * ChangeRebased committed. A retry of a committed key pushes nothing again.
  */
-export const rebaseChange: (
+export const rebase: (
   changeId: ChangeId,
   command: RebaseChange,
 ) => Effect.Effect<
@@ -739,7 +739,7 @@ export const rebaseChange: (
   | PushRejected
   | PackTooLarge,
   Clock | EntityStore | EventOutbox | Trunks | WorkspaceRebaser
-> = Effect.fn("coordination/rebaseChange")(function* (changeId: ChangeId, command: RebaseChange) {
+> = Effect.fn("coordination/rebase")(function* (changeId: ChangeId, command: RebaseChange) {
   const fingerprint = fingerprintOf("rebase", command);
   const answer = (change: Change): Effect.Effect<RebasedChange, ChangeStateRefused> =>
     change.baseSha === undefined
@@ -756,8 +756,8 @@ export const rebaseChange: (
   if (held === undefined || change.baseSha === undefined) return yield* refused(change, "rebase");
   const from = change.baseSha;
   const onto = yield* (yield* Trunks).head(held.projectId);
-  const rebase: ChangeCommand = { _tag: "Rebase", leaseId: command.leaseId, from, onto };
-  const decided = decideChange(change, rebase, { now: yield* (yield* Clock).now, changeId });
+  const rebasing: ChangeCommand = { _tag: "Rebase", leaseId: command.leaseId, from, onto };
+  const decided = decideChange(change, rebasing, { now: yield* (yield* Clock).now, changeId });
   if (Result.isFailure(decided)) {
     const refusal = decided.failure;
     if (isOneOf(["ChangeNotFound", "LeaseStale", "ChangeStateRefused"], refusal))
@@ -785,7 +785,7 @@ export const rebaseChange: (
           tx,
           changeId,
           ["ChangeNotFound", "LeaseStale", "ChangeStateRefused"],
-          [rebase],
+          [rebasing],
           command.leaseId,
         ),
         asTransition,

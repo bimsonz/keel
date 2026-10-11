@@ -7,7 +7,9 @@ import {
   CodeHostFixture,
   makeCodeHostMemory,
   makeManualClock,
+  makeTrunksMemory,
   makeWorkspacePoolMemory,
+  makeWorkspaceRebaserMemory,
   sampleProjectId,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
@@ -84,7 +86,13 @@ export async function changeUnderTest(projectId: ProjectId = sampleProjectId) {
   const clock = makeManualClock(Date.now());
   const pool = makeWorkspacePoolMemory();
   const code = makeCodeHostMemory();
-  await rewire(stub, Layer.merge(pool.layer, code.layer), clock.layer);
+  const trunks = makeTrunksMemory();
+  const rebaser = makeWorkspaceRebaserMemory(code);
+  await rewire(
+    stub,
+    Layer.mergeAll(pool.layer, code.layer, trunks.layer, rebaser.layer),
+    clock.layer,
+  );
 
   const get = async () => decodeExit(ChangeCodecs.get, await stub.get());
   return {
@@ -94,6 +102,10 @@ export async function changeUnderTest(projectId: ProjectId = sampleProjectId) {
     stub,
     clock,
     pool,
+    /** The code host, the Trunk DO's head and the rebaser the change reaches, all in memory. */
+    code,
+    trunks,
+    rebaser,
     get,
     /** The change as it stands; throws if it cannot be read. */
     current: async () => ok(await get()),

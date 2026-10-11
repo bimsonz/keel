@@ -1,4 +1,4 @@
-// rebaseChange on one Change DO's state in memory: the change's workspace is a
+// rebase on one Change DO's state in memory: the change's workspace is a
 // fork of its project's trunk at the grant, trunk then moves on, and a rebase
 // puts trunk's head on the workspace's keel/trunk and moves the change's base
 // there. The domain decides first, so a refused rebase pushes nothing.
@@ -9,13 +9,20 @@ import {
   declare,
   precheckRefused,
   precheckStarted,
-  rebaseChange,
+  rebase,
   submit,
 } from "@keeltown/core/application/coordination";
 import { projectRepos } from "@keeltown/core/application/integration";
 import { LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
 import { AgentId, ChangeId, type CommitSha, LeaseId } from "@keeltown/core/kernel";
-import { CodeHost, EntityStore, EventOutbox, KEEL_TRUNK_REF } from "@keeltown/core/ports";
+import { PushRejected } from "@keeltown/core/domain/integration";
+import {
+  CodeHost,
+  EntityStore,
+  EventOutbox,
+  KEEL_TRUNK_REF,
+  PackTooLarge,
+} from "@keeltown/core/ports";
 import {
   makeCodeHostMemory,
   makeEventOutboxMemory,
@@ -33,6 +40,7 @@ import {
   PrecheckStartedCommand,
   SubmitCommand,
 } from "../../src/rpc/index.ts";
+import { rebaseError } from "../../src/adapters/driving/http/work-loop.ts";
 
 const changeId = Schema.decodeUnknownSync(ChangeId)("chg_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 const agentId = Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
@@ -100,7 +108,7 @@ const rebasedEvents = Effect.map(EventOutbox, (outbox) =>
   outbox.log({ kind: "change", id: changeId }).filter((e) => e.type === "ChangeRebased"),
 );
 
-describe("rebaseChange", () => {
+describe("rebase", () => {
   it.effect(
     "[rebase.moves-base] puts trunk's head on the workspace's keel/trunk and moves the change's base there; the view serves the new base and the grant",
     () => {
@@ -109,7 +117,7 @@ describe("rebaseChange", () => {
         const { base, landed } = yield* w.seeded;
         return yield* Effect.gen(function* () {
           const { lease, held } = yield* declared;
-          const rebased = yield* rebaseChange(changeId, rebasing(lease));
+          const rebased = yield* rebase(changeId, rebasing(lease));
           expect(rebased).toMatchObject({ ref: KEEL_TRUNK_REF, base: landed });
           expect(rebased.change).toMatchObject({ state: "working", baseSha: landed });
           expect(yield* (yield* CodeHost).head(held.repo, KEEL_TRUNK_REF)).toBe(landed);
@@ -157,7 +165,7 @@ describe("rebaseChange", () => {
         ).toBe(base);
         return yield* Effect.gen(function* () {
           const { lease } = yield* declared;
-          expect((yield* rebaseChange(changeId, rebasing(lease))).base).toBe(landed);
+          expect((yield* rebase(changeId, rebasing(lease))).base).toBe(landed);
           expect(w.rebaser.pushed.map((p) => p.to)).toEqual([landed]);
         }).pipe(Effect.provide(w.layerFor(base)));
       });
@@ -173,7 +181,7 @@ describe("rebaseChange", () => {
         return yield* Effect.gen(function* () {
           const { lease, held } = yield* declared;
           const stale = yield* Effect.exit(
-            rebaseChange(changeId, rebasing(LeaseId.make("lse_01JZ8PT2C4E6G8J0M2N4Q6S8V9"))),
+            rebase(changeId, rebasing(LeaseId.make("lse_01JZ8PT2C4E6G8J0M2N4Q6S8V9"))),
           );
           expect(Exit.isFailure(stale) && JSON.stringify(stale.cause)).toContain("LeaseStale");
 
@@ -187,7 +195,7 @@ describe("rebaseChange", () => {
               idempotencyKey: "submit-1",
             }),
           );
-          const submitted = yield* Effect.exit(rebaseChange(changeId, rebasing(lease, "rebase-2")));
+          const submitted = yield* Effect.exit(rebase(changeId, rebasing(lease, "rebase-2")));
           expect(Exit.isFailure(submitted) && JSON.stringify(submitted.cause)).toContain(
             "ChangeStateRefused",
           );
@@ -235,7 +243,7 @@ describe("rebaseChange", () => {
               nextActions: [{ kind: "call", title: "Rebase", operationId: "rebase" }],
             }),
           );
-          const rebased = yield* rebaseChange(changeId, rebasing(lease));
+          const rebased = yield* rebase(changeId, rebasing(lease));
           expect(rebased.change).toMatchObject({ state: "bounced", baseSha: landed });
         }).pipe(Effect.provide(w.layerFor(base)));
       });
@@ -250,15 +258,15 @@ describe("rebaseChange", () => {
         const { base, landed } = yield* w.seeded;
         return yield* Effect.gen(function* () {
           const { lease } = yield* declared;
-          const first = yield* rebaseChange(changeId, rebasing(lease));
+          const first = yield* rebase(changeId, rebasing(lease));
           w.clock.advance(LEASE_TTL_MS / 2);
-          const again = yield* rebaseChange(changeId, rebasing(lease));
+          const again = yield* rebase(changeId, rebasing(lease));
           expect(again).toEqual({ ...first, change: again.change });
           expect(again.base).toBe(landed);
           expect(w.rebaser.pushed).toHaveLength(1);
           expect((yield* rebasedEvents).length).toBe(1);
           const reused = yield* Effect.flip(
-            rebaseChange(changeId, {
+            rebase(changeId, {
               ...rebasing(lease),
               agentId: AgentId.make("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V1"),
             }),
@@ -268,4 +276,28 @@ describe("rebaseChange", () => {
       });
     },
   );
+});
+
+describe("rebase over HTTP", () => {
+  const caller = { requestId: "req-1", principal: null, signal: new AbortController().signal };
+
+  it("[rebase.problems] a busy workspace is 503 workspace.busy with Retry-After and a rebase to retry; a pack over the cap is 409 with an escalation", () => {
+    const busy = rebaseError(caller, new PushRejected({ reason: "busy" }));
+    expect(busy).toMatchObject({
+      status: 503,
+      headers: { "retry-after": 5 },
+      body: {
+        code: "workspace.busy",
+        nextActions: [expect.objectContaining({ kind: "call", operationId: "rebase" })],
+      },
+    });
+    const tooLarge = rebaseError(
+      caller,
+      new PackTooLarge({ repo: { namespace: "keel-ws-00", name: "w" }, bytes: 70e6, limit: 60e6 }),
+    );
+    expect(tooLarge).toMatchObject({
+      status: 409,
+      body: { code: "workspace.pack_too_large", nextActions: [{ kind: "escalate" }] },
+    });
+  });
 });

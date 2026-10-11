@@ -92,6 +92,19 @@ model Adopted {
 
 model AdoptedEnvelope is AgentEnvelope<Adopted>;
 
+/** A change moved onto trunk's head: its new base, and the workspace branch that holds it, to fetch and merge. */
+model Rebased {
+  change: Change;
+
+  /** The workspace branch holding trunk's head: `refs/heads/keel/trunk`. */
+  ref: string;
+
+  /** The change's base now: trunk's head, which a resubmission is judged against. */
+  base: CommitSha;
+}
+
+model RebasedEnvelope is AgentEnvelope<Rebased>;
+
 model ChangePath {
   @path changeId: ChangeId;
 }
@@ -219,4 +232,23 @@ interface Changes {
   @route("/{changeId}/adopt")
   @post
   adopt(...ChangePath, ...IdempotencyKey): AdoptedEnvelope | NotFound | Conflict | StandardErrors;
+
+  /**
+   * Trunk moved under your change and it bounced on a textual conflict: put trunk's head on your
+   * workspace's `keel/trunk` branch and move the change's base there. Then run
+   * `git fetch origin keel/trunk && git merge FETCH_HEAD`, resolve, push and submit again (merge,
+   * never force-push). Allowed while the change is working or bounced, under your lease. A retry
+   * with the same key answers as before; 503 `workspace.busy` means try again shortly.
+   */
+  @summary("Rebase a change onto trunk")
+  @tag("mcp")
+  @operationId("rebase")
+  @useAuth(AgentWork)
+  @route("/{changeId}/rebase")
+  @post
+  rebase(
+    ...ChangePath,
+    ...LeaseHeader,
+    ...IdempotencyKey,
+  ): RebasedEnvelope | NotFound | Conflict | StandardErrors;
 }

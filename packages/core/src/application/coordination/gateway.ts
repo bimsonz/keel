@@ -23,7 +23,17 @@ import {
   type SubmissionStatus,
   type ViewSnapshot,
 } from "../ports/index.ts";
-import type { Adopted, AdoptInput, Declared, DeclareInput, SubmitInput } from "./index.ts";
+import type { PushRejected } from "../../domain/integration/index.ts";
+import type { PackTooLarge } from "../ports/index.ts";
+import type { RebasedChange } from "./change.ts";
+import type {
+  Adopted,
+  AdoptInput,
+  Declared,
+  DeclareInput,
+  RebaseInput,
+  SubmitInput,
+} from "./index.ts";
 
 /**
  * The isolate's side of the work loop. The doorways have already checked the
@@ -63,6 +73,21 @@ export const adoptChange: (
   ChangeNotFound | ChangeStateRefused | LeaseNotLapsed | ChangeInOtherProject | IdempotencyConflict,
   Changes
 > = (principal, input) => Changes.use((changes) => changes.adopt(principal, input));
+
+/** Moves a change onto trunk's head after a textual bounce. The Change DO checks the lease and the state before anything is pushed. */
+export const rebaseChange: (
+  principal: Principal,
+  input: RebaseInput,
+) => Effect.Effect<
+  RebasedChange,
+  | ChangeNotFound
+  | LeaseStale
+  | ChangeStateRefused
+  | IdempotencyConflict
+  | PushRejected
+  | PackTooLarge,
+  Changes
+> = (principal, input) => Changes.use((changes) => changes.rebase(principal, input));
 
 /** Where a change's submission stands, waiting up to `waitSeconds` (0–30) for it to move. */
 export const submissionOf: (

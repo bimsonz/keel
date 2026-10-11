@@ -3,8 +3,11 @@ import type {
   AdoptInput,
   Declared,
   DeclareInput,
+  RebasedChange,
+  RebaseInput,
   SubmitInput,
 } from "@keeltown/core/application/coordination";
+import type { PushRejected } from "@keeltown/core/domain/integration";
 import {
   type Change,
   type ChangeInOtherProject,
@@ -31,13 +34,14 @@ import {
   LeaseId,
   SketchId,
 } from "@keeltown/core/kernel";
-import type { Remedy, SubmissionStatus } from "@keeltown/core/ports";
+import type { PackTooLarge, Remedy, SubmissionStatus } from "@keeltown/core/ports";
 import { Result, Schema, SchemaIssue } from "effect";
 import type {
   AdoptResult,
   DeclareResult,
   InboxResult,
   Operations,
+  RebaseResult,
   StatusResult,
   SubmitResult,
 } from "../../../generated/http/app.gen.ts";
@@ -439,6 +443,109 @@ export function submitError(
           detail: `Idempotency-Key ${error.idempotencyKey} was used for a different request.`,
           nextActions: [
             { kind: "call", title: "Submit with a fresh Idempotency-Key", operationId: "submit" },
+          ],
+        }),
+      };
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
+}
+
+const LeasedFields = Schema.Struct({ changeId: ChangeId, lease: LeaseId });
+
+export function rebaseInput(input: Input<"rebase">): Result.Result<RebaseInput, Issues> {
+  return Result.map(
+    decodeWith(LeasedFields, { changeId: input.changeId, lease: input["keel-lease"] }),
+    (fields) => ({ ...fields, idempotencyKey: input["idempotency-key"] }),
+  );
+}
+
+export function rebaseOk(rebased: RebasedChange): RebaseResult {
+  const { change, ref, base } = rebased;
+  return {
+    status: 200,
+    body: envelope(
+      `Rebased ${change.id} onto trunk ${base.slice(0, 12)}, now on your workspace's keel/trunk. Merge it, resolve, push, then submit.`,
+      { change: changeView(change), ref, base },
+      [
+        {
+          kind: "call",
+          title:
+            "Run git fetch origin keel/trunk && git merge FETCH_HEAD, resolve any conflicts, push, then submit",
+          operationId: "submit",
+          args: { changeId: change.id },
+        },
+      ],
+    ),
+  };
+}
+
+export function rebaseError(
+  caller: Caller,
+  error:
+    | ChangeNotFound
+    | LeaseStale
+    | ChangeStateRefused
+    | IdempotencyConflict
+    | PushRejected
+    | PackTooLarge,
+): RebaseResult {
+  switch (error._tag) {
+    case "ChangeNotFound":
+      return changeNotFound(caller, error);
+    case "LeaseStale":
+      return {
+        status: 409,
+        body: problem(409, "change.lease_stale", caller.requestId, {
+          detail: `Lease ${error.leaseId} is not the active lease on ${error.changeId}.`,
+          nextActions: [
+            {
+              kind: "read",
+              title: "Read the change to see who holds its lease now",
+              operationId: "Changes_getChange",
+              args: { changeId: error.changeId },
+            },
+          ],
+        }),
+      };
+    case "ChangeStateRefused":
+      return {
+        status: 409,
+        body: problem(409, "change.state_refused", caller.requestId, {
+          detail: `${error.changeId} is ${error.state}, where a rebase is not allowed: it rebases while working or bounced, and onto a trunk head it is not already on.`,
+          nextActions: [statusOf(error.changeId)],
+        }),
+      };
+    case "IdempotencyConflict":
+      return {
+        status: 409,
+        body: problem(409, "request.idempotency_conflict", caller.requestId, {
+          detail: `Idempotency-Key ${error.idempotencyKey} was used for a different request.`,
+          nextActions: [
+            { kind: "call", title: "Rebase with a fresh Idempotency-Key", operationId: "rebase" },
+          ],
+        }),
+      };
+    case "PushRejected":
+      return {
+        status: 503,
+        headers: { "retry-after": 5 },
+        body: problem(503, "workspace.busy", caller.requestId, {
+          detail: `Trunk could not be put on the workspace's keel/trunk (${error.reason}); nothing moved.`,
+          nextActions: [
+            { kind: "call", title: "Rebase again in a few seconds", operationId: "rebase" },
+          ],
+        }),
+      };
+    case "PackTooLarge":
+      return {
+        status: 409,
+        body: problem(409, "workspace.pack_too_large", caller.requestId, {
+          detail: `Trunk's history since the change's base is ${error.bytes} bytes, over the ${error.limit}-byte relay limit; nothing moved.`,
+          nextActions: [
+            { kind: "escalate", title: "Ask an operator to move this change onto trunk by hand" },
           ],
         }),
       };

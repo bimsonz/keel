@@ -27,6 +27,8 @@ const TITLES: Record<ProblemCode, string> = {
   "change.state_refused": "The change's state does not allow this",
   "change.commit_not_in_workspace": "The commit is not in the change's workspace",
   "workspace.pool_exhausted": "No workspace is ready yet",
+  "workspace.busy": "The change's workspace was busy, so nothing moved",
+  "workspace.pack_too_large": "What the workspace needs from trunk is over the relay limit",
   "sketch.not_found": "No such sketch",
   "repo.ref_not_found": "The project's trunk has no such branch or commit",
   "repo.path_not_found": "Nothing of that kind at this path",

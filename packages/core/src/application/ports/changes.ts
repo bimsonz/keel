@@ -19,11 +19,15 @@ import type {
   VerdictId,
   WorkspaceId,
 } from "../../domain/kernel/index.ts";
+import type { PackTooLarge } from "./trunk-writer.ts";
+import type { PushRejected } from "../../domain/integration/index.ts";
 import type {
   Adopted,
   AdoptInput,
   Declared,
   DeclareInput,
+  RebasedChange,
+  RebaseInput,
   SubmitInput,
 } from "../coordination/index.ts";
 import type { RepoRef } from "./code-host.ts";
@@ -97,6 +101,24 @@ export class Changes extends Context.Service<
       | LeaseNotLapsed
       | ChangeInOtherProject
       | IdempotencyConflict
+    >;
+    /**
+     * Moves the change onto trunk's head after a textual bounce: trunk's head
+     * goes on the workspace's `keel/trunk`, and the change's base moves there.
+     * Working or Bounced, under the lease; idempotent by Idempotency-Key per
+     * change. PushRejected: the workspace stayed busy, or kept moving (retry).
+     */
+    readonly rebase: (
+      principal: Principal,
+      input: RebaseInput,
+    ) => Effect.Effect<
+      RebasedChange,
+      | ChangeNotFound
+      | LeaseStale
+      | ChangeStateRefused
+      | IdempotencyConflict
+      | PushRejected
+      | PackTooLarge
     >;
     readonly get: (changeId: ChangeId) => Effect.Effect<Change, ChangeNotFound>;
     /**

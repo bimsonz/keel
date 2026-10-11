@@ -1,6 +1,7 @@
 import {
   createProject,
   adoptChange,
+  rebaseChange,
   declareChange,
   getSettings,
   putSettings,
@@ -62,6 +63,9 @@ import {
   adoptError,
   adoptInput,
   adoptOk,
+  rebaseError,
+  rebaseInput,
+  rebaseOk,
   changeIdInput,
   declareError,
   declareInput,
@@ -219,6 +223,17 @@ export function makeHandlers(run: Runner) {
           principalOf(caller).pipe(
             Effect.flatMap((principal) => adoptChange(principal, decoded.success)),
             Effect.match({ onSuccess: adoptOk, onFailure: (error) => adoptError(caller, error) }),
+          ),
+        );
+      },
+      rebase: (caller: Caller, input: Input<"rebase">) => {
+        const decoded = rebaseInput(input);
+        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+        return run(
+          caller,
+          principalOf(caller).pipe(
+            Effect.flatMap((principal) => rebaseChange(principal, decoded.success)),
+            Effect.match({ onSuccess: rebaseOk, onFailure: (error) => rebaseError(caller, error) }),
           ),
         );
       },

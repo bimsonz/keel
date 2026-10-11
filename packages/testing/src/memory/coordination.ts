@@ -1,3 +1,4 @@
+import type { RebasedChange } from "@keeltown/core/application/coordination";
 import {
   AGENT_OWNED,
   type Change,
@@ -34,6 +35,7 @@ import {
   Recall,
   SubjectRegistry,
   type SubjectEntry,
+  KEEL_TRUNK_REF,
   type SubmissionStatus,
   type ObservedPush,
   type PoolConfig,
@@ -43,6 +45,16 @@ import {
 import { Duration, Clock as EffectClock, Effect, Layer, Option } from "effect";
 
 const MEMORY_BASE = CommitSha.make("0".repeat(40));
+/** What a rebase answers: the change on its base, and the workspace branch holding it. */
+const rebasedAnswer = (change: Change): RebasedChange => ({
+  change,
+  ref: KEEL_TRUNK_REF,
+  base: change.baseSha ?? MEMORY_BASE,
+});
+/** The states a rebase is taken in, as the domain's Rebase allows. */
+const REBASABLE: ReadonlySet<ChangeState> = new Set(["working", "bounced"]);
+/** Trunk's head as the in-memory Trunk DO reports it, which a rebase moves a change onto. */
+const MEMORY_TRUNK_HEAD = CommitSha.make("7".repeat(40));
 
 /**
  * Grants workspaces up to `capacity`, then refuses with PoolExhausted. A
@@ -210,9 +222,15 @@ function makeWaiters<K>() {
 const MEMORY_PROJECT = makeId("prj", "00000000000000000000000000");
 
 export function makeChangesMemory(
-  options: { readonly capacity?: number; readonly projectId?: ProjectId } = {},
+  options: {
+    readonly capacity?: number;
+    readonly projectId?: ProjectId;
+    readonly trunkHead?: CommitSha;
+  } = {},
 ) {
   const changes = new Map<ChangeId, Change>();
+  /** A rebase replays by its key per change, as the DO's commit does. */
+  const rebases = new Map<string, Change>();
   const commits = new Map<ChangeId, CommitSha>();
   const workspaces = new Map<ChangeId, WorkspaceId>();
   const pushed = new Map<WorkspaceId, Set<string>>();
@@ -432,6 +450,31 @@ export function makeChangesMemory(
               grantedSha: MEMORY_BASE,
               projectId: options.projectId ?? MEMORY_PROJECT,
             };
+          }),
+        rebase: (_principal, input) =>
+          Effect.gen(function* () {
+            const replayed = rebases.get(`${input.changeId} ${input.idempotencyKey}`);
+            if (replayed !== undefined) return rebasedAnswer(replayed);
+            const change = changes.get(input.changeId);
+            if (change === undefined)
+              return yield* new ChangeNotFound({ changeId: input.changeId });
+            if (change.lease.id !== input.lease || change.lease.state !== "active")
+              return yield* new LeaseStale({ changeId: input.changeId, leaseId: input.lease });
+            const onto = options.trunkHead ?? MEMORY_TRUNK_HEAD;
+            if (
+              !REBASABLE.has(change.state) ||
+              change.baseSha === undefined ||
+              change.baseSha === onto
+            )
+              return yield* new ChangeStateRefused({
+                changeId: change.id,
+                state: change.state,
+                command: "Rebase",
+              });
+            const rebased: Change = { ...change, baseSha: onto };
+            changes.set(change.id, rebased);
+            rebases.set(`${input.changeId} ${input.idempotencyKey}`, rebased);
+            return rebasedAnswer(rebased);
           }),
         get: (changeId) =>
           Effect.suspend(() => {

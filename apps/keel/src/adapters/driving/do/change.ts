@@ -11,6 +11,7 @@ import {
   precheckRefused,
   precheckStarted,
   reactToBatch,
+  rebase,
   revise,
   submissionStatus,
   submit,
@@ -34,6 +35,7 @@ import {
   PlanCompiledCommand,
   PrecheckRefusedCommand,
   PrecheckStartedCommand,
+  RebaseCommand,
   ReviseCommand,
   SubmitCommand,
 } from "../../../rpc/index.ts";
@@ -115,6 +117,14 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
       Effect.flatMap((submitting) => submit(changeId, submitting)),
     );
     return this.answer(ChangeCodecs.submit, program);
+  }
+
+  async rebase(command: typeof RebaseCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(RebaseCommand, command).pipe(
+      Effect.flatMap((rebasing) => rebase(changeId, rebasing)),
+    );
+    return this.answer(ChangeCodecs.rebase, program);
   }
 
   async abandon(command: typeof AbandonCommand.Encoded) {

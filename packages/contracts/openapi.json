@@ -1386,6 +1386,145 @@
         ]
       }
     },
+    "/changes/{changeId}/rebase": {
+      "post": {
+        "operationId": "rebase",
+        "summary": "Rebase a change onto trunk",
+        "description": "Trunk moved under your change and it bounced on a textual conflict: put trunk's head on your\nworkspace's `keel/trunk` branch and move the change's base there. Then run\n`git fetch origin keel/trunk && git merge FETCH_HEAD`, resolve, push and submit again (merge,\nnever force-push). Allowed while the change is working or bounced, under your lease. A retry\nwith the same key answers as before; 503 `workspace.busy` means try again shortly.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ChangePath"
+          },
+          {
+            "$ref": "#/components/parameters/LeaseHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RebasedEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Changes",
+          "mcp"
+        ],
+        "security": [
+          {
+            "OAuth2Auth": [
+              "agent:work"
+            ]
+          }
+        ]
+      }
+    },
     "/changes/{changeId}/revisions": {
       "post": {
         "operationId": "revise",
@@ -12235,6 +12374,8 @@
           "change.state_refused",
           "change.commit_not_in_workspace",
           "workspace.pool_exhausted",
+          "workspace.busy",
+          "workspace.pack_too_large",
           "sketch.not_found",
           "repo.ref_not_found",
           "repo.path_not_found",
@@ -12701,6 +12842,86 @@
           "not": {}
         },
         "description": "The write-ahead log entry (ADR 0003): the group about to be pushed, written before the compose."
+      },
+      "Rebased": {
+        "type": "object",
+        "required": [
+          "change",
+          "ref",
+          "base"
+        ],
+        "properties": {
+          "change": {
+            "$ref": "#/components/schemas/Change"
+          },
+          "ref": {
+            "type": "string",
+            "description": "The workspace branch holding trunk's head: `refs/heads/keel/trunk`."
+          },
+          "base": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The change's base now: trunk's head, which a resubmission is judged against."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A change moved onto trunk's head: its new base, and the workspace branch that holds it, to fetch and merge."
+      },
+      "RebasedEnvelope": {
+        "type": "object",
+        "required": [
+          "ok",
+          "summary",
+          "result",
+          "findings",
+          "next",
+          "notices",
+          "cost"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string",
+            "description": "One line, written for the agent."
+          },
+          "result": {
+            "$ref": "#/components/schemas/Rebased"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            }
+          },
+          "next": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NextAction"
+            },
+            "maxItems": 3
+          },
+          "notices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notice"
+            },
+            "maxItems": 3
+          },
+          "cost": {
+            "$ref": "#/components/schemas/CallCost"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Every work-loop response: the result, plus what the agent should know and do next."
       },
       "Relied": {
         "type": "object",

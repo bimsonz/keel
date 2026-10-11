@@ -13,7 +13,7 @@ index e3214e6..80688fb 100644
  import {
    BatchFailed,
    BatchFormed,
-@@ -755,7 +756,9 @@ export const rebaseChange: (
+@@ -755,7 +756,9 @@ export const rebase: (
    const held = heldWorkspace(yield* EntityStore, changeId);
    if (held === undefined || change.baseSha === undefined) return yield* refused(change, "rebase");
    const from = change.baseSha;
@@ -21,6 +21,6 @@ index e3214e6..80688fb 100644
 +  const onto = yield* (yield* CodeHost)
 +    .head(projectRepos(held.projectId).mirror, "refs/heads/main")
 +    .pipe(Effect.orDie);
-   const rebase: ChangeCommand = { _tag: "Rebase", leaseId: command.leaseId, from, onto };
-   const decided = decideChange(change, rebase, { now: yield* (yield* Clock).now, changeId });
+   const rebasing: ChangeCommand = { _tag: "Rebase", leaseId: command.leaseId, from, onto };
+   const decided = decideChange(change, rebasing, { now: yield* (yield* Clock).now, changeId });
    if (Result.isFailure(decided)) {
