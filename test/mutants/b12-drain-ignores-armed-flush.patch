@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/drain.test.ts -t b12.drain
+# kills: b12.drain
+# why: the drain calls an object quiet with its flush still armed, so a debounced flush can outlive its test file
+diff --git a/apps/keel/test/pool/helpers.ts b/apps/keel/test/pool/helpers.ts
+index 8f2ba72..f996203 100644
+--- a/apps/keel/test/pool/helpers.ts
++++ b/apps/keel/test/pool/helpers.ts
+@@ -141,7 +141,7 @@ export async function drainOutbox(stub: DurableObjectStub, timeout = 20_000): Pr
+         owed: state.storage.sql.exec("SELECT event_id FROM keel_deliveries").toArray().length,
+         armed: armedAlarms(state.storage)
+           .map((alarm) => alarm.reason)
+-          .filter((reason) => reason === OUTBOX_FLUSH || reason === OUTBOX_REDELIVERY),
++          .filter(() => false),
+       }));
+       expect(outbox).toEqual({ owed: 0, armed: [] });
+     },

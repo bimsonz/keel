@@ -8,12 +8,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { AgentSessionDO } from "../../src/adapters/driving/do/agent-session.ts";
 import type { SocketFrame } from "../../src/adapters/driving/notices.ts";
 import { AgentSessionCodecs, decodeExit, EventCodecs } from "../../src/rpc/index.ts";
-import { BASE, seedAgent, tokenFor } from "./helpers.ts";
+import { BASE, drainAfter, seedAgent, tokenFor } from "./helpers.ts";
 
 const WAIT = { timeout: 5_000, interval: 20 };
 
 const agentStub = (agentId: AgentId) =>
-  env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`));
+  drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)));
 
 /** A platform-caused event about some change, encoded as the fan-out delivers it. */
 const platformEvent = () => {

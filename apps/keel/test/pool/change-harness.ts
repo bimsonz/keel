@@ -15,9 +15,10 @@ import { ulid } from "ulid";
 import type { ChangeDO } from "../../src/adapters/driving/do/change.ts";
 import { backbone, type ChangeServices } from "../../src/composition/do.ts";
 import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
+import { drainAfter } from "./helpers.ts";
 
 export const changeStub = (changeId = makeId("chg", ulid())) =>
-  env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`));
+  drainAfter(env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`)));
 
 /**
  * Runs the Change DO on these driven adapters (and, when given, this clock)
@@ -75,6 +76,10 @@ export async function changeUnderTest() {
   const changeId: ChangeId = makeId("chg", ulid());
   const agentId = makeId("agt", ulid());
   const stub = changeStub(changeId);
+  // Drained after the change: what it delivers to its agent, pool and lane may owe flushes of their own.
+  drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)));
+  drainAfter(env.WORKSPACE_POOL.get(env.WORKSPACE_POOL.idFromName(`pool:${sampleProjectId}`)));
+  drainAfter(env.LANE.get(env.LANE.idFromName(`lane:${sampleProjectId}:main`)));
   const clock = makeManualClock(Date.now());
   const pool = makeWorkspacePoolMemory();
   const code = makeCodeHostMemory();

@@ -6,13 +6,13 @@ import { describe, expect, it, vi } from "vitest";
 import { AgentSessionCodecs, ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
 import { changeUnderTest, ok } from "./change-harness.ts";
 import { inertPrecheck } from "./inert-precheck.ts";
-import { BASE, seedAgent, tokenFor } from "./helpers.ts";
+import { BASE, drainAfter, seedAgent, tokenFor } from "./helpers.ts";
 
 /** How long a test waits for something the objects do by themselves (a flush, a delivery). */
 const WAIT = { timeout: 10_000, interval: 20 };
 
 const agentStub = (agentId: AgentId) =>
-  env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`));
+  drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)));
 
 /** Every notice in the agent's inbox, read from the start. */
 async function inboxOf(agentId: AgentId) {

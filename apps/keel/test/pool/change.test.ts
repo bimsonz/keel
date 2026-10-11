@@ -21,7 +21,7 @@ import {
   replayed,
   unrenewed,
 } from "./change-harness.ts";
-import { drainOutbox } from "./helpers.ts";
+import { drainAfter } from "./helpers.ts";
 import { inertPrecheck } from "./inert-precheck.ts";
 
 /** How long a test waits for something the object does by itself (a flush, an alarm). */
@@ -391,7 +391,7 @@ describe("a compiled change and its lane", () => {
     );
     const queued = (await c.log()).at(-1);
     if (queued?.type !== "ChangeQueued") throw new Error("no ChangeQueued was committed");
-    const lane = env.LANE.get(env.LANE.idFromName(`lane:${sampleProjectId}:main`));
+    const lane = drainAfter(env.LANE.get(env.LANE.idFromName(`lane:${sampleProjectId}:main`)));
 
     expect(compiled.state).toBe("queued");
     await vi.waitFor(
@@ -486,7 +486,9 @@ describe("a change moved by its lane's delivered events", () => {
     await using precheck = await inertPrecheck();
     const c = await changeUnderTest();
     await queue(c);
-    const lane = env.LANE.get(env.LANE.idFromName(`lane:${sampleProjectId}:test-${ulid()}`));
+    const lane = drainAfter(
+      env.LANE.get(env.LANE.idFromName(`lane:${sampleProjectId}:test-${ulid()}`)),
+    );
     const mine: EntityRef = { kind: "change", id: c.changeId };
     const batchId = makeId("bat", ulid());
     const batch: EntityRef = { kind: "batch", id: batchId };
@@ -583,8 +585,10 @@ describe("a change moved by its lane's delivered events", () => {
     await using precheck = await inertPrecheck();
     const c = await changeUnderTest();
     await queue(c);
-    const lane = env.LANE.get(env.LANE.idFromName(`lane:${sampleProjectId}:test-${ulid()}`));
-    const trunk = env.TRUNK.get(env.TRUNK.idFromName(`trunk:${sampleProjectId}`));
+    const lane = drainAfter(
+      env.LANE.get(env.LANE.idFromName(`lane:${sampleProjectId}:test-${ulid()}`)),
+    );
+    const trunk = drainAfter(env.TRUNK.get(env.TRUNK.idFromName(`trunk:${sampleProjectId}`)));
     const mine: EntityRef = { kind: "change", id: c.changeId };
     const batchId = makeId("bat", ulid());
     const otherChange = makeId("chg", ulid());
@@ -657,7 +661,6 @@ describe("a change moved by its lane's delivered events", () => {
       proofId: "prf-mine",
     });
     await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);
-    await Promise.all([drainOutbox(lane), drainOutbox(trunk), drainOutbox(c.stub)]);
   });
 });
 

@@ -5,10 +5,10 @@ import { hashSecret, sampleProjectId } from "@keeltown/testing";
 import { Exit, Schema } from "effect";
 import { ulid } from "ulid";
 import { AgentSessionCodecs, decodeExit } from "../../src/rpc/index.ts";
-import { exchange } from "./helpers.ts";
+import { drainAfter, exchange } from "./helpers.ts";
 
 const agentStub = (agentId = makeId("agt", ulid())) =>
-  env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`));
+  drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)));
 
 /** An event of a change, encoded as the fan-out delivers it. */
 const delivery = (entity: EntityRef, seq: number) =>

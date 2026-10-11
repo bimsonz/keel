@@ -2,10 +2,10 @@
 # kills: b1.alarm-quiet
 # why: every flush re-arms the redelivery deadline even with nothing owed, which is a polling loop
 diff --git a/apps/keel/src/adapters/driving/do/keel-object.ts b/apps/keel/src/adapters/driving/do/keel-object.ts
-index 19e981a..cfc20e2 100644
+index 1d456f5..0703107 100644
 --- a/apps/keel/src/adapters/driving/do/keel-object.ts
 +++ b/apps/keel/src/adapters/driving/do/keel-object.ts
-@@ -146,12 +146,10 @@ export abstract class KeelObject extends DurableObject<Env> implements EventRece
+@@ -193,16 +193,11 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
    private async flush(): Promise<void> {
      const report = await this.runtime.runPromise(flushOutbox(this.fanOut));
      if (report.stuck.length > 0) console.warn("outbox backlog stuck", JSON.stringify(report.stuck));
@@ -15,6 +15,9 @@ index 19e981a..cfc20e2 100644
 -        reason: OUTBOX_REDELIVERY,
 -        at: report.nextAttemptAt,
 -      });
+-    } else {
+-      // Nothing waits on a retry any more: an earlier failure's redelivery has nothing left to do.
+-      await cancelAlarm(this.ctx.storage, OUTBOX_REDELIVERY);
 -    }
 +    await scheduleAlarm(this.ctx.storage, {
 +      kind: "deadline",
@@ -23,3 +26,4 @@ index 19e981a..cfc20e2 100644
 +    });
    }
  }
+ 

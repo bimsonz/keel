@@ -134,7 +134,7 @@ export async function mcpResult(response: Response): Promise<Record<string, unkn
  * passed. A delivery is deleted only once its subscriber took it, so an empty
  * table means the last one arrived.
  */
-export async function drainOutbox(stub: DurableObjectStub): Promise<void> {
+export async function drainOutbox(stub: DurableObjectStub, timeout = 20_000): Promise<void> {
   await vi.waitFor(
     async () => {
       const outbox = await runInDurableObject(stub, (_instance: unknown, state) => ({
@@ -145,6 +145,31 @@ export async function drainOutbox(stub: DurableObjectStub): Promise<void> {
       }));
       expect(outbox).toEqual({ owed: 0, armed: [] });
     },
-    { timeout: 20_000, interval: 25 },
+    { timeout, interval: 25 },
   );
+}
+
+/** The objects to drain when the running case ends, by id. Each test file loads its own copy of this module. */
+const toDrain = new Map<string, DurableObjectStub>();
+
+/**
+ * Registers `stub` to be drained when the running case ends, and returns it.
+ * Stub helpers call it, so a case that commits real events cannot end with a
+ * flush still owed: `drainRegistered` runs after every case (setup.ts).
+ */
+export function drainAfter<S extends DurableObjectStub>(stub: S): S {
+  toDrain.set(stub.id.toString(), stub);
+  return stub;
+}
+
+/**
+ * Drains every object registered since the last call, in the order they were
+ * registered, then forgets them. In order, because an object drained first
+ * delivers to those registered after it (a change to its agent, pool and
+ * lane), whose reactions may then owe a flush of their own.
+ */
+export async function drainRegistered(): Promise<void> {
+  const stubs = [...toDrain.values()];
+  toDrain.clear();
+  for (const stub of stubs) await drainOutbox(stub);
 }

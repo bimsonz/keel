@@ -12,15 +12,17 @@ import { EntityStoreSql } from "../../src/adapters/driven/do-storage/entity-stor
 import { EventOutboxSql } from "../../src/adapters/driven/do-storage/event-outbox.ts";
 import type { AgentSessionDO } from "../../src/adapters/driving/do/agent-session.ts";
 import { armedAlarms, dueAlarms, scheduleAlarm } from "../../src/adapters/driving/do/alarm.ts";
+import { OUTBOX_REDELIVERY } from "../../src/adapters/driving/do/keel-object.ts";
 import type { ChangeDO } from "../../src/adapters/driving/do/change.ts";
 import type { ProjectorDO } from "../../src/adapters/driving/do/projector.ts";
 import type { DurableObjectServices } from "../../src/composition/do.ts";
 import { decodeExit, EventCodecs, exitCodec } from "../../src/rpc/index.ts";
+import { drainAfter } from "./helpers.ts";
 
 const changeStub = (changeId = makeId("chg", ulid())) =>
-  env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`));
+  drainAfter(env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`)));
 const agentStub = (agentId: string) =>
-  env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`));
+  drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)));
 const projectorStub = () => env.PROJECTOR.get(env.PROJECTOR.idFromName("projector"));
 
 // The real adapter passes the same contract suite as the in-memory one. DO SQLite can only be touched from inside its
@@ -169,27 +171,50 @@ describe("the event backbone across real Durable Objects", () => {
     expect(after).toEqual({ owed: [], alarm: null });
   });
 
-  it("keeps an event owed to an unreachable subscriber and arms a redelivery deadline, never a loop", async () => {
+  it("[b1.redelivery] keeps an event owed to an unreachable subscriber and arms a redelivery deadline, never a loop", async () => {
     const changeId = makeId("chg", ulid());
     const entity: EntityRef = { kind: "change", id: changeId };
-    const emitter = changeStub(changeId);
+    // Not drained: its subscriber never answers, so it owes the event for good.
+    const emitter = env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`));
     const flushedAt = Date.now();
     await through(emitter, emit(entity, "declare", ["nowhere:1"]));
     await runDurableObjectAlarm(emitter);
-    const owed = () =>
-      runInDurableObject(emitter, (_instance: ChangeDO, state) => ({
+    // The failed attempt is recorded before the redelivery is armed, so both are read in one turn.
+    await vi.waitFor(async () => {
+      const after = await runInDurableObject(emitter, (_instance: ChangeDO, state) => ({
         owed: tables(state).deliveries,
         alarms: armedAlarms(state.storage),
       }));
-    await vi.waitFor(
-      async () =>
-        expect((await owed()).owed).toMatchObject([{ subscriber: "nowhere:1", attempts: 1 }]),
-      WAIT,
+      expect(after.owed).toMatchObject([{ subscriber: "nowhere:1", attempts: 1 }]);
+      expect(after.alarms).toHaveLength(1);
+      expect(after.alarms[0]).toMatchObject({ kind: "deadline", reason: "outbox redelivery" });
+      expect(after.alarms[0]?.at).toBeGreaterThanOrEqual(flushedAt + 1000);
+    }, WAIT);
+  });
+
+  it("[b1.redelivery] disarms an earlier failure's redelivery once a flush leaves nothing owed", async () => {
+    const changeId = makeId("chg", ulid());
+    const agentId = makeId("agt", ulid());
+    const entity: EntityRef = { kind: "change", id: changeId };
+    const emitter = changeStub(changeId);
+    agentStub(agentId);
+    // What an earlier failed attempt leaves armed, a minute out.
+    await runInDurableObject(emitter, (_instance: ChangeDO, state) =>
+      scheduleAlarm(state.storage, {
+        kind: "deadline",
+        reason: OUTBOX_REDELIVERY,
+        at: Date.now() + 60_000,
+      }),
     );
-    const after = await owed();
-    expect(after.alarms).toHaveLength(1);
-    expect(after.alarms[0]).toMatchObject({ kind: "deadline", reason: "outbox redelivery" });
-    expect(after.alarms[0]?.at).toBeGreaterThanOrEqual(flushedAt + 1000);
+    await through(emitter, emit(entity, "declare", [`agent:${agentId}`]));
+
+    await vi.waitFor(async () => {
+      const after = await runInDurableObject(emitter, (_instance: ChangeDO, state) => ({
+        owed: tables(state).deliveries,
+        alarms: armedAlarms(state.storage),
+      }));
+      expect(after).toEqual({ owed: [], alarms: [] });
+    }, WAIT);
   });
 
   it("[b1.duplicate-noop] treats a duplicate delivery as a no-op: the receiver's state and event log are unchanged", async () => {

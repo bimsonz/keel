@@ -26,7 +26,7 @@ import {
   encodeExit,
   readDelivery,
 } from "../../../rpc/index.ts";
-import { type AlarmRequest, dueAlarms, scheduleAlarm } from "./alarm.ts";
+import { type AlarmRequest, cancelAlarm, dueAlarms, scheduleAlarm } from "./alarm.ts";
 import { Waiters } from "./waiters.ts";
 
 /** The alarm reasons the backbone owns. Every other reason is the subclass's, handed to `onDeadline`. */
@@ -199,6 +199,9 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
         reason: OUTBOX_REDELIVERY,
         at: report.nextAttemptAt,
       });
+    } else {
+      // Nothing waits on a retry any more: an earlier failure's redelivery has nothing left to do.
+      await cancelAlarm(this.ctx.storage, OUTBOX_REDELIVERY);
     }
   }
 }

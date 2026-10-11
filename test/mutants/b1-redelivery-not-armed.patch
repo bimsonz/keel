@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t b1.redelivery
+# kills: b1.redelivery
+# why: a failed delivery arms no redelivery, so the owed event waits for the next commit
+diff --git a/apps/keel/src/adapters/driving/do/keel-object.ts b/apps/keel/src/adapters/driving/do/keel-object.ts
+index 1d456f5..a5d64f4 100644
+--- a/apps/keel/src/adapters/driving/do/keel-object.ts
++++ b/apps/keel/src/adapters/driving/do/keel-object.ts
+@@ -193,7 +193,7 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
+   private async flush(): Promise<void> {
+     const report = await this.runtime.runPromise(flushOutbox(this.fanOut));
+     if (report.stuck.length > 0) console.warn("outbox backlog stuck", JSON.stringify(report.stuck));
+-    if (report.nextAttemptAt !== undefined) {
++    if (report.nextAttemptAt === undefined && report.stuck.length < 0) {
+       await scheduleAlarm(this.ctx.storage, {
+         kind: "deadline",
+         reason: OUTBOX_REDELIVERY,

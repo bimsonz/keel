@@ -16,7 +16,7 @@ import type { ProjectDO } from "../../src/adapters/driving/do/project.ts";
 import { backbone } from "../../src/composition/do.ts";
 import { decodeExit, ProjectCodecs } from "../../src/rpc/index.ts";
 import { ok, refusal } from "./change-harness.ts";
-import { BASE, seedAgent, tokenFor, worker } from "./helpers.ts";
+import { BASE, drainAfter, seedAgent, tokenFor, worker } from "./helpers.ts";
 
 const SOURCE = { namespace: "keel-core", name: "seed-app" };
 
@@ -28,7 +28,7 @@ const SOURCE = { namespace: "keel-core", name: "seed-app" };
 async function projectUnderTest() {
   const projectId: ProjectId = makeId("prj", ulid());
   const operator: AgentId = makeId("agt", ulid());
-  const stub = env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`));
+  const stub = drainAfter(env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)));
   const journal: string[] = [];
   const code = makeCodeHostMemory();
   const trunks = makeTrunksMemory({ journal });
