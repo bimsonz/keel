@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/names.test.ts -t names.reserved
+# kills: names.reserved
+# why: device is a handle anyone can take, so keel.town/device stops being the device-login page
+diff --git a/apps/keel/src/adapters/driven/better-auth/names.ts b/apps/keel/src/adapters/driven/better-auth/names.ts
+index ecbbf78..cc4e04f 100644
+--- a/apps/keel/src/adapters/driven/better-auth/names.ts
++++ b/apps/keel/src/adapters/driven/better-auth/names.ts
+@@ -16,7 +16,6 @@ export const RESERVED_NAMES: ReadonlySet<string> = new Set([
+   "login",
+   "signup",
+   "logout",
+-  "device",
+   "invite",
+   "settings",
+   "new",

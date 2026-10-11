@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/names.test.ts -t names.handle
+# kills: names.handle
+# why: a handle may hold a run of hyphens, which GitHub-style names never do
+diff --git a/apps/keel/src/adapters/driven/better-auth/names.ts b/apps/keel/src/adapters/driven/better-auth/names.ts
+index ecbbf78..c55ecf3 100644
+--- a/apps/keel/src/adapters/driven/better-auth/names.ts
++++ b/apps/keel/src/adapters/driven/better-auth/names.ts
+@@ -34,7 +34,7 @@ export const RESERVED_NAMES: ReadonlySet<string> = new Set([
+ ]);
+ 
+ /** Lower-case letters and digits, single hyphens between them, at most 39 characters. */
+-export const HANDLE = /^[a-z0-9](?:-?[a-z0-9]){0,38}$/;
++export const HANDLE = /^[a-z0-9](?:-*[a-z0-9]){0,38}$/;
+ 
+ /** Why `name` can't be a handle or an org name, or undefined when it can. Case never matters. */
+ export function nameRefusal(name: string): string | undefined {
