@@ -15,16 +15,16 @@ import {
 } from "@keeltown/gitcore";
 import { Effect, Layer } from "effect";
 
-const MAIN = "refs/heads/main";
+export const MAIN = "refs/heads/main";
 
 /** Every trunk-side token lives a minute, minted for the one operation that needs it. */
-const TOKEN_TTL_SECONDS = 60;
+export const TOKEN_TTL_SECONDS = 60;
 
 /** How many times a target that moved under a relay is read again before the sync gives up. */
 const STALE_RETRIES = 3;
 
 /** Over the cap is the one expected failure of a relay; anything else from git is a defect. */
-const tooLarge =
+export const tooLarge =
   (target: RepoRef) =>
   (cause: unknown): Effect.Effect<never, PackTooLarge> =>
     cause instanceof GitPackTooLarge

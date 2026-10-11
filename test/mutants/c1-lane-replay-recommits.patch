@@ -1,0 +1,24 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.verdict-replay"
+# kills: lane.verdict-replay
+# why: The verdict's cause carries the time, so KeelVerify's replayed step is not a no-op and commits again
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index a57774b..e523ada 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -39,6 +39,7 @@ import {
+   CandidateComposer,
+   type CandidateMember,
+   Changes,
++  Clock,
+   CodeHost,
+   commit,
+   EntityStore,
+@@ -863,7 +864,7 @@ export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
+   const committed = yield* onBatch(
+     laneId,
+     batch.id,
+-    `${verdict.instanceId}:recordVerdict`,
++    `${verdict.instanceId}:recordVerdict@${yield* (yield* Clock).now}`,
+     (now, lane) => {
+       const issued = issuedFor(verdict, now, lane);
+       exhausted = issued.exhausted;

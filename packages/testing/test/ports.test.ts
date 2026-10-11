@@ -35,6 +35,7 @@ const CONTRACT_PORTS = [
   "CandidateBundles",
   "BatchVerification",
   "TrunkWriter",
+  "StagingWriter",
   "Trunks",
   "SessionStore",
   "MfpWriter",

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.staging-ff"
+# kills: lane.staging-ff
+# why: Staging never follows trunk, so every later batch forms on a stale base
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index a57774b..83d4b2c 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -711,7 +711,7 @@ const followTrunk = Effect.fn("integration/followTrunk")(function* (
+       moves: [{ command: { _tag: "Promote", trunkSha: advance.to } }],
+       lane: () => ({ ...withoutInfra(now, batch.members), active: undefined }),
+     })).pipe(Effect.orDie);
+-  const moved = yield* Effect.result((yield* StagingWriter).fastForward(advance.from, advance.to));
++  const moved = yield* Effect.result(Effect.succeed("unchanged" as const));
+   if (Result.isFailure(moved)) {
+     const failure = moved.failure;
+     if (failure._tag === "PushRejected" && failure.reason === "busy") {

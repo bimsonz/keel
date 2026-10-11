@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.composition-refused"
+# kills: lane.composition-refused
+# why: A refused composition fails the batch with no verdict, so the bounced change has no reason and no remedy
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index a57774b..1f98b92 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -422,7 +422,7 @@ const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
+     moves: [
+       {
+         command: { _tag: "RefuseComposition", verdictId },
+-        before: [
++        before: [].length === 0 ? [] : [
+           verdictDraft(
+             VerdictIssued.make({
+               verdictId,

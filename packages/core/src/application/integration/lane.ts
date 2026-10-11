@@ -1,0 +1,909 @@
+import { Effect, Result, Schema } from "effect";
+import {
+  ChangeQueued,
+  ChangeRequeued,
+  ChangeSuperseded,
+  ChangeWithdrawn,
+} from "../../domain/coordination/index.ts";
+import {
+  attribute,
+  Batch,
+  type BatchAttribution,
+  CandidateEvent,
+  type CandidateCommand,
+  CandidateNotFound,
+  type CandidateRejection,
+  type CompositionRefused,
+  decideCandidate,
+  evolveCandidate,
+  isCandidateTerminal,
+  TrunkAdvanced,
+} from "../../domain/integration/index.ts";
+import {
+  BatchId,
+  CandidateId,
+  ChangeId,
+  CommitSha,
+  ContentHash,
+  type EntityRef,
+  type EventEnvelope,
+  type Instant,
+  type NextAction,
+  ProjectId,
+} from "../../domain/kernel/index.ts";
+import { type VerdictOutcome, VerdictIssued } from "../../domain/verification/index.ts";
+import {
+  type BatchVerdict,
+  BatchVerification,
+  CandidateBundles,
+  CandidateComposer,
+  type CandidateMember,
+  Changes,
+  CodeHost,
+  commit,
+  EntityStore,
+  type EventDraft,
+  EventOutbox,
+  Ids,
+  Projects,
+  type RepoRef,
+  StagingWriter,
+  type Transaction,
+  type Transition,
+} from "../ports/index.ts";
+import { L1_SUITE_PLAN } from "../verification/index.ts";
+import { projectRepos } from "./project-repos.ts";
+
+/** The EntityStore kinds the Lane keeps: its queue and batch in flight, and each batch as its events fold. */
+const LANE = "lane";
+const BATCH = "batch";
+const MAIN = "refs/heads/main";
+
+/** What a member change hears of its own batches: the Form commit subscribes it, scoped to `change:<id>`. */
+const MEMBER_EVENTS = [
+  "BatchFormed",
+  "BatchFailed",
+  "CandidateBisected",
+  "CandidateInvalidated",
+  "VerdictIssued",
+];
+
+/** On this many consecutive infra failures of one change the Lane bounces it, so it never loops. */
+export const INFRA_FAILURE_LIMIT = 3;
+
+/** The batch in flight and what the Lane learned composing and bundling it. */
+const ActiveBatch = Schema.Struct({
+  batchId: BatchId,
+  /** Minted with the batch, so a retried compose pushes the same candidate ref. */
+  candidateId: CandidateId,
+  /** The candidate's tip in staging and each member's restacked commit, in batch order. */
+  composed: Schema.optional(
+    Schema.Struct({
+      commitSha: CommitSha,
+      commits: Schema.Array(Schema.Struct({ changeId: ChangeId, sha: CommitSha })),
+    }),
+  ),
+  bundle: Schema.optional(ContentHash),
+  /** KeelVerify's instance exists: the start is retried until it does. */
+  started: Schema.optional(Schema.Boolean),
+});
+type ActiveBatch = typeof ActiveBatch.Type;
+
+/** A lane: its FIFO queue, the one batch in flight at L1, trunk advances staging has yet to follow. */
+export const Lane = Schema.Struct({
+  laneId: Schema.String,
+  projectId: ProjectId,
+  queue: Schema.Array(ChangeId),
+  active: Schema.optional(ActiveBatch),
+  advances: Schema.Array(
+    Schema.Struct({ from: CommitSha, to: CommitSha, members: Schema.Array(ChangeId) }),
+  ),
+  /** Each change's consecutive infra failures, their reasons oldest first. */
+  infra: Schema.Array(Schema.Struct({ changeId: ChangeId, reasons: Schema.Array(Schema.String) })),
+});
+export type Lane = typeof Lane.Type;
+
+const decodeLane = Schema.decodeUnknownSync(Schema.toCodecJson(Lane));
+const encodeLane = Schema.encodeSync(Schema.toCodecJson(Lane));
+const decodeBatch = Schema.decodeUnknownSync(Schema.toCodecJson(Batch));
+const encodeBatch = Schema.encodeSync(Schema.toCodecJson(Batch));
+const encodeCandidateEvent = Schema.encodeSync(Schema.toCodecJson(CandidateEvent));
+const encodeVerdict = Schema.encodeSync(Schema.toCodecJson(VerdictIssued));
+const decodeProject = Schema.decodeUnknownSync(ProjectId);
+
+type Store = (typeof EntityStore)["Service"];
+
+/** A lane is addressed `lane:<projectId>:<name>`; the L1 lane of a project is `lane:<projectId>:main`. */
+export const laneProject = (laneId: string): ProjectId => {
+  const match = /^lane:([^:]+):[^:]+$/.exec(laneId);
+  if (match?.[1] === undefined)
+    throw new Error(`a lane is addressed lane:<projectId>:<name>, not ${laneId}`);
+  return decodeProject(match[1]);
+};
+
+export const laneOf = (store: Store, laneId: string): Lane | undefined => {
+  const stored = store.get(LANE, laneId);
+  return stored === undefined ? undefined : decodeLane(stored);
+};
+
+const putLane = (store: Store, lane: Lane): void => store.put(LANE, lane.laneId, encodeLane(lane));
+
+const emptyLane = (laneId: string): Lane => ({
+  laneId,
+  projectId: laneProject(laneId),
+  queue: [],
+  advances: [],
+  infra: [],
+});
+
+/** The batch as its events left it. */
+export const batchOf = (store: Store, batchId: BatchId): Batch | undefined => {
+  const stored = store.get(BATCH, batchId);
+  return stored === undefined ? undefined : decodeBatch(stored);
+};
+
+const batchRef = (batchId: BatchId): EntityRef => ({ kind: "batch", id: batchId });
+const changeRef = (changeId: ChangeId): EntityRef => ({ kind: "change", id: changeId });
+
+const isTagged = (json: Schema.Json): json is EventDraft["payload"] =>
+  typeof json === "object" &&
+  json !== null &&
+  !Array.isArray(json) &&
+  "_tag" in json &&
+  typeof json["_tag"] === "string";
+
+const payloadOf = (json: Schema.Json, tag: string): EventDraft["payload"] => {
+  if (!isTagged(json)) throw new Error(`${tag} did not encode as a tagged object`);
+  return json;
+};
+
+/** A batch event, naming its members as affected so each member's scoped subscription hears it. */
+const batchDraft = (event: CandidateEvent, members: readonly ChangeId[]): EventDraft => ({
+  payload: payloadOf(encodeCandidateEvent(event), event._tag),
+  affected: members.map(changeRef),
+});
+
+/** A verdict on the batch, on the verdict's own entity, naming the members as affected. */
+const verdictDraft = (
+  verdict: typeof VerdictIssued.Type,
+  members: readonly ChangeId[],
+): EventDraft => ({
+  entity: { kind: "verdict", id: verdict.verdictId },
+  payload: payloadOf(encodeVerdict(verdict), verdict._tag),
+  affected: members.map(changeRef),
+});
+
+const fold = (batch: Batch | undefined, events: readonly CandidateEvent[], at: Instant): Batch => {
+  const folded = events.reduce<Batch | undefined>(
+    (state, payload) => evolveCandidate(state, { at, payload }),
+    batch,
+  );
+  if (folded === undefined) throw new Error("a batch decision folded to no batch");
+  return folded;
+};
+
+/** Whether the lane already holds a change: queued, or a member of its batch in flight. */
+const holds = (store: Store, lane: Lane, changeId: ChangeId): boolean =>
+  lane.queue.includes(changeId) ||
+  (lane.active !== undefined &&
+    (batchOf(store, lane.active.batchId)?.members.includes(changeId) ?? false));
+
+const decodeQueued = Schema.decodeUnknownSync(ChangeQueued);
+const decodeRequeued = Schema.decodeUnknownSync(ChangeRequeued);
+const decodeAdvanced = Schema.decodeUnknownSync(TrunkAdvanced);
+const decodeEnded = Schema.decodeUnknownSync(Schema.Union([ChangeWithdrawn, ChangeSuperseded]));
+
+/**
+ * A delivered event, inside the transaction that records it: ChangeQueued
+ * joins the queue's back, ChangeRequeued its front (it re-enters with no
+ * blame), a change withdrawn or superseded while queued leaves the queue,
+ * and TrunkAdvanced is noted for staging to follow. State only: the
+ * step commits the events. True when the lane changed.
+ */
+export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope): boolean => {
+  const lane = laneOf(tx.store, laneId) ?? emptyLane(laneId);
+  const next = ((): Lane | undefined => {
+    switch (event.type) {
+      case "ChangeQueued": {
+        const queued = decodeQueued(event.payload);
+        return queued.laneId !== laneId || holds(tx.store, lane, queued.changeId)
+          ? undefined
+          : { ...lane, queue: [...lane.queue, queued.changeId] };
+      }
+      case "ChangeRequeued": {
+        const requeued = decodeRequeued(event.payload);
+        return holds(tx.store, lane, requeued.changeId)
+          ? undefined
+          : { ...lane, queue: [requeued.changeId, ...lane.queue] };
+      }
+      case "ChangeWithdrawn":
+      case "ChangeSuperseded": {
+        const ended = decodeEnded(event.payload);
+        return lane.queue.includes(ended.changeId)
+          ? { ...lane, queue: lane.queue.filter((id) => id !== ended.changeId) }
+          : undefined;
+      }
+      case "TrunkAdvanced": {
+        const advanced = decodeAdvanced(event.payload);
+        return advanced.projectId !== lane.projectId
+          ? undefined
+          : {
+              ...lane,
+              advances: [
+                ...lane.advances,
+                {
+                  from: advanced.from,
+                  to: advanced.to,
+                  members: advanced.landings.map((landing) => landing.changeId),
+                },
+              ],
+            };
+      }
+      default:
+        return undefined;
+    }
+  })();
+  if (next === undefined) return false;
+  putLane(tx.store, next);
+  return true;
+};
+
+/** The batch's BatchFormed: its id names the KeelVerify instance, its time every composed commit. */
+const formedOf = (outbox: (typeof EventOutbox)["Service"], batchId: BatchId) => {
+  const formed = outbox.log(batchRef(batchId)).find((event) => event.type === "BatchFormed");
+  if (formed === undefined) throw new Error(`batch ${batchId} has no BatchFormed`);
+  return formed;
+};
+
+/** Writes lane state that carries no event (a step's bookkeeping), on the lane's project. */
+const noteLane = (lane: Lane, cause: string, update: (lane: Lane) => Lane) =>
+  commit({ entity: { kind: "project", id: lane.projectId }, cause }, (tx) => {
+    putLane(tx.store, update(laneOf(tx.store, lane.laneId) ?? lane));
+    return Result.succeed({ value: undefined, drafts: [] });
+  });
+
+const withoutInfra = (lane: Lane, members: readonly ChangeId[]): Lane => ({
+  ...lane,
+  infra: lane.infra.filter((entry) => !members.includes(entry.changeId)),
+});
+
+/** One Candidate command, with what is committed just before its events (a verdict precedes BatchFailed). */
+interface Move {
+  readonly command: CandidateCommand;
+  readonly before?: readonly EventDraft[];
+}
+
+/** The commands one transaction takes a batch through, and how they leave the lane. */
+interface BatchStep {
+  readonly moves: readonly Move[];
+  readonly lane: (after: Batch) => Lane;
+}
+
+/**
+ * Candidate commands on the batch in flight, in one transaction: decide each
+ * on the batch as the previous left it, fold the events, update the lane,
+ * and commit each move's `before` and then its events. A refusal of any
+ * writes nothing.
+ */
+const onBatch = (
+  laneId: string,
+  batchId: BatchId,
+  cause: string,
+  plan: (batch: Batch, lane: Lane) => BatchStep,
+) =>
+  commit({ entity: batchRef(batchId), cause, project: laneProject(laneId) }, (tx) => {
+    const batch = batchOf(tx.store, batchId);
+    const lane = laneOf(tx.store, laneId);
+    if (batch === undefined || lane === undefined)
+      throw new Error(`lane ${laneId} holds no batch ${batchId}`);
+    const step = plan(batch, lane);
+    let state = batch;
+    const drafts: EventDraft[] = [];
+    for (const move of step.moves) {
+      const decided = decideCandidate(state, move.command, { now: tx.at, batchId });
+      if (Result.isFailure(decided)) return Result.fail(decided.failure);
+      state = fold(state, decided.success, tx.at);
+      drafts.push(
+        ...(move.before ?? []),
+        ...decided.success.map((e) => batchDraft(e, batch.members)),
+      );
+    }
+    tx.store.put(BATCH, batchId, encodeBatch(state));
+    putLane(tx.store, step.lane(state));
+    return Result.succeed({ value: state, drafts });
+  });
+
+/** A call on the change, naming it when the batch is of one: the remedy a lane-issued bounce names. */
+const remedy = (batch: Batch, operationId: "submit" | "revise", title: string): NextAction => {
+  const [sole] = batch.members;
+  return {
+    kind: "call",
+    title,
+    operationId,
+    ...(sole === undefined || batch.members.length > 1 ? {} : { args: { changeId: sole } }),
+  };
+};
+
+/**
+ * An infrastructure failure of the batch, blamed on `infra` (the Change DO
+ * requeues its members) until a batch of one fails that way the
+ * INFRA_FAILURE_LIMIT-th time in a row: then on the change, so it bounces
+ * visibly, with every reason, instead of looping.
+ */
+const infraBlame = (
+  lane: Lane,
+  batch: Batch,
+  reason: string,
+): {
+  readonly attribution: ChangeId | "infra";
+  readonly lane: Lane;
+  readonly exhausted?: string;
+} => {
+  const [only] = batch.members;
+  const sole = batch.members.length === 1 ? only : undefined;
+  if (sole === undefined) return { attribution: "infra", lane };
+  const reasons = [...(lane.infra.find((entry) => entry.changeId === sole)?.reasons ?? []), reason];
+  const others = withoutInfra(lane, [sole]);
+  if (reasons.length >= INFRA_FAILURE_LIMIT)
+    return {
+      attribution: sole,
+      lane: others,
+      exhausted: `infra-failure x${reasons.length}: ${reasons.join("; ")}`,
+    };
+  return {
+    attribution: "infra",
+    lane: { ...others, infra: [...others.infra, { changeId: sole, reasons }] },
+  };
+};
+
+/** What the agent does after its change bounced on repeated infra failures. */
+const afterInfra = (batch: Batch, failures: number): readonly NextAction[] => [
+  remedy(batch, "submit", "Submit the change again once the infrastructure is fixed"),
+  { kind: "wait", title: `The operator has been alerted to ${failures} infra failures in a row` },
+];
+
+/** Forms a batch of one from the queue's head, on staging main's head. */
+const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
+  const base = yield* (yield* CodeHost)
+    .head(projectRepos(lane.projectId).staging, MAIN)
+    .pipe(Effect.orDie);
+  const ids = yield* Ids;
+  const batchId = yield* ids.next("bat");
+  const candidateId = yield* ids.next("cnd");
+  yield* commit(
+    { entity: batchRef(batchId), cause: `form:${batchId}`, project: lane.projectId },
+    (tx): Result.Result<Transition<undefined>, CandidateRejection> => {
+      const now = laneOf(tx.store, lane.laneId) ?? lane;
+      const [first] = now.queue;
+      if (first === undefined || now.active !== undefined)
+        return Result.succeed({ value: undefined, drafts: [] });
+      const members = [first];
+      return Result.map(
+        decideCandidate(
+          undefined,
+          {
+            _tag: "Form",
+            laneId: lane.laneId,
+            projectId: lane.projectId,
+            members,
+            base,
+            predecessors: [],
+            attempt: 0,
+            chainEpoch: 0,
+          },
+          { now: tx.at, batchId },
+        ),
+        (events) => {
+          // Subscribed before the append, so BatchFormed itself reaches them.
+          for (const member of members)
+            tx.outbox.subscribe(`change:${member}`, MEMBER_EVENTS, changeRef(member));
+          tx.outbox.subscribe(`trunk:${lane.projectId}`, ["BatchVerified"]);
+          tx.store.put(BATCH, batchId, encodeBatch(fold(undefined, events, tx.at)));
+          putLane(tx.store, {
+            ...now,
+            queue: now.queue.slice(1),
+            active: { batchId, candidateId },
+          });
+          return { value: undefined, drafts: events.map((e) => batchDraft(e, members)) };
+        },
+      );
+    },
+  ).pipe(Effect.orDie);
+});
+
+/** A composition GitCore refused: the verdict, then BatchFailed (on the change of a batch of one), in one transaction. */
+const refuseComposition = Effect.fn("integration/refuseComposition")(function* (
+  lane: Lane,
+  batch: Batch,
+  refused: CompositionRefused,
+) {
+  const verdictId = yield* (yield* Ids).next("vrd");
+  yield* onBatch(lane.laneId, batch.id, `compose-refused:${batch.id}`, (_, now) => ({
+    moves: [
+      {
+        command: { _tag: "RefuseComposition", verdictId },
+        before: [
+          verdictDraft(
+            VerdictIssued.make({
+              verdictId,
+              subject: batch.id,
+              outcome: "bounce",
+              evidence: [
+                `composition-refused: ${refused.reason} ${refused.paths.join(" ")}`.trimEnd(),
+              ],
+              nextActions: [
+                remedy(
+                  batch,
+                  "revise",
+                  `Revise the change onto trunk ${batch.base} and resolve ${refused.paths.join(", ") || "the conflict"}`,
+                ),
+              ],
+            }),
+            batch.members,
+          ),
+        ],
+      },
+    ],
+    lane: () => ({ ...withoutInfra(now, batch.members), active: undefined }),
+  })).pipe(Effect.orDie);
+});
+
+/** Composes the batch onto its base in staging, one restacked commit per member. */
+const composeBatch = Effect.fn("integration/composeBatch")(function* (
+  lane: Lane,
+  active: ActiveBatch,
+  batch: Batch,
+) {
+  const changes = yield* Changes;
+  const members = yield* Effect.forEach(batch.members, (changeId) =>
+    Effect.gen(function* () {
+      const change = yield* changes.get(changeId);
+      const workspace = yield* changes.workspace(changeId);
+      if (change.commitSha === undefined)
+        return yield* Effect.die(new Error(`${changeId} is in a batch with no submitted commit`));
+      return {
+        changeId,
+        repo: workspace.repo,
+        base: workspace.baseSha,
+        head: change.commitSha,
+        author: change.agentId,
+        title: change.intent.goal,
+      } satisfies CandidateMember;
+    }).pipe(Effect.orDie),
+  );
+  const formed = formedOf(yield* EventOutbox, batch.id);
+  const composed = yield* Effect.result(
+    (yield* CandidateComposer).compose({
+      candidateId: active.candidateId,
+      staging: projectRepos(lane.projectId).staging,
+      base: batch.base,
+      at: formed.at,
+      members,
+    }),
+  );
+  if (Result.isFailure(composed)) {
+    yield* refuseComposition(lane, batch, composed.failure);
+    return;
+  }
+  const candidate = composed.success;
+  yield* onBatch(lane.laneId, batch.id, `assemble:${batch.id}`, (_, now) => ({
+    moves: [
+      {
+        command: {
+          _tag: "Assemble",
+          candidateId: active.candidateId,
+          treeSha: candidate.treeSha,
+          composer: candidate.composer,
+          tier: candidate.tier,
+          tierReason: candidate.tierReason,
+        },
+      },
+    ],
+    lane: () => ({
+      ...now,
+      active: {
+        ...active,
+        composed: { commitSha: candidate.commitSha, commits: candidate.commits },
+      },
+    }),
+  })).pipe(Effect.orDie);
+});
+
+/**
+ * Who a refused bundle entry is on: the member whose restacked commit adds
+ * it (or turns an entry into it), or `infra` when the base already held it.
+ * No bisection: the diffs along the chain say exactly.
+ */
+export const bundleBlame = Effect.fn("integration/bundleBlame")(function* (
+  staging: RepoRef,
+  path: string,
+  base: CommitSha,
+  commits: readonly { readonly changeId: ChangeId; readonly sha: CommitSha }[],
+) {
+  const host = yield* CodeHost;
+  let parent = base;
+  for (const step of commits) {
+    const changed = yield* host.diffTrees(staging, parent, step.sha).pipe(Effect.orDie);
+    if (
+      changed.some(
+        (entry) =>
+          entry.path === path && (entry.change === "added" || entry.change === "type-changed"),
+      )
+    )
+      return step.changeId;
+    parent = step.sha;
+  }
+  return "infra" as const;
+});
+
+/**
+ * Bundles the composed candidate for KeelVerify. A refused bundle fails the
+ * batch through RefuseBundle with the verdict first: on the member whose
+ * commit introduced the entry, or `infra` when the base already held it.
+ */
+const bundleBatch = Effect.fn("integration/bundleBatch")(function* (
+  lane: Lane,
+  active: ActiveBatch,
+  batch: Batch,
+  composed: NonNullable<ActiveBatch["composed"]>,
+) {
+  const staging = projectRepos(lane.projectId).staging;
+  const bundled = yield* Effect.result(
+    (yield* CandidateBundles).bundle(staging, composed.commitSha),
+  );
+  if (Result.isSuccess(bundled)) {
+    yield* noteLane(lane, `bundled:${batch.id}`, (now) => ({
+      ...now,
+      active: { ...active, bundle: bundled.success },
+    }));
+    return;
+  }
+  const refused = bundled.failure;
+  const blame =
+    refused.path === undefined
+      ? "infra"
+      : yield* bundleBlame(staging, refused.path, batch.base, composed.commits);
+  const verdictId = yield* (yield* Ids).next("vrd");
+  let exhausted: string | undefined;
+  yield* onBatch(lane.laneId, batch.id, `bundle-refused:${batch.id}`, (_, now) => {
+    const evidence = [
+      `bundle-refused: ${refused.reason}`,
+      ...(blame === "infra" && refused.path !== undefined
+        ? [`bundle-refused-in-base: ${refused.path}`]
+        : []),
+    ];
+    const infra = blame === "infra" ? infraBlame(now, batch, evidence.join("; ")) : undefined;
+    exhausted = infra?.exhausted;
+    const attribution = infra?.attribution ?? blame;
+    const nextActions =
+      infra === undefined
+        ? [
+            remedy(
+              batch,
+              "submit",
+              `Remove ${refused.path ?? "the entry"} (a bundle carries regular files only), then submit it again`,
+            ),
+          ]
+        : infra.exhausted === undefined
+          ? undefined
+          : afterInfra(batch, INFRA_FAILURE_LIMIT);
+    return {
+      moves: [
+        {
+          command: { _tag: "RefuseBundle", verdictId, attribution },
+          before: [
+            verdictDraft(
+              VerdictIssued.make({
+                verdictId,
+                subject: batch.id,
+                outcome: "bounce",
+                evidence:
+                  infra?.exhausted === undefined ? evidence : [infra.exhausted, ...evidence],
+                ...(nextActions === undefined ? {} : { nextActions }),
+              }),
+              batch.members,
+            ),
+          ],
+        },
+      ],
+      lane: () => ({
+        ...(infra?.lane ?? withoutInfra(now, batch.members)),
+        active: undefined,
+      }),
+    };
+  }).pipe(Effect.orDie);
+  if (exhausted !== undefined)
+    yield* Effect.logError(
+      `lane ${lane.laneId} bounced ${batch.members.join(", ")} on ${exhausted}`,
+    );
+});
+
+/** The KeelVerify instance of a batch: named by its BatchFormed, so a retried start starts nothing new. */
+const instanceOf = (formedEventId: string): string => `keel-verify-${formedEventId}`;
+
+/**
+ * Commits VerificationStarted, then creates the KeelVerify instance: its
+ * verdict can never reach a batch not yet Verifying. The start is retried
+ * until it is recorded, and a second start of one id starts nothing.
+ */
+const verifyBatch = Effect.fn("integration/verifyBatch")(function* (
+  lane: Lane,
+  active: ActiveBatch,
+  batch: Batch,
+  bundle: ContentHash,
+) {
+  const instanceId = instanceOf(formedOf(yield* EventOutbox, batch.id).eventId);
+  if (batch.state === "assembled")
+    yield* onBatch(lane.laneId, batch.id, `verify:${batch.id}`, (_, now) => ({
+      moves: [
+        { command: { _tag: "StartVerification", instanceId, planHash: L1_SUITE_PLAN.planHash } },
+      ],
+      lane: () => now,
+    })).pipe(Effect.orDie);
+  yield* (yield* BatchVerification).start(instanceId, {
+    jobId: `${batch.id}#${batch.attempt}`,
+    laneId: lane.laneId,
+    candidateId: active.candidateId,
+    bundle,
+    fence: { batchId: batch.id, attempt: batch.attempt, chainEpoch: batch.chainEpoch },
+    planHash: L1_SUITE_PLAN.planHash,
+  });
+  yield* noteLane(lane, `verify-started:${batch.id}`, (now) =>
+    now.active?.batchId === batch.id ? { ...now, active: { ...now.active, started: true } } : now,
+  );
+});
+
+/**
+ * A project whose verification is off (S-0's negative control, operator-set
+ * and audited): the batch is verified without KeelVerify or a bundle, its
+ * verdict and BatchVerified stamped `verified: false`, in one transaction.
+ */
+const passUnverified = Effect.fn("integration/passUnverified")(function* (
+  lane: Lane,
+  batch: Batch,
+) {
+  const formed = formedOf(yield* EventOutbox, batch.id);
+  const verdictId = yield* (yield* Ids).next("vrd");
+  const fence = { attempt: batch.attempt, chainEpoch: batch.chainEpoch };
+  yield* onBatch(lane.laneId, batch.id, `unverified:${batch.id}`, (_, now) => ({
+    moves: [
+      {
+        command: {
+          _tag: "StartVerification",
+          instanceId: `unverified-${formed.eventId}`,
+          planHash: L1_SUITE_PLAN.planHash,
+        },
+      },
+      {
+        command: { _tag: "Verified", verdictId, verified: false, ...fence },
+        before: [
+          verdictDraft(
+            VerdictIssued.make({
+              verdictId,
+              subject: batch.id,
+              outcome: "land",
+              evidence: ["verification-off: the project's verification is off, so no plan ran"],
+              verified: false,
+            }),
+            batch.members,
+          ),
+        ],
+      },
+    ],
+    lane: () => withoutInfra(now, batch.members),
+  })).pipe(Effect.orDie);
+});
+
+/**
+ * Follows one trunk advance: a green batch whose members it landed is
+ * Promoted, then staging main moves `from → to`. A staging that moved some
+ * other way, or a pack too large to relay, is logged and left: the next batch
+ * forms on whatever staging holds, and a lagging base is the Trunk's restack.
+ */
+const followTrunk = Effect.fn("integration/followTrunk")(function* (
+  lane: Lane,
+  advance: Lane["advances"][number],
+) {
+  const active = lane.active;
+  const batch = active === undefined ? undefined : batchOf(yield* EntityStore, active.batchId);
+  if (batch?.state === "green" && batch.members.every((m) => advance.members.includes(m)))
+    yield* onBatch(lane.laneId, batch.id, `promote:${batch.id}`, (_, now) => ({
+      moves: [{ command: { _tag: "Promote", trunkSha: advance.to } }],
+      lane: () => ({ ...withoutInfra(now, batch.members), active: undefined }),
+    })).pipe(Effect.orDie);
+  const moved = yield* Effect.result((yield* StagingWriter).fastForward(advance.from, advance.to));
+  if (Result.isFailure(moved)) {
+    const failure = moved.failure;
+    if (failure._tag === "PushRejected" && failure.reason === "busy") {
+      yield* Effect.die(new Error(`staging stayed busy following ${advance.to}`));
+      return;
+    }
+    yield* Effect.logWarning(
+      `lane ${lane.laneId} left staging behind trunk ${advance.to}: ${failure._tag}`,
+    );
+  }
+  yield* noteLane(lane, `followed:${advance.from}..${advance.to}`, (now) => ({
+    ...now,
+    advances: now.advances.filter((a) => a.from !== advance.from || a.to !== advance.to),
+  }));
+});
+
+/** Where a lane stands after a step: nothing to do, or waiting on a verdict, trunk, or the domain. */
+export type LaneStep = "idle" | "waiting";
+
+/**
+ * Drives the lane as far as it can go without a reply from outside: follow
+ * trunk, then Form → Compose → Bundle → Verify for the one batch in flight.
+ * Every step reads its I/O first and commits after, so a retry resumes where
+ * the last commit left the lane.
+ */
+export const laneStep = Effect.fn("integration/laneStep")(function* (laneId: string) {
+  for (;;) {
+    const store = yield* EntityStore;
+    const lane = laneOf(store, laneId);
+    if (lane === undefined) return "idle" satisfies LaneStep;
+    const [advance] = lane.advances;
+    if (advance !== undefined) {
+      yield* followTrunk(lane, advance);
+      continue;
+    }
+    const active = lane.active;
+    if (active === undefined) {
+      if (lane.queue.length === 0) return "idle" satisfies LaneStep;
+      yield* formBatch(lane);
+      continue;
+    }
+    const batch = batchOf(store, active.batchId);
+    if (batch === undefined)
+      return yield* Effect.die(new Error(`lane ${laneId} lost batch ${active.batchId}`));
+    if (isCandidateTerminal(batch)) {
+      // Every terminal commit clears the batch in flight; one left behind must not stall the lane.
+      yield* noteLane(lane, `cleared:${batch.id}`, (now) => ({ ...now, active: undefined }));
+      continue;
+    }
+    if (batch.state === "forming") {
+      yield* composeBatch(lane, active, batch);
+      continue;
+    }
+    if (batch.state === "assembled" && active.bundle === undefined) {
+      if (active.composed === undefined)
+        return yield* Effect.die(new Error(`batch ${batch.id} assembled with no candidate`));
+      const settings = yield* (yield* Projects).settings(lane.projectId).pipe(Effect.orDie);
+      if (settings.verification === "off") yield* passUnverified(lane, batch);
+      else yield* bundleBatch(lane, active, batch, active.composed);
+      continue;
+    }
+    if (
+      active.bundle !== undefined &&
+      (batch.state === "assembled" || (batch.state === "verifying" && active.started !== true))
+    ) {
+      yield* verifyBatch(lane, active, batch, active.bundle);
+      continue;
+    }
+    return "waiting" satisfies LaneStep;
+  }
+});
+
+/** A bounce is on the member `attribute` pins; a batch of one's failure is its member's. */
+const blameOf = (batch: Batch, failingTests: readonly string[]): BatchAttribution => {
+  const [only] = batch.members;
+  if (batch.members.length === 1 && only !== undefined) return only;
+  const found = attribute(
+    failingTests[0] ?? "",
+    batch.members.map((id) => ({ id, affected: [] })),
+  );
+  return found.next._tag === "culprit" ? found.next.id : "unattributed";
+};
+
+/** What a verdict commits: the outcome, evidence and remedy it is issued with, who the batch is on, and the lane after. */
+interface Issued {
+  readonly outcome: VerdictOutcome;
+  readonly evidence: readonly string[];
+  readonly nextActions?: readonly NextAction[];
+  /** Absent for a land. */
+  readonly attribution?: BatchAttribution;
+  readonly lane: Lane;
+  readonly exhausted?: string;
+}
+
+const issuedFor = (verdict: BatchVerdict, batch: Batch, lane: Lane): Issued => {
+  const cleared = withoutInfra(lane, batch.members);
+  if (verdict.outcome === "land")
+    return { outcome: "land", evidence: verdict.evidence, lane: cleared };
+  if (verdict.outcome === "bounce")
+    return {
+      outcome: "bounce",
+      evidence: verdict.evidence,
+      attribution: blameOf(batch, verdict.failingTests),
+      lane: cleared,
+    };
+  // park, hold and supersede are the infrastructure's, never a member's: until the limit in a row.
+  const infra = infraBlame(
+    lane,
+    batch,
+    `${verdict.outcome}: ${verdict.evidence[0] ?? "no evidence"}`,
+  );
+  return infra.exhausted === undefined
+    ? {
+        outcome: verdict.outcome,
+        evidence: verdict.evidence,
+        attribution: "infra",
+        lane: infra.lane,
+      }
+    : {
+        outcome: "bounce",
+        evidence: [infra.exhausted, ...verdict.evidence],
+        nextActions: afterInfra(batch, INFRA_FAILURE_LIMIT),
+        attribution: infra.attribution,
+        lane: infra.lane,
+        exhausted: infra.exhausted,
+      };
+};
+
+/**
+ * KeelVerify's verdict on the batch in flight: VerdictIssued, then
+ * BatchVerified (a land) or BatchFailed, in one transaction through the
+ * Candidate machine, fenced on `(batchId, attempt, chainEpoch)`. Idempotent
+ * by the instance (cause `<instanceId>:recordVerdict`). A result for another
+ * attempt or epoch is ResultFenced, which is terminal; the third consecutive
+ * infra failure of a change bounces it, and is logged at error level.
+ */
+export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
+  laneId: string,
+  verdict: BatchVerdict,
+) {
+  const found = batchOf(yield* EntityStore, verdict.fence.batchId);
+  const batch =
+    found !== undefined && found.candidateId === verdict.candidateId
+      ? found
+      : yield* new CandidateNotFound({ candidateId: verdict.candidateId });
+  const fence = { attempt: verdict.fence.attempt, chainEpoch: verdict.fence.chainEpoch };
+  // Set inside the transaction when this verdict is the change's last infra failure allowed.
+  let exhausted: string | undefined;
+  const committed = yield* onBatch(
+    laneId,
+    batch.id,
+    `${verdict.instanceId}:recordVerdict`,
+    (now, lane) => {
+      const issued = issuedFor(verdict, now, lane);
+      exhausted = issued.exhausted;
+      return {
+        moves: [
+          {
+            command:
+              issued.attribution === undefined
+                ? { _tag: "Verified", verdictId: verdict.verdictId, ...fence }
+                : {
+                    _tag: "Failed",
+                    verdictId: verdict.verdictId,
+                    attribution: issued.attribution,
+                    ...fence,
+                  },
+            before: [
+              verdictDraft(
+                VerdictIssued.make({
+                  verdictId: verdict.verdictId,
+                  subject: now.id,
+                  outcome: issued.outcome,
+                  evidence: issued.evidence,
+                  planHash: verdict.planHash,
+                  ...(issued.nextActions === undefined ? {} : { nextActions: issued.nextActions }),
+                }),
+                now.members,
+              ),
+            ],
+          },
+        ],
+        lane: (after) =>
+          after.state === "red" ? { ...issued.lane, active: undefined } : issued.lane,
+      };
+    },
+  ).pipe(
+    Effect.catchTags({
+      CandidateStateRefused: (refused) => Effect.die(refused),
+      InvalidBatch: (invalid) => Effect.die(invalid),
+    }),
+  );
+  if (!committed.duplicate && exhausted !== undefined)
+    yield* Effect.logError(`lane ${laneId} bounced ${batch.members.join(", ")} on ${exhausted}`);
+});

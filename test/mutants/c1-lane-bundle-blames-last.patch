@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.bundle-blame"
+# kills: lane.bundle-blame
+# why: A refused bundle entry is blamed on the batch's last member, not the one whose commit added it
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index a57774b..d4d3eaa 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -530,7 +530,7 @@ export const bundleBlame = Effect.fn("integration/bundleBlame")(function* (
+           entry.path === path && (entry.change === "added" || entry.change === "type-changed"),
+       )
+     )
+-      return step.changeId;
++      return commits.at(-1)?.changeId ?? step.changeId;
+     parent = step.sha;
+   }
+   return "infra" as const;

@@ -1,6 +1,7 @@
 import {
   CompositionRefused,
   PromotionStateRefused,
+  PushRejected,
   UnexpectedHead,
 } from "@keeltown/core/domain/integration";
 import { type ChangeId, CommitSha, ContentHash, type ProjectId } from "@keeltown/core/kernel";
@@ -10,6 +11,7 @@ import {
   CandidateBundles,
   CandidateComposer,
   type RepoRef,
+  StagingWriter,
   type SyncOutcome,
   TrunkWriter,
   Trunks,
@@ -103,6 +105,49 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
               return "advanced";
             });
             return { head: current, outcomes };
+          }),
+      }),
+    ),
+  };
+}
+
+/** Where a memory StagingWriter keeps staging's main: its own cell, or a memory CodeHost's ref. */
+export interface MainRef {
+  readonly get: () => CommitSha | undefined;
+  readonly set: (sha: CommitSha) => void;
+}
+
+const cellOf = (initial?: CommitSha): MainRef => {
+  let held = initial;
+  return {
+    get: () => held,
+    set: (sha) => {
+      held = sha;
+    },
+  };
+};
+
+/**
+ * Staging's main, fenced as the GitCore writer fences it: `fastForward`
+ * moves it only from `from`; already at `to` is `unchanged`; anywhere else
+ * is PushRejected `stale`. `moved` records each advance in order.
+ */
+export function makeStagingWriterMemory(main: MainRef = cellOf()) {
+  const moved: { readonly from: CommitSha; readonly to: CommitSha }[] = [];
+  return {
+    moved,
+    main,
+    layer: Layer.succeed(
+      StagingWriter,
+      StagingWriter.of({
+        fastForward: (from, to) =>
+          Effect.suspend((): Effect.Effect<SyncOutcome, PushRejected> => {
+            const held = main.get();
+            if (held === to) return Effect.succeed("unchanged");
+            if (held !== from) return Effect.fail(new PushRejected({ reason: "stale" }));
+            main.set(to);
+            moved.push({ from, to });
+            return Effect.succeed("advanced");
           }),
       }),
     ),

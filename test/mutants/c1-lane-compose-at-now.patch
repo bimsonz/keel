@@ -1,0 +1,24 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.compose-deterministic"
+# kills: lane.compose-deterministic
+# why: A retried compose stamps its commits with the clock instead of BatchFormed's time, so a retry pushes different SHAs
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index a57774b..64121e6 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -39,6 +39,7 @@ import {
+   CandidateComposer,
+   type CandidateMember,
+   Changes,
++  Clock,
+   CodeHost,
+   commit,
+   EntityStore,
+@@ -477,7 +478,7 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
+       candidateId: active.candidateId,
+       staging: projectRepos(lane.projectId).staging,
+       base: batch.base,
+-      at: formed.at,
++      at: yield* (yield* Clock).now,
+       members,
+     }),
+   );

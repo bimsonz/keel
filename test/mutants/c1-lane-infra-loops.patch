@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.infra-limit"
+# kills: lane.infra-limit
+# why: A change failing on the infrastructure every time is requeued forever instead of bouncing on the third
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index a57774b..45f4d55 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -344,7 +344,7 @@ const infraBlame = (
+   if (sole === undefined) return { attribution: "infra", lane };
+   const reasons = [...(lane.infra.find((entry) => entry.changeId === sole)?.reasons ?? []), reason];
+   const others = withoutInfra(lane, [sole]);
+-  if (reasons.length >= INFRA_FAILURE_LIMIT)
++  if (reasons.length > Number.MAX_SAFE_INTEGER)
+     return {
+       attribution: sole,
+       lane: others,

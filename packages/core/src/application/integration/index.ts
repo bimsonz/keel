@@ -11,6 +11,7 @@ import { stub } from "../not-implemented.ts";
 import type { EntityStore } from "../ports/index.ts";
 
 export * from "./create-project.ts";
+export * from "./lane.ts";
 export * from "./project-repos.ts";
 export * from "./project-settings.ts";
 export * from "./trunk.ts";

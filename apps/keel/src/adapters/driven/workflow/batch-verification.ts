@@ -5,7 +5,7 @@ import { keelVerifyParams } from "../../../rpc/keel-verify.ts";
 /** The two calls a start makes on a Workflow binding. */
 export interface WorkflowStarts {
   get(id: string): Promise<unknown>;
-  create(options: { id: string; params: unknown }): Promise<unknown>;
+  create(options: { id: string; params: Readonly<Record<string, unknown>> }): Promise<unknown>;
 }
 
 /** Whether the binding already holds an instance by this id; `get` throws for one it does not. */

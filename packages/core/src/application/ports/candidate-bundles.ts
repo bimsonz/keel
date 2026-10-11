@@ -5,6 +5,8 @@ import type { RepoRef } from "./code-host.ts";
 /** A candidate's tree holds something the bundle format cannot carry (a symlink, a submodule, an unsafe path). */
 export class BundleRefused extends Schema.TaggedError<BundleRefused>()("BundleRefused", {
   reason: Schema.String,
+  /** The tree entry refused, when one is: the Lane blames the member whose commit introduced it. */
+  path: Schema.optional(Schema.String),
 }) {}
 
 /**

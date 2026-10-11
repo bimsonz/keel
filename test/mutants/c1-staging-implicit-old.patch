@@ -1,0 +1,21 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts -t "stagingwriter.cas"
+# kills: stagingwriter.cas
+# why: Staging's move takes its old value from staging's current head instead of trunk's last head, so a staging that moved some other way is overwritten
+diff --git a/apps/keel/src/adapters/driven/gitcore/staging-writer.ts b/apps/keel/src/adapters/driven/gitcore/staging-writer.ts
+index 16c5d1e..52dd38c 100644
+--- a/apps/keel/src/adapters/driven/gitcore/staging-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/staging-writer.ts
+@@ -30,7 +30,12 @@ export const StagingWriterGitCore = ({ trunk, staging }: { trunk: RepoRef; stagi
+             const source = yield* remoteOf(trunk, "read");
+             const target = yield* remoteOf(staging, "write");
+             const outcome = yield* Effect.tryPromise({
+-              try: () => relay(source, target, { ref: MAIN, from, to }),
++              try: async () =>
++                relay(source, target, {
++                  ref: MAIN,
++                  from: await Effect.runPromise(host.head(staging, MAIN).pipe(Effect.orDie)),
++                  to,
++                }),
+               catch: (cause) => cause,
+             }).pipe(
+               Effect.catch((cause): Effect.Effect<never, PackTooLarge | PushRejected> =>

@@ -4,11 +4,12 @@
 // ([trunkwriter.live]); this proves what the adapter asks it to compare.
 import { describe, expect, it } from "@effect/vitest";
 import { CommitSha } from "@keeltown/core/kernel";
-import { CodeHost, type RepoRef, TrunkWriter } from "@keeltown/core/ports";
+import { CodeHost, type RepoRef, StagingWriter, TrunkWriter } from "@keeltown/core/ports";
 import { concat, dec, FLUSH, pkt, readPkts } from "@keeltown/gitcore";
 import { makeCodeHostMemory } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 import { afterEach, vi } from "vitest";
+import { StagingWriterGitCore } from "../../src/adapters/driven/gitcore/staging-writer.ts";
 import { TrunkWriterGitCore } from "../../src/adapters/driven/gitcore/trunk-writer.ts";
 
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
@@ -83,20 +84,25 @@ function host() {
     ),
   ).pipe(Layer.provide(code.layer));
   const layer = TrunkWriterGitCore({ trunk: TRUNK, staging: STAGING }).pipe(Layer.provide(spied));
+  const stagingLayer = StagingWriterGitCore({ trunk: TRUNK, staging: STAGING }).pipe(
+    Layer.provide(spied),
+  );
   const seeded = Effect.gen(function* () {
     const h = yield* CodeHost;
     yield* h.create(TRUNK);
     yield* h.create(STAGING);
     return yield* code.fixture.commit(TRUNK, "refs/heads/main", { "README.md": "moved on\n" });
   }).pipe(Effect.provide(code.layer));
-  return { minted, layer, seeded };
+  /** Staging's main at a commit of its own, which a stale push may find it already at. */
+  const stagingAt = code.fixture.commit(STAGING, "refs/heads/main", { "README.md": "staged\n" });
+  return { minted, layer, stagingLayer, seeded, stagingAt };
 }
 
 const pushing = (replies: Reply[], pack?: Uint8Array) => {
   const server = gitServer(replies, pack);
   vi.stubGlobal("fetch", server.fetch);
-  const { minted, layer, seeded } = host();
-  return { server, minted, layer, seeded };
+  const { minted, layer, stagingLayer, seeded, stagingAt } = host();
+  return { server, minted, layer, stagingLayer, seeded, stagingAt };
 };
 
 afterEach(() => {
@@ -180,6 +186,61 @@ describe("TrunkWriter.push", () => {
         );
         expect(error).toMatchObject({ _tag: "PackTooLarge", repo: TRUNK });
         expect(server.requests.map((r) => r.service)).toEqual(["upload-pack"]);
+      }),
+  );
+});
+
+describe("StagingWriter.fastForward", () => {
+  it.effect(
+    "[stagingwriter.cas] relays trunk's pack into staging with trunk's old head as the explicit old value",
+    () =>
+      Effect.gen(function* () {
+        const { server, minted, stagingLayer, seeded, stagingAt } = pushing(["ok"]);
+        yield* seeded;
+        const held = yield* stagingAt;
+        expect(held).not.toBe(FROM);
+        const moved = yield* Effect.flatMap(StagingWriter, (w) => w.fastForward(FROM, TO)).pipe(
+          Effect.provide(stagingLayer),
+        );
+        expect(moved).toBe("advanced");
+        expect(
+          server.requests.map(({ service, repo, lines }) => ({ service, repo, lines })),
+        ).toEqual([
+          {
+            service: "upload-pack",
+            repo: "memory/prj.git",
+            lines: [expect.stringMatching(new RegExp(`^want ${TO} `)), `have ${FROM}`, "done"],
+          },
+          {
+            service: "receive-pack",
+            repo: "memory/prj-staging.git",
+            lines: [`${FROM} ${TO} refs/heads/main`],
+          },
+        ]);
+        expect(minted).toEqual(["prj read 60s", "prj-staging write 60s"]);
+      }),
+  );
+
+  it.effect(
+    "[stagingwriter.stale] a staging already at the head is unchanged; one anywhere else is PushRejected",
+    () =>
+      Effect.gen(function* () {
+        const first = pushing(["stale"]);
+        yield* first.seeded;
+        const held = yield* first.stagingAt;
+        const unchanged = yield* Effect.flatMap(StagingWriter, (w) =>
+          w.fastForward(FROM, held),
+        ).pipe(Effect.provide(first.stagingLayer));
+        expect(unchanged).toBe("unchanged");
+        const second = pushing(["stale"]);
+        yield* second.seeded;
+        yield* second.stagingAt;
+        const refused = yield* Effect.flip(
+          Effect.flatMap(StagingWriter, (w) => w.fastForward(FROM, TO)).pipe(
+            Effect.provide(second.stagingLayer),
+          ),
+        );
+        expect(refused).toMatchObject({ _tag: "PushRejected", reason: "stale" });
       }),
   );
 });

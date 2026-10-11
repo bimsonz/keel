@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.fifo"
+# kills: lane.fifo
+# why: The lane batches the newest queued change first, so changes land out of the order they were queued
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index a57774b..34d97ae 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -374,7 +374,7 @@ const formBatch = Effect.fn("integration/formBatch")(function* (lane: Lane) {
+     { entity: batchRef(batchId), cause: `form:${batchId}`, project: lane.projectId },
+     (tx): Result.Result<Transition<undefined>, CandidateRejection> => {
+       const now = laneOf(tx.store, lane.laneId) ?? lane;
+-      const [first] = now.queue;
++      const first = now.queue.at(-1);
+       if (first === undefined || now.active !== undefined)
+         return Result.succeed({ value: undefined, drafts: [] });
+       const members = [first];

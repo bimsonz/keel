@@ -1,6 +1,7 @@
 import { BundleRefused, BundleStore, CandidateBundles } from "@keeltown/core/ports";
 import { MODE_EXEC, MODE_FILE, MODE_TREE, type ObjectReader } from "@keeltown/gitcore";
 import {
+  BUNDLE_MANIFEST,
   type BundleFile,
   BundleRefused as WriterRefused,
   writeBundle,
@@ -8,8 +9,15 @@ import {
 import { Effect, Layer } from "effect";
 import type { OpenObjects } from "./candidate-composer.ts";
 
-/** Refused while walking the tree: the bundle carries regular files only. */
-class Unbundlable extends Error {}
+/** Refused while walking the tree, at `path`: the bundle carries regular files only, and never its own manifest. */
+class Unbundlable extends Error {
+  constructor(
+    readonly path: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 /** Every regular file under `tree`, its subtrees read in parallel; a symlink or submodule refuses the bundle. */
 async function filesOf(reader: ObjectReader, tree: string, prefix: string): Promise<BundleFile[]> {
@@ -18,7 +26,11 @@ async function filesOf(reader: ObjectReader, tree: string, prefix: string): Prom
       const path = prefix === "" ? e.name : `${prefix}/${e.name}`;
       if (e.mode === MODE_TREE) return filesOf(reader, e.oid, path);
       if (e.mode !== MODE_FILE && e.mode !== MODE_EXEC)
-        throw new Unbundlable(`${path} has mode ${e.mode}: a bundle carries regular files only`);
+        throw new Unbundlable(
+          path,
+          `${path} has mode ${e.mode}: a bundle carries regular files only`,
+        );
+      if (path === BUNDLE_MANIFEST) throw new Unbundlable(path, `${BUNDLE_MANIFEST} is reserved`);
       return [{ path, bytes: await reader.readBlob(e.oid), executable: e.mode === MODE_EXEC }];
     }),
   );
@@ -47,9 +59,11 @@ export const CandidateBundlesGitCore = (open: OpenObjects) =>
                 catch: (cause) => cause,
               }).pipe(
                 Effect.catch((cause) =>
-                  cause instanceof Unbundlable || cause instanceof WriterRefused
-                    ? Effect.fail(new BundleRefused({ reason: cause.message }))
-                    : Effect.die(cause),
+                  cause instanceof Unbundlable
+                    ? Effect.fail(new BundleRefused({ reason: cause.message, path: cause.path }))
+                    : cause instanceof WriterRefused
+                      ? Effect.fail(new BundleRefused({ reason: cause.message }))
+                      : Effect.die(cause),
                 ),
                 Effect.flatMap(store.put),
               ),

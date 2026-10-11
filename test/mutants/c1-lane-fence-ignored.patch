@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.verdict-fenced"
+# kills: lane.verdict-fenced
+# why: The verdict is decided under the batch's own attempt instead of the one it reports, so a stale attempt's result lands
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index a57774b..da1dc12 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -857,7 +857,7 @@ export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
+     found !== undefined && found.candidateId === verdict.candidateId
+       ? found
+       : yield* new CandidateNotFound({ candidateId: verdict.candidateId });
+-  const fence = { attempt: verdict.fence.attempt, chainEpoch: verdict.fence.chainEpoch };
++  const fence = { attempt: batch.attempt, chainEpoch: batch.chainEpoch };
+   // Set inside the transaction when this verdict is the change's last infra failure allowed.
+   let exhausted: string | undefined;
+   const committed = yield* onBatch(

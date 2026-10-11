@@ -80,25 +80,29 @@ describe("CandidateBundles over gitcore", () => {
       }),
   );
 
-  it.effect("[bundles.refuses] refuses a tree holding a symlink or a submodule", () =>
-    Effect.gen(function* () {
-      for (const odd of [
-        { mode: "120000", data: "../README.md" },
-        { mode: "160000", data: "1".repeat(40) },
-      ] as const) {
-        const { commit, reader } = yield* Effect.promise(() =>
-          repoOf({ "README.md": "keel\n", "lib/odd": odd }),
-        );
-        const error = yield* Effect.flip(
-          Effect.flatMap(CandidateBundles, (b) => b.bundle(STAGING, commit)).pipe(
-            Effect.provide(bundling(reader)),
-          ),
-        );
-        expect(error).toMatchObject({
-          _tag: "BundleRefused",
-          reason: expect.stringContaining("lib/odd"),
-        });
-      }
-    }),
+  it.effect(
+    "[bundles.refuses] refuses a tree holding a symlink, a submodule or the manifest, naming it",
+    () =>
+      Effect.gen(function* () {
+        for (const [path, odd] of [
+          ["lib/odd", { mode: "120000", data: "../README.md" }],
+          ["lib/odd", { mode: "160000", data: "1".repeat(40) }],
+          [".keel-bundle.sha256", "planted\n"],
+        ] as const) {
+          const { commit, reader } = yield* Effect.promise(() =>
+            repoOf({ "README.md": "keel\n", [path]: odd }),
+          );
+          const error = yield* Effect.flip(
+            Effect.flatMap(CandidateBundles, (b) => b.bundle(STAGING, commit)).pipe(
+              Effect.provide(bundling(reader)),
+            ),
+          );
+          expect(error).toMatchObject({
+            _tag: "BundleRefused",
+            reason: expect.stringContaining(path),
+            path,
+          });
+        }
+      }),
   );
 });

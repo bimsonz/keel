@@ -293,6 +293,10 @@ export const PORTS = {
     () => integration.makeTrunkWriterMemory(GENESIS).layer,
     pending("TrunkWriter", ["head", "push", "sync"]),
   ),
+  StagingWriter: port(
+    () => integration.makeStagingWriterMemory().layer,
+    pending("StagingWriter", ["fastForward"]),
+  ),
   SessionStore: port(
     () => storage.makeSessionStoreMemory().layer,
     pending("SessionStore", ["append", "read"]),

@@ -9,6 +9,9 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 ### Added
 
 - Port `EventFeed.read({cursor?, limit?, waitSeconds})` → `EventFeedPage {events: EventFeedEntry[], cursor}` (new; `EventFeedEntry` is an `EventEnvelope` with an optional `label`), over the existing `ProjectorRpc.read`, with an in-memory adapter and a contract suite. `GET /v1/events` (`Inbox_listEvents`) is served over it: `nextCursor` on every page, an empty one included; a cursor that is not a feed position is a 400 naming `cursor`. An agent reads only its own project's events; an observer or operator reads the whole instance.
+- Port `StagingWriter.fastForward(from, to)` → `SyncOutcome`, failing `PushRejected` (`stale`: staging holds neither `from` nor `to`; `busy`) or `PackTooLarge`: the Lane moves staging's main after trunk by relaying trunk's pack with `from` as the explicit old value; it reads trunk and writes staging, never trunk. GitCore adapter `StagingWriterGitCore({trunk, staging})`, memory `makeStagingWriterMemory(main?)`.
+- `BundleRefused.path?`: the tree entry a bundle refused (a symlink, a submodule, the reserved manifest name), so the Lane blames the member whose commit introduced it.
+- The Lane's use-cases in `@keeltown/core/application/integration`: `laneHeard` (ChangeQueued joins the queue's back, ChangeRequeued its front, ChangeWithdrawn or ChangeSuperseded takes a queued change out, TrunkAdvanced is noted for staging), `laneStep` (follow trunk, then Form on staging main's head → Compose → Bundle → Verify for one batch of one in flight), `recordVerdict`, `bundleBlame`, `laneOf`, `batchOf`, `laneProject`, the `Lane` schema and `INFRA_FAILURE_LIMIT` (3). The Lane DO (`lane:<projectId>:main`) implements `LaneRpc.recordVerdict`; members are subscribed scoped to their own change, and a batch's VerdictIssued precedes its BatchFailed.
 - `Changes.workspace(changeId)` answers `ChangeWorkspace {workspaceId, repo, baseSha, projectId}` (new in the ports) and fails `ChangeNotFound | ChangeStateRefused`, over the existing `ChangeRpc.workspace()`; the Lane reads a member's repo and base there.
 - Port `CandidateBundles.bundle(staging, commit)` → the bundle's `ContentHash`, failing `BundleRefused {reason}` (new) for a tree the bundle format cannot carry (a symlink, a submodule, an unsafe path). The GitCore adapter reads the tree through the binding and writes it with the runner protocol's `writeBundle`.
 - Port `BatchVerification.start(instanceId, job: VerificationJob {jobId, laneId, candidateId, bundle, fence, planHash})` starts KeelVerify once per instance id; an id that already exists counts as started.
@@ -115,6 +118,10 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 - `CodeHost.create` and `fork` fail `RepoAlreadyExists {repo}` (new, in the ports) when the name is taken, leaving that repo as it was. It was a defect. The Artifacts adapter maps `ALREADY_EXISTS`, or through wrangler's proxy (which drops `code`) the message `repo already exists`, seen live on keel-ws-00. `createProject` treats one from a concurrent bootstrap as already done.
 - `WorkspacePool.release(projectId, workspaceId, reason?)` names the project, as `grant` does, so the RPC adapter can address `pool:<projectId>` (no callers).
 - The coordination use-cases `declare`, `revise`, `submit`, `abandon`, `adopt` and `getChange` are the Change DO's: they take the change id and the decoded Change RPC command, and carry exactly the ports and errors they use (`submit` needs `CodeHost`; `declare` no longer names `SubjectRegistry`). `declare` answers `{change, preflight, grant}`. `DeclareInput`, `SubmitInput` and `Declared` stay as the `Changes` port's inputs, and `rely`, `nearby` and `openSketch` stay stubs (unused since contracts-v0).
+
+### Removed
+
+- `LaneRpc.enqueue` and `LaneCodecs.enqueue`, which nothing called: a change joins its lane by its ChangeQueued only (no callers).
 
 ## contracts-v0 (10 Oct 2026)
 

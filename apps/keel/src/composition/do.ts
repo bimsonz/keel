@@ -1,23 +1,37 @@
 import {
   type AgentDirectory,
+  type BatchVerification,
+  type CandidateBundles,
+  type CandidateComposer,
+  type Changes,
   type Clock,
   type CodeHost,
   type EntityStore,
   type EventOutbox,
   type FanOut,
   type Ids,
+  type Projects,
+  type StagingWriter,
   type TrunkWriter,
   type Trunks,
   type WorkspacePool,
 } from "@keeltown/core/ports";
 import { projectRepos } from "@keeltown/core/application/integration";
-import type { ProjectId } from "@keeltown/core/kernel";
+import type { AgentId, ChangeId, ProjectId } from "@keeltown/core/kernel";
 import { Layer, ManagedRuntime } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
+import { ArtifactsObjects } from "../adapters/driven/artifacts/objects.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
+import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { FanOutRpc } from "../adapters/driven/do-rpc/fan-out.ts";
+import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
+import { CandidateBundlesGitCore } from "../adapters/driven/gitcore/candidate-bundles.ts";
+import { CandidateComposerGitCore } from "../adapters/driven/gitcore/candidate-composer.ts";
+import { StagingWriterGitCore } from "../adapters/driven/gitcore/staging-writer.ts";
 import { TrunkWriterGitCore } from "../adapters/driven/gitcore/trunk-writer.ts";
+import { BundleStoreR2 } from "../adapters/driven/r2/bundle-store.ts";
+import { BatchVerificationWorkflow } from "../adapters/driven/workflow/batch-verification.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { EntityStoreSql, migrateEntityStore } from "../adapters/driven/do-storage/entity-store.ts";
 import { EventOutboxSql, migrateEventOutbox } from "../adapters/driven/do-storage/event-outbox.ts";
@@ -87,6 +101,48 @@ export function trunkServices(env: Env, projectId: () => ProjectId): Layer.Layer
   return Layer.suspend(() =>
     TrunkWriterGitCore(projectRepos(projectId())).pipe(Layer.provide(codeHostLayer(env))),
   );
+}
+
+/** The Lane DO's driven adapters beyond the backbone: it composes, bundles and verifies its batches. */
+export type LaneServices =
+  | CodeHost
+  | Changes
+  | CandidateComposer
+  | CandidateBundles
+  | BatchVerification
+  | StagingWriter
+  | Projects;
+
+/**
+ * The Lane DO reads its members from their Change DOs and its project's
+ * settings from the Project DO (verification may be off), composes and bundles
+ * candidates through GitCore over the Artifacts bindings (one handle per repo
+ * per compose), stores bundles in R2, starts KeelVerify, and moves staging's
+ * main after trunk. It never holds a trunk write token. `projectId` is read
+ * lazily, on first use, from the object's name.
+ */
+export function laneServices(env: Env, projectId: () => ProjectId): Layer.Layer<LaneServices> {
+  return Layer.suspend(() => {
+    const repos = projectRepos(projectId());
+    const host = codeHostLayer(env);
+    const objects = ArtifactsObjects({ "keel-core": env.ARTIFACTS, "keel-ws-00": workspaces(env) });
+    const change = (changeId: ChangeId) =>
+      env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`));
+    const agentSession = (agentId: AgentId) =>
+      env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`));
+    const project = (id: ProjectId) => env.PROJECT.get(env.PROJECT.idFromName(`project:${id}`));
+    return Layer.mergeAll(
+      host,
+      ChangesRpc({ change, agentSession }),
+      ProjectsRpc(project),
+      CandidateComposerGitCore(objects).pipe(Layer.provide(host)),
+      CandidateBundlesGitCore(objects).pipe(Layer.provide(BundleStoreR2(env.BUNDLES))),
+      BatchVerificationWorkflow(env.CI_WORKFLOW),
+      StagingWriterGitCore({ trunk: repos.trunk, staging: repos.staging }).pipe(
+        Layer.provide(host),
+      ),
+    );
+  });
 }
 
 const LOCATION_HINTS: readonly DurableObjectLocationHint[] = [
