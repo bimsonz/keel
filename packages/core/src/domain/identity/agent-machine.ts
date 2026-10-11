@@ -4,21 +4,19 @@ import {
   type Committed,
   IllegalTransition,
   type Instant,
+  type OrgId,
   type ProjectId,
+  type UserId,
 } from "../kernel/index.ts";
 import type { Agent, AgentKind, Scope, Sponsor } from "./agent.ts";
 import { AgentNotKnown, AgentStateRefused } from "./errors.ts";
 import {
   AgentEnrolled,
+  type AgentEvent,
   AgentReinstated,
   AgentRevoked,
   AgentSuspended,
-  IdentityEvent,
 } from "./events.ts";
-
-/** The events the AgentSession DO commits for one agent. */
-export const AgentEvent = IdentityEvent;
-export type AgentEvent = IdentityEvent;
 
 /** An operator's command on an agent; the doorway checks the `operator` scope. */
 export type AgentCommand =
@@ -29,6 +27,9 @@ export type AgentCommand =
       readonly kind: AgentKind;
       readonly scopes: readonly Scope[];
       readonly onBehalfOf?: Sponsor;
+      readonly org?: OrgId;
+      /** The user minting the credential, who becomes the agent's sponsor. */
+      readonly sponsor?: UserId;
     }
   | { readonly _tag: "Suspend"; readonly reason: string; readonly by: string }
   | { readonly _tag: "Reinstate"; readonly by: string }
@@ -64,6 +65,8 @@ export const decideAgent = (
             kind: command.kind,
             scopes: command.scopes,
             ...(command.onBehalfOf === undefined ? {} : { onBehalfOf: command.onBehalfOf }),
+            ...(command.org === undefined ? {} : { org: command.org }),
+            ...(command.sponsor === undefined ? {} : { sponsor: command.sponsor }),
           }),
         ])
       : Result.fail(new AgentNotKnown({ agentId: facts.agentId }));
@@ -121,6 +124,8 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
           kind: event.kind,
           scopes: event.scopes,
           ...(event.onBehalfOf === undefined ? {} : { onBehalfOf: event.onBehalfOf }),
+          ...(event.org === undefined ? {} : { org: event.org }),
+          ...(event.sponsor === undefined ? {} : { sponsor: event.sponsor }),
           state: "active",
           revocationEpoch: 0,
           createdAt: committed.at,

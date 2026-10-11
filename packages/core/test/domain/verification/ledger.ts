@@ -351,7 +351,12 @@ export const build = (
         bundleHash: BUNDLE,
       });
     case "DraftFailed":
-      return toProbe({ _tag: "DraftFailed", conflictId: CONFLICT });
+      // Now and then a failure that says why, so replay carries the detail through the wire.
+      return toProbe({
+        _tag: "DraftFailed",
+        conflictId: CONFLICT,
+        ...(plan.attempts % 2 === 0 ? { detail: "repairs-exhausted" as const } : {}),
+      });
     case "Record": {
       const cell =
         step.mode === "progress"

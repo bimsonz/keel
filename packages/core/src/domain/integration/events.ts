@@ -8,6 +8,7 @@ import {
   InstantSchema,
   ProjectId,
   Tier,
+  UserId,
   VerdictId,
 } from "../kernel/index.ts";
 
@@ -152,6 +153,13 @@ export const ProjectCreated = Schema.TaggedStruct("ProjectCreated", {
   projectId: ProjectId,
   name: Schema.String,
   by: Schema.String,
+  /** The project this one was forked from, when it is a fork. */
+  forkedFrom: Schema.optional(ProjectId),
+});
+/** A project and its repos are gone, deleted by an owner of its org or with the org. */
+export const ProjectDeleted = Schema.TaggedStruct("ProjectDeleted", {
+  projectId: ProjectId,
+  by: UserId,
 });
 /** One setting an operator changed: its name, and its JSON value before and after. */
 export const SettingChange = Schema.Struct({
@@ -214,6 +222,7 @@ export const IntegrationEvent = Schema.Union([
   PromotionFrozen,
   PromotionResumed,
   ProjectCreated,
+  ProjectDeleted,
   ProjectSettingsChanged,
   TrunkInitialized,
   PromotionStarted,

@@ -6,4 +6,6 @@ export * from "./bootstrap.ts";
 export * from "./errors.ts";
 export * from "./events.ts";
 export * from "./inbox.ts";
+export * from "./quota.ts";
+export * from "./revocation.ts";
 export * from "./tenancy.ts";

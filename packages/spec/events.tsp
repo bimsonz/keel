@@ -631,6 +631,12 @@ model AgentEnrolled {
 
   /** The human the agent acts on behalf of, when the operator named one. */
   onBehalfOf?: Sponsor;
+
+  /** The agent's org. Optional only so agents enrolled before tenancy still decode. */
+  org?: OrgId;
+
+  /** The user who minted the agent's credential: its sponsor, accountable for it. */
+  sponsor?: UserId;
 }
 
 model AgentSuspended {
@@ -651,6 +657,87 @@ model AgentRevoked {
   agentId: AgentId;
   revocationEpoch: integer;
   by: string;
+}
+
+// Tenancy. Better Auth's tables in D1 are identity's source of truth;
+// its after-hooks commit these for the feed and the audit, one per row-state
+// change, keyed `user:<userId>` or `org:<orgId>`. No event carries an email.
+
+/** A member's role in an org: each includes the one below it. */
+union Role {
+  owner: "owner",
+  maintainer: "maintainer",
+  member: "member",
+}
+
+/** A user's handle or an org's name: one segment of `/<org>/<project>`. */
+@pattern("^[a-z0-9](?:-?[a-z0-9]){0,38}$")
+scalar Handle extends string;
+
+model UserSignedUp {
+  _tag: "UserSignedUp";
+  userId: UserId;
+
+  /** Absent until the user chooses one. */
+  handle?: Handle;
+}
+
+model OrgCreated {
+  _tag: "OrgCreated";
+  orgId: OrgId;
+  name: Handle;
+
+  /** A user's personal org, created on sign-up and named by its handle. */
+  personal: boolean;
+
+  by: UserId;
+}
+
+/**
+ * A user joined an org (`to` alone), left it (`from` alone), or changed role.
+ * At least one of `from` and `to` is set, and they differ.
+ */
+model MembershipChanged {
+  _tag: "MembershipChanged";
+  orgId: OrgId;
+  userId: UserId;
+  from?: Role;
+  to?: Role;
+
+  /** Absent when the user acted alone, e.g. accepting an invitation. */
+  by?: UserId;
+}
+
+model UserSuspended {
+  _tag: "UserSuspended";
+  userId: UserId;
+  reason: string;
+  by: UserId;
+}
+
+model UserReinstated {
+  _tag: "UserReinstated";
+  userId: UserId;
+  by: UserId;
+}
+
+model OrgSuspended {
+  _tag: "OrgSuspended";
+  orgId: OrgId;
+  reason: string;
+  by: UserId;
+}
+
+model OrgReinstated {
+  _tag: "OrgReinstated";
+  orgId: OrgId;
+  by: UserId;
+}
+
+/** An org and everything it owned are gone: its projects, repos, R2 prefix, objects and rows. */
+model OrgDeleted {
+  _tag: "OrgDeleted";
+  orgId: OrgId;
 }
 
 // ─── Verification ───────────────────────────────────────────────────────────
@@ -737,6 +824,13 @@ model ProbeDiscarded {
 
   /** Always set (optional only so older events decode): a probe whose drafts all failed begins with this event. */
   conflictId?: ConflictId;
+
+  /**
+   * Why every draft failed, with `draft-failed` only: the reply did not fit the
+   * slots' schema, it was cut at the token limit, the model abstained, or the
+   * repairs ran out.
+   */
+  detail?: "schema" | "truncated" | "abstained" | "repairs-exhausted";
 }
 
 model ConflictProven {
@@ -1054,6 +1148,16 @@ model ProjectCreated {
   projectId: ProjectId;
   name: string;
   by: string;
+
+  /** The project this one was forked from, when it is a fork. */
+  forkedFrom?: ProjectId;
+}
+
+/** A project and its repos are gone, deleted by an owner of its org or with the org. */
+model ProjectDeleted {
+  _tag: "ProjectDeleted";
+  projectId: ProjectId;
+  by: UserId;
 }
 
 /** One setting an operator changed: its name, and its JSON value before and after. */
@@ -1308,6 +1412,14 @@ union KeelEvent {
   AgentSuspended,
   AgentReinstated,
   AgentRevoked,
+  UserSignedUp,
+  OrgCreated,
+  MembershipChanged,
+  UserSuspended,
+  UserReinstated,
+  OrgSuspended,
+  OrgReinstated,
+  OrgDeleted,
 
   // Coordination
   IntentDeclared,
@@ -1382,6 +1494,7 @@ union KeelEvent {
   PromotionComposed,
   AuditCompleted,
   ProjectCreated,
+  ProjectDeleted,
   ProjectSettingsChanged,
 
   // Memory

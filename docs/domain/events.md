@@ -39,10 +39,23 @@ The AgentSession DO (`agent:<id>`) is the source of truth for an agent. D1's `Ag
 
 | Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
 |---|---|---|---|---|---|
-| `AgentEnrolled` | AgentSession DO (operator command) | `agentId, projectId, name, kind: interactive\|hosted\|human\|synthetic, scopes[], onBehalfOf?` (the sponsor, a `scheme:value` address) | — | Projector | Catalog row created |
+| `AgentEnrolled` | AgentSession DO (operator command) | `agentId, projectId, name, kind: interactive\|hosted\|human\|synthetic, scopes[], onBehalfOf?` (the sponsor, a `scheme:value` address), `org?`, `sponsor?: UserId` (the user who minted the credential; optional only for agents enrolled before tenancy) | — | Projector | Catalog row created |
 | `AgentSuspended` | AgentSession DO (operator command) | `agentId, reason, by` | the agent's open changes | the agent's AgentSession DO, Projector | Token exchange and every call refused until reinstated; its leases stop renewing |
 | `AgentReinstated` | AgentSession DO (operator command) | `agentId, by` | — | the agent's AgentSession DO, Projector | Calls accepted again |
 | `AgentRevoked` | AgentSession DO (operator command) | `agentId, revocationEpoch, by` | the agent's open changes, its leases | the agent's AgentSession DO, Projector | Revocation epoch bumped, so every token minted before it is rejected; its changes park for adoption |
+
+Tenancy events ([tenancy.md](tenancy.md)). Better Auth's tables in D1 are identity's source of truth; its after-hooks commit these through a Queue, one per row-state change, idempotent by the envelope's key, keyed `user:<userId>` or `org:<orgId>`. They are for the feed and the audit: `authorize` never reads them. None carries an email address.
+
+| Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
+|---|---|---|---|---|---|
+| `UserSignedUp` | Better Auth's after-hook (`user:<userId>`) | `userId, handle?` | — | instance audit | — |
+| `OrgCreated` | Better Auth's after-hook (`org:<orgId>`) | `orgId, name: Handle, personal, by: UserId` | — | Projector | A personal org is created on sign-up, named by the user's handle |
+| `MembershipChanged` | Better Auth's after-hook (`org:<orgId>`) | `orgId, userId, from?: Role, to?: Role, by?: UserId` (at least one of `from` and `to`, and they differ) | the agents the user sponsored there, when the membership ended | Projector | Ending a membership revokes every live agent the user sponsored in the org (`revokedBy`) |
+| `UserSuspended` | Better Auth's after-hook (`user:<userId>`), instance admin | `userId, reason, by: UserId` | — | instance audit | Every request of the user is refused, and so is every request of the agents it sponsors |
+| `UserReinstated` | Better Auth's after-hook (`user:<userId>`), instance admin | `userId, by: UserId` | — | instance audit | Requests accepted again |
+| `OrgSuspended` | Better Auth's after-hook (`org:<orgId>`), instance admin | `orgId, reason, by: UserId` | — | Projector | Members are told the org is suspended; everyone else gets not-found |
+| `OrgReinstated` | Better Auth's after-hook (`org:<orgId>`), instance admin | `orgId, by: UserId` | — | Projector | Requests accepted again |
+| `OrgDeleted` | Better Auth's after-hook (`org:<orgId>`), owner | `orgId` | the org's projects | Projector | Its repos, R2 prefix, objects and rows are deleted |
 
 ## coordination
 
@@ -109,7 +122,7 @@ The Project DO (`project:<id>`) holds the subject registry (keys, aliases, ancho
 | `ProbeDrafted` | Subject DO | `probeId, conflictId, attempts (≤3), bundleHash` | — | — | The probe entity begins here, for a Suspected conflict with no probe, which moves to Probing. The world matrix runs it on trunk, in A, B and A+B, and in A-noop |
 | `WorldCheckRan` | Subject DO (fact) | `conflictId, world: trunk\|A\|B\|AB\|A-noop, check: suite:<changeId>, run: 1..3, outcome: pass\|fail\|n/a, counts?: {passed, failed, skipped}, reason?` (`reason` required for n/a) | — | Projector | One cell of the world matrix filled by a project's suite rather than the probe. The conflict stays Probing; the same cell again commits nothing, and a different answer for it is refused |
 | `ProbeRan` | Subject DO (fact) | `probeId, conflictId, world: trunk\|A\|B\|AB\|A-noop, run: 1..3, outcome: pass\|fail\|n/a, resultRef` | — | Projector | One cell of the world matrix. `A-noop` is the premise-holder's world with the premised behaviour removed, built from the probe template's recipe. Admission is computed from these, and Conflict Theatre fills the matrix from them |
-| `ProbeDiscarded` | Subject DO | `probeId, reason: non-discriminating\|unstable\|draft-failed, conflictId` | the conflict | — | A non-discriminating probe dismisses the conflict; an unstable one, or three failed drafts, make it unprovable. With `draft-failed` it is the probe's first and only event |
+| `ProbeDiscarded` | Subject DO | `probeId, reason: non-discriminating\|unstable\|draft-failed, conflictId, detail?: schema\|truncated\|abstained\|repairs-exhausted` (only with `draft-failed`) | the conflict | — | A non-discriminating probe dismisses the conflict; an unstable one, or three failed drafts, make it unprovable. With `draft-failed` it is the probe's first and only event |
 | `ConflictProven` | Subject DO | `conflictId, evidence: {probeId\|guardId\|mergeRefusal\|interaction: batchId}` | each party | the parties' agents, the lane | The change bounces with evidence, or escalates if human-class. Proof without a probe matches the kind: a refused merge proves a textual conflict, a failing guard a precedent one, a failing union an interaction one |
 | `ConflictDismissed` | Subject DO | `conflictId, evidence` | each party | the parties' agents | The dismissal is recorded as evidence: `lattice:compatible\|refines` (the domain's own comparison of the premise and the effect) or `probe:<probeId>:non-discriminating` |
 | `ConflictEscalated` | Subject DO | `conflictId, escalationId, reason: human-class\|unprovable` | each party | the escalation inbox | The parties park until a ruling |
@@ -135,7 +148,8 @@ A **Batch** is a set of Changes verified together; its **Candidate** is the comp
 | `CandidateBisected` | Lane DO | `candidateId, batchId, into: batchId[]` | each member change | member Change DOs | Leave-one-out or a 4-way split |
 | `CandidateInvalidated` | Lane DO | `candidateId, batchId, reason: head-moved` | each member change | member Change DOs | Caused by `PromotionDeclined`; only the intersection is re-verified |
 | `CandidatePromoted` | Lane DO | `candidateId, batchId, trunkSha` | — | — | Caused by `TrunkAdvanced` |
-| `ProjectCreated` | Project DO (`project:<id>`) | `projectId, name, by` | — | Projector | The project exists; its trunk, lanes and subject registry are keyed by `projectId` from here on. The trunk still waits for `TrunkInitialized` |
+| `ProjectCreated` | Project DO (`project:<id>`) | `projectId, name, by, forkedFrom?` (the project it was forked from) | — | Projector | The project exists; its trunk, lanes and subject registry are keyed by `projectId` from here on. The trunk still waits for `TrunkInitialized` |
+| `ProjectDeleted` | Project DO (`project:<id>`) | `projectId, by: UserId` | the project's changes | Projector | The project and its repos are gone |
 | `ProjectSettingsChanged` | Project DO (`project:<id>`) | `projectId, changes: [{field, from, to}], by` | — | Projector | An operator changed the project's settings; each changed field is recorded with its value before and after, so a switch such as turning verification off is audited |
 | `TrunkInitialized` | Trunk DO | `projectId, head, by` | — | Projector | The trunk's first known head, from the project's seed or an operator. Nothing is queued or promoted before it |
 | `PromotionStarted` | Trunk DO | `projectId, groupId, old, members: changeId[], batches: batchId[], proofIds[], committerTime` | — | Projector | The write-ahead log entry ([ADR 0003](../adr/0003-trunk-single-writer-wal.md)), committed with the batches' declines. Resolved by exactly one `TrunkAdvanced` or `PromotionFrozen` |

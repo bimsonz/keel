@@ -1,6 +1,7 @@
 import { Schema } from "effect";
-import { AgentId, ProjectId } from "../kernel/index.ts";
+import { AgentId, OrgId, ProjectId, UserId } from "../kernel/index.ts";
 import { AgentKind, Scope, Sponsor } from "./agent.ts";
+import { Handle, Role } from "./tenancy.ts";
 
 export const AgentEnrolled = Schema.TaggedStruct("AgentEnrolled", {
   agentId: AgentId,
@@ -10,6 +11,10 @@ export const AgentEnrolled = Schema.TaggedStruct("AgentEnrolled", {
   scopes: Schema.Array(Scope),
   /** The human the agent acts on behalf of, when the operator named one. */
   onBehalfOf: Schema.optional(Sponsor),
+  /** The agent's org. Optional only so agents enrolled before tenancy still decode. */
+  org: Schema.optional(OrgId),
+  /** The user who minted the agent's credential: its sponsor, accountable for it. */
+  sponsor: Schema.optional(UserId),
 });
 export const AgentSuspended = Schema.TaggedStruct("AgentSuspended", {
   agentId: AgentId,
@@ -26,10 +31,85 @@ export const AgentRevoked = Schema.TaggedStruct("AgentRevoked", {
   by: Schema.String,
 });
 
+/** The events of one agent, which the AgentSession DO commits. */
+export const AgentEvent = Schema.Union([
+  AgentEnrolled,
+  AgentSuspended,
+  AgentReinstated,
+  AgentRevoked,
+]);
+export type AgentEvent = typeof AgentEvent.Type;
+
+/**
+ * Tenancy events. Better Auth's tables in D1 are identity's source
+ * of truth; its after-hooks commit these for the feed and the audit, one per
+ * row-state change, keyed `user:<userId>` or `org:<orgId>`. Authorization never
+ * reads them. No event carries an email address.
+ */
+export const UserSignedUp = Schema.TaggedStruct("UserSignedUp", {
+  userId: UserId,
+  /** Absent until the user chooses one. */
+  handle: Schema.optional(Handle),
+});
+export const OrgCreated = Schema.TaggedStruct("OrgCreated", {
+  orgId: OrgId,
+  name: Handle,
+  /** A user's personal org, created on sign-up and named by its handle. */
+  personal: Schema.Boolean,
+  by: UserId,
+});
+/**
+ * A user joined an org (`to` alone), left it (`from` alone), or changed role.
+ * `by` is absent when the user acted alone, e.g. accepting an invitation.
+ */
+export const MembershipChanged = Schema.TaggedStruct("MembershipChanged", {
+  orgId: OrgId,
+  userId: UserId,
+  from: Schema.optional(Role),
+  to: Schema.optional(Role),
+  by: Schema.optional(UserId),
+}).check(
+  Schema.makeFilter(
+    (e) =>
+      e.from !== e.to ||
+      "a membership change names the role left or the role taken, and they differ",
+  ),
+);
+export const UserSuspended = Schema.TaggedStruct("UserSuspended", {
+  userId: UserId,
+  reason: Schema.String,
+  by: UserId,
+});
+export const UserReinstated = Schema.TaggedStruct("UserReinstated", {
+  userId: UserId,
+  by: UserId,
+});
+export const OrgSuspended = Schema.TaggedStruct("OrgSuspended", {
+  orgId: OrgId,
+  reason: Schema.String,
+  by: UserId,
+});
+export const OrgReinstated = Schema.TaggedStruct("OrgReinstated", {
+  orgId: OrgId,
+  by: UserId,
+});
+/** An org and everything it owned are gone: its projects, repos, R2 prefix, objects and rows. */
+export const OrgDeleted = Schema.TaggedStruct("OrgDeleted", {
+  orgId: OrgId,
+});
+
 export const IdentityEvent = Schema.Union([
   AgentEnrolled,
   AgentSuspended,
   AgentReinstated,
   AgentRevoked,
+  UserSignedUp,
+  OrgCreated,
+  MembershipChanged,
+  UserSuspended,
+  UserReinstated,
+  OrgSuspended,
+  OrgReinstated,
+  OrgDeleted,
 ]);
 export type IdentityEvent = typeof IdentityEvent.Type;

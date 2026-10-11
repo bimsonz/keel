@@ -6466,6 +6466,22 @@
               }
             ],
             "description": "The human the agent acts on behalf of, when the operator named one."
+          },
+          "org": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrgId"
+              }
+            ],
+            "description": "The agent's org. Optional only so agents enrolled before tenancy still decode."
+          },
+          "sponsor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserId"
+              }
+            ],
+            "description": "The user who minted the agent's credential: its sponsor, accountable for it."
           }
         },
         "additionalProperties": {
@@ -9855,6 +9871,11 @@
           "not": {}
         }
       },
+      "Handle": {
+        "type": "string",
+        "pattern": "^[a-z0-9](?:-?[a-z0-9]){0,38}$",
+        "description": "A user's handle or an org's name: one segment of `/<org>/<project>`."
+      },
       "InboxEnvelope": {
         "type": "object",
         "required": [
@@ -10123,6 +10144,30 @@
             "$ref": "#/components/schemas/AgentRevoked"
           },
           {
+            "$ref": "#/components/schemas/UserSignedUp"
+          },
+          {
+            "$ref": "#/components/schemas/OrgCreated"
+          },
+          {
+            "$ref": "#/components/schemas/MembershipChanged"
+          },
+          {
+            "$ref": "#/components/schemas/UserSuspended"
+          },
+          {
+            "$ref": "#/components/schemas/UserReinstated"
+          },
+          {
+            "$ref": "#/components/schemas/OrgSuspended"
+          },
+          {
+            "$ref": "#/components/schemas/OrgReinstated"
+          },
+          {
+            "$ref": "#/components/schemas/OrgDeleted"
+          },
+          {
             "$ref": "#/components/schemas/IntentDeclared"
           },
           {
@@ -10325,6 +10370,9 @@
           },
           {
             "$ref": "#/components/schemas/ProjectCreated"
+          },
+          {
+            "$ref": "#/components/schemas/ProjectDeleted"
           },
           {
             "$ref": "#/components/schemas/ProjectSettingsChanged"
@@ -12157,6 +12205,46 @@
         },
         "description": "How one member landed: its commit on trunk, the candidate it was verified in, and its batch's proof."
       },
+      "MembershipChanged": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "orgId",
+          "userId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "MembershipChanged"
+            ]
+          },
+          "orgId": {
+            "$ref": "#/components/schemas/OrgId"
+          },
+          "userId": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "from": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "to": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "by": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserId"
+              }
+            ],
+            "description": "Absent when the user acted alone, e.g. accepting an invitation."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A user joined an org (`to` alone), left it (`from` alone), or changed role.\nAt least one of `from` and `to` is set, and they differ."
+      },
       "MessagesCaptured": {
         "type": "object",
         "required": [
@@ -12442,9 +12530,119 @@
           "not": {}
         }
       },
+      "OrgCreated": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "orgId",
+          "name",
+          "personal",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "OrgCreated"
+            ]
+          },
+          "orgId": {
+            "$ref": "#/components/schemas/OrgId"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Handle"
+          },
+          "personal": {
+            "type": "boolean",
+            "description": "A user's personal org, created on sign-up and named by its handle."
+          },
+          "by": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "OrgDeleted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "orgId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "OrgDeleted"
+            ]
+          },
+          "orgId": {
+            "$ref": "#/components/schemas/OrgId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An org and everything it owned are gone: its projects, repos, R2 prefix, objects and rows."
+      },
       "OrgId": {
         "type": "string",
         "pattern": "^org_[0-9A-HJKMNP-TV-Z]{26}$"
+      },
+      "OrgReinstated": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "orgId",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "OrgReinstated"
+            ]
+          },
+          "orgId": {
+            "$ref": "#/components/schemas/OrgId"
+          },
+          "by": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "OrgSuspended": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "orgId",
+          "reason",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "OrgSuspended"
+            ]
+          },
+          "orgId": {
+            "$ref": "#/components/schemas/OrgId"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "by": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "OverruleRequested": {
         "type": "object",
@@ -12999,6 +13197,16 @@
               }
             ],
             "description": "Always set (optional only so older events decode): a probe whose drafts all failed begins with this event."
+          },
+          "detail": {
+            "type": "string",
+            "enum": [
+              "schema",
+              "truncated",
+              "abstained",
+              "repairs-exhausted"
+            ],
+            "description": "Why every draft failed, with `draft-failed` only: the reply did not fit the\nslots' schema, it was cut at the token limit, the model abstained, or the\nrepairs ran out."
           }
         },
         "additionalProperties": {
@@ -13213,12 +13421,46 @@
           },
           "by": {
             "type": "string"
+          },
+          "forkedFrom": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectId"
+              }
+            ],
+            "description": "The project this one was forked from, when it is a fork."
           }
         },
         "additionalProperties": {
           "not": {}
         },
         "description": "A project was created: its trunk, staging, mirror and pool exist, and trunk has its first head."
+      },
+      "ProjectDeleted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ProjectDeleted"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "by": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A project and its repos are gone, deleted by an owner of its org or with the org."
       },
       "ProjectId": {
         "type": "string",
@@ -14243,6 +14485,15 @@
         },
         "description": "Every work-loop response: the result, plus what the agent should know and do next."
       },
+      "Role": {
+        "type": "string",
+        "enum": [
+          "owner",
+          "maintainer",
+          "member"
+        ],
+        "description": "A member's role in an org: each includes the one below it."
+      },
       "RulingGiven": {
         "type": "object",
         "required": [
@@ -15195,6 +15446,89 @@
       "UserId": {
         "type": "string",
         "pattern": "^usr_[0-9A-HJKMNP-TV-Z]{26}$"
+      },
+      "UserReinstated": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "userId",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "UserReinstated"
+            ]
+          },
+          "userId": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "by": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "UserSignedUp": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "userId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "UserSignedUp"
+            ]
+          },
+          "userId": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "handle": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Handle"
+              }
+            ],
+            "description": "Absent until the user chooses one."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "UserSuspended": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "userId",
+          "reason",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "UserSuspended"
+            ]
+          },
+          "userId": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "by": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
       },
       "VerdictId": {
         "type": "string",

@@ -289,6 +289,35 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(named).toBeGreaterThan(0);
   });
 
+  it("[agent.enrol-tenancy] Enroll's org and sponsoring user reach AgentEnrolled and the Agent, through the wire; none named, none appears", () => {
+    const ORG = makeId("org", "0".repeat(26));
+    const USER = makeId("usr", "0".repeat(26));
+    let named = 0;
+    fc.assert(
+      fc.property(fc.boolean(), fc.boolean(), (withOrg, withSponsor) => {
+        if (withOrg && withSponsor) named++;
+        const enrol: AgentCommand = {
+          ...build("Enroll"),
+          ...(withOrg ? { org: ORG } : {}),
+          ...(withSponsor ? { sponsor: USER } : {}),
+        };
+        const [event] = eventsOf(decideAgent(undefined, enrol, { now: T0, agentId: AGENT }));
+        if (event?._tag !== "AgentEnrolled") return false;
+        const agent = replayAgent(throughTheWire([{ at: T0, payload: event }]));
+        if (agent === undefined) return false;
+        return (
+          event.org === (withOrg ? ORG : undefined) &&
+          event.sponsor === (withSponsor ? USER : undefined) &&
+          agent.org === event.org &&
+          agent.sponsor === event.sponsor &&
+          "sponsor" in agent === withSponsor &&
+          "org" in agent === withOrg
+        );
+      }),
+    );
+    expect(named).toBeGreaterThan(0);
+  });
+
   it("[agent.sponsor-address] a sponsor is a scheme:value address of at most 256 characters", () => {
     const valid = Schema.is(Sponsor);
     expect(["github:bimsonz", "mailto:a@b.c", "slack+team:U123 x"].every(valid)).toBe(true);

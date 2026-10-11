@@ -1,10 +1,12 @@
-import { Result } from "effect";
+import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { Instant } from "../../../src/domain/kernel/index.ts";
 import {
   admit,
   type ConflictCommand,
+  type DraftFailure,
   type ProbeCommand,
+  ProbeDiscarded,
   ProbeEvent,
   replayProbe,
 } from "../../../src/domain/verification/index.ts";
@@ -260,5 +262,57 @@ describe("the Probe → Guard chart", { timeout: PROPERTY_TIMEOUT }, () => {
       P({ _tag: "Retire", decisionId: DECISION }),
     ]);
     expect(retired.state?.probe?.state).toBe("retired");
+  });
+});
+
+const DRAFT_FAILURES: readonly DraftFailure[] = [
+  "schema",
+  "truncated",
+  "abstained",
+  "repairs-exhausted",
+];
+const decodeDiscarded = Schema.decodeUnknownResult(ProbeDiscarded);
+
+describe("a probe whose drafts failed", () => {
+  it("[events.discard-detail] DraftFailed's detail reaches ProbeDiscarded, and a detail rides only with draft-failed", () => {
+    fc.assert(
+      fc.property(
+        fc.option(fc.constantFrom(...DRAFT_FAILURES), { nil: undefined }),
+        fc.constantFrom("non-discriminating", "unstable", "draft-failed"),
+        (detail, reason) => {
+          const { results } = drive([
+            suspect,
+            P({
+              _tag: "DraftFailed",
+              conflictId: CONFLICT,
+              ...(detail === undefined ? {} : { detail }),
+            }),
+          ]);
+          const [discarded] = results[1] === undefined ? [] : eventsIn(results[1]);
+          const carried =
+            discarded?._tag === "ProbeDiscarded" &&
+            discarded.detail === detail &&
+            "detail" in discarded === (detail !== undefined);
+          const decoded = decodeDiscarded({
+            _tag: "ProbeDiscarded",
+            probeId: discarded?._tag === "ProbeDiscarded" ? discarded.probeId : undefined,
+            reason,
+            conflictId: CONFLICT,
+            ...(detail === undefined ? {} : { detail }),
+          });
+          return (
+            carried &&
+            Result.isSuccess(decoded) === (detail === undefined || reason === "draft-failed")
+          );
+        },
+      ),
+    );
+    const { results } = drive([
+      suspect,
+      P({ _tag: "DraftFailed", conflictId: CONFLICT, detail: "truncated" }),
+    ]);
+    expect(results[1] === undefined ? [] : eventsIn(results[1])).toMatchObject([
+      { _tag: "ProbeDiscarded", reason: "draft-failed", detail: "truncated" },
+    ]);
   });
 });

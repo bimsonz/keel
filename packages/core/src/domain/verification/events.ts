@@ -66,6 +66,19 @@ export const WorldCheckRan = Schema.TaggedStruct("WorldCheckRan", {
     (e) => e.outcome !== "n/a" || e.reason !== undefined || "an n/a check says why",
   ),
 );
+/**
+ * Why every draft of a probe failed (the drafting): the model's reply did
+ * not fit the slots' schema, it was cut at the token limit, the model
+ * abstained, or the repairs ran out.
+ */
+export const DraftFailure = Schema.Literals([
+  "schema",
+  "truncated",
+  "abstained",
+  "repairs-exhausted",
+]);
+export type DraftFailure = typeof DraftFailure.Type;
+
 export const ProbeDiscarded = Schema.TaggedStruct("ProbeDiscarded", {
   probeId: ProbeId,
   reason: Schema.Literals(["non-discriminating", "unstable", "draft-failed"]),
@@ -74,7 +87,16 @@ export const ProbeDiscarded = Schema.TaggedStruct("ProbeDiscarded", {
    * drafts all failed begins with this event, and it is the only one naming its conflict.
    */
   conflictId: Schema.optional(ConflictId),
-});
+  /** Why the drafts failed, with `draft-failed` only. */
+  detail: Schema.optional(DraftFailure),
+}).check(
+  Schema.makeFilter(
+    (e) =>
+      e.detail === undefined ||
+      e.reason === "draft-failed" ||
+      "a detail is given only when the drafts failed",
+  ),
+);
 export const ConflictProven = Schema.TaggedStruct("ConflictProven", {
   conflictId: ConflictId,
   evidence: Schema.Union([

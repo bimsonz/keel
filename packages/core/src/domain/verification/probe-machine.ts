@@ -12,7 +12,14 @@ import {
 } from "../kernel/index.ts";
 import type { Conflict, World } from "./conflict.ts";
 import { ProbeNotFound, ProbeStateRefused } from "./errors.ts";
-import { GuardAdmitted, GuardRetired, ProbeDiscarded, ProbeDrafted, ProbeRan } from "./events.ts";
+import {
+  type DraftFailure,
+  GuardAdmitted,
+  GuardRetired,
+  ProbeDiscarded,
+  ProbeDrafted,
+  ProbeRan,
+} from "./events.ts";
 import {
   ADMISSION_RUNS,
   admit,
@@ -41,7 +48,12 @@ export type ProbeCommand =
       readonly bundleHash: ContentHash;
     }
   /** Every draft failed: the probe begins and ends discarded, and its conflict is unprovable. */
-  | { readonly _tag: "DraftFailed"; readonly conflictId: ConflictId }
+  | {
+      readonly _tag: "DraftFailed";
+      readonly conflictId: ConflictId;
+      /** Why, carried onto ProbeDiscarded. */
+      readonly detail?: DraftFailure;
+    }
   /** One world-matrix cell completed. `guardId` names the guard the probe becomes if this cell admits it. */
   | {
       readonly _tag: "Record";
@@ -140,6 +152,7 @@ export const decideProbe = (
             probeId: facts.probeId,
             reason: "draft-failed",
             conflictId: command.conflictId,
+            ...(command.detail === undefined ? {} : { detail: command.detail }),
           }),
         ]);
       default:

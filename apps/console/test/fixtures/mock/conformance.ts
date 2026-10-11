@@ -58,6 +58,14 @@ const RULES: Record<EventType, Rule[]> = {
   AgentRevoked: [
     { kind: "agent", idField: "agentId", from: ["active", "suspended"], to: "revoked" },
   ],
+  UserSignedUp: [{ kind: "user", idField: "userId", from: null, to: "active" }],
+  UserSuspended: [{ kind: "user", idField: "userId", from: ["active"], to: "suspended" }],
+  UserReinstated: [{ kind: "user", idField: "userId", from: ["suspended"], to: "active" }],
+  OrgCreated: [{ kind: "org", idField: "orgId", from: null, to: "active" }],
+  MembershipChanged: [{ kind: "org", idField: "orgId", from: ["active"] }],
+  OrgSuspended: [{ kind: "org", idField: "orgId", from: ["active"], to: "suspended" }],
+  OrgReinstated: [{ kind: "org", idField: "orgId", from: ["suspended"], to: "active" }],
+  OrgDeleted: [{ kind: "org", idField: "orgId", from: ["active", "suspended"], to: "deleted" }],
 
   IntentDeclared: [change(null, "declared")],
   ChangeStarted: [change(["declared"], "working")],
@@ -175,6 +183,7 @@ const RULES: Record<EventType, Rule[]> = {
     { kind: "batch", idField: "batchId", from: ["green"], to: "promoted" },
   ],
   ProjectCreated: [{ kind: "project", idField: "projectId", from: null, to: "created" }],
+  ProjectDeleted: [{ kind: "project", idField: "projectId", from: ["created"], to: "deleted" }],
   ProjectSettingsChanged: [{ kind: "project", idField: "projectId", from: ["created"] }],
   // The Trunk DO's promotion machine. Debouncing has no event of its own, so it reads as idle here.
   TrunkInitialized: [{ kind: "trunk", idField: "projectId", from: null, to: "idle" }],

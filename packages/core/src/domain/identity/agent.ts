@@ -1,5 +1,12 @@
 import { Schema } from "effect";
-import { AgentId, InstantSchema, ProjectId, type SessionId } from "../kernel/index.ts";
+import {
+  AgentId,
+  InstantSchema,
+  OrgId,
+  ProjectId,
+  type SessionId,
+  UserId,
+} from "../kernel/index.ts";
 
 /**
  * `interactive`: an agent a person drives; `hosted`: one Keel's operator runs;
@@ -35,6 +42,10 @@ export const Agent = Schema.Struct({
   scopes: Schema.Array(Scope),
   /** The agent's sponsor, named at enrolment. */
   onBehalfOf: Schema.optional(Sponsor),
+  /** The agent's org. Optional only for agents enrolled before tenancy. */
+  org: Schema.optional(OrgId),
+  /** The user who minted its credential: an agent never exceeds this user's rights. */
+  sponsor: Schema.optional(UserId),
   state: AgentState,
   /** Bumped on revocation: a token minted under an earlier epoch is refused. */
   revocationEpoch: Schema.Int,
