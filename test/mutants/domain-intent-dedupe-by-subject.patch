@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/intent.test.ts
+# kills: intent.dedupe, intent.revise
+# why: dedupe treats two premises on one subject as the same premise, dropping a distinct one
+diff --git a/packages/core/src/domain/coordination/intent.ts b/packages/core/src/domain/coordination/intent.ts
+index 283d87c..c75baea 100644
+--- a/packages/core/src/domain/coordination/intent.ts
++++ b/packages/core/src/domain/coordination/intent.ts
+@@ -23,7 +23,7 @@ export const sameProposition = (a: Proposition, b: Proposition): boolean =>
+ export const dedupePremises = (premises: readonly Proposition[]): readonly Proposition[] => {
+   const seen = new Set<string>();
+   return premises.filter((premise) => {
+-    const key = canonicalJson(asJson(premise));
++    const key = String(premise.subject);
+     if (seen.has(key)) return false;
+     seen.add(key);
+     return true;

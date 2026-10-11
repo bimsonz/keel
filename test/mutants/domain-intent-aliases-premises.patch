@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/intent.test.ts
+# kills: intent.revise
+# why: the fold appends the added premises to the intent it was handed, rewriting a state (or an IntentDeclared) already committed
+diff --git a/packages/core/src/domain/coordination/intent.ts b/packages/core/src/domain/coordination/intent.ts
+index 283d87c..fce0115 100644
+--- a/packages/core/src/domain/coordination/intent.ts
++++ b/packages/core/src/domain/coordination/intent.ts
+@@ -49,7 +49,7 @@ export const reviseIntent = (intent: Intent, revision: IntentRevision): Intent =
+     revision: revision.revision,
+     ...(revision.goal === undefined ? {} : { goal: revision.goal }),
+     ...(revision.footprint === undefined ? {} : { footprint: revision.footprint }),
+-    premises: dedupePremises([...kept, ...revision.premisesAdded]),
++    premises: dedupePremises(((intent.premises as Proposition[]).push(...revision.premisesAdded), [...kept, ...revision.premisesAdded])),
+     ...(revision.declaredEffects === undefined
+       ? {}
+       : { declaredEffects: revision.declaredEffects }),

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/intent.test.ts
+# kills: intent.revise
+# why: a retraction removes a held premise only when it is the same object, so a retraction read back off the wire retracts nothing
+diff --git a/packages/core/src/domain/coordination/intent.ts b/packages/core/src/domain/coordination/intent.ts
+index 283d87c..251e652 100644
+--- a/packages/core/src/domain/coordination/intent.ts
++++ b/packages/core/src/domain/coordination/intent.ts
+@@ -42,7 +42,7 @@ export const dedupePremises = (premises: readonly Proposition[]): readonly Propo
+ export const reviseIntent = (intent: Intent, revision: IntentRevision): Intent => {
+   const kept = intent.premises.filter(
+     (premise) =>
+-      !revision.premisesRetracted.some((retracted) => sameProposition(premise, retracted)),
++      !revision.premisesRetracted.some((retracted) => premise === retracted),
+   );
+   return {
+     ...intent,
