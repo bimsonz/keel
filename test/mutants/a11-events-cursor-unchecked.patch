@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/events.test.ts -t a11.events-cursor
+# kills: a11.events-cursor
+# why: a cursor that is not a position reaches the Projector's decode and answers 500
+diff --git a/apps/keel/src/adapters/driving/http/events.ts b/apps/keel/src/adapters/driving/http/events.ts
+index be92cd7..7ae5831 100644
+--- a/apps/keel/src/adapters/driving/http/events.ts
++++ b/apps/keel/src/adapters/driving/http/events.ts
+@@ -53,7 +53,7 @@ export interface EventsInput {
+ 
+ /** The query, with a cursor that is not a feed position refused as a 400 naming it. */
+ export function eventsInput(input: Input<"Inbox_listEvents">): Result.Result<EventsInput, Issues> {
+-  if (input.cursor !== undefined && !POSITION.test(input.cursor)) {
++  if (input.cursor !== undefined && !POSITION.test(input.cursor) && input.cursor.length < 0) {
+     return Result.fail([
+       { path: ["cursor"], message: "Expected a cursor from an earlier page: twelve digits" },
+     ]);
