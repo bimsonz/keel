@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
+# kills: ba.handle-first
+# why: a user without a handle reaches everything, so orgs and memberships exist before the personal org does
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index e646105..14f5ee6 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -188,7 +188,7 @@ export function authOptions(config: AuthConfig) {
+           return;
+         }
+         const session = await getSessionFromCtx(ctx);
+-        if (session !== null && !session.user["username"])
++        if (session === null && session !== null)
+           throw APIError.from("FORBIDDEN", {
+             code: "HANDLE_REQUIRED",
+             message: "Choose a handle first: it names your personal org",

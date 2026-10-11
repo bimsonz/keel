@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
+# kills: ba.placeholder
+# why: a code is sent to the passkey-first placeholder address
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index e646105..691aa2a 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -280,7 +280,7 @@ export function authOptions(config: AuthConfig) {
+ /** Never sends to an address that can't receive mail, the passkey-first placeholder among them. */
+ export function refusingInvalid(send: OtpSender) {
+   return async ({ email, otp, type }: { email: string; otp: string; type: string }) => {
+-    if (/\.invalid$/i.test(email.trim()))
++    if (/\.invalid$/i.test(email.trim()) && type === "never")
+       throw refuse("EMAIL_UNDELIVERABLE", "That address can't receive mail");
+     await send({ to: email, otp, type });
+   };

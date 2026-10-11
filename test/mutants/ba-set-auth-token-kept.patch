@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
+# kills: ba.no-token
+# why: the bearer plugin's set-auth-token header reaches the page with the session's token
+diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
+index e23b8df..e2dc78c 100644
+--- a/apps/keel/src/adapters/driving/http/auth-mount.ts
++++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
+@@ -24,7 +24,6 @@ const TOKEN_ENDPOINT = "/device/token";
+ export async function withoutSessionTokens(path: string, response: Response): Promise<Response> {
+   if (path === TOKEN_ENDPOINT) return response;
+   const headers = new Headers(response.headers);
+-  headers.delete("set-auth-token");
+   const type = headers.get("content-type") ?? "";
+   if (!/^application\/(.+\+)?json\b/i.test(type) || response.body === null)
+     return new Response(response.body, { status: response.status, headers });

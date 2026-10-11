@@ -1,0 +1,23 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/gate.test.ts
+# kills: gate.session-anonymous
+# why: a request carrying a session cookie and no token is read as an observer, so a signed-in browser reads private projects and the whole instance
+diff --git a/apps/keel/src/adapters/driving/http/route-deps.ts b/apps/keel/src/adapters/driving/http/route-deps.ts
+index 204d456..9b75b32 100644
+--- a/apps/keel/src/adapters/driving/http/route-deps.ts
++++ b/apps/keel/src/adapters/driving/http/route-deps.ts
+@@ -51,6 +51,15 @@ export function routeDeps(verify: TokenVerifier): RouteDeps<AppEnv, Caller> {
+   return {
+     authorize: (requirements) => async (c, next) => {
+       const header = c.req.header("authorization");
++      if (header === undefined && /keel\.session_token=/.test(c.req.header("cookie") ?? "")) {
++        c.set("principal", {
++          agentId: "agt_00000000000000000000000000",
++          projectId: "prj_00000000000000000000000000",
++          scopes: ["observer"],
++          revocationEpoch: 0,
++        } as never);
++        return next();
++      }
+       // An optional route (anonymous beside a real scheme) still reads a presented
+       // credential, so a token's own access applies; a bad one is refused, never
+       // read as anonymous. A route with no real scheme ignores it.

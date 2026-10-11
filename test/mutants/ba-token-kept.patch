@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
+# kills: ba.no-token, ba.passkey-first
+# why: answers keep the session's token in their body, where the page's script reads what the HttpOnly cookie hides
+diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
+index e23b8df..b1f36fb 100644
+--- a/apps/keel/src/adapters/driving/http/auth-mount.ts
++++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
+@@ -44,7 +44,6 @@ function stripTokens(value: unknown): unknown {
+   if (typeof value !== "object" || value === null) return value;
+   return Object.fromEntries(
+     Object.entries(value)
+-      .filter(([key]) => key !== "token")
+       .map(([key, inner]) => [key, stripTokens(inner)]),
+   );
+ }

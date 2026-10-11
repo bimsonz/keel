@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
+# kills: ba.passkey-first
+# why: the passkey-first placeholder email is marked verified, as if Keel could reach it
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index e646105..3da7867 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -256,7 +256,7 @@ export function authOptions(config: AuthConfig) {
+             const created = await ctx.context.internalAdapter.createUser(
+               {
+                 email: `${handle}@${PLACEHOLDER_EMAIL_DOMAIN}`,
+-                emailVerified: false,
++                emailVerified: true,
+                 name: handle,
+                 username: handle,
+                 displayUsername: handle,

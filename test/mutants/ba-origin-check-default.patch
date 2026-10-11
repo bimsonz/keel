@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
+# kills: ba.cross-site
+# why: Better Auth's own default stands, which skips the origin check under a test runner, so the pool cannot see a forged write
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index e646105..eeb567c 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -155,8 +155,6 @@ export function authOptions(config: AuthConfig) {
+       cookiePrefix: COOKIE_PREFIX,
+       useSecureCookies: true,
+       // Better Auth turns both off under a test runner; set them so tests and production agree.
+-      disableOriginCheck: false,
+-      disableCSRFCheck: false,
+       ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
+       database: { generateId },
+       ...(config.background === undefined

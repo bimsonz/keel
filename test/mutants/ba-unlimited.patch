@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
+# kills: ba.rate-limit
+# why: the mount never asks the limiter, so one address can send codes and attempts without end
+diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
+index e23b8df..a4ab301 100644
+--- a/apps/keel/src/adapters/driving/http/auth-mount.ts
++++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
+@@ -55,7 +55,7 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
+     const request = c.req.raw;
+     if (request.method !== "GET" && request.method !== "HEAD") {
+       const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+-      if (!(await mount.admit(`auth:${ip}`)))
++      if (ip === "never")
+         return problemResponse(429, "rate.limited", c.get("requestId"), {
+           detail: "Too many sign-in requests from this address; wait a minute.",
+         });

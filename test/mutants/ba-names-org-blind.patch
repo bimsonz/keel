@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
+# kills: ba.names
+# why: a handle is checked against other handles only, so a user can take an org's name
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index e646105..9e55c23 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -115,7 +115,7 @@ async function claimable(db: D1Database, name: string, creator?: string): Promis
+   const lowered = name.toLowerCase();
+   const holder = await db
+     .prepare(
+-      `SELECT id AS holder FROM user WHERE username = ?1 UNION ALL SELECT 'org' FROM organization WHERE slug = ?1 LIMIT 1`,
++      `SELECT id AS holder FROM user WHERE username = ?1 LIMIT 1`,
+     )
+     .bind(lowered)
+     .first<{ holder: string }>();

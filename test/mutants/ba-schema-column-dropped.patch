@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
+# kills: ba.schema
+# why: migration 0006 leaves out the username plugin's displayUsername, so Better Auth writes a column D1 does not have
+diff --git a/apps/keel/migrations/0006_better_auth.sql b/apps/keel/migrations/0006_better_auth.sql
+index e0a9cc7..0abe589 100644
+--- a/apps/keel/migrations/0006_better_auth.sql
++++ b/apps/keel/migrations/0006_better_auth.sql
+@@ -4,7 +4,7 @@
+ -- compileMigrations from Keel's auth options (plugins username, organization,
+ -- admin, deviceAuthorization, bearer, passkey, emailOTP), and held equal to
+ -- them by [ba.schema]. Expand-only, as every migration on keel.town.
+-create table "user" ("id" text not null primary key, "name" text not null, "email" text not null unique, "emailVerified" integer not null, "image" text, "createdAt" date not null, "updatedAt" date not null, "username" text unique, "displayUsername" text, "role" text, "banned" integer, "banReason" text, "banExpires" date);
++create table "user" ("id" text not null primary key, "name" text not null, "email" text not null unique, "emailVerified" integer not null, "image" text, "createdAt" date not null, "updatedAt" date not null, "username" text unique, "role" text, "banned" integer, "banReason" text, "banExpires" date);
+ 
+ create table "session" ("id" text not null primary key, "expiresAt" date not null, "token" text not null unique, "createdAt" date not null, "updatedAt" date not null, "ipAddress" text, "userAgent" text, "userId" text not null references "user" ("id") on delete cascade, "activeOrganizationId" text, "impersonatedBy" text);
+ 
