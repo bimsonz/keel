@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/methods.test.ts -t "sdk.query"
+# kills: sdk.query
+# why: the client's events() takes project but never puts it on the URL, so a project's feed can't be read through the SDK
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index 352579f..d99d199 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -411,7 +411,6 @@ export class KeelClient {
+       "Inbox_listEvents",
+       {
+         cursor: options.cursor,
+-        project: options.project,
+         wait: options.wait,
+         limit: options.limit,
+       },

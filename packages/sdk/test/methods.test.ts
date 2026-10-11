@@ -81,6 +81,41 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
 
 const isRouted = (operation: string): operation is RoutedOperation => operation in ROUTES;
 
+/** The routed operations whose route names query parameters. */
+type QueriedOperation = {
+  [Op in RoutedOperation]: (typeof ROUTES)[Op] extends { readonly query: readonly string[] }
+    ? Op
+    : never;
+}[RoutedOperation];
+
+/**
+ * One call for each operation with query parameters, passing every one of
+ * them. Typed over every such operation, so a route that names a query and
+ * has no call here fails to compile, and [sdk.query] then checks the method
+ * puts each parameter on the URL.
+ */
+const QUERY: Readonly<Record<QueriedOperation, (client: KeelClient) => Promise<unknown>>> = {
+  status: (c) => c.status("chg_1", { wait: 1 }),
+  inbox: (c) => c.inbox({ cursor: "c1", wait: 1 }),
+  Inbox_listEvents: (c) => c.events({ cursor: "c1", project: "prj_1", wait: 1, limit: 5 }),
+  Repo_getTree: (c) => c.tree("prj_1", { ref: "main", path: "src" }),
+  Repo_getBlob: (c) => c.blob("prj_1", "README.md", { ref: "main" }),
+  Repo_listCommits: (c) => c.commits("prj_1", { ref: "main", cursor: "c1", limit: 5 }),
+  Changes_listChanges: (c) =>
+    c.changes({ state: "working", project: "prj_1", cursor: "c1", limit: 5 }),
+  Conflicts_listConflicts: (c) =>
+    c.conflicts({ changeId: "chg_1", state: "proven", cursor: "c1", limit: 5 }),
+  why: (c) => c.why({ path: "src/a.ts", line: 3, subject: "authz.permissions" }),
+  Memory_listDecisions: (c) =>
+    c.decisions({ subject: "authz.permissions", cursor: "c1", limit: 5 }),
+  Inbox_getSnapshot: (c) => c.snapshot({ project: "prj_1" }),
+  Views_listLanes: (c) => c.lanes("prj_1", { cursor: "c1", limit: 5 }),
+  Operator_listProjects: (c) => c.projects({ cursor: "c1", limit: 5 }),
+  Operator_listEscalations: (c) => c.escalations({ state: "open", cursor: "c1", limit: 5 }),
+};
+
+const isQueried = (operation: string): operation is QueriedOperation => operation in QUERY;
+
 /** The one request a call made, past the token exchange. */
 async function sentBy(operation: RoutedOperation) {
   const keel = fakeKeel(() => Response.json({}));
@@ -103,6 +138,17 @@ describe("the client's methods", () => {
       expect(new URL(request.url).pathname).toBe(`/v1${path}`);
       for (const header of "headers" in route ? route.headers : [])
         expect(Object.keys(request.headers)).toContain(header);
+    },
+  );
+
+  it.each(Object.keys(QUERY).filter(isQueried))(
+    "[sdk.query] %s puts every query parameter its route names on the URL",
+    async (operation) => {
+      const keel = fakeKeel(() => Response.json({}));
+      await QUERY[operation](keel.client);
+      const request = keel.sent.find((s) => !s.url.endsWith("/v1/oauth/token"));
+      const sent = [...new URL(request?.url ?? "http://keel.invalid").searchParams.keys()];
+      expect(sent.toSorted()).toEqual([...ROUTES[operation].query].toSorted());
     },
   );
 

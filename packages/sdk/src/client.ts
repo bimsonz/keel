@@ -395,17 +395,26 @@ export class KeelClient {
     return this.call("inbox", { cursor: options.cursor, wait: options.wait }, options);
   }
 
-  /** The operation log after `cursor`, oldest first; with `wait`, the next event. */
+  /**
+   * The operation log after `cursor`, oldest first, optionally one project's;
+   * with `wait`, the next event.
+   */
   events(
     options: CallOptions & {
       readonly cursor?: string;
+      readonly project?: string;
       readonly wait?: number;
       readonly limit?: number;
     } = {},
   ): Promise<WireOutputs["Inbox_listEvents"]> {
     return this.call(
       "Inbox_listEvents",
-      { cursor: options.cursor, wait: options.wait, limit: options.limit },
+      {
+        cursor: options.cursor,
+        project: options.project,
+        wait: options.wait,
+        limit: options.limit,
+      },
       options,
     );
   }
