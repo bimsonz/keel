@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/handler.test.ts
+# kills: handler.once
+# why: a ruling Keel refused as a conflict is told it ruled, so a second answer looks taken when it was not
+diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
+index 6ffe5c9..31daa7e 100644
+--- a/apps/console/src/worker/handler.ts
++++ b/apps/console/src/worker/handler.ts
+@@ -282,8 +282,7 @@ export function createConsole(now: () => number = Date.now): Console {
+     if (response === null) return unreachable();
+     if (response.ok) return json(200, { state: "ruled" });
+     // Keel answers a ruling on a question already ruled, or withdrawn, with 409.
+-    if (response.status === 409)
+-      return json(409, { reason: "This question has already been answered." });
++    if (response.status === 409) return json(200, { state: "ruled" });
+     if (response.status === 404) return json(404, { reason: "This question is not open." });
+     // This Worker sends a well-formed ruling, so a 400 is Keel's domain refusing an option the question does not
+     // have. The one exception is Keel's own code for a request it could not read, which would be a fault here.

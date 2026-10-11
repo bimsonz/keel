@@ -341,7 +341,7 @@ describe("ruling through the console", () => {
     });
   });
 
-  it("is good once: the same capability again changes nothing, and another finds the question closed", async () => {
+  it("[handler.once] is good once: the same capability again changes nothing, and another finds the question closed", async () => {
     const r = rig();
     const question = openQuestion(r.keel);
     const first = await capabilityFor(r, question);
@@ -349,6 +349,10 @@ describe("ruling through the console", () => {
     expect((await r.post(`/rule/${first}`, { option: "invalidate" })).status).toBe(200);
     // A retry of the same tap is the same command.
     expect((await r.post(`/rule/${first}`, { option: "invalidate" })).status).toBe(200);
+    // The same capability for another answer is not that command, and is not told it ruled.
+    const changed = await r.post(`/rule/${first}`, { option: "no-cache" });
+    expect(changed.status).toBe(409);
+    expect(await reason(changed)).toBe("This question has already been answered.");
     const late = await r.post(`/rule/${second}`, { option: "no-cache" });
     expect(late.status).toBe(409);
     expect(await reason(late)).toBe("This question has already been answered.");

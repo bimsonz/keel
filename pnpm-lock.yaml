@@ -96,6 +96,9 @@ catalogs:
     oxlint-tsgolint:
       specifier: 7.0.2004
       version: 7.0.2004
+    playwright:
+      specifier: 1.64.0
+      version: 1.64.0
     react:
       specifier: 19.3.0
       version: 19.3.0
@@ -219,6 +222,9 @@ importers:
       oxlint-tsgolint:
         specifier: 'catalog:'
         version: 7.0.2004
+      playwright:
+        specifier: 'catalog:'
+        version: 1.64.0
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.3
@@ -2894,6 +2900,16 @@ packages:
     resolution: {integrity: sha512-IwbkQNgQK/kvXbSYxZWZpcAItk46ECZm6QFA66+smFZqSIjdglXGNTFniO2VLPpgt8uY8EE0uLOsGgvBrerU5Q==}
     hasBin: true
 
+  playwright-core@1.64.0:
+    resolution: {integrity: sha512-T9r+MZkTECl2+oUcZ26YgZzTrYidTsIhYYkJix+6iDOymOb1FB2RLLSOxRGnZGv5DStt+aduIVbt+E8WygXYpg==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.64.0:
+    resolution: {integrity: sha512-kVzTnYFYEyQ9RGzBjNCd2+yEqWmVbxl3AHPynv3qQ6JTjv4a+kwRcnqQwIpuP3NnrnIrE/Q6wWAIAvMfIE2/Yg==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   postcss@8.5.29:
     resolution: {integrity: sha512-49cGhUbXj8Qenv0iTMxA1cFBzxXoctpC9Ujd77t1WcbJIr6nF/eI7g/8MgxrYldFRuAXvja7xQRwavoW7kgrxQ==}
     engines: {node: ^10 || ^12 || >=14}
@@ -5269,6 +5285,12 @@ snapshots:
       require-dir: 1.2.0
       serialize-error: 7.0.1
       yargs: 16.2.2
+
+  playwright-core@1.64.0: {}
+
+  playwright@1.64.0:
+    dependencies:
+      playwright-core: 1.64.0
 
   postcss@8.5.29:
     dependencies:

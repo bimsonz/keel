@@ -12,6 +12,7 @@
     "lint:page": "oxlint -c oxlint.console.json src test scripts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.worker.json && pnpm run lint:page",
     "guard:build": "node scripts/guard-build.ts",
+    "e2e": "node scripts/e2e.ts",
     "deploy:dry": "vite build && node scripts/guard-build.ts && wrangler deploy --dry-run --outdir .wrangler/dry-run"
   },
   "dependencies": {
@@ -33,6 +34,7 @@
     "@vitejs/plugin-react": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
+    "playwright": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

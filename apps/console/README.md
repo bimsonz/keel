@@ -82,8 +82,17 @@ All of these run in the repository's `pnpm check`:
 | The build contains no fixture and no playback control | `scripts/guard-build.ts`, in `deploy:dry` |
 | No retired name for a view comes back | `test/unit/names.test.ts` |
 
-Each was seen failing against a planted fault. The faults for the security rule and for folding by project are in `test/mutants/console-*.patch`, for `pnpm prove:red console`.
+Each was seen failing against a planted fault. The faults for the security rule, for folding by project and for the rest of what the move added are in `test/mutants/console-*.patch`, for `pnpm prove:red console`.
 
-Not yet moved here: the browser checks (the real page in Chrome, on the fixtures and on the built console behind its Worker) and the captures. Until they are, what a browser shows is checked by hand.
+One check is run by hand, because it needs Chrome and a dev server:
+
+```sh
+pnpm --dir apps/console dev      # in one terminal
+pnpm --dir apps/console e2e      # in another: the real page in headless Chrome
+```
+
+It drives the pages on the fixtures the dev server serves (every tab and row a link with an address of its own, Back returning the way one came, any page opening from its address alone), then builds the console and drives it as it is deployed, with the Worker's own code answering the page and a stand-in Keel behind it: as a visitor, who is shown what Keel reads to anyone and sends no credential; as the presenter, who reads the whole instance and answers a question; and on a phone that holds a capability and nothing else. The dev server goes on serving the old version of a file that a script has written, so restart it before running this after an edit.
+
+A phone cannot show its question yet. Keel reads a question only to an observer, and a QR code carries a capability to answer one question, not a key to read with; the phone says so. It will read that one question through the Worker once Keel serves a question on its own.
 
 Not yet checked against a running Keel: the console has read only the stand-in. The first read of a real Keel is on staging, with the presenter's key.

@@ -153,14 +153,23 @@ function Console({ mode, seed }: { mode: Mode; seed: number }) {
 
   // The page a QR code opens is for answering one question, on whatever screen it is opened. It keeps the address it
   // was given, which holds its capability.
-  const answering =
-    asked !== null && (narrow || new URLSearchParams(window.location.search).has("rule"));
+  const linked = new URLSearchParams(window.location.search).has("rule");
+  // A narrow screen that can read the log is a phone too. One that cannot is a visitor's, and gets what a visitor gets.
+  const answering = asked !== null && (linked || (narrow && !closed));
   // What the project is, and who may read it, is Keel's to say, and is asked once.
   useEffect(() => {
     if (asked !== null) player.repository.wantProject();
   }, [player, asked]);
 
   // A phone is for one thing: answering the question a QR code brought it to.
+  if (answering && closed) {
+    return (
+      <Notice title="This phone cannot show the question yet">
+        Keel reads a question only to an observer today, and what a QR code carries is a way to
+        answer one question, not a key to read with. Answer it on the console it was asked on.
+      </Notice>
+    );
+  }
   if (answering) {
     return (
       <Phone

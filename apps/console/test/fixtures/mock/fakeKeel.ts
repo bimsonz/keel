@@ -244,15 +244,18 @@ export function createFakeKeel(options: {
           raisedAt: asked.at,
           state: "ruled",
         });
-        // The same command again is answered as it was; anything else finds the question closed.
-        if (ruled !== undefined)
-          return ruled.key === key
-            ? Response.json(view())
-            : problem(409, "escalation.state_refused");
         const body = fields(sent);
         const option = body.get("option");
         // A body Keel cannot read is refused before the domain sees it.
         if (typeof option !== "string") return problem(400, "request.invalid");
+        // The same command again is answered as it was. The same key on another command is a conflict, as it is
+        // on every operation of Keel's that takes a key; and any other command finds the question closed.
+        if (ruled !== undefined) {
+          if (ruled.key !== key) return problem(409, "escalation.state_refused");
+          return ruled.option === option
+            ? Response.json(view())
+            : problem(409, "request.idempotency_conflict");
+        }
         // Keel has no 422: an option the escalation does not have is refused by the domain, as a 400 with this
         // code, and its next actions name the options there are.
         if (!isRuling(option)) {
