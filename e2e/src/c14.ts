@@ -9,7 +9,11 @@
 //       resolves, pushes and submits again, and lands;
 //   (d) trunk read back holds the resolution, with the first change below it;
 //   (e) b2: every agent push shows one WorkspacePushed from a `<prj>-ws-<ulid>`
-//       workspace, and neither the mirror syncs nor the keel/trunk push show any.
+//       workspace, and neither the mirror syncs nor the keel/trunk push show any;
+//   (f) before merging, the rebased change's old commit, which doesn't descend
+//       from its new base, is refused with `rebase` (Precheck);
+//   (g) two more changes insert lines in different parts of package.json
+//       and both land with no rebase, each merged by hunk onto trunk.
 // The operator credential comes from `.keel/<env>.json` under KEEL_SEEDED_ROOT
 // (the repo root by default). No remote URL or credential is printed.
 import { execFileSync } from "node:child_process";
@@ -244,6 +248,29 @@ try {
   );
   git(dirB, ["fetch", "-q", "origin", "keel/trunk"], tokenB);
   check(git(dirB, ["rev-parse", "FETCH_HEAD"]) === trunkHead, "(c) keel/trunk is trunk's head");
+
+  // (f) the old commit doesn't descend from the new base: refused with rebase.
+  await second.submit(
+    { changeId: b.change.id, commitSha: shaB },
+    { lease: b.lease.id, idempotencyKey: `c14:${run}:b:off-base` },
+  );
+  events = await projectEvents(
+    first,
+    cursor,
+    project.id,
+    (seen) => tagged(seen, "ChangeBounced", b.change.id).length > 1,
+  );
+  const offBase = tagged(events, "ChangeBounced", b.change.id)[1]?.payload;
+  const offBaseActions: readonly { readonly operationId?: string; readonly title: string }[] =
+    offBase === undefined ? [] : (Reflect.get(offBase, "nextActions") ?? []);
+  console.log(`     off base: ${JSON.stringify(offBase && Reflect.get(offBase, "reasons"))}`);
+  for (const next of offBaseActions)
+    console.log(`     next: ${next.operationId ?? ""} "${next.title}"`);
+  check(offBase !== undefined, "(f) the unmerged commit is refused");
+  check(
+    offBaseActions.some((n) => n.operationId === "rebase"),
+    "(f) the refusal names rebase",
+  );
   const identity = [
     "-c",
     "user.name=c14-second",
@@ -275,7 +302,7 @@ try {
     project.id,
     (seen) =>
       tagged(seen, "ChangeLanded", b.change.id).length > 0 ||
-      tagged(seen, "ChangeBounced", b.change.id).length > 1,
+      tagged(seen, "ChangeBounced", b.change.id).length > 2,
   );
   check(tagged(events, "ChangeRebased", b.change.id).length === 1, "(c) ChangeRebased once");
   check(tagged(events, "ChangeLanded", b.change.id).length === 1, "(c) the rebased change lands");
@@ -308,6 +335,65 @@ try {
       ),
     ),
     "(e) both workspaces are named <prj>-ws-<ulid>",
+  );
+
+  // (g) two changes to different parts of one file both land, no rebase.
+  const hunks = [
+    {
+      client: first,
+      who: "first",
+      after: '  "license": "MIT",\n',
+      line: `  "keywords": ["c14-${run}-d"],\n`,
+    },
+    { client: second, who: "second", after: "{\n", line: `  "author": "c14-${run}-e",\n` },
+  ];
+  const declaredHunks: Declared[] = [];
+  for (const [i, h] of hunks.entries()) {
+    const d = await declareWhenPooled(h.client, `C1.5 ${run}: ${i}`, `c14:${run}:hunk${i}`);
+    if (d.workspace.token === undefined) throw new Error("declare answered no workspace token");
+    const dir = cloneWorkspace(d.workspace.remote, d.workspace.token);
+    dirs.push(dir);
+    const path = join(dir, "package.json");
+    const before = readFileSync(path, "utf8");
+    if (!before.includes(h.after))
+      throw new Error(`package.json has no ${JSON.stringify(h.after)}`);
+    writeFileSync(path, before.replace(h.after, `${h.after}${h.line}`));
+    const sha = commitAndPush(dir, d.workspace.token, `c14-${h.who}`, `hunks ${run}: ${i}`);
+    await h.client.submit(
+      { changeId: d.change.id, commitSha: sha },
+      { lease: d.lease.id, idempotencyKey: `c14:${run}:hunk${i}:submit` },
+    );
+    console.log(`     hunk change ${i}: ${d.change.id} submitted at ${sha.slice(0, 12)}`);
+    declaredHunks.push(d);
+  }
+  events = await projectEvents(first, cursor, project.id, (seen) =>
+    declaredHunks.every(
+      (d) =>
+        tagged(seen, "ChangeLanded", d.change.id).length > 0 ||
+        tagged(seen, "ChangeBounced", d.change.id).length > 0,
+    ),
+  );
+  for (const d of declaredHunks) {
+    const bounced = tagged(events, "ChangeBounced", d.change.id)[0]?.payload;
+    if (bounced !== undefined)
+      console.log(
+        `     ${d.change.id} bounced: ${JSON.stringify(Reflect.get(bounced, "reasons"))}`,
+      );
+  }
+  check(
+    declaredHunks.every((d) => tagged(events, "ChangeLanded", d.change.id).length === 1),
+    "(g) both same-file changes land",
+  );
+  check(
+    declaredHunks.every((d) => tagged(events, "ChangeRebased", d.change.id).length === 0),
+    "(g) neither was rebased",
+  );
+  const merged = String(
+    Reflect.get(Object(await first.blob(project.id, "package.json")), "content") ?? "",
+  );
+  check(
+    hunks.every((h) => merged.includes(h.line)) && merged.includes(resolved),
+    "(g) trunk's package.json holds both inserted lines and the earlier resolution",
   );
 
   console.log("\n     chain:");
