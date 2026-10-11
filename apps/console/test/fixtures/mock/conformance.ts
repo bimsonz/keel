@@ -68,6 +68,7 @@ const RULES: Record<EventType, Rule[]> = {
     { kind: "change", idField: "changeId", from: ["declared", "working"] },
   ],
   ChangeSubmitted: [change(["working", "bounced"], "submitted")],
+  ChangeRebased: [change(["working", "bounced"])],
   PrecheckStarted: [change(["submitted"], "deriving")],
   EffectsDerived: [change(["deriving"])],
   DriftDetected: [change(["deriving"])],

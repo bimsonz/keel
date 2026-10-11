@@ -21,6 +21,7 @@ export const EVENT_TYPES = [
   "IntentRevised",
   "PremiseRelied",
   "ChangeSubmitted",
+  "ChangeRebased",
   "PrecheckStarted",
   "EffectsDerived",
   "DriftDetected",
