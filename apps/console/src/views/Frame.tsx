@@ -2,8 +2,9 @@
 // The project is the frame, as a repository is on a code host; everything
 // else is a tab of it.
 
-import { Badge } from "@cloudflare/kumo";
+import { Badge, DropdownMenu } from "@cloudflare/kumo";
 import {
+  CaretUpDownIcon,
   ChartBarIcon,
   CodeIcon,
   GitDiffIcon,
@@ -135,12 +136,72 @@ function Source({ source }: { source: SourceMark }) {
   );
 }
 
+/** Something the reader could be in instead of where they are: another project of this Keel. */
+export interface Sibling {
+  name: string;
+  href: string;
+  /** What is said beside its name: who may read it. */
+  note?: string;
+}
+
+/**
+ * Beside a name in the frame, the others of its kind, a click away: as a code host's frame lets a reader drop
+ * down on the owner or on the repository and go to another.
+ */
+function Switch({
+  what,
+  here,
+  others,
+  all,
+}: {
+  what: string;
+  here: string;
+  others: Sibling[];
+  all: { label: string; href: string };
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenu.Trigger
+        render={
+          <button
+            type="button"
+            aria-label={`Switch ${what}`}
+            className="flex h-6 w-5 items-center justify-center rounded text-kumo-subtle hover:text-kumo-strong"
+          >
+            <CaretUpDownIcon size={14} aria-hidden />
+          </button>
+        }
+      />
+      <DropdownMenu.Content>
+        {others.map((other) => (
+          <DropdownMenu.LinkItem
+            key={other.name}
+            href={other.href}
+            aria-current={other.name === here ? "true" : undefined}
+          >
+            <span className={other.name === here ? "font-semibold text-kumo-strong" : undefined}>
+              {other.name}
+            </span>
+            {other.note !== undefined && (
+              <span className="ml-3 text-sm text-kumo-subtle">{other.note}</span>
+            )}
+          </DropdownMenu.LinkItem>
+        ))}
+        <DropdownMenu.LinkItem href={all.href}>{all.label}</DropdownMenu.LinkItem>
+      </DropdownMenu.Content>
+    </DropdownMenu>
+  );
+}
+
 export function Frame({
   visibility,
   source,
   counts,
+  projects,
   children,
 }: {
+  /** The projects this reader may go to, where Keel has named them. */
+  projects?: Sibling[];
   /** Whether anyone may read the project, where Keel has said. */
   visibility?: string;
   source: SourceMark;
@@ -168,6 +229,14 @@ export function Frame({
                 >
                   {project}
                 </Link>
+                {projects !== undefined && projects.length > 0 && (
+                  <Switch
+                    what="project"
+                    here={project}
+                    others={projects}
+                    all={{ label: "All projects", href: "/" }}
+                  />
+                )}
               </>
             )}
             {visibility !== undefined && (

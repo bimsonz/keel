@@ -14,7 +14,7 @@ import { InsightsPage } from "./pages/Insights.tsx";
 import { Missing } from "./pages/Missing.tsx";
 import { MissionControlPage } from "./pages/MissionControl.tsx";
 import { type Route, TRUNK, href, parse } from "./route.ts";
-import { WhereProvider, onMove, useAddress } from "./router.tsx";
+import { WhereProvider, carriedParams, onMove, useAddress } from "./router.tsx";
 import { KeyRefused, createHttpSource } from "./source/http.ts";
 import { type Mode, applyMode } from "./theme/mode.ts";
 import { Frame, Notice } from "./views/Frame.tsx";
@@ -150,6 +150,12 @@ function Console({ mode, seed }: { mode: Mode; seed: number }) {
   /** Keel reads its log to an observer, and this reader is a visitor: the console has what Keel reads to anyone. */
   const closed = player.source.descriptor.log === "closed";
   const source = { mode: player.source.descriptor.mode, seed, unread: player.unread, closed };
+  // The other projects Keel has named to this reader, for the frame's switcher. A visitor is named none.
+  const projects = player.projects.list.map((project) => ({
+    name: project.name,
+    href: href(project.name, HOME, carriedParams()),
+    note: project.visibility,
+  }));
 
   // The page a QR code opens is for answering one question, on whatever screen it is opened. It keeps the address it
   // was given, which holds its capability.
@@ -214,6 +220,7 @@ function Console({ mode, seed }: { mode: Mode; seed: number }) {
         <Frame
           source={source}
           counts={counts}
+          projects={projects}
           {...(visibility === undefined ? {} : { visibility })}
         >
           {closed && !CODE.has(route.at) && route.at !== "missing" ? (

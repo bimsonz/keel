@@ -1227,6 +1227,26 @@ expectEqual(
   (await presenter.locator(".a-tree li").allInnerTexts()).map(squash).join(" | "),
   "src | package.json | README.md",
 );
+// Beside the project's name, the projects Keel has named, a click away, as a code host's frame has them.
+await presenter.getByRole("button", { name: "Switch project" }).click();
+await presenter.getByRole("menuitem", { name: "All projects" }).waitFor();
+expectEqual(
+  "presenter: the frame drops down on the project, to the others and to all of them",
+  (await presenter.getByRole("menuitem").allInnerTexts()).map(squash).join(" | "),
+  "demo private | All projects",
+);
+expectEqual(
+  "presenter: each is a link to its own address",
+  (
+    await presenter
+      .getByRole("menuitem")
+      .evaluateAll((items) => items.map((item) => item.getAttribute("href")))
+  ).join(" | "),
+  "/demo | /",
+);
+if ((process.env["SHOTS"] ?? "") !== "")
+  await presenter.screenshot({ path: `${process.env["SHOTS"] ?? "."}/switcher.png` });
+await presenter.keyboard.press("Escape");
 // Keel has no clone address to give yet, and the console makes none up.
 expectEqual(
   "presenter: no clone address is made up",
