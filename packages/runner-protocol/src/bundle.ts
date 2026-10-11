@@ -160,6 +160,124 @@ export const writeBundle = async (files: readonly BundleFile[]): Promise<Uint8Ar
   return new Uint8Array(await new Response(gzipped).arrayBuffer());
 };
 
+// ------------------------------------------------------------------ reading
+
+/** Why a bundle cannot be read back: not gzip, not the ustar `writeBundle` writes, or not what its manifest lists. */
+export class BundleUnreadable extends Error {
+  readonly reason: string;
+  constructor(reason: string) {
+    super(`bundle unreadable: ${reason}`);
+    this.name = "BundleUnreadable";
+    this.reason = reason;
+  }
+}
+
+const decoder = new TextDecoder();
+
+/** A NUL-terminated header field as text. */
+const field = (block: Uint8Array, offset: number, length: number): string => {
+  const bytes = block.subarray(offset, offset + length);
+  const end = bytes.indexOf(0);
+  return decoder.decode(end === -1 ? bytes : bytes.subarray(0, end));
+};
+
+const octalField = (block: Uint8Array, offset: number, length: number): number => {
+  const text = field(block, offset, length).trim();
+  if (!/^[0-7]+$/.test(text)) throw new BundleUnreadable(`bad octal field ${JSON.stringify(text)}`);
+  return Number.parseInt(text, 8);
+};
+
+/** The `path` a PAX extended header sets for the entry after it. */
+const paxPathOf = (records: Uint8Array): string => {
+  const text = decoder.decode(records);
+  for (const record of text.split("\n")) {
+    const at = record.indexOf(" path=");
+    if (at !== -1) return record.slice(at + " path=".length);
+  }
+  throw new BundleUnreadable("a PAX header with no path");
+};
+
+/** The entries of an uncompressed ustar archive: regular files only, ending in its two zero blocks. */
+const entriesOf = (tar: Uint8Array): { name: string; bytes: Uint8Array; mode: number }[] => {
+  const entries: { name: string; bytes: Uint8Array; mode: number }[] = [];
+  let offset = 0;
+  let pax: string | undefined;
+  for (;;) {
+    if (offset + BLOCK > tar.length)
+      throw new BundleUnreadable("the archive ends before its end marker");
+    const block = tar.subarray(offset, offset + BLOCK);
+    if (block.every((b) => b === 0)) {
+      const next = tar.subarray(offset + BLOCK, offset + 2 * BLOCK);
+      if (next.length !== BLOCK || !next.every((b) => b === 0))
+        throw new BundleUnreadable("the archive ends before its end marker");
+      return entries;
+    }
+    const stored = octalField(block, 148, 8);
+    const summed = block.reduce((t, b, i) => t + (i >= 148 && i < 156 ? 32 : b), 0);
+    if (stored !== summed)
+      throw new BundleUnreadable(`a header's checksum is wrong at byte ${offset}`);
+    if (field(block, 257, 6) !== "ustar") throw new BundleUnreadable("not a ustar archive");
+    const size = octalField(block, 124, 12);
+    const mode = octalField(block, 100, 8);
+    const type = String.fromCharCode(block[156] ?? 0);
+    const start = offset + BLOCK;
+    if (start + size > tar.length) throw new BundleUnreadable("an entry is cut short");
+    const bytes = tar.slice(start, start + size);
+    offset = start + Math.ceil(size / BLOCK) * BLOCK;
+    if (type === "x") {
+      pax = paxPathOf(bytes);
+      continue;
+    }
+    if (type !== "0" && type !== "\0")
+      throw new BundleUnreadable(`an entry of type ${JSON.stringify(type)}: only regular files`);
+    entries.push({ name: pax ?? field(block, 0, 100), bytes, mode });
+    pax = undefined;
+  }
+};
+
+/**
+ * Reads a bundle back into its files, as a runner that is not a shell reads
+ * it (a VerifierDO building a world). It must be the gzipped ustar
+ * `writeBundle` writes: every entry a regular file under `BUNDLE_ROOT/`, at a
+ * safe path, once, and the manifest listing exactly the other files with
+ * their sha256. Anything else is `BundleUnreadable`, so a truncated, altered
+ * or foreign archive is never read as a smaller or different tree.
+ */
+export const readBundle = async (bytes: Uint8Array): Promise<BundleFile[]> => {
+  let tar: Uint8Array;
+  try {
+    const stream = new Blob([bytes.slice()]).stream().pipeThrough(new DecompressionStream("gzip"));
+    tar = new Uint8Array(await new Response(stream).arrayBuffer());
+  } catch {
+    throw new BundleUnreadable("not gzip, or cut short");
+  }
+  let manifest: string | undefined;
+  const files: BundleFile[] = [];
+  const seen = new Set<string>();
+  for (const e of entriesOf(tar)) {
+    if (!e.name.startsWith(`${BUNDLE_ROOT}/`))
+      throw new BundleUnreadable(`an entry outside ${BUNDLE_ROOT}/: ${JSON.stringify(e.name)}`);
+    const path = e.name.slice(BUNDLE_ROOT.length + 1);
+    if (path === BUNDLE_MANIFEST) {
+      if (manifest !== undefined) throw new BundleUnreadable("two manifests");
+      manifest = decoder.decode(e.bytes);
+      continue;
+    }
+    try {
+      checkPath(path);
+    } catch (error) {
+      throw new BundleUnreadable(error instanceof BundleRefused ? error.reason : String(error));
+    }
+    if (seen.has(path)) throw new BundleUnreadable(`duplicate path ${path}`);
+    seen.add(path);
+    files.push({ path, bytes: e.bytes, ...((e.mode & 0o111) === 0 ? {} : { executable: true }) });
+  }
+  if (manifest === undefined) throw new BundleUnreadable(`no ${BUNDLE_MANIFEST}`);
+  if (manifest !== (await manifestOf(files)))
+    throw new BundleUnreadable("the files are not the ones the manifest lists");
+  return files;
+};
+
 /** The virtual host a sandbox fetches bundles from; KeelSandbox's outbound handler answers it from R2. */
 export const BUNDLE_HOST = "bundles.keel.internal";
 

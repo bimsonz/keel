@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/bundle-read.test.ts
+# kills: bundle.manifest-checked
+# why: A bundle is read without checking its files against the manifest, so an altered file is built into a world
+diff --git a/packages/runner-protocol/src/bundle.ts b/packages/runner-protocol/src/bundle.ts
+index d9ee0e9..5769dde 100644
+--- a/packages/runner-protocol/src/bundle.ts
++++ b/packages/runner-protocol/src/bundle.ts
+@@ -273,7 +273,7 @@ export const readBundle = async (bytes: Uint8Array): Promise<BundleFile[]> => {
+     files.push({ path, bytes: e.bytes, ...((e.mode & 0o111) === 0 ? {} : { executable: true }) });
+   }
+   if (manifest === undefined) throw new BundleUnreadable(`no ${BUNDLE_MANIFEST}`);
+-  if (manifest !== (await manifestOf(files)))
++  if (manifest === "never" && manifest !== (await manifestOf(files)))
+     throw new BundleUnreadable("the files are not the ones the manifest lists");
+   return files;
+ };
