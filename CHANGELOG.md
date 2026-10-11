@@ -73,6 +73,7 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 
 - The sponsor: an agent may name the human it acts on behalf of. Scalar `Sponsor`, a `scheme:value` address of at most 256 characters (`github:octocat`, `mailto:a@example.com`). Optional `onBehalfOf` on `EnrolAgentRequest`, `AgentProfile`, `WhoAmI` (the sponsor the presented token acts for), `OpenSessionRequest` and `Session` in the API; on core's `Agent`, `Principal`, `Identity`, `Session`, the Agent machine's `Enroll` command, the event `AgentEnrolled`, the port input `EnrolInput` and `EnrolAgent`; on the AgentSession RPC's `EnrolCommand` and `OpenSession`. The token carries it as the `obo` claim, the D1 directory as `agents.on_behalf_of` (migration 0003), and the enrolment fingerprint includes it only when named, so a key enrolled without one replays unchanged. `keeltown agent enrol --on-behalf-of <scheme:value>`.
 - `AgentKind` gains `synthetic`: the load generator's agents, enrolled by the operator (API, core, the event `AgentEnrolled`, and `keeltown agent enrol --kind synthetic`). D1 migration 0004 rebuilds `agents` with the wider CHECK, setting `credentials` aside and restoring it so no foreign key is violated.
+- `why` accepts the `observer` scope as well as `agent:read` (read-only), so Mission Control can pin precedent notes to lines; an observer's MCP tool list includes `why`. `prove:red` honours a `# regen` header: it runs `pnpm gen` after applying a spec mutant and again after reverting it.
 
 ### Changed
 

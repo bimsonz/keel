@@ -4181,6 +4181,11 @@
             "OAuth2Auth": [
               "agent:read"
             ]
+          },
+          {
+            "OAuth2Auth": [
+              "observer"
+            ]
           }
         ]
       }

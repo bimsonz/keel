@@ -67,6 +67,17 @@ describe("the published contract, through the Worker's fetch handler", () => {
     expect(toolNames(readOnly)).toEqual(["inbox", "nearby", "status", "whoami", "why"]);
   });
 
+  it("[a11d.why-observer] lets an observer ask why, over REST and as an MCP tool", async () => {
+    const observer = await tokenFor(await seedAgent({}, ["observer"]));
+    const response = await exports.default.fetch(`${BASE}/v1/why?subject=authz.permissions`, {
+      headers: { authorization: `Bearer ${observer}` },
+    });
+    // `why` is still a stub: the observer reaches it (503), not the scope gate (403).
+    expect(response.status).toBe(503);
+    expect((await response.json<{ code: string }>()).code).toBe("service.not_implemented");
+    expect(toolNames(await mcpResult(await mcp(observer, "tools/list")))).toContain("why");
+  });
+
   it("refuses the MCP endpoint without a token", async () => {
     expect((await mcp(null, "tools/list")).status).toBe(401);
   });

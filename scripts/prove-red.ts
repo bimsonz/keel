@@ -10,7 +10,9 @@
 // seed. It counts red only if, in every run, every claimed tag has a failing
 // test whose title carries `[tag]`; a non-zero exit is not enough, because one
 // tag failing can hide another that passes. A patch without tags counts red
-// when its command exits non-zero.
+// when its command exits non-zero. A patch to the spec carries `# regen`: the
+// generated code is gitignored, so `pnpm gen` runs after applying it and again
+// after reverting it, and no later mutant runs against its generated output.
 //
 // Apply, run, revert: the tree is restored even when a step throws. Exit 1 if
 // any mutant survived.
@@ -61,6 +63,7 @@ if (
 interface Header {
   readonly command: string | undefined;
   readonly kills: readonly string[];
+  readonly regen: boolean;
 }
 
 function headerOf(path: string): Header {
@@ -71,7 +74,11 @@ function headerOf(path: string): Header {
     .flatMap((line) => line.slice("# kills:".length).split(","))
     .map((tag) => tag.trim())
     .filter((tag) => tag !== "");
-  return { command, kills };
+  return { command, kills, regen: lines.some((line) => line.trim() === "# regen") };
+}
+
+function regenerate(): void {
+  execSync("pnpm gen", { cwd: root, stdio: "ignore" });
 }
 
 /** Each `[tag]` in a test's full name, with whether that test failed. */
@@ -145,7 +152,7 @@ function killsEveryTag(command: string, kills: readonly string[]): string | null
 const survivors: string[] = [];
 for (const name of patches) {
   const path = join(dir, name);
-  const { command, kills } = headerOf(path);
+  const { command, kills, regen } = headerOf(path);
   if (command === undefined) {
     console.log(`SKIP ${name}: first line must be "# expect-red: <command>"`);
     survivors.push(name);
@@ -158,6 +165,7 @@ for (const name of patches) {
   }
   execSync(`git apply ${JSON.stringify(path)}`, { cwd: root });
   try {
+    if (regen) regenerate();
     const started = Date.now();
     if (kills.length > 0) {
       const survived = killsEveryTag(command, kills);
@@ -184,6 +192,7 @@ for (const name of patches) {
     }
   } finally {
     execSync(`git apply -R ${JSON.stringify(path)}`, { cwd: root });
+    if (regen) regenerate();
   }
 }
 

@@ -30,7 +30,7 @@ interface Memory {
   @summary("Why is it like this?")
   @tag("mcp")
   @operationId("why")
-  @useAuth(AgentRead)
+  @useAuth(AgentRead | Observer)
   @route("/why")
   @get
   why(
