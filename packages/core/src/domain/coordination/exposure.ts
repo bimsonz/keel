@@ -76,9 +76,9 @@ export const exposure = (
     }
   }
 
-  const unreadable = mine.flatMap((p) => {
-    const read = readClaim(p);
-    return Result.isFailure(read) ? [read.failure] : [];
-  });
+  const unreadable = [
+    ...myPremises.map((p) => readClaim(p, "premise")),
+    ...myEffects.map((e) => readClaim(e)),
+  ].flatMap((read) => (Result.isFailure(read) ? [read.failure] : []));
   return { neighbours, contradictions, unreadable };
 };

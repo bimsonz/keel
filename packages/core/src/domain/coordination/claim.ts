@@ -1,5 +1,5 @@
 import { Result } from "effect";
-import type { Anchor } from "../kernel/index.ts";
+import type { Anchor, NextAction } from "../kernel/index.ts";
 import { UnreadableProposition } from "./errors.ts";
 import type {
   Authority,
@@ -8,15 +8,21 @@ import type {
   ClaimRelation,
   Consistency,
   Freshness,
+  FreshnessValue,
   Ordering,
 } from "./lattice.ts";
+import { isInvalidated } from "./lattice.ts";
 import type { Predicate, Proposition, Strength, SubjectKey } from "./proposition.ts";
 import { readScope, type Scope, writeScope } from "./scope.ts";
 import { readShape, type Shape } from "./shape.ts";
 
 /** A predicate paired with the value domain it compares over. */
 export type Claim =
-  | { readonly predicate: "freshness"; readonly relation: ClaimRelation; readonly value: Freshness }
+  | {
+      readonly predicate: "freshness";
+      readonly relation: ClaimRelation;
+      readonly value: FreshnessValue;
+    }
   | {
       readonly predicate: "cardinality";
       readonly relation: ClaimRelation;
@@ -65,6 +71,19 @@ const parameter = (prefix: string, value: string): number | undefined => {
 const pick = <T extends string>(options: readonly T[], value: unknown): T | undefined =>
   options.find((o) => o === value);
 
+/** `<freshness> invalidated-on <key>,<key>`: the effect form "cached, invalidated on E". */
+const INVALIDATION = /^(\S+) invalidated-on (\S+)$/;
+const EVENT_KEY = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
+
+const readFreshness = (v: string): Freshness | undefined => {
+  const named = pick(freshnessNames, v);
+  if (named !== undefined) return named;
+  const ttl = parameter("ttl", v);
+  return ttl === undefined ? undefined : { ttl };
+};
+
+const writeFreshness = (v: Freshness): string => (typeof v === "object" ? `ttl:${v.ttl}` : v);
+
 const readValue = (p: Proposition): Claim | string => {
   const v = p.value;
   const rel = p.relation;
@@ -73,13 +92,27 @@ const readValue = (p: Proposition): Claim | string => {
     case "freshness": {
       if (latticeRel === undefined || typeof v !== "string")
         return "freshness takes is/at-most/at-least/not and a string";
-      const named = pick(freshnessNames, v);
-      const ttl = parameter("ttl", v);
-      if (named !== undefined)
-        return { predicate: "freshness", relation: latticeRel, value: named };
-      return ttl === undefined
-        ? `"${v}" is not a freshness`
-        : { predicate: "freshness", relation: latticeRel, value: { ttl } };
+      const invalidation = INVALIDATION.exec(v);
+      if (invalidation === null) {
+        const base = readFreshness(v);
+        return base === undefined
+          ? `"${v}" is not a freshness`
+          : { predicate: "freshness", relation: latticeRel, value: base };
+      }
+      const cached = readFreshness(invalidation[1] ?? "");
+      const keys = (invalidation[2] ?? "").split(",");
+      if (cached === undefined) return `"${invalidation[1]}" is not a freshness`;
+      if (latticeRel !== "is" && latticeRel !== "at-most")
+        return "an invalidation form takes is or at-most";
+      if (!keys.every((k) => EVENT_KEY.test(k)))
+        return "invalidated-on takes dotted event keys, e.g. authz.revoke";
+      if (!keys.every((k, i) => i === 0 || (keys[i - 1] ?? "") < k))
+        return "invalidated-on lists its event keys sorted, each once";
+      return {
+        predicate: "freshness",
+        relation: latticeRel,
+        value: { cached, invalidatedOn: keys },
+      };
     }
     case "consistency": {
       if (latticeRel === undefined || typeof v !== "string")
@@ -156,16 +189,40 @@ const readValue = (p: Proposition): Claim | string => {
   }
 };
 
-/** Reads a wire proposition onto its predicate's lattice, or says why it cannot. */
+/** Premises state what they rely on; an eviction on an event is something code does, so only effects say it. */
+const statePremiseFreshness: NextAction = {
+  kind: "call",
+  title:
+    "State the freshness you rely on, e.g. at-most per-request; invalidation is an effect form",
+  operationId: "revise",
+};
+
+/**
+ * Reads a wire proposition onto its predicate's lattice, or says why it
+ * cannot. A premise is read as one: the effect-only invalidation form is
+ * refused, with the next action.
+ */
 export const readClaim = (
   p: Proposition,
+  role: "premise" | "effect" = "effect",
 ): Result.Result<ReadProposition, UnreadableProposition> => {
-  const unreadable = (reason: string) =>
-    Result.fail(new UnreadableProposition({ subject: p.subject, predicate: p.predicate, reason }));
+  const unreadable = (reason: string, nextActions?: readonly NextAction[]) =>
+    Result.fail(
+      new UnreadableProposition({
+        subject: p.subject,
+        predicate: p.predicate,
+        reason,
+        ...(nextActions === undefined ? {} : { nextActions }),
+      }),
+    );
   const scope = readScope(p.scope);
   if (Result.isFailure(scope)) return unreadable(scope.failure);
   const claim = readValue(p);
   if (typeof claim === "string") return unreadable(claim);
+  if (role === "premise" && claim.predicate === "freshness" && isInvalidated(claim.value))
+    return unreadable("a premise cannot rely on an invalidation: it is an effect form", [
+      statePremiseFreshness,
+    ]);
   return Result.succeed({
     subject: p.subject,
     scope: scope.success,
@@ -180,11 +237,15 @@ const writeValue = (
   claim: Claim,
 ): { relation: Proposition["relation"]; value: string | number | boolean; unit?: string } => {
   switch (claim.predicate) {
-    case "freshness":
+    case "freshness": {
+      const v = claim.value;
+      if (!isInvalidated(v)) return { relation: claim.relation, value: writeFreshness(v) };
+      const keys = [...new Set(v.invalidatedOn)].toSorted();
       return {
         relation: claim.relation,
-        value: typeof claim.value === "object" ? `ttl:${claim.value.ttl}` : claim.value,
+        value: `${writeFreshness(v.cached)} invalidated-on ${keys.join(",")}`,
       };
+    }
     case "consistency":
       return {
         relation: claim.relation,

@@ -11,6 +11,8 @@ import type {
   ClaimRelation,
   Consistency,
   Freshness,
+  FreshnessValue,
+  Invalidated,
   Tri,
 } from "../../src/domain/coordination/index.ts";
 
@@ -161,6 +163,58 @@ const memberships = (premise: Claim, effect: Claim): readonly Membership[] | und
 
 export type OracleDecision = "within" | "disjoint" | "overlap";
 
+const invalidated = (v: FreshnessValue): v is Invalidated => typeof v === "object" && "cached" in v;
+
+/** How a region of freshness samples sits against the premise, in the world where a session lasts `d`. */
+const freshnessIn = (
+  d: number,
+  premise: { readonly relation: ClaimRelation; readonly value: Freshness },
+  inEffect: (x: Freshness) => Tri,
+): OracleDecision =>
+  decideMemberships(
+    freshnessSamples.map((x) => ({
+      inEffect: inEffect(x),
+      inPremise: member(freshnessLeqIn(d), x, premise.relation, premise.value),
+    })),
+  );
+
+/** meet(x, per-request), read off the order: per-request sits below everything but per-call. */
+const metWithPerRequest = (x: Freshness): Freshness =>
+  specFreshnessLeq(x, "per-request") === true ? x : "per-request";
+
+/** Events the effect does not evict on; whether any of them changes the subject is unknown. */
+const otherEvents = ["other.a", "other.b"];
+
+/**
+ * The invalidation form in one session world, decided by brute force over
+ * which events change the subject: every evicting event does (the extractor
+ * saw its handler evict), and any subset of the others may. A change by an
+ * evicting event lands in the image of the effect's region under meet with
+ * per-request; any other change, in the region itself. The premise holds only
+ * if it holds for every kind of change that happens.
+ */
+const evictionWorlds = (
+  d: number,
+  premise: { readonly relation: ClaimRelation; readonly value: Freshness },
+  relation: ClaimRelation,
+  effect: Invalidated,
+): OracleDecision[] => {
+  const inCached = (x: Freshness): boolean =>
+    member(freshnessLeqIn(d), x, relation, effect.cached) === true;
+  const cached = freshnessIn(d, premise, inCached);
+  const evicted = freshnessIn(d, premise, (y) =>
+    freshnessSamples.some((x) => inCached(x) && same(metWithPerRequest(x), y)),
+  );
+  const subsets = Array.from({ length: 2 ** otherEvents.length }, (_, mask) =>
+    otherEvents.filter((_e, i) => (mask >> i) % 2 === 1),
+  );
+  return subsets.map((others) => {
+    const kinds = [...effect.invalidatedOn.map(() => evicted), ...others.map(() => cached)];
+    if (kinds.includes("disjoint")) return "disjoint";
+    return kinds.every((k) => k === "within") ? "within" : "overlap";
+  });
+};
+
 /**
  * within: every sample the effect might allow is certainly in the premise.
  * disjoint: no sample is possibly in both. Otherwise overlap.
@@ -186,15 +240,20 @@ export const oracleDecision = (premise: Claim, effect: Claim): OracleDecision | 
     return "overlap";
   }
   if (premise.predicate === "freshness" && effect.predicate === "freshness") {
+    const held = premise.value;
+    const done = effect.value;
+    // A premise never relies on an eviction: only a probe can say what it means.
+    if (invalidated(held)) return "overlap";
     // Decide in every possible world; a decision that changes between worlds is no decision.
-    const perWorld = sessionWorlds.map((d) =>
-      decideMemberships(
-        freshnessSamples.map((x) => ({
-          inEffect: member(freshnessLeqIn(d), x, effect.relation, effect.value),
-          inPremise: member(freshnessLeqIn(d), x, premise.relation, premise.value),
-        })),
-      ),
-    );
+    const perWorld = invalidated(done)
+      ? sessionWorlds.flatMap((d) =>
+          evictionWorlds(d, { relation: premise.relation, value: held }, effect.relation, done),
+        )
+      : sessionWorlds.map((d) =>
+          freshnessIn(d, { relation: premise.relation, value: held }, (x) =>
+            member(freshnessLeqIn(d), x, effect.relation, done),
+          ),
+        );
     const first = perWorld[0];
     return perWorld.every((w) => w === first) ? first : "overlap";
   }

@@ -42,7 +42,9 @@ export const Proposition = Schema.Struct({
   predicate: Predicate,
   relation: Relation,
   /**
-   * Read on the predicate's lattice: freshness `per-call|per-request|per-session|static|ttl:<s>`;
+   * Read on the predicate's lattice: freshness `per-call|per-request|per-session|static|ttl:<s>`,
+   * and for an effect only, with `is` or `at-most`, `<freshness> invalidated-on <key>,<key>` (dotted
+   * event keys, sorted, each once);
    * consistency `eventual|read-your-writes|linearizable|bounded:<s>`; authority a comma-separated
    * writer set; shape a JSON-encoded structural type; ordering with before/after, the subject being
    * the first event and the value the second; bound a number in `unit`; purity, idempotent and

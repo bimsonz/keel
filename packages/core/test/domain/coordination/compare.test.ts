@@ -13,6 +13,7 @@ import {
   consistencyLeq,
   type Freshness,
   freshnessLeq,
+  type Invalidated,
   isAncestorOrSelf,
   type Proposition,
   readClaim,
@@ -487,5 +488,149 @@ describe("claims on the wire", () => {
       expect(compare(readable, p)).toEqual({ outcome: "needs-probe", reason: "unreadable" });
       expect(compare({ ...p, subject: key("billing") }, readable).outcome).toBe("unrelated");
     }
+  });
+});
+
+// ------------------------------------------------- cached, invalidated on E
+
+const eventKeyArb = fc.constantFrom("authz.revoke", "authz.grant", "role.delete", "session.end");
+const invalidatedArb = (
+  cached: fc.Arbitrary<Freshness> = freshnessArb,
+): fc.Arbitrary<Invalidated> =>
+  fc.record({
+    cached,
+    invalidatedOn: fc
+      .uniqueArray(eventKeyArb, { minLength: 1, maxLength: 3 })
+      .map((keys) => keys.toSorted()),
+  });
+const evictingRelationArb = fc.constantFrom<"is" | "at-most">("is", "at-most");
+const fresh = (relation: Claim["relation"], value: Freshness | Invalidated): Proposition =>
+  proposition(evaluation, { predicate: "freshness", relation, value });
+const refusedOnWire = (relation: Proposition["relation"], value: string): boolean =>
+  Result.isFailure(readClaim({ subject: evaluation, predicate: "freshness", relation, value }));
+const rank = { contradicts: 0, "needs-probe": 1, refines: 2, compatible: 2, unrelated: -1 };
+
+describe("freshness: cached, invalidated on E", () => {
+  it("[freshness.invalidation-sound] decides only what holds whichever other events change the subject, as brute force over event worlds does", () => {
+    const seen = new Set<ComparisonOutcome>();
+    fc.assert(
+      fc.property(
+        latticeRelationArb,
+        freshnessArb,
+        evictingRelationArb,
+        invalidatedArb(),
+        (pr, pv, er, ev) => {
+          const premise: Claim = { predicate: "freshness", relation: pr, value: pv };
+          const effect: Claim = { predicate: "freshness", relation: er, value: ev };
+          const { outcome } = compare(fresh(pr, pv), fresh(er, ev));
+          seen.add(outcome);
+          const oracle = oracleDecision(premise, effect);
+          if (oracle === "disjoint") return outcome === "contradicts";
+          if (oracle === "overlap") return outcome === "needs-probe";
+          return outcome === "compatible";
+        },
+      ),
+      { numRuns: 1000 },
+    );
+    expect([...seen].toSorted()).toEqual(["compatible", "contradicts", "needs-probe"]);
+  });
+
+  it("[freshness.invalidation-never-staler] against at-most v the form never decides worse than its base, and never contradicts a premise at or above per-request", () => {
+    fc.assert(
+      fc.property(freshnessArb, evictingRelationArb, invalidatedArb(), (pv, er, ev) => {
+        const premise = fresh("at-most", pv);
+        const form = rank[compare(premise, fresh(er, ev)).outcome];
+        const base = rank[compare(premise, fresh(er, ev.cached)).outcome];
+        const lenient = specFreshnessLeq("per-request", pv) === true;
+        return form >= base && (!lenient || form > rank.contradicts);
+      }),
+    );
+    // A per-session cache evicted on revoke never contradicts "at most per-request".
+    const bPrime = fresh("is", { cached: "per-session", invalidatedOn: ["authz.revoke"] });
+    expect(compare(fresh("at-most", "per-request"), bPrime).outcome).not.toBe("contradicts");
+  });
+
+  it("[freshness.invalidation-fresh-base] a base at or below per-request compares exactly as the base does", () => {
+    const freshBase = fc.constantFrom<Freshness>("per-call", "per-request");
+    fc.assert(
+      fc.property(
+        latticeRelationArb,
+        freshnessArb,
+        evictingRelationArb,
+        invalidatedArb(freshBase),
+        (pr, pv, er, ev) =>
+          compare(fresh(pr, pv), fresh(er, ev)).outcome ===
+          compare(fresh(pr, pv), fresh(er, ev.cached)).outcome,
+      ),
+    );
+    const perCall = fresh("is", { cached: "per-call", invalidatedOn: ["authz.revoke"] });
+    expect(compare(fresh("at-most", "per-call"), perCall).outcome).toBe("compatible");
+  });
+
+  it("[freshness.s1-bprime] S-1: B\u2032, per-session evicted on revoke, needs a probe against at most per-request; the careless patch contradicts; B is compatible", () => {
+    const premise = fresh("at-most", "per-request");
+    const b = fresh("is", "per-request");
+    const bPrime = fresh("is", { cached: "per-session", invalidatedOn: ["authz.revoke"] });
+    const careless = fresh("is", "per-session");
+    expect(bPrime.value).toBe("per-session invalidated-on authz.revoke");
+    expect(compare(premise, bPrime).outcome).toBe("needs-probe");
+    expect(compare(premise, careless).outcome).toBe("contradicts");
+    expect(compare(premise, b).outcome).toBe("compatible");
+  });
+
+  it("[freshness.invalidation-wire] the form is written with its keys sorted and deduped, reads back equal, and every other spelling is refused", () => {
+    fc.assert(
+      fc.property(
+        evictingRelationArb,
+        freshnessArb,
+        fc.array(eventKeyArb, { minLength: 1, maxLength: 5 }),
+        (relation, cached, keys) => {
+          const written = fresh(relation, { cached, invalidatedOn: keys });
+          const canonical = [...new Set(keys)].toSorted();
+          const read = readClaim(written);
+          return (
+            typeof written.value === "string" &&
+            written.value.endsWith(` invalidated-on ${canonical.join(",")}`) &&
+            Result.isSuccess(read) &&
+            JSON.stringify(read.success.claim.value) ===
+              JSON.stringify({ cached, invalidatedOn: canonical })
+          );
+        },
+      ),
+    );
+    expect(refusedOnWire("is", "per-session invalidated-on authz.revoke,authz.grant")).toBe(true);
+    expect(refusedOnWire("is", "per-session invalidated-on authz.grant,authz.grant")).toBe(true);
+    expect(refusedOnWire("is", "per-session invalidated-on ")).toBe(true);
+    expect(refusedOnWire("is", "per-session invalidated-on Authz.Revoke")).toBe(true);
+    expect(refusedOnWire("at-least", "per-session invalidated-on authz.revoke")).toBe(true);
+    expect(refusedOnWire("not", "per-session invalidated-on authz.revoke")).toBe(true);
+    expect(refusedOnWire("is", "hourly invalidated-on authz.revoke")).toBe(true);
+    expect(refusedOnWire("at-most", "ttl:60 invalidated-on authz.grant,authz.revoke")).toBe(false);
+  });
+
+  it("[freshness.premise-invalidation-refused] a premise in the invalidation form is refused with a next action, and needs a probe against anything", () => {
+    fc.assert(
+      fc.property(
+        evictingRelationArb,
+        invalidatedArb(),
+        latticeRelationArb,
+        freshnessArb,
+        (pr, pv, er, ev) => {
+          const premise = fresh(pr, pv);
+          const read = readClaim(premise, "premise");
+          return (
+            Result.isFailure(read) &&
+            (read.failure.nextActions ?? []).some((a) => a.operationId === "revise") &&
+            Result.isSuccess(readClaim(premise, "effect")) &&
+            compare(premise, fresh(er, ev)).outcome === "needs-probe"
+          );
+        },
+      ),
+    );
+    const refused = readClaim(
+      fresh("is", { cached: "per-session", invalidatedOn: ["authz.revoke"] }),
+      "premise",
+    );
+    expect(Result.isFailure(refused) && refused.failure.reason).toMatch(/effect form/);
   });
 });

@@ -35,7 +35,29 @@ export type Freshness =
   | "static"
   | { readonly ttl: number };
 
+/**
+ * The effect form "cached, invalidated on E": a cache that serves `cached`
+ * staleness, except that each event in `invalidatedOn` evicts it in that
+ * event's own handler, against the same store. A change that arrives by one
+ * of those events is stale at most meet(cached, per-request); any other
+ * change, at most `cached`. Only effects take this form: a premise states
+ * the freshness it relies on.
+ */
+export type Invalidated = {
+  readonly cached: Freshness;
+  /** Dotted event keys, sorted, deduped and never empty. */
+  readonly invalidatedOn: readonly string[];
+};
+export type FreshnessValue = Freshness | Invalidated;
+
+export const isInvalidated = (v: FreshnessValue): v is Invalidated =>
+  typeof v === "object" && "cached" in v;
+
 const isTtl = (v: Freshness): v is { readonly ttl: number } => typeof v === "object";
+
+/** meet(v, per-request): per-request sits below everything except per-call. */
+export const meetPerRequest = (v: Freshness): Freshness =>
+  v === "per-call" ? "per-call" : "per-request";
 
 const freshnessRank = (v: "per-call" | "per-request" | "per-session" | "static"): number =>
   ({ "per-call": 0, "per-request": 1, "per-session": 2, static: 3 })[v];
@@ -116,7 +138,7 @@ const sessionCandidates = (ttls: readonly number[]): readonly number[] => {
 
 const validTtl = (v: Freshness): boolean => !isTtl(v) || (Number.isFinite(v.ttl) && v.ttl >= 0);
 
-export const freshnessDecision = (
+const plainFreshnessDecision = (
   p: { readonly relation: ClaimRelation; readonly value: Freshness },
   e: { readonly relation: ClaimRelation; readonly value: Freshness },
 ): RegionDecision => {
@@ -136,6 +158,50 @@ export const freshnessDecision = (
   );
   const first = decisions[0] ?? "overlap";
   return decisions.every((d) => d === first) ? first : "overlap";
+};
+
+/** Several kinds of change at once: the premise holds only if it holds for every one. */
+const everyChange = (a: RegionDecision, b: RegionDecision): RegionDecision =>
+  a === "disjoint" || b === "disjoint"
+    ? "disjoint"
+    : a === "within" && b === "within"
+      ? "within"
+      : "overlap";
+
+/**
+ * Which events change the subject is unknown, beyond those the effect evicts
+ * on (the extractor saw each one's handler evict). So decide both cases:
+ * every change arrives by an evicting event, or some change does not. Answer
+ * only when the two agree; otherwise only a probe can settle it.
+ */
+const invalidationDecision = (
+  p: { readonly relation: ClaimRelation; readonly value: Freshness },
+  relation: ClaimRelation,
+  e: Invalidated,
+): RegionDecision => {
+  if (e.invalidatedOn.length === 0 || (relation !== "is" && relation !== "at-most"))
+    return "overlap";
+  // A change through an evicting event: the effect's own region, each value met with per-request.
+  const evicted = plainFreshnessDecision(p, { relation, value: meetPerRequest(e.cached) });
+  const cached = plainFreshnessDecision(p, { relation, value: e.cached });
+  // Every change evicts: `evicted`. Some change does not: both kinds happen.
+  return evicted === everyChange(evicted, cached) ? evicted : "overlap";
+};
+
+/**
+ * Decides an effect's freshness against a premise's. A premise in the
+ * invalidation form is not one `readClaim` reads; met here, it needs a probe.
+ */
+export const freshnessDecision = (
+  p: { readonly relation: ClaimRelation; readonly value: FreshnessValue },
+  e: { readonly relation: ClaimRelation; readonly value: FreshnessValue },
+): RegionDecision => {
+  const premise = p.value;
+  if (isInvalidated(premise)) return "overlap";
+  const held = { relation: p.relation, value: premise };
+  return isInvalidated(e.value)
+    ? invalidationDecision(held, e.relation, e.value)
+    : plainFreshnessDecision(held, { relation: e.relation, value: e.value });
 };
 
 // -------------------------------------------------------------- consistency

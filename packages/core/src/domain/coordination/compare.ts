@@ -10,6 +10,7 @@ import {
   discreteLeq,
   finiteOrderDecision,
   freshnessDecision,
+  isInvalidated,
   orderingDecision,
   type RegionDecision,
 } from "./lattice.ts";
@@ -89,6 +90,9 @@ export const compareRead = (premise: ReadProposition, effect: ReadProposition): 
   }
   if (premise.claim.predicate !== effect.claim.predicate)
     return { outcome: "unrelated", reason: "predicates-differ" };
+  // A premise holding the effect-only invalidation form was never read as a premise.
+  if (premise.claim.predicate === "freshness" && isInvalidated(premise.claim.value))
+    return { outcome: "needs-probe", reason: "unreadable" };
   const decision = decideClaims(premise.claim, effect.claim);
   if (decision === "within")
     return { outcome: covers(premise, effect) ? "compatible" : "refines", reason: "lattice" };
@@ -105,7 +109,7 @@ export const compareRead = (premise: ReadProposition, effect: ReadProposition): 
 export const compare = (premise: Proposition, effect: Proposition): Comparison => {
   if (!subjectsRelated(premise.subject, effect.subject))
     return { outcome: "unrelated", reason: "subjects-unrelated" };
-  const p = readClaim(premise);
+  const p = readClaim(premise, "premise");
   const e = readClaim(effect);
   if (Result.isFailure(p) || Result.isFailure(e))
     return { outcome: "needs-probe", reason: "unreadable" };

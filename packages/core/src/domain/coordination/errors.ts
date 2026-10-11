@@ -110,6 +110,8 @@ export class UnreadableProposition extends Schema.TaggedError<UnreadableProposit
     subject: Schema.String,
     predicate: Schema.String,
     reason: Schema.String,
+    /** Set when the form is refused rather than malformed, e.g. a premise relying on an invalidation. */
+    nextActions,
   },
 ) {}
 
