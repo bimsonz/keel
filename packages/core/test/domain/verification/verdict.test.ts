@@ -23,6 +23,7 @@ import {
   flowCaseArb,
   guardedCaseArb,
   policyArb,
+  probeOf,
 } from "../../arbitraries/flow.ts";
 import { fc } from "../../support/fast-check.ts";
 import { SubjectKey } from "../../../src/domain/coordination/index.ts";
@@ -442,7 +443,10 @@ const witnessRunArb = fc
   })
   .map(({ n, policy, picks }) => {
     const steps = Array.from({ length: n }, (_, i) =>
-      specStep(`w${i}`, i === 0 ? { guards: "freshness" } : {}),
+      specStep(
+        `w${i}`,
+        i === 0 ? { guards: { predicate: "freshness", probe: probeOf("w0") } } : {},
+      ),
     );
     const plan = Result.getOrThrow(
       compile(
@@ -516,7 +520,9 @@ describe("verdict: guards take their predicate's policy", () => {
       ),
     );
     expect(mattered).toBeGreaterThan(0);
-    const guard = specStep("guard", { guards: "freshness" });
+    const guard = specStep("guard", {
+      guards: { predicate: "freshness", probe: probeOf("guard") },
+    });
     const seq: FlowPlan["flow"] = {
       _tag: "seq",
       exitOn: "fail",

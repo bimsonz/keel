@@ -44,6 +44,13 @@ export type Read =
   | { readonly _tag: "step"; readonly step: string }
   | { readonly _tag: "fact"; readonly fact: string };
 
+/**
+ * What a guard step guards and runs: a tenet's predicate, and the admitted
+ * probe bundle it runs, by content hash. The verifier fetches that bundle from
+ * the guard store by its hash, never from the candidate's `.keel/guards/`.
+ */
+export type GuardSpec = { readonly predicate: Predicate; readonly probe: ContentHash };
+
 /** One typed step, as the project's flow spec declares it. */
 export type StepSpec = {
   readonly id: string;
@@ -68,8 +75,8 @@ export type StepSpec = {
   /** A tier the project pins, overriding policy. */
   readonly tier?: Tier;
   readonly optional: boolean;
-  /** The step guards a tenet on this predicate (an admitted probe), so its fail takes that predicate's policy. */
-  readonly guards?: Predicate;
+  /** The step guards a tenet (it runs an admitted probe), so its fail takes that predicate's policy. */
+  readonly guards?: GuardSpec;
 };
 
 /** A project's flow, read from `.keel/flow` at the change's base commit. */

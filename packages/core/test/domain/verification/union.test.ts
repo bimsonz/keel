@@ -235,4 +235,36 @@ describe("unionPlans: the plan a batch runs", () => {
     );
     expect(conflicts).toBeGreaterThan(0);
   });
+
+  it("[union.guard-probe-conflict] members whose guard step pins different probes cannot share a run; pinning the same one, the union keeps it", () => {
+    let guarded = 0;
+    fc.assert(
+      fc.property(batchArb, (plans) => {
+        const [p] = plans;
+        const step = p.steps.find((s) => s.guards !== undefined);
+        if (step?.guards === undefined) return true;
+        guarded++;
+        const probe = step.guards.probe;
+        const other = contentHashOf({ other: probe });
+        const repinned = {
+          ...p,
+          steps: p.steps.map((s) =>
+            s.id === step.id && s.guards !== undefined
+              ? { ...s, guards: { ...s.guards, probe: other } }
+              : s,
+          ),
+        };
+        const rival = { ...repinned, planHash: planHashOf(repinned) };
+        const clash = unionPlans([p, rival]);
+        const kept = unionOf(plans).steps.find((s) => s.id === step.id)?.guards?.probe;
+        return (
+          Result.isFailure(clash) &&
+          clash.failure.stepId === step.id &&
+          [...clash.failure.versions].toSorted().join() === [probe, other].toSorted().join() &&
+          kept === probe
+        );
+      }),
+    );
+    expect(guarded).toBeGreaterThan(0);
+  });
 });

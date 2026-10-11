@@ -20,6 +20,7 @@ import {
   type FlowCase,
   flowCaseArb,
   guardedCaseArb,
+  probeOf,
 } from "../../arbitraries/flow.ts";
 import { fc } from "../../support/fast-check.ts";
 
@@ -180,7 +181,10 @@ describe("run-plan: the compiled plan's flow, executed", () => {
   });
 
   it("[run-plan.guard-advised] a seq goes on past an advised or annotated guard's fail, and stops at a blocked one", async () => {
-    const steps = [proofStep("g", { guards: "freshness" }), proofStep("b")];
+    const steps = [
+      proofStep("g", { guards: { predicate: "freshness", probe: probeOf("g") } }),
+      proofStep("b"),
+    ];
     const flow = seq(leaf("g"), leaf("b"));
     for (const policy of ["advise", "annotate"] as const) {
       const r = recording((s, w) => report(s, w, s.id === "g" ? "fail" : "pass"));
@@ -199,7 +203,11 @@ describe("run-plan: the compiled plan's flow, executed", () => {
   });
 
   it("[run-plan.guard-advised] a cascade accepts an advised guard's fail as a pass; a when still reads it as a fail", async () => {
-    const steps = [proofStep("g", { guards: "freshness" }), proofStep("b"), proofStep("c")];
+    const steps = [
+      proofStep("g", { guards: { predicate: "freshness", probe: probeOf("g") } }),
+      proofStep("b"),
+      proofStep("c"),
+    ];
     const cascade: Flow = { _tag: "cascade", accept: ["pass"], items: [leaf("g"), leaf("b")] };
     const accepted = recording((s, w) => report(s, w, s.id === "g" ? "fail" : "pass"));
     await run(guardPlan(steps, cascade, "advise"), accepted.runner);

@@ -476,8 +476,9 @@ export const compile = (
           ? {}
           : {
               guards: {
-                predicate: s.guards,
-                policy: facts.predicatePolicy?.[s.guards] ?? DEFAULT_PREDICATE_POLICY,
+                predicate: s.guards.predicate,
+                policy: facts.predicatePolicy?.[s.guards.predicate] ?? DEFAULT_PREDICATE_POLICY,
+                probe: s.guards.probe,
               },
             }),
       },

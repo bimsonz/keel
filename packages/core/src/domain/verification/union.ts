@@ -80,8 +80,8 @@ const mergeLists = (
  * plans alone. The flow runs every member's flow side by side (`par`); a step
  * two members share is planned once, at the stricter of their choices, and
  * runs at most once per plan run: every branch that names it reads that one
- * result. Steps at different versions, or plans from different compilers,
- * cannot share a run.
+ * result. Steps at different versions, guard steps pinning different probes,
+ * or plans from different compilers, cannot share a run.
  */
 export const unionPlans = (
   plans: readonly [FlowPlan, ...FlowPlan[]],
@@ -95,12 +95,18 @@ export const unionPlans = (
   const compilers = sortedUnion(members.map((m) => m.compiler));
   if (compilers.length > 1) return Result.fail(new UnionVersionConflict({ versions: compilers }));
   const versions = new Map<string, Set<ContentHash>>();
-  for (const m of members)
+  const probes = new Map<string, Set<ContentHash>>();
+  for (const m of members) {
     for (const [id, v] of Object.entries(m.versions))
       versions.set(id, (versions.get(id) ?? new Set()).add(v));
-  for (const [stepId, vs] of [...versions].toSorted(([a], [b]) => byCodePoint(a, b)))
-    if (vs.size > 1)
-      return Result.fail(new UnionVersionConflict({ stepId, versions: sortedUnion([...vs]) }));
+    for (const s of m.steps)
+      if (s.guards !== undefined)
+        probes.set(s.id, (probes.get(s.id) ?? new Set()).add(s.guards.probe));
+  }
+  for (const pinned of [versions, probes])
+    for (const [stepId, vs] of [...pinned].toSorted(([a], [b]) => byCodePoint(a, b)))
+      if (vs.size > 1)
+        return Result.fail(new UnionVersionConflict({ stepId, versions: sortedUnion([...vs]) }));
 
   const steps = new Map<string, PlanStep>();
   for (const m of members)

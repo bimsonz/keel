@@ -44,8 +44,13 @@ export const PlanStep = Schema.Struct({
    * Set when the step is a guard of a tenet on `predicate`: its proof fail
    * takes the project's policy for that predicate, resolved at compile
    * (absent there is `advise`). Only under `block` does it fail the verdict.
+   * `probe` is the admitted probe bundle the step runs, pinned under the plan
+   * hash: the verifier fetches it from the guard store by this hash, never
+   * from the candidate's `.keel/guards/`.
    */
-  guards: Schema.optional(Schema.Struct({ predicate: Predicate, policy: PredicatePolicy })),
+  guards: Schema.optional(
+    Schema.Struct({ predicate: Predicate, policy: PredicatePolicy, probe: ContentHash }),
+  ),
 });
 export type PlanStep = typeof PlanStep.Type;
 

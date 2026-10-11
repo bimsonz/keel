@@ -308,6 +308,9 @@ const conditionReads = (flow: Flow, out = new Set<string>()): Set<string> => {
 };
 
 const guardedPredicates: readonly Predicate[] = ["freshness", "authority", "ordering"];
+
+/** The admitted probe bundle a guard step runs: one per step, so two guards never share one. */
+export const probeOf = (stepId: string) => contentHashOf({ probe: stepId });
 export const policyArb: fc.Arbitrary<PredicatePolicy> = fc.constantFrom(
   "block",
   "advise",
@@ -341,8 +344,10 @@ export const guardedCaseArb = (): fc.Arbitrary<FlowCase> =>
           spec: {
             ...c.spec,
             steps: c.spec.steps.map((s, i) => {
-              const guards = marks[i];
-              return guards === undefined || read.has(s.id) ? s : { ...s, guards };
+              const predicate = marks[i];
+              return predicate === undefined || read.has(s.id)
+                ? s
+                : { ...s, guards: { predicate, probe: probeOf(s.id) } };
             }),
           },
           facts: { ...c.facts, predicatePolicy: policy },

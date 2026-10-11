@@ -28,6 +28,7 @@ import {
   flowCaseArb,
   guardedCaseArb,
   otherCommit,
+  probeOf,
 } from "../../arbitraries/flow.ts";
 import { fc } from "../../support/fast-check.ts";
 
@@ -576,7 +577,41 @@ const perturbations = (plan: FlowPlan): readonly PlanPreimage[] => {
   ];
 };
 
+/** The plan with its first guard step pinning another probe, or undefined when it has none. */
+const repinned = (plan: FlowPlan): PlanPreimage | undefined => {
+  const i = plan.steps.findIndex((s) => s.guards !== undefined);
+  if (i === -1) return undefined;
+  return {
+    ...plan,
+    steps: plan.steps.map((s, j) =>
+      j === i && s.guards !== undefined
+        ? { ...s, guards: { ...s.guards, probe: contentHashOf({ other: s.guards.probe }) } }
+        : s,
+    ),
+  };
+};
+
 describe("flow-compiler/2: what a plan's hash covers", () => {
+  it("[flow.hash-pins-probe] a plan whose guard step pins another probe is another plan", () => {
+    let guarded = 0;
+    fc.assert(
+      fc.property(guardedCaseArb(), (c) => {
+        const plan = ok(c);
+        const other = repinned(plan);
+        if (other === undefined) return true;
+        guarded++;
+        return planHashOf(other) !== plan.planHash;
+      }),
+    );
+    expect(guarded).toBeGreaterThan(0);
+    const plan = ok(
+      single([{ ...suiteStep("g"), guards: { predicate: "freshness", probe: probeOf("g") } }]),
+    );
+    const other = repinned(plan);
+    expect(other?.steps[0]?.guards?.probe).not.toBe(probeOf("g"));
+    expect(other === undefined ? plan.planHash : planHashOf(other)).not.toBe(plan.planHash);
+  });
+
   it("[flow.plan-hash-preimage] a plan rehashes to its own hash, every field that affects execution moves it, and the cost estimate does not", () => {
     let guards = 0;
     fc.assert(
@@ -610,7 +645,7 @@ describe("flow-compiler/2: what a plan's hash covers", () => {
         const plan = ok(c);
         const specs = new Map(c.spec.steps.map((s) => [s.id, s]));
         return plan.steps.every((p) => {
-          const predicate = specs.get(p.id)?.guards;
+          const predicate = specs.get(p.id)?.guards?.predicate;
           if (predicate === undefined) return p.guards === undefined;
           const chosen = c.facts.predicatePolicy?.[predicate];
           if (chosen === undefined) defaulted++;
@@ -621,14 +656,40 @@ describe("flow-compiler/2: what a plan's hash covers", () => {
     );
     expect(defaulted).toBeGreaterThan(0);
     expect(named).toBeGreaterThan(0);
-    const guard = { ...suiteStep("guard"), guards: "freshness" as const };
+    const probe = probeOf("guard");
+    const guard = { ...suiteStep("guard"), guards: { predicate: "freshness" as const, probe } };
     const unset = ok(single([guard]));
-    expect(unset.steps[0]?.guards).toEqual({ predicate: "freshness", policy: "advise" });
+    expect(unset.steps[0]?.guards).toEqual({ predicate: "freshness", policy: "advise", probe });
     const blocked = ok({
       spec: single([guard]).spec,
       facts: { ...single([guard]).facts, predicatePolicy: { freshness: "block" } },
     });
-    expect(blocked.steps[0]?.guards).toEqual({ predicate: "freshness", policy: "block" });
+    expect(blocked.steps[0]?.guards).toEqual({ predicate: "freshness", policy: "block", probe });
     expect(blocked.planHash).not.toBe(unset.planHash);
+  });
+
+  it("[flow.guard-probe-pinned] a guard step runs the probe its own spec pins, never another guard's", () => {
+    let several = 0;
+    fc.assert(
+      fc.property(guardedCaseArb(), (c) => {
+        const plan = ok(c);
+        const specs = new Map(c.spec.steps.map((s) => [s.id, s]));
+        if (plan.steps.filter((p) => p.guards !== undefined).length > 1) several++;
+        return plan.steps.every(
+          (p) => p.guards === undefined || p.guards.probe === specs.get(p.id)?.guards?.probe,
+        );
+      }),
+    );
+    expect(several).toBeGreaterThan(0);
+    const pair = ok(
+      single([
+        { ...suiteStep("g1"), guards: { predicate: "freshness", probe: probeOf("g1") } },
+        { ...suiteStep("g2"), guards: { predicate: "authority", probe: probeOf("g2") } },
+      ]),
+    );
+    expect(pair.steps.map((s) => [s.id, s.guards?.probe])).toEqual([
+      ["g1", probeOf("g1")],
+      ["g2", probeOf("g2")],
+    ]);
   });
 });
