@@ -489,6 +489,27 @@ const invalidated = (batchId: string) =>
     { kind: "candidate", id: CANDIDATE },
     { _tag: "CandidateInvalidated", candidateId: CANDIDATE, batchId, reason: "head-moved" },
   );
+const TRUNK_TO = CommitSha.make("d".repeat(40));
+/** One member's landing: its commit on trunk, its batch's candidate and proof. */
+const landing = (member: string, commitSha: string, candidateId: string, proofId: string) => ({
+  changeId: member,
+  commitSha,
+  candidateId,
+  proofId,
+});
+const advanced = (landings: readonly ReturnType<typeof landing>[]) =>
+  arriving(
+    { kind: "trunk", id: sampleProjectId },
+    {
+      _tag: "TrunkAdvanced",
+      projectId: sampleProjectId,
+      from: BASE,
+      to: TRUNK_TO,
+      groupId: "group-1",
+      landings,
+      height: 1,
+    },
+  );
 
 /** Receives `event` as the Change DO does: recorded, reacted to and the reaction's events appended, in one transaction. */
 const receive = (event: EventEnvelope) =>
@@ -659,6 +680,66 @@ describe("the change's batch, delivered", () => {
           yield* receive(event);
 
         expect(yield* getChange(changeId)).toMatchObject({ state: "integrating", batchId });
+        expect((yield* EventOutbox).log(changeRef)).toHaveLength(before);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+});
+
+describe("the change's trunk, delivered", () => {
+  it.effect(
+    "[b13.reacts] lands the change from its own landing, once, and ignores an advance that does not name it",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* batched;
+        const before = (yield* EventOutbox).log(changeRef).length;
+        const otherCandidate = makeId("cnd", ulid());
+        yield* receive(advanced([landing(otherChange, "1".repeat(40), otherCandidate, "prf-o")]));
+        const untouched = yield* getChange(changeId);
+        const advance = advanced([
+          landing(otherChange, "1".repeat(40), otherCandidate, "prf-o"),
+          landing(changeId, "2".repeat(40), CANDIDATE, "prf-c"),
+        ]);
+        yield* receive(advance);
+        yield* receive(advance);
+        const log = (yield* EventOutbox).log(changeRef);
+
+        expect(untouched.state).toBe("integrating");
+        expect(yield* getChange(changeId)).toMatchObject({ state: "landed" });
+        expect(log.slice(before).map((event) => event.type)).toEqual(["ChangeLanded"]);
+        expect(log.at(-1)).toMatchObject({
+          causation: advance.eventId,
+          project: sampleProjectId,
+          payload: {
+            _tag: "ChangeLanded",
+            changeId,
+            commitSha: "2".repeat(40),
+            trunkSha: TRUNK_TO,
+            candidateId: CANDIDATE,
+            proofId: "prf-c",
+          },
+        });
+        expect(log.at(-1)?.actor).toBeUndefined();
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[b13.reacts] commits nothing and reports a problem when an advance lands a change that is not integrating",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* queued;
+        const before = (yield* EventOutbox).log(changeRef).length;
+        const reaction = yield* receive(
+          advanced([landing(changeId, "2".repeat(40), CANDIDATE, "prf-c")]),
+        );
+
+        expect(reaction?.problem).toBe(
+          "TrunkAdvanced refused with ChangeStateRefused in state queued",
+        );
+        expect((yield* getChange(changeId)).state).toBe("queued");
         expect((yield* EventOutbox).log(changeRef)).toHaveLength(before);
       }).pipe(Effect.provide(layer));
     },

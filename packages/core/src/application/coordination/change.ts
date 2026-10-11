@@ -28,6 +28,7 @@ import {
   BatchFormed,
   CandidateBisected,
   CandidateInvalidated,
+  TrunkAdvanced,
 } from "../../domain/integration/index.ts";
 import {
   type Actor,
@@ -817,6 +818,7 @@ const decodeFailed = Schema.decodeUnknownOption(BatchFailed);
 const decodeBisected = Schema.decodeUnknownOption(CandidateBisected);
 const decodeInvalidated = Schema.decodeUnknownOption(CandidateInvalidated);
 const decodeVerdict = Schema.decodeUnknownOption(VerdictIssued);
+const decodeAdvanced = Schema.decodeUnknownOption(TrunkAdvanced);
 
 /** Every refusal a reaction may meet: none crosses as a defect, which would be redelivered forever. */
 const REACTION_REFUSALS: readonly Tag[] = [
@@ -854,9 +856,10 @@ const bounceFor = (
 };
 
 /**
- * What the change does about an event on its batch, given the change it is.
- * A VerdictIssued on its batch is kept for the BatchFailed that follows it in
- * the same commit (delivered in commit order); every other event maps to the
+ * What the change does about an event on its batch or trunk, given the change
+ * it is. A VerdictIssued on its batch is kept for the BatchFailed that follows
+ * it in the same commit (delivered in commit order); a TrunkAdvanced lands it
+ * from its own landing, never another member's; every other event maps to the
  * machine's command, or to nothing.
  */
 const commandFor = (
@@ -912,6 +915,22 @@ const commandFor = (
             command: { _tag: "Requeue", batchId: invalidated.value.batchId, reason: "invalidated" },
           }
         : undefined;
+    }
+    case "TrunkAdvanced": {
+      const advanced = decodeAdvanced(event.payload);
+      if (Option.isNone(advanced)) return undefined;
+      const landing = advanced.value.landings.find((each) => each.changeId === change.id);
+      return landing === undefined
+        ? undefined
+        : {
+            command: {
+              _tag: "Land",
+              commitSha: landing.commitSha,
+              trunkSha: advanced.value.to,
+              candidateId: landing.candidateId,
+              proofId: landing.proofId,
+            },
+          };
     }
     default:
       return undefined;

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t b13
+# kills: b13.reacts
+# why: a change lands from the advance's first landing, so another member's commit, candidate and proof land it
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index b876f15..93fe5cf 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -919,7 +919,7 @@ const commandFor = (
+     case "TrunkAdvanced": {
+       const advanced = decodeAdvanced(event.payload);
+       if (Option.isNone(advanced)) return undefined;
+-      const landing = advanced.value.landings.find((each) => each.changeId === change.id);
++      const landing = advanced.value.landings[0];
+       return landing === undefined
+         ? undefined
+         : {

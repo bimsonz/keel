@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import { armedAlarms, scheduleAlarm } from "../../src/adapters/driving/do/alarm.ts";
 import type { ChangeDO } from "../../src/adapters/driving/do/change.ts";
 import type { LaneDO } from "../../src/adapters/driving/do/lane.ts";
+import type { TrunkDO } from "../../src/adapters/driving/do/trunk.ts";
 import { ChangeCodecs, decodeExit, exitCodec } from "../../src/rpc/index.ts";
 import {
   type ChangeUnderTest,
@@ -20,6 +21,7 @@ import {
   replayed,
   unrenewed,
 } from "./change-harness.ts";
+import { drainOutbox } from "./helpers.ts";
 import { inertPrecheck } from "./inert-precheck.ts";
 
 /** How long a test waits for something the object does by itself (a flush, an alarm). */
@@ -435,17 +437,17 @@ async function queue(c: ChangeUnderTest) {
 const committedCodec = exitCodec(Schema.Null, Schema.Never);
 
 /**
- * Commits `drafts` on a real Lane DO, as the Lane will: through its own
- * outbox, after subscribing each `scoped` change to `types` on its own ref.
+ * Commits `drafts` on a real Lane or Trunk DO, as a promotion does: through its
+ * own outbox, after subscribing each `scoped` change to `types` on its own ref.
  * The DO's answer arms its flush, so the events leave by its fan-out alone.
  */
-async function laneCommits(
-  lane: DurableObjectStub<LaneDO>,
+async function commitsOn<O extends LaneDO | TrunkDO>(
+  emitter: DurableObjectStub<O>,
   entity: EntityRef,
   drafts: readonly EventDraft[],
   scoped: readonly { readonly changeId: string; readonly types: readonly string[] }[] = [],
 ) {
-  const committed = await runInDurableObject(lane, (instance: LaneDO) =>
+  const committed = await runInDurableObject(emitter, (instance: O) =>
     instance["answer"](
       committedCodec,
       commit({ entity, cause: `test-${ulid()}` }, (tx) => {
@@ -492,7 +494,7 @@ describe("a change moved by its lane's delivered events", () => {
     const otherBatch = makeId("bat", ulid());
     const otherChange = makeId("chg", ulid());
 
-    await laneCommits(
+    await commitsOn(
       lane,
       batch,
       [
@@ -514,7 +516,7 @@ describe("a change moved by its lane's delivered events", () => {
     await vi.waitFor(async () => expect((await c.current()).state).toBe("integrating"), WAIT);
 
     // Another batch, committed before this one fails: it names another change only.
-    await laneCommits(lane, { kind: "batch", id: otherBatch }, [
+    await commitsOn(lane, { kind: "batch", id: otherBatch }, [
       {
         payload: {
           _tag: "BatchFormed",
@@ -540,7 +542,7 @@ describe("a change moved by its lane's delivered events", () => {
       title: "Revise the change onto trunk, then submit it again",
       operationId: "revise",
     };
-    await laneCommits(lane, batch, [
+    await commitsOn(lane, batch, [
       {
         entity: { kind: "verdict", id: verdictId },
         payload: {
@@ -575,6 +577,87 @@ describe("a change moved by its lane's delivered events", () => {
     expect(otherFormed).toBeDefined();
     expect(await received(c, [otherFormed?.dedupeKey ?? ""])).toEqual([]);
     await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);
+  });
+
+  it("[b13.delivered] goes Queued → Integrating → Landed from its own landing in a real Trunk DO's advance", async () => {
+    await using precheck = await inertPrecheck();
+    const c = await changeUnderTest();
+    await queue(c);
+    const lane = env.LANE.get(env.LANE.idFromName(`lane:${sampleProjectId}:test-${ulid()}`));
+    const trunk = env.TRUNK.get(env.TRUNK.idFromName(`trunk:${sampleProjectId}`));
+    const mine: EntityRef = { kind: "change", id: c.changeId };
+    const batchId = makeId("bat", ulid());
+    const otherChange = makeId("chg", ulid());
+    const candidateId = makeId("cnd", ulid());
+
+    await commitsOn(
+      lane,
+      { kind: "batch", id: batchId },
+      [
+        {
+          payload: {
+            _tag: "BatchFormed",
+            batchId,
+            laneId: `lane:${sampleProjectId}:main`,
+            members: [otherChange, c.changeId],
+            base: "b".repeat(40),
+            attempt: 1,
+            chainEpoch: 0,
+          },
+          affected: [mine],
+        },
+      ],
+      [{ changeId: c.changeId, types: BATCH_EVENTS }],
+    );
+    await vi.waitFor(async () => expect((await c.current()).state).toBe("integrating"), WAIT);
+
+    // The group lands the other member first: this change lands from its own landing only.
+    const to = "d".repeat(40);
+    await commitsOn(
+      trunk,
+      { kind: "trunk", id: sampleProjectId },
+      [
+        {
+          payload: {
+            _tag: "TrunkAdvanced",
+            projectId: sampleProjectId,
+            from: "b".repeat(40),
+            to,
+            groupId: `group-${ulid()}`,
+            landings: [
+              {
+                changeId: otherChange,
+                commitSha: "1".repeat(40),
+                candidateId: makeId("cnd", ulid()),
+                proofId: "prf-other",
+              },
+              { changeId: c.changeId, commitSha: "2".repeat(40), candidateId, proofId: "prf-mine" },
+            ],
+            height: 1,
+          },
+          affected: [{ kind: "change", id: otherChange }, mine],
+        },
+      ],
+      [{ changeId: c.changeId, types: ["TrunkAdvanced"] }],
+    );
+    await vi.waitFor(async () => expect((await c.current()).state).toBe("landed"), WAIT);
+    const log = await c.log();
+
+    expect(log.map((event) => event.type).slice(-3)).toEqual([
+      "ChangeQueued",
+      "ChangeBatched",
+      "ChangeLanded",
+    ]);
+    expect(log.at(-1)?.payload).toEqual({
+      _tag: "ChangeLanded",
+      changeId: c.changeId,
+      commitSha: "2".repeat(40),
+      trunkSha: to,
+      candidateId,
+      proofId: "prf-mine",
+    });
+    await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);
+    await Promise.all([drainOutbox(lane), drainOutbox(trunk), drainOutbox(c.stub)]);
   });
 });
 

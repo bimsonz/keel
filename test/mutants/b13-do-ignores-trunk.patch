@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/change.test.ts -t b13.delivered
+# kills: b13.delivered
+# why: the Change DO hands trunk's advance to no reaction, so a delivered TrunkAdvanced never lands it
+diff --git a/apps/keel/src/adapters/driving/do/change.ts b/apps/keel/src/adapters/driving/do/change.ts
+index 72291cb..f4e6441 100644
+--- a/apps/keel/src/adapters/driving/do/change.ts
++++ b/apps/keel/src/adapters/driving/do/change.ts
+@@ -179,7 +179,7 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
+    * worth an alert, and still commits nothing.
+    */
+   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
+-    if (event.type !== "WorkspaceGranted") {
++    if (event.type !== "WorkspaceGranted" && event.type !== "TrunkAdvanced") {
+       const reaction = reactToBatch(this.changeId, event, tx);
+       if (reaction === undefined) return undefined;
+       const { drafts, project, problem } = reaction;
