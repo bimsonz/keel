@@ -24,6 +24,7 @@ import type {
 import type { PackTooLarge } from "./trunk-writer.ts";
 import type { PushRejected } from "../../domain/integration/index.ts";
 import type {
+  AbandonInput,
   Adopted,
   AdoptInput,
   Declared,
@@ -150,6 +151,18 @@ export class Changes extends Context.Service<
       principal: Principal,
       changeId: ChangeId,
     ) => Effect.Effect<Preflight, ChangeNotFound | ChangeInOtherProject>;
+    /**
+     * Withdraws a change under its lease, or as an operator: the change ends
+     * and its workspace is released. Idempotent by Idempotency-Key per change;
+     * the same key with another body is an IdempotencyConflict.
+     */
+    readonly abandon: (
+      principal: Principal,
+      input: AbandonInput,
+    ) => Effect.Effect<
+      Change,
+      ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict
+    >;
     readonly get: (changeId: ChangeId) => Effect.Effect<Change, ChangeNotFound>;
     /**
      * The change once its submission state moves, or as it stands when

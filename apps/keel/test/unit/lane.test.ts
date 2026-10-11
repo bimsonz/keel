@@ -101,6 +101,7 @@ function world(options: WorldOptions = {}) {
       revise: () => Effect.die(new Error("the Lane never revises")),
       rely: () => Effect.die(new Error("the Lane never relies")),
       nearby: () => Effect.die(new Error("the Lane never reads nearby")),
+      abandon: () => Effect.die(new Error("the Lane never abandons")),
       get: (id) =>
         Effect.suspend(() => {
           const found = changes.get(id);

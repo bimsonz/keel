@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import type {
   Change,
   ChangeInOtherProject,
@@ -11,9 +11,10 @@ import type {
   Preflight,
   RevisionMismatch,
   SketchNotFound,
+  WithdrawAuthority,
 } from "../../domain/coordination/index.ts";
 import type { IdempotencyConflict, InboxPage, Principal } from "../../domain/identity/index.ts";
-import type { ChangeId, ProjectId } from "../../domain/kernel/index.ts";
+import { ChangeId, type LeaseId, type ProjectId } from "../../domain/kernel/index.ts";
 import {
   type ChangeListPage,
   type ChangeListRead,
@@ -29,6 +30,7 @@ import type { PushRejected } from "../../domain/integration/index.ts";
 import type { PackTooLarge } from "../ports/index.ts";
 import type { RebasedChange } from "./change.ts";
 import type {
+  AbandonCall,
   Adopted,
   AdoptInput,
   Declared,
@@ -122,6 +124,45 @@ export const nearbyOf: (
   principal,
   changeId,
 ) => Changes.use((changes) => changes.nearby(principal, changeId));
+
+/**
+ * An abandon with no lease from a caller without the operator scope: only the
+ * holder of the change's lease, or an operator, may withdraw it.
+ */
+export class LeaseRequired extends Schema.TaggedError<LeaseRequired>()("LeaseRequired", {
+  changeId: ChangeId,
+}) {}
+
+/**
+ * Who withdraws: the lease when the caller sent one, else an operator when its
+ * token carries the scope. Decided from the scope alone, never from who holds
+ * the change; whether the lease is the change's is the Change DO's to say.
+ */
+const withdrawAuthority = (
+  principal: Principal,
+  lease: LeaseId | undefined,
+): WithdrawAuthority | undefined => {
+  if (lease !== undefined) return { _tag: "Lease", leaseId: lease };
+  return principal.scopes.includes("operator")
+    ? { _tag: "Operator", by: principal.agentId }
+    : undefined;
+};
+
+/** Withdraws a change under its lease, or as an operator. The Change DO checks the lease and the state. */
+export const abandonChange: (
+  principal: Principal,
+  call: AbandonCall,
+) => Effect.Effect<
+  Change,
+  ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict | LeaseRequired,
+  Changes
+> = (principal, call) => {
+  const { lease, ...rest } = call;
+  const authority = withdrawAuthority(principal, lease);
+  return authority === undefined
+    ? Effect.fail(new LeaseRequired({ changeId: call.changeId }))
+    : Changes.use((changes) => changes.abandon(principal, { ...rest, authority }));
+};
 
 /** Where a change's submission stands, waiting up to `waitSeconds` (0–30) for it to move. */
 export const submissionOf: (

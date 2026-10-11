@@ -72,6 +72,7 @@ model Nearby {
 model NearbyEnvelope is AgentEnvelope<Nearby>;
 
 model AbandonRequest {
+  /** Why it is withdrawn, kept on the change's ChangeWithdrawn. */
   reason?: string;
 }
 
@@ -207,14 +208,23 @@ interface Changes {
   @get
   nearby(...ChangePath): NearbyEnvelope | NotFound | StandardErrors;
 
-  /** Withdraw the change. */
+  /**
+   * Withdraw the change and release its workspace: under its lease, or as an operator with no lease (a
+   * parked change, say). A change being integrated, or one that has ended, is 409
+   * `change.state_refused`. A retry with the same key answers the same change.
+   */
   @summary("Abandon a change")
-  @useAuth(AgentWork)
+  @tag("mcp")
+  @operationId("abandon")
+  @useAuth(AgentWork | OperatorScope)
   @route("/{changeId}/abandon")
   @post
   abandon(
     ...ChangePath,
-    ...LeaseHeader,
+
+    /** The lease on the change, from `declare` or `adopt`. Only an operator may leave it out. */
+    @header("keel-lease") lease?: LeaseId,
+
     ...IdempotencyKey,
     @body body: AbandonRequest,
   ): AbandonedEnvelope | NotFound | Conflict | StandardErrors;

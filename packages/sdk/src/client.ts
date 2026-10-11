@@ -1,4 +1,5 @@
 import type {
+  AbandonRequest,
   CreateProjectRequest,
   DeclareRequest,
   EnrolAgentRequest,
@@ -177,6 +178,22 @@ export class KeelClient {
     return this.call(
       "submit",
       { ...submission, "keel-lease": options.lease, "idempotency-key": keyOf(options) },
+      options,
+    );
+  }
+
+  /**
+   * Withdraws a change and releases its workspace: under its lease, or with
+   * no lease when the client holds the operator scope.
+   */
+  abandon(
+    changeId: string,
+    request: AbandonRequest = {},
+    options: Idempotent & { readonly lease?: string } = {},
+  ): Promise<WireOutputs["abandon"]> {
+    return this.call(
+      "abandon",
+      { ...request, changeId, "keel-lease": options.lease, "idempotency-key": keyOf(options) },
       options,
     );
   }

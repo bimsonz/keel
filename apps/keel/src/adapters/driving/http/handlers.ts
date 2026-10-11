@@ -1,4 +1,5 @@
 import {
+  abandonChange,
   createProject,
   adoptChange,
   rebaseChange,
@@ -70,6 +71,9 @@ import { sessionError, sessionInput, sessionOk } from "./sessions.ts";
 import { notImplemented } from "./problems.ts";
 import type { Runner } from "./run.ts";
 import {
+  abandonError,
+  abandonInput,
+  abandonOk,
   adoptError,
   adoptInput,
   adoptOk,
@@ -286,7 +290,20 @@ export function makeHandlers(run: Runner) {
           ),
         );
       },
-      Changes_abandon: notYet,
+      abandon: (caller: Caller, input: Input<"abandon">) => {
+        const decoded = abandonInput(input);
+        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+        return run(
+          caller,
+          principalOf(caller).pipe(
+            Effect.flatMap((principal) => abandonChange(principal, decoded.success)),
+            Effect.match({
+              onSuccess: abandonOk,
+              onFailure: (error) => abandonError(caller, error),
+            }),
+          ),
+        );
+      },
       adopt: (caller: Caller, input: Input<"adopt">) => {
         const decoded = adoptInput(input);
         if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);

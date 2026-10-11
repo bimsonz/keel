@@ -75,6 +75,13 @@ const declared = (harness: ChangesHarness) =>
     return { who, result, commitSha, submit };
   });
 
+/** Another agent of the caller's project, holding only the operator scope. */
+const operatorBeside = (who: Principal): Principal => ({
+  ...who,
+  agentId: Schema.decodeUnknownSync(AgentId)(fresh("agt")),
+  scopes: ["operator"],
+});
+
 /** A declared change whose lease has lapsed, and another agent of its project to adopt it. */
 const lapsedChange = (harness: ChangesHarness) =>
   Effect.gen(function* () {
@@ -445,6 +452,144 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
         const changeId = Schema.decodeUnknownSync(ChangeId)(fresh("chg"));
         const error = yield* Effect.flip(
           changes.adopt(yield* callerOf(harness), { changeId, idempotencyKey: "adopt-nowhere" }),
+        );
+        expect(error).toMatchObject({ _tag: "ChangeNotFound", changeId });
+      }).pipe(Effect.provide(harness.layer));
+    });
+
+    it.live(
+      "[changes.abandon] withdraws a change under its lease: it ends, and its lease is released",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const changes = yield* Changes;
+          const { who, result } = yield* declared(harness);
+          const lease = result.change.lease.id;
+          const withdrawn = yield* changes.abandon(who, {
+            changeId: result.change.id,
+            authority: { _tag: "Lease", leaseId: lease },
+            reason: "A smaller change does it",
+            idempotencyKey: `abandon-${crypto.randomUUID()}`,
+          });
+          expect(withdrawn).toMatchObject({
+            id: result.change.id,
+            agentId: who.agentId,
+            state: "withdrawn",
+            lease: { id: lease, state: "released" },
+          });
+          expect((yield* changes.get(result.change.id)).state).toBe("withdrawn");
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[changes.abandon-operator] withdraws a change as an operator, who holds no lease on it",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const changes = yield* Changes;
+          const { who, result } = yield* declared(harness);
+          const operator = operatorBeside(who);
+          const withdrawn = yield* changes.abandon(operator, {
+            changeId: result.change.id,
+            authority: { _tag: "Operator", by: operator.agentId },
+            idempotencyKey: `abandon-${crypto.randomUUID()}`,
+          });
+          expect(withdrawn).toMatchObject({
+            id: result.change.id,
+            agentId: who.agentId,
+            state: "withdrawn",
+          });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[changes.abandon-stale] refuses a withdraw under another lease as LeaseStale, and the change carries on",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const changes = yield* Changes;
+          const { who, result } = yield* declared(harness);
+          const other = Schema.decodeUnknownSync(LeaseId)(fresh("lse"));
+          const error = yield* Effect.flip(
+            changes.abandon(who, {
+              changeId: result.change.id,
+              authority: { _tag: "Lease", leaseId: other },
+              idempotencyKey: `abandon-${crypto.randomUUID()}`,
+            }),
+          );
+          expect(error).toMatchObject({ _tag: "LeaseStale", leaseId: other });
+          expect((yield* changes.get(result.change.id)).state).toBe("working");
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[changes.abandon-refused] refuses a second withdraw, under a new key, as ChangeStateRefused",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const changes = yield* Changes;
+          const { who, result } = yield* declared(harness);
+          const operator = operatorBeside(who);
+          const withdraw = (idempotencyKey: string) =>
+            changes.abandon(operator, {
+              changeId: result.change.id,
+              authority: { _tag: "Operator", by: operator.agentId },
+              idempotencyKey,
+            });
+          yield* withdraw(`abandon-${crypto.randomUUID()}`);
+          const error = yield* Effect.flip(withdraw(`abandon-${crypto.randomUUID()}`));
+          expect(error).toMatchObject({
+            _tag: "ChangeStateRefused",
+            changeId: result.change.id,
+            state: "withdrawn",
+            command: "Withdraw",
+          });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[changes.abandon-replay] answers a retried withdraw with the same change, and the key with another reason as IdempotencyConflict",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const changes = yield* Changes;
+          const { who, result } = yield* declared(harness);
+          const input = {
+            changeId: result.change.id,
+            authority: { _tag: "Lease" as const, leaseId: result.change.lease.id },
+            reason: "A smaller change does it",
+            idempotencyKey: `abandon-${crypto.randomUUID()}`,
+          };
+          const first = yield* changes.abandon(who, input);
+          const again = yield* changes.abandon(who, input);
+          expect(again).toEqual(first);
+          const error = yield* Effect.flip(
+            changes.abandon(who, { ...input, reason: "Another reason entirely" }),
+          );
+          expect(error).toMatchObject({
+            _tag: "IdempotencyConflict",
+            idempotencyKey: input.idempotencyKey,
+          });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live("refuses an abandon of an unknown change as ChangeNotFound", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const changes = yield* Changes;
+        const changeId = Schema.decodeUnknownSync(ChangeId)(fresh("chg"));
+        const operator = operatorBeside(principal());
+        const error = yield* Effect.flip(
+          changes.abandon(operator, {
+            changeId,
+            authority: { _tag: "Operator", by: operator.agentId },
+            idempotencyKey: "abandon-nowhere",
+          }),
         );
         expect(error).toMatchObject({ _tag: "ChangeNotFound", changeId });
       }).pipe(Effect.provide(harness.layer));

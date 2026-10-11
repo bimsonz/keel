@@ -23,6 +23,11 @@ export const ROUTES = {
   inbox: { method: "GET", path: "/inbox", query: ["cursor", "wait"] },
   Inbox_listEvents: { method: "GET", path: "/events", query: ["cursor", "wait", "limit"] },
   Views_getTrunk: { method: "GET", path: "/projects/{projectId}/trunk" },
+  abandon: {
+    method: "POST",
+    path: "/changes/{changeId}/abandon",
+    headers: ["idempotency-key", "keel-lease"],
+  },
   Operator_createProject: { method: "POST", path: "/projects", headers: ["idempotency-key"] },
   Operator_getSettings: { method: "GET", path: "/projects/{projectId}/settings" },
   Operator_putSettings: { method: "PUT", path: "/projects/{projectId}/settings" },

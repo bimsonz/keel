@@ -227,6 +227,11 @@ export const ChangeCodecs = {
       IdempotencyConflict,
     ]),
   ),
+  // Nor does abandon.
+  abandon: exitCodec(
+    Change,
+    Schema.Union([ChangeNotFound, LeaseStale, ChangeStateRefused, IdempotencyConflict]),
+  ),
   // PushRejected: the workspace stayed busy or kept moving; PackTooLarge: trunk's new history is over the relay cap.
   rebase: exitCodec(
     Schema.Struct({
@@ -243,7 +248,6 @@ export const ChangeCodecs = {
       PackTooLarge,
     ]),
   ),
-  abandon: exitCodec(Change, Mutation),
   // LeaseNotLapsed: adoption needs a Lapsed lease. `grant` re-mints the held workspace's token.
   adopt: exitCodec(
     Schema.Struct({ change: Change, grant: Schema.optional(WorkspaceGrant) }),

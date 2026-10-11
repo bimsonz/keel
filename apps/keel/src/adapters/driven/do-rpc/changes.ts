@@ -2,6 +2,7 @@ import type { AgentId, ChangeId } from "@keeltown/core/kernel";
 import { Changes, PackTooLarge } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 import {
+  AbandonCommand,
   AdoptCommand,
   NearbyCommand,
   RebaseCommand,
@@ -28,6 +29,7 @@ export interface ChangeStub {
   submit(command: typeof SubmitCommand.Encoded): Promise<unknown>;
   adopt(command: typeof AdoptCommand.Encoded): Promise<unknown>;
   rebase(command: typeof RebaseCommand.Encoded): Promise<unknown>;
+  abandon(command: typeof AbandonCommand.Encoded): Promise<unknown>;
   get(): Promise<unknown>;
   submission(waitMs: number): Promise<unknown>;
   workspace(): Promise<unknown>;
@@ -55,6 +57,7 @@ const encodeRebase = Schema.encodeSync(RebaseCommand);
 const encodeRevise = Schema.encodeSync(ReviseCommand);
 const encodeRely = Schema.encodeSync(RelyCommand);
 const encodeNearby = Schema.encodeSync(NearbyCommand);
+const encodeAbandon = Schema.encodeSync(AbandonCommand);
 
 /**
  * `Changes` over Durable Object RPC. A declare first asks the agent's
@@ -177,6 +180,17 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
       nearby: (principal, changeId) =>
         callObject(ChangeCodecs.nearby, () =>
           objects.change(changeId).nearby(encodeNearby({ projectId: principal.projectId })),
+        ),
+      abandon: (principal, input) =>
+        callObject(ChangeCodecs.abandon, () =>
+          objects.change(input.changeId).abandon(
+            encodeAbandon({
+              agentId: principal.agentId,
+              authority: input.authority,
+              ...(input.reason === undefined ? {} : { reason: input.reason }),
+              idempotencyKey: input.idempotencyKey,
+            }),
+          ),
         ),
       get: (changeId) => callObject(ChangeCodecs.get, () => objects.change(changeId).get()),
       workspace: (changeId) =>

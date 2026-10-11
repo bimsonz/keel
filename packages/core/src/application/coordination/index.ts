@@ -5,6 +5,7 @@ import type {
   PoolExhausted,
   Preflight,
   Proposition,
+  WithdrawAuthority,
 } from "../../domain/coordination/index.ts";
 import type { Principal } from "../../domain/identity/index.ts";
 import type { ChangeId, CommitSha, Instant, LeaseId, SketchId } from "../../domain/kernel/index.ts";
@@ -41,6 +42,25 @@ export interface AdoptInput {
 export interface Adopted {
   readonly change: Change;
   readonly workspace?: WorkspaceGrant;
+}
+
+/**
+ * Withdraw a change: under its lease, or as an operator. The Change DO
+ * authorises the lease; the doorway has decided the authority from the scope.
+ */
+export interface AbandonInput {
+  readonly changeId: ChangeId;
+  readonly authority: WithdrawAuthority;
+  readonly reason?: string;
+  readonly idempotencyKey: string;
+}
+
+/** An abandon as a doorway hands it over: the `Keel-Lease` value when the caller sent one. */
+export interface AbandonCall {
+  readonly changeId: ChangeId;
+  readonly lease?: LeaseId;
+  readonly reason?: string;
+  readonly idempotencyKey: string;
 }
 
 /** Writes made on a change: the caller holds its lease. */

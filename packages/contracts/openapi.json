@@ -1262,15 +1262,21 @@
     },
     "/changes/{changeId}/abandon": {
       "post": {
-        "operationId": "Changes_abandon",
+        "operationId": "abandon",
         "summary": "Abandon a change",
-        "description": "Withdraw the change.",
+        "description": "Withdraw the change and release its workspace: under its lease, or as an operator with no lease (a\nparked change, say). A change being integrated, or one that has ended, is 409\n`change.state_refused`. A retry with the same key answers the same change.",
         "parameters": [
           {
             "$ref": "#/components/parameters/ChangePath"
           },
           {
-            "$ref": "#/components/parameters/LeaseHeader"
+            "name": "keel-lease",
+            "in": "header",
+            "required": false,
+            "description": "The lease on the change, from `declare` or `adopt`. Only an operator may leave it out.",
+            "schema": {
+              "$ref": "#/components/schemas/LeaseId"
+            }
           },
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -1387,7 +1393,8 @@
           }
         },
         "tags": [
-          "Changes"
+          "Changes",
+          "mcp"
         ],
         "requestBody": {
           "required": true,
@@ -1403,6 +1410,11 @@
           {
             "OAuth2Auth": [
               "agent:work"
+            ]
+          },
+          {
+            "OAuth2Auth": [
+              "operator"
             ]
           }
         ]
@@ -6218,7 +6230,8 @@
         "type": "object",
         "properties": {
           "reason": {
-            "type": "string"
+            "type": "string",
+            "description": "Why it is withdrawn, kept on the change's ChangeWithdrawn."
           }
         },
         "additionalProperties": {

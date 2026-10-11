@@ -227,7 +227,9 @@ function makeWaiters<K>() {
  * change that is `working` (the DO commits ChangeStarted with the declaration),
  * with an active lease and a workspace, idempotent by (agent, Idempotency-Key).
  * `submit` checks the lease and the state, as the Change DO does, and accepts
- * only a commit `push`ed to the change's workspace. `awaitSubmission` waits
+ * only a commit `push`ed to the change's workspace. `abandon` withdraws it
+ * under its lease or as an operator, refused once it has ended or while it
+ * is integrating, as the Change machine refuses it. `awaitSubmission` waits
  * for `settle` (or a submit) to move the change, up to its deadline.
  * `capacity` bounds the workspaces it will grant.
  */
@@ -294,6 +296,8 @@ export function makeChangesMemory(
       amendments.set(key, { body: JSON.stringify(body), answer });
       return answer;
     });
+  /** An abandon replays by its key per change; the same key with another body is a conflict. */
+  const withdrawals = new Map<string, string>();
   let sequence = 0;
   let tokens = 0;
   const grant = (changeId: ChangeId, now: Instant): WorkspaceGrant => {
@@ -478,6 +482,43 @@ export function makeChangesMemory(
             adoptions.set(`${changeId} ${idempotencyKey}`, { caller, change: unparked });
             waiters.wake(changeId);
             return { change: unparked, ...regrant() };
+          }),
+        abandon: (principal, input) =>
+          Effect.gen(function* () {
+            const now = Instant(yield* EffectClock.currentTimeMillis);
+            const { changeId, authority, reason, idempotencyKey } = input;
+            const body = JSON.stringify({ agentId: principal.agentId, authority, reason });
+            const replayed = withdrawals.get(`${changeId} ${idempotencyKey}`);
+            if (replayed !== undefined && replayed !== body)
+              return yield* new IdempotencyConflict({ idempotencyKey });
+            const change = changes.get(changeId);
+            if (change === undefined) return yield* new ChangeNotFound({ changeId });
+            if (replayed !== undefined) return change;
+            const refused = new ChangeStateRefused({
+              changeId,
+              state: change.state,
+              command: "Withdraw",
+            });
+            if (TERMINAL.has(change.state)) return yield* refused;
+            if (
+              authority._tag === "Lease" &&
+              (change.lease.id !== authority.leaseId ||
+                change.lease.state !== "active" ||
+                lapsed.has(changeId) ||
+                isLapsed(change.lease, now))
+            )
+              return yield* new LeaseStale({ changeId, leaseId: authority.leaseId });
+            if (change.state === "integrating") return yield* refused;
+            const { parkReason: _parked, ...ended } = change;
+            const withdrawn: Change = {
+              ...ended,
+              state: "withdrawn",
+              lease: { ...change.lease, state: "released" },
+            };
+            changes.set(changeId, withdrawn);
+            withdrawals.set(`${changeId} ${idempotencyKey}`, body);
+            waiters.wake(changeId);
+            return withdrawn;
           }),
         workspace: (changeId) =>
           Effect.gen(function* () {

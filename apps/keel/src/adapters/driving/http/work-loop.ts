@@ -1,8 +1,10 @@
 import type {
+  AbandonCall,
   Adopted,
   AdoptInput,
   Declared,
   DeclareInput,
+  LeaseRequired,
   RebasedChange,
   RebaseInput,
   RelyInput,
@@ -41,6 +43,7 @@ import {
 import type { PackTooLarge, Remedy, SubmissionStatus } from "@keeltown/core/ports";
 import { Result, Schema, SchemaIssue } from "effect";
 import type {
+  AbandonResult,
   AdoptResult,
   DeclareResult,
   InboxResult,
@@ -57,7 +60,7 @@ import type { Caller } from "./caller.ts";
 import { type NextAction, problem, type ProblemBody } from "./problems.ts";
 
 /**
- * Pure mappers for the work loop: declare, submit, status and inbox. Wire
+ * Pure mappers for the work loop: declare, submit, adopt, abandon, status and inbox. Wire
  * input is decoded into domain types here (a value the domain refuses is a 400
  * naming the field); domain results and every error tag map to the generated
  * result unions, exhaustively.
@@ -406,28 +409,9 @@ export function submitError(
     case "ChangeNotFound":
       return changeNotFound(caller, error);
     case "LeaseStale":
-      return {
-        status: 409,
-        body: problem(409, "change.lease_stale", caller.requestId, {
-          detail: `Lease ${error.leaseId} is not the active lease on ${error.changeId}.`,
-          nextActions: [
-            {
-              kind: "read",
-              title: "Read the change to see who holds its lease now",
-              operationId: "Changes_getChange",
-              args: { changeId: error.changeId },
-            },
-          ],
-        }),
-      };
+      return leaseStale(caller, error);
     case "ChangeStateRefused":
-      return {
-        status: 409,
-        body: problem(409, "change.state_refused", caller.requestId, {
-          detail: `${error.changeId} is ${error.state}, where ${error.command} is not allowed.`,
-          nextActions: [statusOf(error.changeId)],
-        }),
-      };
+      return stateRefused(caller, error);
     case "CommitNotInWorkspace":
       return {
         status: 409,
@@ -835,13 +819,7 @@ export function adoptError(
     case "ChangeNotFound":
       return changeNotFound(caller, error);
     case "ChangeStateRefused":
-      return {
-        status: 409,
-        body: problem(409, "change.state_refused", caller.requestId, {
-          detail: `${error.changeId} is ${error.state}, where ${error.command} is not allowed.`,
-          nextActions: [statusOf(error.changeId)],
-        }),
-      };
+      return stateRefused(caller, error);
     case "LeaseNotLapsed":
       return {
         status: 409,
@@ -904,6 +882,76 @@ function nextFor(change: Change, remedy: Remedy | undefined): NextAction[] {
       return [];
     default:
       return [statusOf(change.id)];
+  }
+}
+
+const AbandonFields = Schema.Struct({ changeId: ChangeId, lease: Schema.optionalKey(LeaseId) });
+
+export function abandonInput(input: Input<"abandon">): Result.Result<AbandonCall, Issues> {
+  const lease = input["keel-lease"];
+  return Result.map(
+    decodeWith(AbandonFields, {
+      changeId: input.changeId,
+      ...(lease === undefined ? {} : { lease }),
+    }),
+    (fields) => ({
+      ...fields,
+      ...(input.reason === undefined ? {} : { reason: input.reason }),
+      idempotencyKey: input["idempotency-key"],
+    }),
+  );
+}
+
+export function abandonOk(change: Change): AbandonResult {
+  return {
+    status: 200,
+    body: envelope(`Withdrew ${change.id}; its workspace is released.`, {
+      change: changeView(change),
+    }),
+  };
+}
+
+export function abandonError(
+  caller: Caller,
+  error: ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict | LeaseRequired,
+): AbandonResult {
+  switch (error._tag) {
+    case "ChangeNotFound":
+      return changeNotFound(caller, error);
+    case "LeaseStale":
+      return leaseStale(caller, error);
+    case "ChangeStateRefused":
+      return stateRefused(caller, error);
+    case "IdempotencyConflict":
+      return {
+        status: 409,
+        body: problem(409, "request.idempotency_conflict", caller.requestId, {
+          detail: `Idempotency-Key ${error.idempotencyKey} was used for a different request.`,
+          nextActions: [
+            { kind: "call", title: "Abandon with a fresh Idempotency-Key", operationId: "abandon" },
+          ],
+        }),
+      };
+    case "LeaseRequired":
+      return {
+        status: 400,
+        body: problem(400, "request.invalid", caller.requestId, {
+          detail: `Only the holder of ${error.changeId}'s lease, or an operator, may abandon it.`,
+          nextActions: [
+            {
+              kind: "call",
+              title:
+                "Abandon again with the keel-lease header: the lease declare or adopt answered",
+              operationId: "abandon",
+              args: { changeId: error.changeId },
+            },
+          ],
+        }),
+      };
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
   }
 }
 

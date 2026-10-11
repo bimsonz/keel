@@ -24,6 +24,7 @@ const USAGE = `keeltown <command> [options]
   declare --goal <text> [--footprint <path[:edit|create|delete]>]... [--key <idempotency-key>]
   submit --change <chg_…> --commit <sha> --lease <lse_…> [--key <idempotency-key>]
   status <chg_…> [--wait <0-30>]
+  abandon <chg_…> [--reason <text>] [--lease <lse_…>] [--key <idempotency-key>]
   inbox [--cursor <cursor>] [--wait <0-30>]
   events [--cursor <cursor>] [--wait <0-30>] [--limit <1-500>]
   project create --name <name> --source <repo> [--key <idempotency-key>]
@@ -41,6 +42,7 @@ const OPTIONS = {
   change: { type: "string" },
   commit: { type: "string" },
   lease: { type: "string" },
+  reason: { type: "string" },
   wait: { type: "string" },
   cursor: { type: "string" },
   limit: { type: "string" },
@@ -145,6 +147,13 @@ async function dispatch(
     default:
       if (command[0] === "status" && command.length === 2)
         return client.status(required(command[1], "change"), waiting);
+      // No --lease is an operator's withdrawal; Keel refuses it to anyone else.
+      if (command[0] === "abandon" && command.length === 2)
+        return client.abandon(
+          required(command[1], "change"),
+          values.reason === undefined ? {} : { reason: values.reason },
+          { ...(values.lease === undefined ? {} : { lease: values.lease }), ...idempotent },
+        );
       throw new UsageError(`unknown command: ${command.join(" ") || "(none)"}`);
   }
 }

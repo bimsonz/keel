@@ -53,7 +53,6 @@ describe("mappers", () => {
 /** The operations still answering 503 service.not_implemented. Shrinks, visibly, as lanes land each one. */
 const STUBBED = [
   "Changes_getChange",
-  "Changes_abandon",
   "sketch",
   "Workspaces_refreshWorkspaceToken",
   "Workspaces_releaseWorkspace",

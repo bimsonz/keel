@@ -131,6 +131,62 @@ describe("keeltown", () => {
     expect(keel.err.join("\n")).toContain("next: Adopt the change [adopt]");
   });
 
+  it("[cli.abandon] withdraws under the lease given, with the reason and key; without a lease, prints Keel's refusal and exits 1", async () => {
+    const refusal = {
+      type: "urn:keel:problem:request.invalid",
+      title: "invalid",
+      status: 400,
+      code: "request.invalid",
+      detail: "Only the holder of chg_1's lease, or an operator, may abandon it.",
+      requestId: "req-7",
+      nextActions: [
+        { kind: "call", title: "Abandon again with the keel-lease header", operationId: "abandon" },
+      ],
+    };
+    const keel = fakeKeel((_url, init) =>
+      new Headers(init.headers).has("keel-lease")
+        ? Response.json({ ...envelope, summary: "Withdrew chg_1; its workspace is released." })
+        : new Response(JSON.stringify(refusal), {
+            status: 400,
+            headers: { "content-type": "application/problem+json" },
+          }),
+    );
+    const withdrawn = await run(
+      [
+        "abandon",
+        "chg_1",
+        "--reason",
+        "A smaller change does it",
+        "--lease",
+        "lse_1",
+        "--key",
+        "key-0005",
+      ],
+      keel.io,
+    );
+    const refused = await run(["abandon", "chg_1"], keel.io);
+    const [abandon] = keel.requests;
+    const headers = new Headers(abandon?.init.headers);
+    const body = abandon?.init.body;
+
+    expect(withdrawn).toBe(0);
+    expect(abandon?.url).toBe("https://keel.test/v1/changes/chg_1/abandon");
+    expect(abandon?.init.method).toBe("POST");
+    expect(headers.get("keel-lease")).toBe("lse_1");
+    expect(headers.get("idempotency-key")).toBe("key-0005");
+    expect(JSON.parse(typeof body === "string" ? body : "null")).toEqual({
+      reason: "A smaller change does it",
+    });
+    expect(keel.out).toEqual(["Withdrew chg_1; its workspace is released."]);
+    expect(refused).toBe(1);
+    expect(keel.err.join("\n")).toContain("request.invalid");
+    expect(keel.err.join("\n")).toContain(
+      "next: Abandon again with the keel-lease header [abandon]",
+    );
+    expect(await run(["abandon"], keel.io)).toBe(2);
+    expect(keel.requests).toHaveLength(2);
+  });
+
   it("refuses a command line it cannot read with usage and exit 2, before calling Keel", async () => {
     const keel = fakeKeel(() => Response.json(envelope));
     expect(await run(["submit", "--change", "chg_1"], keel.io)).toBe(2);
