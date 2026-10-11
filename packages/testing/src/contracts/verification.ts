@@ -1,6 +1,13 @@
 import { describe, expect, it } from "@effect/vitest";
 import { L1_SUITE_PLAN } from "@keeltown/core/application/verification";
-import { canBlock, ContentHash, contentHashOf, makeId, weakest } from "@keeltown/core/kernel";
+import {
+  canBlock,
+  CommitSha,
+  ContentHash,
+  contentHashOf,
+  makeId,
+  weakest,
+} from "@keeltown/core/kernel";
 import type { PlanStep, VerificationJob } from "@keeltown/core/domain/verification";
 import {
   type BatchVerdict,
@@ -8,7 +15,9 @@ import {
   BundleStore,
   ChangePrecheck,
   EvidenceStore,
+  FlowSpecSource,
   type PrecheckWorkspace,
+  type RepoRef,
   VerifierRuntime,
 } from "@keeltown/core/ports";
 import { Effect, type Layer, Schema } from "effect";
@@ -305,5 +314,67 @@ export function describeChangePrecheckContract(
         }).pipe(Effect.provide(h.layer));
       },
     );
+  });
+}
+
+/** Paths in code-unit order, as git sorts them. */
+const sorted = (paths: readonly string[]) =>
+  [...paths].toSorted((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+
+/** A FlowSpecSource and a way to make a commit holding given files in a repo it reads. */
+export interface FlowSpecSourceHarness {
+  readonly layer: Layer.Layer<FlowSpecSource>;
+  readonly commit: (
+    files: Readonly<Record<string, string>>,
+  ) => Effect.Effect<{ readonly repo: RepoRef; readonly base: CommitSha }>;
+}
+
+export function describeFlowSpecSourceContract(adapter: string, make: () => FlowSpecSourceHarness) {
+  describe(`FlowSpecSource contract: ${adapter}`, () => {
+    it.effect("answers the root's paths, and .keel/flow.json and package.json as text", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const flow = JSON.stringify({
+          flow: { _tag: "step", step: "js-ts.suite" },
+          nonce: random(8),
+        });
+        const { repo, base } = yield* harness.commit({
+          "package.json": '{"name":"x"}',
+          ".keel/flow.json": flow,
+          "src/a.ts": "export const a = 1;\n",
+          "README.md": "# x\n",
+        });
+        const sources = yield* (yield* FlowSpecSource).read(repo, base);
+        expect(sorted(sources.rootPaths)).toEqual([".keel", "README.md", "package.json", "src"]);
+        expect(sources.flowJson).toBe(flow);
+        expect(sources.packageJson).toBe('{"name":"x"}');
+      }).pipe(Effect.provide(harness.layer));
+    });
+    it.effect(
+      "reads only the root's package.json and only .keel/flow.json, and leaves out what is missing",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const { repo, base } = yield* harness.commit({
+            "pkg/package.json": "{}",
+            ".keel/flow.yaml": "flow: {}",
+            "nested/.keel/flow.json": "{}",
+          });
+          const sources = yield* (yield* FlowSpecSource).read(repo, base);
+          expect(sorted(sources.rootPaths)).toEqual([".keel", "nested", "pkg"]);
+          expect(sources.flowJson).toBeUndefined();
+          expect(sources.packageJson).toBeUndefined();
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+    it.effect("fails ObjectNotFound for a commit the repo does not hold", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const { repo } = yield* harness.commit({ "a.txt": "a" });
+        const missing = CommitSha.make("f".repeat(40));
+        const error = yield* Effect.flip((yield* FlowSpecSource).read(repo, missing));
+        expect(error._tag).toBe("ObjectNotFound");
+      }).pipe(Effect.provide(harness.layer));
+    });
   });
 }

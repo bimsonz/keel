@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/flow-spec.test.ts
+# kills: flow-spec.parses
+# why: The project's own steps are dropped, so its flow names steps that do not exist
+diff --git a/packages/core/src/application/verification/flow-spec.ts b/packages/core/src/application/verification/flow-spec.ts
+index a95131c..16e9bce 100644
+--- a/packages/core/src/application/verification/flow-spec.ts
++++ b/packages/core/src/application/verification/flow-spec.ts
+@@ -63,7 +63,7 @@ export const parseFlow = (
+   return Result.succeed({
+     commit,
+     flow: decoded.success.flow,
+-    steps: (decoded.success.steps ?? []).map((s, i) => filled(s, written[i] ?? null)),
++    steps: [],
+   });
+ };
+ 

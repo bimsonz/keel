@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/packs.test.ts
+# kills: packs.worker-app-by-config
+# why: A wrangler config does not make a worker app
+diff --git a/packages/core/src/application/verification/packs.ts b/packages/core/src/application/verification/packs.ts
+index e36a39c..618e0e8 100644
+--- a/packages/core/src/application/verification/packs.ts
++++ b/packages/core/src/application/verification/packs.ts
+@@ -103,7 +103,7 @@ export const detectPack = (
+   rootPaths: readonly string[],
+   packageJson: string | undefined,
+ ): VerifierPack => {
+-  const config = WRANGLER_CONFIGS.find((name) => rootPaths.includes(name));
++  const config = WRANGLER_CONFIGS.find(() => false);
+   if (config !== undefined)
+     return { name: "worker-app", reason: `worker-app: ${config}`, defaults: WORKER_APP_PACK };
+   if (packageJson === undefined)

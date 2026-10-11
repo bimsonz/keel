@@ -14,9 +14,7 @@ import {
 } from "@keeltown/core/domain/coordination";
 import { CandidateNotFound, ResultFenced } from "@keeltown/core/domain/integration";
 import {
-  FlowSpecInvalid,
   ModelAbstained,
-  type FlowSpec,
   type StepResult,
   type VerificationJob,
 } from "@keeltown/core/domain/verification";
@@ -33,6 +31,7 @@ import {
   GuardRepo,
   type GuardFile,
   HumanGate,
+  ObjectNotFound,
   type PlatformFunctionCall,
   PlatformFunction,
   type PrecheckCall,
@@ -41,6 +40,7 @@ import {
   VerifierRuntime,
 } from "@keeltown/core/ports";
 import { Effect, Layer, Result, Schema } from "effect";
+import type { FlowSpecSourceHarness } from "../contracts/verification.ts";
 import { makeEventOutboxMemory } from "./event-outbox.ts";
 import { makeClockMemory } from "./identity.ts";
 
@@ -122,19 +122,40 @@ export function makeVerifierRuntimeMemory(
   };
 }
 
-export function makeFlowSpecSourceMemory(specs: ReadonlyMap<string, FlowSpec> = new Map()) {
+/**
+ * FlowSpecSource over commits held in memory: `commit` files a set of paths
+ * under a fresh repo and commit id, and `read` answers them as the CodeHost
+ * adapter would read them from a tree.
+ */
+export function makeFlowSpecSourceMemory(): FlowSpecSourceHarness {
+  const commits = new Map<string, Readonly<Record<string, string>>>();
+  let n = 0;
   return {
     layer: Layer.succeed(
       FlowSpecSource,
       FlowSpecSource.of({
-        read: (projectId, base) => {
-          const spec = specs.get(`${projectId}@${base}`);
-          return spec === undefined
-            ? Effect.fail(new FlowSpecInvalid({ reason: "no flow spec at the base commit" }))
-            : Effect.succeed(spec);
+        read: (repo, base) => {
+          const files = commits.get(`${repo.namespace}/${repo.name}@${base}`);
+          if (files === undefined) return Effect.fail(new ObjectNotFound({ repo, oid: base }));
+          const paths = Object.keys(files);
+          return Effect.succeed({
+            rootPaths: [...new Set(paths.map((p) => p.split("/")[0] ?? p))],
+            ...(files[".keel/flow.json"] === undefined
+              ? {}
+              : { flowJson: files[".keel/flow.json"] }),
+            ...(files["package.json"] === undefined ? {} : { packageJson: files["package.json"] }),
+          });
         },
       }),
     ),
+    commit: (files) =>
+      Effect.sync(() => {
+        n += 1;
+        const repo = { namespace: "memory", name: `flow-${n}` };
+        const base = CommitSha.make(n.toString(16).padStart(40, "0"));
+        commits.set(`${repo.namespace}/${repo.name}@${base}`, files);
+        return { repo, base };
+      }),
   };
 }
 

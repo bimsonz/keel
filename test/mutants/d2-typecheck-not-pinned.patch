@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/packs.test.ts
+# kills: packs.worker-app-compiles
+# why: The typecheck is not pinned to Tier 2, so policy sends a compiled toolchain to an isolate
+diff --git a/packages/core/src/application/verification/packs.ts b/packages/core/src/application/verification/packs.ts
+index e36a39c..e877165 100644
+--- a/packages/core/src/application/verification/packs.ts
++++ b/packages/core/src/application/verification/packs.ts
+@@ -52,7 +52,6 @@ export const WORKER_APP_TYPECHECK: StepSpec = {
+   budget: { usd: 0.01, cpuMs: 300_000, tokens: 0 },
+   determinism: "deterministic",
+   suite: false,
+-  tier: 2,
+   optional: false,
+ };
+ 

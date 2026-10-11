@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/flow-spec.test.ts
+# kills: flow-spec.defaults
+# why: A step written without a version gets one hash for every step, so two different steps claim the same version
+diff --git a/packages/core/src/application/verification/flow-spec.ts b/packages/core/src/application/verification/flow-spec.ts
+index a95131c..1720605 100644
+--- a/packages/core/src/application/verification/flow-spec.ts
++++ b/packages/core/src/application/verification/flow-spec.ts
+@@ -20,7 +20,7 @@ const FlowFile = Schema.Struct({
+ /** A step as written, with its version (the hash of the step as written, unless given) and empty lists filled in. */
+ const filled = (written: StepFileJson, source: Json): StepSpec => ({
+   ...written,
+-  version: written.version ?? contentHashOf(source),
++  version: written.version ?? contentHashOf(null),
+   appliesTo: written.appliesTo ?? { paths: [], subjects: [] },
+   reads: written.reads ?? [],
+   mayskip: written.mayskip ?? [],

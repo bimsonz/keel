@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/flow-spec.test.ts
+# kills: flow-setup.invalid
+# why: A malformed flow is quietly replaced by the pack's defaults
+diff --git a/packages/core/src/application/verification/flow-spec.ts b/packages/core/src/application/verification/flow-spec.ts
+index a95131c..3ab7fc1 100644
+--- a/packages/core/src/application/verification/flow-spec.ts
++++ b/packages/core/src/application/verification/flow-spec.ts
+@@ -80,5 +80,5 @@ export const flowSetup = (
+ ): Result.Result<FlowSetup, FlowSpecInvalid> => {
+   const pack = detectPack(sources.rootPaths, sources.packageJson);
+   if (sources.flowJson === undefined) return Result.succeed({ definition: undefined, pack });
+-  return Result.map(parseFlow(sources.flowJson, base), (definition) => ({ definition, pack }));
++  return Result.succeed({ definition: Result.getOrUndefined(parseFlow(sources.flowJson, base)), pack });
+ };

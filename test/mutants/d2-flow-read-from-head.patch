@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/flow-spec-source.test.ts
+# kills: flow-source.base-not-head
+# why: The flow is read from the ref's head, so a change can edit its own checks
+diff --git a/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts b/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts
+index 403c251..9fe3753 100644
+--- a/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts
++++ b/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts
+@@ -24,7 +24,7 @@ export const FlowSpecSourceCodeHost = Layer.effect(
+     return FlowSpecSource.of({
+       read: (repo, base) =>
+         Effect.gen(function* () {
+-          const entries = yield* host.readTree(repo, base);
++          const entries = yield* host.readTree(repo, yield* Effect.orDie(host.head(repo, "refs/heads/main")));
+           const flowJson = yield* textAt(repo, entries, FLOW_SPEC_PATH);
+           const packageJson = yield* textAt(repo, entries, "package.json");
+           return {

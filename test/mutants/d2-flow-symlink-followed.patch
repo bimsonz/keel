@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/flow-spec-source.test.ts
+# kills: flow-source.no-symlink
+# why: A symlinked package.json or flow is read through its link
+diff --git a/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts b/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts
+index 403c251..a7799d1 100644
+--- a/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts
++++ b/apps/keel/src/adapters/driven/gitcore/flow-spec-source.ts
+@@ -16,7 +16,7 @@ export const FlowSpecSourceCodeHost = Layer.effect(
+   Effect.gen(function* () {
+     const host = yield* CodeHost;
+     const textAt = (repo: RepoRef, entries: readonly TreeEntry[], path: string) => {
+-      const entry = entries.find((e) => e.path === path && e.type === "blob" && e.mode !== SYMLINK);
++      const entry = entries.find((e) => e.path === path && e.type === "blob");
+       return entry === undefined
+         ? Effect.succeed(undefined)
+         : Effect.map(host.readBlob(repo, entry.oid), (bytes) => utf8.decode(bytes));

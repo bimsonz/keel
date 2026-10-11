@@ -23,7 +23,9 @@ import {
   describeBundleStoreContract,
   describeChangePrecheckContract,
   describeEvidenceStoreContract,
+  describeFlowSpecSourceContract,
   describeVerifierRuntimeContract,
+  type FlowSpecSourceHarness,
   freshId,
 } from "./contracts/verification.ts";
 import { describeProjectsContract, type ProjectsHarness } from "./contracts/projects.ts";
@@ -45,6 +47,7 @@ import type {
   Changes,
   Enrolments,
   EventFeed,
+  FlowSpecSource,
   Inbox,
   Notifier,
   Projects,
@@ -259,9 +262,9 @@ export const PORTS = {
     () => verification.makeVerifierRuntimeMemory().layer,
     describeVerifierRuntimeContract,
   ),
-  FlowSpecSource: port(
-    () => verification.makeFlowSpecSourceMemory().layer,
-    pending("FlowSpecSource", ["read"]),
+  FlowSpecSource: harnessed<FlowSpecSource, FlowSpecSourceHarness>(
+    verification.makeFlowSpecSourceMemory,
+    describeFlowSpecSourceContract,
   ),
   BundleStore: port(() => storage.makeBundleStoreMemory().layer, describeBundleStoreContract),
   EvidenceStore: port(() => storage.makeEvidenceStoreMemory().layer, describeEvidenceStoreContract),
