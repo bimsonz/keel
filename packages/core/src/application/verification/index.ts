@@ -72,6 +72,7 @@ export * from "./precheck.ts";
 export * from "./probe-run.ts";
 export * from "./probe-templates/freshness.ts";
 export * from "./redact.ts";
+export * from "./run-matrix.ts";
 export * from "./run-plan.ts";
 export * from "./runner-output.ts";
 export * from "./suite.ts";

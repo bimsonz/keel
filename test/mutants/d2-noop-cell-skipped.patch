@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-matrix.test.ts
+# kills: world-matrix.noop-cell
+# why: The matrix skips A-noop, so no run is ever complete and a probe that never tests A's call can never be told apart from one that does
+diff --git a/packages/core/src/application/verification/run-matrix.ts b/packages/core/src/application/verification/run-matrix.ts
+index 0d77344..2f3a660 100644
+--- a/packages/core/src/application/verification/run-matrix.ts
++++ b/packages/core/src/application/verification/run-matrix.ts
+@@ -28,7 +28,7 @@ export const runMatrix = Effect.fn("verification/runMatrix")(function* (
+   const harnessErrors: MatrixHarnessError[] = [];
+   for (let run = 1; run <= runs; run++) {
+     const answers = yield* Effect.forEach(
+-      MATRIX_WORLDS,
++      MATRIX_WORLDS.filter((w) => w !== "A-noop"),
+       (world) =>
+         runner
+           .run({ probe, world, worldBundle: worlds[world], run })

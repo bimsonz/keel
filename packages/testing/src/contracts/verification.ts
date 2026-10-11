@@ -27,6 +27,8 @@ import {
   FlowSpecSource,
   PlanStore,
   type PrecheckWorkspace,
+  ProbeRunner,
+  type ProbeRunRequest,
   type RepoRef,
   VerifierRuntime,
 } from "@keeltown/core/ports";
@@ -199,6 +201,42 @@ export function describePlanStoreContract(adapter: string, make: () => PlanStore
         expect((yield* Effect.flip(store.get(plan.planHash)))._tag).toBe("PlanMissing");
       }).pipe(Effect.provide(harness.layer));
     });
+  });
+}
+
+export interface ProbeRunnerHarness {
+  readonly layer: Layer.Layer<ProbeRunner>;
+  /** Requests the harness prepared so the probe reports each answer. */
+  readonly prepared: Readonly<Record<"pass" | "fail" | "n/a" | "harness-error", ProbeRunRequest>>;
+}
+
+export function describeProbeRunnerContract(adapter: string, make: () => ProbeRunnerHarness) {
+  describe(`ProbeRunner contract: ${adapter}`, () => {
+    it.effect(
+      "[probe-runner.reports] answers each run with what the probe reported, n/a as n/a",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const runner = yield* ProbeRunner;
+          for (const outcome of ["pass", "fail", "n/a"] as const)
+            expect(yield* runner.run(harness.prepared[outcome])).toMatchObject({
+              _tag: "ran",
+              outcome,
+            });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+    it.effect(
+      "[probe-runner.harness-error] answers a broken probe as a harness error, never an outcome",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const answer = yield* (yield* ProbeRunner).run(harness.prepared["harness-error"]);
+          expect(answer._tag).toBe("harness-error");
+          expect(answer.reason.length).toBeGreaterThan(0);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
   });
 }
 

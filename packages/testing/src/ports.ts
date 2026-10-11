@@ -29,9 +29,11 @@ import {
   describeEvidenceStoreContract,
   describeFlowSpecSourceContract,
   describePlanStoreContract,
+  describeProbeRunnerContract,
   describeVerifierRuntimeContract,
   type FlowSpecSourceHarness,
   type PlanStoreHarness,
+  type ProbeRunnerHarness,
   freshId,
 } from "./contracts/verification.ts";
 import { describeProjectsContract, type ProjectsHarness } from "./contracts/projects.ts";
@@ -56,6 +58,7 @@ import type {
   EventFeed,
   FlowSpecSource,
   PlanStore,
+  ProbeRunner,
   Inbox,
   Notifier,
   Projects,
@@ -289,6 +292,10 @@ export const PORTS = {
   PlanStore: harnessed<PlanStore, PlanStoreHarness>(
     storage.makePlanStoreMemory,
     describePlanStoreContract,
+  ),
+  ProbeRunner: harnessed<ProbeRunner, ProbeRunnerHarness>(
+    verification.memoryProbeRunnerHarness,
+    describeProbeRunnerContract,
   ),
   BatchVerdicts: harnessed<BatchVerdicts, BatchVerdictsHarness>(
     memoryBatchVerdictsHarness,

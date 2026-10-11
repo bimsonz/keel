@@ -33,6 +33,7 @@ export * from "./metrics.ts";
 export * from "./mfp-writer.ts";
 export * from "./notifier.ts";
 export * from "./plan-store.ts";
+export * from "./probe-runner.ts";
 export * from "./platform-function.ts";
 export * from "./project-views.ts";
 export * from "./projects.ts";

@@ -2,6 +2,7 @@ import {
   type CandidateId,
   type ChangeId,
   CommitSha,
+  ContentHash,
   type EscalationId,
   type GuardId,
   makeId,
@@ -36,11 +37,15 @@ import {
   PlatformFunction,
   type PrecheckCall,
   type PrecheckWorkspace,
+  ProbeRunner,
+  type ProbeRunRequest,
+  ProbeRunnerUnavailable,
   type Ruling,
   VerifierRuntime,
 } from "@keeltown/core/ports";
+import type { ProbeRun } from "@keeltown/core/application/verification";
 import { Effect, Layer, Result, Schema } from "effect";
-import type { FlowSpecSourceHarness } from "../contracts/verification.ts";
+import type { FlowSpecSourceHarness, ProbeRunnerHarness } from "../contracts/verification.ts";
 import { makeEventOutboxMemory } from "./event-outbox.ts";
 import { makeClockMemory } from "./identity.ts";
 
@@ -378,4 +383,64 @@ export function makeChangePrecheckMemory() {
       }),
     ),
   };
+}
+
+/**
+ * Probe runs answered from a script: what the probe reports for each request,
+ * or `unavailable` for a runner that could not run it. Every request is kept,
+ * so a test can see which worlds and runs were asked for.
+ */
+export function makeProbeRunnerMemory(
+  answer: (request: ProbeRunRequest) => ProbeRun | "unavailable",
+) {
+  const requests: ProbeRunRequest[] = [];
+  return {
+    requests,
+    layer: Layer.succeed(
+      ProbeRunner,
+      ProbeRunner.of({
+        run: (request) =>
+          Effect.suspend(() => {
+            requests.push(request);
+            const answered = answer(request);
+            return answered === "unavailable"
+              ? Effect.fail(new ProbeRunnerUnavailable({ reason: "scripted: unavailable" }))
+              : Effect.succeed(answered);
+          }),
+      }),
+    ),
+  };
+}
+
+const probeHash = (i: number) =>
+  Schema.decodeUnknownSync(ContentHash)(`sha256:${String(i).padStart(64, "0")}`);
+
+const probeRequest = (i: number): ProbeRunRequest => ({
+  probe: probeHash(i),
+  world: "A",
+  worldBundle: probeHash(9),
+  run: 1,
+});
+
+/** The contract's harness over the memory runner: one probe per prepared answer. */
+export function memoryProbeRunnerHarness(): ProbeRunnerHarness {
+  const prepared = {
+    pass: probeRequest(0),
+    fail: probeRequest(1),
+    "n/a": probeRequest(2),
+    "harness-error": probeRequest(3),
+  };
+  const runner = makeProbeRunnerMemory((r): ProbeRun | "unavailable" => {
+    if (r.probe === prepared["harness-error"].probe)
+      return {
+        _tag: "harness-error",
+        reason: "expected exactly one probe test, found 0",
+        observations: [],
+      };
+    const outcome = (["pass", "fail", "n/a"] as const).find((k) => prepared[k].probe === r.probe);
+    return outcome === undefined
+      ? "unavailable"
+      : { _tag: "ran", outcome, reason: outcome, observations: ["observed"] };
+  });
+  return { layer: runner.layer, prepared };
 }

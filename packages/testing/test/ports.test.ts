@@ -30,6 +30,7 @@ const CONTRACT_PORTS = [
   "BundleStore",
   "EvidenceStore",
   "PlanStore",
+  "ProbeRunner",
   "BatchVerdicts",
   "ChangePrecheck",
   "GuardRepo",

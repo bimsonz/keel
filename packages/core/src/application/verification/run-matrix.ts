@@ -1,0 +1,44 @@
+import { Effect } from "effect";
+import type { ContentHash } from "../../domain/kernel/index.ts";
+import { ADMISSION_RUNS, type ProbeCell, type World } from "../../domain/verification/index.ts";
+import { ProbeRunner } from "../ports/index.ts";
+import { MATRIX_WORLDS } from "./world-matrix.ts";
+
+/** A run the probe's harness broke on: never a cell, and the deterministic text a repair is given. */
+export interface MatrixHarnessError {
+  readonly world: World;
+  readonly run: number;
+  readonly reason: string;
+}
+
+/**
+ * Runs a probe across the world matrix: every world in MATRIX_WORLDS, A-noop
+ * included, on each calibration run 1..`runs`, each on its own fresh isolate.
+ * A run's worlds go at once, the runs one after another. What the probe
+ * reported becomes a cell for core's `admit`; a harness error is kept apart,
+ * so a broken probe can never complete a run, let alone be admitted.
+ */
+export const runMatrix = Effect.fn("verification/runMatrix")(function* (
+  probe: ContentHash,
+  worlds: Readonly<Record<World, ContentHash>>,
+  runs: number = ADMISSION_RUNS,
+) {
+  const runner = yield* ProbeRunner;
+  const cells: ProbeCell[] = [];
+  const harnessErrors: MatrixHarnessError[] = [];
+  for (let run = 1; run <= runs; run++) {
+    const answers = yield* Effect.forEach(
+      MATRIX_WORLDS,
+      (world) =>
+        runner
+          .run({ probe, world, worldBundle: worlds[world], run })
+          .pipe(Effect.map((answer) => ({ world, answer }))),
+      { concurrency: "unbounded" },
+    );
+    for (const { world, answer } of answers) {
+      if (answer._tag === "ran") cells.push({ world, run, outcome: answer.outcome });
+      else harnessErrors.push({ world, run, reason: answer.reason });
+    }
+  }
+  return { cells, harnessErrors };
+});
