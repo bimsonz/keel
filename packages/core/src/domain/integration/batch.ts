@@ -95,6 +95,8 @@ export const Trunk = Schema.Struct({
   queue: Schema.Array(QueuedBatch),
   /** Every change promoted so far, for commutation's wait check. */
   promoted: Schema.Array(ChangeId),
+  /** How many times Keel has advanced trunk since TrunkInitialized; absent in state folded before it was kept. */
+  height: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   wal: Schema.optional(PendingGroup),
   frozen: Schema.optional(Schema.Struct({ expected: CommitSha, observed: CommitSha })),
 });

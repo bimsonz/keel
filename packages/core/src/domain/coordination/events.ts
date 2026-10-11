@@ -98,7 +98,7 @@ export const PlanCompiled = Schema.TaggedStruct("PlanCompiled", {
   revision: Schema.Int,
   planHash: ContentHash,
   steps: Schema.Int,
-  costEstimate: Schema.Number,
+  costEstimate: Schema.Finite,
 });
 export const ChangeQueued = Schema.TaggedStruct("ChangeQueued", {
   changeId: ChangeId,

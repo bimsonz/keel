@@ -58,7 +58,7 @@ export const TenetEstablished = Schema.TaggedStruct("TenetEstablished", {
   tenetId: TenetId,
   subjectId: SubjectId,
   predicate: Predicate,
-  value: Schema.Union([Schema.String, Schema.Number, Schema.Boolean]),
+  value: Schema.Union([Schema.String, Schema.Finite, Schema.Boolean]),
   changeId: ChangeId,
   guardIds: Schema.Array(GuardId),
 });

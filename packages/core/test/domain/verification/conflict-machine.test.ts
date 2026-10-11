@@ -296,6 +296,53 @@ describe("the Conflict machine", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(dismiss(0).state?.conflict?.state).toBe("dismissed");
     expect(dismiss(3).state?.conflict?.state).toBe("dismissed");
   });
+  it("[conflict.world-checks] a suite's cell is recorded only while the conflict is Probing, leaves its state, and a cell never changes its answer", () => {
+    let recorded = 0;
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        run(plan).every((r) =>
+          conflictTries(r).every((p) => {
+            if (p.command._tag !== "RecordCheck") return true;
+            const events = Result.isSuccess(p.result) ? p.result.success : [];
+            if (events.length > 0) recorded++;
+            const before = r.before?.conflict;
+            return (
+              (before?.state === "probing" || Result.isFailure(p.result)) &&
+              events.every((e) => e._tag === "WorldCheckRan") &&
+              (p.after?.conflict?.state ?? "none") === (before?.state ?? "none")
+            );
+          }),
+        ),
+      ),
+    );
+    expect(recorded).toBeGreaterThan(0);
+    const check = (outcome: "pass" | "fail" | "n/a", reason?: string): LedgerCommand =>
+      C({
+        _tag: "RecordCheck",
+        world: "AB",
+        check: `suite:${CHANGE_A}`,
+        run: 1,
+        outcome,
+        ...(reason === undefined ? {} : { reason }),
+      });
+    const early = drive([C(suspectSemantic), check("pass")]);
+    expect(early.results.at(-1)?._tag).toBe("Failure");
+    const played = drive([
+      C(suspectSemantic),
+      draft,
+      check("fail"),
+      check("fail"),
+      check("pass"),
+      check("n/a"),
+    ]);
+    expect(
+      played.results.map((x) => (Result.isSuccess(x) ? x.success.length : failureReason(x))),
+    ).toEqual([1, 1, 1, 0, "cell-recorded", "malformed-check"]);
+    expect(played.state?.conflict).toMatchObject({
+      state: "probing",
+      checks: [{ world: "AB", run: 1, outcome: "fail" }],
+    });
+  });
 });
 
 const conflictView: View<Ledger, LedgerEvent> = {

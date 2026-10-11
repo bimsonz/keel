@@ -11,7 +11,7 @@ const asProbeCost = Brand.nominal<ProbeCost>();
 export const probeCost = (cost: number): Result.Result<ProbeCost, InvalidProbeCost> =>
   Number.isFinite(cost) && cost > 0
     ? Result.succeed(asProbeCost(cost))
-    : Result.fail(new InvalidProbeCost({ cost }));
+    : Result.fail(new InvalidProbeCost(Number.isFinite(cost) ? { cost } : {}));
 
 /**
  * A premise no tenet guards: the fleet is betting on it, and its probe is the

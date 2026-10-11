@@ -206,6 +206,7 @@ stateDiagram-v2
   Suspected --> Dismissed: ConflictDismissed
   Suspected --> Escalated: ConflictEscalated
   Probing --> Probing: ProbeRan
+  Probing --> Probing: WorldCheckRan
   Probing --> Proven: ConflictProven
   Probing --> Dismissed: ConflictDismissed
   Probing --> Escalated: ConflictEscalated
@@ -225,6 +226,7 @@ stateDiagram-v2
 | Suspected | Probing | A probe compiles and runs | — | `ProbeDrafted` |
 | Suspected | Escalated | Three drafts fail: the conflict is unprovable | — | `ProbeDiscarded {draft-failed}`, then `ConflictEscalated {reason: unprovable}` |
 | Probing | Probing | One world-matrix cell completes | — | `ProbeRan` |
+| Probing | Probing | A project suite's cell of the matrix (`suite:<changeId>`, any world, run 1–3) completes | The same cell again commits nothing; a different answer for it is refused; an n/a cell says why | `WorldCheckRan` |
 | Probing | Proven | The probe discriminates | It passes on trunk (or does not apply), passes in the premise-holder's world, fails in the combined world and fails in A-noop, three runs in a row | `GuardAdmitted`, then `ConflictProven` |
 | Probing | Dismissed | The probe gives the same answer in every world | — | `ProbeDiscarded {non-discriminating}`, then `ConflictDismissed` |
 | Probing | Escalated | The probe is unstable across runs | — | `ProbeDiscarded {unstable}`, then `ConflictEscalated {reason: unprovable}` |

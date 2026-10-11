@@ -46,7 +46,7 @@ export type PlanStep = typeof PlanStep.Type;
 export const VerificationPlan = Schema.Struct({
   planHash: ContentHash,
   steps: Schema.Array(PlanStep),
-  costEstimate: Schema.Number,
+  costEstimate: Schema.Finite,
   /** The compiled flow tree the steps came from. Opaque outside the flow compiler. */
   flow: Schema.optional(Schema.Unknown),
 });
@@ -66,7 +66,7 @@ export const StepResult = Schema.Struct({
   outcome: StepOutcome,
   evidenceClass: EvidenceClass,
   tier: TierChoice,
-  durationMs: Schema.Number,
+  durationMs: Schema.Finite,
   resultRef: Schema.optional(Schema.String),
   world: Schema.optional(Schema.Literals(["trunk", "A", "B", "AB"])),
   /** Steps this step's outcome skipped (an opinion step may skip only optional ones). */

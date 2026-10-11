@@ -43,7 +43,7 @@ export const Tenet = Schema.Struct({
   predicate: Predicate,
   /** How the value is held; `is` when absent. */
   relation: Schema.optional(Relation),
-  value: Schema.Union([Schema.String, Schema.Number, Schema.Boolean]),
+  value: Schema.Union([Schema.String, Schema.Finite, Schema.Boolean]),
   guards: Schema.NonEmptyArray(GuardId),
   state: TenetState,
 });

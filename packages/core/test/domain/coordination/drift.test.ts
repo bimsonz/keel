@@ -14,7 +14,7 @@ import {
   readScope,
   scopeCovers,
 } from "../../../src/domain/coordination/index.ts";
-import { Glob, makeId } from "../../../src/domain/kernel/index.ts";
+import { type EvidenceClass, Glob, makeId } from "../../../src/domain/kernel/index.ts";
 import { key } from "../../arbitraries/coordination.ts";
 import {
   changeIdArb,
@@ -114,7 +114,8 @@ const retracts = (s: Scenario, e: Proposition): boolean =>
       compare(p.proposition, e).outcome === "contradicts",
   ) || s.tenets.some((t) => compare(t.proposition, e).outcome === "contradicts");
 
-const decides = (c: DerivedEffect["evidenceClass"]): boolean => c === "proof" || c === "ruling";
+/** ADR 0005: only proof or a ruling decides. */
+const decides = (c: EvidenceClass): boolean => c === "proof" || c === "ruling";
 
 const evaluation = key("authz.permission-evaluation");
 const premiseA: HeldPremise = {
@@ -126,13 +127,17 @@ const premiseA: HeldPremise = {
     value: "per-request",
   },
 };
-const cache = (value: string, evidenceClass: DerivedEffect["evidenceClass"]): DerivedEffect => ({
-  proposition: { subject: evaluation, predicate: "freshness", relation: "is", value },
-  method: evidenceClass === "proof" ? "extractor" : "clef",
-  evidenceClass,
-  anchors: [],
-  declared: false,
-});
+const cache = (value: string, evidenceClass: DerivedEffect["evidenceClass"]): DerivedEffect => {
+  const proposition = {
+    subject: evaluation,
+    predicate: "freshness",
+    relation: "is",
+    value,
+  } as const;
+  return evidenceClass === "opinion"
+    ? { proposition, method: "clef", evidenceClass, p: 0.9, anchors: [], declared: false }
+    : { proposition, method: "extractor", evidenceClass, anchors: [], declared: false };
+};
 const b: Scenario = {
   self: changeIds[1]!,
   derived: [],
@@ -167,11 +172,12 @@ describe("drift", () => {
         run(s).every((f) => f._tag === "footprint" || f.blocks === decides(f.effect.evidenceClass)),
       ),
     );
-    expect(run({ ...b, derived: [cache("per-call", "proof")] }).map((f) => f.blocks)).toEqual([
-      true,
-    ]);
+    // An extractor's finding is a ruling, and blocks; a model's is opinion, and never does.
     expect(run({ ...b, derived: [cache("per-call", "ruling")] }).map((f) => f.blocks)).toEqual([
       true,
+    ]);
+    expect(run({ ...b, derived: [cache("per-call", "opinion")] }).map((f) => f.blocks)).toEqual([
+      false,
     ]);
   });
 

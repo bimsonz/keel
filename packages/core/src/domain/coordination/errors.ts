@@ -117,7 +117,8 @@ export class UnreadableProposition extends Schema.TaggedError<UnreadableProposit
 
 /** A probe's cost must be a positive, finite number: blast is divided by it. */
 export class InvalidProbeCost extends Schema.TaggedError<InvalidProbeCost>()("InvalidProbeCost", {
-  cost: Schema.Number,
+  /** The refused cost when it was a finite number; absent for NaN or ±Infinity, which JSON cannot carry. */
+  cost: Schema.optional(Schema.Finite),
 }) {}
 
 /** The command is not valid in the workspace's current state, or names another holder. */

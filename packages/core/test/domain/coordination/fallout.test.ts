@@ -238,7 +238,7 @@ describe("exposure", () => {
             {
               proposition,
               method: "extractor",
-              evidenceClass: "proof",
+              evidenceClass: "ruling",
               anchors: [],
               declared: true,
             },
@@ -295,7 +295,7 @@ describe("exposure", () => {
       {
         proposition: viaAnchor.declaredEffects![0]!,
         method: "extractor",
-        evidenceClass: "proof",
+        evidenceClass: "ruling",
         anchors: [],
         declared: true,
       },

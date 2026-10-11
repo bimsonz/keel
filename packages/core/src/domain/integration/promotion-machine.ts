@@ -250,6 +250,7 @@ export const decidePromotion = (
             proofIds: wal.proofIds,
             // One unverified batch makes the whole advance unverified.
             ...(wal.batches.every(isVerified) ? {} : { verified: false }),
+            ...(trunk.height === undefined ? {} : { height: trunk.height + 1 }),
           }),
         ]);
       }
@@ -314,7 +315,14 @@ export const evolvePromotion = (
   const event = committed.payload;
   if (state === undefined) {
     return event._tag === "TrunkInitialized"
-      ? { projectId: event.projectId, phase: "idle", head: event.head, queue: [], promoted: [] }
+      ? {
+          projectId: event.projectId,
+          phase: "idle",
+          head: event.head,
+          queue: [],
+          promoted: [],
+          height: 0,
+        }
       : illegal(state, event);
   }
   const trunk = state;
@@ -403,12 +411,17 @@ export const evolvePromotion = (
         wal !== undefined &&
         wal.groupId === event.groupId &&
         wal.old === event.from &&
-        wal.composed === event.to
+        wal.composed === event.to &&
+        (event.height === undefined ||
+          trunk.height === undefined ||
+          event.height === trunk.height + 1)
         ? {
-            ...without(trunk, "wal"),
+            // An advance without a height (an older Trunk DO's) leaves the height unknown.
+            ...without(trunk, "wal", "height"),
             head: event.to,
             promoted: [...trunk.promoted, ...event.members],
             phase: settled(trunk.queue),
+            ...(event.height === undefined ? {} : { height: event.height }),
           }
         : illegal(trunk, event);
 

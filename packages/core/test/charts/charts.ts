@@ -260,7 +260,7 @@ export const conflictChart: Chart = {
   meta: { createdBy: "ConflictSuspected", section: "Conflict" },
   states: {
     suspected: { on: { ProbeDrafted: f("probing"), ...unsettled } },
-    probing: { on: { ProbeRan: f("probing"), ...unsettled } },
+    probing: { on: { ProbeRan: f("probing"), WorldCheckRan: f("probing"), ...unsettled } },
     proven: { on: { ConflictResolved: f("resolved"), ConflictEscalated: f("escalated") } },
     escalated: { on: { ConflictResolved: f("resolved") } },
     resolved: { type: "final" },

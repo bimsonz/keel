@@ -12,7 +12,7 @@ import {
   type SubjectId,
 } from "../kernel/index.ts";
 import { compare, type Move, type Predicate, type Proposition } from "../coordination/index.ts";
-import type { Conflict, ConflictKind, ConflictOrigin, Party } from "./conflict.ts";
+import type { Conflict, ConflictKind, ConflictOrigin, Party, World } from "./conflict.ts";
 import { ConflictNotFound, ConflictStateRefused } from "./errors.ts";
 import {
   ConflictDismissed,
@@ -22,17 +22,20 @@ import {
   ConflictSuspected,
   ProbeDrafted,
   ProbeRan,
+  WorldCheckRan,
 } from "./events.ts";
 import type { Probe } from "./probe.ts";
 
 /**
- * The events a conflict folds: its own, and the two probe events it moves on
- * (`ProbeDrafted`, `ProbeRan`), which its probe commits in the same DO.
+ * The events a conflict folds: its own, the two probe events it moves on
+ * (`ProbeDrafted`, `ProbeRan`), which its probe commits in the same DO, and
+ * the suite cells of its world matrix (`WorldCheckRan`).
  */
 export const ConflictEvent = Schema.Union([
   ConflictSuspected,
   ProbeDrafted,
   ProbeRan,
+  WorldCheckRan,
   ConflictProven,
   ConflictDismissed,
   ConflictEscalated,
@@ -62,7 +65,21 @@ export type ConflictCommand =
   | { readonly _tag: "Settle"; readonly escalationId: EscalationId }
   /** The conflict is human-class: permission semantics, a destructive migration, an ambiguous requirement. */
   | { readonly _tag: "Escalate"; readonly escalationId: EscalationId }
-  | { readonly _tag: "Resolve"; readonly move: Move; readonly decisionId?: DecisionId };
+  | { readonly _tag: "Resolve"; readonly move: Move; readonly decisionId?: DecisionId }
+  /** A project suite's cell in the world matrix, recorded while the conflict's probe runs. */
+  | {
+      readonly _tag: "RecordCheck";
+      readonly world: World;
+      readonly check: string;
+      readonly run: number;
+      readonly outcome: "pass" | "fail" | "n/a";
+      readonly counts?: {
+        readonly passed: number;
+        readonly failed: number;
+        readonly skipped: number;
+      };
+      readonly reason?: string;
+    };
 
 /** Facts from I/O: the time, the conflict this decision is about, and its probe as the owning DO holds it. */
 export interface ConflictFacts {
@@ -88,6 +105,15 @@ const askAPerson: NextAction = {
   kind: "escalate",
   title: "Escalate to a person: only a ruling resolves an escalated conflict",
 };
+
+/** The suite cell already recorded at the same world, check and run, if any. */
+const sameCell = (
+  conflict: Conflict,
+  cell: { readonly world: World; readonly check: string; readonly run: number },
+) =>
+  conflict.checks?.find(
+    (c) => c.world === cell.world && c.check === cell.check && c.run === cell.run,
+  );
 
 /** Which proof settles which kind without a probe; semantic and precedent-at-risk conflicts need one. */
 const provesKind: Readonly<Record<ProofWithoutProbe["_tag"], ConflictKind>> = {
@@ -243,6 +269,25 @@ export const decideConflict = (
           ])
         : refuse();
     }
+    case "RecordCheck": {
+      if (conflict.state !== "probing") return refuse(undefined, awaitProbe);
+      const cell = {
+        conflictId: conflict.id,
+        world: command.world,
+        check: command.check,
+        run: command.run,
+        outcome: command.outcome,
+        ...(command.counts === undefined ? {} : { counts: command.counts }),
+        ...(command.reason === undefined ? {} : { reason: command.reason }),
+      };
+      if (!Schema.is(WorldCheckRan)({ _tag: "WorldCheckRan", ...cell }))
+        return refuse("malformed-check");
+      const recorded = sameCell(conflict, command);
+      // A repeated cell is idempotent; a cell that changes its answer is refused.
+      if (recorded !== undefined)
+        return recorded.outcome === command.outcome ? Result.succeed([]) : refuse("cell-recorded");
+      return Result.succeed([WorldCheckRan.make(cell)]);
+    }
     default: {
       const unreachable: never = command;
       return unreachable;
@@ -288,6 +333,16 @@ export const evolveConflict = (
     case "ProbeRan":
       return conflict.state === "probing" && event.probeId === conflict.probeId
         ? { ...conflict }
+        : illegal(conflict, event);
+    case "WorldCheckRan":
+      return conflict.state === "probing" && sameCell(conflict, event) === undefined
+        ? {
+            ...conflict,
+            checks: [
+              ...(conflict.checks ?? []),
+              { world: event.world, check: event.check, run: event.run, outcome: event.outcome },
+            ],
+          }
         : illegal(conflict, event);
     case "ConflictProven": {
       const proof = event.evidence;

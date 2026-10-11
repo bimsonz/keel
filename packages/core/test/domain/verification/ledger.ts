@@ -69,6 +69,7 @@ const CONFLICT_FOLDS: ReadonlySet<string> = new Set([
   "ConflictSuspected",
   "ProbeDrafted",
   "ProbeRan",
+  "WorldCheckRan",
   "ConflictProven",
   "ConflictDismissed",
   "ConflictEscalated",
@@ -287,6 +288,7 @@ export const KINDS = [
   "Settle",
   "Escalate",
   "Resolve",
+  "RecordCheck",
   "Draft",
   "DraftFailed",
   "Record",
@@ -328,6 +330,17 @@ export const build = (
         _tag: "Resolve",
         move: "sequence",
         ...(step.flag ? { decisionId: DECISION } : {}),
+      });
+    case "RecordCheck":
+      return toConflict({
+        _tag: "RecordCheck",
+        world: WORLDS[step.world] ?? "A",
+        check: `suite:${CHANGE_A}`,
+        run: step.run,
+        outcome: step.outcome,
+        ...(step.outcome === "n/a" ? {} : { counts: { passed: 12, failed: 0, skipped: 1 } }),
+        // Now and then an n/a cell that does not say why: refused as malformed.
+        ...(step.flag ? { reason: "the suite's fixture is absent in this world" } : {}),
       });
     case "Draft":
       return toProbe({
@@ -450,6 +463,19 @@ export const conflictOracle = (
           : "refused";
       return "refused";
     case "probing":
+      if (command._tag === "RecordCheck") {
+        const malformed =
+          command.run < 1 ||
+          command.run > 3 ||
+          !command.check.startsWith("suite:chg_") ||
+          (command.outcome === "n/a" && command.reason === undefined);
+        const known = conflict.checks?.find(
+          (c) => c.world === command.world && c.check === command.check && c.run === command.run,
+        );
+        return malformed || (known !== undefined && known.outcome !== command.outcome)
+          ? "refused"
+          : "probing";
+      }
       if (command._tag !== "Settle" || !ours || probe.id !== conflict.probeId) return "refused";
       if (probe.state === "admitted") return "proven";
       if (probe.state === "discarded" && probe.discarded === "non-discriminating")

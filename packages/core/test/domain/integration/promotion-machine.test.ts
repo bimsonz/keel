@@ -376,10 +376,11 @@ const facts = (n: number, member: ChangeId, path: string): CommutationFacts => (
 const flush = (
   inputs: readonly CommutationFacts[],
   observedHead: CommitSha = H0,
+  groupId = "group-1",
 ): PromotionCommand => ({
   _tag: "Flush",
   observedHead,
-  groupId: "group-1",
+  groupId,
   committerTime: T0,
   barriers: BARRIERS,
   inputs,
@@ -859,6 +860,46 @@ const carries = (flags: readonly Flag[]): boolean => {
     flagIn(advanced) === (flags.includes(false) ? false : "absent")
   );
 };
+
+describe("trunk height", { timeout: PROPERTY_TIMEOUT }, () => {
+  it("[promotion.height] each advance is one higher than the last, from 0 at TrunkInitialized, and a resume keeps the height", () => {
+    let advances = 0;
+    fc.assert(
+      fc.property(planArb, (steps) =>
+        run(steps).every((r) => {
+          const heights = r.log.flatMap((c) =>
+            c.payload._tag === "TrunkAdvanced" ? [c.payload.height] : [],
+          );
+          advances += heights.length;
+          // Whatever decide proposes is one above the trunk it decided from, committed or not.
+          const proposed = [r.taken, ...r.probes].flatMap((p) =>
+            eventsOf(p.result).flatMap((e) => (e._tag === "TrunkAdvanced" ? [e.height] : [])),
+          );
+          const next = (r.before?.height ?? 0) + 1;
+          return (
+            heights.every((h, i) => h === i + 1) &&
+            proposed.every((h) => h === next) &&
+            (r.after === undefined || r.after.height === heights.length)
+          );
+        }),
+      ),
+    );
+    expect(advances).toBeGreaterThan(0);
+    const twice = drive([
+      ...l1Path,
+      readBack(NEW),
+      enqueue(2, C2),
+      flush([facts(2, C2, "src/b.ts")], NEW, "group-2"),
+      { _tag: "Composed", sha: sha(0x1002) },
+      readBack(sha(0x1002)),
+    ]);
+    const advanced = twice.results.flatMap((r) =>
+      eventsOf(r).flatMap((e) => (e._tag === "TrunkAdvanced" ? [e.height] : [])),
+    );
+    expect(advanced).toEqual([1, 2]);
+    expect(twice.state?.height).toBe(2);
+  });
+});
 
 describe("the verified flag", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[promotion.verified-carried] a verdict's verified flag reaches BatchVerified, the queue and the WAL unchanged, and one unverified batch makes the advance unverified", () => {

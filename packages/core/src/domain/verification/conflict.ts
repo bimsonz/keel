@@ -36,6 +36,21 @@ export type Party = typeof Party.Type;
 export const ConflictOrigin = Schema.Literals(["fallout", "opinion"]);
 export type ConflictOrigin = typeof ConflictOrigin.Type;
 
+/** One combination of changes evaluated together, as a flow can run steps over it. */
+export const FlowWorld = Schema.Literals(["trunk", "A", "B", "AB"]);
+export type FlowWorld = typeof FlowWorld.Type;
+
+/**
+ * A world a probe runs in: a flow's worlds, plus `A-noop`, the
+ * premise-holder's world with the premised behaviour removed (for S-1's
+ * freshness template, a revoke route that answers 204 and removes nothing).
+ * The probe's template supplies the recipe for building it, so no flow step
+ * runs there. A probe that passes there does not test the premise, so it is
+ * never admitted.
+ */
+export const World = Schema.Literals(["trunk", "A", "B", "AB", "A-noop"]);
+export type World = typeof World.Type;
+
 export const Conflict = Schema.Struct({
   id: ConflictId,
   kind: ConflictKind,
@@ -53,20 +68,16 @@ export const Conflict = Schema.Struct({
   /** The Move that resolved it, and the Decision when a ruling did. */
   move: Schema.optional(Move),
   decisionId: Schema.optional(DecisionId),
+  /** The suite cells of its world matrix (`WorldCheckRan`), in the order they were recorded. */
+  checks: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        world: World,
+        check: Schema.String,
+        run: Schema.Int,
+        outcome: Schema.Literals(["pass", "fail", "n/a"]),
+      }),
+    ),
+  ),
 });
 export type Conflict = typeof Conflict.Type;
-
-/** One combination of changes evaluated together, as a flow can run steps over it. */
-export const FlowWorld = Schema.Literals(["trunk", "A", "B", "AB"]);
-export type FlowWorld = typeof FlowWorld.Type;
-
-/**
- * A world a probe runs in: a flow's worlds, plus `A-noop`, the
- * premise-holder's world with the premised behaviour removed (for S-1's
- * freshness template, a revoke route that answers 204 and removes nothing).
- * The probe's template supplies the recipe for building it, so no flow step
- * runs there. A probe that passes there does not test the premise, so it is
- * never admitted.
- */
-export const World = Schema.Literals(["trunk", "A", "B", "AB", "A-noop"]);
-export type World = typeof World.Type;

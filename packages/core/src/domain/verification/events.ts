@@ -9,6 +9,7 @@ import {
   EntityRef,
   EscalationId,
   GuardId,
+  idPattern,
   ProbeId,
   SubjectId,
   VerdictId,
@@ -40,6 +41,29 @@ export const ProbeRan = Schema.TaggedStruct("ProbeRan", {
   outcome: Schema.Literals(["pass", "fail", "n/a"]),
   resultRef: Schema.String,
 });
+/** A suite's run in one world of a conflict's matrix: `suite:<changeId>`, run 1 to 3. */
+export const WorldCheck = Schema.String.check(
+  Schema.isPattern(new RegExp(`^suite:${idPattern("chg").source.slice(1)}`)),
+);
+const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+/**
+ * One cell of a conflict's world matrix filled by a project's suite rather
+ * than its probe: a fact of the conflict, which stays Probing. An `n/a` cell
+ * says why the suite did not apply.
+ */
+export const WorldCheckRan = Schema.TaggedStruct("WorldCheckRan", {
+  conflictId: ConflictId,
+  world: World,
+  check: WorldCheck,
+  run: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 3 })),
+  outcome: Schema.Literals(["pass", "fail", "n/a"]),
+  counts: Schema.optional(Schema.Struct({ passed: Count, failed: Count, skipped: Count })),
+  reason: Schema.optional(Schema.NonEmptyString),
+}).check(
+  Schema.makeFilter(
+    (e) => e.outcome !== "n/a" || e.reason !== undefined || "an n/a check says why",
+  ),
+);
 export const ProbeDiscarded = Schema.TaggedStruct("ProbeDiscarded", {
   probeId: ProbeId,
   reason: Schema.Literals(["non-discriminating", "unstable", "draft-failed"]),
@@ -83,12 +107,24 @@ export const GuardRetired = Schema.TaggedStruct("GuardRetired", {
   guardId: GuardId,
   decisionId: DecisionId,
 });
+/**
+ * A guard failing is a fact of what it ran against: a batch's candidate at
+ * the Lane DO, or, at Precheck, the change itself, with no batch or candidate.
+ */
 export const GuardFailed = Schema.TaggedStruct("GuardFailed", {
   guardId: GuardId,
-  batchId: BatchId,
-  candidateId: CandidateId,
+  batchId: Schema.optional(BatchId),
+  candidateId: Schema.optional(CandidateId),
+  changeId: Schema.optional(ChangeId),
   world: World,
-});
+}).check(
+  Schema.makeFilter(
+    (e) =>
+      e.changeId !== undefined ||
+      (e.batchId !== undefined && e.candidateId !== undefined) ||
+      "a guard fails against a change, or against a batch and its candidate",
+  ),
+);
 export const VerdictIssued = Schema.TaggedStruct("VerdictIssued", {
   verdictId: VerdictId,
   subject: Schema.Union([ChangeId, BatchId]),
@@ -122,6 +158,7 @@ export const VerificationEvent = Schema.Union([
   ConflictSuspected,
   ProbeDrafted,
   ProbeRan,
+  WorldCheckRan,
   ProbeDiscarded,
   ConflictProven,
   ConflictDismissed,

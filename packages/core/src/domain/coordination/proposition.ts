@@ -50,7 +50,7 @@ export const Proposition = Schema.Struct({
    * the first event and the value the second; bound a number in `unit`; purity, idempotent and
    * presence a boolean. `is` means exactly the value, `not` its complement.
    */
-  value: Schema.Union([Schema.String, Schema.Number, Schema.Boolean]),
+  value: Schema.Union([Schema.String, Schema.Finite, Schema.Boolean]),
   /** The unit of a `bound` value, e.g. `ms`. */
   unit: Schema.optional(Schema.String),
   /** `;`-separated `key:value` pairs, e.g. `env:prod|staging;tenant:t1`. Absent means everywhere. */

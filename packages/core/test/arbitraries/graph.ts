@@ -8,7 +8,7 @@ import type {
   Predicate,
   Proposition,
 } from "../../src/domain/coordination/index.ts";
-import { type ChangeId, EvidenceClass, Glob, makeId } from "../../src/domain/kernel/index.ts";
+import { type ChangeId, CommitSha, Glob, makeId } from "../../src/domain/kernel/index.ts";
 import { fc } from "../support/fast-check.ts";
 import { propositionArb } from "./coordination.ts";
 
@@ -44,18 +44,36 @@ export const tenetArb: fc.Arbitrary<GuardedTenet> = fc
     guards: [makeId("grd", ulid(n))],
   }));
 
-export const evidenceArb: fc.Arbitrary<EvidenceClass> = fc.constantFrom(...EvidenceClass.literals);
+/** Where a derivation rests: Keel never derives an effect without an anchor. */
+const DERIVED_ANCHOR = { path: "src/authz/cache.ts", commit: CommitSha.make("c".repeat(40)) };
 
 export const derivedEffectArb = (
   proposition: fc.Arbitrary<Proposition> = graphPropositionArb,
 ): fc.Arbitrary<DerivedEffect> =>
-  fc.record({
-    proposition,
-    method: fc.constantFrom("extractor" as const, "clef" as const, "code-model" as const),
-    evidenceClass: evidenceArb,
-    anchors: fc.constant([]),
-    declared: fc.boolean(),
-  });
+  fc.oneof(
+    fc.record({
+      proposition,
+      method: fc.constant("extractor" as const),
+      evidenceClass: fc.constant("ruling" as const),
+      anchors: fc.constant([DERIVED_ANCHOR]),
+      declared: fc.boolean(),
+    }),
+    fc.record({
+      proposition,
+      method: fc.constant("clef" as const),
+      evidenceClass: fc.constant("opinion" as const),
+      p: fc.double({ min: 0, max: 1, noNaN: true }),
+      anchors: fc.constant([DERIVED_ANCHOR]),
+      declared: fc.boolean(),
+    }),
+    fc.record({
+      proposition,
+      method: fc.constant("code-model" as const),
+      evidenceClass: fc.constant("opinion" as const),
+      anchors: fc.constant([DERIVED_ANCHOR]),
+      declared: fc.boolean(),
+    }),
+  );
 
 const footprintPaths = [
   "src/authz/**",

@@ -90,6 +90,8 @@ export const TrunkAdvanced = Schema.TaggedStruct("TrunkAdvanced", {
   proofIds: Schema.Array(Schema.String),
   /** False when any batch in the group was unverified; absent means every one was verified. */
   verified: Schema.optional(Schema.Boolean),
+  /** Trunk's height after this advance: TrunkInitialized is height 0, and each advance adds 1. */
+  height: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
 });
 export const PromotionDeclined = Schema.TaggedStruct("PromotionDeclined", {
   projectId: ProjectId,
