@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/tier1/probe-worker.test.ts
+# kills: probe-worker.guard-pinned, probe-worker.guards-never-from-world
+# why: The candidate's own .keel/guards/ reaches the run, so a change can edit the guard that judges it
+diff --git a/packages/runner-protocol/src/tier1/probe-worker.ts b/packages/runner-protocol/src/tier1/probe-worker.ts
+index 9b9129a..ef7ebc7 100644
+--- a/packages/runner-protocol/src/tier1/probe-worker.ts
++++ b/packages/runner-protocol/src/tier1/probe-worker.ts
+@@ -145,7 +145,6 @@ export const probeWorkerFiles = (
+   const files: Record<string, string> = {};
+   for (const file of world) {
+     if (
+-      file.path.startsWith(GUARDS_ROOT) ||
+       inNodeModules(file.path) ||
+       file.path === "pyproject.toml"
+     )

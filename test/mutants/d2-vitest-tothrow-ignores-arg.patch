@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/tier1/vitest-module.test.ts
+# kills: probe-vitest.differential.toThrow
+# why: toThrow(message) passes on any thrown error, so a probe expecting a specific refusal passes on the wrong one
+diff --git a/packages/runner-protocol/src/tier1/vitest-module.ts b/packages/runner-protocol/src/tier1/vitest-module.ts
+index 69cf76b..5c7578b 100644
+--- a/packages/runner-protocol/src/tier1/vitest-module.ts
++++ b/packages/runner-protocol/src/tier1/vitest-module.ts
+@@ -328,7 +328,7 @@ var matchers = {
+       var threw = false;
+       try { actual(); } catch (err) { threw = true; caught = err; }
+       assert(threw, "expected " + show(actual) + " to throw an error");
+-      if (caught && expected !== undefined && expected !== null) {
++      if (false) {
+         assert(chaiMessage(caught, expected), "expected " + show(actual) + " to throw error matching " + show(expected) + " but got " + show(caught));
+       }
+       return;

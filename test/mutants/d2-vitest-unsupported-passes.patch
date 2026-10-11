@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/tier1/vitest-module.test.ts
+# kills: probe-vitest.unsupported
+# why: An unsupported matcher is a silent no-op, so a probe asserting with toContain passes without checking anything
+diff --git a/packages/runner-protocol/src/tier1/vitest-module.ts b/packages/runner-protocol/src/tier1/vitest-module.ts
+index 69cf76b..77530d2 100644
+--- a/packages/runner-protocol/src/tier1/vitest-module.ts
++++ b/packages/runner-protocol/src/tier1/vitest-module.ts
+@@ -361,7 +361,7 @@ var expect = guarded("expect", function expect(actual) {
+         return function (expected) { return matchers[key](actual, expected); };
+       }
+       if (key === "then") return undefined;
+-      throw KeelUnsupported("expect(...)." + String(key));
++      return function () {};
+     },
+   });
+ });

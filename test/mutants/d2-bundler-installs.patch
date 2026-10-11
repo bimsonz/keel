@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/tier1/probe-worker.test.ts
+# kills: probe-worker.deps-stripped
+# why: The world's dependencies reach worker-bundler, which installs them from npm inside the VerifierDO
+diff --git a/packages/runner-protocol/src/tier1/probe-worker.ts b/packages/runner-protocol/src/tier1/probe-worker.ts
+index 9b9129a..98c61f8 100644
+--- a/packages/runner-protocol/src/tier1/probe-worker.ts
++++ b/packages/runner-protocol/src/tier1/probe-worker.ts
+@@ -152,7 +152,7 @@ export const probeWorkerFiles = (
+       continue;
+     const text = textOf(file);
+     if (text === undefined) continue;
+-    files[file.path] = file.path === "package.json" ? withoutDependencies(text) : text;
++    files[file.path] = text;
+   }
+ 
+   const tests: string[] = [];

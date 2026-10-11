@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/tier1/semaphore.test.ts
+# kills: semaphore.bounded-fifo
+# why: A run over the limit is refused rather than queued, which is the platform's own failure the semaphore exists to avoid
+diff --git a/packages/runner-protocol/src/tier1/semaphore.ts b/packages/runner-protocol/src/tier1/semaphore.ts
+index b871502..74b0093 100644
+--- a/packages/runner-protocol/src/tier1/semaphore.ts
++++ b/packages/runner-protocol/src/tier1/semaphore.ts
+@@ -37,7 +37,7 @@ export class Semaphore {
+       this.#free--;
+       return Promise.resolve(this.#permit(false));
+     }
+-    return new Promise((resolve) => this.#waiting.push(resolve));
++    return Promise.reject(new Error("busy"));
+   }
+ 
+   /** Runs `task` holding a slot, and releases it however the task ends. */

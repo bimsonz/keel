@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/tier1/vitest-module.test.ts
+# kills: probe-vitest.pass-unobserved
+# why: A probe that never reported what it saw counts as a pass, a vacuous pass presented as evidence
+diff --git a/packages/runner-protocol/src/tier1/vitest-module.ts b/packages/runner-protocol/src/tier1/vitest-module.ts
+index 69cf76b..9dfb44f 100644
+--- a/packages/runner-protocol/src/tier1/vitest-module.ts
++++ b/packages/runner-protocol/src/tier1/vitest-module.ts
+@@ -412,7 +412,6 @@ async function run(load) {
+     }
+     if (unsupported.length > 0) return harness(observations, "unsupported: " + unsupported[0]);
+     if (failure === undefined) {
+-      if (observations.length === 0) return harness(observations, "the probe passed without reporting an observation");
+       return report(observations, "pass", observations[observations.length - 1], EXIT.pass);
+     }
+     var text = errorText(failure);

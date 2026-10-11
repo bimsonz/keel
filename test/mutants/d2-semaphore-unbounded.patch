@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/tier1/semaphore.test.ts
+# kills: semaphore.bounded-fifo
+# why: Every run gets an isolate at once, so the fifth concurrent Dynamic Worker call throws instead of waiting
+diff --git a/packages/runner-protocol/src/tier1/semaphore.ts b/packages/runner-protocol/src/tier1/semaphore.ts
+index b871502..035baff 100644
+--- a/packages/runner-protocol/src/tier1/semaphore.ts
++++ b/packages/runner-protocol/src/tier1/semaphore.ts
+@@ -33,7 +33,7 @@ export class Semaphore {
+   }
+ 
+   acquire(): Promise<Permit> {
+-    if (this.#free > 0) {
++    if (true) {
+       this.#free--;
+       return Promise.resolve(this.#permit(false));
+     }

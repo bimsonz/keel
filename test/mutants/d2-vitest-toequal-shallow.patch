@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/runner-protocol/test/tier1/vitest-module.test.ts
+# kills: probe-vitest.differential.toEqual
+# why: toEqual compares members by identity, so a probe asserting a deep shape passes or fails where real vitest would not
+diff --git a/packages/runner-protocol/src/tier1/vitest-module.ts b/packages/runner-protocol/src/tier1/vitest-module.ts
+index 69cf76b..33bc148 100644
+--- a/packages/runner-protocol/src/tier1/vitest-module.ts
++++ b/packages/runner-protocol/src/tier1/vitest-module.ts
+@@ -173,7 +173,7 @@ function eq(a, b, aStack, bStack, testers, has) {
+   if (keysOf(b, has).length !== size) return false;
+   while (size--) {
+     var key = aKeys[size];
+-    result = has(b, key) && eq(a[key], b[key], aStack, bStack, testers, has);
++    result = has(b, key) && Object.is(a[key], b[key]);
+     if (!result) return false;
+   }
+   aStack.pop();
