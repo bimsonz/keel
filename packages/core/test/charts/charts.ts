@@ -25,6 +25,7 @@ export const changeChart: Chart = {
       on: {
         IntentRevised: c("working"),
         ChangeSubmitted: c("submitted"),
+        ChangeRebased: c("working"),
         ...lapses,
         ...waits("working"),
         ...ends,
@@ -70,6 +71,7 @@ export const changeChart: Chart = {
       on: {
         IntentRevised: c("working"),
         ChangeSubmitted: c("submitted"),
+        ChangeRebased: c("bounced"),
         ...lapses,
         ...waits("bounced"),
         ...ends,

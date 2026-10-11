@@ -44,6 +44,7 @@ import {
   ChangeLanded,
   ChangeParked,
   ChangeQueued,
+  ChangeRebased,
   ChangeRequeued,
   ChangeResumed,
   ChangeStarted,
@@ -71,6 +72,7 @@ export const ChangeEvent = Schema.Union([
   IntentRevised,
   ChangeStarted,
   ChangeSubmitted,
+  ChangeRebased,
   PrecheckStarted,
   EffectsDerived,
   DriftDetected,
@@ -132,6 +134,13 @@ export type ChangeCommand =
       readonly premisesRetracted: readonly Proposition[];
       readonly declaredEffects?: readonly Proposition[];
       readonly preflight: Preflight;
+    }
+  | {
+      /** The agent rebased its workspace: `from` must be the change's base, and `onto` another commit. */
+      readonly _tag: "Rebase";
+      readonly leaseId: LeaseId;
+      readonly from: CommitSha;
+      readonly onto: CommitSha;
     }
   | {
       readonly _tag: "Rely";
@@ -282,6 +291,7 @@ const leaseOf = (command: ChangeCommand): LeaseId | undefined => {
     case "Revise":
     case "Rely":
     case "Submit":
+    case "Rebase":
       return command.leaseId;
     case "Withdraw":
       return command.authority._tag === "Lease" ? command.authority.leaseId : undefined;
@@ -401,6 +411,16 @@ export const decideChange = (
           ])
         : refuse(change, command);
 
+    case "Rebase":
+      return at("working", "bounced") &&
+        change.baseSha !== undefined &&
+        command.from === change.baseSha &&
+        command.onto !== command.from
+        ? Result.succeed([
+            ChangeRebased.make({ changeId: id, from: command.from, to: command.onto }),
+          ])
+        : refuse(change, command);
+
     case "Submit": {
       if (!at("working", "bounced") || change.workspaceId === undefined)
         return refuse(change, command);
@@ -426,6 +446,7 @@ export const decideChange = (
           revision,
           commitSha: command.commitSha,
           workspaceId: change.workspaceId,
+          ...(change.baseSha === undefined ? {} : { baseSha: change.baseSha }),
         }),
       ]);
     }
@@ -696,6 +717,10 @@ export const evolveChange = (
     case "ChangeSubmitted":
       return from("working", "bounced")
         ? { ...moveTo(change, "submitted"), commitSha: event.commitSha }
+        : illegal(change, event);
+    case "ChangeRebased":
+      return from("working", "bounced") && event.from === change.baseSha
+        ? { ...change, baseSha: event.to }
         : illegal(change, event);
     case "PrecheckStarted":
       return from("submitted") ? moveTo(change, "deriving") : illegal(change, event);

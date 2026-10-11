@@ -6692,6 +6692,36 @@
           "not": {}
         }
       },
+      "ChangeRebased": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ChangeRebased"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "from": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "to": {
+            "$ref": "#/components/schemas/CommitSha"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The agent rebased its workspace onto `to`: the change's base moves from `from`, and nothing else changes."
+      },
       "ChangeRequeued": {
         "type": "object",
         "required": [
@@ -6830,6 +6860,14 @@
           },
           "workspaceId": {
             "$ref": "#/components/schemas/WorkspaceId"
+          },
+          "baseSha": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The change's base when it was submitted: the base the submission is judged against. Always set when the change has one; optional only so older events still decode."
           }
         },
         "additionalProperties": {
@@ -9271,6 +9309,9 @@
           },
           {
             "$ref": "#/components/schemas/ChangeSubmitted"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeRebased"
           },
           {
             "$ref": "#/components/schemas/PrecheckStarted"

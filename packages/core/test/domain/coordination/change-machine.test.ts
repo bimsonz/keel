@@ -41,6 +41,9 @@ const SHA = CommitSha.make("c".repeat(40));
 const BASE = CommitSha.make("b".repeat(40));
 /** The member's commit on trunk, as TrunkAdvanced's landing carries it: never the submitted one. */
 const ON_TRUNK = CommitSha.make("e".repeat(40));
+/** The commits a workspace is rebased onto, and a base the change never had. */
+const REBASED = CommitSha.make("f".repeat(40));
+const NEVER_BASE = CommitSha.make("9".repeat(40));
 const preflight: Preflight = {
   neighbours: [],
   contradictions: [],
@@ -61,6 +64,7 @@ const ALL: readonly Kind[] = [
   "Start",
   "Revise",
   "Rely",
+  "Rebase",
   "Submit",
   "StartPrecheck",
   "Drift",
@@ -102,14 +106,14 @@ const PROGRESS: Readonly<Record<Key, readonly Kind[]>> = {
 const SIDE: Readonly<Record<Key, readonly Kind[]>> = {
   none: ["Declare"],
   declared: ["Lapse", "Adopt", "Renew"],
-  working: ["Revise", "Rely", "Lapse", "Adopt", "Renew"],
+  working: ["Revise", "Rely", "Rebase", "Lapse", "Adopt", "Renew"],
   submitted: ["Lapse", "Adopt", "Renew"],
   deriving: ["Drift", "Bounce", "Lapse", "Adopt"],
   drifted: ["Lapse", "Adopt", "Renew"],
   verifying: ["Park", "Bounce", "Lapse", "Adopt"],
   queued: ["Bounce", "Lapse", "Supersede"],
   integrating: ["Requeue", "Bounce", "Lapse", "Adopt"],
-  bounced: ["Revise", "Lapse", "Adopt", "Renew"],
+  bounced: ["Revise", "Rebase", "Lapse", "Adopt", "Renew"],
   "parked:awaiting-ruling": ["Bounce", "Adopt", "Lapse", "Supersede"],
   "parked:lease-lapsed": ["Withdraw", "Supersede"],
   landed: ALL,
@@ -273,6 +277,12 @@ const build = (
       return premise === undefined
         ? { _tag: "Lapse", leaseId: token }
         : { _tag: "Rely", leaseId: token, premise, preflight };
+    case "Rebase": {
+      // From the current base or one it never had; onto the other rebase target, or back onto itself.
+      const from = step.flag ? (state?.baseSha ?? BASE) : NEVER_BASE;
+      const onto = step.blocked ? from : from === REBASED ? BASE : REBASED;
+      return { _tag: "Rebase", leaseId: token, from, onto };
+    }
     case "Submit":
       return { _tag: "Submit", leaseId: token, commitSha: SHA, inWorkspace: step.flag };
     case "StartPrecheck":
@@ -379,7 +389,10 @@ const attempt = (state: Change | undefined, command: ChangeCommand, now: Instant
 };
 
 const leaseCarried = (command: ChangeCommand): LeaseId | undefined =>
-  command._tag === "Revise" || command._tag === "Rely" || command._tag === "Submit"
+  command._tag === "Revise" ||
+  command._tag === "Rely" ||
+  command._tag === "Rebase" ||
+  command._tag === "Submit"
     ? command.leaseId
     : command._tag === "Withdraw" && command.authority._tag === "Lease"
       ? command.authority.leaseId
@@ -485,6 +498,13 @@ const oracle = (
         : "refused";
     case "Rely":
       return key === "working" ? "working" : "refused";
+    case "Rebase":
+      return (key === "working" || key === "bounced") &&
+        before.baseSha !== undefined &&
+        command.from === before.baseSha &&
+        command.onto !== command.from
+        ? key
+        : "refused";
     case "Submit":
       return (key === "working" || key === "bounced") && command.inWorkspace
         ? "submitted"
@@ -983,6 +1003,136 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
     );
     // Submitted as SHA, landed as the restacked commit with its trailers.
     expect(s0.log.at(-1)).toMatchObject({ _tag: "ChangeLanded", commitSha: ON_TRUNK });
+  });
+});
+
+const rebase = (from: CommitSha, onto: CommitSha, leaseId: LeaseId = LEASE): ChangeCommand => ({
+  _tag: "Rebase",
+  leaseId,
+  from,
+  onto,
+});
+
+/** Every rebase a run tried, with the change it was tried on and when. */
+const rebasesTried = (trace: Trace) =>
+  trace.records.flatMap((r) =>
+    r.probes.flatMap((probe) =>
+      probe.command._tag === "Rebase"
+        ? [{ before: r.before, now: r.now, command: probe.command, result: probe.result }]
+        : [],
+    ),
+  );
+
+describe("rebasing a change", { timeout: PROPERTY_TIMEOUT }, () => {
+  it("[change.rebase-moves-base] an accepted rebase commits exactly ChangeRebased, and the change after differs from the change before only in its base", () => {
+    let rebased = 0;
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        rebasesTried(run(plan)).every(({ before, now, command, result }) => {
+          if (before === undefined || Result.isFailure(result)) return true;
+          rebased++;
+          const [event, ...rest] = result.success;
+          const after = result.success.reduce<Change>(
+            (s, payload) => evolveChange(s, { at: now, payload }),
+            before,
+          );
+          return (
+            rest.length === 0 &&
+            event?._tag === "ChangeRebased" &&
+            event.from === before.baseSha &&
+            event.to === command.onto &&
+            comparable(after) === comparable({ ...before, baseSha: command.onto })
+          );
+        }),
+      ),
+    );
+    expect(rebased).toBeGreaterThan(0);
+    const bounced = drive(
+      [declare, start, submit, precheck, compile, bounce, rebase(BASE, REBASED)].map(
+        (c) => [c, 1] as const,
+      ),
+    );
+    expect(bounced.state?.state).toBe("bounced");
+    expect(bounced.state?.baseSha).toBe(REBASED);
+  });
+
+  it("[change.rebase-only-agent-owned-work] a rebase is refused in every state but Working and Bounced, and commits nothing", () => {
+    let elsewhere = 0;
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        rebasesTried(run(plan)).every(({ before, result }) => {
+          const key = keyOf(before);
+          if (key === "working" || key === "bounced") return true;
+          elsewhere++;
+          return Result.isFailure(result);
+        }),
+      ),
+    );
+    expect(elsewhere).toBeGreaterThan(0);
+    const queued = drive(
+      [declare, start, submit, precheck, compile, queue, rebase(BASE, REBASED)].map(
+        (c) => [c, 1] as const,
+      ),
+    );
+    expect(failureTag(queued.results[6])).toBe("ChangeStateRefused");
+  });
+
+  it("[change.rebase-stale-from] a rebase from anything but the change's base, or onto that base itself, is refused with a read of the change", () => {
+    let stale = 0;
+    let onto = 0;
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        rebasesTried(run(plan)).every(({ before, now, command, result }) => {
+          const key = keyOf(before);
+          if (before === undefined || (key !== "working" && key !== "bounced")) return true;
+          if (command.leaseId !== before.lease.id || lapsedAt(before, now)) return true;
+          if (command.from !== before.baseSha) stale++;
+          else if (command.onto === command.from) onto++;
+          else return true;
+          const failure = Result.isFailure(result) ? result.failure : undefined;
+          return (
+            failure?._tag === "ChangeStateRefused" &&
+            (failure.nextActions ?? []).some((a) => a.kind === "read")
+          );
+        }),
+      ),
+    );
+    expect(stale).toBeGreaterThan(0);
+    expect(onto).toBeGreaterThan(0);
+    const working = [declare, start].map((c) => [c, 1] as const);
+    expect(brief(drive([...working, [rebase(REBASED, BASE), 1]]).results[2])).toEqual({
+      tag: "ChangeStateRefused",
+      reason: undefined,
+      next: ["Changes_getChange"],
+    });
+    expect(failureTag(drive([...working, [rebase(BASE, BASE), 1]]).results[2])).toBe(
+      "ChangeStateRefused",
+    );
+  });
+
+  it("[change.submit-after-rebase] every submission carries the change's base at that moment, so a submit after a rebase is judged against the new base", () => {
+    let afterRebase = 0;
+    fc.assert(
+      fc.property(planArb, (plan) => {
+        let base: CommitSha | undefined;
+        let rebased = false;
+        return run(plan).log.every(({ payload }) => {
+          if (payload._tag === "ChangeStarted") base = payload.baseSha;
+          if (payload._tag === "ChangeRebased") {
+            base = payload.to;
+            rebased = true;
+          }
+          if (payload._tag !== "ChangeSubmitted") return true;
+          if (rebased) afterRebase++;
+          return payload.baseSha === base;
+        });
+      }),
+    );
+    expect(afterRebase).toBeGreaterThan(0);
+    const submitted = drive(
+      [declare, start, rebase(BASE, REBASED), submit].map((c) => [c, 1] as const),
+    ).log.find((e) => e._tag === "ChangeSubmitted");
+    expect(submitted?._tag === "ChangeSubmitted" ? submitted.baseSha : undefined).toBe(REBASED);
   });
 });
 

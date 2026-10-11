@@ -54,6 +54,7 @@ stateDiagram-v2
   Declared --> Superseded: ChangeSuperseded
   Working --> Working: IntentRevised
   Working --> Submitted: ChangeSubmitted
+  Working --> Working: ChangeRebased
   Working --> LeaseLapsed: ChangeParked
   Working --> Working: ChangeAdopted
   Working --> Withdrawn: ChangeWithdrawn
@@ -90,6 +91,7 @@ stateDiagram-v2
   Integrating --> Integrating: ChangeAdopted
   Bounced --> Working: IntentRevised
   Bounced --> Submitted: ChangeSubmitted
+  Bounced --> Bounced: ChangeRebased
   Bounced --> LeaseLapsed: ChangeParked
   Bounced --> Bounced: ChangeAdopted
   Bounced --> Withdrawn: ChangeWithdrawn
@@ -112,7 +114,8 @@ stateDiagram-v2
 | — | Declared | `declare` (or `declare --from-sketch`), or the Auditor declaring a revert | Scope `agent:work` for agents | `IntentDeclared {origin}` (lease issued), then `PreflightIssued` |
 | Declared | Working | The pool grants a workspace, or the promoted sketch's workspace is reassigned | — | `ChangeStarted` (caused by `WorkspaceGranted` or `SketchPromoted`) |
 | Working | Working | `revise` / `rely` | Valid lease; `If-Match` on the current revision (`revise`) | `IntentRevised`, then `PreflightIssued`. A `rely` is a revision that adds one premise; the Subject DO answers it with its own `PremiseRelied` |
-| Working, Bounced | Submitted | `submit {changeId, commitSha}` | Valid lease; the commit is in the change's workspace | `ChangeSubmitted` |
+| Working, Bounced | Submitted | `submit {changeId, commitSha}` | Valid lease; the commit is in the change's workspace | `ChangeSubmitted`, carrying the change's base: the base Precheck judges the submission against |
+| Working, Bounced | the same state | `rebase {from, onto}`: the agent rebased its workspace (after a textual bounce, say) | Valid lease; `from` is the change's base and `onto` another commit; otherwise refused, with a read of the change | `ChangeRebased {from, to}`: the base moves, and nothing else changes |
 | Submitted | Deriving | Precheck instance created | — | `PrecheckStarted` |
 | Deriving | Bounced | Precheck: a protected or guard path is touched | — | `ChangeBounced` |
 | Deriving | Drifted | Precheck: drift needs the agent (an undeclared proof-class effect) | — | `ChangeDrifted` |

@@ -305,6 +305,17 @@ model ChangeSubmitted {
   revision: integer;
   commitSha: CommitSha;
   workspaceId: WorkspaceId;
+
+  /** The change's base when it was submitted: the base the submission is judged against. Always set when the change has one; optional only so older events still decode. */
+  baseSha?: CommitSha;
+}
+
+/** The agent rebased its workspace onto `to`: the change's base moves from `from`, and nothing else changes. */
+model ChangeRebased {
+  _tag: "ChangeRebased";
+  changeId: ChangeId;
+  from: CommitSha;
+  to: CommitSha;
 }
 
 model PrecheckStarted {
@@ -1241,6 +1252,7 @@ union KeelEvent {
   ChangeStarted,
   PremiseRelied,
   ChangeSubmitted,
+  ChangeRebased,
   PrecheckStarted,
   EffectsDerived,
   DriftDetected,
