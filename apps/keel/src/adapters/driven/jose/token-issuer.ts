@@ -1,4 +1,4 @@
-import { type Principal, Scope, Sponsor, TokenRejected } from "@keeltown/core/domain/identity";
+import { type AgentToken, Scope, Sponsor, TokenRejected } from "@keeltown/core/domain/identity";
 import { AgentId, Instant, ProjectId } from "@keeltown/core/kernel";
 import { Clock, TokenIssuer } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
@@ -42,7 +42,7 @@ export function TokenIssuerJose(options: TokenIssuerOptions) {
       const kid = jwk.kid ?? "keel";
 
       return TokenIssuer.of({
-        issue: (principal: Principal, ttlSeconds: number) =>
+        issue: (principal: AgentToken, ttlSeconds: number) =>
           Effect.gen(function* () {
             const now = yield* clock.now;
             const issuedAt = Math.floor(now / 1000);

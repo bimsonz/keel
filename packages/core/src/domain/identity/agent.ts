@@ -43,7 +43,7 @@ export const Agent = Schema.Struct({
 export type Agent = typeof Agent.Type;
 
 /** Who a verified token says is calling. */
-export interface Principal {
+export interface AgentToken {
   readonly agentId: AgentId;
   /** The agent's project, carried in the token's `prj` claim. */
   readonly projectId: ProjectId;
@@ -66,6 +66,6 @@ export interface Identity {
 }
 
 /** A principal may act only while its agent is active and its epoch is current. */
-export function admits(agent: Agent, principal: Principal): boolean {
+export function admits(agent: Agent, principal: AgentToken): boolean {
   return agent.state === "active" && principal.revocationEpoch === agent.revocationEpoch;
 }

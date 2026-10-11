@@ -1,6 +1,6 @@
 import type { Effect } from "effect";
 import type { Move } from "../../domain/coordination/index.ts";
-import type { Principal } from "../../domain/identity/index.ts";
+import type { AgentToken } from "../../domain/identity/index.ts";
 import type { ChangeId, ConflictId, LeaseId, VerdictId } from "../../domain/kernel/index.ts";
 import type {
   Conflict,
@@ -42,17 +42,17 @@ export interface VerdictView {
 }
 
 export const listConflicts: (
-  principal: Principal,
+  principal: AgentToken,
   query: ConflictQuery,
 ) => Effect.Effect<ConflictPage, never, EntityStore> = stub("verification/listConflicts");
 
 export const getConflict: (
-  principal: Principal,
+  principal: AgentToken,
   conflictId: ConflictId,
 ) => Effect.Effect<Conflict, ConflictNotFound, EntityStore> = stub("verification/getConflict");
 
 export const resolveConflict: (
-  principal: Principal,
+  principal: AgentToken,
   input: ResolveInput,
 ) => Effect.Effect<
   Conflict,
@@ -61,7 +61,7 @@ export const resolveConflict: (
 > = stub("verification/resolveConflict");
 
 export const getVerdict: (
-  principal: Principal,
+  principal: AgentToken,
   verdictId: VerdictId,
 ) => Effect.Effect<VerdictView, VerdictNotFound, EntityStore> = stub("verification/getVerdict");
 

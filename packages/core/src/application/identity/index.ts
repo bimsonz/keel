@@ -8,7 +8,7 @@ import {
   CredentialRejected,
   type IdempotencyConflict,
   type Identity,
-  type Principal,
+  type AgentToken,
   type Scope,
   ScopeNotGranted,
   type SessionSponsorRefused,
@@ -31,7 +31,7 @@ import {
 /** identity use-cases. `whoami` and `exchangeToken` are the exemplar for the rest. */
 
 /** Why an agent may not act, or null when it may. */
-function refusal(agent: Agent, principal: Principal | null): AgentNotAdmitted["reason"] | null {
+function refusal(agent: Agent, principal: AgentToken | null): AgentNotAdmitted["reason"] | null {
   if (agent.state === "suspended") return "suspended";
   if (agent.state === "revoked") return "revoked";
   if (principal !== null && !admits(agent, principal)) return "stale-epoch";
@@ -44,10 +44,10 @@ function refusal(agent: Agent, principal: Principal | null): AgentNotAdmitted["r
  * AgentDirectory, so the request gate never calls an AgentSession DO.
  */
 export const admit: (
-  principal: Principal,
+  principal: AgentToken,
 ) => Effect.Effect<Agent, AgentNotKnown | AgentNotAdmitted, AgentDirectory> = Effect.fn(
   "identity/admit",
-)(function* (principal: Principal) {
+)(function* (principal: AgentToken) {
   const directory = yield* AgentDirectory;
   const agent = yield* directory.findAgent(principal.agentId);
   if (Option.isNone(agent)) return yield* new AgentNotKnown({ agentId: principal.agentId });
@@ -58,9 +58,9 @@ export const admit: (
 
 /** Who the caller is: its admitted agent, its current session, and the sponsor its token acts for. */
 export const whoami: (
-  principal: Principal,
+  principal: AgentToken,
 ) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted, AgentDirectory | Sessions> =
-  Effect.fn("identity/whoami")(function* (principal: Principal) {
+  Effect.fn("identity/whoami")(function* (principal: AgentToken) {
     const agent = yield* admit(principal);
     const current = yield* (yield* Sessions).current(agent.id);
     const session = current === null ? null : { id: current.id };
@@ -125,7 +125,7 @@ export const exchangeToken: (
  * operator scope; the bootstrap credential may call only this.
  */
 export const enrolAgent: (
-  principal: Principal,
+  principal: AgentToken,
   input: EnrolInput,
 ) => Effect.Effect<Enrolment, IdempotencyConflict, Enrolments> = (principal, input) =>
   Enrolments.use((enrolments) => enrolments.enrol(principal, input));
@@ -136,7 +136,7 @@ export const enrolAgent: (
  * already checked the operator scope.
  */
 export const suspendAgent: (
-  principal: Principal,
+  principal: AgentToken,
   input: StandingInput,
 ) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict, Standings> = (
   principal,
@@ -144,7 +144,7 @@ export const suspendAgent: (
 ) => Standings.use((standings) => standings.suspend(principal, input));
 
 export const reinstateAgent: (
-  principal: Principal,
+  principal: AgentToken,
   input: StandingInput,
 ) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict, Standings> = (
   principal,
@@ -152,7 +152,7 @@ export const reinstateAgent: (
 ) => Standings.use((standings) => standings.reinstate(principal, input));
 
 export const revokeAgent: (
-  principal: Principal,
+  principal: AgentToken,
   input: StandingInput,
 ) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict, Standings> = (
   principal,
@@ -161,7 +161,7 @@ export const revokeAgent: (
 
 /** Opens a session for the caller's agent in its AgentSession DO, which makes it the agent's current one. */
 export const openAgentSession: (
-  principal: Principal,
+  principal: AgentToken,
   input: OpenSessionInput,
 ) => Effect.Effect<
   Session,

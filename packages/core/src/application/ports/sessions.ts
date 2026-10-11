@@ -3,7 +3,7 @@ import type {
   AgentNotAdmitted,
   AgentNotKnown,
   IdempotencyConflict,
-  Principal,
+  AgentToken,
   SessionSponsorRefused,
   Sponsor,
 } from "../../domain/identity/index.ts";
@@ -31,7 +31,7 @@ export class Sessions extends Context.Service<
      * an IdempotencyConflict.
      */
     readonly open: (
-      principal: Principal,
+      principal: AgentToken,
       input: OpenSessionInput,
     ) => Effect.Effect<
       Session,

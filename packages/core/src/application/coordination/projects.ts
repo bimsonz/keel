@@ -1,5 +1,5 @@
 import type { Effect } from "effect";
-import type { IdempotencyConflict, Principal } from "../../domain/identity/index.ts";
+import type { IdempotencyConflict, AgentToken } from "../../domain/identity/index.ts";
 import type { ProjectNotFound } from "../../domain/integration/index.ts";
 import type { ProjectId } from "../../domain/kernel/index.ts";
 import {
@@ -17,7 +17,7 @@ import {
  * head. The doorways have already checked the operator scope.
  */
 export const createProject: (
-  principal: Principal,
+  principal: AgentToken,
   input: CreateProjectInput,
 ) => Effect.Effect<ProjectRecord, IdempotencyConflict | RepoNotFound, Projects> = (
   principal,
@@ -36,7 +36,7 @@ export const getSettings: (
  * bind it; the doorways have already checked the operator scope.
  */
 export const putSettings: (
-  principal: Principal,
+  principal: AgentToken,
   projectId: ProjectId,
   settings: PutProjectSettings,
   requestId: string,

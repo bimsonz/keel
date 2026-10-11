@@ -1,5 +1,5 @@
 import { Context, type Effect } from "effect";
-import type { IdempotencyConflict, Principal } from "../../domain/identity/index.ts";
+import type { IdempotencyConflict, AgentToken } from "../../domain/identity/index.ts";
 import type { ProjectNotFound } from "../../domain/integration/index.ts";
 import type { Glob, Instant, ProjectId } from "../../domain/kernel/index.ts";
 import type { RepoNotFound } from "./code-host.ts";
@@ -60,12 +60,12 @@ export class Projects extends Context.Service<
   Projects,
   {
     readonly create: (
-      principal: Principal,
+      principal: AgentToken,
       input: CreateProjectInput,
     ) => Effect.Effect<ProjectRecord, IdempotencyConflict | RepoNotFound>;
     readonly settings: (projectId: ProjectId) => Effect.Effect<ProjectSettings, ProjectNotFound>;
     readonly putSettings: (
-      principal: Principal,
+      principal: AgentToken,
       projectId: ProjectId,
       settings: PutProjectSettings,
       requestId: string,

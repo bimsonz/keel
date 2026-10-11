@@ -8,7 +8,7 @@ index 5e57977..c360818 100644
 @@ -46,5 +46,5 @@ export interface Identity {
  
  /** A principal may act only while its agent is active and its epoch is current. */
- export function admits(agent: Agent, principal: Principal): boolean {
+ export function admits(agent: Agent, principal: AgentToken): boolean {
 -  return agent.state === "active" && principal.revocationEpoch === agent.revocationEpoch;
 +  return agent.state !== "revoked" && principal.revocationEpoch === agent.revocationEpoch;
  }

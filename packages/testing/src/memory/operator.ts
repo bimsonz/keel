@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS } from "@keeltown/core/application/integration";
-import { type Agent, IdempotencyConflict, type Principal } from "@keeltown/core/domain/identity";
+import { type Agent, IdempotencyConflict, type AgentToken } from "@keeltown/core/domain/identity";
 import { ProjectNotFound } from "@keeltown/core/domain/integration";
 import { type AgentId, Instant, makeId, type ProjectId } from "@keeltown/core/kernel";
 import {
@@ -29,7 +29,7 @@ interface Keyed<T> {
   readonly fingerprint: string;
 }
 
-const keyOf = (principal: Principal, idempotencyKey: string) =>
+const keyOf = (principal: AgentToken, idempotencyKey: string) =>
   `${principal.agentId}\u0000${idempotencyKey}`;
 
 /**

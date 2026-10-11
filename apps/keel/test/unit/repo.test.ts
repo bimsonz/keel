@@ -1,7 +1,7 @@
 // The repo read API through the handler object: who may read a project's
 // code, and what each read answers, over in-memory trunks.
 import { projectRepos } from "@keeltown/core/application/integration";
-import type { Principal } from "@keeltown/core/domain/identity";
+import type { AgentToken } from "@keeltown/core/domain/identity";
 import { AgentId, CommitSha, Instant, ProjectId } from "@keeltown/core/kernel";
 import { CodeHost, type ProjectSettings } from "@keeltown/core/ports";
 import {
@@ -84,12 +84,12 @@ async function commit(projectId: ProjectId, files: FixtureFiles): Promise<string
   );
 }
 
-const caller = (principal: Principal | null): Caller => ({
+const caller = (principal: AgentToken | null): Caller => ({
   requestId: "req-repo",
   principal,
   signal: new AbortController().signal,
 });
-const principal = (projectId: ProjectId, scopes: Principal["scopes"]): Principal => ({
+const principal = (projectId: ProjectId, scopes: AgentToken["scopes"]): AgentToken => ({
   agentId: Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0"),
   projectId,
   scopes,

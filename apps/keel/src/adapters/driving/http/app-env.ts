@@ -1,4 +1,4 @@
-import type { Principal } from "./caller.ts";
+import type { AgentToken } from "./caller.ts";
 
 /** What every route sees on the Hono context: the Worker's bindings and per-request variables. */
 declare module "../../../generated/http/runtime.gen.ts" {
@@ -6,7 +6,7 @@ declare module "../../../generated/http/runtime.gen.ts" {
     Bindings: Env;
     Variables: {
       requestId: string;
-      principal: Principal | undefined;
+      principal: AgentToken | undefined;
     };
   }
 }

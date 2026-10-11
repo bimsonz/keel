@@ -6,13 +6,13 @@ index d6ccfa3..b22a7c1 100644
 @@ -56,7 +56,11 @@ export const admit: (
  /** Who the caller is: its admitted agent, its current session, and the sponsor its token acts for. */
  export const whoami: (
-   principal: Principal,
+   principal: AgentToken,
 -) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted, AgentDirectory | Sessions> =
 +) => Effect.Effect<
 +  Identity,
 +  AgentNotKnown | AgentNotAdmitted | CredentialRejected,
 +  AgentDirectory | Sessions
 +> =
-   Effect.fn("identity/whoami")(function* (principal: Principal) {
+   Effect.fn("identity/whoami")(function* (principal: AgentToken) {
      const agent = yield* admit(principal);
      const current = yield* (yield* Sessions).current(agent.id);

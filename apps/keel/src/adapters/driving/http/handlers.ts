@@ -35,7 +35,7 @@ import { isBootstrap, Scope } from "@keeltown/core/domain/identity";
 import { ProjectId } from "@keeltown/core/kernel";
 import { Effect, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
-import type { Caller, Principal } from "./caller.ts";
+import type { Caller, AgentToken } from "./caller.ts";
 import { latticesOk, tokenError, tokenOk, whoamiError, whoamiOk } from "./mappers.ts";
 import {
   bootstrapConfined,
@@ -105,7 +105,7 @@ import {
 const notYet = (caller: Caller) => notImplemented(caller.requestId);
 
 /** The authorize middleware admitted this caller; a missing principal here is a defect, never a response. */
-function principalOf(caller: Caller): Effect.Effect<Principal> {
+function principalOf(caller: Caller): Effect.Effect<AgentToken> {
   return caller.principal === null
     ? Effect.die(new Error("an authenticated operation ran without a principal"))
     : Effect.succeed(caller.principal);

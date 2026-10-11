@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { Principal } from "@keeltown/core/domain/identity";
+import type { AgentToken } from "@keeltown/core/domain/identity";
 import { AgentId, ProjectId } from "@keeltown/core/kernel";
 import { AgentDirectory, type EnrolInput, Enrolments } from "@keeltown/core/ports";
 import { Effect, type Layer, Option, Schema } from "effect";
@@ -17,7 +17,7 @@ const ulid = () =>
   [...crypto.getRandomValues(new Uint8Array(26))].map((b) => CROCKFORD[b % 32] ?? "0").join("");
 const projectId = () => Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`);
 
-const operator = (): Principal => ({
+const operator = (): AgentToken => ({
   agentId: Schema.decodeUnknownSync(AgentId)(`agt_${ulid()}`),
   projectId: projectId(),
   scopes: ["operator"],

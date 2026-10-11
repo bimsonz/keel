@@ -4,7 +4,7 @@
 // adapter whether a submitted commit is in the workspace.
 import { runDurableObjectAlarm } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import type { Principal } from "@keeltown/core/domain/identity";
+import type { AgentToken } from "@keeltown/core/domain/identity";
 import { LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
 import { type AgentId, type ChangeId, makeId, type ProjectId } from "@keeltown/core/kernel";
 import { makeManualClock, PORTS } from "@keeltown/testing";
@@ -25,7 +25,7 @@ async function readyIn(projectId: ProjectId): Promise<number> {
 }
 
 /** An agent in a project of its own, whose pool holds ready workspaces, as createProject leaves it. */
-async function stockedCaller(): Promise<Principal> {
+async function stockedCaller(): Promise<AgentToken> {
   if (env.TEST_ARTIFACTS === undefined) throw new Error("vitest.config.ts binds TEST_ARTIFACTS");
   const projectId: ProjectId = makeId("prj", ulid());
   const mirror = `mirror-${ulid().toLowerCase()}`;

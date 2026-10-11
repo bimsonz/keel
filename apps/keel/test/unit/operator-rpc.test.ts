@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Agent, IdempotencyConflict, type Principal } from "@keeltown/core/domain/identity";
+import { Agent, IdempotencyConflict, type AgentToken } from "@keeltown/core/domain/identity";
 import { AgentId, isId, ProjectId } from "@keeltown/core/kernel";
 import { Enrolments, Projects, RepoNotFound } from "@keeltown/core/ports";
 import { Effect, Exit, Schema } from "effect";
@@ -14,7 +14,7 @@ import {
   ProjectCodecs,
 } from "../../src/rpc/index.ts";
 
-const operator = (id: string): Principal => ({
+const operator = (id: string): AgentToken => ({
   agentId: Schema.decodeUnknownSync(AgentId)(id),
   projectId: Schema.decodeUnknownSync(ProjectId)("prj_01JZ8PT2C4E6G8J0M2N4Q6S8V3"),
   scopes: ["operator"],
@@ -44,7 +44,7 @@ function projectObjects(answer?: (command: typeof CreateProjectCommand.Encoded) 
 }
 
 const create = (
-  by: Principal,
+  by: AgentToken,
   name: string,
   idempotencyKey: string,
   source = "fixture-forge-lite",

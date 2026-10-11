@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { AgentId, InstantSchema, ProjectId } from "../kernel/index.ts";
-import { Agent, type Principal } from "./agent.ts";
+import { Agent, type AgentToken } from "./agent.ts";
 
 /**
  * The bootstrap credential: how a new deployment gets its first operator.
@@ -30,5 +30,5 @@ export const BOOTSTRAP_AGENT: Agent = Schema.decodeSync(Agent)({
 });
 
 /** Whether a verified token is the bootstrap credential's. */
-export const isBootstrap = (principal: Principal | null): boolean =>
+export const isBootstrap = (principal: AgentToken | null): boolean =>
   principal?.agentId === BOOTSTRAP_AGENT_ID;

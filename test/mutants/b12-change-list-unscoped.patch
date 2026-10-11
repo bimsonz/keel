@@ -6,7 +6,7 @@ index 66bc55e..a2d72bf 100644
 --- a/packages/core/src/application/coordination/read-scope.ts
 +++ b/packages/core/src/application/coordination/read-scope.ts
 @@ -192,7 +192,7 @@ export const projectScope = (
-   principal: Principal | null,
+   principal: AgentToken | null,
    project: ProjectId,
  ): Effect.Effect<ProjectScope, ProjectNotFound | ForeignProject, Projects> => {
 -  if (principal !== null && (readsInstanceWide(principal) || principal.projectId === project))

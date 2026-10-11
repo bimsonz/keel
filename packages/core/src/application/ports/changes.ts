@@ -12,7 +12,7 @@ import type {
   RevisionMismatch,
   SketchNotFound,
 } from "../../domain/coordination/index.ts";
-import type { IdempotencyConflict, Principal } from "../../domain/identity/index.ts";
+import type { IdempotencyConflict, AgentToken } from "../../domain/identity/index.ts";
 import type {
   ChangeId,
   CommitSha,
@@ -81,11 +81,11 @@ export class Changes extends Context.Service<
   Changes,
   {
     readonly declare: (
-      principal: Principal,
+      principal: AgentToken,
       input: DeclareInput,
     ) => Effect.Effect<Declared, PoolExhausted | SketchNotFound | IdempotencyConflict>;
     readonly submit: (
-      principal: Principal,
+      principal: AgentToken,
       input: SubmitInput,
     ) => Effect.Effect<
       Change,
@@ -98,7 +98,7 @@ export class Changes extends Context.Service<
      * IdempotencyConflict.
      */
     readonly adopt: (
-      principal: Principal,
+      principal: AgentToken,
       input: AdoptInput,
     ) => Effect.Effect<
       Adopted,
@@ -115,7 +115,7 @@ export class Changes extends Context.Service<
      * change. PushRejected: the workspace stayed busy, or kept moving (retry).
      */
     readonly rebase: (
-      principal: Principal,
+      principal: AgentToken,
       input: RebaseInput,
     ) => Effect.Effect<
       RebasedChange,
@@ -132,7 +132,7 @@ export class Changes extends Context.Service<
      * leaves. Idempotent by Idempotency-Key per change.
      */
     readonly revise: (
-      principal: Principal,
+      principal: AgentToken,
       input: ReviseInput,
     ) => Effect.Effect<
       Revised,
@@ -140,7 +140,7 @@ export class Changes extends Context.Service<
     >;
     /** Adds one premise under the lease, subscribing the change to its subject; idempotent by Idempotency-Key per change. */
     readonly rely: (
-      principal: Principal,
+      principal: AgentToken,
       input: RelyInput,
     ) => Effect.Effect<
       Revised,
@@ -148,7 +148,7 @@ export class Changes extends Context.Service<
     >;
     /** The preflight of the change's intent as it stands; commits nothing. Only for an agent of the change's project. */
     readonly nearby: (
-      principal: Principal,
+      principal: AgentToken,
       changeId: ChangeId,
     ) => Effect.Effect<Preflight, ChangeNotFound | ChangeInOtherProject>;
     /**
@@ -157,7 +157,7 @@ export class Changes extends Context.Service<
      * the same key with another body is an IdempotencyConflict.
      */
     readonly abandon: (
-      principal: Principal,
+      principal: AgentToken,
       input: AbandonInput,
     ) => Effect.Effect<
       Change,

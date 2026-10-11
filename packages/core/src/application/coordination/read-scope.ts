@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 import type { CoordinationEvent } from "../../domain/coordination/index.ts";
 import type { DeliveryEvent } from "../../domain/delivery/index.ts";
-import type { IdentityEvent, Principal } from "../../domain/identity/index.ts";
+import type { IdentityEvent, AgentToken } from "../../domain/identity/index.ts";
 import { type IntegrationEvent, ProjectNotFound } from "../../domain/integration/index.ts";
 import { ProjectId } from "../../domain/kernel/index.ts";
 import type { MemoryEvent } from "../../domain/memory/index.ts";
@@ -172,7 +172,7 @@ export type ReadRefused = TokenRequired | ProjectNotFound | ForeignProject;
  * every project (S-0's control project too), and an operator, whose authority
  * is instance-wide.
  */
-const readsInstanceWide = (principal: Principal): boolean =>
+const readsInstanceWide = (principal: AgentToken): boolean =>
   principal.scopes.includes("observer") || principal.scopes.includes("operator");
 
 const isPublic = (projectId: ProjectId): Effect.Effect<boolean, never, Projects> =>
@@ -189,7 +189,7 @@ const isPublic = (projectId: ProjectId): Effect.Effect<boolean, never, Projects>
  * (404), whether or not the project exists.
  */
 export const projectScope = (
-  principal: Principal | null,
+  principal: AgentToken | null,
   project: ProjectId,
 ): Effect.Effect<ProjectScope, ProjectNotFound | ForeignProject, Projects> => {
   if (principal !== null && (readsInstanceWide(principal) || principal.projectId === project))
@@ -214,7 +214,7 @@ export const projectScope = (
  * `projectScope`.
  */
 export const readScope = (
-  principal: Principal | null,
+  principal: AgentToken | null,
   asked: ProjectId | undefined,
 ): Effect.Effect<ReadScope, ReadRefused, Projects> => {
   if (asked !== undefined)
@@ -233,7 +233,7 @@ export const readScope = (
  * name one.
  */
 export const viewScope = (
-  principal: Principal | null,
+  principal: AgentToken | null,
   asked: ProjectId | undefined,
 ): Effect.Effect<ProjectScope, ReadRefused, Projects> => {
   const project = asked ?? principal?.projectId;

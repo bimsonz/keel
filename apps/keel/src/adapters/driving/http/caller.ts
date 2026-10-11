@@ -1,6 +1,6 @@
-import type { Principal } from "@keeltown/core/domain/identity";
+import type { AgentToken } from "@keeltown/core/domain/identity";
 
-export type { Principal };
+export type { AgentToken };
 
 /**
  * Who is calling, as the doorways establish it. The HTTP and MCP surfaces
@@ -9,14 +9,14 @@ export type { Principal };
 export interface Caller {
   readonly requestId: string;
   /** Null only on operations the spec publishes as anonymous (the token exchange). */
-  readonly principal: Principal | null;
+  readonly principal: AgentToken | null;
   /** Aborted when the client goes away; the use-case's fiber is interrupted with it. */
   readonly signal: AbortSignal;
 }
 
 /** The outcome of verifying a bearer token. */
 export type Verification =
-  | { readonly principal: Principal }
+  | { readonly principal: AgentToken }
   | { readonly refused: "invalid" | "revoked" };
 
 /** Verifies a bearer token: its signature and expiry, then that its agent may still act at that epoch. */
@@ -25,7 +25,7 @@ export type TokenVerifier = (token: string) => Promise<Verification>;
 /** Whether `principal` satisfies one of the OpenAPI security requirements. */
 export function satisfies(
   requirements: readonly Readonly<Record<string, readonly string[]>>[],
-  principal: Principal,
+  principal: AgentToken,
 ): boolean {
   return requirements.some((requirement) =>
     Object.values(requirement).every((scopes) =>

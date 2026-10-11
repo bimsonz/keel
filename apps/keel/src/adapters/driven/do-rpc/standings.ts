@@ -1,6 +1,6 @@
 import type { AgentId } from "@keeltown/core/kernel";
 import { type StandingInput, Standings } from "@keeltown/core/ports";
-import type { Principal } from "@keeltown/core/domain/identity";
+import type { AgentToken } from "@keeltown/core/domain/identity";
 import { Effect, Layer, Schema } from "effect";
 import { AgentSessionCodecs, StandingCommand } from "../../../rpc/index.ts";
 import { callObject, fingerprintOf } from "./answer.ts";
@@ -23,7 +23,7 @@ export function StandingsRpc(
   agentSession: (agentId: AgentId) => StandingsStub,
 ): Layer.Layer<Standings> {
   const move =
-    (kind: "suspend" | "reinstate" | "revoke") => (principal: Principal, input: StandingInput) =>
+    (kind: "suspend" | "reinstate" | "revoke") => (principal: AgentToken, input: StandingInput) =>
       Effect.gen(function* () {
         const fingerprint = yield* Effect.promise(() =>
           fingerprintOf({ move: kind, reason: input.reason ?? null }),

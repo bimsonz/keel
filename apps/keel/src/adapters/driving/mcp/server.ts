@@ -16,7 +16,7 @@ import { Option, Schema } from "effect";
 import {
   admitsAnonymous,
   type Caller,
-  type Principal,
+  type AgentToken,
   satisfies,
   type TokenVerifier,
 } from "../http/caller.ts";
@@ -28,7 +28,7 @@ const decodeScopes = Schema.decodeUnknownOption(Schema.Array(Scope));
 const decodeSponsor = Schema.decodeUnknownOption(Sponsor);
 
 /** The principal travels from the bearer gate to the tool handlers inside AuthInfo, and is decoded back out. */
-function principalOf(auth: AuthInfo | undefined): Principal | null {
+function principalOf(auth: AuthInfo | undefined): AgentToken | null {
   const agentId = decodeAgentId(auth?.extra?.["agentId"]);
   const projectId = decodeProjectId(auth?.extra?.["projectId"]);
   const scopes = decodeScopes(auth?.scopes ?? []);
@@ -50,7 +50,7 @@ function principalOf(auth: AuthInfo | undefined): Principal | null {
   };
 }
 
-function toolDeps(principal: Principal | null): ToolDeps<Caller> {
+function toolDeps(principal: AgentToken | null): ToolDeps<Caller> {
   return {
     // Consulted at registration: a caller is never shown a tool it could not call.
     permits: (requirements) =>

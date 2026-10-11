@@ -1,4 +1,4 @@
-import { type Agent, type Principal, TokenRejected } from "@keeltown/core/domain/identity";
+import { type Agent, type AgentToken, TokenRejected } from "@keeltown/core/domain/identity";
 import { type AgentId, Instant, makeId } from "@keeltown/core/kernel";
 import {
   AgentDirectory,
@@ -112,7 +112,7 @@ export function makeAgentDirectoryMemory() {
  * reads the Clock port, so a test can expire a token by moving TestClock.
  */
 export function makeTokenIssuerMemory() {
-  const issued = new Map<string, { readonly principal: Principal; readonly expiresAt: number }>();
+  const issued = new Map<string, { readonly principal: AgentToken; readonly expiresAt: number }>();
   return {
     issued,
     layer: Layer.effect(

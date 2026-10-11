@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { type DeclareInput, type SubmitInput } from "@keeltown/core/application/coordination";
 import { FootprintEntry, Proposition } from "@keeltown/core/domain/coordination";
-import type { Principal } from "@keeltown/core/domain/identity";
+import type { AgentToken } from "@keeltown/core/domain/identity";
 import { AgentId, ChangeId, CommitSha, LeaseId, ProjectId } from "@keeltown/core/kernel";
 import { Changes, type WorkspaceGrant } from "@keeltown/core/ports";
 import { Effect, Fiber, type Layer, Schema } from "effect";
@@ -18,7 +18,7 @@ export interface ChangesHarness {
    * A caller whose project can declare: a real adapter's project needs a
    * stocked WorkspacePool first. Absent, each case makes its own.
    */
-  readonly caller?: () => Effect.Effect<Principal>;
+  readonly caller?: () => Effect.Effect<AgentToken>;
   /** The change's lease deadline passes, as time would let it, so an adopt may take it. */
   readonly lapse: (changeId: ChangeId) => Effect.Effect<void>;
 }
@@ -28,7 +28,7 @@ const fresh = (prefix: string) =>
   `${prefix}_${[...crypto.getRandomValues(new Uint8Array(26))].map((b) => CROCKFORD[b % 32] ?? "0").join("")}`;
 
 /** A caller of its own per test: a real adapter's DOs outlive one case. */
-function principal(): Principal {
+function principal(): AgentToken {
   return {
     agentId: Schema.decodeUnknownSync(AgentId)(fresh("agt")),
     projectId: Schema.decodeUnknownSync(ProjectId)(fresh("prj")),
@@ -76,7 +76,7 @@ const declared = (harness: ChangesHarness) =>
   });
 
 /** Another agent of the caller's project, holding only the operator scope. */
-const operatorBeside = (who: Principal): Principal => ({
+const operatorBeside = (who: AgentToken): AgentToken => ({
   ...who,
   agentId: Schema.decodeUnknownSync(AgentId)(fresh("agt")),
   scopes: ["operator"],
@@ -87,7 +87,7 @@ const lapsedChange = (harness: ChangesHarness) =>
   Effect.gen(function* () {
     const found = yield* declared(harness);
     yield* harness.lapse(found.result.change.id);
-    const adopter: Principal = {
+    const adopter: AgentToken = {
       ...found.who,
       agentId: Schema.decodeUnknownSync(AgentId)(fresh("agt")),
     };
@@ -281,7 +281,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
         return Effect.gen(function* () {
           const changes = yield* Changes;
           const { who, result } = yield* declared(harness);
-          const adopter: Principal = {
+          const adopter: AgentToken = {
             ...who,
             agentId: Schema.decodeUnknownSync(AgentId)(fresh("agt")),
           };
@@ -311,7 +311,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
           const again = yield* changes.adopt(adopter, input);
           expect(again.change.lease.id).toBe(first.change.lease.id);
           expect(again.workspace?.workspaceId).toBe(first.workspace?.workspaceId);
-          const other: Principal = {
+          const other: AgentToken = {
             ...adopter,
             agentId: Schema.decodeUnknownSync(AgentId)(fresh("agt")),
           };
@@ -332,7 +332,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
         return Effect.gen(function* () {
           const changes = yield* Changes;
           const { result, adopter } = yield* lapsedChange(harness);
-          const foreign: Principal = {
+          const foreign: AgentToken = {
             ...adopter,
             projectId: Schema.decodeUnknownSync(ProjectId)(fresh("prj")),
           };
@@ -428,7 +428,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
           const { who, result } = yield* declared(harness);
           const near = yield* changes.nearby(who, result.change.id);
           expect(near).toMatchObject({ contradictions: [], suggestedMove: "proceed" });
-          const foreign: Principal = {
+          const foreign: AgentToken = {
             ...who,
             projectId: Schema.decodeUnknownSync(ProjectId)(fresh("prj")),
           };

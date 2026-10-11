@@ -7,7 +7,7 @@ import {
   AgentEvent,
   decideAgent,
   evolveAgent,
-  type Principal,
+  type AgentToken,
   replayAgent,
   Sponsor,
 } from "../../../src/domain/identity/index.ts";
@@ -144,7 +144,7 @@ const throughTheWire = (log: readonly Committed<AgentEvent>[]): Committed<AgentE
     payload: Schema.decodeUnknownSync(AgentEvent)(w.payload),
   }));
 
-const principal = (revocationEpoch: number): Principal => ({
+const principal = (revocationEpoch: number): AgentToken => ({
   agentId: AGENT,
   projectId: PROJECT,
   scopes: ["agent:work"],

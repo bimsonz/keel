@@ -5,8 +5,8 @@ diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapte
 index 34cb8bc..0a5bf8f 100644
 --- a/apps/keel/src/adapters/driving/mcp/server.ts
 +++ b/apps/keel/src/adapters/driving/mcp/server.ts
-@@ -50,8 +50,7 @@ function principalOf(auth: AuthInfo | undefined): Principal | null {
- function toolDeps(principal: Principal | null): ToolDeps<Caller> {
+@@ -50,8 +50,7 @@ function principalOf(auth: AuthInfo | undefined): AgentToken | null {
+ function toolDeps(principal: AgentToken | null): ToolDeps<Caller> {
    return {
      // Consulted at registration: a caller is never shown a tool it could not call.
 -    permits: (requirements) =>

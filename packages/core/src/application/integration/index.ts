@@ -1,5 +1,5 @@
 import type { Effect } from "effect";
-import type { Principal } from "../../domain/identity/index.ts";
+import type { AgentToken } from "../../domain/identity/index.ts";
 import type {
   Batch,
   CandidateNotFound,
@@ -35,17 +35,17 @@ export interface LaneView {
 }
 
 export const getCandidate: (
-  principal: Principal,
+  principal: AgentToken,
   candidateId: CandidateId,
 ) => Effect.Effect<Batch, CandidateNotFound, EntityStore> = stub("integration/getCandidate");
 
 export const listLanes: (
-  principal: Principal,
+  principal: AgentToken,
   projectId: ProjectId,
 ) => Effect.Effect<readonly LaneView[], ProjectNotFound, EntityStore> =
   stub("integration/listLanes");
 
 export const getTrunk: (
-  principal: Principal,
+  principal: AgentToken,
   projectId: ProjectId,
 ) => Effect.Effect<TrunkView, ProjectNotFound, EntityStore> = stub("integration/getTrunk");

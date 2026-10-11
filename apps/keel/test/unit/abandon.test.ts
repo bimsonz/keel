@@ -1,19 +1,19 @@
 import { describe, expect, it } from "@effect/vitest";
 import { type AbandonInput, abandonChange } from "@keeltown/core/application/coordination";
-import type { Principal } from "@keeltown/core/domain/identity";
+import type { AgentToken } from "@keeltown/core/domain/identity";
 import { AgentId, makeId, ProjectId } from "@keeltown/core/kernel";
 import { Changes } from "@keeltown/core/ports";
 import { makeChangesMemory } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 
 const projectId = Schema.decodeUnknownSync(ProjectId)("prj_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
-const agent: Principal = {
+const agent: AgentToken = {
   agentId: Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0"),
   projectId,
   scopes: ["agent:read", "agent:work"],
   revocationEpoch: 0,
 };
-const operator: Principal = {
+const operator: AgentToken = {
   ...agent,
   agentId: Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V1"),
   scopes: ["operator"],

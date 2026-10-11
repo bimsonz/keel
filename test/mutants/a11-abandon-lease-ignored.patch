@@ -6,7 +6,7 @@ index 6fcdbb4..46de497 100644
 --- a/packages/core/src/application/coordination/gateway.ts
 +++ b/packages/core/src/application/coordination/gateway.ts
 @@ -89,7 +89,7 @@ const withdrawAuthority = (
-   principal: Principal,
+   principal: AgentToken,
    lease: LeaseId | undefined,
  ): WithdrawAuthority | undefined => {
 -  if (lease !== undefined) return { _tag: "Lease", leaseId: lease };

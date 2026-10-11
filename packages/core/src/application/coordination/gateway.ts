@@ -13,7 +13,7 @@ import type {
   SketchNotFound,
   WithdrawAuthority,
 } from "../../domain/coordination/index.ts";
-import type { IdempotencyConflict, InboxPage, Principal } from "../../domain/identity/index.ts";
+import type { IdempotencyConflict, InboxPage, AgentToken } from "../../domain/identity/index.ts";
 import { ChangeId, type LeaseId, type ProjectId } from "../../domain/kernel/index.ts";
 import {
   type ChangeListPage,
@@ -57,7 +57,7 @@ const clampWait = (seconds: number | undefined) =>
   Math.min(MAX_WAIT_SECONDS, Math.max(0, Math.trunc(seconds ?? 0)));
 
 export const declareChange: (
-  principal: Principal,
+  principal: AgentToken,
   input: DeclareInput,
 ) => Effect.Effect<Declared, PoolExhausted | SketchNotFound | IdempotencyConflict, Changes> = (
   principal,
@@ -65,7 +65,7 @@ export const declareChange: (
 ) => Changes.use((changes) => changes.declare(principal, input));
 
 export const submitChange: (
-  principal: Principal,
+  principal: AgentToken,
   input: SubmitInput,
 ) => Effect.Effect<
   Change,
@@ -75,7 +75,7 @@ export const submitChange: (
 
 /** Takes over a change whose lease lapsed. The Change DO checks the lapse and the caller's project. */
 export const adoptChange: (
-  principal: Principal,
+  principal: AgentToken,
   input: AdoptInput,
 ) => Effect.Effect<
   Adopted,
@@ -85,7 +85,7 @@ export const adoptChange: (
 
 /** Moves a change onto trunk's head after a textual bounce. The Change DO checks the lease and the state before anything is pushed. */
 export const rebaseChange: (
-  principal: Principal,
+  principal: AgentToken,
   input: RebaseInput,
 ) => Effect.Effect<
   RebasedChange,
@@ -100,7 +100,7 @@ export const rebaseChange: (
 
 /** Revises a change's intent at the revision the caller last read. The Change DO checks the lease and the revision. */
 export const reviseChange: (
-  principal: Principal,
+  principal: AgentToken,
   input: ReviseInput,
 ) => Effect.Effect<
   Revised,
@@ -110,7 +110,7 @@ export const reviseChange: (
 
 /** Adds one premise to a change; relying on a subject subscribes the change to it. */
 export const relyOn: (
-  principal: Principal,
+  principal: AgentToken,
   input: RelyInput,
 ) => Effect.Effect<
   Revised,
@@ -120,7 +120,7 @@ export const relyOn: (
 
 /** What is near a change now, for an agent of its project. */
 export const nearbyOf: (
-  principal: Principal,
+  principal: AgentToken,
   changeId: ChangeId,
 ) => Effect.Effect<Preflight, ChangeNotFound | ChangeInOtherProject, Changes> = (
   principal,
@@ -141,7 +141,7 @@ export class LeaseRequired extends Schema.TaggedError<LeaseRequired>()("LeaseReq
  * the change; whether the lease is the change's is the Change DO's to say.
  */
 const withdrawAuthority = (
-  principal: Principal,
+  principal: AgentToken,
   lease: LeaseId | undefined,
 ): WithdrawAuthority | undefined => {
   if (lease !== undefined) return { _tag: "Lease", leaseId: lease };
@@ -152,7 +152,7 @@ const withdrawAuthority = (
 
 /** Withdraws a change under its lease, or as an operator. The Change DO checks the lease and the state. */
 export const abandonChange: (
-  principal: Principal,
+  principal: AgentToken,
   call: AbandonCall,
 ) => Effect.Effect<
   Change,
@@ -175,7 +175,7 @@ export const submissionOf: (
 
 /** The caller's own inbox after `cursor`, waiting up to `waitSeconds` (0–30) for a notice. */
 export const readInbox: (
-  principal: Principal,
+  principal: AgentToken,
   cursor: string | undefined,
   waitSeconds?: number,
 ) => Effect.Effect<InboxPage, never, Inbox> = (principal, cursor, waitSeconds) =>
@@ -190,7 +190,7 @@ export const readInbox: (
  * before any wait.
  */
 export const readEvents: (
-  principal: Principal | null,
+  principal: AgentToken | null,
   input: {
     readonly cursor?: string;
     readonly limit?: number;
@@ -223,7 +223,7 @@ export const readEvents: (
 
 /** A project's changes from the Projector's read model, newest `#n` first, as far as `viewScope` lets the caller read. */
 export const readChangeList: (
-  principal: Principal | null,
+  principal: AgentToken | null,
   read: Omit<ChangeListRead, "project"> & { readonly project?: ProjectId },
 ) => Effect.Effect<ChangeListPage, ReadRefused, ProjectViews | Projects> = (principal, read) =>
   Effect.flatMap(viewScope(principal, read.project), ({ project }) =>
@@ -232,7 +232,7 @@ export const readChangeList: (
 
 /** A project's changes and trunk at the feed's head, with the cursor to fold forward from. */
 export const readSnapshot: (
-  principal: Principal | null,
+  principal: AgentToken | null,
   project: ProjectId | undefined,
 ) => Effect.Effect<ViewSnapshot, ReadRefused, ProjectViews | Projects> = (principal, asked) =>
   Effect.flatMap(viewScope(principal, asked), ({ project }) =>

@@ -1,6 +1,6 @@
 import type { Effect } from "effect";
 import type { SubjectKey } from "../../domain/coordination/index.ts";
-import type { Principal } from "../../domain/identity/index.ts";
+import type { AgentToken } from "../../domain/identity/index.ts";
 import type { DecisionId, EscalationId } from "../../domain/kernel/index.ts";
 import type {
   Decision,
@@ -19,24 +19,24 @@ export type WhyTarget =
   | { readonly kind: "subject"; readonly subject: SubjectKey };
 
 export const why: (
-  principal: Principal,
+  principal: AgentToken,
   target: WhyTarget,
 ) => Effect.Effect<readonly WhyLink[], NothingToExplain, EntityStore | SubjectRegistry> =
   stub("memory/why");
 
 export const listDecisions: (
-  principal: Principal,
+  principal: AgentToken,
   subject: SubjectKey | undefined,
 ) => Effect.Effect<readonly Decision[], never, EntityStore | SubjectRegistry> =
   stub("memory/listDecisions");
 
 export const getDecision: (
-  principal: Principal,
+  principal: AgentToken,
   decisionId: DecisionId,
 ) => Effect.Effect<Decision, DecisionNotFound, EntityStore> = stub("memory/getDecision");
 
 export const giveRuling: (
-  principal: Principal,
+  principal: AgentToken,
   input: {
     readonly escalationId: EscalationId;
     readonly option: string;

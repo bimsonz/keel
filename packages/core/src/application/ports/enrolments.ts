@@ -3,7 +3,7 @@ import type {
   Agent,
   AgentKind,
   IdempotencyConflict,
-  Principal,
+  AgentToken,
   Scope,
   Sponsor,
 } from "../../domain/identity/index.ts";
@@ -39,7 +39,7 @@ export class Enrolments extends Context.Service<
   Enrolments,
   {
     readonly enrol: (
-      principal: Principal,
+      principal: AgentToken,
       input: EnrolInput,
     ) => Effect.Effect<Enrolment, IdempotencyConflict>;
   }

@@ -1,5 +1,5 @@
 import { Effect, Option, Schema } from "effect";
-import type { Principal } from "../../domain/identity/index.ts";
+import type { AgentToken } from "../../domain/identity/index.ts";
 import { ProjectNotFound } from "../../domain/integration/index.ts";
 import { CommitSha, type ProjectId } from "../../domain/kernel/index.ts";
 import {
@@ -44,7 +44,7 @@ const asSha = Schema.decodeUnknownOption(CommitSha);
  * not exist, so a private project's existence does not leak.
  */
 export const repoAccess = (
-  principal: Principal | null,
+  principal: AgentToken | null,
   projectId: ProjectId,
 ): Effect.Effect<RepoRef, ProjectNotFound, Projects> => {
   const trunk = Effect.succeed(projectRepos(projectId).trunk);
@@ -90,7 +90,7 @@ export interface RepoTreeView {
 }
 
 export const readRepoTree = (
-  principal: Principal | null,
+  principal: AgentToken | null,
   projectId: ProjectId,
   input: { readonly ref?: string; readonly path: string },
 ): Effect.Effect<RepoTreeView, ProjectNotFound | RefNotFound | PathNotFound, Projects | CodeHost> =>
@@ -117,7 +117,7 @@ export interface RepoBlobView {
 }
 
 export const readRepoBlob = (
-  principal: Principal | null,
+  principal: AgentToken | null,
   projectId: ProjectId,
   input: { readonly ref?: string; readonly path: string },
 ): Effect.Effect<RepoBlobView, ProjectNotFound | RefNotFound | PathNotFound, Projects | CodeHost> =>
@@ -164,7 +164,7 @@ export interface RepoCommitPage {
  * trunk moves.
  */
 export const listRepoCommits = (
-  principal: Principal | null,
+  principal: AgentToken | null,
   projectId: ProjectId,
   input: { readonly ref?: string; readonly from?: CommitSha; readonly limit?: number },
 ): Effect.Effect<RepoCommitPage, ProjectNotFound | RefNotFound, Projects | CodeHost> =>
@@ -236,7 +236,7 @@ const withSides = (repo: RepoRef, files: readonly TreeChange[]) =>
 
 /** A commit and the files it changed against its first parent, with their text; a root commit adds every file. */
 export const readRepoCommit = (
-  principal: Principal | null,
+  principal: AgentToken | null,
   projectId: ProjectId,
   sha: CommitSha,
 ): Effect.Effect<RepoCommitDiffView, ProjectNotFound | RefNotFound, Projects | CodeHost> =>

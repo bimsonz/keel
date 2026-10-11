@@ -7,7 +7,11 @@ import {
   Preflight,
   ChangeStateRefused,
 } from "@keeltown/core/domain/coordination";
-import { AgentNotKnown, IdempotencyConflict, type Principal } from "@keeltown/core/domain/identity";
+import {
+  AgentNotKnown,
+  IdempotencyConflict,
+  type AgentToken,
+} from "@keeltown/core/domain/identity";
 import { AgentId, ChangeId, CommitSha, LeaseId, ProjectId } from "@keeltown/core/kernel";
 import { NotImplemented } from "@keeltown/core/not-implemented";
 import { Changes, Inbox } from "@keeltown/core/ports";
@@ -28,7 +32,7 @@ import {
 const agentId = Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 const changeId = Schema.decodeUnknownSync(ChangeId)("chg_01JZ8PT2C4E6G8J0M2N4Q6S8V1");
 const lease = Schema.decodeUnknownSync(LeaseId)("lse_01JZ8PT2C4E6G8J0M2N4Q6S8V2");
-const principal: Principal = {
+const principal: AgentToken = {
   agentId,
   projectId: Schema.decodeUnknownSync(ProjectId)("prj_01JZ8PT2C4E6G8J0M2N4Q6S8V3"),
   scopes: ["agent:work"],

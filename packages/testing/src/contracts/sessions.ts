@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { Agent, Principal, Sponsor } from "@keeltown/core/domain/identity";
+import type { Agent, AgentToken, Sponsor } from "@keeltown/core/domain/identity";
 import { AgentId, ProjectId } from "@keeltown/core/kernel";
 import {
   type AgentDirectory,
@@ -25,7 +25,7 @@ const ulid = () =>
   [...crypto.getRandomValues(new Uint8Array(26))].map((b) => CROCKFORD[b % 32] ?? "0").join("");
 const agentId = () => Schema.decodeUnknownSync(AgentId)(`agt_${ulid()}`);
 
-const operator = (): Principal => ({
+const operator = (): AgentToken => ({
   agentId: agentId(),
   projectId: Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`),
   scopes: ["operator"],
@@ -45,7 +45,7 @@ const enrolled = (sponsor?: Sponsor, obo?: Sponsor) =>
     return { agent, principal: principalOf(agent, obo) };
   });
 
-const principalOf = (agent: Agent, obo?: Sponsor): Principal => ({
+const principalOf = (agent: Agent, obo?: Sponsor): AgentToken => ({
   agentId: agent.id,
   projectId: agent.projectId,
   scopes: agent.scopes,
@@ -160,7 +160,7 @@ export function describeSessionsContract(adapter: string, make: () => SessionsHa
       const harness = make();
       return Effect.gen(function* () {
         const sessions = yield* Sessions;
-        const stranger: Principal = { ...operator(), scopes: ["agent:work"] };
+        const stranger: AgentToken = { ...operator(), scopes: ["agent:work"] };
         expect(yield* Effect.flip(sessions.open(stranger, asking()))).toMatchObject({
           _tag: "AgentNotKnown",
           agentId: stranger.agentId,

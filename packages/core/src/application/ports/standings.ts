@@ -4,7 +4,7 @@ import type {
   AgentNotKnown,
   AgentStateRefused,
   IdempotencyConflict,
-  Principal,
+  AgentToken,
 } from "../../domain/identity/index.ts";
 import type { AgentId } from "../../domain/kernel/index.ts";
 
@@ -27,15 +27,15 @@ export class Standings extends Context.Service<
   Standings,
   {
     readonly suspend: (
-      principal: Principal,
+      principal: AgentToken,
       input: StandingInput,
     ) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict>;
     readonly reinstate: (
-      principal: Principal,
+      principal: AgentToken,
       input: StandingInput,
     ) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict>;
     readonly revoke: (
-      principal: Principal,
+      principal: AgentToken,
       input: StandingInput,
     ) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict>;
   }

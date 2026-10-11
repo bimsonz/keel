@@ -8,7 +8,7 @@ index 2a4ba09..24fd0b0 100644
 @@ -1,6 +1,6 @@
 -import type { Effect } from "effect";
 +import { Effect } from "effect";
- import type { IdempotencyConflict, Principal } from "../../domain/identity/index.ts";
+ import type { IdempotencyConflict, AgentToken } from "../../domain/identity/index.ts";
 -import type { ProjectNotFound } from "../../domain/integration/index.ts";
 +import { ProjectNotFound } from "../../domain/integration/index.ts";
  import type { ProjectId } from "../../domain/kernel/index.ts";

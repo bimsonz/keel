@@ -5,7 +5,7 @@ diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages
 index 66bc55e..4f9f734 100644
 --- a/packages/core/src/application/coordination/read-scope.ts
 +++ b/packages/core/src/application/coordination/read-scope.ts
-@@ -178,7 +178,6 @@ const readsInstanceWide = (principal: Principal): boolean =>
+@@ -178,7 +178,6 @@ const readsInstanceWide = (principal: AgentToken): boolean =>
  const isPublic = (projectId: ProjectId): Effect.Effect<boolean, never, Projects> =>
    Projects.use((projects) => projects.settings(projectId)).pipe(
      Effect.map((settings) => settings.visibility === "public"),

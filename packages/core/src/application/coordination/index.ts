@@ -7,7 +7,7 @@ import type {
   Proposition,
   WithdrawAuthority,
 } from "../../domain/coordination/index.ts";
-import type { Principal } from "../../domain/identity/index.ts";
+import type { AgentToken } from "../../domain/identity/index.ts";
 import type { ChangeId, CommitSha, Instant, LeaseId, SketchId } from "../../domain/kernel/index.ts";
 import { stub } from "../not-implemented.ts";
 import type { Clock, Ids, WorkspacePool, WorkspaceGrant } from "../ports/index.ts";
@@ -103,7 +103,7 @@ export interface SketchOpened {
 }
 
 export const openSketch: (
-  principal: Principal,
+  principal: AgentToken,
   purpose: string | undefined,
 ) => Effect.Effect<SketchOpened, PoolExhausted, Clock | Ids | WorkspacePool> =
   stub("coordination/openSketch");
