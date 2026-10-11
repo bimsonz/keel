@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: events.world-check-id
+# why: a suite cell on trunk is refused: only a change's own suite may fill a world
+diff --git a/packages/core/src/domain/verification/events.ts b/packages/core/src/domain/verification/events.ts
+index 745e46e..f1ff8c8 100644
+--- a/packages/core/src/domain/verification/events.ts
++++ b/packages/core/src/domain/verification/events.ts
+@@ -59,7 +59,7 @@ export const ProbeRan = Schema.TaggedStruct("ProbeRan", {
+  * the project's suite on trunk, or `suite:<changeId>`, a change's own.
+  */
+ export const WorldCheck = Schema.String.check(
+-  Schema.isPattern(new RegExp(`^suite:(?:trunk|${idPattern("chg").source.slice(1, -1)})$`)),
++  Schema.isPattern(new RegExp(`^suite:${idPattern("chg").source.slice(1, -1)}$`)),
+ );
+ const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+ /**

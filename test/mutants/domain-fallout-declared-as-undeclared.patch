@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/fallout.test.ts
+# kills: fallout.declared
+# why: an effect the agent declared reads as undeclared, so its conflict is a silent retraction
+diff --git a/packages/core/src/domain/coordination/derivation.ts b/packages/core/src/domain/coordination/derivation.ts
+index d06b78f..6b5baeb 100644
+--- a/packages/core/src/domain/coordination/derivation.ts
++++ b/packages/core/src/domain/coordination/derivation.ts
+@@ -71,7 +71,7 @@ export type DeclaredEffect = typeof DeclaredEffect.Type;
+ export const declaredEffect = (proposition: Proposition): DeclaredEffect => ({
+   proposition,
+   anchors: proposition.anchors ?? [],
+-  declared: true,
++  declared: false,
+   method: "declared",
+   evidenceClass: "testimony",
+ });

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.draft-budget
+# why: a probe gets three drafts, so the drafter's last repair is refused
+diff --git a/packages/core/src/domain/verification/probe.ts b/packages/core/src/domain/verification/probe.ts
+index c26be51..8282dc7 100644
+--- a/packages/core/src/domain/verification/probe.ts
++++ b/packages/core/src/domain/verification/probe.ts
+@@ -28,7 +28,7 @@ export const ADMISSION_RUNS = 3;
+  * How many drafts a probe gets before its conflict is unprovable (the bounded
+  * repair loop): the first draft and three repairs, as `DRAFT_REPAIRS` sets them.
+  */
+-export const MAX_DRAFT_ATTEMPTS = 4;
++export const MAX_DRAFT_ATTEMPTS = 3;
+ 
+ export const ProbeState = Schema.Literals(["calibrating", "admitted", "discarded", "retired"]);
+ export type ProbeState = typeof ProbeState.Type;

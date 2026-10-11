@@ -2,7 +2,7 @@
 # kills: probe.needs-three-runs
 # why: Two runs are taken as stable
 diff --git a/packages/core/src/domain/verification/probe.ts b/packages/core/src/domain/verification/probe.ts
-index f3791f2..b5ff6c0 100644
+index c26be51..d78f901 100644
 --- a/packages/core/src/domain/verification/probe.ts
 +++ b/packages/core/src/domain/verification/probe.ts
 @@ -22,7 +22,7 @@ export const ProbeCell = Schema.Struct({
@@ -12,5 +12,5 @@ index f3791f2..b5ff6c0 100644
 -export const ADMISSION_RUNS = 3;
 +export const ADMISSION_RUNS = 2;
  
- /** How many drafts a probe gets before its conflict is unprovable (the bounded repair loop). */
- export const MAX_DRAFT_ATTEMPTS = 3;
+ /**
+  * How many drafts a probe gets before its conflict is unprovable (the bounded

@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.suspect-propositions
+# why: the Conflict forgets the effect it was suspected over, so no probe can be drafted against it
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index 99b163b..eec2d38 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -340,7 +340,6 @@ export const evolveConflict = (
+           ...(event.predicate === undefined ? {} : { predicate: event.predicate }),
+           ...(event.origin === undefined ? {} : { origin: event.origin }),
+           ...(event.premise === undefined ? {} : { premise: event.premise }),
+-          ...(event.effect === undefined ? {} : { effect: event.effect }),
+           openedAt: committed.at,
+         }
+       : illegal(state, event);
