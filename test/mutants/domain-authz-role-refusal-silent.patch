@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.refusal-shape
+# why: a refusal for too low a role names no next action
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 91a2965..b65506a 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -319,7 +319,7 @@ const lacksRole = (need: "member" | "maintain" | "own" | "admin"): Decision =>
+   Result.fail(
+     new AccessRefused({
+       reason: "role",
+-      nextActions: [{ kind: "escalate", title: `Ask ${ROLE_NAMES[need]}: this needs that role` }],
++      nextActions: [],
+     }),
+   );
+ 

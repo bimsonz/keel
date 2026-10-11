@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.role-ladder
+# why: an owner lacks what a maintainer holds, so an owner is refused putSettings
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 91a2965..545cb3d 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -171,7 +171,7 @@ export type AuthorizationRefusal = AuthenticationRequired | NotVisible | AccessR
+ export type Right = "read" | "work" | "member" | "maintain" | "own";
+ 
+ const ROLE_RIGHTS: Readonly<Record<Role, readonly Right[]>> = {
+-  owner: ["read", "member", "maintain", "own"],
++  owner: ["read", "member", "own"],
+   maintainer: ["read", "member", "maintain"],
+   member: ["read", "member"],
+ };

@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.bootstrap-confined
+# why: the bootstrap credential may change a project's settings
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 91a2965..0d1199c 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -155,6 +155,7 @@ export const BOOTSTRAP_ACTIONS: ReadonlySet<Action> = new Set<Action>([
+   "Auth_exchangeToken",
+   "Admin_createUser",
+   "Operator_enrolAgent",
++  "Operator_putSettings",
+ ]);
+ 
+ /** Who may see what a grant lets the caller read: everything members see, or only what is public. */

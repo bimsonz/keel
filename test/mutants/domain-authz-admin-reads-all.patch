@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.admin-not-reader
+# why: the instance admin bypasses the policy on reads, so it reads every org's private projects
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 91a2965..a395d4f 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -373,6 +373,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
+   if (principal.suspended) return refused("user-suspended");
+   if (need === "handle") return granted();
+   if (principal.handle === undefined) return refused("handle-required");
++  if (principal.instanceAdmin && need === "read") return granted("members");
+   switch (need) {
+     case "anyone":
+     case "self":

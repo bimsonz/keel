@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.private-is-missing
+# why: a non-member is told 403 for a private project, so it can tell a private project from a missing one
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 91a2965..4c06841 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -343,7 +343,8 @@ const notSeen = (
+   const inside = insideOrg(principal, resource.org);
+   const suspended = resource._tag === "Org" ? resource.suspended : resource.orgSuspended;
+   if (suspended) return inside ? refused("org-suspended") : hidden();
+-  if (resource._tag === "Project" && resource.visibility === "private" && !inside) return hidden();
++  if (resource._tag === "Project" && resource.visibility === "private" && !inside)
++    return refused("foreign-project");
+   return undefined;
+ };
+ 

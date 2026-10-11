@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.agent-own-project
+# why: an agent reads every project of its org as a member, not only its own
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 91a2965..050ba24 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -440,7 +440,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
+   if (resource._tag === "Org" && need !== "read") return refused("foreign-project");
+   const rights = rightsOf(principal, resource);
+   if (need === "read" || need === "readMembers")
+-    return rights.has("read") ? granted(own ? "members" : "public") : refused("scope");
++    return rights.has("read") ? granted(resource.org === principal.org ? "members" : "public") : refused("scope");
+   return rights.has("work") ? granted() : refused("scope");
+ };
+ 

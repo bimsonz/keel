@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.anonymous-public-only
+# why: an anonymous read of a public project is granted the members' audience
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 91a2965..c24f04c 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -350,7 +350,7 @@ const notSeen = (
+ const anonymous = (need: Need, resource: Resource): Decision => {
+   if (need === "anyone") return granted();
+   if (need !== "read") return unauthenticated();
+-  return rightsOf({ _tag: "Anonymous" }, resource).has("read") ? granted("public") : hidden();
++  return rightsOf({ _tag: "Anonymous" }, resource).has("read") ? granted("members") : hidden();
+ };
+ 
+ const fork = (user: UserPrincipal, resource: ForkResource): Decision => {

@@ -1,0 +1,23 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.spec-covered
+# why: rebase, an operation in the spec, is listed as a non-spec action
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 91a2965..fcde482 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -90,7 +90,6 @@ export const SPEC_ACTIONS = {
+   declare: rule("Project", "work"),
+   adopt: rule("Project", "work"),
+   rely: rule("Project", "work"),
+-  rebase: rule("Project", "work"),
+   revise: rule("Project", "work"),
+   submit: rule("Project", "work"),
+   sketch: rule("Project", "work"),
+@@ -122,6 +121,7 @@ export const NON_SPEC_ACTIONS = {
+   ManageDeployTargets: rule("Project", "own"),
+   DeleteProject: rule("Project", "own"),
+   CloneRepo: rule("Project", "read"),
++  rebase: rule("Project", "work"),
+   /** Granted when the caller reads the source and is a member of the target org. */
+   Operator_forkProject: rule("Fork", "member"),
+   SuspendUser: rule("Instance", "admin"),

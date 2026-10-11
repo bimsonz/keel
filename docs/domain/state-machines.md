@@ -28,6 +28,8 @@ Terms are in [CONTEXT.md](../../CONTEXT.md).
 | tenet | Subject DO | `subj:<project>:<key>` |
 | escalation | the DO that raised it | as its raiser |
 | deployment | the DO that created it | as its creator |
+| user | none: D1 (Better Auth) holds it; its tenancy events are committed for the audit | `user:<userId>` |
+| org | none: D1 (Better Auth) holds it; its tenancy events are committed to the org's object | `org:<orgId>` |
 
 D1 holds projections only (the catalog, and `AgentDirectory`'s client-credential index). No decision reads K2 or D1.
 
