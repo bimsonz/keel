@@ -12,7 +12,8 @@ import { Option, Schema } from "effect";
  */
 export const ArtifactsRepoPushed = Schema.Struct({
   type: Schema.Literal("cf.artifacts.repo.pushed"),
-  source: Schema.Struct({ type: Schema.String, namespace: Schema.String, repoName: Schema.String }),
+  // Delivered on staging (11 Oct): `source` is `{ namespace, repoName }`, with no `type`.
+  source: Schema.Struct({ namespace: Schema.String, repoName: Schema.String }),
   payload: Schema.Struct({ ref: Schema.String, before: Schema.String, after: Schema.String }),
 });
 

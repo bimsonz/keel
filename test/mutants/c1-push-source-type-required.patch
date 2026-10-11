@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/artifacts-push.test.ts -t "push.translate-live"
+# kills: push.translate-live
+# why: The decoder demands a source.type Artifacts never sends, so every real push is dropped and no WorkspacePushed is ever committed (staging, 11 Oct)
+diff --git a/apps/keel/src/adapters/driving/queue/artifacts-events.ts b/apps/keel/src/adapters/driving/queue/artifacts-events.ts
+index c4f2b58..52eacf5 100644
+--- a/apps/keel/src/adapters/driving/queue/artifacts-events.ts
++++ b/apps/keel/src/adapters/driving/queue/artifacts-events.ts
+@@ -13,7 +13,7 @@ import { Option, Schema } from "effect";
+ export const ArtifactsRepoPushed = Schema.Struct({
+   type: Schema.Literal("cf.artifacts.repo.pushed"),
+   // Delivered on staging (11 Oct): `source` is `{ namespace, repoName }`, with no `type`.
+-  source: Schema.Struct({ namespace: Schema.String, repoName: Schema.String }),
++  source: Schema.Struct({ type: Schema.String, namespace: Schema.String, repoName: Schema.String }),
+   payload: Schema.Struct({ ref: Schema.String, before: Schema.String, after: Schema.String }),
+ });
+ 
