@@ -20,7 +20,8 @@
     "smoke": "node scripts/smoke.ts staging",
     "seed": "node scripts/seed.ts",
     "e2e:s0": "node e2e/src/s0.ts",
-    "e2e:agents": "node e2e/agents/two-agents.ts"
+    "e2e:agents": "node e2e/agents/two-agents.ts",
+    "e2e:chain": "node e2e/src/chain.ts"
   },
   "devDependencies": {
     "@keeltown/tooling": "workspace:*",
