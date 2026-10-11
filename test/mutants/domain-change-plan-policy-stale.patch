@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.plan-policy-folded
+# why: a plan compiled with no predicate policy clears the earlier plan's, so a stale block never outlives its plan
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 96ed85a..5517a32 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -815,7 +815,7 @@ export const evolveChange = (
+     case "PlanCompiled":
+       return from("deriving")
+         ? {
+-            ...moveTo(change, "verifying", ["predicatePolicy"]),
++            ...moveTo(change, "verifying"),
+             planHash: event.planHash,
+             ...(event.predicatePolicy === undefined
+               ? {}
