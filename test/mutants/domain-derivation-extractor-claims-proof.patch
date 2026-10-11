@@ -2,7 +2,7 @@
 # kills: derivation.record-shape
 # why: An extractor's finding may claim proof, though an extractor executes nothing
 diff --git a/packages/core/src/domain/coordination/derivation.ts b/packages/core/src/domain/coordination/derivation.ts
-index 513db43..2309bea 100644
+index 27630fa..34a10ee 100644
 --- a/packages/core/src/domain/coordination/derivation.ts
 +++ b/packages/core/src/domain/coordination/derivation.ts
 @@ -27,7 +27,7 @@ const derivedFields = {
@@ -11,6 +11,6 @@ index 513db43..2309bea 100644
    method: Schema.Literal("extractor"),
 -  evidenceClass: Schema.Literal("ruling"),
 +  evidenceClass: Schema.Literals(["proof", "ruling"]),
-   /** An extractor has no probability to give. */
-   p: Schema.optional(Schema.Never),
  });
+ /** Answered by a decision model: opinion, always with its probability. */
+ export const DecisionModelEffect = Schema.Struct({
