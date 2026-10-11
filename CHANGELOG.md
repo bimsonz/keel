@@ -21,6 +21,7 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 - The Workspace, Sketch and Agent state machines: `decideWorkspace`/`evolveWorkspace`/`replayWorkspace`, `decideSketch`/`evolveSketch`/`replaySketch` with `sketchExpired`, `decideAgent`/`evolveAgent`/`replayAgent`; schemas `Workspace`, `WorkspaceState`, `Sketch`, `SketchState`; `WorkspaceEvent`, `SketchEvent`, `AgentEvent`.
 - Event `WorkspaceReassigned {workspaceId, sketchId, changeId}`. Errors `WorkspaceStateRefused`, `SketchStateRefused {reason?: expired, nextActions}`, `AgentStateRefused`.
 - `VerdictIssued.planHash` is optional: absent only for a Precheck refusal, a ruling-class verdict with no compiled plan. A present hash always resolves to a plan.
+- Event `ProjectSettingsChanged {projectId, changes: [{field, from, to}], by}` on the `project` entity, committed by the Project DO when an operator changes the project's settings; `from` and `to` are the field's JSON values (catalogue 89 → 90).
 - Event `ProjectCreated {projectId, name, by}` on the `project` entity, committed by the Project DO when a project is created (catalogue 88 → 89).
 - `EventDraft.entity?`: a draft may name another entity its Durable Object owns (the Change DO's verdicts). That entity gets its own gap-free `seq` and dedupe keys; the default is still `CommitSpec.entity`.
 

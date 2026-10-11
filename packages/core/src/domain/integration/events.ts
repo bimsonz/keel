@@ -112,6 +112,18 @@ export const ProjectCreated = Schema.TaggedStruct("ProjectCreated", {
   name: Schema.String,
   by: Schema.String,
 });
+/** One setting an operator changed: its name, and its JSON value before and after. */
+export const SettingChange = Schema.Struct({
+  field: Schema.String,
+  from: Schema.Unknown,
+  to: Schema.Unknown,
+});
+/** An operator changed the project's settings: every change is audited, e.g. turning verification off. */
+export const ProjectSettingsChanged = Schema.TaggedStruct("ProjectSettingsChanged", {
+  projectId: ProjectId,
+  changes: Schema.Array(SettingChange),
+  by: Schema.String,
+});
 /** The trunk's first known head, from the project's seed or an operator. Nothing promotes before it. */
 export const TrunkInitialized = Schema.TaggedStruct("TrunkInitialized", {
   projectId: ProjectId,
@@ -159,6 +171,7 @@ export const IntegrationEvent = Schema.Union([
   PromotionFrozen,
   PromotionResumed,
   ProjectCreated,
+  ProjectSettingsChanged,
   TrunkInitialized,
   PromotionStarted,
   PromotionComposed,
