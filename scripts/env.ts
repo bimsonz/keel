@@ -45,7 +45,11 @@ export function accountId(): string {
 
 let token: string | undefined;
 
-/** A short-lived API token from the operator's wrangler login, fetched once per run. */
+/**
+ * A short-lived API token from the operator's wrangler login, fetched once and
+ * reused. A wrangler command run in between may refresh the login, which
+ * revokes this token, so `cloudflare()` fetches it again on a 401.
+ */
 export function apiToken(): string {
   token ??= wrangler(["auth", "token"], { quiet: true }).trim().split("\n").pop() ?? "";
   if (token.length < 20)
@@ -55,14 +59,18 @@ export function apiToken(): string {
 
 /** One Cloudflare API call, answering its `result`; throws with the API's own errors. */
 export async function cloudflare(method: string, path: string, body?: unknown): Promise<unknown> {
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId()}${path}`,
-    {
+  const send = () =>
+    fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId()}${path}`, {
       method,
       headers: { authorization: `Bearer ${apiToken()}`, "content-type": "application/json" },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    },
-  );
+    });
+  let response = await send();
+  if (response.status === 401) {
+    // The deploy's own wrangler runs refresh the login, which revokes the token fetched earlier.
+    token = undefined;
+    response = await send();
+  }
   const json: unknown = await response.json();
   const success =
     typeof json === "object" && json !== null && Reflect.get(json, "success") === true;
