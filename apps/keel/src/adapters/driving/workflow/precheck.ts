@@ -1,9 +1,11 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
 import { NonRetryableError } from "cloudflare:workflows";
 import {
+  checkAncestry,
   decidePrecheck,
   diffSubmission,
   PrecheckDecision,
+  type PrecheckFindings,
   type PrecheckSubmission,
   precheckPolicy,
   recordPlan,
@@ -14,11 +16,16 @@ import { ChangeId, CommitSha } from "@keeltown/core/kernel";
 import { Cause, type Effect, Exit, type ManagedRuntime, Option, Schema } from "effect";
 import { precheckRuntime } from "../../../composition/workflow.ts";
 
-/** What the outbox starts Precheck with: `ChangeSubmitted`'s payload, plus the event's id. */
+/**
+ * What the outbox starts Precheck with: `ChangeSubmitted`'s payload, plus the
+ * event's id. `baseSha` is optional only because older events lack it, and a
+ * submission without it is refused.
+ */
 export const PrecheckParams = Schema.Struct({
   changeId: ChangeId,
   revision: Schema.Int,
   commitSha: CommitSha,
+  baseSha: Schema.optional(CommitSha),
   eventId: Schema.String,
 });
 export type PrecheckParams = typeof PrecheckParams.Encoded;
@@ -63,12 +70,13 @@ const done = <A>(settled: Settled<A>): A => {
 };
 
 /**
- * Precheck, started by `ChangeSubmitted` as `precheck-<eventId>`: diff the
- * submitted commit against the change's base, refuse guard and protected
- * paths (and, until D2.1, any plan KeelVerify cannot run yet), otherwise
- * compile the Verification Plan. Steps: `start`, `diff`, `policy`, `decide`,
- * then `refuse` or `compile`. Each write is idempotent by this instance's id,
- * so a replayed step commits nothing new.
+ * Precheck, started by `ChangeSubmitted` as `precheck-<eventId>`: refuse a
+ * submitted commit that does not descend from the submission's base; diff
+ * one that does against that base, refuse guard and protected paths (and,
+ * until D2.1, any plan KeelVerify cannot run yet), otherwise compile the
+ * Verification Plan. Steps: `start`, `ancestry`, then `diff` and `policy` for
+ * a commit on its base, `decide`, then `refuse` or `compile`. Each write is
+ * idempotent by this instance's id, so a replayed step commits nothing new.
  */
 export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
   override async run(
@@ -81,6 +89,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
       changeId: params.value.changeId,
       revision: params.value.revision,
       commitSha: params.value.commitSha,
+      baseSha: params.value.baseSha,
       instanceId: event.instanceId,
     };
     const runtime = precheckRuntime(this.env);
@@ -89,23 +98,28 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
       if (started._tag === "Stale")
         return { outcome: "stale", step: "start", reason: started.reason };
       const workspace = started.value;
-      const touched = done(
-        await step.do("diff", () =>
-          settle(runtime, diffSubmission(workspace, submission.commitSha)),
-        ),
+      const ancestry = done(
+        await step.do("ancestry", () => settle(runtime, checkAncestry(workspace, submission))),
       );
-      const policy = done(
-        await step.do("policy", () => settle(runtime, precheckPolicy(workspace))),
-      );
+      const findings: PrecheckFindings =
+        ancestry._tag === "Descends"
+          ? {
+              ancestry,
+              touched: done(
+                await step.do("diff", () =>
+                  settle(runtime, diffSubmission(workspace, ancestry.base, submission.commitSha)),
+                ),
+              ),
+              policy: done(
+                await step.do("policy", () => settle(runtime, precheckPolicy(workspace))),
+              ),
+            }
+          : { ancestry };
       // Persisted as JSON, since a next action's args are open; decoded, so a replay is checked too.
       const decision = Schema.decodeUnknownSync(PrecheckDecision)(
         JSON.parse(
           await step.do("decide", async () =>
-            JSON.stringify(
-              Schema.encodeSync(PrecheckDecision)(
-                decidePrecheck(touched, policy, workspace.baseSha),
-              ),
-            ),
+            JSON.stringify(Schema.encodeSync(PrecheckDecision)(decidePrecheck(findings))),
           ),
         ),
       );

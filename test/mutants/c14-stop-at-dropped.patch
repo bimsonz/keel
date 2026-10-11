@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/precheck.test.ts -t c14.stop-at
+# kills: c14.stop-at
+# why: The walk is not stopped at the grant, so a diverged commit walks all of trunk's history before it is refused, up to the 10,000-commit cap
+diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
+index 58eaddc..02a1172 100644
+--- a/packages/core/src/application/verification/precheck.ts
++++ b/packages/core/src/application/verification/precheck.ts
+@@ -97,7 +97,7 @@ export const checkAncestry = Effect.fn("verification/checkAncestry")(function* (
+   const commit = submission.commitSha;
+   if (base === undefined) return { _tag: "NoBase", commit } satisfies Ancestry;
+   const host = yield* CodeHost;
+-  return yield* host.isAncestor(workspace.repo, base, commit, [workspace.grantedSha]).pipe(
++  return yield* host.isAncestor(workspace.repo, base, commit, []).pipe(
+     Effect.map((descends): Ancestry =>
+       descends ? { _tag: "Descends", base } : { _tag: "Diverged", base, commit },
+     ),

@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/precheck.test.ts -t "c14.diverged|c14.descends"
+# kills: c14.diverged, c14.descends
+# why: Precheck never walks the ancestry, so a commit pushed without merging keel/trunk after a rebase is judged on a base it does not hold
+diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
+index 58eaddc..9eddd27 100644
+--- a/packages/core/src/application/verification/precheck.ts
++++ b/packages/core/src/application/verification/precheck.ts
+@@ -96,6 +96,7 @@ export const checkAncestry = Effect.fn("verification/checkAncestry")(function* (
+   const base = submission.baseSha;
+   const commit = submission.commitSha;
+   if (base === undefined) return { _tag: "NoBase", commit } satisfies Ancestry;
++  if (base !== undefined) return { _tag: "Descends", base } satisfies Ancestry;
+   const host = yield* CodeHost;
+   return yield* host.isAncestor(workspace.repo, base, commit, [workspace.grantedSha]).pipe(
+     Effect.map((descends): Ancestry =>

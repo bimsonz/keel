@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/precheck.test.ts -t c14.merged
+# kills: c14.merged
+# why: The diff runs from the grant, so trunk's own changes since (a guard trunk tightened) count as the agent's and a correct merge of keel/trunk is bounced
+diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
+index 58eaddc..a3c57d3 100644
+--- a/packages/core/src/application/verification/precheck.ts
++++ b/packages/core/src/application/verification/precheck.ts
+@@ -131,7 +131,7 @@ export const diffSubmission = Effect.fn("verification/diffSubmission")(function*
+   commitSha: CommitSha,
+ ) {
+   const host = yield* CodeHost;
+-  return yield* host.diffTrees(workspace.repo, base, commitSha).pipe(
++  return yield* host.diffTrees(workspace.repo, workspace.grantedSha, commitSha).pipe(
+     Effect.map((rows): TouchedPaths => ({ _tag: "Touched", paths: rows.map((r) => r.path) })),
+     Effect.catchTags({
+       RepoNotFound: (e) =>

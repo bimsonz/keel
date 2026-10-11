@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/precheck.test.ts -t c14.no-base
+# kills: c14.no-base
+# why: A submission without its base is judged against whatever base the workspace serves now, which a rebase after the submission may have moved
+diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
+index 58eaddc..e7a0998 100644
+--- a/packages/core/src/application/verification/precheck.ts
++++ b/packages/core/src/application/verification/precheck.ts
+@@ -93,7 +93,7 @@ export const checkAncestry = Effect.fn("verification/checkAncestry")(function* (
+   workspace: PrecheckWorkspace,
+   submission: PrecheckSubmission,
+ ) {
+-  const base = submission.baseSha;
++  const base = submission.baseSha ?? workspace.baseSha;
+   const commit = submission.commitSha;
+   if (base === undefined) return { _tag: "NoBase", commit } satisfies Ancestry;
+   const host = yield* CodeHost;
