@@ -2,13 +2,13 @@
 # kills: pool.never-unready
 # why: A slot counts as ready the moment its fork starts, so a grant can reach a workspace that does not exist yet
 diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
-index cf7b6ab..3f5119b 100644
+index 2f50536..0e444dc 100644
 --- a/packages/core/src/application/coordination/workspace-pool/pool.ts
 +++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
-@@ -175,7 +175,7 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
+@@ -209,7 +209,7 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
      const slot: Slot = {
        id,
-       repo: { namespace: source.namespace, name: `ws-${id.slice(4).toLowerCase()}` },
+       repo: { namespace: source.namespace, name: workspaceRepoName(project, id) },
 -      state: "forking",
 +      state: "ready",
        since: now,

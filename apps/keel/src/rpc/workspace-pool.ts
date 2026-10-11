@@ -17,6 +17,16 @@ export const WorkspaceGrant = Schema.Struct({
 
 export const CollectionReason = Schema.Literals(["landed", "withdrawn", "expired"]);
 
+/** A push to a workspace's branch, as Artifacts reported it. */
+export const ObservedPush = Schema.Struct({
+  workspaceId: WorkspaceId,
+  ref: Schema.String,
+  sha: CommitSha,
+});
+
+/** WorkspacePushed was committed for the push, or it was not an agent's (no self-loops). */
+export const PushObservation = Schema.Literals(["recorded", "ignored"]);
+
 /** What the pool forks from, and how many ready workspaces it keeps. */
 export const PoolConfig = Schema.Struct({
   source: RepoRef,
@@ -38,6 +48,7 @@ export const WorkspacePoolCodecs = {
   release: exitCodec(Schema.Void, WorkspaceNotFound),
   configure: exitCodec(PoolStatus, Schema.Never),
   status: exitCodec(PoolStatus, Schema.Never),
+  observePush: exitCodec(PushObservation, Schema.Never),
 };
 
 /** The WorkspacePool DO (`pool:<project>`): pre-forked workspaces and sketches. */
@@ -51,4 +62,6 @@ export interface WorkspacePoolRpc {
   ): Promise<ExitJson>;
   configure(config: typeof PoolConfig.Encoded): Promise<ExitJson>;
   status(): Promise<ExitJson>;
+  /** WorkspacePushed for a push to a granted workspace, once per `pushId`; any other push is ignored. */
+  observePush(pushId: string, push: typeof ObservedPush.Encoded): Promise<ExitJson>;
 }

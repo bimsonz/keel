@@ -5,6 +5,7 @@ import {
   WorkspaceForked,
   WorkspaceGranted,
   WorkspaceNotFound,
+  WorkspacePushed,
 } from "../../../domain/coordination/index.ts";
 import {
   type ChangeId,
@@ -23,8 +24,11 @@ import {
   type EventDraft,
   type Transaction,
   Ids,
+  type ObservedPush,
+  type PushObservation,
   type WorkspaceGrant,
 } from "../../ports/index.ts";
+import { workspaceRepoName } from "./repo-names.ts";
 import {
   countIn,
   heldBy,
@@ -150,6 +154,36 @@ const forkOne = (source: RepoName, repo: RepoName) =>
   });
 
 /**
+ * Records an agent's push to the workspace it holds as WorkspacePushed, once
+ * per push: `pushId` (the observing Workflow's instance) is the cause, so a
+ * retried observation commits nothing new and answers the same. A push to a
+ * workspace that is not granted (ready, forking, collecting) or that this
+ * pool never forked was Keel's own write or nobody's, and is ignored: no
+ * agent is woken by Keel's writes (ADR 0009, no self-loops).
+ */
+export const observePush = Effect.fn("coordination/observePush")(function* (
+  project: ProjectId,
+  pushId: string,
+  push: ObservedPush,
+) {
+  const done = yield* commit(
+    { entity: { kind: "workspace", id: push.workspaceId }, cause: `push:${pushId}`, project },
+    (tx) =>
+      Result.succeed(
+        slotOf(tx.store, push.workspaceId)?.state === "granted"
+          ? {
+              value: "recorded" as const,
+              drafts: [draft(WorkspacePushed, { _tag: "WorkspacePushed", ...push })],
+            }
+          : { value: "ignored" as const, drafts: [] },
+      ),
+  );
+  return (
+    done.duplicate ? (done.events.length > 0 ? "recorded" : "ignored") : done.value
+  ) satisfies PushObservation;
+});
+
+/**
  * Tops the pool up to its target. Each new slot is committed as `forking`
  * before its fork starts; the forks run in parallel outside any transaction
  * (a fork is ready when the call resolves, spike S2); each that resolves
@@ -174,7 +208,7 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
     const id: WorkspaceId = yield* ids.next("wsp");
     const slot: Slot = {
       id,
-      repo: { namespace: source.namespace, name: `ws-${id.slice(4).toLowerCase()}` },
+      repo: { namespace: source.namespace, name: workspaceRepoName(project, id) },
       state: "forking",
       since: now,
     };

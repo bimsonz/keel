@@ -1,5 +1,11 @@
 import { describe, expect, it } from "@effect/vitest";
-import { type ChangeId, CommitSha, makeId, type ProjectId } from "@keeltown/core/kernel";
+import {
+  type ChangeId,
+  CommitSha,
+  makeId,
+  type ProjectId,
+  type WorkspaceId,
+} from "@keeltown/core/kernel";
 import { WorkspacePool } from "@keeltown/core/ports";
 import { Effect, type Layer, Schema } from "effect";
 
@@ -111,6 +117,35 @@ export function describeWorkspacePoolContract(adapter: string, make: StockedPool
             const next = yield* pool.grant(projectId, who);
             expect(next.workspaceId).not.toBe(first.workspaceId);
             expect(next.repo.name).not.toBe(first.repo.name);
+          }),
+        ),
+    );
+
+    it.live(
+      "[pool.contract.observe-push] a push to a granted workspace is recorded, a retry answers the same, and a push to a released or unknown one is ignored",
+      () =>
+        withPool(make, 1, (projectId) =>
+          Effect.gen(function* () {
+            const pool = yield* WorkspacePool;
+            const grant = yield* pool.grant(projectId, holder());
+            const push = (workspaceId: WorkspaceId) => ({
+              workspaceId,
+              ref: "refs/heads/main",
+              sha: grant.baseSha,
+            });
+            const pushId = randomUlid();
+            expect(yield* pool.observePush(projectId, pushId, push(grant.workspaceId))).toBe(
+              "recorded",
+            );
+            expect(yield* pool.observePush(projectId, pushId, push(grant.workspaceId))).toBe(
+              "recorded",
+            );
+            const unknown = makeId("wsp", randomUlid());
+            expect(yield* pool.observePush(projectId, randomUlid(), push(unknown))).toBe("ignored");
+            yield* pool.release(projectId, grant.workspaceId, "withdrawn");
+            expect(yield* pool.observePush(projectId, randomUlid(), push(grant.workspaceId))).toBe(
+              "ignored",
+            );
           }),
         ),
     );

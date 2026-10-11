@@ -3,6 +3,7 @@ import {
   collectWorkspaces,
   configurePool,
   grantWorkspace,
+  observePush,
   poolStatus,
   refillPool,
   releaseWorkspace,
@@ -19,6 +20,7 @@ import { Effect, type Layer, Schema } from "effect";
 import { codeHostLayer } from "../../../composition/do.ts";
 import {
   CollectionReason,
+  ObservedPush,
   PoolConfig,
   WorkspacePoolCodecs,
   type WorkspacePoolRpc,
@@ -36,6 +38,7 @@ const decodeHolder = Schema.decodeUnknownEffect(Schema.Union([ChangeId, SketchId
 const decodeWorkspaceId = Schema.decodeUnknownEffect(WorkspaceId);
 const decodeReason = Schema.decodeUnknownEffect(CollectionReason);
 const decodeConfig = Schema.decodeUnknownEffect(PoolConfig);
+const decodePush = Schema.decodeUnknownEffect(ObservedPush);
 const decodeProject = Schema.decodeUnknownSync(ProjectId);
 
 /**
@@ -96,6 +99,15 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
 
   async status() {
     return this.answer(WorkspacePoolCodecs.status, poolStatus());
+  }
+
+  async observePush(pushId: string, push: unknown) {
+    const project = this.project;
+    const program = decodePush(push).pipe(
+      Effect.orDie,
+      Effect.flatMap((pushed) => observePush(project, pushId, pushed)),
+    );
+    return this.answer(WorkspacePoolCodecs.observePush, program);
   }
 
   /** A change that landed, was withdrawn or was superseded gives its workspace up; redelivery is a no-op. */

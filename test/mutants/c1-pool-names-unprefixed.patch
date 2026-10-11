@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t "pool.names"
+# kills: pool.names
+# why: Workspaces keep the old ws-<ulid> name, which names no project, so no push to them is ever observed
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 2f50536..afc0c17 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -208,7 +208,7 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
+     const id: WorkspaceId = yield* ids.next("wsp");
+     const slot: Slot = {
+       id,
+-      repo: { namespace: source.namespace, name: workspaceRepoName(project, id) },
++      repo: { namespace: source.namespace, name: `ws-${id.slice(4).toLowerCase()}` },
+       state: "forking",
+       since: now,
+     };

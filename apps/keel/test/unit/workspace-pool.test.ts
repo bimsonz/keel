@@ -7,11 +7,22 @@ import {
   configurePool,
   grantWorkspace,
   GRANT_TTL_SECONDS,
+  observePush,
+  ownerOfRepo,
   poolStatus,
   refillPool,
   releaseWorkspace,
+  Slot,
+  workspaceRepoName,
 } from "@keeltown/core/application/coordination";
-import { ChangeId, Instant, ProjectId, type WorkspaceId } from "@keeltown/core/kernel";
+import {
+  ChangeId,
+  type CommitSha,
+  Instant,
+  makeId,
+  ProjectId,
+  type WorkspaceId,
+} from "@keeltown/core/kernel";
 import { Clock, CodeHost, EntityStore, EventOutbox } from "@keeltown/core/ports";
 import {
   CodeHostFixture,
@@ -80,6 +91,22 @@ const eventsOf = (id: WorkspaceId) =>
     const outbox = yield* EventOutbox;
     return outbox.log({ kind: "workspace", id }).map((e) => e.payload);
   });
+
+/** Every slot the pool holds, as stored. */
+const slotsHeld = Effect.map(EntityStore, (store) =>
+  store.list("workspace").map((row) => Schema.decodeUnknownSync(Slot)(row.value)),
+);
+
+/** A push to main of `workspaceId`, at `sha`. */
+const push = (workspaceId: WorkspaceId, sha: CommitSha) => ({
+  workspaceId,
+  ref: "refs/heads/main",
+  sha,
+});
+
+/** The WorkspacePushed the pool committed for a workspace. */
+const pushed = (id: WorkspaceId) =>
+  Effect.map(eventsOf(id), (events) => events.filter((p) => tagOf(p) === "WorkspacePushed"));
 
 describe("WorkspacePool", () => {
   it.effect(
@@ -228,6 +255,68 @@ describe("WorkspacePool", () => {
           ["WorkspaceGranted", PROJECT],
           ["WorkspaceCollected", PROJECT],
         ]);
+      }).pipe(Effect.provide(pool())),
+  );
+
+  it.effect(
+    "[pool.names] a workspace's repo is named for its project and its id, so a push to it names its pool",
+    () =>
+      Effect.gen(function* () {
+        yield* seedMirror;
+        yield* configurePool(PROJECT, { source: MIRROR, target: 3 });
+        yield* refillPool(PROJECT);
+        const held = yield* slotsHeld;
+        expect(held).toHaveLength(3);
+        for (const slot of held) {
+          expect(slot.repo).toEqual({
+            namespace: MIRROR.namespace,
+            name: workspaceRepoName(PROJECT, slot.id),
+          });
+          expect(ownerOfRepo(slot.repo.name)).toEqual({
+            kind: "workspace",
+            projectId: PROJECT,
+            id: slot.id,
+          });
+        }
+      }).pipe(Effect.provide(pool())),
+  );
+
+  it.effect(
+    "[push.no-self-loop] only a push to a granted workspace is an agent's: each is recorded once, and a push to a ready, released or unknown one is ignored",
+    () =>
+      Effect.gen(function* () {
+        const base = yield* seedMirror;
+        yield* configurePool(PROJECT, { source: MIRROR, target: 2 });
+        yield* refillPool(PROJECT);
+        const grant = yield* grantWorkspace(PROJECT, holder(1));
+        const ready = (yield* slotsHeld).find((slot) => slot.state === "ready")?.id;
+        if (ready === undefined) throw new Error("the pool kept no ready workspace");
+        const next = yield* Effect.flatMap(CodeHostFixture, (fixture) =>
+          fixture.commit(grant.repo, "refs/heads/main", { "README.md": "the agent's edit\n" }),
+        );
+        expect(yield* observePush(PROJECT, "push-1", push(grant.workspaceId, base))).toBe(
+          "recorded",
+        );
+        // The same Workflow instance, retried, and the agent's next push.
+        expect(yield* observePush(PROJECT, "push-1", push(grant.workspaceId, base))).toBe(
+          "recorded",
+        );
+        expect(yield* observePush(PROJECT, "push-2", push(grant.workspaceId, next))).toBe(
+          "recorded",
+        );
+        expect(yield* observePush(PROJECT, "push-3", push(ready, base))).toBe("ignored");
+        const unknown = makeId("wsp", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
+        expect(yield* observePush(PROJECT, "push-4", push(unknown, base))).toBe("ignored");
+        yield* releaseWorkspace(PROJECT, grant.workspaceId, "withdrawn");
+        expect(yield* observePush(PROJECT, "push-5", push(grant.workspaceId, next))).toBe(
+          "ignored",
+        );
+        expect(yield* pushed(grant.workspaceId)).toEqual([
+          { _tag: "WorkspacePushed", ...push(grant.workspaceId, base) },
+          { _tag: "WorkspacePushed", ...push(grant.workspaceId, next) },
+        ]);
+        expect(yield* pushed(ready)).toEqual([]);
+        expect(yield* pushed(unknown)).toEqual([]);
       }).pipe(Effect.provide(pool())),
   );
 

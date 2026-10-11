@@ -33,6 +33,16 @@ export interface PoolConfig {
   readonly target: number;
 }
 
+/** A push to a workspace's branch, as Artifacts reported it. */
+export interface ObservedPush {
+  readonly workspaceId: WorkspaceId;
+  readonly ref: string;
+  readonly sha: CommitSha;
+}
+
+/** What became of an observed push: WorkspacePushed was committed for it, or it was not an agent's. */
+export type PushObservation = "recorded" | "ignored";
+
 /** Why a workspace is collected (its repo deleted). */
 export type CollectionReason = "landed" | "withdrawn" | "expired";
 
@@ -63,5 +73,16 @@ export class WorkspacePool extends Context.Service<
      * number of ready workspaces to keep forked. The pool starts forking.
      */
     readonly configure: (projectId: ProjectId, config: PoolConfig) => Effect.Effect<void>;
+    /**
+     * Commits WorkspacePushed for a push to a workspace granted to its
+     * holder, once per `pushId` (a retried observation answers the same). A
+     * push to any other repo is Keel's own write or nobody's and is ignored,
+     * so no agent is woken by Keel's writes (ADR 0009: no self-loops).
+     */
+    readonly observePush: (
+      projectId: ProjectId,
+      pushId: string,
+      push: ObservedPush,
+    ) => Effect.Effect<PushObservation>;
   }
 >()("keel/WorkspacePool") {}

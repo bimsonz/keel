@@ -30,6 +30,7 @@ import {
   SubjectRegistry,
   type SubjectEntry,
   type SubmissionStatus,
+  type ObservedPush,
   type PoolConfig,
   type WorkspaceGrant,
   WorkspacePool,
@@ -56,12 +57,15 @@ export function makeWorkspacePoolMemory(
   const granted = new Map<WorkspaceId, string>();
   const released = new Map<WorkspaceId, string>();
   const configured = new Map<ProjectId, PoolConfig>();
+  /** Each push recorded, by its push id. */
+  const pushed = new Map<string, ObservedPush>();
   let counter = 0;
   let tokens = 0;
   return {
     granted,
     released,
     configured,
+    pushed,
     layer: Layer.succeed(
       WorkspacePool,
       WorkspacePool.of({
@@ -91,6 +95,13 @@ export function makeWorkspacePoolMemory(
           Effect.sync(() => {
             configured.set(projectId, config);
             options.journal?.push(`configure ${projectId}`);
+          }),
+        observePush: (_projectId, pushId, push) =>
+          Effect.sync(() => {
+            if (pushed.has(pushId)) return "recorded";
+            if (!granted.has(push.workspaceId)) return "ignored";
+            pushed.set(pushId, push);
+            return "recorded";
           }),
       }),
     ),

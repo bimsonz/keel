@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/artifacts-push.test.ts -t "push.names|push.translate"
+# kills: push.names, push.translate
+# why: Only upper-case names are read, but Artifacts names are lower case: every real push is dropped (the bug b2 fixes)
+diff --git a/packages/core/src/application/coordination/workspace-pool/repo-names.ts b/packages/core/src/application/coordination/workspace-pool/repo-names.ts
+index c866566..c019630 100644
+--- a/packages/core/src/application/coordination/workspace-pool/repo-names.ts
++++ b/packages/core/src/application/coordination/workspace-pool/repo-names.ts
+@@ -28,7 +28,7 @@ export type RepoOwner =
+   | { readonly kind: "sketch"; readonly projectId: ProjectId; readonly id: SketchId };
+ 
+ // Anchored from the right: the ULID is fixed-width Crockford base32 in lower case.
+-const NAMED = /^(?<prj>.+)-(?<kind>ws|sk)-(?<ulid>[0-9a-hjkmnp-tv-z]{26})$/;
++const NAMED = /^(?<prj>.+)-(?<kind>ws|sk)-(?<ulid>[0-9A-HJKMNP-TV-Z]{26})$/;
+ const PROJECT = /^prj-(?<ulid>[0-9a-hjkmnp-tv-z]{26})$/;
+ 
+ /** The owner a repo name gives, or undefined for any other repo (a mirror, staging, trunk, or a name Keel never gave). */

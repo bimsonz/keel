@@ -38,6 +38,8 @@ export function WorkspacePoolRpc(
         call(WorkspacePoolCodecs.configure, () => pool(projectId).configure(config)).pipe(
           Effect.asVoid,
         ),
+      observePush: (projectId, pushId, push) =>
+        call(WorkspacePoolCodecs.observePush, () => pool(projectId).observePush(pushId, push)),
     }),
   );
 }

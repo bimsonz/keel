@@ -9,6 +9,7 @@ import type {
   Ids,
   Projects,
   VerifierRuntime,
+  WorkspacePool,
 } from "@keeltown/core/ports";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import {
@@ -19,9 +20,10 @@ import {
 import { BatchVerdictsRpc, isLaneNamespace } from "../adapters/driven/do-rpc/batch-verdicts.ts";
 import { ChangePrecheckRpc } from "../adapters/driven/do-rpc/change-precheck.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
+import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { EvidenceStoreR2 } from "../adapters/driven/r2/evidence-store.ts";
 import { SystemLive } from "../adapters/driven/system.ts";
-import { codeHostLayer } from "./do.ts";
+import { artifactsLocationHint, codeHostLayer } from "./do.ts";
 
 /**
  * A Workflow's composition root, built from `this.env` on each `run()`. Steps
@@ -30,6 +32,11 @@ import { codeHostLayer } from "./do.ts";
  */
 export function workflowRuntime(_env: Env): ManagedRuntime.ManagedRuntime<Clock | Ids, never> {
   return ManagedRuntime.make(SystemLive);
+}
+
+/** PushObserved's composition root: each project's pool over its DO's RPC, placed as the pool's other callers place it. */
+export function pushObservedRuntime(env: Env): ManagedRuntime.ManagedRuntime<WorkspacePool, never> {
+  return ManagedRuntime.make(WorkspacePoolRpc(env.WORKSPACE_POOL, artifactsLocationHint(env)));
 }
 
 /**
