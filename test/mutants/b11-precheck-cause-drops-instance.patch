@@ -2,15 +2,15 @@
 # kills: b11.precheck-idem
 # why: a Precheck command's cause is its method alone, so a resubmission's own Precheck reads as a replay of the bounced one and commits nothing
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 29e615f..d776fc4 100644
+index 6b2ea89..ddb9c45 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -625,7 +625,7 @@ const precheckCommand = (
- ) =>
-   Effect.gen(function* () {
+@@ -652,7 +652,7 @@ const precheckCommand = (
      const committed = yield* commit(
--      { entity: changeRef(changeId), cause: `${step.instanceId}:${method}` },
-+      { entity: changeRef(changeId), cause: method },
+       {
+         entity: changeRef(changeId),
+-        cause: `${step.instanceId}:${method}`,
++        cause: method,
+         ...inProject(yield* EntityStore, changeId),
+       },
        (tx) => {
-         const stored = storedChange(tx.store, changeId);
-         if (stored !== undefined && stored.intent.revision !== step.revision)

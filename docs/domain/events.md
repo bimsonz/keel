@@ -19,6 +19,7 @@ Every event has the same envelope:
 | `at` | When the transaction committed |
 | `dedupeKey` | Stable across retries of the same cause, so a redelivered command or event is a no-op |
 | `causation` | Optional. The `eventId` that triggered this transition, when another entity's event did |
+| `project` | Optional. The project the emitting entity belongs to. Every Keel DO sets it; the Projector numbers what each project creates (`#n`, `D-n`, `G-n`, `C-n`, `E-n`, `P-n`) by it |
 | `actor` | Optional. The principal whose command caused the event: `agent:<agentId>` or `operator:<name>`. Absent when the platform caused it (Precheck, an alarm, a reaction, the Lane landing a change). An agent is never notified of an event it caused |
 | `affected[]` | Entity refs (`{kind, id}`) whose state this event changes or invalidates, beyond `entity` itself. A subscriber learns what the event released without re-querying |
 | `notified[]` | Subscriber refs the emitter delivered this event to, computed at commit time from its subscription table (e.g. `agent:agt_…`, `lane:<project>:<lane>`, `trunk:<project>`, `workflow:Precheck`) |

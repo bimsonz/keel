@@ -1,7 +1,7 @@
 import type { Result } from "effect";
 import { Schema } from "effect";
 import { EntityRef } from "./entity.ts";
-import { AgentId, EventId, type Instant, InstantSchema } from "./ids.ts";
+import { AgentId, EventId, type Instant, InstantSchema, ProjectId } from "./ids.ts";
 
 /**
  * The principal whose command an event records: an agent, or an operator by
@@ -31,6 +31,8 @@ export const EventEnvelope = Schema.Struct({
   dedupeKey: Schema.NonEmptyString,
   causation: Schema.optional(EventId),
   actor: Schema.optional(Actor),
+  /** The project the emitting entity belongs to. Absent only for events no project owns. */
+  project: Schema.optional(ProjectId),
   affected: Schema.Array(EntityRef),
   notified: Schema.Array(Schema.String),
   payload: Schema.Unknown,

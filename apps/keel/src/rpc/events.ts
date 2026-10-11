@@ -32,6 +32,7 @@ const ArrivingEnvelope = Schema.Struct({
   dedupeKey: Schema.NonEmptyString,
   causation: Schema.optional(Schema.String),
   actor: Schema.optional(Schema.String),
+  project: Schema.optional(Schema.String),
   affected: Schema.optional(Schema.Array(Schema.Unknown)),
   notified: Schema.optional(Schema.Array(Schema.Unknown)),
   payload: Schema.Unknown,

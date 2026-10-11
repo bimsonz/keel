@@ -13,9 +13,19 @@ export const ProjectorRead = Schema.Struct({
   waitMs: Schema.optional(Schema.Int),
 });
 
+/**
+ * One feed entry: the event, and the short label the Projector gave it when it
+ * creates something the console names (`#n` changes, `D-n` decisions, `G-n`
+ * guards, `C-n` conflicts, `E-n` escalations, `P-n` probes), numbered per project.
+ */
+export const FeedEntry = Schema.Struct({
+  ...EventEnvelope.fields,
+  label: Schema.optional(Schema.String),
+});
+
 /** A page of the feed: the events after the cursor read, and the cursor to read on from. */
 export const FeedPage = Schema.Struct({
-  events: Schema.Array(EventEnvelope),
+  events: Schema.Array(FeedEntry),
   cursor: Position,
 });
 

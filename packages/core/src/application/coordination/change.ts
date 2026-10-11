@@ -196,6 +196,12 @@ const heldWorkspace = (store: Store, changeId: ChangeId): HeldWorkspace | undefi
   return value === undefined ? undefined : decodeHeld(value);
 };
 
+/** The change's project, for its events' envelopes: recorded with its workspace at declare. */
+const inProject = (store: Store, changeId: ChangeId): { readonly project?: ProjectId } => {
+  const project = heldWorkspace(store, changeId)?.projectId;
+  return project === undefined ? {} : { project };
+};
+
 const readChange = (changeId: ChangeId): NextAction => ({
   kind: "read",
   title: "Read the change for its current state, revision and lease",
@@ -353,6 +359,7 @@ export const declare: (
       cause: command.idempotencyKey,
       fingerprint: command.fingerprint,
       actor: agentActor(command.agentId),
+      project: command.projectId,
     },
     (tx) => {
       const decided = transition(
@@ -422,6 +429,7 @@ export const revise: (
       cause: command.idempotencyKey,
       fingerprint: fingerprintOf("revise", command),
       actor: agentActor(command.agentId),
+      ...inProject(yield* EntityStore, changeId),
     },
     (tx) =>
       Result.map(
@@ -478,6 +486,7 @@ export const submit: (
       cause: command.idempotencyKey,
       fingerprint: fingerprintOf("submit", command),
       actor: agentActor(command.agentId),
+      ...(held === undefined ? {} : { project: held.projectId }),
     },
     (tx) =>
       Result.map(
@@ -522,6 +531,7 @@ export const abandon: (
       cause: command.idempotencyKey,
       fingerprint: fingerprintOf("abandon", command),
       actor: withdrawnBy(command),
+      ...inProject(yield* EntityStore, changeId),
     },
     (tx) =>
       Result.map(
@@ -562,6 +572,7 @@ export const adopt: (
       cause: command.idempotencyKey,
       fingerprint: fingerprintOf("adopt", command),
       actor: agentActor(command.agentId),
+      ...inProject(yield* EntityStore, changeId),
     },
     (tx) => {
       const before = storedChange(tx.store, changeId);
@@ -609,7 +620,8 @@ export const lapseLease: (
     leaseId: LeaseId,
     cause: string,
   ) {
-    const committed = yield* commit({ entity: changeRef(changeId), cause }, (tx) =>
+    const spec = { entity: changeRef(changeId), cause, ...inProject(yield* EntityStore, changeId) };
+    const committed = yield* commit(spec, (tx) =>
       Result.map(
         transition(
           tx,
@@ -638,7 +650,11 @@ const precheckCommand = (
 ) =>
   Effect.gen(function* () {
     const committed = yield* commit(
-      { entity: changeRef(changeId), cause: `${step.instanceId}:${method}` },
+      {
+        entity: changeRef(changeId),
+        cause: `${step.instanceId}:${method}`,
+        ...inProject(yield* EntityStore, changeId),
+      },
       (tx) => {
         const stored = storedChange(tx.store, changeId);
         if (stored !== undefined && stored.intent.revision !== step.revision)

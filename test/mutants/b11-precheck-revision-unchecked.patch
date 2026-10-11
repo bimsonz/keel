@@ -2,11 +2,11 @@
 # kills: b11.precheck-idem
 # why: Precheck's revision is not checked, so a Precheck of another revision moves the change
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 29e615f..a8d0d76 100644
+index 6b2ea89..aa2677f 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -628,8 +628,6 @@ const precheckCommand = (
-       { entity: changeRef(changeId), cause: `${step.instanceId}:${method}` },
+@@ -657,8 +657,6 @@ const precheckCommand = (
+       },
        (tx) => {
          const stored = storedChange(tx.store, changeId);
 -        if (stored !== undefined && stored.intent.revision !== step.revision)

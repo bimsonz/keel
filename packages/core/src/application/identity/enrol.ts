@@ -62,6 +62,7 @@ export const enrol: (
         entity: { kind: "agent", id: agentId },
         cause: command.idempotencyKey,
         fingerprint: command.fingerprint,
+        project: command.projectId,
       },
       (tx) => {
         const stored = tx.store.get(AGENT, agentId);

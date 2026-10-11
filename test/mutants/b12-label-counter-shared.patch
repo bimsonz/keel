@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/feed.test.ts
+# kills: b12.labels
+# why: one counter per kind across projects, so a project's first conflict is numbered after another project's
+diff --git a/packages/core/src/application/memory/feed.ts b/packages/core/src/application/memory/feed.ts
+index 36e2699..d44d73a 100644
+--- a/packages/core/src/application/memory/feed.ts
++++ b/packages/core/src/application/memory/feed.ts
+@@ -94,7 +94,7 @@ function labelFor(store: Store, event: EventEnvelope): string | undefined {
+   const given = `${project}/${rule.prefix}/${id}`;
+   const already = store.get(FEED.given, given);
+   if (typeof already === "string") return already;
+-  const counter = `${project}/${rule.prefix}`;
++  const counter = rule.prefix;
+   const last = store.get(FEED.counter, counter);
+   const count = (typeof last === "number" ? last : 0) + 1;
+   const label = `${rule.prefix}${count}`;

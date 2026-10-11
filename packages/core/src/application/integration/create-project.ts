@@ -130,6 +130,7 @@ export const createProject: (
       cause: command.idempotencyKey,
       fingerprint: command.fingerprint,
       actor: agentActor(command.by),
+      project: projectId,
     },
     (tx) => {
       const record: ProjectRecord = { id: projectId, name: command.name, createdAt: tx.at };

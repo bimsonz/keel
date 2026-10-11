@@ -5,6 +5,7 @@ import {
   EventEnvelope,
   type EventId,
   type Instant,
+  type ProjectId,
 } from "../../domain/kernel/index.ts";
 import type { Stored } from "./entity-store.ts";
 
@@ -49,6 +50,8 @@ export interface CommitSpec {
   readonly causation?: EventId;
   /** Whose command this is, copied onto every event it commits. Absent when the platform caused it. */
   readonly actor?: Actor;
+  /** The project the entity belongs to, copied onto every event it commits. */
+  readonly project?: ProjectId;
   /** A hash of the command, so a cause reused for a different command can be told apart from a retry. */
   readonly fingerprint?: string;
 }
@@ -211,6 +214,7 @@ export function envelopesFor(
       dedupeKey: dedupeKeyOf(entity, spec.cause, type, ordinal),
       ...(spec.causation === undefined ? {} : { causation: spec.causation }),
       ...(spec.actor === undefined ? {} : { actor: spec.actor }),
+      ...(spec.project === undefined ? {} : { project: spec.project }),
       affected: draft.affected ?? [],
       notified: subscribers(type),
       payload: draft.payload,

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/projector.test.ts
+# kills: b12.envelope-project
+# why: the lenient arrival schema drops `project`, so the Projector sees every event as no project's and labels none
+diff --git a/apps/keel/src/rpc/events.ts b/apps/keel/src/rpc/events.ts
+index c0829e7..80d99c8 100644
+--- a/apps/keel/src/rpc/events.ts
++++ b/apps/keel/src/rpc/events.ts
+@@ -32,7 +32,6 @@ const ArrivingEnvelope = Schema.Struct({
+   dedupeKey: Schema.NonEmptyString,
+   causation: Schema.optional(Schema.String),
+   actor: Schema.optional(Schema.String),
+-  project: Schema.optional(Schema.String),
+   affected: Schema.optional(Schema.Array(Schema.Unknown)),
+   notified: Schema.optional(Schema.Array(Schema.Unknown)),
+   payload: Schema.Unknown,

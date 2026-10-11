@@ -4,6 +4,7 @@ import { Exit, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
 import { decodeExit, ProjectorCodecs } from "../../src/rpc/index.ts";
+import { sampleProjectId } from "@keeltown/testing";
 import { changeUnderTest, ok } from "./change-harness.ts";
 
 /** The one Projector the fan-out delivers to. */
@@ -45,6 +46,32 @@ const arrival = (entity: EntityRef) =>
       payload: { _tag: "ChangeBounced", changeId: entity.id },
     }),
   );
+
+describe("the Projector's labels", () => {
+  it("[b12.envelope-project] stamps a change's events with its project, and labels its declaration in that project", async () => {
+    const from = await tail();
+    const c = await changeUnderTest();
+    ok(await c.declare());
+    const log = await c.log();
+
+    expect(log.map((event) => event.project)).toEqual(log.map(() => sampleProjectId));
+    await vi.waitFor(async () => {
+      let cursor = from;
+      const labels: (string | undefined)[] = [];
+      for (
+        let page = await read({ cursor });
+        page.events.length > 0;
+        page = await read({ cursor })
+      ) {
+        for (const entry of page.events)
+          if (entry.type === "IntentDeclared" && entry.entity.id === c.changeId)
+            labels.push(entry.label);
+        cursor = page.cursor;
+      }
+      expect(labels).toEqual([expect.stringMatching(/^#\d+$/)]);
+    }, WAIT);
+  });
+});
 
 describe("the Projector's feed", () => {
   it("[b12.projector-every] gets every event an object commits, though nothing subscribed it, in each emitter's order", async () => {
