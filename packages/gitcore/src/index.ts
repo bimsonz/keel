@@ -6,3 +6,4 @@ export * from "./merge.ts";
 export * from "./objects.ts";
 export * from "./pack-write.ts";
 export * from "./push.ts";
+export * from "./transfer.ts";

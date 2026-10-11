@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/transfer.test.ts -t between.push-complete
+# kills: between.push-complete
+# why: A file changed at a path the base already had is left out of the pack, so the push lacks its new content
+diff --git a/packages/gitcore/src/transfer.ts b/packages/gitcore/src/transfer.ts
+index b0de470..d9d79e4 100644
+--- a/packages/gitcore/src/transfer.ts
++++ b/packages/gitcore/src/transfer.ts
+@@ -47,7 +47,7 @@ export async function objectsBetween(
+       const was = old.get(e.name);
+       if (was?.oid === e.oid) continue;
+       if (e.mode === MODE_TREE) await walk(was?.mode === MODE_TREE ? was.oid : null, e.oid);
+-      else if (e.mode !== MODE_GITLINK && !out.has(e.oid))
++      else if (e.mode !== MODE_GITLINK && was === undefined && !out.has(e.oid))
+         out.set(e.oid, { type: "blob", body: await reader.readBlob(e.oid) });
+     }
+   };
