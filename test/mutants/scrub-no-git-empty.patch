@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/public-scrub-git.test.ts -t scrub.no-git
+# kills: scrub.no-git
+# why: outside a work tree no file counts as published, so a git archive export is never scrubbed
+diff --git a/packages/tooling/src/scan.ts b/packages/tooling/src/scan.ts
+index cabca6a..5b76132 100644
+--- a/packages/tooling/src/scan.ts
++++ b/packages/tooling/src/scan.ts
+@@ -57,7 +57,7 @@ export function publishable(root: string): ReadonlySet<string> | null {
+   );
+   if (listed.error !== undefined) throw listed.error;
+   if (listed.status !== 0) {
+-    if (listed.status === 128 && /not a git repository/.test(listed.stderr)) return null;
++    if (listed.status === 128 && /not a git repository/.test(listed.stderr)) return new Set();
+     throw new Error(`git ls-files failed in ${root}: ${listed.stderr.trim()}`);
+   }
+   return new Set(listed.stdout.split("\0").filter((path) => path !== ""));

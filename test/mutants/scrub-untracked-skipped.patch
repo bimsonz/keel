@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/public-scrub-git.test.ts -t scrub.untracked
+# kills: scrub.untracked
+# why: only the index is read, so a new file the next commit would publish is never scrubbed
+diff --git a/packages/tooling/src/scan.ts b/packages/tooling/src/scan.ts
+index cabca6a..2c8c572 100644
+--- a/packages/tooling/src/scan.ts
++++ b/packages/tooling/src/scan.ts
+@@ -52,7 +52,7 @@ export function walk(root: string, options: WalkOptions): string[] {
+ export function publishable(root: string): ReadonlySet<string> | null {
+   const listed = spawnSync(
+     "git",
+-    ["-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
++    ["-C", root, "ls-files", "-z", "--cached", "--exclude-standard"],
+     { encoding: "utf8", maxBuffer: 1 << 28 },
+   );
+   if (listed.error !== undefined) throw listed.error;
