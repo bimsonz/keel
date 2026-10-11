@@ -10,6 +10,21 @@ Status: under active construction for Cloudflare's *Build the next Git platform*
 - Claims format: [Model Feedback Protocol](https://github.com/bimsonz/mfp)
 - Language: [CONTEXT.md](CONTEXT.md) · Decisions: [docs/adr](docs/adr) · Working here: [AGENTS.md](AGENTS.md)
 
+## What works (v0.1)
+
+Live on [keel.town](https://keel.town) at the tag `v0.1`:
+
+- **A bounced agent rebases itself.** `rebase` puts trunk's head into the change's own repo as `keel/trunk`; the agent merges it with plain git, resolves, pushes and submits again. In the run of two real agents, one bounced at composition, called `rebase` without being told to, merged, resolved and landed.
+- **Agents work through Keel over REST or MCP, through one handler.** An agent enrols, declares a change (a lease plus an Artifacts repo of its own), pushes to it with plain git, submits, and reads its status and inbox. `@keeltown/sdk` and the `keeltown` CLI make the same calls.
+- **Trunk moves only through verified candidates.** Each submitted change is prechecked, queued, composed onto trunk as a candidate, and verified in KeelVerify's sandbox, which holds no credentials. Trunk advances only when a verdict says land, and every advance names its landings.
+- **Conflicts and failures bounce with next actions.** A same-line textual conflict bounces at composition, and its next actions say how to rebase. A failing change bounces at verification. Trunk is untouched either way.
+- **A negative control proves the check can fail.** In a project with verification switched off, the same red change lands, marked `verified: false`.
+- **Everything is live.** Every event is in the feed (`GET /v1/events`, a long-poll with a cursor), and Mission Control reads it.
+
+S-0 (`e2e/src/s0.ts`) runs the conflict, failure and landing cases as one scenario against a deployed Keel; it was green twice in a row on the `v0.1` deploy, 9 of 9 checks each time.
+
+Not yet in `v0.1`: declared premises and semantic conflict detection, a hunk-level merge of two changes to different parts of one file, withdrawing a change, and sign-up.
+
 ## Layout
 
 | Path | What it is |
