@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/candidate-composer.test.ts -t composer.deterministic
+# kills: composer.deterministic
+# why: Commit times come from the clock, not BatchFormed's time, so a recompose of the same batch gives different SHAs
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
+index ad8d065..344e7be 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
+@@ -44,7 +44,7 @@ export function restackSpec(request: CandidateRequest): {
+   readonly committer: Signature;
+   readonly members: readonly RestackMember[];
+ } {
+-  const time = Math.floor(request.at / 1000);
++  const time = Math.floor(Date.now() / 1000);
+   return {
+     ref: `refs/heads/cand/${request.candidateId}`,
+     committer: { name: "Keel", email: "keel@keel.invalid", time },

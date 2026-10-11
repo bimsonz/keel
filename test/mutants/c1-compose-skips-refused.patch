@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/compose.test.ts -t composer.refuses
+# kills: composer.refuses
+# why: A member GitCore refuses is dropped and the fold goes on, so the candidate silently leaves a queued change out
+diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
+index d176ed8..2d0f7d7 100644
+--- a/packages/gitcore/src/compose.ts
++++ b/packages/gitcore/src/compose.ts
+@@ -93,8 +93,10 @@ export async function restack(
+   for (const [i, m] of members.entries()) {
+     const [from, to] = await Promise.all([r.readCommit(m.base), r.readCommit(m.head)]);
+     const merged = await mergeTrees(r, from.tree, acc, to.tree, options).catch((e: unknown) => {
+-      throw e instanceof Refusal ? new MemberRefused(i, e) : e;
++      if (e instanceof Refusal) return null;
++      throw e;
+     });
++    if (merged === null) continue;
+     for (const [oid, o] of merged.newObjects) written.set(oid, o);
+     for (const o of await objectsBetween(r, acc, merged.tree))
+       objects.set(await hashObject(o.type, o.body), o);

@@ -298,3 +298,67 @@ export function sides(h: History): { readonly a: TreeModel; readonly b: TreeMode
     b: applyOps(base, [...h.shared, ...h.theirs]),
   };
 }
+
+/**
+ * A batch for restacking: trunk moved from `P` to `B` by its own edits, and
+ * each member changed either `B` or the older `P` (a change made before
+ * trunk's last landing). Members are composed onto `B` in order.
+ */
+export interface Batch {
+  base: Array<{ path: string; lines: number[] }>;
+  trunk: Op[];
+  members: Array<{ onOld: boolean; ops: Op[] }>;
+}
+
+export const batchArb: fc.Arbitrary<Batch> = fc.record({
+  base: fc.array(fc.record({ path: pathArb, lines: linesArb }), { minLength: 2, maxLength: 10 }),
+  trunk: fc.array(textOpArb, { maxLength: 2 }),
+  members: fc.array(
+    fc.record({
+      onOld: fc.oneof({ weight: 3, arbitrary: fc.constant(false) }, fc.constant(true)),
+      ops: fc.array(fc.oneof({ weight: 4, arbitrary: textOpArb }, anyOpArb), {
+        minLength: 1,
+        maxLength: 2,
+      }),
+    }),
+    { minLength: 1, maxLength: 4 },
+  ),
+});
+
+export interface BatchPlan {
+  /** Trunk's commits, `P` then `B`: all a staging repo holds. */
+  trunk: CommitPlan[];
+  /** Trunk's commits and every member's head, for the workspaces. */
+  commits: CommitPlan[];
+  oldMark: number;
+  headMark: number;
+  members: Array<{ baseMark: number; headMark: number }>;
+}
+
+export function planBatch(b: Batch, id: number): BatchPlan {
+  const old = new Map<string, FileSpec>();
+  for (const f of b.base) setPath(old, f.path, { mode: "100644", data: render(f.lines) });
+  const head = applyOps(old, b.trunk);
+  const ref = (n: string) => `refs/heads/b${id}/${n}`;
+  const trunk: CommitPlan[] = [
+    { mark: 1, ref: ref("p"), parents: [], tree: old, message: "P\n" },
+    { mark: 2, ref: ref("b"), parents: [1], tree: head, message: "B\n" },
+  ];
+  const members = b.members.map((m, i) => ({
+    plan: {
+      mark: 3 + i,
+      ref: ref(`m${i}`),
+      parents: [m.onOld ? 1 : 2],
+      tree: applyOps(m.onOld ? old : head, m.ops),
+      message: `m${i}\n`,
+    },
+    baseMark: m.onOld ? 1 : 2,
+  }));
+  return {
+    trunk,
+    commits: [...trunk, ...members.map((m) => m.plan)],
+    oldMark: 1,
+    headMark: 2,
+    members: members.map((m) => ({ baseMark: m.baseMark, headMark: m.plan.mark })),
+  };
+}

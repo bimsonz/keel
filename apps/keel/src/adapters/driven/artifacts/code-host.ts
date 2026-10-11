@@ -15,10 +15,10 @@ import {
   MissingObject,
   MODE_GITLINK,
   MODE_TREE,
-  normaliseMode,
   type TreeReader,
 } from "@keeltown/gitcore";
 import { Effect, Layer, Schema } from "effect";
+import { objectsOf } from "./objects.ts";
 
 const toCommitSha = Schema.decodeUnknownSync(CommitSha);
 const plain = (repo: RepoRef) => ({ namespace: repo.namespace, name: repo.name });
@@ -70,15 +70,6 @@ async function revoke(namespace: Artifacts, name: string, token: string): Promis
     handle[Symbol.dispose]();
   }
 }
-
-/** gitcore's reader over one open repo handle: a tree the repo lacks throws `MissingObject`. */
-const readerOf = (handle: ArtifactsRepo): TreeReader => ({
-  readTree: async (oid) => {
-    const entries = await handle.readTree(oid);
-    if (entries === null) throw new MissingObject(oid);
-    return entries.map((e) => ({ name: e.name, mode: normaliseMode(e.mode), oid: e.hash }));
-  },
-});
 
 async function rootTree(handle: ArtifactsRepo, commit: string): Promise<string> {
   const read = await handle.readCommit(commit);
@@ -214,7 +205,7 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
         onRepo(repo, async (handle) => (await handle.readCommit(sha)) !== null),
       readTree: (repo, commit) =>
         onObjects(repo, async (handle) =>
-          listTree(readerOf(handle), await rootTree(handle, commit), ""),
+          listTree(objectsOf(handle), await rootTree(handle, commit), ""),
         ),
       readBlob: (repo, oid) =>
         onObjects(repo, async (handle) => {
@@ -228,7 +219,7 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
             rootTree(handle, base),
             rootTree(handle, head),
           ]);
-          return diffTrees(readerOf(handle), before, after);
+          return diffTrees(objectsOf(handle), before, after);
         }),
       delete: (repo) => Effect.promise(() => binding(repo).delete(repo.name)).pipe(Effect.asVoid),
     }),

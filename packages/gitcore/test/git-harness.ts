@@ -208,9 +208,16 @@ export type GitMerge =
 /**
  * `git merge-tree --write-tree ours theirs`: exit 0 is clean, 1 is conflicted,
  * death by a signal is a crash; anything else (git missing, a bad argument) fails.
+ * `mergeBase` names the base commit instead of letting git find one.
  */
-export function gitMergeTree(dir: string, ours: string, theirs: string): GitMerge {
-  const r = spawnSync("git", ["merge-tree", "--write-tree", ours, theirs], {
+export function gitMergeTree(
+  dir: string,
+  ours: string,
+  theirs: string,
+  mergeBase?: string,
+): GitMerge {
+  const base = mergeBase === undefined ? [] : [`--merge-base=${mergeBase}`];
+  const r = spawnSync("git", ["merge-tree", "--write-tree", ...base, ours, theirs], {
     cwd: dir,
     env: GIT_ENV,
   });

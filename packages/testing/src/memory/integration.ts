@@ -3,7 +3,7 @@ import {
   PromotionStateRefused,
   UnexpectedHead,
 } from "@keeltown/core/domain/integration";
-import { CommitSha, type ProjectId } from "@keeltown/core/kernel";
+import { type ChangeId, CommitSha, type ProjectId } from "@keeltown/core/kernel";
 import {
   CandidateComposer,
   type RepoRef,
@@ -13,31 +13,50 @@ import {
 } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 
-const sha = async (text: string): Promise<CommitSha> => {
+const sha1 = async (text: string): Promise<CommitSha> => {
   const digest = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(text));
   const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
   return Schema.decodeUnknownSync(CommitSha)(hex);
 };
 
 /**
- * Composes deterministically: the tree id is a hash of the base and the
- * members, so recomposing the same batch gives the same id. `refuse` lists
- * change ids whose composition is refused, as GitCore refuses when unsure.
+ * Composes deterministically: each member's commit id is a hash of the base,
+ * the batch's time and the members up to it, and the tree a hash of those
+ * without the time, so recomposing the same batch gives the same ids.
+ * `refuse` lists change ids whose composition is refused, as GitCore refuses
+ * when unsure.
  */
 export function makeCandidateComposerMemory(options: { readonly refuse?: readonly string[] } = {}) {
   return {
     layer: Layer.succeed(
       CandidateComposer,
       CandidateComposer.of({
-        compose: (base, members) =>
+        compose: (request) =>
           Effect.gen(function* () {
-            const refused = members.filter((m) => options.refuse?.includes(m.changeId));
+            const refused = request.members.filter((m) => options.refuse?.includes(m.changeId));
             if (refused.length > 0)
-              return yield* new CompositionRefused({ reason: "overlapping edits", paths: [] });
+              return yield* new CompositionRefused({ reason: "both-modified", paths: [] });
+            const commits: { changeId: ChangeId; sha: CommitSha }[] = [];
+            let parent: string = request.base;
+            for (const m of request.members) {
+              const sha = yield* Effect.promise(() =>
+                sha1([parent, m.changeId, m.head, m.author, m.title, request.at].join("\n")),
+              );
+              commits.push({ changeId: m.changeId, sha });
+              parent = sha;
+            }
             const treeSha = yield* Effect.promise(() =>
-              sha([base, ...members.map((m) => m.commit)].join("\n")),
+              sha1([request.base, ...request.members.map((m) => m.head)].join("\n")),
             );
-            return { treeSha, tier: { tier: 0, reason: "path-disjoint members" } };
+            return {
+              treeSha,
+              commitSha: commits.at(-1)?.sha ?? request.base,
+              commits,
+              ref: `refs/heads/cand/${request.candidateId}`,
+              composer: "gitcore" as const,
+              tier: 0 as const,
+              tierReason: "path-disjoint members",
+            };
           }),
       }),
     ),
