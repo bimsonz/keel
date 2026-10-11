@@ -16,10 +16,12 @@
     "deploy:dry": "vite build && node scripts/guard-build.ts && wrangler deploy --dry-run --outdir .wrangler/dry-run"
   },
   "dependencies": {
+    "@better-auth/passkey": "catalog:",
     "@cloudflare/kumo": "catalog:",
     "@phosphor-icons/react": "catalog:",
     "@pierre/diffs": "catalog:",
     "@xyflow/react": "catalog:",
+    "better-auth": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "uqr": "catalog:"

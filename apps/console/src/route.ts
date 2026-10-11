@@ -46,8 +46,38 @@ export type Route =
 /** The moving head of trunk, as an address says it. */
 export const TRUNK = "trunk";
 
-/** First segments that are never a project: the Worker answers them itself, or they are the build's own files. */
-export const RESERVED = ["api", "present", "rule", "healthz", "assets"] as const;
+/**
+ * First segments that are never a project, nor an org's handle: Keel answers them (`v1`, `mcp`), the console's
+ * Worker does, they are the build's own files, or they are a page above every project (places.ts). Keel refuses
+ * each as a handle, so the list is kept the same there. `rule` and `present` go when sessions replace the
+ * presenter's key.
+ */
+export const RESERVED = [
+  "api",
+  "v1",
+  "mcp",
+  "assets",
+  "healthz",
+  "login",
+  "signup",
+  "logout",
+  "device",
+  "invite",
+  "settings",
+  "new",
+  "orgs",
+  "install",
+  "admin",
+  "terms",
+  "privacy",
+  "start",
+  "llms.txt",
+  ".well-known",
+  "robots.txt",
+  "favicon.ico",
+  "rule",
+  "present",
+] as const;
 
 const HOME: Route = { at: "code", kind: "tree", ref: TRUNK, path: "" };
 const MISSING: Route = { at: "missing" };

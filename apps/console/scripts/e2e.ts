@@ -9,6 +9,7 @@
 //   node scripts/e2e.ts
 import { type BrowserContext, type Page, chromium } from "playwright";
 import { build, preview } from "vite";
+import { type Identity, createIdentity } from "../test/fixtures/identity/standIn.ts";
 import { createFakeKeel } from "../test/fixtures/mock/fakeKeel.ts";
 import { type Env, createConsole } from "../src/worker/handler.ts";
 
@@ -1533,6 +1534,250 @@ expectEqual(
   String(keel.events().filter((event) => event.type === "RulingGiven").length),
   "1",
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The pages above every project: signing up and in, the user's settings, approving a terminal
+// ─────────────────────────────────────────────────────────────────────────────
+// Keel's identity is Better Auth, mounted at /v1/auth on the page's own origin. Here the real library stands in
+// for it (test code only), so what the page is checked against answers as Keel's will. The page calls it
+// directly: nothing of this goes through the console's Worker.
+
+/** What the page sent to /v1, as the browser sent it. */
+interface Sent {
+  path: string;
+  authorization: string | undefined;
+}
+
+async function withIdentity(
+  context: BrowserContext,
+  identity: Pick<Identity, "handle">,
+  sent: Sent[] = [],
+): Promise<void> {
+  await behindTheWorker(context);
+  await context.route(new RegExp(`^${built}/v1/`), async (route) => {
+    const request = route.request();
+    const headers = await request.allHeaders();
+    delete headers["content-length"];
+    delete headers["host"];
+    sent.push({ path: new URL(request.url()).pathname, authorization: headers["authorization"] });
+    const posted = request.postData();
+    const response = await identity.handle(
+      new Request(request.url(), {
+        method: request.method(),
+        headers,
+        ...(posted === null ? {} : { body: posted }),
+      }),
+    );
+    const answered = Object.fromEntries(response.headers);
+    const cookies = response.headers.getSetCookie();
+    if (cookies.length > 0) answered["set-cookie"] = cookies.join("\n");
+    await route
+      .fulfill({ status: response.status, headers: answered, body: await response.text() })
+      .catch(() => undefined);
+  });
+}
+
+const identity = createIdentity(built);
+const lobby = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const sentToKeel: Sent[] = [];
+await withIdentity(lobby, identity, sentToKeel);
+const person = watch(await lobby.newPage(), "account");
+// A passkey needs an authenticator. Chrome plays one, which makes and keeps real keys and signs with them.
+const devtools = await lobby.newCDPSession(person);
+await devtools.send("WebAuthn.enable");
+await devtools.send("WebAuthn.addVirtualAuthenticator", {
+  options: {
+    protocol: "ctap2",
+    transport: "internal",
+    hasResidentKey: true,
+    hasUserVerification: true,
+    isUserVerified: true,
+    automaticPresenceSimulation: true,
+  },
+});
+/** A capture of a page as it stands, kept only when a folder is named for them (`SHOTS=<folder>`). */
+const shot = async (shown: Page, name: string): Promise<void> => {
+  const folder = process.env["SHOTS"];
+  if (folder !== undefined && folder !== "")
+    await shown.screenshot({ path: `${folder}/${name}.png` });
+};
+const whereOf = (shown: Page): string => {
+  const url = new URL(shown.url());
+  return `${url.pathname}${url.search}`;
+};
+
+// A page for a signed-in user sends a visitor to sign in, and remembers where they were going.
+await person.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
+await person.getByRole("heading", { name: "Sign in to Keel" }).waitFor();
+expectEqual("account: a visitor is sent to sign in", whereOf(person), "/login?next=%2Fsettings");
+await person.getByRole("link", { name: "Create an account" }).click();
+await person.getByRole("heading", { name: "Create your account" }).waitFor();
+expectEqual(
+  "account: and on to sign up, going to the same place",
+  whereOf(person),
+  "/signup?next=%2Fsettings",
+);
+
+await shot(person, "signup");
+// Sign up with a code sent by email. The code is read where Keel would have sent it.
+await person.getByLabel("Email").fill("ada@example.com");
+await person.getByRole("button", { name: "Send a code" }).click();
+await person.getByLabel("The code sent to ada@example.com").waitFor();
+expectEqual("account: one code was sent", String(identity.outbox.length), "1");
+await person.getByLabel("The code sent to ada@example.com").fill("000000");
+await person.getByRole("button", { name: "Create the account" }).click();
+await person.getByRole("alert").waitFor();
+expectEqual(
+  "account: a code that was not the one sent is refused, and said",
+  String((await person.getByRole("alert").innerText()).length > 0),
+  "true",
+);
+await person.getByLabel("The code sent to ada@example.com").fill(identity.outbox.at(-1)?.otp ?? "");
+await person.getByRole("button", { name: "Create the account" }).click();
+// A new user chooses a handle before anything else.
+await person.getByRole("heading", { name: "Choose your handle" }).waitFor();
+await person.getByLabel("Handle").fill("Ada Lovelace");
+expectEqual(
+  "account: a handle that is not one is not taken",
+  String(await person.getByRole("button", { name: "Take this handle" }).isDisabled()),
+  "true",
+);
+await person.getByLabel("Handle").fill("ada");
+await shot(person, "handle");
+await person.getByRole("button", { name: "Take this handle" }).click();
+await person.getByRole("heading", { name: "Your account" }).waitFor();
+expectEqual("account: signed up, and where they were going", whereOf(person), "/settings");
+expectEqual(
+  "account: the frame says who is signed in",
+  squash(await person.locator("header").first().innerText()),
+  "Keel ada",
+);
+
+// The session is a cookie the page cannot read, and the page keeps nothing else.
+const sessionCookies = (await lobby.cookies()).filter((cookie) =>
+  cookie.name.endsWith("session_token"),
+);
+expectEqual(
+  "account: the session is one cookie, HttpOnly",
+  sessionCookies.map((cookie) => `${cookie.httpOnly} ${cookie.sameSite}`).join(","),
+  "true Lax",
+);
+expectEqual(
+  "account: the page can read no cookie and has stored nothing",
+  JSON.stringify(
+    await person.evaluate(() => [
+      document.cookie,
+      Object.keys(window.localStorage),
+      Object.keys(window.sessionStorage),
+    ]),
+  ),
+  '["",[],[]]',
+);
+
+// A passkey, made on this device and kept by Keel under the name given.
+await person.getByText("You have no passkey yet.").waitFor();
+await person.getByLabel("Name for a new passkey").fill("This laptop");
+await person.getByRole("button", { name: "Add a passkey" }).click();
+await person.getByRole("list", { name: "Your passkeys" }).getByText("This laptop").waitFor();
+await shot(person, "settings");
+expectEqual(
+  "account: the passkey is listed",
+  String(await person.getByRole("list", { name: "Your passkeys" }).getByRole("listitem").count()),
+  "1",
+);
+
+// Sign out, then back in with the passkey alone: no address and no code.
+await person.getByRole("button", { name: "Sign out", exact: true }).click();
+await person.waitForURL(`${built}/`);
+expectEqual(
+  "account: signed out, the session cookie is gone",
+  String((await lobby.cookies()).filter((cookie) => cookie.name.endsWith("session_token")).length),
+  "0",
+);
+await person.goto(`${built}/login?next=%2Fsettings`, { waitUntil: "domcontentloaded" });
+await shot(person, "login");
+await person.getByRole("button", { name: "Sign in with a passkey" }).click();
+await person.getByRole("heading", { name: "Your account" }).waitFor();
+expectEqual(
+  "account: signed in with the passkey, as the same user",
+  squash(await person.locator("header").first().innerText()),
+  "Keel ada",
+);
+
+// Once signed in, an address cannot send the reader on to another site.
+await person.goto(`${built}/login?next=${encodeURIComponent("https://elsewhere.example/")}`, {
+  waitUntil: "domcontentloaded",
+});
+await person.waitForURL(`${built}/`);
+expectEqual("account: sign-in goes on to no other site", new URL(person.url()).origin, built);
+
+// A terminal running `keeltown login` shows a code and sends its person to /device.
+const terminal = async (path: string, body: unknown): Promise<Response> =>
+  identity.handle(
+    new Request(`${built}/v1/auth${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+const shownByTerminal: { device_code: string; user_code: string } = await (
+  await terminal("/device/code", { client_id: "keeltown" })
+).json();
+await person.goto(`${built}/device?user_code=${shownByTerminal.user_code}`, {
+  waitUntil: "domcontentloaded",
+});
+await person.getByRole("heading", { name: "Sign a terminal in as you?" }).waitFor();
+expectEqual(
+  "device: the code is the one the terminal shows",
+  await person.locator("[data-user-code]").innerText(),
+  shownByTerminal.user_code,
+);
+await shot(person, "device");
+await person.getByRole("button", { name: "Approve" }).click();
+await person.getByRole("heading", { name: "The terminal is signed in" }).waitFor();
+await new Promise((resolve) => setTimeout(resolve, 5_100));
+const granted: { access_token?: string } = await (
+  await terminal("/device/token", {
+    grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+    device_code: shownByTerminal.device_code,
+    client_id: "keeltown",
+  })
+).json();
+expectEqual(
+  "device: the terminal is given its session, and the page none of it",
+  `${typeof granted.access_token} ${String((await person.content()).includes(granted.access_token ?? "none"))}`,
+  "string false",
+);
+
+// Whatever the page asked of Keel, it put no credential of its own on it.
+expectEqual(
+  "account: the page sent Keel no Authorization",
+  String(sentToKeel.filter((request) => request.authorization !== undefined).length),
+  "0",
+);
+expectEqual(
+  "account: and everything it asked was of Keel's identity",
+  String(
+    sentToKeel.length > 10 && sentToKeel.every((request) => request.path.startsWith("/v1/auth/")),
+  ),
+  "true",
+);
+await lobby.close();
+
+// Where Keel serves no identity yet, the pages say so, and take nobody for a visitor to be signed up.
+const early = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+await withIdentity(early, {
+  handle: () => Promise.resolve(new Response("Not found", { status: 404 })),
+});
+const earlyPage = watch(await early.newPage(), "account, before Keel has identity");
+await earlyPage.goto(`${built}/signup`, { waitUntil: "domcontentloaded" });
+await earlyPage.getByRole("heading", { name: "Signing in is not open on this Keel yet" }).waitFor();
+expectEqual(
+  "account: with no identity on Keel, there is no form to fill",
+  String(await earlyPage.locator("form, button").count()),
+  "0",
+);
+await early.close();
 
 await browser.close();
 await new Promise<void>((resolve) => {

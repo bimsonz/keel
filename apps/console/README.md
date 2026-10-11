@@ -20,6 +20,21 @@ The page never holds a credential for Keel. The Worker holds two: an observer's 
 
 Keel reads its event log only to an observer today. So Changes, Conflicts, Escalations, Mission Control and Insights tell a visitor that they are read from the log, and show nothing in its place.
 
+## Accounts
+
+Keel's users sign up and sign in through Better Auth, which Keel mounts at `/v1/auth` on the console's own origin. The pages above every project speak to it directly, and the console's Worker has no part in it.
+
+| Address | What it is |
+|---|---|
+| `/signup`, `/login` | A passkey, GitHub, or a code sent by email. A new address is signed up by its first code, and then chooses a handle: its name on this Keel, and the name of its own org |
+| `/settings` | The user's passkeys, and signing out here or everywhere else |
+| `/device` | Approving a terminal that is running `keeltown login`, by the code it shows |
+
+- **The session is an HttpOnly cookie**, which the page cannot read. Better Auth's answers also carry the session's token in their body, so one module (`src/account/account.ts`) is the only code that sees an answer, and it hands on nothing but the user's id, email, name and handle.
+- **The page puts no credential on a request.** A visitor's request carries none.
+- **Where Keel serves no identity yet**, these pages say that signing in is not open, and show no form.
+- **In tests the real Better Auth stands in for Keel's** (`test/fixtures/identity/standIn.ts`), with the plugins Keel uses and its origin check on, so nothing imitates a route by hand. The browser checks sign up, add a passkey with Chrome's own virtual authenticator, sign out and sign back in with it.
+
 ## The code
 
 The Code tab is read from Keel's four repository reads (`Repo_getTree`, `Repo_getBlob`, `Repo_listCommits`, `Repo_getCommit`), which Keel answers with no token for a public project.

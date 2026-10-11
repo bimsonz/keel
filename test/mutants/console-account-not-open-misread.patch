@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/account.test.ts
+# kills: account.not-open
+# why: a Keel that serves no identity is not told apart from one that refused
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index dcd6290..41dff9a 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -59,7 +59,6 @@ interface Failure {
+ }
+ 
+ function refusal(error: Failure): Error {
+-  if (error.status === 404) return new NotOpen();
+   return new Refused(error.code ?? "", error.message ?? "Keel refused, and did not say why");
+ }
+ 

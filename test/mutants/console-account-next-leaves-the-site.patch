@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts
+# kills: places.next
+# why: once signed in, the reader is sent wherever the address asked, another site included
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index 5b06905..0e155f4 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -46,7 +46,7 @@ export function nextOf(search: string): string {
+   const nowhere = "https://nowhere.invalid";
+   try {
+     const read = new URL(asked, nowhere);
+-    return read.origin === nowhere ? `${read.pathname}${read.search}` : "/";
++    return asked;
+   } catch {
+     return "/";
+   }

@@ -67,9 +67,37 @@ describe("the console's addresses", () => {
     });
   });
 
-  it("takes no project to be named by a path the Worker answers itself", () => {
-    // What the Worker runs first for: its reads, its ruling routes and its health check. And the build's own files.
-    expect([...RESERVED].toSorted()).toEqual(["api", "assets", "healthz", "present", "rule"]);
+  it("[route.reserved] takes no project, and no org, to be named by a reserved first segment", () => {
+    // The list agreed with Keel, which refuses each of these as a handle: what Keel or the Worker answers itself,
+    // the build's own files, and the pages above every project. `rule` and `present` are the Worker's, for now.
+    expect([...RESERVED].toSorted()).toEqual(
+      [
+        ".well-known",
+        "admin",
+        "api",
+        "assets",
+        "device",
+        "favicon.ico",
+        "healthz",
+        "install",
+        "invite",
+        "llms.txt",
+        "login",
+        "logout",
+        "mcp",
+        "new",
+        "orgs",
+        "present",
+        "privacy",
+        "robots.txt",
+        "rule",
+        "settings",
+        "signup",
+        "start",
+        "terms",
+        "v1",
+      ].toSorted(),
+    );
     for (const segment of RESERVED)
       expect(read(`/${segment}/anything`)).toEqual({ project: null, route: { at: "missing" } });
   });
