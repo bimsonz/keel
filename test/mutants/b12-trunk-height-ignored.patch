@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: b12.snapshot
+# why: the trunk's height counts advances and ignores the height TrunkAdvanced carries
+diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
+index 8de3573..fbe2ecc 100644
+--- a/packages/core/src/application/memory/change-views.ts
++++ b/packages/core/src/application/memory/change-views.ts
+@@ -97,7 +97,7 @@ function foldTrunk(store: Store, event: EventEnvelope): string | undefined {
+   const trunk: TrunkView =
+     payload._tag === "TrunkInitialized"
+       ? { head: payload.head, height: 0 }
+-      : { head: payload.to, height: payload.height ?? (before?.height ?? 0) + 1 };
++      : { head: payload.to, height: (before?.height ?? 0) + 1 };
+   store.put(VIEWS.trunk, payload.projectId, asStored(trunk));
+   return undefined;
+ }

@@ -2,6 +2,7 @@ import "@typespec/http";
 import "@typespec/openapi";
 import "./common.tsp";
 import "./events.tsp";
+import "./changes.tsp";
 
 using Http;
 using OpenAPI;
@@ -80,4 +81,33 @@ interface Inbox {
   @route("/events")
   @get
   listEvents(@query cursor?: string, ...WaitQuery, @query @minValue(1) @maxValue(500) limit?: int32): EventPage | StandardErrors;
+
+  /**
+   * A project's changes and trunk at the head of the operation log, with the cursor they were taken at:
+   * `listEvents` from that cursor returns exactly what the snapshot does not hold, so a console folds
+   * forward from it. Head only. Scoped as `listChanges`.
+   */
+  @summary("Snapshot at the head")
+  @useAuth(Observer | AgentRead)
+  @route("/events/snapshot")
+  @get
+  getSnapshot(@query project?: ProjectId): FeedSnapshot | StandardErrors;
+}
+
+/** Trunk's head commit and height: 0 at initialization, one more per advance. */
+model TrunkHead {
+  head: CommitSha;
+  height: int32;
+}
+
+/** A project's state at the head of the operation log, and the cursor it was taken at. */
+model FeedSnapshot {
+  /** Read `GET /v1/events?cursor=` from here to fold forward. */
+  cursor: string;
+
+  /** Every change of the project, newest `#n` first. */
+  changes: ChangeSummary[];
+
+  /** Absent until the project's trunk is initialized. */
+  trunk?: TrunkHead;
 }

@@ -13,6 +13,10 @@ import { describeChangesContract, type ChangesHarness } from "./contracts/change
 import { describeCodeHostContract } from "./contracts/code-host.ts";
 import { describeEnrolmentsContract, type EnrolmentsHarness } from "./contracts/enrolments.ts";
 import { describeEventFeedContract, type EventFeedHarness } from "./contracts/event-feed.ts";
+import {
+  describeProjectViewsContract,
+  type ProjectViewsHarness,
+} from "./contracts/project-views.ts";
 import { describeInboxContract, type InboxHarness } from "./contracts/inbox.ts";
 import { describeNotifierContract, type NotifierHarness } from "./contracts/notifier.ts";
 import { describeWorkspacePoolContract, type StockedPool } from "./contracts/workspace-pool.ts";
@@ -37,6 +41,7 @@ import * as outbox from "./memory/event-outbox.ts";
 import * as identity from "./memory/identity.ts";
 import * as integration from "./memory/integration.ts";
 import * as operator from "./memory/operator.ts";
+import * as projectViews from "./memory/project-views.ts";
 import * as storage from "./memory/storage.ts";
 import * as verification from "./memory/verification.ts";
 import { CommitSha, makeId } from "@keeltown/core/kernel";
@@ -51,6 +56,7 @@ import type {
   Inbox,
   Notifier,
   Projects,
+  ProjectViews,
 } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 
@@ -113,6 +119,11 @@ function memoryChangesHarness(): ChangesHarness {
 function memoryEventFeedHarness(): EventFeedHarness {
   const memory = feed.makeEventFeedMemory();
   return { layer: memory.layer, arrive: (event) => Effect.sync(() => memory.append(event)) };
+}
+
+function memoryProjectViewsHarness(): ProjectViewsHarness {
+  const memory = projectViews.makeProjectViewsMemory();
+  return { layer: memory.layer, arrive: memory.arrive };
 }
 
 function memoryInboxHarness(): InboxHarness {
@@ -247,6 +258,10 @@ export const PORTS = {
   EventFeed: harnessed<EventFeed, EventFeedHarness>(
     memoryEventFeedHarness,
     describeEventFeedContract,
+  ),
+  ProjectViews: harnessed<ProjectViews, ProjectViewsHarness>(
+    memoryProjectViewsHarness,
+    describeProjectViewsContract,
   ),
   EventLog: port(() => storage.makeEventLogMemory().layer, pending("EventLog", ["publish"])),
   WorkQueue: port(() => storage.makeWorkQueueMemory().layer, pending("WorkQueue", ["enqueue"])),

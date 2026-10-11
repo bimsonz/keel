@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts apps/keel/test/unit/change-views.test.ts
+# kills: b12.change-list
+# why: the folded change is never stored, so each event folds from nothing and a change stays as declared
+diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
+index 8de3573..9912353 100644
+--- a/packages/core/src/application/memory/change-views.ts
++++ b/packages/core/src/application/memory/change-views.ts
+@@ -68,7 +68,6 @@ function foldChange(store: Store, event: EventEnvelope): string | undefined {
+     if (error instanceof IllegalTransition) return `${event.eventId}: ${error.message}`;
+     throw error;
+   }
+-  store.put(VIEWS.change, change.id, asStored(encodeChange(change)));
+   const { project } = event;
+   if (project === undefined) return undefined;
+   const number = numberOf(store, project, change.id);

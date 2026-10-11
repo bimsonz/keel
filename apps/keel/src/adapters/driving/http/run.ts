@@ -9,6 +9,7 @@ import type {
   Inbox,
   Notifier,
   Projects,
+  ProjectViews,
   TokenIssuer,
 } from "@keeltown/core/ports";
 import { Cause, type Effect, Exit, type ManagedRuntime } from "effect";
@@ -26,6 +27,7 @@ export type IsolateServices =
   | Inbox
   | Notifier
   | Projects
+  | ProjectViews
   | Enrolments;
 
 /** What a request answers with when its effect dies rather than failing with a declared error. */

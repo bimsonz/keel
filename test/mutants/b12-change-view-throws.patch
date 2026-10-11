@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: b12.change-view-tolerant
+# why: an event the change machine calls illegal throws out of the receipt instead of being skipped
+diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
+index 8de3573..99d25f2 100644
+--- a/packages/core/src/application/memory/change-views.ts
++++ b/packages/core/src/application/memory/change-views.ts
+@@ -65,7 +65,6 @@ function foldChange(store: Store, event: EventEnvelope): string | undefined {
+       payload: decoded.success,
+     });
+   } catch (error) {
+-    if (error instanceof IllegalTransition) return `${event.eventId}: ${error.message}`;
+     throw error;
+   }
+   store.put(VIEWS.change, change.id, asStored(encodeChange(change)));

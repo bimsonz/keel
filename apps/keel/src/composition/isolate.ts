@@ -17,6 +17,7 @@ import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { EnrolmentsRpc } from "../adapters/driven/do-rpc/enrolments.ts";
 import { EventFeedRpc } from "../adapters/driven/do-rpc/event-feed.ts";
+import { ProjectViewsRpc } from "../adapters/driven/do-rpc/project-views.ts";
 import { InboxRpc } from "../adapters/driven/do-rpc/inbox.ts";
 import { NotifierRpc } from "../adapters/driven/do-rpc/notifier.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
@@ -52,6 +53,7 @@ export function isolateLayer(
     overrides.changes ?? ChangesRpc({ change, agentSession }),
     overrides.inbox ?? InboxRpc(agentSession),
     overrides.eventFeed ?? EventFeedRpc(projector),
+    ProjectViewsRpc(projector),
     overrides.notifier ?? NotifierRpc(agentSession),
     overrides.projects ?? ProjectsRpc(project),
     (overrides.enrolments ?? EnrolmentsRpc(agentSession)).pipe(Layer.provide(directory)),

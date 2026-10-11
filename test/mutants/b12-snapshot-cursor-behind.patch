@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/views.test.ts
+# kills: b12.snapshot
+# why: the snapshot's cursor is one position early, so folding the feed forward from it replays an event the snapshot already holds
+diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
+index 8de3573..36601e4 100644
+--- a/packages/core/src/application/memory/change-views.ts
++++ b/packages/core/src/application/memory/change-views.ts
+@@ -150,7 +150,7 @@ export const viewSnapshot: (project: ProjectId) => Effect.Effect<ViewSnapshot, n
+     return store.transaction(() => {
+       const stored = store.get(VIEWS.trunk, project);
+       return {
+-        cursor: feedCursor(store),
++        cursor: String(Number(feedCursor(store)) - 1).padStart(12, "0"),
+         changes: summariesOf(store, project),
+         ...(stored === undefined ? {} : { trunk: decodeTrunk(stored) }),
+       };

@@ -422,6 +422,142 @@
       }
     },
     "/changes": {
+      "get": {
+        "operationId": "Changes_listChanges",
+        "summary": "List changes",
+        "description": "A project's changes, newest `#n` first, from the Projector's read model; `cursor` is a page's\n`nextCursor`. An agent reads its own project only (another `project` is 403); an observer or\noperator reads any, its token's project when `project` is absent.",
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ChangeState"
+            },
+            "explode": false
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            },
+            "explode": false
+          },
+          {
+            "$ref": "#/components/parameters/PageQuery.cursor"
+          },
+          {
+            "$ref": "#/components/parameters/PageQuery.limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeSummaryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Changes"
+        ],
+        "security": [
+          {
+            "OAuth2Auth": [
+              "observer"
+            ]
+          },
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          }
+        ]
+      },
       "post": {
         "operationId": "declare",
         "summary": "Declare a change",
@@ -2401,6 +2537,129 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EventPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Inbox"
+        ],
+        "security": [
+          {
+            "OAuth2Auth": [
+              "observer"
+            ]
+          },
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          }
+        ]
+      }
+    },
+    "/events/snapshot": {
+      "get": {
+        "operationId": "Inbox_getSnapshot",
+        "summary": "Snapshot at the head",
+        "description": "A project's changes and trunk at the head of the operation log, with the cursor they were taken at:\n`listEvents` from that cursor returns exactly what the snapshot does not hold, so a console folds\nforward from it. Head only. Scoped as `listChanges`.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedSnapshot"
                 }
               }
             }
@@ -5772,6 +6031,89 @@
           "not": {}
         }
       },
+      "ChangeSummary": {
+        "type": "object",
+        "required": [
+          "changeId",
+          "number",
+          "state",
+          "agentId",
+          "goal",
+          "revision",
+          "declaredAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The change's `#n`, counted per project in declaration order."
+          },
+          "state": {
+            "$ref": "#/components/schemas/ChangeState"
+          },
+          "parkReason": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ParkReason"
+              }
+            ],
+            "description": "Why it is parked, while it is."
+          },
+          "agentId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AgentId"
+              }
+            ],
+            "description": "The agent holding it now: the adopter after an adoption."
+          },
+          "goal": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "declaredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When its last event was committed."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One change as Mission Control lists it: `#number`, its state, goal and agent."
+      },
+      "ChangeSummaryPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeSummary"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "Absent on the last page."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
       "ChangeSuperseded": {
         "type": "object",
         "required": [
@@ -7675,6 +8017,38 @@
         "type": "string",
         "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$",
         "description": "A subject key as events carry it: the API's `SubjectKey` without its length cap."
+      },
+      "FeedSnapshot": {
+        "type": "object",
+        "required": [
+          "cursor",
+          "changes"
+        ],
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "Read `GET /v1/events?cursor=` from here to fold forward."
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeSummary"
+            },
+            "description": "Every change of the project, newest `#n` first."
+          },
+          "trunk": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TrunkHead"
+              }
+            ],
+            "description": "Absent until the project's trunk is initialized."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A project's state at the head of the operation log, and the cursor it was taken at."
       },
       "Finding": {
         "type": "object",
@@ -12585,6 +12959,26 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "TrunkHead": {
+        "type": "object",
+        "required": [
+          "head",
+          "height"
+        ],
+        "properties": {
+          "head": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Trunk's head commit and height: 0 at initialization, one more per advance."
       },
       "TrunkInitialized": {
         "type": "object",

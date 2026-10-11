@@ -1,8 +1,20 @@
-import { readFeed, recordFeed } from "@keeltown/core/application/memory";
+import {
+  foldViews,
+  listChanges,
+  readFeed,
+  recordFeed,
+  viewSnapshot,
+} from "@keeltown/core/application/memory";
 import type { EventEnvelope } from "@keeltown/core/kernel";
 import { EntityStore, type Stored, type Transaction } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
-import { ProjectorCodecs, ProjectorRead, type ProjectorRpc } from "../../../rpc/index.ts";
+import {
+  ChangesRead,
+  ProjectorCodecs,
+  ProjectorRead,
+  type ProjectorRpc,
+  SnapshotRead,
+} from "../../../rpc/index.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 
 /** Where the Projector counts the nudges it has had. */
@@ -32,9 +44,16 @@ export class ProjectorDO extends KeelObjectWith<never> implements ProjectorRpc {
     return this.answer(ProjectorCodecs.nudge, program);
   }
 
-  /** Every arrival joins the feed; the receipt's dedupe makes a redelivery a no-op, and `answer` wakes any reader. */
+  /**
+   * Every arrival joins the feed, then the read models beside it, in the
+   * receipt's transaction: the receipt's dedupe makes a redelivery a no-op,
+   * and `answer` wakes any reader. An event a read model cannot take stays in
+   * the feed and is logged here.
+   */
   protected override react(event: EventEnvelope, tx: Transaction): Reaction {
     recordFeed(tx.store, event);
+    const skipped = foldViews(tx.store, event);
+    if (skipped !== undefined) console.warn("projector read model skipped an event", skipped);
     return { drafts: [] };
   }
 
@@ -47,5 +66,21 @@ export class ProjectorDO extends KeelObjectWith<never> implements ProjectorRpc {
       ),
     );
     return this.answer(ProjectorCodecs.read, program);
+  }
+
+  async changes(request: typeof ChangesRead.Encoded) {
+    const program = Schema.decodeUnknownEffect(ChangesRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(listChanges),
+    );
+    return this.answer(ProjectorCodecs.changes, program);
+  }
+
+  async snapshot(request: typeof SnapshotRead.Encoded) {
+    const program = Schema.decodeUnknownEffect(SnapshotRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ project }) => viewSnapshot(project)),
+    );
+    return this.answer(ProjectorCodecs.snapshot, program);
   }
 }

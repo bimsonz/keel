@@ -9,13 +9,17 @@ import type {
   SketchNotFound,
 } from "../../domain/coordination/index.ts";
 import type { IdempotencyConflict, InboxPage, Principal } from "../../domain/identity/index.ts";
-import type { ChangeId } from "../../domain/kernel/index.ts";
+import type { ChangeId, ProjectId } from "../../domain/kernel/index.ts";
 import {
+  type ChangeListPage,
+  type ChangeListRead,
   Changes,
   EventFeed,
   type EventFeedPage,
   Inbox,
+  ProjectViews,
   type SubmissionStatus,
+  type ViewSnapshot,
 } from "../ports/index.ts";
 import type { Declared, DeclareInput, SubmitInput } from "./index.ts";
 
@@ -93,3 +97,26 @@ export const readEvents: (
         : { ...page, events: page.events.filter((e) => e.project === principal.projectId) },
     ),
   );
+
+/**
+ * The project a read of a project's views is about: the one asked for, or the
+ * token's when none is. An agent reads its own project only, so asking for
+ * another, whether or not it exists, is undefined (a 403); an observer or an
+ * operator reads any.
+ */
+export const viewedProject = (principal: Principal, asked?: ProjectId): ProjectId | undefined => {
+  if (asked === undefined || asked === principal.projectId) return principal.projectId;
+  return readsInstanceWide(principal) ? asked : undefined;
+};
+
+/** A project's changes from the Projector's read model, newest `#n` first. */
+export const readChangeList: (
+  read: ChangeListRead,
+) => Effect.Effect<ChangeListPage, never, ProjectViews> = (read) =>
+  ProjectViews.use((views) => views.changes(read));
+
+/** A project's changes and trunk at the feed's head, with the cursor to fold forward from. */
+export const readSnapshot: (
+  project: ProjectId,
+) => Effect.Effect<ViewSnapshot, never, ProjectViews> = (project) =>
+  ProjectViews.use((views) => views.snapshot(project));

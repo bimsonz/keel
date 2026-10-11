@@ -3,6 +3,7 @@ import "@typespec/openapi";
 import "@bimsonz/mfp";
 import "./common.tsp";
 import "./models.tsp";
+import "./events.tsp";
 
 using Http;
 using OpenAPI;
@@ -84,9 +85,48 @@ model ChangePath {
   @path changeId: ChangeId;
 }
 
+/** One change as Mission Control lists it: `#number`, its state, goal and agent. */
+model ChangeSummary {
+  changeId: ChangeId;
+
+  /** The change's `#n`, counted per project in declaration order. */
+  number: int32;
+
+  state: ChangeState;
+
+  /** Why it is parked, while it is. */
+  parkReason?: ParkReason;
+
+  /** The agent holding it now: the adopter after an adoption. */
+  agentId: AgentId;
+
+  goal: string;
+  revision: int32;
+  declaredAt: utcDateTime;
+
+  /** When its last event was committed. */
+  updatedAt: utcDateTime;
+}
+
+model ChangeSummaryPage is Page<ChangeSummary>;
+
 @tag("Changes")
 @route("/changes")
 interface Changes {
+  /**
+   * A project's changes, newest `#n` first, from the Projector's read model; `cursor` is a page's
+   * `nextCursor`. An agent reads its own project only (another `project` is 403); an observer or
+   * operator reads any, its token's project when `project` is absent.
+   */
+  @summary("List changes")
+  @useAuth(Observer | AgentRead)
+  @get
+  listChanges(
+    @query state?: ChangeState,
+    @query project?: ProjectId,
+    ...PageQuery,
+  ): ChangeSummaryPage | StandardErrors;
+
   /** Declare an intent before writing code. Returns preflight, a workspace to push to, and a lease. */
   @summary("Declare a change")
   @tag("mcp")

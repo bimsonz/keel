@@ -20,6 +20,7 @@ const CONTRACT_PORTS = [
   "EntityStore",
   "EventOutbox",
   "EventFeed",
+  "ProjectViews",
   "EventLog",
   "WorkQueue",
   "DecisionModel",

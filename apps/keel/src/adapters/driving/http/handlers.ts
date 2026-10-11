@@ -3,13 +3,17 @@ import {
   declareChange,
   getSettings,
   putSettings,
+  readChangeList,
   readEvents,
   readInbox,
+  readSnapshot,
   submissionOf,
   submitChange,
+  viewedProject,
 } from "@keeltown/core/application/coordination";
 import { enrolAgent, exchangeToken, whoami } from "@keeltown/core/application/identity";
 import { isBootstrap, Scope } from "@keeltown/core/domain/identity";
+import { ProjectId } from "@keeltown/core/kernel";
 import { Effect, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
 import type { Caller, Principal } from "./caller.ts";
@@ -28,6 +32,7 @@ import {
   settingsProject,
 } from "./operator.ts";
 import { eventsInput, eventsOk } from "./events.ts";
+import { changeListInput, changesOk, foreignProject, snapshotOk } from "./views.ts";
 import { piggyback } from "./piggyback.ts";
 import { notImplemented } from "./problems.ts";
 import type { Runner } from "./run.ts";
@@ -150,6 +155,22 @@ export function makeHandlers(run: Runner) {
           ),
         );
       },
+      Changes_listChanges: (caller: Caller, input: Input<"Changes_listChanges">) => {
+        const decoded = changeListInput(input);
+        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+        const { project: asked, ...read } = decoded.success;
+        return run(
+          caller,
+          principalOf(caller).pipe(
+            Effect.flatMap((principal) => {
+              const project = viewedProject(principal, asked);
+              return project === undefined
+                ? Effect.succeed(foreignProject(caller))
+                : Effect.map(readChangeList({ ...read, project }), changesOk);
+            }),
+          ),
+        );
+      },
       Changes_getChange: notYet,
       revise: notYet,
       rely: notYet,
@@ -210,6 +231,19 @@ export function makeHandlers(run: Runner) {
           ),
         );
       },
+      Inbox_getSnapshot: (caller: Caller, input: Input<"Inbox_getSnapshot">) =>
+        run(
+          caller,
+          principalOf(caller).pipe(
+            Effect.flatMap((principal) => {
+              const asked = input.project === undefined ? undefined : ProjectId.make(input.project);
+              const project = viewedProject(principal, asked);
+              return project === undefined
+                ? Effect.succeed(foreignProject(caller))
+                : Effect.map(readSnapshot(project), snapshotOk);
+            }),
+          ),
+        ),
       Lattices_listLattices: latticesOk,
       Views_getVerdict: notYet,
       Views_getCandidate: notYet,

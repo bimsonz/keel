@@ -45,4 +45,5 @@ export const giveRuling: (
 ) => Effect.Effect<Decision, EscalationNotFound, EntityStore | EventOutbox | Ids | Clock> =
   stub("memory/giveRuling");
 
+export * from "./change-views.ts";
 export * from "./feed.ts";

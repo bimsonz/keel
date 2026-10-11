@@ -1,4 +1,12 @@
-import { EventEnvelope } from "@keeltown/core/kernel";
+import { ChangeState, ParkReason } from "@keeltown/core/domain/coordination";
+import {
+  AgentId,
+  ChangeId,
+  CommitSha,
+  EventEnvelope,
+  InstantSchema,
+  ProjectId,
+} from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
@@ -29,9 +37,50 @@ export const FeedPage = Schema.Struct({
   cursor: Position,
 });
 
+/** One change as the console lists it: `#number`, its state, goal and agent. */
+export const ChangeSummary = Schema.Struct({
+  changeId: ChangeId,
+  number: Schema.Int,
+  state: ChangeState,
+  parkReason: Schema.optional(ParkReason),
+  agentId: AgentId,
+  goal: Schema.String,
+  revision: Schema.Int,
+  declaredAt: InstantSchema,
+  updatedAt: InstantSchema,
+});
+
+/** Trunk's head and height: TrunkInitialized is height 0, and each advance adds 1. */
+export const TrunkView = Schema.Struct({ head: CommitSha, height: Schema.Int });
+
+/** A project's changes, newest `#n` first: in one `state` when given, numbered below `cursor`, at most `limit` (1–100, default 50). */
+export const ChangesRead = Schema.Struct({
+  project: ProjectId,
+  state: Schema.optional(ChangeState),
+  cursor: Schema.optional(Schema.Int),
+  limit: Schema.optional(Schema.Int),
+});
+
+/** A page of a project's changes; `nextCursor` is the last number returned when more remain. */
+export const ChangePage = Schema.Struct({
+  items: Schema.Array(ChangeSummary),
+  nextCursor: Schema.optional(Schema.Int),
+});
+
+/** A project's changes and trunk at the feed's head, and that head as the cursor to fold forward from. */
+export const ViewSnapshot = Schema.Struct({
+  cursor: Position,
+  changes: Schema.Array(ChangeSummary),
+  trunk: Schema.optional(TrunkView),
+});
+
+export const SnapshotRead = Schema.Struct({ project: ProjectId });
+
 export const ProjectorCodecs = {
   nudge: exitCodec(Schema.Struct({ drained: Schema.Int }), Schema.Never),
   read: exitCodec(FeedPage, Schema.Never),
+  changes: exitCodec(ChangePage, Schema.Never),
+  snapshot: exitCodec(ViewSnapshot, Schema.Never),
 };
 
 /**
@@ -45,4 +94,8 @@ export interface ProjectorRpc extends EventReceiverRpc {
   nudge(): Promise<ExitJson>;
   /** The events after `cursor`; with `waitMs` above 0 and none yet, the first page an arrival brings, or an empty one at the deadline. */
   read(request: typeof ProjectorRead.Encoded): Promise<ExitJson>;
+  /** A project's changes as the console lists them (Mission Control's D6). */
+  changes(request: typeof ChangesRead.Encoded): Promise<ExitJson>;
+  /** A project's changes and trunk with the feed's head, read in one turn (Mission Control's D7). */
+  snapshot(request: typeof SnapshotRead.Encoded): Promise<ExitJson>;
 }

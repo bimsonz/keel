@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts apps/keel/test/unit/change-views.test.ts
+# kills: b12.change-list
+# why: a page includes the change its cursor names, so walking the pages returns each boundary change twice
+diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
+index 8de3573..4a967e5 100644
+--- a/packages/core/src/application/memory/change-views.ts
++++ b/packages/core/src/application/memory/change-views.ts
+@@ -134,7 +134,7 @@ export const listChanges: (
+   const matching = summariesOf(store, read.project).filter(
+     (summary) =>
+       (read.state === undefined || summary.state === read.state) &&
+-      (below === undefined || summary.number < below),
++      (below === undefined || summary.number <= below),
+   );
+   const items = matching.slice(0, limit);
+   const last = items.at(-1);

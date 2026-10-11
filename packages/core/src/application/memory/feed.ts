@@ -75,6 +75,9 @@ const headOf = (store: Store): number => {
   return typeof head === "number" ? head : 0;
 };
 
+/** The feed's head as a cursor: a read from it returns only what arrives after. */
+export const feedCursor = (store: Store): string => position(headOf(store));
+
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
