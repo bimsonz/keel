@@ -1,10 +1,15 @@
 // The Trunk's bootstrapping over in-memory ports: Initialize through the
 // domain's Promotion machine and commit(), and the project repo convention.
 import { describe, expect, it } from "@effect/vitest";
-import { initializeTrunk, projectRepos, trunkOf } from "@keeltown/core/application/integration";
+import {
+  initializeTrunk,
+  projectRepos,
+  syncTrunk,
+  trunkOf,
+} from "@keeltown/core/application/integration";
 import { CommitSha, makeId, type ProjectId } from "@keeltown/core/kernel";
 import { EntityStore, EventOutbox } from "@keeltown/core/ports";
-import { makeClockMemory, makeEventOutboxMemory } from "@keeltown/testing";
+import { makeClockMemory, makeEventOutboxMemory, makeTrunkWriterMemory } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
 
 const PROJECT: ProjectId = makeId("prj", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
@@ -41,6 +46,33 @@ describe("the Trunk's Initialize", () => {
         expect(trunkOf(yield* EntityStore, PROJECT)?.head).toBe(sha("a"));
         expect(yield* logOf(PROJECT)).toEqual(["TrunkInitialized"]);
       }).pipe(Effect.provide(ports())),
+  );
+});
+
+describe("the Trunk's sync", () => {
+  it.effect(
+    "[trunk.sync] copies trunk's head into staging and the mirror, and a second sync changes nothing",
+    () => {
+      const writer = makeTrunkWriterMemory(sha("c"));
+      const repos = projectRepos(PROJECT);
+      return Effect.gen(function* () {
+        expect(yield* syncTrunk(PROJECT)).toEqual({
+          head: sha("c"),
+          staging: "advanced",
+          mirror: "advanced",
+        });
+        expect([writer.synced(repos.staging), writer.synced(repos.mirror)]).toEqual([
+          sha("c"),
+          sha("c"),
+        ]);
+        expect(writer.synced(repos.trunk)).toBeUndefined();
+        expect(yield* syncTrunk(PROJECT)).toEqual({
+          head: sha("c"),
+          staging: "unchanged",
+          mirror: "unchanged",
+        });
+      }).pipe(Effect.provide(writer.layer));
+    },
   );
 });
 

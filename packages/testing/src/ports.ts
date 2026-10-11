@@ -220,7 +220,7 @@ export const PORTS = {
   ),
   TrunkWriter: port(
     () => integration.makeTrunkWriterMemory(GENESIS).layer,
-    pending("TrunkWriter", ["head", "push"]),
+    pending("TrunkWriter", ["head", "push", "sync"]),
   ),
   SessionStore: port(
     () => storage.makeSessionStoreMemory().layer,

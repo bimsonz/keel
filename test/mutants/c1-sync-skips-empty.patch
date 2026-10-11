@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/fetch.test.ts -t sync.empty-then-advance
+# kills: sync.empty-then-advance
+# why: An empty target is treated as already in sync, so a new project's staging and mirror never receive trunk
+diff --git a/packages/gitcore/src/fetch.ts b/packages/gitcore/src/fetch.ts
+index 8d2310f..81ea3ca 100644
+--- a/packages/gitcore/src/fetch.ts
++++ b/packages/gitcore/src/fetch.ts
+@@ -104,7 +104,7 @@ export async function relay(
+   move: RelayMove,
+   options: RelayOptions = {},
+ ): Promise<RelayOutcome> {
+-  if (move.from === move.to) return { kind: "unchanged" };
++  if (move.from === move.to || move.from === null) return { kind: "unchanged" };
+   const pack = await uploadPack(source, [move.to], move.from === null ? [] : [move.from]);
+   const limit = options.maxPackBytes ?? MAX_RELAY_PACK_BYTES;
+   if (pack.length > limit) throw new PackTooLarge(pack.length, limit);

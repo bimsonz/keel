@@ -6,14 +6,18 @@ import {
   type EventOutbox,
   type FanOut,
   type Ids,
+  type TrunkWriter,
   Trunks,
   type WorkspacePool,
 } from "@keeltown/core/ports";
+import { projectRepos } from "@keeltown/core/application/integration";
+import type { ProjectId } from "@keeltown/core/kernel";
 import { NotImplemented } from "@keeltown/core/not-implemented";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { FanOutRpc } from "../adapters/driven/do-rpc/fan-out.ts";
+import { TrunkWriterGitCore } from "../adapters/driven/gitcore/trunk-writer.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { EntityStoreSql, migrateEntityStore } from "../adapters/driven/do-storage/entity-store.ts";
 import { EventOutboxSql, migrateEventOutbox } from "../adapters/driven/do-storage/event-outbox.ts";
@@ -73,6 +77,19 @@ export function changeServices(env: Env): Layer.Layer<ChangeServices> {
   return Layer.mergeAll(
     WorkspacePoolRpc(env.WORKSPACE_POOL, artifactsLocationHint(env)),
     codeHostLayer(env),
+  );
+}
+
+/** The Trunk DO's driven adapters beyond the backbone: the one writer of its project's trunk. */
+export type TrunkServices = TrunkWriter;
+
+/**
+ * The Trunk DO writes and syncs its project's trunk through GitCore over the
+ * code host. `projectId` is read lazily, on first use, from the object's name.
+ */
+export function trunkServices(env: Env, projectId: () => ProjectId): Layer.Layer<TrunkServices> {
+  return Layer.suspend(() =>
+    TrunkWriterGitCore(projectRepos(projectId()).trunk).pipe(Layer.provide(codeHostLayer(env))),
   );
 }
 

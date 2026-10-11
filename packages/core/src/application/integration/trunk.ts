@@ -8,7 +8,8 @@ import {
   TrunkEvent,
 } from "../../domain/integration/index.ts";
 import type { CommitSha, ProjectId } from "../../domain/kernel/index.ts";
-import { Clock, commit, EntityStore, type EventDraft } from "../ports/index.ts";
+import { Clock, commit, EntityStore, type EventDraft, TrunkWriter } from "../ports/index.ts";
+import { projectRepos } from "./project-repos.ts";
 
 /** The EntityStore kind holding a trunk's folded state, keyed by its project. */
 const TRUNK = "trunk";
@@ -98,4 +99,18 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
       command: "Initialize",
     });
   return trunk;
+});
+
+/**
+ * Copies trunk's head into the project's staging and mirror, off the
+ * promotion path: a lagging mirror is safe (a change's base is its
+ * workspace's head), and trunk never waits on or fails by it. Idempotent.
+ */
+export const syncTrunk = Effect.fn("integration/syncTrunk")(function* (projectId: ProjectId) {
+  const repos = projectRepos(projectId);
+  const { head, outcomes } = yield* (yield* TrunkWriter).sync([repos.staging, repos.mirror]);
+  const [staging, mirror] = outcomes;
+  if (staging === undefined || mirror === undefined)
+    return yield* Effect.die(new Error(`trunk ${projectId} synced ${outcomes.length} of 2 repos`));
+  return { head, staging, mirror };
 });

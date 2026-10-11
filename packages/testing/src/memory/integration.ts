@@ -4,7 +4,13 @@ import {
   UnexpectedHead,
 } from "@keeltown/core/domain/integration";
 import { CommitSha, type ProjectId } from "@keeltown/core/kernel";
-import { CandidateComposer, TrunkWriter, Trunks } from "@keeltown/core/ports";
+import {
+  CandidateComposer,
+  type RepoRef,
+  type SyncOutcome,
+  TrunkWriter,
+  Trunks,
+} from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 
 const sha = async (text: string): Promise<CommitSha> => {
@@ -38,11 +44,19 @@ export function makeCandidateComposerMemory(options: { readonly refuse?: readonl
   };
 }
 
-/** One head. A push from anything but the head is refused, as a fenced writer must refuse it. */
+const repoKey = (repo: RepoRef) => `${repo.namespace}/${repo.name}`;
+
+/**
+ * One head. A push from anything but the head is refused, as a fenced writer
+ * must refuse it. `sync` copies the head into each target's main, which
+ * `synced` reads back (undefined: never synced).
+ */
 export function makeTrunkWriterMemory(initial: CommitSha) {
   let current = initial;
+  const targets = new Map<string, CommitSha>();
   return {
     head: () => current,
+    synced: (repo: RepoRef) => targets.get(repoKey(repo)),
     /** Moves trunk behind the writer's back, to exercise the read-back freeze. */
     interfere: (to: CommitSha) => {
       current = to;
@@ -57,6 +71,15 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
               return Effect.fail(new UnexpectedHead({ expected: from, observed: current }));
             current = to;
             return Effect.void;
+          }),
+        sync: (repos) =>
+          Effect.sync(() => {
+            const outcomes = repos.map((repo): SyncOutcome => {
+              if (targets.get(repoKey(repo)) === current) return "unchanged";
+              targets.set(repoKey(repo), current);
+              return "advanced";
+            });
+            return { head: current, outcomes };
           }),
       }),
     ),

@@ -36,6 +36,36 @@ export function tempRepo(bare = true): { dir: string; cleanup: () => void } {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
+/**
+ * A fetch that answers smart-HTTP requests from local bare repos, as a git
+ * server would: `<base>/<name>/git-upload-pack` and `/git-receive-pack` run
+ * the matching `--stateless-rpc` service on `repos[name]`. `requests` counts
+ * every call, so a test can see that nothing was sent.
+ */
+export function smartHttp(repos: Readonly<Record<string, string>>) {
+  const served = { requests: 0 };
+  const fetch: typeof globalThis.fetch = async (input, init) => {
+    served.requests += 1;
+    const url = new URL(
+      typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+    );
+    const [, name, service] =
+      /^\/([^/]+)\/(git-upload-pack|git-receive-pack)$/.exec(url.pathname) ?? [];
+    const dir = name === undefined ? undefined : repos[name];
+    if (dir === undefined || service === undefined)
+      return new Response("no such repo", { status: 404 });
+    const body = new Uint8Array(await new Response(init?.body).arrayBuffer());
+    const run = spawnSync("git", [service.slice("git-".length), "--stateless-rpc", dir], {
+      env: GIT_ENV,
+      input: body,
+      maxBuffer: 1 << 30,
+    });
+    if (run.status !== 0) return new Response(run.stderr, { status: 500 });
+    return new Response(new Uint8Array(run.stdout), { status: 200 });
+  };
+  return { fetch, served };
+}
+
 /** Pipelined `git cat-file --batch`; responses come back in request order. */
 export class CatFileReader implements TreeReader {
   private proc: ChildProcessWithoutNullStreams;
