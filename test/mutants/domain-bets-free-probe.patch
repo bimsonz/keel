@@ -2,7 +2,7 @@
 # kills: bets.probe-cost-positive
 # why: A zero-cost probe makes blast ÷ cost infinite
 diff --git a/packages/core/src/domain/coordination/bets.ts b/packages/core/src/domain/coordination/bets.ts
-index f2b06ff..c28df64 100644
+index 38093b8..edeefa1 100644
 --- a/packages/core/src/domain/coordination/bets.ts
 +++ b/packages/core/src/domain/coordination/bets.ts
 @@ -9,7 +9,7 @@ export type ProbeCost = Brand.Branded<number, "ProbeCost">;
@@ -12,5 +12,5 @@ index f2b06ff..c28df64 100644
 -  Number.isFinite(cost) && cost > 0
 +  Number.isFinite(cost) && cost >= 0
      ? Result.succeed(asProbeCost(cost))
-     : Result.fail(new InvalidProbeCost({ cost }));
+     : Result.fail(new InvalidProbeCost(Number.isFinite(cost) ? { cost } : {}));
  

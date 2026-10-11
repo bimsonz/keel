@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: wire.finite
+# why: PlanCompiled.costEstimate decodes as NaN or Infinity
+diff --git a/packages/core/src/domain/coordination/events.ts b/packages/core/src/domain/coordination/events.ts
+index d933a90..54e3e8b 100644
+--- a/packages/core/src/domain/coordination/events.ts
++++ b/packages/core/src/domain/coordination/events.ts
+@@ -98,7 +98,7 @@ export const PlanCompiled = Schema.TaggedStruct("PlanCompiled", {
+   revision: Schema.Int,
+   planHash: ContentHash,
+   steps: Schema.Int,
+-  costEstimate: Schema.Finite,
++  costEstimate: Schema.Number,
+ });
+ export const ChangeQueued = Schema.TaggedStruct("ChangeQueued", {
+   changeId: ChangeId,

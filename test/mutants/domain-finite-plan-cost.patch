@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: wire.finite
+# why: VerificationPlan.costEstimate decodes as NaN or Infinity
+diff --git a/packages/core/src/domain/verification/plan.ts b/packages/core/src/domain/verification/plan.ts
+index 047c6df..4de43be 100644
+--- a/packages/core/src/domain/verification/plan.ts
++++ b/packages/core/src/domain/verification/plan.ts
+@@ -46,7 +46,7 @@ export type PlanStep = typeof PlanStep.Type;
+ export const VerificationPlan = Schema.Struct({
+   planHash: ContentHash,
+   steps: Schema.Array(PlanStep),
+-  costEstimate: Schema.Finite,
++  costEstimate: Schema.Number,
+   /** The compiled flow tree the steps came from. Opaque outside the flow compiler. */
+   flow: Schema.optional(Schema.Unknown),
+ });

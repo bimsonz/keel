@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: wire.finite
+# why: A model's probability decodes as NaN or Infinity
+diff --git a/packages/core/src/domain/coordination/derivation.ts b/packages/core/src/domain/coordination/derivation.ts
+index 513db43..d34c659 100644
+--- a/packages/core/src/domain/coordination/derivation.ts
++++ b/packages/core/src/domain/coordination/derivation.ts
+@@ -7,7 +7,7 @@ export const DerivationMethod = Schema.Literals(["extractor", "clef", "code-mode
+ export type DerivationMethod = typeof DerivationMethod.Type;
+ 
+ /** A model's probability for its answer. */
+-const Probability = Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 1 }));
++const Probability = Schema.Number;
+ 
+ const derivedFields = {
+   proposition: Proposition,

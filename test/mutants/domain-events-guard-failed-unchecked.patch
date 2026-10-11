@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: events.guard-failed-shape
+# why: A GuardFailed naming neither a change nor a batch and its candidate decodes
+diff --git a/packages/core/src/domain/verification/events.ts b/packages/core/src/domain/verification/events.ts
+index 44cac2c..11ccc59 100644
+--- a/packages/core/src/domain/verification/events.ts
++++ b/packages/core/src/domain/verification/events.ts
+@@ -120,7 +120,7 @@ export const GuardFailed = Schema.TaggedStruct("GuardFailed", {
+ }).check(
+   Schema.makeFilter(
+     (e) =>
+-      e.changeId !== undefined ||
++      true ||
+       (e.batchId !== undefined && e.candidateId !== undefined) ||
+       "a guard fails against a change, or against a batch and its candidate",
+   ),

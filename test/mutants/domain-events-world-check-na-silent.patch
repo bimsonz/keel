@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: events.world-check-na-reason
+# why: An n/a suite cell decodes without saying why the suite did not apply
+diff --git a/packages/core/src/domain/verification/events.ts b/packages/core/src/domain/verification/events.ts
+index 44cac2c..746f41c 100644
+--- a/packages/core/src/domain/verification/events.ts
++++ b/packages/core/src/domain/verification/events.ts
+@@ -61,7 +61,7 @@ export const WorldCheckRan = Schema.TaggedStruct("WorldCheckRan", {
+   reason: Schema.optional(Schema.NonEmptyString),
+ }).check(
+   Schema.makeFilter(
+-    (e) => e.outcome !== "n/a" || e.reason !== undefined || "an n/a check says why",
++    () => true,
+   ),
+ );
+ export const ProbeDiscarded = Schema.TaggedStruct("ProbeDiscarded", {

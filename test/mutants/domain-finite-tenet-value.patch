@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: wire.finite
+# why: A tenet's value decodes as NaN or Infinity
+diff --git a/packages/core/src/domain/memory/memory.ts b/packages/core/src/domain/memory/memory.ts
+index 3cd13f9..c1fecc8 100644
+--- a/packages/core/src/domain/memory/memory.ts
++++ b/packages/core/src/domain/memory/memory.ts
+@@ -42,7 +42,7 @@ export const Tenet = Schema.Struct({
+   predicate: Predicate,
+   /** How the value is held; `is` when absent. */
+   relation: Schema.optional(Relation),
+-  value: Schema.Union([Schema.String, Schema.Finite, Schema.Boolean]),
++  value: Schema.Union([Schema.String, Schema.Number, Schema.Boolean]),
+   guards: Schema.NonEmptyArray(GuardId),
+   state: TenetState,
+ });

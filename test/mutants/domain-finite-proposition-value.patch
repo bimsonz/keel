@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: wire.finite
+# why: A proposition's value decodes as NaN or Infinity
+diff --git a/packages/core/src/domain/coordination/proposition.ts b/packages/core/src/domain/coordination/proposition.ts
+index 4d2e37b..ed8bffd 100644
+--- a/packages/core/src/domain/coordination/proposition.ts
++++ b/packages/core/src/domain/coordination/proposition.ts
+@@ -50,7 +50,7 @@ export const Proposition = Schema.Struct({
+    * the first event and the value the second; bound a number in `unit`; purity, idempotent and
+    * presence a boolean. `is` means exactly the value, `not` its complement.
+    */
+-  value: Schema.Union([Schema.String, Schema.Finite, Schema.Boolean]),
++  value: Schema.Union([Schema.String, Schema.Number, Schema.Boolean]),
+   /** The unit of a `bound` value, e.g. `ms`. */
+   unit: Schema.optional(Schema.String),
+   /** `;`-separated `key:value` pairs, e.g. `env:prod|staging;tenant:t1`. Absent means everywhere. */

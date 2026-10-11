@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: wire.finite
+# why: An instant decodes as NaN or Infinity
+diff --git a/packages/core/src/domain/kernel/ids.ts b/packages/core/src/domain/kernel/ids.ts
+index 32d1958..782db26 100644
+--- a/packages/core/src/domain/kernel/ids.ts
++++ b/packages/core/src/domain/kernel/ids.ts
+@@ -105,7 +105,7 @@ export interface IdOf {
+ /** A point in time, as milliseconds since the Unix epoch. Time reaches the domain only as a value. */
+ export type Instant = number & Brand.Brand<"Instant">;
+ export const Instant = Brand.nominal<Instant>();
+-export const InstantSchema = Schema.Finite.pipe(Schema.brand("Instant"));
++export const InstantSchema = Schema.Number.pipe(Schema.brand("Instant"));
+ 
+ /** Thrown when a string handed to `makeId` is not a ULID. A defect: ids come from `Ids`, never from input. */
+ export class MalformedId extends Error {

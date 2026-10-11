@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: derivation.record-shape
+# why: A decision model's effect decodes without its probability
+diff --git a/packages/core/src/domain/coordination/derivation.ts b/packages/core/src/domain/coordination/derivation.ts
+index 513db43..0ae9b07 100644
+--- a/packages/core/src/domain/coordination/derivation.ts
++++ b/packages/core/src/domain/coordination/derivation.ts
+@@ -36,7 +36,7 @@ export const DecisionModelEffect = Schema.Struct({
+   ...derivedFields,
+   method: Schema.Literal("clef"),
+   evidenceClass: Schema.Literal("opinion"),
+-  p: Probability,
++  p: Schema.optional(Probability),
+ });
+ /** Proposed by a code model: opinion, with a probability when the model gave one. */
+ export const CodeModelEffect = Schema.Struct({

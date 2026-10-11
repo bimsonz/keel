@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.world-checks
+# why: A suite cell is recorded for a conflict no probe is running yet, so the matrix fills before its probe exists
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index 933801b..bf90564 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -270,7 +270,8 @@ export const decideConflict = (
+         : refuse();
+     }
+     case "RecordCheck": {
+-      if (conflict.state !== "probing") return refuse(undefined, awaitProbe);
++      if (conflict.state !== "probing" && conflict.state !== "suspected")
++        return refuse(undefined, awaitProbe);
+       const cell = {
+         conflictId: conflict.id,
+         world: command.world,
