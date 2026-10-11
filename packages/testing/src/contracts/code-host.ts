@@ -253,6 +253,19 @@ export function describeCodeHostContract(
     );
 
     it.live(
+      "[codehost.log-merge] log follows a merge's first parent only, never the trunk it merged",
+      () =>
+        Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const { repo, base, work, trunk, merge } = yield* mergeHistory;
+          expect((yield* host.readCommit(repo, merge)).parents).toEqual([work, trunk]);
+          expect(shas(yield* host.log(repo, merge, 10))).toEqual([merge, work, base]);
+          expect(shas(yield* host.log(repo, merge, 2))).toEqual([merge, work]);
+          expect(shas(yield* host.log(repo, trunk, 10))).toEqual([trunk, base]);
+        }).pipe(Effect.provide(make())),
+    );
+
+    it.live(
       "[codehost.fork] a fork copies refs and content, then moves independently and outlives its source",
       () =>
         Effect.gen(function* () {

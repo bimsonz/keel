@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "codehost.log-merge"
+# kills: codehost.log-merge
+# why: log walks a merge's last parent, so the history shown runs down the trunk an agent merged instead of the change's own line
+diff --git a/packages/testing/src/memory/code-host.ts b/packages/testing/src/memory/code-host.ts
+index eea195d..24ba6a0 100644
+--- a/packages/testing/src/memory/code-host.ts
++++ b/packages/testing/src/memory/code-host.ts
+@@ -218,7 +218,7 @@ export function makeCodeHostMemory() {
+         while (next !== undefined && out.length < limit) {
+           const commit = commitInfo(next, (yield* object(repo, found, next, "commit")).body);
+           out.push(commit);
+-          next = commit.parents[0];
++          next = commit.parents.at(-1);
+         }
+         return out;
+       }),
