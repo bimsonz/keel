@@ -34,9 +34,12 @@ describe("bindings inside workerd", () => {
     expect(result.retryMessages).toEqual([]);
   });
 
-  it("Workflow: Precheck fails permanently, not by retrying, until it is implemented", async () => {
+  it("Workflow: Precheck fails permanently, not by retrying, on a payload that is not ChangeSubmitted's", async () => {
     await using instance = await introspectWorkflowInstance(env.PRECHECK, "precheck-chg-1");
-    await env.PRECHECK.create({ id: "precheck-chg-1", params: { changeId: "chg_1", revision: 1 } });
+    await env.PRECHECK.create({
+      id: "precheck-chg-1",
+      params: { changeId: "chg_1", revision: 1, commitSha: "not-a-sha", eventId: "evt_1" },
+    });
     await expect(instance.waitForStatus("errored")).resolves.not.toThrow();
   });
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { Principal } from "@keeltown/core/domain/identity";
-import { AgentId, ProjectId } from "@keeltown/core/kernel";
-import { Projects } from "@keeltown/core/ports";
+import { AgentId, Glob, ProjectId } from "@keeltown/core/kernel";
+import { Projects, type ProjectSettings } from "@keeltown/core/ports";
 import { Effect, type Layer, Schema } from "effect";
 
 /**
@@ -11,6 +11,8 @@ import { Effect, type Layer, Schema } from "effect";
 export interface ProjectsHarness {
   readonly layer: Layer.Layer<Projects>;
   readonly source: string;
+  /** A project that holds these settings. */
+  readonly withSettings: (settings: ProjectSettings) => Effect.Effect<ProjectId>;
 }
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -90,6 +92,26 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
         );
         expect(error._tag).toBe("RepoNotFound");
         if (error._tag === "RepoNotFound") expect(error.repo.name).toBe(missing);
+      }).pipe(Effect.provide(harness.layer));
+    });
+    it.live("answers a project's settings as they were put", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const settings: ProjectSettings = {
+          protectedPaths: [Glob.make("infra/**"), Glob.make(".github/workflows/*")],
+          maxBatchSize: 4,
+        };
+        const projectId = yield* harness.withSettings(settings);
+        expect(yield* (yield* Projects).settings(projectId)).toEqual(settings);
+      }).pipe(Effect.provide(harness.layer));
+    });
+
+    it.live("is ProjectNotFound for the settings of a project that was never created", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const missing = Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`);
+        const error = yield* Effect.flip((yield* Projects).settings(missing));
+        expect(error._tag).toBe("ProjectNotFound");
       }).pipe(Effect.provide(harness.layer));
     });
   });

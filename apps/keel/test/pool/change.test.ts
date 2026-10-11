@@ -2,8 +2,9 @@ import { introspectWorkflow, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { isAgentOwned, LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
 import { makeId } from "@keeltown/core/kernel";
+import { EventOutbox } from "@keeltown/core/ports";
 import * as fc from "fast-check";
-import { Exit } from "effect";
+import { Effect, Exit } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
 import { armedAlarms, scheduleAlarm } from "../../src/adapters/driving/do/alarm.ts";
@@ -17,6 +18,7 @@ import {
   replayed,
   unrenewed,
 } from "./change-harness.ts";
+import { inertPrecheck } from "./inert-precheck.ts";
 
 /** How long a test waits for something the object does by itself (a flush, an alarm). */
 const WAIT = { timeout: 10_000, interval: 20 };
@@ -84,8 +86,14 @@ const deadline = (c: ChangeUnderTest, leaseId: string) =>
 
 /** The stored change agrees with its log: the state the events say, but for `renewedAt`. */
 async function expectStateIsTheLog(c: ChangeUnderTest) {
-  const stored = await c.current();
-  expect(unrenewed(stored)).toEqual(unrenewed(replayed(await c.log())));
+  // Both in one turn of the object, so nothing (a Precheck the outbox started) commits between them.
+  const { stored, log } = await runInDurableObject(c.stub, async (instance: ChangeDO) => ({
+    stored: ok(decodeExit(ChangeCodecs.get, await instance.get())),
+    log: await instance["runtime"].runPromise(
+      Effect.map(EventOutbox, (outbox) => outbox.log({ kind: "change", id: c.changeId })),
+    ),
+  }));
+  expect(unrenewed(stored)).toEqual(unrenewed(replayed(log)));
   return stored;
 }
 
@@ -149,24 +157,30 @@ describe("the Change DO over real RPC", () => {
     "[b11.replay] keeps, for any command sequence, the state its event log folds to, and no orphaned change",
     { timeout: 120_000 },
     async () => {
+      // The steps drive Precheck by hand.
+      const precheck = await inertPrecheck();
       let runs = 0;
-      await fc.assert(
-        fc.asyncProperty(
-          fc.array(fc.constantFrom(...STEPS), { minLength: 1, maxLength: 10 }),
-          async (steps) => {
-            runs += 1;
-            const c = await changeUnderTest();
-            ok(await c.declare());
-            const sha = await c.push();
-            for (const [i, step] of steps.entries()) await take(c, step, i, sha);
+      try {
+        await fc.assert(
+          fc.asyncProperty(
+            fc.array(fc.constantFrom(...STEPS), { minLength: 1, maxLength: 10 }),
+            async (steps) => {
+              runs += 1;
+              const c = await changeUnderTest();
+              ok(await c.declare());
+              const sha = await c.push();
+              for (const [i, step] of steps.entries()) await take(c, step, i, sha);
 
-            const stored = await expectStateIsTheLog(c);
-            // No orphaned change: one waiting on its agent holds an active lease, or it is parked.
-            expect(isAgentOwned(stored.state) ? stored.lease.state : "active").toBe("active");
-          },
-        ),
-        { numRuns: 25, ...seed },
-      );
+              const stored = await expectStateIsTheLog(c);
+              // No orphaned change: one waiting on its agent holds an active lease, or it is parked.
+              expect(isAgentOwned(stored.state) ? stored.lease.state : "active").toBe("active");
+            },
+          ),
+          { numRuns: 25, ...seed },
+        );
+      } finally {
+        await precheck.dispose();
+      }
       expect(runs).toBeGreaterThanOrEqual(25);
     },
   );
@@ -319,6 +333,7 @@ describe("Precheck and the change", () => {
 
 describe("a Precheck refusal over RPC", () => {
   it("[b11.precheck-refused] bounces the change and answers the verdict it issued", async () => {
+    await using precheck = await inertPrecheck();
     const c = await changeUnderTest();
     const lease = ok(await c.declare()).change.lease.id;
     ok(await submit(c, lease, await c.push(), "submit-1"));
@@ -336,6 +351,8 @@ describe("a Precheck refusal over RPC", () => {
     expect(refused.change.state).toBe("bounced");
     expect(bounced?.payload).toMatchObject({ _tag: "ChangeBounced", verdictId: refused.verdictId });
     await expectStateIsTheLog(c);
+    // The submission's own Precheck started, and was held inert.
+    await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);
   });
 });
 

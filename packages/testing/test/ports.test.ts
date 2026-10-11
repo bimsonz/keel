@@ -28,6 +28,7 @@ const CONTRACT_PORTS = [
   "BundleStore",
   "EvidenceStore",
   "BatchVerdicts",
+  "ChangePrecheck",
   "GuardRepo",
   "CandidateComposer",
   "TrunkWriter",

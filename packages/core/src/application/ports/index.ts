@@ -8,6 +8,7 @@ export * from "./background.ts";
 export * from "./batch-verdicts.ts";
 export * from "./bundle-store.ts";
 export * from "./candidate-composer.ts";
+export * from "./change-precheck.ts";
 export * from "./changes.ts";
 export * from "./clock.ts";
 export * from "./commit.ts";

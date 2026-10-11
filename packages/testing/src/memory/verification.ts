@@ -5,7 +5,13 @@ import {
   type EscalationId,
   type GuardId,
   makeId,
+  type VerdictId,
 } from "@keeltown/core/kernel";
+import {
+  ChangeNotFound,
+  type ChangeState,
+  ChangeStateRefused,
+} from "@keeltown/core/domain/coordination";
 import { CandidateNotFound, ResultFenced } from "@keeltown/core/domain/integration";
 import {
   FlowSpecInvalid,
@@ -17,6 +23,7 @@ import {
 import {
   type BatchVerdict,
   BatchVerdicts,
+  ChangePrecheck,
   commit,
   type DecisionRequest,
   type Transition,
@@ -28,6 +35,8 @@ import {
   HumanGate,
   type PlatformFunctionCall,
   PlatformFunction,
+  type PrecheckCall,
+  type PrecheckWorkspace,
   type Ruling,
   VerifierRuntime,
 } from "@keeltown/core/ports";
@@ -259,5 +268,92 @@ export function makeBatchVerdictsMemory(batches: ReadonlyMap<string, LaneBatch> 
     recorded,
     outbox,
     layer: Layer.succeed(BatchVerdicts, BatchVerdicts.of({ record })),
+  };
+}
+
+/** A change as Precheck sees it in memory: its revision, state and workspace, and the calls it took. */
+interface PrecheckedChange {
+  revision: number;
+  state: ChangeState;
+  readonly workspace: PrecheckWorkspace | undefined;
+  readonly replies: Map<string, VerdictId | undefined>;
+}
+
+/**
+ * The Change DO's side of `ChangePrecheck`, in memory: the transitions its
+ * machine takes (submitted → deriving on `started`, then bounced on
+ * `refused` or verifying on `compiled`), idempotent by instance, and
+ * ChangeStateRefused for a stale revision or a step the state does not allow.
+ * `submit` seeds a change; `calls` lists the writes that took effect.
+ */
+export function makeChangePrecheckMemory() {
+  const changes = new Map<ChangeId, PrecheckedChange>();
+  let verdicts = 0;
+  const calls: { changeId: ChangeId; method: string; call: PrecheckCall }[] = [];
+  const known = (changeId: ChangeId) => {
+    const change = changes.get(changeId);
+    return change === undefined
+      ? Effect.fail(new ChangeNotFound({ changeId }))
+      : Effect.succeed(change);
+  };
+  const refusedBy = (changeId: ChangeId, change: PrecheckedChange, command: string) =>
+    new ChangeStateRefused({ changeId, state: change.state, command });
+  /** One write: a replay answers what the first did; otherwise `from` must hold at `call.revision`. */
+  const write = (
+    changeId: ChangeId,
+    method: string,
+    call: PrecheckCall,
+    from: ChangeState,
+    to: ChangeState,
+    reply: () => VerdictId | undefined,
+  ) =>
+    Effect.flatMap(known(changeId), (change) => {
+      const key = `${call.instanceId}:${method}`;
+      if (change.replies.has(key)) return Effect.succeed(change.replies.get(key));
+      if (call.revision !== change.revision || change.state !== from)
+        return Effect.fail(refusedBy(changeId, change, method));
+      const answer = reply();
+      change.replies.set(key, answer);
+      change.state = to;
+      calls.push({ changeId, method, call });
+      return Effect.succeed(answer);
+    });
+  return {
+    calls,
+    /** Seeds `changeId` as submitted at `revision`, holding `workspace` (none: it holds none yet). */
+    submit: (changeId: ChangeId, revision: number, workspace?: PrecheckWorkspace) => {
+      changes.set(changeId, { revision, state: "submitted", workspace, replies: new Map() });
+    },
+    /** The change's state, for a test to read. */
+    stateOf: (changeId: ChangeId) => changes.get(changeId)?.state,
+    layer: Layer.succeed(
+      ChangePrecheck,
+      ChangePrecheck.of({
+        workspace: (changeId) =>
+          Effect.flatMap(known(changeId), (change) =>
+            change.workspace === undefined
+              ? Effect.fail(refusedBy(changeId, change, "workspace"))
+              : Effect.succeed(change.workspace),
+          ),
+        started: (changeId, call) =>
+          write(changeId, "precheckStarted", call, "submitted", "deriving", () => undefined).pipe(
+            Effect.asVoid,
+          ),
+        refused: (changeId, refusal) =>
+          write(changeId, "precheckRefused", refusal, "deriving", "bounced", () =>
+            makeId("vrd", String((verdicts += 1)).padStart(26, "0")),
+          ).pipe(
+            Effect.flatMap((verdictId) =>
+              verdictId === undefined
+                ? Effect.die("a refusal always issues a verdict")
+                : Effect.succeed(verdictId),
+            ),
+          ),
+        compiled: (changeId, plan) =>
+          write(changeId, "planCompiled", plan, "deriving", "verifying", () => undefined).pipe(
+            Effect.asVoid,
+          ),
+      }),
+    ),
   };
 }

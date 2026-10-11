@@ -1,4 +1,5 @@
 import { type Agent, IdempotencyConflict, type Principal } from "@keeltown/core/domain/identity";
+import { ProjectNotFound } from "@keeltown/core/domain/integration";
 import { type AgentId, Instant, makeId, type ProjectId } from "@keeltown/core/kernel";
 import {
   AgentDirectory,
@@ -6,6 +7,7 @@ import {
   Enrolments,
   type ProjectRecord,
   Projects,
+  type ProjectSettings,
   RepoNotFound,
 } from "@keeltown/core/ports";
 import { Effect, Layer } from "effect";
@@ -32,15 +34,19 @@ const keyOf = (principal: Principal, idempotencyKey: string) =>
 /**
  * Projects in a map. `create` keys each project by its operator and
  * Idempotency-Key, as the real adapter derives the project id from both, and
- * forks only from a source registered with `addSource`.
+ * forks only from a source registered with `addSource`. `setSettings` gives a
+ * project its settings; `settings` of any other project is ProjectNotFound.
  */
 export function makeProjectsMemory(options: { readonly sources?: Iterable<string> } = {}) {
   const sources = new Set(options.sources ?? []);
   const byKey = new Map<string, Keyed<ProjectRecord>>();
+  const settings = new Map<ProjectId, ProjectSettings>();
   let count = 0;
   return {
     sources,
     addSource: (name: string) => void sources.add(name),
+    setSettings: (projectId: ProjectId, value: ProjectSettings) =>
+      void settings.set(projectId, value),
     projects: () => [...byKey.values()].map((keyed) => keyed.made),
     layer: Layer.succeed(
       Projects,
@@ -67,6 +73,13 @@ export function makeProjectsMemory(options: { readonly sources?: Iterable<string
             };
             byKey.set(key, { made, fingerprint });
             return Effect.succeed(made);
+          }),
+        settings: (projectId) =>
+          Effect.suspend(() => {
+            const found = settings.get(projectId);
+            return found === undefined
+              ? Effect.fail(new ProjectNotFound({ projectId }))
+              : Effect.succeed(found);
           }),
       }),
     ),

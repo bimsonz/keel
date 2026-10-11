@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck.test.ts
+# kills: d12.protected-refused
+# why: Precheck reads the project's settings but drops the protected globs, so a protected path goes through
+diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
+index 444b694..9ebfcdf 100644
+--- a/packages/core/src/application/verification/precheck.ts
++++ b/packages/core/src/application/verification/precheck.ts
+@@ -93,7 +93,7 @@ export const precheckPolicy = Effect.fn("verification/precheckPolicy")(function*
+ ) {
+   const settings = yield* (yield* Projects).settings(workspace.projectId);
+   const policy: PrecheckPolicy = {
+-    protectedPaths: settings.protectedPaths,
++    protectedPaths: [],
+     guardPaths: GUARD_PATHS,
+   };
+   return policy;

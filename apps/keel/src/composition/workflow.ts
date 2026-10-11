@@ -2,9 +2,12 @@ import type { WorkflowStep } from "cloudflare:workers";
 import { ContentHash } from "@keeltown/core/kernel";
 import type {
   BatchVerdicts,
+  ChangePrecheck,
   Clock,
+  CodeHost,
   EvidenceStore,
   Ids,
+  Projects,
   VerifierRuntime,
 } from "@keeltown/core/ports";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
@@ -14,8 +17,11 @@ import {
   SuiteRuntimeCi,
 } from "../adapters/driven/ci/suite-runtime.ts";
 import { BatchVerdictsRpc, isLaneNamespace } from "../adapters/driven/do-rpc/batch-verdicts.ts";
+import { ChangePrecheckRpc } from "../adapters/driven/do-rpc/change-precheck.ts";
+import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { EvidenceStoreR2 } from "../adapters/driven/r2/evidence-store.ts";
 import { SystemLive } from "../adapters/driven/system.ts";
+import { codeHostLayer } from "./do.ts";
 
 /**
  * A Workflow's composition root, built from `this.env` on each `run()`. Steps
@@ -61,5 +67,20 @@ export function keelVerifyRuntime(
         literals: [env.CLOUDFLARE_ACCOUNT_ID].filter((l) => typeof l === "string" && l.length > 0),
       }).pipe(Layer.provide(evidence)),
     ),
+  );
+}
+
+/**
+ * Precheck's composition root, per run: the change through the Change
+ * DO, settings through the Project DO, and the diff through the code host.
+ */
+export function precheckRuntime(
+  env: Env,
+): ManagedRuntime.ManagedRuntime<ChangePrecheck | Projects | CodeHost, never> {
+  // Until the Project DO declares settings(), the policy step fails and retries.
+  const project = (projectId: string) =>
+    env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`));
+  return ManagedRuntime.make(
+    Layer.mergeAll(ChangePrecheckRpc(env.CHANGE), ProjectsRpc(project), codeHostLayer(env)),
   );
 }

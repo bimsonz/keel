@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck.test.ts
+# kills: d12.base-diff, d12.guard-refused
+# why: Precheck diffs from the workspace's current head instead of the change's base, so what the agent pushed is never seen
+diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
+index 444b694..908f30b 100644
+--- a/packages/core/src/application/verification/precheck.ts
++++ b/packages/core/src/application/verification/precheck.ts
+@@ -73,7 +73,8 @@ export const diffSubmission = Effect.fn("verification/diffSubmission")(function*
+   commitSha: CommitSha,
+ ) {
+   const host = yield* CodeHost;
+-  return yield* host.diffTrees(workspace.repo, workspace.baseSha, commitSha).pipe(
++  const head = yield* host.head(workspace.repo, "refs/heads/main").pipe(Effect.orDie);
++  return yield* host.diffTrees(workspace.repo, head, commitSha).pipe(
+     Effect.map((rows): TouchedPaths => ({ _tag: "Touched", paths: rows.map((r) => r.path) })),
+     Effect.catchTags({
+       RepoNotFound: (e) =>

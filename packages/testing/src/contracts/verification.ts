@@ -6,7 +6,9 @@ import {
   type BatchVerdict,
   BatchVerdicts,
   BundleStore,
+  ChangePrecheck,
   EvidenceStore,
+  type PrecheckWorkspace,
   VerifierRuntime,
 } from "@keeltown/core/ports";
 import { Effect, type Layer, Schema } from "effect";
@@ -194,4 +196,114 @@ export function describeBatchVerdictsContract(
 }
 
 /** A fresh id for harnesses to seed batches and candidates with. */
-export const freshId = <P extends "bat" | "cnd" | "chg">(prefix: P) => makeId(prefix, ulid());
+export const freshId = <P extends "bat" | "cnd" | "chg" | "prj">(prefix: P) =>
+  makeId(prefix, ulid());
+
+export interface ChangePrecheckHarness {
+  readonly layer: Layer.Layer<ChangePrecheck>;
+  /** A change just submitted: its id, its revision, and the workspace it holds. */
+  readonly submitted: () => Effect.Effect<{
+    readonly changeId: ReturnType<typeof freshId<"chg">>;
+    readonly revision: number;
+    readonly workspace: PrecheckWorkspace;
+  }>;
+}
+
+const PLAN = { planHash: L1_SUITE_PLAN.planHash, steps: 1, costEstimate: 0.01 };
+const REFUSAL = {
+  reasons: ["precheck:protected:src/secret.ts (src/secret*)"] as const,
+  nextActions: [{ kind: "call" as const, title: "Submit again", operationId: "submit" }] as const,
+};
+
+export function describeChangePrecheckContract(
+  adapter: string,
+  harness: () => ChangePrecheckHarness,
+) {
+  describe(`ChangePrecheck contract: ${adapter}`, () => {
+    it.effect("answers the workspace a submitted change holds", () => {
+      const h = harness();
+      return Effect.gen(function* () {
+        const { changeId, workspace } = yield* h.submitted();
+        expect(yield* (yield* ChangePrecheck).workspace(changeId)).toEqual(workspace);
+      }).pipe(Effect.provide(h.layer));
+    });
+
+    it.effect("is ChangeNotFound on every step for a change that was never declared", () => {
+      const h = harness();
+      return Effect.gen(function* () {
+        const changes = yield* ChangePrecheck;
+        const unknown = freshId("chg");
+        const call = { revision: 1, instanceId: `precheck-${random(6)}` };
+        const tags = [
+          yield* Effect.flip(changes.workspace(unknown)),
+          yield* Effect.flip(changes.started(unknown, call)),
+          yield* Effect.flip(changes.refused(unknown, { ...call, ...REFUSAL })),
+          yield* Effect.flip(changes.compiled(unknown, { ...call, ...PLAN })),
+        ].map((e) => e._tag);
+        expect(tags).toEqual([
+          "ChangeNotFound",
+          "ChangeNotFound",
+          "ChangeNotFound",
+          "ChangeNotFound",
+        ]);
+      }).pipe(Effect.provide(h.layer));
+    });
+
+    it.effect(
+      "refuses a stale revision with ChangeStateRefused, and the change does not move",
+      () => {
+        const h = harness();
+        return Effect.gen(function* () {
+          const changes = yield* ChangePrecheck;
+          const { changeId, revision } = yield* h.submitted();
+          const instanceId = `precheck-${random(6)}`;
+          const stale = yield* Effect.flip(
+            changes.started(changeId, { revision: revision + 1, instanceId }),
+          );
+          expect(stale._tag).toBe("ChangeStateRefused");
+          // Still submitted: the current revision starts.
+          yield* changes.started(changeId, { revision, instanceId });
+        }).pipe(Effect.provide(h.layer));
+      },
+    );
+
+    it.effect(
+      "takes a submission to its plan once: a replayed step commits nothing new, another instance is refused",
+      () => {
+        const h = harness();
+        return Effect.gen(function* () {
+          const changes = yield* ChangePrecheck;
+          const { changeId, revision } = yield* h.submitted();
+          const call = { revision, instanceId: `precheck-${random(6)}` };
+          yield* changes.started(changeId, call);
+          yield* changes.started(changeId, call);
+          yield* changes.compiled(changeId, { ...call, ...PLAN });
+          yield* changes.compiled(changeId, { ...call, ...PLAN });
+          const other = { revision, instanceId: `precheck-${random(6)}` };
+          expect((yield* Effect.flip(changes.started(changeId, other)))._tag).toBe(
+            "ChangeStateRefused",
+          );
+        }).pipe(Effect.provide(h.layer));
+      },
+    );
+
+    it.effect(
+      "answers a refusal's verdict, the same one on a replay, and then compiles nothing",
+      () => {
+        const h = harness();
+        return Effect.gen(function* () {
+          const changes = yield* ChangePrecheck;
+          const { changeId, revision } = yield* h.submitted();
+          const call = { revision, instanceId: `precheck-${random(6)}` };
+          yield* changes.started(changeId, call);
+          const verdictId = yield* changes.refused(changeId, { ...call, ...REFUSAL });
+          expect(verdictId).toMatch(/^vrd_/);
+          expect(yield* changes.refused(changeId, { ...call, ...REFUSAL })).toBe(verdictId);
+          expect((yield* Effect.flip(changes.compiled(changeId, { ...call, ...PLAN })))._tag).toBe(
+            "ChangeStateRefused",
+          );
+        }).pipe(Effect.provide(h.layer));
+      },
+    );
+  });
+}

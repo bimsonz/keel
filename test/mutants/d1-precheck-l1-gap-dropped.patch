@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck.test.ts
+# kills: d12.l1-plan-gap
+# why: Precheck compiles a plan KeelVerify cannot run at L1, so a .keel/flow change reaches KeelVerify without its human step
+diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
+index b126f54..4819df9 100644
+--- a/packages/core/src/application/verification/precheck.ts
++++ b/packages/core/src/application/verification/precheck.ts
+@@ -151,7 +151,7 @@ export const decidePrecheck = (
+       `the js-ts pack does not compile: ${plan.failure.map((e) => e._tag).join(", ")}`,
+     );
+   const missing = plan.success.steps.map((s) => s.id).filter((id) => !L1_STEPS.has(id));
+-  const [gap, ...gaps] = missing;
++  const [gap, ...gaps] = missing.filter(() => false);
+   if (gap !== undefined)
+     return {
+       _tag: "Refuse",

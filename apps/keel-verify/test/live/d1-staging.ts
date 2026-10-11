@@ -5,6 +5,7 @@
 //   CLOUDFLARE_ACCOUNT_ID=… node apps/keel-verify/test/live/d1-staging.ts <command> …
 //     upload                         build base, red and canary bundles and put them in R2
 //     run <variant> <instance-id>    start one KeelVerify run and print its verdict and timings
+//     show <instance-id>...          print a run's verdict and timings again
 //     grep <instance-id>...          grep each instance's persisted output, decoded, for credentials
 //     series <n> <prefix>            n sequential base runs, then the timing distribution
 //
@@ -85,6 +86,8 @@ const Step = Schema.Struct({
   output: Schema.optional(Schema.Unknown),
 });
 type Step = typeof Step.Type;
+/** A step's name as the Workflow code gave it: the API suffixes each with its call count (`verdict-1`). */
+const nameOf = (s: Step) => s.name.replace(/-\d+$/, "");
 const Described = Schema.Struct({ status: Schema.String, steps: Schema.Array(Schema.Unknown) });
 const Envelope = Schema.Struct({ result: Described });
 const RunnerLogs = Schema.Struct({ logs: Schema.Struct({ stdout: Schema.String }) });
@@ -121,7 +124,7 @@ const ms = (s: Step | undefined) =>
 const waitForVerdict = async (id: string) => {
   for (let i = 0; i < 120; i++) {
     const d = describe(id);
-    const verdict = d.steps.find((s) => s.name === "verdict" && typeof s.end === "string");
+    const verdict = d.steps.find((s) => nameOf(s) === "verdict" && typeof s.end === "string");
     if (verdict !== undefined || d.status === "errored" || d.status === "complete") return d;
     await new Promise((r) => setTimeout(r, 2_000));
   }
@@ -129,7 +132,7 @@ const waitForVerdict = async (id: string) => {
 };
 
 const summarise = (id: string, d: { status: string; steps: Step[] }) => {
-  const step = (name: string) => d.steps.find((s) => s.name === name);
+  const step = (name: string) => d.steps.find((s) => nameOf(s) === name);
   const plan = step("plan");
   const runner = step(L1_SUITE_PLAN.steps[0]?.id ?? "");
   const verdict = step("verdict");
@@ -153,7 +156,7 @@ const run = async (variant: Variant, id: string) => {
 
 /** Everything a runner's persisted output says, with its encoded fields decoded so a grep can see them. */
 const persisted = (d: { steps: Step[] }) => {
-  const runner = d.steps.find((s) => s.name === L1_SUITE_PLAN.steps[0]?.id);
+  const runner = d.steps.find((s) => nameOf(s) === L1_SUITE_PLAN.steps[0]?.id);
   const logs = Schema.decodeUnknownOption(RunnerLogs)(runner?.output);
   const stdout = Option.isSome(logs) ? logs.value.logs.stdout : "";
   const field = (key: string) =>
@@ -198,7 +201,7 @@ const grep = (text: string) =>
   });
 
 const evidenceOf = (d: { steps: Step[] }) => {
-  const ref = d.steps.find((s) => s.name.endsWith(":evidence"))?.output;
+  const ref = d.steps.find((s) => nameOf(s).endsWith(":evidence"))?.output;
   if (typeof ref !== "string") return "";
   return wrangler(
     "r2",
@@ -230,6 +233,8 @@ else if (command === "run")
       1,
     ),
   );
+else if (command === "show")
+  for (const id of args) console.log(JSON.stringify(summarise(id, describe(id)), null, 1));
 else if (command === "grep")
   for (const id of args) {
     const d = describe(id);
@@ -276,4 +281,7 @@ else if (command === "series") {
       1,
     ),
   );
-} else throw new Error("usage: upload | run <variant> <id> | grep <id>... | series <n> <prefix>");
+} else
+  throw new Error(
+    "usage: upload | run <variant> <id> | show <id>... | grep <id>... | series <n> <prefix>",
+  );

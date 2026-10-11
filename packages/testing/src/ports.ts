@@ -16,8 +16,10 @@ import { describeInboxContract, type InboxHarness } from "./contracts/inbox.ts";
 import { describeWorkspacePoolContract, type StockedPool } from "./contracts/workspace-pool.ts";
 import {
   type BatchVerdictsHarness,
+  type ChangePrecheckHarness,
   describeBatchVerdictsContract,
   describeBundleStoreContract,
+  describeChangePrecheckContract,
   describeEvidenceStoreContract,
   describeVerifierRuntimeContract,
   freshId,
@@ -32,10 +34,11 @@ import * as integration from "./memory/integration.ts";
 import * as operator from "./memory/operator.ts";
 import * as storage from "./memory/storage.ts";
 import * as verification from "./memory/verification.ts";
-import { CommitSha } from "@keeltown/core/kernel";
+import { CommitSha, makeId } from "@keeltown/core/kernel";
 import type {
   AgentDirectory,
   BatchVerdicts,
+  ChangePrecheck,
   Changes,
   Enrolments,
   Inbox,
@@ -119,6 +122,26 @@ const workspacePool = {
     ),
 };
 
+/** Precheck's suite needs submitted changes holding workspaces. */
+function memoryChangePrecheckHarness(): ChangePrecheckHarness {
+  const memory = verification.makeChangePrecheckMemory();
+  return {
+    layer: memory.layer,
+    submitted: () =>
+      Effect.sync(() => {
+        const changeId = freshId("chg");
+        const workspace = {
+          workspaceId: makeId("wsp", changeId.slice(4)),
+          repo: { namespace: "keel-ws-00", name: `ws-${changeId.slice(4).toLowerCase()}` },
+          baseSha: GENESIS,
+          projectId: freshId("prj"),
+        };
+        memory.submit(changeId, 1, workspace);
+        return { changeId, revision: 1, workspace };
+      }),
+  };
+}
+
 /** The lane's suite needs a formed batch of one change to record against. */
 function memoryBatchVerdictsHarness(): BatchVerdictsHarness {
   const fence = { batchId: freshId("bat"), attempt: 1, chainEpoch: 0 };
@@ -134,7 +157,17 @@ function memoryBatchVerdictsHarness(): BatchVerdictsHarness {
 /** The in-memory Projects can fork from one source repo, which the suite names. */
 function memoryProjectsHarness(): ProjectsHarness {
   const source = "fixture-source";
-  return { layer: operator.makeProjectsMemory({ sources: [source] }).layer, source };
+  const memory = operator.makeProjectsMemory({ sources: [source] });
+  return {
+    layer: memory.layer,
+    source,
+    withSettings: (settings) =>
+      Effect.sync(() => {
+        const projectId = freshId("prj");
+        memory.setSettings(projectId, settings);
+        return projectId;
+      }),
+  };
 }
 
 /** In-memory Enrolments project into an in-memory AgentDirectory, which the suite reads. */
@@ -209,6 +242,10 @@ export const PORTS = {
   BatchVerdicts: harnessed<BatchVerdicts, BatchVerdictsHarness>(
     memoryBatchVerdictsHarness,
     describeBatchVerdictsContract,
+  ),
+  ChangePrecheck: harnessed<ChangePrecheck, ChangePrecheckHarness>(
+    memoryChangePrecheckHarness,
+    describeChangePrecheckContract,
   ),
   GuardRepo: port(
     () => verification.makeGuardRepoMemory().layer,
