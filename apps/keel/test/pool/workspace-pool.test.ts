@@ -178,7 +178,11 @@ describe("the WorkspacePool DO", () => {
   it("[pool.do.alarms] refill and collection are named deadlines, armed only while there is work", async () => {
     const projectId = freshProject();
     await stock(projectId, 2);
-    expect(await alarmsOf(projectId)).toEqual({ armed: [], alarm: null });
+    // The refill's commits owe the Projector a delivery, so a flush is armed for a moment: wait for it to run.
+    await vi.waitFor(
+      async () => expect(await alarmsOf(projectId)).toEqual({ armed: [], alarm: null }),
+      WAIT,
+    );
 
     const stub = poolStub(projectId);
     const grant = valueOf(WorkspacePoolCodecs.grant, await stub.grant(holder()));

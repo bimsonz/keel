@@ -1,0 +1,24 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts -t "pool.do.alarms"
+# kills: pool.do.alarms
+# why: the flush's alarm row is written but the platform alarm is never armed for it, so a deadline sits in the table that never fires
+diff --git a/apps/keel/src/adapters/driving/do/keel-object.ts b/apps/keel/src/adapters/driving/do/keel-object.ts
+index e00ddd7..80f3e9d 100644
+--- a/apps/keel/src/adapters/driving/do/keel-object.ts
++++ b/apps/keel/src/adapters/driving/do/keel-object.ts
+@@ -166,11 +166,11 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
+       }),
+     );
+     if (owed)
+-      await scheduleAlarm(this.ctx.storage, {
+-        kind: "debounce",
+-        reason: OUTBOX_FLUSH,
+-        at: Date.now(),
+-      });
++      this.ctx.storage.sql.exec(
++        "INSERT INTO keel_alarms (reason, kind, at) VALUES (?, 'debounce', ?) ON CONFLICT (reason) DO UPDATE SET at = excluded.at",
++        OUTBOX_FLUSH,
++        Date.now(),
++      );
+   }
+ 
+   private async flush(): Promise<void> {
