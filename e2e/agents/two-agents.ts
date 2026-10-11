@@ -86,6 +86,7 @@ function prompt(agent: keyof typeof TASKS): string {
     "4. Call `submit` with the change id, the commit sha and the lease.",
     "5. Call `status` with wait=30 until the change is landed or bounced. If it bounced, follow the next actions it names.",
     "Push nowhere but your workspace. Do not use any other remote.",
+    "Your shell runs git and nothing else, one command per call: use `git -C repo …` rather than cd, never chain commands with && or ;, and edit files with the file tools. You cannot run the tests; Keel's verification does.",
     `Your change: ${TASKS[agent]}`,
   ].join("\n");
 }
