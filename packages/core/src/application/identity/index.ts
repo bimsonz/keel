@@ -4,6 +4,7 @@ import {
   type Agent,
   AgentNotAdmitted,
   AgentNotKnown,
+  type AgentStateRefused,
   CredentialRejected,
   type IdempotencyConflict,
   type Identity,
@@ -22,6 +23,8 @@ import {
   type IssuedToken,
   type OpenSessionInput,
   Sessions,
+  type StandingInput,
+  Standings,
   TokenIssuer,
 } from "../ports/index.ts";
 
@@ -127,6 +130,35 @@ export const enrolAgent: (
 ) => Effect.Effect<Enrolment, IdempotencyConflict, Enrolments> = (principal, input) =>
   Enrolments.use((enrolments) => enrolments.enrol(principal, input));
 
+/**
+ * An operator suspends, reinstates or revokes an agent in its AgentSession
+ * DO, which writes the directory row before answering. The doorways have
+ * already checked the operator scope.
+ */
+export const suspendAgent: (
+  principal: Principal,
+  input: StandingInput,
+) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict, Standings> = (
+  principal,
+  input,
+) => Standings.use((standings) => standings.suspend(principal, input));
+
+export const reinstateAgent: (
+  principal: Principal,
+  input: StandingInput,
+) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict, Standings> = (
+  principal,
+  input,
+) => Standings.use((standings) => standings.reinstate(principal, input));
+
+export const revokeAgent: (
+  principal: Principal,
+  input: StandingInput,
+) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict, Standings> = (
+  principal,
+  input,
+) => Standings.use((standings) => standings.revoke(principal, input));
+
 /** Opens a session for the caller's agent in its AgentSession DO, which makes it the agent's current one. */
 export const openAgentSession: (
   principal: Principal,
@@ -141,3 +173,4 @@ export * from "./enrol.ts";
 export * from "./inbox.ts";
 export * from "./reservations.ts";
 export * from "./session.ts";
+export * from "./standing.ts";

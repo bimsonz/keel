@@ -1,0 +1,42 @@
+import { Context, type Effect } from "effect";
+import type {
+  Agent,
+  AgentNotKnown,
+  AgentStateRefused,
+  IdempotencyConflict,
+  Principal,
+} from "../../domain/identity/index.ts";
+import type { AgentId } from "../../domain/kernel/index.ts";
+
+/** An operator's move on an agent's standing. A suspension says why; the others take no reason. */
+export interface StandingInput {
+  readonly agentId: AgentId;
+  readonly reason?: string;
+  readonly idempotencyKey: string;
+}
+
+/**
+ * An agent's standing, which its AgentSession DO holds: an operator suspends,
+ * reinstates or revokes it. Each writes the agent's directory row before it
+ * answers, so the agent's next request is judged by its new standing. The
+ * same Idempotency-Key and body answers the agent again; another body is an
+ * IdempotencyConflict. A move the agent's state refuses (reinstating an
+ * active agent, anything after a revocation) is AgentStateRefused.
+ */
+export class Standings extends Context.Service<
+  Standings,
+  {
+    readonly suspend: (
+      principal: Principal,
+      input: StandingInput,
+    ) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict>;
+    readonly reinstate: (
+      principal: Principal,
+      input: StandingInput,
+    ) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict>;
+    readonly revoke: (
+      principal: Principal,
+      input: StandingInput,
+    ) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict>;
+  }
+>()("keel/Standings") {}

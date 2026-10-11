@@ -59,6 +59,11 @@ export function AgentDirectoryWithBootstrap(
           agent.id === BOOTSTRAP_AGENT_ID || credential.clientId === BOOTSTRAP_CLIENT_ID
             ? Effect.die(new Error("the bootstrap credential is never stored"))
             : inner.upsert(agent, credential),
+        // The bootstrap agent has no row and no standing: rotating the secret retires it.
+        standing: (agentId, standing, seq) =>
+          agentId === BOOTSTRAP_AGENT_ID
+            ? Effect.die(new Error("the bootstrap agent has no standing to change"))
+            : inner.standing(agentId, standing, seq),
       });
     }),
   );

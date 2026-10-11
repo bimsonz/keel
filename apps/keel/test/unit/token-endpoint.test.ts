@@ -14,6 +14,7 @@ import {
   makeInboxMemory,
   makeProjectsMemory,
   makeSessionsMemory,
+  makeStandingsMemory,
   sampleProjectId,
 } from "@keeltown/testing";
 import { decodeJwt } from "jose";
@@ -76,6 +77,7 @@ describe("the token endpoint", () => {
         makeEnrolmentsMemory().layer.pipe(Layer.provide(directory.layer)),
         makeCodeHostMemory().layer,
         makeSessionsMemory().layer.pipe(Layer.provide(directory.layer)),
+        makeStandingsMemory().layer.pipe(Layer.provide(directory.layer)),
       ),
     );
     const handlers = makeHandlers(makeRunner(runtime));

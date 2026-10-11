@@ -43,6 +43,7 @@ export * from "./recall.ts";
 export * from "./secrets-provider.ts";
 export * from "./session-store.ts";
 export * from "./sessions.ts";
+export * from "./standings.ts";
 export * from "./staging-writer.ts";
 export * from "./subject-registry.ts";
 export * from "./token-issuer.ts";

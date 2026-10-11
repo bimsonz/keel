@@ -6,6 +6,7 @@ import {
   type CodeHost,
   type Enrolments,
   type Sessions,
+  type Standings,
   type EventFeed,
   Inbox,
   type Notifier,
@@ -20,6 +21,7 @@ import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { EnrolmentsRpc } from "../adapters/driven/do-rpc/enrolments.ts";
 import { SessionsRpc } from "../adapters/driven/do-rpc/sessions.ts";
+import { StandingsRpc } from "../adapters/driven/do-rpc/standings.ts";
 import { EventFeedRpc } from "../adapters/driven/do-rpc/event-feed.ts";
 import { ProjectViewsRpc } from "../adapters/driven/do-rpc/project-views.ts";
 import { InboxRpc } from "../adapters/driven/do-rpc/inbox.ts";
@@ -62,6 +64,7 @@ export function isolateLayer(
     overrides.projects ?? ProjectsRpc(project),
     (overrides.enrolments ?? EnrolmentsRpc(agentSession)).pipe(Layer.provide(directory)),
     overrides.sessions ?? SessionsRpc(agentSession),
+    overrides.standings ?? StandingsRpc(agentSession),
     directory,
     // The repo read API reads trunks, which live in the core namespace alone.
     overrides.codeHost ?? CodeHostArtifacts({ "keel-core": env.ARTIFACTS }),
@@ -84,6 +87,7 @@ export interface IsolateOverrides {
   readonly enrolments?: Layer.Layer<Enrolments, never, AgentDirectory>;
   readonly codeHost?: Layer.Layer<CodeHost>;
   readonly sessions?: Layer.Layer<Sessions>;
+  readonly standings?: Layer.Layer<Standings>;
 }
 
 export type IsolateRuntime = ManagedRuntime.ManagedRuntime<IsolateServices, never>;

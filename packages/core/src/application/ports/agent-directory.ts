@@ -1,5 +1,5 @@
 import { Context, type Effect, type Option } from "effect";
-import type { Agent } from "../../domain/identity/index.ts";
+import type { Agent, AgentState } from "../../domain/identity/index.ts";
 import type { AgentId } from "../../domain/kernel/index.ts";
 
 /** A client credential as stored: never the secret itself, only its hash. */
@@ -8,6 +8,16 @@ export interface StoredCredential {
   readonly agentId: AgentId;
   /** `sha256:` and the hex digest of the secret. */
   readonly secretHash: string;
+}
+
+/**
+ * An agent's standing as one of its events leaves it. Only a revocation moves
+ * the epoch, so a suspension or reinstatement carries none and the row keeps
+ * its own.
+ */
+export interface AgentStanding {
+  readonly state: AgentState;
+  readonly revocationEpoch?: number;
 }
 
 /**
@@ -27,7 +37,18 @@ export class AgentDirectory extends Context.Service<
       clientId: string,
       secret: string,
     ) => Effect.Effect<Option.Option<AgentId>>;
-    /** Writes the projection of an agent and its credential. */
+    /** Writes the projection of an agent and its credential. Its standing's seq is left alone. */
     readonly upsert: (agent: Agent, credential: StoredCredential) => Effect.Effect<void>;
+    /**
+     * Writes an agent's standing as the event at `seq` on its entity left it,
+     * only if the row last took an earlier one: a late or repeated write (the
+     * Projector's repair after the inline write) never moves it back. An
+     * unknown agent is left alone.
+     */
+    readonly standing: (
+      agentId: AgentId,
+      standing: AgentStanding,
+      seq: number,
+    ) => Effect.Effect<void>;
   }
 >()("keel/AgentDirectory") {}

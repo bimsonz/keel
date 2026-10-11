@@ -1,10 +1,12 @@
 import {
+  changeStanding,
   enrol,
   hearEvent,
   INBOX_PAGE,
   openSession,
   readInbox,
   reserveChange,
+  type StandingMove,
   takeNotices,
   viewSession,
 } from "@keeltown/core/application/identity";
@@ -18,6 +20,7 @@ import {
   InboxRead,
   OpenSession,
   ReserveChange,
+  StandingCommand,
   TakeNotices,
 } from "../../../rpc/index.ts";
 import { type AgentSessionServices, agentSessionServices } from "../../../composition/do.ts";
@@ -175,6 +178,27 @@ export class AgentSessionDO
   }
 
   /** Enrols this object's agent: AgentEnrolled committed, then the directory row written, before it answers. */
+  async suspend(command: typeof StandingCommand.Encoded) {
+    return this.standing("suspend", command);
+  }
+
+  async reinstate(command: typeof StandingCommand.Encoded) {
+    return this.standing("reinstate", command);
+  }
+
+  async revoke(command: typeof StandingCommand.Encoded) {
+    return this.standing("revoke", command);
+  }
+
+  private standing(move: StandingMove, command: typeof StandingCommand.Encoded) {
+    const agentId = agentIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(StandingCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((moving) => changeStanding(agentId, move, moving)),
+    );
+    return this.answer(AgentSessionCodecs[move], program);
+  }
+
   async enrol(command: typeof EnrolCommand.Encoded) {
     const agentId = agentIdOf(this.ctx.id.name);
     const program = Schema.decodeUnknownEffect(EnrolCommand)(command).pipe(

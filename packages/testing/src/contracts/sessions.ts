@@ -11,8 +11,8 @@ import { Effect, type Layer, Schema } from "effect";
 
 /**
  * The `Sessions` suite enrols its agents through `Enrolments`, as an operator
- * would, and suspends one through the harness: push P adds the operator's
- * suspend.
+ * would, and suspends one through the harness, as the operator's `Standings`
+ * suspend does on a real adapter.
  */
 export interface SessionsHarness {
   readonly layer: Layer.Layer<Sessions | Enrolments | AgentDirectory>;

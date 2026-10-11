@@ -1,6 +1,6 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/whoami.test.ts
 diff --git a/apps/keel/src/adapters/driving/http/mappers.ts b/apps/keel/src/adapters/driving/http/mappers.ts
-index 27f4023..68dbc4d 100644
+index 5004b34..da2ad51 100644
 --- a/apps/keel/src/adapters/driving/http/mappers.ts
 +++ b/apps/keel/src/adapters/driving/http/mappers.ts
 @@ -34,7 +34,7 @@ export function agentProfile(agent: Agent) {
@@ -11,4 +11,4 @@ index 27f4023..68dbc4d 100644
 +    scopes: [],
      ...(agent.onBehalfOf === undefined ? {} : { onBehalfOf: agent.onBehalfOf }),
      revocationEpoch: agent.revocationEpoch,
-     createdAt: iso(agent.createdAt),
+     state: agent.state,

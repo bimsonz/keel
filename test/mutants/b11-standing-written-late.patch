@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/standing.test.ts
+# kills: b11.standing-inline
+# why: a move answers before the directory row holds it, leaving the row to the Projector's repair, so the agent's next request may still be admitted
+diff --git a/packages/core/src/application/identity/standing.ts b/packages/core/src/application/identity/standing.ts
+index 1532c6f..7563d55 100644
+--- a/packages/core/src/application/identity/standing.ts
++++ b/packages/core/src/application/identity/standing.ts
+@@ -148,11 +148,6 @@ export const changeStanding: (
+   );
+   if (committed.duplicate && !committed.sameCommand)
+     return yield* new IdempotencyConflict({ idempotencyKey: command.idempotencyKey });
+-  const directory = yield* AgentDirectory;
+-  for (const event of committed.events) {
+-    const moved = standingOf(event);
+-    if (moved !== undefined) yield* directory.standing(moved.agentId, moved.standing, moved.seq);
+-  }
+   return committed.duplicate
+     ? decodeAgent((yield* EntityStore).get(AGENT, agentId))
+     : committed.value;

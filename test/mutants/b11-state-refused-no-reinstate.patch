@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/standing.test.ts
+# kills: b11.standing-route
+# why: refusing a move on a suspended agent offers no way forward, though reinstating it is the next step
+diff --git a/apps/keel/src/adapters/driving/http/operator.ts b/apps/keel/src/adapters/driving/http/operator.ts
+index 76c1aeb..7b6aecc 100644
+--- a/apps/keel/src/adapters/driving/http/operator.ts
++++ b/apps/keel/src/adapters/driving/http/operator.ts
+@@ -267,7 +267,7 @@ export function standingError(
+         body: problem(409, "agent.state_refused", caller.requestId, {
+           detail: `${error.agentId} is ${error.state ?? "not enrolled"}, where ${error.command} is not allowed.`,
+           nextActions:
+-            error.state === "suspended"
++            error.state === "never"
+               ? [
+                   {
+                     kind: "call",

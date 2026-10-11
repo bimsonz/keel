@@ -4,6 +4,7 @@ import {
   AgentNotice,
   AgentNotAdmitted,
   AgentNotKnown,
+  AgentStateRefused,
   IdempotencyConflict,
   InboxPage,
   Scope,
@@ -84,6 +85,20 @@ export const EnrolCommand = Schema.Struct({
   fingerprint: Schema.String,
 });
 
+/**
+ * An operator suspends, reinstates or revokes the agent. `by` is
+ * `operator:<agentId>`, the events' `by` and the commit's actor; `reason` is
+ * a suspension's. The commit's cause is `standing:<idempotencyKey>`.
+ */
+export const StandingCommand = Schema.Struct({
+  by: Schema.TemplateLiteral(["operator:", Schema.NonEmptyString]),
+  reason: Schema.optional(Schema.NonEmptyString),
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
+});
+
+const StandingRefusal = Schema.Union([AgentNotKnown, AgentStateRefused, IdempotencyConflict]);
+
 export const AgentSessionCodecs = {
   describe: exitCodec(SessionSnapshot, AgentNotKnown),
   openSession: exitCodec(
@@ -94,6 +109,9 @@ export const AgentSessionCodecs = {
   inbox: exitCodec(InboxPage, AgentNotKnown),
   takeNotices: exitCodec(Schema.Array(AgentNotice), Schema.Never),
   enrol: exitCodec(Agent, IdempotencyConflict),
+  suspend: exitCodec(Agent, StandingRefusal),
+  reinstate: exitCodec(Agent, StandingRefusal),
+  revoke: exitCodec(Agent, StandingRefusal),
 };
 
 /** The AgentSession DO: inbox, cursor, leases, fidelity and the agent's live connections. */
@@ -126,4 +144,12 @@ export interface AgentSessionRpc extends EventReceiverRpc {
    */
   takeNotices(request: typeof TakeNotices.Encoded): Promise<ExitJson>;
   enrol(command: typeof EnrolCommand.Encoded): Promise<ExitJson>;
+  /**
+   * Suspends, reinstates or revokes the agent through the domain's Agent
+   * machine, writing its directory row (guarded by the event's seq) before
+   * answering, so its next request is judged by its new standing.
+   */
+  suspend(command: typeof StandingCommand.Encoded): Promise<ExitJson>;
+  reinstate(command: typeof StandingCommand.Encoded): Promise<ExitJson>;
+  revoke(command: typeof StandingCommand.Encoded): Promise<ExitJson>;
 }

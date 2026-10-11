@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/standing.test.ts
+# kills: b11.standing-route
+# why: a suspension's key reused with another reason replays the first, where it should be a conflict
+diff --git a/apps/keel/src/adapters/driven/do-rpc/standings.ts b/apps/keel/src/adapters/driven/do-rpc/standings.ts
+index 34f534e..dd3cce3 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/standings.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/standings.ts
+@@ -26,7 +26,7 @@ export function StandingsRpc(
+     (kind: "suspend" | "reinstate" | "revoke") => (principal: Principal, input: StandingInput) =>
+       Effect.gen(function* () {
+         const fingerprint = yield* Effect.promise(() =>
+-          fingerprintOf({ move: kind, reason: input.reason ?? null }),
++          fingerprintOf({ move: kind }),
+         );
+         const command = encodeStanding({
+           by: `operator:${principal.agentId}`,

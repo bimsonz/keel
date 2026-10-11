@@ -66,6 +66,8 @@ export function constantTimeEqual(a: string, b: string): boolean {
 export function makeAgentDirectoryMemory() {
   const agents = new Map<AgentId, Agent>();
   const credentials = new Map<string, StoredCredential>();
+  /** The seq of the standing event each agent's row last took. */
+  const standingSeqs = new Map<AgentId, number>();
   const seed = (agent: Agent, credential: StoredCredential): void => {
     agents.set(agent.id, agent);
     credentials.set(credential.clientId, credential);
@@ -81,6 +83,17 @@ export function makeAgentDirectoryMemory() {
         findCredential: (clientId) =>
           Effect.sync(() => Option.fromNullishOr(credentials.get(clientId))),
         upsert: (agent, credential) => Effect.sync(() => seed(agent, credential)),
+        standing: (agentId, standing, seq) =>
+          Effect.sync(() => {
+            const agent = agents.get(agentId);
+            if (agent === undefined || (standingSeqs.get(agentId) ?? 0) >= seq) return;
+            agents.set(agentId, {
+              ...agent,
+              state: standing.state,
+              revocationEpoch: standing.revocationEpoch ?? agent.revocationEpoch,
+            });
+            standingSeqs.set(agentId, seq);
+          }),
         verifyCredential: (clientId, secret) =>
           Effect.promise(async () => {
             const credential = credentials.get(clientId);

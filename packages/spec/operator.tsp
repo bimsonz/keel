@@ -61,6 +61,12 @@ model EnrolAgentRequest {
   onBehalfOf?: Sponsor;
 }
 
+model SuspendAgentRequest {
+  /** Why the agent is suspended: recorded on AgentSuspended. */
+  @minLength(1)
+  reason: string;
+}
+
 model EnrolledAgent {
   agent: AgentProfile;
   clientId: string;
@@ -140,6 +146,33 @@ interface Operator {
     @statusCode statusCode: 201;
     @body body: EnrolledAgent;
   } | Conflict | StandardErrors;
+
+  /**
+   * Suspend an agent: its next request is refused until an operator reinstates it. Only an active
+   * agent can be suspended (409 `agent.state_refused` otherwise).
+   */
+  @summary("Suspend an agent")
+  @useAuth(OperatorScope)
+  @route("/agents/{agentId}/suspend")
+  @post
+  suspendAgent(@path agentId: AgentId, ...IdempotencyKey, @body body: SuspendAgentRequest): AgentProfile | NotFound | Conflict | StandardErrors;
+
+  /** Reinstate a suspended agent: its tokens are accepted again. */
+  @summary("Reinstate an agent")
+  @useAuth(OperatorScope)
+  @route("/agents/{agentId}/reinstate")
+  @post
+  reinstateAgent(@path agentId: AgentId, ...IdempotencyKey): AgentProfile | NotFound | Conflict | StandardErrors;
+
+  /**
+   * Revoke an agent, for good: its revocation epoch moves on, so every token it holds is refused at
+   * once, and it can never be reinstated.
+   */
+  @summary("Revoke an agent")
+  @useAuth(OperatorScope)
+  @route("/agents/{agentId}/revoke")
+  @post
+  revokeAgent(@path agentId: AgentId, ...IdempotencyKey): AgentProfile | NotFound | Conflict | StandardErrors;
 
   @summary("List escalations")
   @useAuth(OperatorScope)

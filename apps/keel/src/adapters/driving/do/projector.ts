@@ -5,9 +5,11 @@ import {
   recordFeed,
   viewSnapshot,
 } from "@keeltown/core/application/memory";
+import { noteStanding, repairStandings } from "@keeltown/core/application/identity";
 import type { EventEnvelope } from "@keeltown/core/kernel";
 import { EntityStore, type Stored, type Transaction } from "@keeltown/core/ports";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Schema } from "effect";
+import { type ProjectorServices, projectorServices } from "../../../composition/do.ts";
 import {
   ChangesRead,
   ProjectorCodecs,
@@ -27,9 +29,10 @@ export const NUDGES = { kind: "projector", id: "nudges" } as const;
  * "nothing polls". Until the operation log exists a nudge only counts
  * itself. It does not deliver to itself.
  */
-export class ProjectorDO extends KeelObjectWith<never> implements ProjectorRpc {
+export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements ProjectorRpc {
   constructor(ctx: DurableObjectState, env: Env) {
-    super(ctx, env, Layer.empty, { projected: false });
+    // The directory is for the standing repair: the AgentSession DO writes it inline, and this repeats it.
+    super(ctx, env, projectorServices(env), { projected: false });
   }
 
   async nudge() {
@@ -54,7 +57,13 @@ export class ProjectorDO extends KeelObjectWith<never> implements ProjectorRpc {
     recordFeed(tx.store, event);
     const skipped = foldViews(tx.store, event);
     if (skipped !== undefined) console.warn("projector read model skipped an event", skipped);
+    noteStanding(tx.store, event);
     return { drafts: [] };
+  }
+
+  /** Repeats each agent standing it received in the directory, once the receipt is committed (D1 is outside it). */
+  protected override async received(): Promise<void> {
+    await this.runtime.runPromise(repairStandings);
   }
 
   async read(request: typeof ProjectorRead.Encoded) {

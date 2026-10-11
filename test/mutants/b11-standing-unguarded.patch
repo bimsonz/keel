@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adapters.test.ts
+# kills: b11.standing-guard
+# why: the D1 row takes any standing written to it, so the Projector's late repeat of an older move sets it back
+diff --git a/apps/keel/src/adapters/driven/d1/agent-directory.ts b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+index b1b3cbc..f7837f8 100644
+--- a/apps/keel/src/adapters/driven/d1/agent-directory.ts
++++ b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+@@ -99,7 +99,7 @@ export function AgentDirectoryD1(db: D1Database) {
+           db
+             .prepare(
+               `UPDATE agents SET state = ?, revocation_epoch = COALESCE(?, revocation_epoch), standing_seq = ?
+-               WHERE id = ? AND standing_seq < ?`,
++               WHERE id = ? AND ? > -1`,
+             )
+             .bind(standing.state, standing.revocationEpoch ?? null, seq, agentId, seq)
+             .run(),

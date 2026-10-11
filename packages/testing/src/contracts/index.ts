@@ -167,6 +167,35 @@ export function describeAgentDirectoryContract(
         expect(yield* directory.findAgent(agent.id)).toEqual(Option.some(agent));
       }).pipe(Effect.provide(make())),
     );
+    it.effect(
+      "[b11.standing-guard] takes a standing only from a later seq than the row's, and keeps its epoch unless one is given",
+      () =>
+        Effect.gen(function* () {
+          const directory = yield* AgentDirectory;
+          const id = freshAgentId();
+          yield* directory.upsert(
+            { ...sampleAgent, id },
+            { clientId: `client-${id}`, agentId: id, secretHash: `sha256:${"a".repeat(64)}` },
+          );
+          const standing = () =>
+            Effect.map(directory.findAgent(id), (found) =>
+              Option.map(found, (agent) => [agent.state, agent.revocationEpoch]),
+            );
+          yield* directory.standing(id, { state: "suspended" }, 3);
+          expect(yield* standing()).toEqual(Option.some(["suspended", 0]));
+          // The reinstatement before it arrives late: the row keeps the suspension.
+          yield* directory.standing(id, { state: "active" }, 2);
+          expect(yield* standing()).toEqual(Option.some(["suspended", 0]));
+          yield* directory.standing(id, { state: "revoked", revocationEpoch: 1 }, 4);
+          expect(yield* standing()).toEqual(Option.some(["revoked", 1]));
+          // A repeat of the same seq is no newer.
+          yield* directory.standing(id, { state: "active", revocationEpoch: 0 }, 4);
+          expect(yield* standing()).toEqual(Option.some(["revoked", 1]));
+          const unknown = freshAgentId();
+          yield* directory.standing(unknown, { state: "suspended" }, 1);
+          expect(Option.isNone(yield* directory.findAgent(unknown))).toBe(true);
+        }).pipe(Effect.provide(make())),
+    );
     it.effect("replaces an agent on a second upsert, so a revocation epoch bump is visible", () =>
       Effect.gen(function* () {
         const directory = yield* AgentDirectory;

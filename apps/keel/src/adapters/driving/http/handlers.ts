@@ -20,6 +20,9 @@ import {
   enrolAgent,
   exchangeToken,
   openAgentSession,
+  reinstateAgent,
+  revokeAgent,
+  suspendAgent,
   whoami,
 } from "@keeltown/core/application/identity";
 import {
@@ -46,6 +49,10 @@ import {
   settingsError,
   settingsOk,
   settingsProject,
+  type StandingOperation,
+  standingError,
+  standingInput,
+  standingOk,
 } from "./operator.ts";
 import { eventsInput, eventsOk } from "./events.ts";
 import { changeListInput, changesOk, foreignProject, snapshotOk } from "./views.ts";
@@ -139,6 +146,26 @@ function confineBootstrap<H extends Operations<Caller>>(handlers: H): H {
  * they implement each operation.
  */
 export function makeHandlers(run: Runner) {
+  /** An operator's move on an agent's standing, answered as the agent's profile. */
+  const standing = (
+    caller: Caller,
+    operation: StandingOperation,
+    input: Parameters<typeof standingInput>[0],
+    move: typeof suspendAgent,
+  ) => {
+    const decoded = standingInput(input);
+    if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+    return run(
+      caller,
+      principalOf(caller).pipe(
+        Effect.flatMap((principal) => move(principal, decoded.success)),
+        Effect.match({
+          onSuccess: standingOk,
+          onFailure: (error) => standingError(caller, operation, error),
+        }),
+      ),
+    );
+  };
   return piggyback(
     run,
     confineBootstrap({
@@ -466,6 +493,12 @@ export function makeHandlers(run: Runner) {
           ),
         );
       },
+      Operator_suspendAgent: (caller: Caller, input: Input<"Operator_suspendAgent">) =>
+        standing(caller, "Operator_suspendAgent", input, suspendAgent),
+      Operator_reinstateAgent: (caller: Caller, input: Input<"Operator_reinstateAgent">) =>
+        standing(caller, "Operator_reinstateAgent", input, reinstateAgent),
+      Operator_revokeAgent: (caller: Caller, input: Input<"Operator_revokeAgent">) =>
+        standing(caller, "Operator_revokeAgent", input, revokeAgent),
       Operator_listEscalations: notYet,
       Operator_giveRuling: notYet,
     } satisfies Operations<Caller>),

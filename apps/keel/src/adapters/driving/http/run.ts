@@ -6,6 +6,7 @@ import type {
   CodeHost,
   Enrolments,
   Sessions,
+  Standings,
   EventFeed,
   Ids,
   Inbox,
@@ -32,7 +33,8 @@ export type IsolateServices =
   | ProjectViews
   | Enrolments
   | CodeHost
-  | Sessions;
+  | Sessions
+  | Standings;
 
 /** What a request answers with when its effect dies rather than failing with a declared error. */
 export type DefectResult =

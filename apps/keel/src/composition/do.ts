@@ -57,6 +57,13 @@ export function backbone(storage: DurableObjectStorage): Layer.Layer<DurableObje
 /** The AgentSession DO's driven adapters beyond the backbone: it writes the directory row its events project. */
 export type AgentSessionServices = AgentDirectory;
 
+/** The Projector repeats each agent standing it hears in the AgentDirectory: the repair after the AgentSession DO's inline write. */
+export type ProjectorServices = AgentDirectory;
+
+export function projectorServices(env: Env): Layer.Layer<ProjectorServices> {
+  return AgentDirectoryD1(env.DB);
+}
+
 /** The AgentSession DO writes the AgentDirectory D1 row inline, so enrolment and revocation bind the next request. */
 export function agentSessionServices(env: Env): Layer.Layer<AgentSessionServices> {
   return AgentDirectoryD1(env.DB);

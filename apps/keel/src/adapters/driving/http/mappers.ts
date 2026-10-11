@@ -37,6 +37,7 @@ export function agentProfile(agent: Agent) {
     scopes: [...agent.scopes],
     ...(agent.onBehalfOf === undefined ? {} : { onBehalfOf: agent.onBehalfOf }),
     revocationEpoch: agent.revocationEpoch,
+    state: agent.state,
     createdAt: iso(agent.createdAt),
   };
 }

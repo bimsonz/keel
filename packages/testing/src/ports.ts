@@ -14,9 +14,11 @@ import type { CodeHostFixture } from "./code-host-fixture.ts";
 import { describeCodeHostContract } from "./contracts/code-host.ts";
 import { describeEnrolmentsContract, type EnrolmentsHarness } from "./contracts/enrolments.ts";
 import { describeSessionsContract, type SessionsHarness } from "./contracts/sessions.ts";
+import { describeStandingsContract, type StandingsHarness } from "./contracts/standings.ts";
 import { describeLiveChangesContract, type LiveChangesHarness } from "./contracts/live-changes.ts";
 import { makeLiveChangesMemory } from "./memory/live-changes.ts";
 import { makeSessionsMemory } from "./memory/sessions.ts";
+import { makeStandingsMemory } from "./memory/standings.ts";
 import { describeEventFeedContract, type EventFeedHarness } from "./contracts/event-feed.ts";
 import {
   describeProjectViewsContract,
@@ -79,6 +81,7 @@ import type {
   ProjectViews,
   WorkspaceRebaser,
   Sessions,
+  Standings,
 } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 
@@ -272,6 +275,16 @@ function memorySessionsHarness(): SessionsHarness {
   };
 }
 
+/** In-memory Standings move the agents that in-memory Enrolments write into one in-memory AgentDirectory. */
+function memoryStandingsHarness(): StandingsHarness {
+  const directory = identity.makeAgentDirectoryMemory();
+  return {
+    layer: Layer.mergeAll(makeStandingsMemory().layer, operator.makeEnrolmentsMemory().layer).pipe(
+      Layer.provideMerge(directory.layer),
+    ),
+  };
+}
+
 const GENESIS = Schema.decodeUnknownSync(CommitSha)("0".repeat(40));
 
 export const PORTS = {
@@ -322,6 +335,10 @@ export const PORTS = {
   Sessions: harnessed<Sessions | Enrolments | AgentDirectory, SessionsHarness>(
     memorySessionsHarness,
     describeSessionsContract,
+  ),
+  Standings: harnessed<Standings | Enrolments | AgentDirectory, StandingsHarness>(
+    memoryStandingsHarness,
+    describeStandingsContract,
   ),
   EntityStore: port(() => storage.makeEntityStoreMemory().layer, describeEntityStoreContract),
   EventOutbox: eventOutbox,

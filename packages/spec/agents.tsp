@@ -16,6 +16,13 @@ union AgentKind {
   synthetic: "synthetic",
 }
 
+/** An agent's standing. An operator suspends and reinstates; revocation is final. */
+union AgentState {
+  active: "active",
+  suspended: "suspended",
+  revoked: "revoked",
+}
+
 model AgentProfile {
   id: AgentId;
 
@@ -31,6 +38,9 @@ model AgentProfile {
 
   /** Bumped on revocation; tokens minted under an earlier epoch are refused. */
   revocationEpoch: int32;
+
+  /** The agent's standing: a suspended or revoked agent's requests are refused. */
+  state?: AgentState;
 
   createdAt: utcDateTime;
 }

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adapters.test.ts
+# kills: b11.standing-guard
+# why: the D1 row never takes a revocation's epoch, so tokens minted before the revocation keep the epoch they were checked against
+diff --git a/apps/keel/src/adapters/driven/d1/agent-directory.ts b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+index b1b3cbc..9f8bf3e 100644
+--- a/apps/keel/src/adapters/driven/d1/agent-directory.ts
++++ b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+@@ -98,7 +98,7 @@ export function AgentDirectoryD1(db: D1Database) {
+         Effect.promise(() =>
+           db
+             .prepare(
+-              `UPDATE agents SET state = ?, revocation_epoch = COALESCE(?, revocation_epoch), standing_seq = ?
++              `UPDATE agents SET state = ?, revocation_epoch = revocation_epoch + 0 * COALESCE(?, 0), standing_seq = ?
+                WHERE id = ? AND standing_seq < ?`,
+             )
+             .bind(standing.state, standing.revocationEpoch ?? null, seq, agentId, seq)

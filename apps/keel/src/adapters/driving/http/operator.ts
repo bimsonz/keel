@@ -5,16 +5,25 @@ import type {
   ProjectSettings,
   PutProjectSettings,
   RepoNotFound,
+  StandingInput,
 } from "@keeltown/core/ports";
-import type { IdempotencyConflict } from "@keeltown/core/domain/identity";
+import type {
+  Agent,
+  AgentNotKnown,
+  AgentStateRefused,
+  IdempotencyConflict,
+} from "@keeltown/core/domain/identity";
 import type { ProjectNotFound } from "@keeltown/core/domain/integration";
-import { Glob, ProjectId } from "@keeltown/core/kernel";
+import { AgentId, Glob, ProjectId } from "@keeltown/core/kernel";
 import { Result, Schema } from "effect";
 import type {
   Operator_createProjectResult,
   Operator_enrolAgentResult,
   Operator_getSettingsResult,
   Operator_putSettingsResult,
+  Operator_reinstateAgentResult,
+  Operator_revokeAgentResult,
+  Operator_suspendAgentResult,
 } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
 import { agentProfile } from "./mappers.ts";
@@ -203,6 +212,77 @@ export function enrolAgentError(
       return conflict(caller, error, "Operator_enrolAgent", "enrolment");
     default: {
       const unmapped: never = error._tag;
+      return unmapped;
+    }
+  }
+}
+
+/** The operator's moves on an agent's standing, by operationId. */
+export type StandingOperation =
+  | "Operator_suspendAgent"
+  | "Operator_reinstateAgent"
+  | "Operator_revokeAgent";
+type StandingResult =
+  | Operator_suspendAgentResult
+  | Operator_reinstateAgentResult
+  | Operator_revokeAgentResult;
+
+const decodeAgentId = Schema.decodeUnknownResult(AgentId);
+
+export function standingInput(input: {
+  readonly agentId: string;
+  readonly "idempotency-key": string;
+  readonly reason?: string;
+}): Result.Result<StandingInput, Issues> {
+  const agentId = decodeAgentId(input.agentId);
+  if (Result.isFailure(agentId))
+    return Result.fail([{ path: ["agentId"], message: "Expected an agent id (agt_…)" }]);
+  return Result.succeed({
+    agentId: agentId.success,
+    ...(input.reason === undefined ? {} : { reason: input.reason }),
+    idempotencyKey: input["idempotency-key"],
+  });
+}
+
+export function standingOk(agent: Agent): StandingResult {
+  return { status: 200, body: agentProfile(agent) };
+}
+
+export function standingError(
+  caller: Caller,
+  operation: StandingOperation,
+  error: AgentNotKnown | AgentStateRefused | IdempotencyConflict,
+): StandingResult {
+  switch (error._tag) {
+    case "AgentNotKnown":
+      return {
+        status: 404,
+        body: problem(404, "resource.not_found", caller.requestId, {
+          detail: `No agent ${error.agentId}.`,
+        }),
+      };
+    case "AgentStateRefused":
+      return {
+        status: 409,
+        body: problem(409, "agent.state_refused", caller.requestId, {
+          detail: `${error.agentId} is ${error.state ?? "not enrolled"}, where ${error.command} is not allowed.`,
+          nextActions:
+            error.state === "suspended"
+              ? [
+                  {
+                    kind: "call",
+                    title: "Reinstate the agent first",
+                    operationId: "Operator_reinstateAgent",
+                    args: { agentId: error.agentId },
+                  },
+                ]
+              : [],
+        }),
+      };
+    case "IdempotencyConflict":
+      return conflict(caller, error, operation, "move on this agent");
+    default: {
+      const unmapped: never = error;
       return unmapped;
     }
   }

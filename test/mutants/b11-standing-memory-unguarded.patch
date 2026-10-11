@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: b11.standing-guard
+# why: the in-memory directory takes any standing written to it, so memory-backed tests pass where D1 would refuse
+diff --git a/packages/testing/src/memory/identity.ts b/packages/testing/src/memory/identity.ts
+index 2989f87..8699bb4 100644
+--- a/packages/testing/src/memory/identity.ts
++++ b/packages/testing/src/memory/identity.ts
+@@ -86,7 +86,7 @@ export function makeAgentDirectoryMemory() {
+         standing: (agentId, standing, seq) =>
+           Effect.sync(() => {
+             const agent = agents.get(agentId);
+-            if (agent === undefined || (standingSeqs.get(agentId) ?? 0) >= seq) return;
++            if (agent === undefined || false) return;
+             agents.set(agentId, {
+               ...agent,
+               state: standing.state,

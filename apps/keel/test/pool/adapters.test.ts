@@ -1,8 +1,7 @@
-import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { EventEnvelope, makeId } from "@keeltown/core/kernel";
 import type { AgentId, ProjectId } from "@keeltown/core/kernel";
-import { type AgentNotice, Enrolments, Sessions } from "@keeltown/core/ports";
+import { type AgentNotice, Enrolments, Sessions, Standings } from "@keeltown/core/ports";
 import {
   describeAgentDirectoryContract,
   describeNotifierContract,
@@ -16,6 +15,7 @@ import { AgentDirectoryD1 } from "../../src/adapters/driven/d1/agent-directory.t
 import { EnrolmentsRpc } from "../../src/adapters/driven/do-rpc/enrolments.ts";
 import { LiveChangesRpc } from "../../src/adapters/driven/do-rpc/live-changes.ts";
 import { SessionsRpc } from "../../src/adapters/driven/do-rpc/sessions.ts";
+import { StandingsRpc } from "../../src/adapters/driven/do-rpc/standings.ts";
 import { InboxRpc } from "../../src/adapters/driven/do-rpc/inbox.ts";
 import { NotifierRpc } from "../../src/adapters/driven/do-rpc/notifier.ts";
 import { TokenIssuerJose } from "../../src/adapters/driven/jose/token-issuer.ts";
@@ -119,24 +119,45 @@ const drainedSessions = Layer.effect(
   }),
 ).pipe(Layer.provide(SessionsRpc(agentSession)));
 
+/** An operator's move commits on the agent's AgentSession DO; each waits for its outbox to go quiet. */
+const drainedStandings = Layer.effect(
+  Standings,
+  Effect.gen(function* () {
+    const standings = yield* Standings;
+    const drained =
+      (move: "suspend" | "reinstate" | "revoke"): (typeof standings)["suspend"] =>
+      (principal, input) =>
+        standings[move](principal, input).pipe(
+          Effect.ensuring(Effect.promise(() => drainOutbox(agentSession(input.agentId)))),
+        );
+    return Standings.of({
+      suspend: drained("suspend"),
+      reinstate: drained("reinstate"),
+      revoke: drained("revoke"),
+    });
+  }),
+).pipe(Layer.provide(StandingsRpc(agentSession)));
+
+PORTS.Standings.contract("AgentSession DO over RPC", () => ({
+  layer: Layer.mergeAll(drainedStandings, drainedEnrolments, AgentDirectoryD1(env.DB)),
+}));
+
+const suiteOperator = {
+  agentId: makeId("agt", ulid()),
+  projectId: makeId("prj", ulid()),
+  scopes: ["operator" as const],
+  revocationEpoch: 0,
+};
+
 PORTS.Sessions.contract("AgentSession DO over RPC", () => ({
   layer: Layer.mergeAll(drainedSessions, drainedEnrolments, AgentDirectoryD1(env.DB)),
-  // The DO holds the agent; push P brings the operator's suspend, so the harness rewrites the row.
+  // The operator's own suspend, on the agent's AgentSession DO.
   suspend: (agentId) =>
-    Effect.promise(() =>
-      runInDurableObject(agentSession(agentId), (_instance, state) => {
-        const [row] = state.storage.sql
-          .exec<{ value: string }>(
-            "SELECT value FROM entities WHERE kind = 'agent' AND id = ?",
-            agentId,
-          )
-          .toArray();
-        if (row === undefined) throw new Error(`${agentId} is not enrolled`);
-        state.storage.sql.exec(
-          "UPDATE entities SET value = ? WHERE kind = 'agent' AND id = ?",
-          JSON.stringify({ ...JSON.parse(row.value), state: "suspended" }),
-          agentId,
-        );
+    Standings.use((standings) =>
+      standings.suspend(suiteOperator, {
+        agentId,
+        reason: "suspended by the Sessions suite",
+        idempotencyKey: `suspend-${agentId}`,
       }),
-    ),
+    ).pipe(Effect.asVoid, Effect.orDie, Effect.provide(drainedStandings)),
 }));

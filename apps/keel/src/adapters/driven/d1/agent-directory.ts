@@ -94,6 +94,16 @@ export function AgentDirectoryD1(db: D1Database) {
             ? Option.some(decodeAgentId(row.agent_id))
             : Option.none();
         }),
+      standing: (agentId, standing, seq) =>
+        Effect.promise(() =>
+          db
+            .prepare(
+              `UPDATE agents SET state = ?, revocation_epoch = COALESCE(?, revocation_epoch), standing_seq = ?
+               WHERE id = ? AND standing_seq < ?`,
+            )
+            .bind(standing.state, standing.revocationEpoch ?? null, seq, agentId, seq)
+            .run(),
+        ).pipe(Effect.asVoid),
       upsert: (agent, credential) =>
         Effect.promise(() =>
           db.batch([
