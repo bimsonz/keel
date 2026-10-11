@@ -1,13 +1,20 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
+  enrol,
   readInbox,
   recordDelivery,
   RESERVATION_TTL_MS,
   reserveChange,
 } from "@keeltown/core/application/identity";
 import { AgentId, EventEnvelope } from "@keeltown/core/kernel";
-import { EntityStore } from "@keeltown/core/ports";
-import { makeEventOutboxMemory, makeIdsMemory, makeManualClock } from "@keeltown/testing";
+import { EntityStore, EventOutbox } from "@keeltown/core/ports";
+import {
+  makeAgentDirectoryMemory,
+  makeEventOutboxMemory,
+  makeIdsMemory,
+  makeManualClock,
+  sampleProjectId,
+} from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
 
 const agentId = Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
@@ -89,5 +96,77 @@ describe("readInbox", () => {
       expect(later).toEqual({ notices: [], cursor: all.cursor });
       expect(fourth.notices.map((notice) => notice.id)).toEqual([delivered(4).eventId]);
     }).pipe(Effect.provide(makeEventOutboxMemory().layer)),
+  );
+});
+
+/** An operator's enrolment, as the isolate sends it: the secret travels only as its hash. */
+const enrolling = (idempotencyKey: string, fingerprint: string, secretHash: string) => ({
+  projectId: sampleProjectId,
+  name: "pool-agent",
+  kind: "interactive" as const,
+  scopes: ["agent:read" as const, "agent:work" as const],
+  clientId: `client-${agentId.toLowerCase()}`,
+  secretHash,
+  idempotencyKey,
+  fingerprint,
+});
+
+describe("enrol", () => {
+  it.effect(
+    "[b11.enrol-inline] commits AgentEnrolled and writes the directory row before answering",
+    () => {
+      const directory = makeAgentDirectoryMemory();
+      const layer = Layer.mergeAll(
+        makeEventOutboxMemory().layer,
+        makeManualClock().layer,
+        directory.layer,
+      );
+      return Effect.gen(function* () {
+        const agent = yield* enrol(agentId, enrolling("enrol-1", "body-1", "sha256:aa"));
+        const log = (yield* EventOutbox).log({ kind: "agent", id: agentId });
+
+        expect(agent).toMatchObject({
+          id: agentId,
+          projectId: sampleProjectId,
+          state: "active",
+          revocationEpoch: 0,
+        });
+        expect(log.map((event) => event.type)).toEqual(["AgentEnrolled"]);
+        expect(directory.agents.get(agentId)).toEqual(agent);
+        expect(directory.credentials.get(`client-${agentId.toLowerCase()}`)).toEqual({
+          clientId: `client-${agentId.toLowerCase()}`,
+          agentId,
+          secretHash: "sha256:aa",
+        });
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[b11.enrol-replay] replaces the secret hash on a replay of the key, and refuses the key for another body",
+    () => {
+      const directory = makeAgentDirectoryMemory();
+      const layer = Layer.mergeAll(
+        makeEventOutboxMemory().layer,
+        makeManualClock().layer,
+        directory.layer,
+      );
+      return Effect.gen(function* () {
+        const first = yield* enrol(agentId, enrolling("enrol-1", "body-1", "sha256:aa"));
+        const replayed = yield* enrol(agentId, enrolling("enrol-1", "body-1", "sha256:bb"));
+        const conflict = yield* Effect.exit(
+          enrol(agentId, enrolling("enrol-1", "body-2", "sha256:cc")),
+        );
+
+        expect(replayed).toEqual(first);
+        expect(directory.credentials.get(`client-${agentId.toLowerCase()}`)?.secretHash).toBe(
+          "sha256:bb",
+        );
+        expect((yield* EventOutbox).log({ kind: "agent", id: agentId })).toHaveLength(1);
+        expect(Exit.isFailure(conflict) && JSON.stringify(conflict.cause)).toContain(
+          "IdempotencyConflict",
+        );
+      }).pipe(Effect.provide(layer));
+    },
   );
 });

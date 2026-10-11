@@ -1,4 +1,9 @@
-import { readInbox, recordDelivery, reserveChange } from "@keeltown/core/application/identity";
+import {
+  enrol,
+  readInbox,
+  recordDelivery,
+  reserveChange,
+} from "@keeltown/core/application/identity";
 import { AgentNotKnown } from "@keeltown/core/domain/identity";
 import { NotImplemented } from "@keeltown/core/not-implemented";
 import { AgentId, type EventEnvelope } from "@keeltown/core/kernel";
@@ -7,13 +12,14 @@ import { Effect, Schema } from "effect";
 import {
   AgentSessionCodecs,
   type AgentSessionRpc,
-  type EnrolCommand,
+  EnrolCommand,
   InboxRead,
   type OpenSession,
   ReserveChange,
   SessionSnapshot,
 } from "../../../rpc/index.ts";
-import { KeelObject, type Reaction } from "./keel-object.ts";
+import { type AgentSessionServices, agentSessionServices } from "../../../composition/do.ts";
+import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 
 /** The AgentSession DO is named `agent:<agentId>`. */
 const agentIdOf = (name: string | undefined) =>
@@ -26,7 +32,14 @@ export const SNAPSHOT = { kind: "agent-session", id: "self" } as const;
  * The AgentSession DO (`agent:<id>`): inbox, cursor, leases, fidelity and the
  * agent's live connections. Every RPC answers with an Exit envelope.
  */
-export class AgentSessionDO extends KeelObject implements AgentSessionRpc {
+export class AgentSessionDO
+  extends KeelObjectWith<AgentSessionServices>
+  implements AgentSessionRpc
+{
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env, agentSessionServices(env));
+  }
+
   async describe() {
     const name = this.ctx.id.name;
     const program = Effect.gen(function* () {
@@ -74,7 +87,13 @@ export class AgentSessionDO extends KeelObject implements AgentSessionRpc {
     return this.answer(AgentSessionCodecs.inbox, program);
   }
 
-  async enrol(_command: typeof EnrolCommand.Encoded) {
-    return this.answer(AgentSessionCodecs.enrol, Effect.die(new NotImplemented("identity/enrol")));
+  /** Enrols this object's agent: AgentEnrolled committed, then the directory row written, before it answers. */
+  async enrol(command: typeof EnrolCommand.Encoded) {
+    const agentId = agentIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(EnrolCommand)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((enrolling) => enrol(agentId, enrolling)),
+    );
+    return this.answer(AgentSessionCodecs.enrol, program);
   }
 }

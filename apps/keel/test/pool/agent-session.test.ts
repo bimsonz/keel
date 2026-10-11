@@ -1,9 +1,11 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { type EntityRef, EventEnvelope, makeId } from "@keeltown/core/kernel";
+import { type AgentId, type EntityRef, EventEnvelope, makeId } from "@keeltown/core/kernel";
+import { hashSecret, sampleProjectId } from "@keeltown/testing";
 import { Exit, Schema } from "effect";
 import { ulid } from "ulid";
 import { AgentSessionCodecs, decodeExit } from "../../src/rpc/index.ts";
+import { exchange } from "./helpers.ts";
 
 const agentStub = (agentId = makeId("agt", ulid())) =>
   env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`));
@@ -71,5 +73,45 @@ describe("the AgentSession DO over RPC", () => {
     expect(Exit.isSuccess(page) && page.value.notices).toEqual([]);
     expect(waited).toBeGreaterThanOrEqual(400);
     expect(waited).toBeLessThan(5_000);
+  });
+});
+
+/** Enrols `agentId` over RPC as the isolate would, with this secret's hash; answers the agent and its credential. */
+async function enrolOverRpc(agentId: AgentId, idempotencyKey: string, secret: string) {
+  const clientId = `client-${agentId.toLowerCase()}`;
+  const answer = decodeExit(
+    AgentSessionCodecs.enrol,
+    await agentStub(agentId).enrol({
+      projectId: sampleProjectId,
+      name: "pool-agent",
+      kind: "interactive",
+      scopes: ["agent:read", "agent:work"],
+      clientId,
+      secretHash: await hashSecret(secret),
+      idempotencyKey,
+      fingerprint: "enrol-body",
+    }),
+  );
+  if (!Exit.isSuccess(answer)) throw new Error(`enrol failed: ${JSON.stringify(answer.cause)}`);
+  return { agent: answer.value, clientId, clientSecret: secret };
+}
+
+describe("enrolling an agent over RPC", () => {
+  it("[b11.enrol-inline] lets the new credential exchange for a token as soon as enrol answers", async () => {
+    const enrolled = await enrolOverRpc(makeId("agt", ulid()), "enrol-1", "secret-first");
+    const exchanged = await exchange(enrolled);
+
+    expect(enrolled.agent.state).toBe("active");
+    expect(exchanged.status).toBe(200);
+  });
+
+  it("[b11.enrol-replay] retires the old secret when a replay of the key re-issues it", async () => {
+    const agentId = makeId("agt", ulid());
+    const first = await enrolOverRpc(agentId, "enrol-1", "secret-first");
+    const replayed = await enrolOverRpc(agentId, "enrol-1", "secret-second");
+
+    expect(replayed.agent).toEqual(first.agent);
+    expect((await exchange(first)).status).toBe(401);
+    expect((await exchange(replayed)).status).toBe(200);
   });
 });

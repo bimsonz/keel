@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/agent-session.test.ts
+# kills: b11.enrol-inline
+# why: enrol answers before writing the directory row, leaving it to a later projection, so the new credential cannot exchange for a token yet
+diff --git a/packages/core/src/application/identity/enrol.ts b/packages/core/src/application/identity/enrol.ts
+index 088c703..e12e19b 100644
+--- a/packages/core/src/application/identity/enrol.ts
++++ b/packages/core/src/application/identity/enrol.ts
+@@ -93,10 +93,5 @@ export const enrol: (
+     const agent = committed.duplicate
+       ? decodeAgent((yield* EntityStore).get(AGENT, agentId))
+       : committed.value;
+-    yield* (yield* AgentDirectory).upsert(agent, {
+-      clientId: command.clientId,
+-      agentId,
+-      secretHash: command.secretHash,
+-    });
+     return agent;
+   });

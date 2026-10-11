@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/agent-session.test.ts
+# kills: b11.enrol-replay
+# why: a replay answers the stored agent without writing the row again, so the re-issued secret never replaces the old one
+diff --git a/packages/core/src/application/identity/enrol.ts b/packages/core/src/application/identity/enrol.ts
+index 088c703..ca77911 100644
+--- a/packages/core/src/application/identity/enrol.ts
++++ b/packages/core/src/application/identity/enrol.ts
+@@ -90,9 +90,8 @@ export const enrol: (
+     );
+     if (committed.duplicate && !committed.sameCommand)
+       return yield* new IdempotencyConflict({ idempotencyKey: command.idempotencyKey });
+-    const agent = committed.duplicate
+-      ? decodeAgent((yield* EntityStore).get(AGENT, agentId))
+-      : committed.value;
++    if (committed.duplicate) return decodeAgent((yield* EntityStore).get(AGENT, agentId));
++    const agent = committed.value;
+     yield* (yield* AgentDirectory).upsert(agent, {
+       clientId: command.clientId,
+       agentId,

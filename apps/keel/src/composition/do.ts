@@ -1,4 +1,5 @@
 import {
+  type AgentDirectory,
   type Clock,
   type CodeHost,
   type EntityStore,
@@ -9,6 +10,7 @@ import {
 } from "@keeltown/core/ports";
 import { Layer, ManagedRuntime } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
+import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { FanOutRpc } from "../adapters/driven/do-rpc/fan-out.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { EntityStoreSql, migrateEntityStore } from "../adapters/driven/do-storage/entity-store.ts";
@@ -26,6 +28,14 @@ export type DurableObjectRuntime<R = never> = ManagedRuntime.ManagedRuntime<
 /** The services every Durable Object runs on: its own storage and outbox, the system clock and ids. */
 export function backbone(storage: DurableObjectStorage): Layer.Layer<DurableObjectServices> {
   return Layer.mergeAll(EntityStoreSql(storage), EventOutboxSql(storage), SystemLive);
+}
+
+/** The AgentSession DO's driven adapters beyond the backbone: it writes the directory row its events project. */
+export type AgentSessionServices = AgentDirectory;
+
+/** The AgentSession DO writes the AgentDirectory D1 row inline, so enrolment and revocation bind the next request. */
+export function agentSessionServices(env: Env): Layer.Layer<AgentSessionServices> {
+  return AgentDirectoryD1(env.DB);
 }
 
 /** The Change DO's driven adapters beyond the backbone. */
