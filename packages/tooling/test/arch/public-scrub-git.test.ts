@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -32,7 +32,9 @@ function tree(name: string, files: Record<string, string>, repository: boolean):
 }
 
 const leaks = (dir: string) =>
-  checkPublicScrub(dir, { skip: [], vacuity: VACUITY }).violations.map((v) => `${v.file}: ${v.message}`);
+  checkPublicScrub(dir, { skip: [], vacuity: VACUITY }).violations.map(
+    (v) => `${v.file}: ${v.message}`,
+  );
 
 /**
  * public-scrub reads what git would publish from a work tree, so a gitignored
@@ -55,6 +57,20 @@ describe("public-scrub reads what git would publish", () => {
   it("[scrub.untracked] reads an untracked file no rule ignores, since `git add -A` would publish it", () => {
     const dir = tree("untracked", { "notes.md": LEAK }, true);
     expect(leaks(dir)).toEqual(["notes.md: names a local filesystem path"]);
+  });
+
+  it("[scrub.repeat] names a forbidden term in every file that holds it, not only the first", () => {
+    // The control fixture plants a fictional forbidden name; copied here, so this file never spells it.
+    const planted = readFileSync(
+      join(import.meta.dirname, "../../../../test/controls/public-scrub/README.md"),
+      "utf8",
+    ).replace(/^.*\/(Users|home)\/.*$/gm, "");
+    const dir = tree("repeat", { "a.md": planted, "b.md": planted }, true);
+    git(dir, "add", "a.md", "b.md");
+    expect(leaks(dir)).toEqual([
+      expect.stringMatching(/^a\.md: names the control's planted name$/),
+      expect.stringMatching(/^b\.md: names the control's planted name$/),
+    ]);
   });
 
   it("[scrub.no-git] reads every file outside a work tree, ignore rules or not", () => {

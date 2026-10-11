@@ -43,11 +43,14 @@ export function digest(term: string): string {
 export function termsOf(line: string): string[] {
   const words = line.toLowerCase().match(/[a-z0-9]+/g) ?? [];
   const terms: string[] = [];
-  for (let start = 0; start < words.length; start += 1) {
-    for (let size = 1; size <= 3 && start + size <= words.length; size += 1) {
-      terms.push(words.slice(start, start + size).join("-"));
+  words.forEach((word, start) => {
+    let term = word;
+    terms.push(term);
+    for (const next of words.slice(start + 1, start + 3)) {
+      term = `${term}-${next}`;
+      terms.push(term);
     }
-  }
+  });
   return terms;
 }
 
@@ -71,6 +74,14 @@ export function checkPublicScrub(root: string, options: GuardOptions = {}): Guar
   );
   const secrets = secretsFromEnvironment();
   const violations: Violation[] = [];
+  // Each distinct term is hashed once: the tree holds ~5M terms but under a million distinct ones.
+  const clean = new Set<string>();
+  const reasonFor = (term: string): string | undefined => {
+    if (clean.has(term)) return undefined;
+    const reason = FORBIDDEN_TERMS.get(digest(term));
+    if (reason === undefined) clean.add(term);
+    return reason;
+  };
   for (const file of files) {
     const text = read(root, file);
     for (const hit of matchingLines(text, LOCAL_PATH)) {
@@ -82,9 +93,11 @@ export function checkPublicScrub(root: string, options: GuardOptions = {}): Guar
       });
     }
     text.split("\n").forEach((line, index) => {
-      const named = new Set(
-        termsOf(line).flatMap((term) => FORBIDDEN_TERMS.get(digest(term)) ?? []),
-      );
+      const named = new Set<string>();
+      for (const term of termsOf(line)) {
+        const reason = reasonFor(term);
+        if (reason !== undefined) named.add(reason);
+      }
       for (const reason of named) {
         violations.push({ rule: PUBLIC_SCRUB, file, line: index + 1, message: `names ${reason}` });
       }
