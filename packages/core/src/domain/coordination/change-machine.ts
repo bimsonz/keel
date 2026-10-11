@@ -18,8 +18,6 @@ import {
   type SketchId,
   type VerdictId,
   type WorkspaceId,
-  canonicalJson,
-  type Json,
 } from "../kernel/index.ts";
 import {
   type Change,
@@ -61,6 +59,7 @@ import {
   PrecheckStarted,
   PreflightIssued,
 } from "./events.ts";
+import { reviseIntent } from "./intent.ts";
 import { checkLease, isLapsed, lapsesAt } from "./lease.ts";
 import type { Preflight } from "./preflight.ts";
 import type { FootprintEntry, Proposition } from "./proposition.ts";
@@ -632,11 +631,6 @@ const moveTo = (change: Change, next: ChangeState, drop: readonly Optional[] = [
   return moved;
 };
 
-const asJson = (value: unknown): Json => JSON.parse(JSON.stringify(value));
-
-const sameProposition = (a: Proposition, b: Proposition): boolean =>
-  canonicalJson(asJson(a)) === canonicalJson(asJson(b));
-
 const released = (change: Change, next: ChangeState): Change => ({
   ...moveTo(change, next, ["parkReason", "escalationId", "batchId", "laneId"]),
   lease: { ...change.lease, state: "released" },
@@ -687,26 +681,10 @@ export const evolveChange = (
       return from("declared", "working") && event.revision === change.intent.revision
         ? change
         : illegal(change, event);
-    case "IntentRevised": {
-      if (!from("working", "drifted", "bounced") || event.revision !== change.intent.revision + 1)
-        return illegal(change, event);
-      const kept = change.intent.premises.filter(
-        (p) => !event.premisesRetracted.some((r) => sameProposition(p, r)),
-      );
-      return {
-        ...moveTo(change, "working"),
-        intent: {
-          ...change.intent,
-          revision: event.revision,
-          ...(event.goal === undefined ? {} : { goal: event.goal }),
-          ...(event.footprint === undefined ? {} : { footprint: event.footprint }),
-          premises: [...kept, ...event.premisesAdded],
-          ...(event.declaredEffects === undefined
-            ? {}
-            : { declaredEffects: event.declaredEffects }),
-        },
-      };
-    }
+    case "IntentRevised":
+      return from("working", "drifted", "bounced") && event.revision === change.intent.revision + 1
+        ? { ...moveTo(change, "working"), intent: reviseIntent(change.intent, event) }
+        : illegal(change, event);
     case "ChangeStarted":
       return from("declared")
         ? {

@@ -11,6 +11,7 @@ export * from "./events.ts";
 export * from "./exposure.ts";
 export * from "./fallout.ts";
 export * from "./graph.ts";
+export * from "./intent.ts";
 export * from "./lattice.ts";
 export * from "./lattice-data.ts";
 export * from "./lease.ts";
