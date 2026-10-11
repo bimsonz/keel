@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.queued-plan-hash
+# why: a requeue carries the plan too, so the Lane re-adds the member from the event alone
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 1f891e1..2ca26a7 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -585,7 +585,6 @@ export const decideChange = (
+               changeId: id,
+               batchId: command.batchId,
+               reason: command.reason,
+-              ...planOf(change),
+             }),
+           ])
+         : refuse(change, command);

@@ -2,15 +2,15 @@
 # kills: change.refusals-guide
 # why: A bounce whose verdict suggests nothing reaches the agent with no next action
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 8b58b69..b179582 100644
+index 1f891e1..6c29473 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -502,7 +502,7 @@ export const decideChange = (
-       if (!(at("deriving", "verifying", "queued") || fromBatch || awaitingRuling))
+@@ -601,7 +601,7 @@ export const decideChange = (
+       if (!(beforeBatch || ("verdictId" in cause && (fromBatch || awaitingRuling))))
          return refuse(change, command);
        const nextActions =
--        command.nextActions.length > 0 ? command.nextActions : defaultBounceActions(id);
-+        command.nextActions.length >= 0 ? command.nextActions : defaultBounceActions(id);
-       return intoAgentOwned(
-         change,
-         now,
+-        command.nextActions.length > 0
++        command.nextActions.length >= 0
+           ? command.nextActions
+           : "conflictId" in cause
+             ? conflictActions(id, cause.conflictId)

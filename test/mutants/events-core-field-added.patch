@@ -2,14 +2,14 @@
 # kills: events.conform
 # why: core gives ChangeQueued an optional position the spec does not publish, so the event grows a field no consumer can see
 diff --git a/packages/core/src/domain/coordination/events.ts b/packages/core/src/domain/coordination/events.ts
-index 54e3e8b..d2c881f 100644
+index afe7435..9b5afa8 100644
 --- a/packages/core/src/domain/coordination/events.ts
 +++ b/packages/core/src/domain/coordination/events.ts
-@@ -103,6 +103,7 @@ export const PlanCompiled = Schema.TaggedStruct("PlanCompiled", {
+@@ -122,6 +122,7 @@ export const PlanCompiled = Schema.TaggedStruct("PlanCompiled", {
  export const ChangeQueued = Schema.TaggedStruct("ChangeQueued", {
    changeId: ChangeId,
    laneId: Schema.String,
 +  position: Schema.optional(Schema.Int),
+   /** The plan the change was verified under: its PlanCompiled's hash. Optional only so older events still decode. */
+   planHash: Schema.optional(ContentHash),
  });
- export const ChangeBatched = Schema.TaggedStruct("ChangeBatched", {
-   changeId: ChangeId,

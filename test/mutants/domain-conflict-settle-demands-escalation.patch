@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.settle-escalation-optional
+# why: a settle that proves or dismisses needs no escalation; demanding one always refuses a proof
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index 40f14d3..3632e15 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -226,6 +226,7 @@ export const decideConflict = (
+         (conflict.probeId !== undefined && probe.id !== conflict.probeId)
+       )
+         return refuse("no-probe-of-this-conflict");
++      if (command.escalationId === undefined) return refuse("escalation-required", raiseFirst);
+       const drafted = conflict.state === "probing";
+       if (probe.state === "admitted" && drafted)
+         return Result.succeed([
