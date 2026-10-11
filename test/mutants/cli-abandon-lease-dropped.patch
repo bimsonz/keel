@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/cli.test.ts -t "cli.abandon"
+# kills: cli.abandon
+# why: keeltown abandon ignores --lease, so the holder's withdrawal is refused as a lease-less one
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index 816e370..766f559 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -152,7 +152,7 @@ async function dispatch(
+         return client.abandon(
+           required(command[1], "change"),
+           values.reason === undefined ? {} : { reason: values.reason },
+-          { ...(values.lease === undefined ? {} : { lease: values.lease }), ...idempotent },
++          { ...idempotent },
+         );
+       throw new UsageError(`unknown command: ${command.join(" ") || "(none)"}`);
+   }

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/changes.test.ts -t changes.abandon-replay
+# kills: changes.abandon-replay
+# why: the RPC adapter mints its own key for each abandon, so a retry is decided again and refused instead of answered
+diff --git a/apps/keel/src/adapters/driven/do-rpc/changes.ts b/apps/keel/src/adapters/driven/do-rpc/changes.ts
+index 45df051..6084be6 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/changes.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/changes.ts
+@@ -125,7 +125,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
+               agentId: principal.agentId,
+               authority: input.authority,
+               ...(input.reason === undefined ? {} : { reason: input.reason }),
+-              idempotencyKey: input.idempotencyKey,
++              idempotencyKey: crypto.randomUUID(),
+             }),
+           ),
+         ),

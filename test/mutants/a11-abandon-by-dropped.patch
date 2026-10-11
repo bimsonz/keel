@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel --project unit apps/keel/test/pool/abandon.test.ts apps/keel/test/unit/abandon.test.ts -t "a11.abandon-operator|a11.abandon-authority"
+# kills: a11.abandon-operator, a11.abandon-authority
+# why: an operator's withdrawal names no one, so ChangeWithdrawn cannot say which operator ended the change
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 6fcdbb4..818632c 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -91,7 +91,7 @@ const withdrawAuthority = (
+ ): WithdrawAuthority | undefined => {
+   if (lease !== undefined) return { _tag: "Lease", leaseId: lease };
+   return principal.scopes.includes("operator")
+-    ? { _tag: "Operator", by: principal.agentId }
++    ? { _tag: "Operator", by: "" }
+     : undefined;
+ };
+ 

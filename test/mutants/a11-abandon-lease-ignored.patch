@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel --project unit apps/keel/test/pool/abandon.test.ts apps/keel/test/unit/abandon.test.ts -t "a11.abandon-stale|a11.abandon-authority"
+# kills: a11.abandon-stale, a11.abandon-authority
+# why: a sent lease is ignored and the caller withdraws as an operator, so a stale or made-up lease ends the change
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 6fcdbb4..46de497 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -89,7 +89,7 @@ const withdrawAuthority = (
+   principal: Principal,
+   lease: LeaseId | undefined,
+ ): WithdrawAuthority | undefined => {
+-  if (lease !== undefined) return { _tag: "Lease", leaseId: lease };
++  if (lease !== undefined) return { _tag: "Operator", by: principal.agentId };
+   return principal.scopes.includes("operator")
+     ? { _tag: "Operator", by: principal.agentId }
+     : undefined;
