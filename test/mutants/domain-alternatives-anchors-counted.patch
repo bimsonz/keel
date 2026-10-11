@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/alternatives.test.ts
+# kills: alternatives.equal-sets
+# why: a claim is what an effect says, not where it is pinned: anchors are not part of it
+diff --git a/packages/core/src/domain/coordination/alternatives.ts b/packages/core/src/domain/coordination/alternatives.ts
+index 0ea8ac4..dcdf858 100644
+--- a/packages/core/src/domain/coordination/alternatives.ts
++++ b/packages/core/src/domain/coordination/alternatives.ts
+@@ -20,6 +20,7 @@ const claimKey = (p: Proposition): string => {
+     value: c.value,
+     unit: c.unit ?? null,
+     scope: c.scope ?? null,
++    anchors: JSON.stringify(c.anchors ?? []),
+   });
+ };
+ 

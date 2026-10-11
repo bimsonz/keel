@@ -1,0 +1,24 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.preflight-alternatives
+# why: PreflightIssued records the alternatives the agent was shown, for the feed and the console
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 96ed85a..592e774 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -331,7 +331,15 @@ const intoAgentOwned = (change: Change, now: Instant, event: ChangeEvent): Decis
+   );
+ 
+ const preflightIssued = (changeId: ChangeId, revision: number, preflight: Preflight) =>
+-  PreflightIssued.make({ changeId, revision, ...preflight });
++  PreflightIssued.make({
++    changeId,
++    revision,
++    neighbours: preflight.neighbours,
++    contradictions: preflight.contradictions,
++    precedents: preflight.precedents,
++    suggestedMove: preflight.suggestedMove,
++    ...(preflight.basis === undefined ? {} : { basis: preflight.basis }),
++  });
+ 
+ /** The commands an agent makes while holding the lease: refused outright on a stale or lapsed token. */
+ const leaseOf = (command: ChangeCommand): LeaseId | undefined => {

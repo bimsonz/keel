@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/alternatives.test.ts
+# kills: alternatives.equal-sets
+# why: an intent that declares no effects is no one's alternative, not even another empty one's
+diff --git a/packages/core/src/domain/coordination/alternatives.ts b/packages/core/src/domain/coordination/alternatives.ts
+index 0ea8ac4..b49039f 100644
+--- a/packages/core/src/domain/coordination/alternatives.ts
++++ b/packages/core/src/domain/coordination/alternatives.ts
+@@ -35,7 +35,7 @@ const claimsOf = (intent: Intent): ReadonlySet<string> =>
+ export const areAlternatives = (a: Intent, b: Intent): boolean => {
+   const mine = claimsOf(a);
+   const theirs = claimsOf(b);
+-  return mine.size > 0 && mine.size === theirs.size && [...mine].every((c) => theirs.has(c));
++  return mine.size === theirs.size && [...mine].every((c) => theirs.has(c));
+ };
+ 
+ /**

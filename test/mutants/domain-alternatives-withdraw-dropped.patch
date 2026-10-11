@@ -1,0 +1,20 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/alternatives.test.ts
+# kills: events.alternative-notices
+# why: the notice names every way forward, withdrawing included: Keel informs and the agent chooses
+diff --git a/packages/core/src/domain/coordination/alternatives.ts b/packages/core/src/domain/coordination/alternatives.ts
+index 0ea8ac4..9ad455a 100644
+--- a/packages/core/src/domain/coordination/alternatives.ts
++++ b/packages/core/src/domain/coordination/alternatives.ts
+@@ -70,12 +70,6 @@ const waysForward = (changeId: ChangeId, other: ChangeId): readonly NextAction[]
+     operationId: "rebase",
+     args: { changeId },
+   },
+-  {
+-    kind: "call",
+-    title: "Withdraw your change",
+-    operationId: "abandon",
+-    args: { changeId },
+-  },
+ ];
+ 
+ /** The notice for `changeId`'s agent that `alternativeId` was declared with the same intent. */

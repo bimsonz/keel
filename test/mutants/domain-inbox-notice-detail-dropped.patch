@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/inbox.test.ts
+# kills: inbox.notice-detail
+# why: a notice carries the detail its entry was delivered with
+diff --git a/packages/core/src/domain/identity/inbox.ts b/packages/core/src/domain/identity/inbox.ts
+index 884c9f0..940769d 100644
+--- a/packages/core/src/domain/identity/inbox.ts
++++ b/packages/core/src/domain/identity/inbox.ts
+@@ -61,7 +61,6 @@ export const noticeOf = (entry: InboxEntry, position: string): AgentNotice => ({
+   at: entry.at,
+   kind: entry.type,
+   title: `${sentence(entry.type)}: ${entry.entity.id}`,
+-  ...(entry.detail === undefined ? {} : { detail: entry.detail }),
+   ref: `${entry.entity.kind}:${entry.entity.id}`,
+   ...(entry.nextActions === undefined || entry.nextActions.length === 0
+     ? {}

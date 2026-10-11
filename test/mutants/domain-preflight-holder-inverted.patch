@@ -2,12 +2,12 @@
 # kills: preflight.direction
 # why: a live change's must premise contradicted by my effect means I refine; here the premise's holder is read the wrong way round
 diff --git a/packages/core/src/domain/coordination/preflight.ts b/packages/core/src/domain/coordination/preflight.ts
-index 09f806d..ce04a86 100644
+index 5b1f133..e7ee7fc 100644
 --- a/packages/core/src/domain/coordination/preflight.ts
 +++ b/packages/core/src/domain/coordination/preflight.ts
-@@ -105,7 +105,7 @@ export const preflight = (
-     contradictions,
+@@ -111,7 +111,7 @@ export const preflight = (
      precedents: precedents.map((p) => p.ref),
+     ...(alternatives.length === 0 ? {} : { alternatives }),
    };
 -  const breaks = contradictions.findIndex((c) => c.holder !== self && isMust(c.premise));
 +  const breaks = contradictions.findIndex((c) => c.holder === self && isMust(c.premise));

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/alternatives.test.ts
+# kills: events.alternative-notices
+# why: comparing means reading the other change, not your own
+diff --git a/packages/core/src/domain/coordination/alternatives.ts b/packages/core/src/domain/coordination/alternatives.ts
+index 0ea8ac4..e8a39fb 100644
+--- a/packages/core/src/domain/coordination/alternatives.ts
++++ b/packages/core/src/domain/coordination/alternatives.ts
+@@ -56,7 +56,7 @@ const waysForward = (changeId: ChangeId, other: ChangeId): readonly NextAction[]
+     kind: "read",
+     title: "Read the other change: its intent, its state and its evidence",
+     operationId: "Changes_getChange",
+-    args: { changeId: other },
++    args: { changeId },
+   },
+   {
+     kind: "read",

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/preflight.test.ts
+# kills: preflight.alternatives-unranked
+# why: preflight lists alternatives in exposure's order: Keel never ranks them
+diff --git a/packages/core/src/domain/coordination/preflight.ts b/packages/core/src/domain/coordination/preflight.ts
+index 5b1f133..cb0aaea 100644
+--- a/packages/core/src/domain/coordination/preflight.ts
++++ b/packages/core/src/domain/coordination/preflight.ts
+@@ -109,7 +109,7 @@ export const preflight = (
+     neighbours,
+     contradictions,
+     precedents: precedents.map((p) => p.ref),
+-    ...(alternatives.length === 0 ? {} : { alternatives }),
++    ...(alternatives.length === 0 ? {} : { alternatives: alternatives.toSorted() }),
+   };
+   const breaks = contradictions.findIndex((c) => c.holder !== self && isMust(c.premise));
+   if (breaks !== -1) return { ...listed, suggestedMove: "refine", basis: cites(breaks) };

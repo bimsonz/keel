@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/alternatives.test.ts
+# kills: alternatives.equal-sets
+# why: `a before b` and `b after a` are one claim, so both changes are alternatives
+diff --git a/packages/core/src/domain/coordination/alternatives.ts b/packages/core/src/domain/coordination/alternatives.ts
+index 0ea8ac4..39da5d2 100644
+--- a/packages/core/src/domain/coordination/alternatives.ts
++++ b/packages/core/src/domain/coordination/alternatives.ts
+@@ -12,7 +12,7 @@ import type { Proposition } from "./proposition.ts";
+  * say where and how firmly, not what, and are left out.
+  */
+ const claimKey = (p: Proposition): string => {
+-  const c = canonicalProposition(p);
++  const c = p;
+   return canonicalJson({
+     subject: c.subject,
+     predicate: c.predicate,

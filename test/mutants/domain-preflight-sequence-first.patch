@@ -2,11 +2,11 @@
 # kills: preflight.move-table
 # why: the change that would break another refines before one that would be broken sequences; here sequence is checked first
 diff --git a/packages/core/src/domain/coordination/preflight.ts b/packages/core/src/domain/coordination/preflight.ts
-index 09f806d..f93f94d 100644
+index 5b1f133..86862fa 100644
 --- a/packages/core/src/domain/coordination/preflight.ts
 +++ b/packages/core/src/domain/coordination/preflight.ts
-@@ -106,7 +106,7 @@ export const preflight = (
-     precedents: precedents.map((p) => p.ref),
+@@ -112,7 +112,7 @@ export const preflight = (
+     ...(alternatives.length === 0 ? {} : { alternatives }),
    };
    const breaks = contradictions.findIndex((c) => c.holder !== self && isMust(c.premise));
 -  if (breaks !== -1) return { ...listed, suggestedMove: "refine", basis: cites(breaks) };

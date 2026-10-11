@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/inbox.test.ts
+# kills: inbox.notice-next-actions
+# why: an empty list of next actions reads as none: the notice carries no field
+diff --git a/packages/core/src/domain/identity/inbox.ts b/packages/core/src/domain/identity/inbox.ts
+index 884c9f0..cf91de5 100644
+--- a/packages/core/src/domain/identity/inbox.ts
++++ b/packages/core/src/domain/identity/inbox.ts
+@@ -63,7 +63,7 @@ export const noticeOf = (entry: InboxEntry, position: string): AgentNotice => ({
+   title: `${sentence(entry.type)}: ${entry.entity.id}`,
+   ...(entry.detail === undefined ? {} : { detail: entry.detail }),
+   ref: `${entry.entity.kind}:${entry.entity.id}`,
+-  ...(entry.nextActions === undefined || entry.nextActions.length === 0
++  ...(entry.nextActions === undefined
+     ? {}
+     : { nextActions: entry.nextActions }),
+   cursor: position,

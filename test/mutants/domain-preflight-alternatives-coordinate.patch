@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/preflight.test.ts
+# kills: preflight.alternatives-unranked
+# why: alternatives inform and never steer: the suggested move does not read them
+diff --git a/packages/core/src/domain/coordination/preflight.ts b/packages/core/src/domain/coordination/preflight.ts
+index 5b1f133..da10bbb 100644
+--- a/packages/core/src/domain/coordination/preflight.ts
++++ b/packages/core/src/domain/coordination/preflight.ts
+@@ -125,5 +125,7 @@ export const preflight = (
+       basis: { _tag: "precedent", decisionId: decided.ref.decisionId },
+     };
+   if (contradictions.length > 0) return { ...listed, suggestedMove: "coordinate", basis: cites(0) };
+-  return { ...listed, suggestedMove: "proceed" };
++  return alternatives.length > 0
++    ? { ...listed, suggestedMove: "coordinate", basis: cites(0) }
++    : { ...listed, suggestedMove: "proceed" };
+ };

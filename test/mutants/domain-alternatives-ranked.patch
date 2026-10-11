@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/alternatives.test.ts
+# kills: alternatives.of-live
+# why: Keel never ranks alternatives: they come back in the order the live index gave them
+diff --git a/packages/core/src/domain/coordination/alternatives.ts b/packages/core/src/domain/coordination/alternatives.ts
+index 0ea8ac4..7287652 100644
+--- a/packages/core/src/domain/coordination/alternatives.ts
++++ b/packages/core/src/domain/coordination/alternatives.ts
+@@ -48,7 +48,9 @@ export const alternativesOf = (
+   intent: Intent,
+   live: readonly LiveChange[],
+ ): readonly ChangeId[] =>
+-  live.filter((l) => l.id !== self && areAlternatives(intent, l.intent)).map((l) => l.id);
++  live.filter((l) => l.id !== self && areAlternatives(intent, l.intent))
++    .map((l) => l.id)
++    .toSorted();
+ 
+ /** What the agent of `changeId` can do about the other change: compare the two, rebase, or withdraw. */
+ const waysForward = (changeId: ChangeId, other: ChangeId): readonly NextAction[] => [

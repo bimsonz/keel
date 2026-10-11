@@ -1,0 +1,14 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/alternatives.test.ts
+# kills: events.alternative-notices
+# why: the next actions are for the live change's agent: it is the one that may rebase or withdraw, never the landed change
+diff --git a/packages/core/src/domain/coordination/alternatives.ts b/packages/core/src/domain/coordination/alternatives.ts
+index 0ea8ac4..10c2b8c 100644
+--- a/packages/core/src/domain/coordination/alternatives.ts
++++ b/packages/core/src/domain/coordination/alternatives.ts
+@@ -101,5 +101,5 @@ export const alternativeLanded = (
+     projectId,
+     changeId,
+     landedChangeId,
+-    nextActions: waysForward(changeId, landedChangeId),
++    nextActions: waysForward(landedChangeId, changeId),
+   });

@@ -2,14 +2,15 @@
 # kills: exposure.unreadable-noticed
 # why: An unreadable proposition is silently weak
 diff --git a/packages/core/src/domain/coordination/exposure.ts b/packages/core/src/domain/coordination/exposure.ts
-index 3aca278..cfa9a7a 100644
+index 6c4653b..e502ff9 100644
 --- a/packages/core/src/domain/coordination/exposure.ts
 +++ b/packages/core/src/domain/coordination/exposure.ts
-@@ -79,6 +79,6 @@ export const exposure = (
+@@ -93,7 +93,7 @@ export const exposure = (
    const unreadable = [
      ...myPremises.map((p) => readClaim(p, "premise")),
      ...myEffects.map((e) => readClaim(e)),
 -  ].flatMap((read) => (Result.isFailure(read) ? [read.failure] : []));
 +  ].flatMap(() => []);
-   return { neighbours, contradictions, unreadable };
- };
+   return {
+     neighbours,
+     contradictions,
