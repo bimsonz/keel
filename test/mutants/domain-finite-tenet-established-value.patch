@@ -2,15 +2,15 @@
 # kills: wire.finite
 # why: TenetEstablished.value decodes as NaN or Infinity
 diff --git a/packages/core/src/domain/memory/events.ts b/packages/core/src/domain/memory/events.ts
-index 2342641..161ba32 100644
+index e4244d7..4ffaf5e 100644
 --- a/packages/core/src/domain/memory/events.ts
 +++ b/packages/core/src/domain/memory/events.ts
-@@ -58,7 +58,7 @@ export const TenetEstablished = Schema.TaggedStruct("TenetEstablished", {
+@@ -64,7 +64,7 @@ export const TenetEstablished = Schema.TaggedStruct("TenetEstablished", {
    tenetId: TenetId,
    subjectId: SubjectId,
    predicate: Predicate,
 -  value: Schema.Union([Schema.String, Schema.Finite, Schema.Boolean]),
 +  value: Schema.Union([Schema.String, Schema.Number, Schema.Boolean]),
    changeId: ChangeId,
-   guardIds: Schema.Array(GuardId),
- });
+   /** At least one: a tenet is a landed effect backed by a guard. */
+   guardIds: Schema.Array(GuardId).check(Schema.isMinLength(1)),

@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/tenet-machine.test.ts
+# kills: tenet.one-terminal
+# why: a retracted tenet takes another retraction
+diff --git a/packages/core/src/domain/memory/tenet-machine.ts b/packages/core/src/domain/memory/tenet-machine.ts
+index 309d480..ed7d716 100644
+--- a/packages/core/src/domain/memory/tenet-machine.ts
++++ b/packages/core/src/domain/memory/tenet-machine.ts
+@@ -167,7 +167,8 @@ export const decideTenet = (
+         : refuse("conflict-unsettled");
+     case "Retract": {
+       const contesting = tenet.conflictId;
+-      if (tenet.state !== "contested" || contesting === undefined) return refuse();
++      if ((tenet.state !== "contested" && tenet.state !== "retracted") || contesting === undefined)
++        return refuse();
+       if (command.decisionId !== undefined)
+         return Result.succeed([
+           TenetRetracted.make({

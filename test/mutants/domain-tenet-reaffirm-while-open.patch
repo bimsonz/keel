@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/tenet-machine.test.ts
+# kills: tenet.reaffirm-on-settled
+# why: a tenet is reaffirmed while its conflict is still open
+diff --git a/packages/core/src/domain/memory/tenet-machine.ts b/packages/core/src/domain/memory/tenet-machine.ts
+index 309d480..2b3c3df 100644
+--- a/packages/core/src/domain/memory/tenet-machine.ts
++++ b/packages/core/src/domain/memory/tenet-machine.ts
+@@ -160,7 +160,7 @@ export const decideTenet = (
+       if (tenet.state !== "contested") return refuse();
+       return command.conflictId === tenet.conflictId &&
+         conflict?.id === command.conflictId &&
+-        settledInFavour(conflict)
++        (OPEN.has(conflict.state) || settledInFavour(conflict))
+         ? Result.succeed([
+             TenetReaffirmed.make({ tenetId: tenet.id, conflictId: command.conflictId }),
+           ])

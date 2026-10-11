@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/tenet-machine.test.ts
+# kills: tenet.transitions
+# why: a tenet is superseded by itself
+diff --git a/packages/core/src/domain/memory/tenet-machine.ts b/packages/core/src/domain/memory/tenet-machine.ts
+index 309d480..3bc1a98 100644
+--- a/packages/core/src/domain/memory/tenet-machine.ts
++++ b/packages/core/src/domain/memory/tenet-machine.ts
+@@ -192,7 +192,7 @@ export const decideTenet = (
+         : refuse("not-proven");
+     }
+     case "Supersede":
+-      return tenet.state === "established" && command.by !== tenet.id
++      return tenet.state === "established"
+         ? Result.succeed([TenetSuperseded.make({ tenetId: tenet.id, by: command.by })])
+         : refuse();
+     default: {

@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/tenet-machine.test.ts
+# kills: tenet.retract-by-proof
+# why: a change that is not a party to the proven conflict retracts the tenet by landing
+diff --git a/packages/core/src/domain/memory/tenet-machine.ts b/packages/core/src/domain/memory/tenet-machine.ts
+index 309d480..09f1621 100644
+--- a/packages/core/src/domain/memory/tenet-machine.ts
++++ b/packages/core/src/domain/memory/tenet-machine.ts
+@@ -180,8 +180,7 @@ export const decideTenet = (
+       if ((facts.policy ?? DEFAULT_BELIEF_POLICY) === "block")
+         return refuse("ruling-required", readEscalations);
+       return conflict?.id === contesting &&
+-        conflict.state === "proven" &&
+-        conflict.parties.includes(command.changeId)
++        conflict.state === "proven"
+         ? Result.succeed([
+             TenetRetracted.make({
+               tenetId: tenet.id,

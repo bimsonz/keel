@@ -2,10 +2,10 @@
 # kills: wire.finite
 # why: A tenet's value decodes as NaN or Infinity
 diff --git a/packages/core/src/domain/memory/memory.ts b/packages/core/src/domain/memory/memory.ts
-index 3cd13f9..c1fecc8 100644
+index 776fe1f..64ecbad 100644
 --- a/packages/core/src/domain/memory/memory.ts
 +++ b/packages/core/src/domain/memory/memory.ts
-@@ -42,7 +42,7 @@ export const Tenet = Schema.Struct({
+@@ -49,7 +49,7 @@ export const Tenet = Schema.Struct({
    predicate: Predicate,
    /** How the value is held; `is` when absent. */
    relation: Schema.optional(Relation),
@@ -13,4 +13,4 @@ index 3cd13f9..c1fecc8 100644
 +  value: Schema.Union([Schema.String, Schema.Number, Schema.Boolean]),
    guards: Schema.NonEmptyArray(GuardId),
    state: TenetState,
- });
+   /** The conflict contesting it, from `TenetContested` until it is reaffirmed; kept once it is retracted. */

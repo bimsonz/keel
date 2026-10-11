@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/memory/tenet-machine.test.ts
+# kills: tenet.guarded
+# why: a tenet is established with no guard behind it
+diff --git a/packages/core/src/domain/memory/tenet-machine.ts b/packages/core/src/domain/memory/tenet-machine.ts
+index 309d480..4045c99 100644
+--- a/packages/core/src/domain/memory/tenet-machine.ts
++++ b/packages/core/src/domain/memory/tenet-machine.ts
+@@ -131,7 +131,6 @@ export const decideTenet = (
+   if (state === undefined) {
+     if (command._tag !== "Establish") return refuse();
+     const guardIds = command.guardIds;
+-    if (!Arr.isReadonlyArrayNonEmpty(guardIds)) return refuse("unguarded");
+     return Result.succeed([
+       TenetEstablished.make({
+         tenetId: facts.tenetId,
