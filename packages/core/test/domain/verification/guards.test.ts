@@ -11,6 +11,7 @@ import {
   type GuardExposure,
   guardStepId,
   guardSteps,
+  selectGuards,
 } from "../../../src/domain/verification/index.ts";
 import { key, subjectArb } from "../../arbitraries/coordination.ts";
 import { graphPropositionArb } from "../../arbitraries/graph.ts";
@@ -19,12 +20,17 @@ import { fc } from "../../support/fast-check.ts";
 const ulid = (n: number): string => String(n).padStart(26, "0");
 const paths = ["src/authz/check.ts", "src/authz/cache.ts", "src/billing/charge.ts", "README.md"];
 
+/** An admitted guard; before TenetEstablished it has no tenet id, only the proposition it holds. */
 const guardArb = (n: number): fc.Arbitrary<AdmittedGuard> =>
-  graphPropositionArb.map((proposition) => ({
+  fc.tuple(graphPropositionArb, fc.boolean()).map(([proposition, named]) => ({
     guardId: makeId("grd", ulid(n)),
     probe: contentHashOf({ probe: n }),
-    tenet: { id: makeId("tnt", ulid(n)), proposition },
+    tenet: named ? { id: makeId("tnt", ulid(n)), proposition } : { proposition },
   }));
+
+/** The same guards, before any tenet is established. */
+const unnamed = (admitted: readonly AdmittedGuard[]): readonly AdmittedGuard[] =>
+  admitted.map((g) => ({ ...g, tenet: { proposition: g.tenet.proposition } }));
 
 /** Up to four admitted guards with distinct ids, listed in any order. */
 const admittedArb: fc.Arbitrary<readonly AdmittedGuard[]> = fc
@@ -107,6 +113,22 @@ describe("guardSteps: which admitted guards a change runs", () => {
       guardStepId(g.guardId),
     ]);
     expect(guardSteps([g], { subjects: [key("billing")], touchedPaths: [] })).toEqual([]);
+  });
+
+  it("[guards.tenet-id-optional] a guard admitted before its tenet is established is selected by exposure and compiles to the same step, citing the guard", () => {
+    fc.assert(
+      fc.property(admittedArb, exposureArb, (admitted, change) => {
+        const before = selectGuards(unnamed(admitted), change);
+        const after = selectGuards(admitted, change);
+        return (
+          JSON.stringify(before.map((g) => g.spec)) === JSON.stringify(after.map((g) => g.spec)) &&
+          before.every((g) => g.because[0] === `guards ${g.spec.id.slice("guard:".length)}`)
+        );
+      }),
+    );
+    const g = admittedOn(tenetOn(key("authz.permission-evaluation")));
+    const [selected] = selectGuards(unnamed([g]), { subjects: [key("authz")], touchedPaths: [] });
+    expect(selected?.because[0]).toBe(`guards ${g.guardId}`);
   });
 
   it("[guards.sibling-applies] a change near the tenet's subject only as a sibling still runs the guard", () => {

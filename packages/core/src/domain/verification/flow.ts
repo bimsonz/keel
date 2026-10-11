@@ -110,7 +110,12 @@ export type AdmittedGuard = {
   readonly guardId: GuardId;
   /** The admitted probe bundle the guard runs, by content hash. */
   readonly probe: ContentHash;
-  readonly tenet: { readonly id: TenetId; readonly proposition: Proposition };
+  /**
+   * The proposition the guard holds, from its guard.json, and the tenet that
+   * guards it once TenetEstablished names one: admission comes first, so the
+   * id may be absent while selection already works from the proposition.
+   */
+  readonly tenet: { readonly id?: TenetId; readonly proposition: Proposition };
 };
 
 /** What compile knows about the change. */

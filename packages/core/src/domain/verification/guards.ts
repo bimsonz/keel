@@ -73,7 +73,13 @@ export const selectGuards = (
     const seen = byId.get(spec.id);
     // A guard listed twice runs once; were its listings to disagree, the least probe hash wins, whatever the order.
     if (because.length > 0 && (seen === undefined || spec.version < seen.spec.version))
-      byId.set(spec.id, { spec, because: [`guards tenet ${g.tenet.id}`, ...because] });
+      byId.set(spec.id, {
+        spec,
+        because: [
+          g.tenet.id === undefined ? `guards ${g.guardId}` : `guards tenet ${g.tenet.id}`,
+          ...because,
+        ],
+      });
   }
   return [...byId.values()].toSorted((a, b) => byCodePoint(a.spec.id, b.spec.id));
 };
