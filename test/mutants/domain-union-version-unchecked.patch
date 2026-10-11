@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/union.test.ts
+# kills: union.version-conflict
+# why: members naming one step at two versions are unioned, so the batch runs one version for both
+diff --git a/packages/core/src/domain/verification/union.ts b/packages/core/src/domain/verification/union.ts
+index 4a74ac7..7dd7107 100644
+--- a/packages/core/src/domain/verification/union.ts
++++ b/packages/core/src/domain/verification/union.ts
+@@ -99,8 +99,7 @@ export const unionPlans = (
+     for (const [id, v] of Object.entries(m.versions))
+       versions.set(id, (versions.get(id) ?? new Set()).add(v));
+   for (const [stepId, vs] of [...versions].toSorted(([a], [b]) => byCodePoint(a, b)))
+-    if (vs.size > 1)
+-      return Result.fail(new UnionVersionConflict({ stepId, versions: sortedUnion([...vs]) }));
++    if (vs.size > 99) return Result.fail(new UnionVersionConflict({ stepId, versions: [] }));
+ 
+   const steps = new Map<string, PlanStep>();
+   for (const m of members)

@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/union.test.ts
+# kills: union.step-once
+# why: a step two members share is planned once per member, so it would run twice in one plan run
+diff --git a/packages/core/src/domain/verification/union.ts b/packages/core/src/domain/verification/union.ts
+index 4a74ac7..f1c1098 100644
+--- a/packages/core/src/domain/verification/union.ts
++++ b/packages/core/src/domain/verification/union.ts
+@@ -105,8 +105,7 @@ export const unionPlans = (
+   const steps = new Map<string, PlanStep>();
+   for (const m of members)
+     for (const s of m.steps) {
+-      const seen = steps.get(s.id);
+-      steps.set(s.id, seen === undefined ? s : mergeStep(seen, s));
++      steps.set(`${s.id}@${m.planHash}`, s);
+     }
+   const preimage: PlanPreimage = {
+     compiler: first.compiler,

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/union.test.ts
+# kills: union.plan-fields
+# why: the union is human-class only if its first member is, so a later member's flow change loses its gate
+diff --git a/packages/core/src/domain/verification/union.ts b/packages/core/src/domain/verification/union.ts
+index 4a74ac7..5908e70 100644
+--- a/packages/core/src/domain/verification/union.ts
++++ b/packages/core/src/domain/verification/union.ts
+@@ -116,7 +116,7 @@ export const unionPlans = (
+     versions: Object.fromEntries(members.flatMap((m) => Object.entries(m.versions))),
+     overrides: mergeLists(members, (m) => m.overrides),
+     mayskip: mergeLists(members, (m) => m.mayskip),
+-    humanClass: members.some((m) => m.humanClass),
++    humanClass: first.humanClass,
+     members: members.map((m) => m.planHash),
+   };
+   return Result.succeed({

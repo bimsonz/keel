@@ -2,14 +2,14 @@
 # kills: tenet.policy-default
 # why: a project that names no policy is treated as block, where the default is advise
 diff --git a/packages/core/src/domain/memory/tenet-machine.ts b/packages/core/src/domain/memory/tenet-machine.ts
-index 309d480..5ede1cd 100644
+index 72d411e..62a98a8 100644
 --- a/packages/core/src/domain/memory/tenet-machine.ts
 +++ b/packages/core/src/domain/memory/tenet-machine.ts
-@@ -177,7 +177,7 @@ export const decideTenet = (
+@@ -167,7 +167,7 @@ export const decideTenet = (
              decisionId: command.decisionId,
            }),
          ]);
--      if ((facts.policy ?? DEFAULT_BELIEF_POLICY) === "block")
+-      if ((facts.policy ?? DEFAULT_PREDICATE_POLICY) === "block")
 +      if ((facts.policy ?? "block") === "block")
          return refuse("ruling-required", readEscalations);
        return conflict?.id === contesting &&

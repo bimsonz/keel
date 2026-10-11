@@ -2,11 +2,11 @@
 # kills: tenet.retract-by-proof
 # why: a change that is not a party to the proven conflict retracts the tenet by landing
 diff --git a/packages/core/src/domain/memory/tenet-machine.ts b/packages/core/src/domain/memory/tenet-machine.ts
-index 309d480..09f1621 100644
+index 72d411e..86cdf26 100644
 --- a/packages/core/src/domain/memory/tenet-machine.ts
 +++ b/packages/core/src/domain/memory/tenet-machine.ts
-@@ -180,8 +180,7 @@ export const decideTenet = (
-       if ((facts.policy ?? DEFAULT_BELIEF_POLICY) === "block")
+@@ -170,8 +170,7 @@ export const decideTenet = (
+       if ((facts.policy ?? DEFAULT_PREDICATE_POLICY) === "block")
          return refuse("ruling-required", readEscalations);
        return conflict?.id === contesting &&
 -        conflict.state === "proven" &&

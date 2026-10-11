@@ -2,11 +2,11 @@
 # kills: tenet.retract-by-proof
 # why: any open conflict retracts the tenet, so a suspicion (possibly opinion) unproven by any probe retracts a guarded belief
 diff --git a/packages/core/src/domain/memory/tenet-machine.ts b/packages/core/src/domain/memory/tenet-machine.ts
-index 309d480..275d328 100644
+index 72d411e..fa73469 100644
 --- a/packages/core/src/domain/memory/tenet-machine.ts
 +++ b/packages/core/src/domain/memory/tenet-machine.ts
-@@ -180,7 +180,7 @@ export const decideTenet = (
-       if ((facts.policy ?? DEFAULT_BELIEF_POLICY) === "block")
+@@ -170,7 +170,7 @@ export const decideTenet = (
+       if ((facts.policy ?? DEFAULT_PREDICATE_POLICY) === "block")
          return refuse("ruling-required", readEscalations);
        return conflict?.id === contesting &&
 -        conflict.state === "proven" &&

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/union.test.ts
+# kills: union.idempotent
+# why: a member listed twice is unioned twice: it doubles the cost and changes the hash
+diff --git a/packages/core/src/domain/verification/union.ts b/packages/core/src/domain/verification/union.ts
+index 4a74ac7..731c7d0 100644
+--- a/packages/core/src/domain/verification/union.ts
++++ b/packages/core/src/domain/verification/union.ts
+@@ -86,7 +86,7 @@ const mergeLists = (
+ export const unionPlans = (
+   plans: readonly [FlowPlan, ...FlowPlan[]],
+ ): Result.Result<FlowPlan, UnionVersionConflict> => {
+-  const members = [...new Map(plans.map((p) => [p.planHash, p] as const)).values()].toSorted(
++  const members = [...plans].toSorted(
+     (a, b) => byCodePoint(a.planHash, b.planHash),
+   );
+   const [first, ...rest] = members;

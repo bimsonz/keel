@@ -2,14 +2,14 @@
 # kills: flow.plan-hash-content-addressed
 # why: A new step version reuses the old plan hash
 diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
-index 04f37e3..c97c318 100644
+index dabfd31..b1e6a22 100644
 --- a/packages/core/src/domain/verification/compile.ts
 +++ b/packages/core/src/domain/verification/compile.ts
-@@ -461,7 +461,6 @@ export const compile = (
-       baseCommit: facts.baseCommit,
-       flow: compiled,
-       steps: planned,
--      versions,
-       overrides,
-       mayskip,
-     }),
+@@ -390,7 +390,6 @@ export const planHashOf = (plan: PlanPreimage): ContentHash =>
+       baseCommit: plan.baseCommit,
+       flow: plan.flow,
+       steps: plan.steps,
+-      versions: plan.versions,
+       overrides: plan.overrides,
+       mayskip: plan.mayskip,
+       humanClass: plan.humanClass,

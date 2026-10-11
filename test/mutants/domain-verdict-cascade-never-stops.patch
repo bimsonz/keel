@@ -2,14 +2,15 @@
 # kills: verdict.flow-semantics
 # why: A cascade runs past its first accepted answer
 diff --git a/packages/core/src/domain/verification/verdict.ts b/packages/core/src/domain/verification/verdict.ts
-index 39d8d1b..5d472f6 100644
+index b90adf2..06907b4 100644
 --- a/packages/core/src/domain/verification/verdict.ts
 +++ b/packages/core/src/domain/verification/verdict.ts
-@@ -151,7 +151,6 @@ const evaluate = (ctx: Context, flow: Flow, world: World | undefined): Value =>
+@@ -190,7 +190,7 @@ const evaluate = (ctx: Context, flow: Flow, world: World | undefined): Value =>
        for (const item of flow.items) {
          const v = evaluate(ctx, item, world);
-         if (v.status === "pending") return v;
--        if (flow.accept.includes(statusOutcome(v))) return v;
+         advisories.push(...v.advisories);
+-        if (v.status === "pending" || flow.accept.includes(statusOutcome(v)))
++        if (v.status === "pending")
+           return { ...v, advisories };
        }
-       return { status: "escalate", evidence: [], waiting: [] };
-     }
+       return { status: "escalate", evidence: [], waiting: [], advisories };

@@ -2,14 +2,14 @@
 # kills: tenet.retract-needs-ruling
 # why: the policy is ignored, so a project that blocks sees a tenet retracted by proof alone, without the ruling it requires
 diff --git a/packages/core/src/domain/memory/tenet-machine.ts b/packages/core/src/domain/memory/tenet-machine.ts
-index 309d480..bbad7ca 100644
+index 72d411e..f7a5bf3 100644
 --- a/packages/core/src/domain/memory/tenet-machine.ts
 +++ b/packages/core/src/domain/memory/tenet-machine.ts
-@@ -177,8 +177,6 @@ export const decideTenet = (
+@@ -167,8 +167,6 @@ export const decideTenet = (
              decisionId: command.decisionId,
            }),
          ]);
--      if ((facts.policy ?? DEFAULT_BELIEF_POLICY) === "block")
+-      if ((facts.policy ?? DEFAULT_PREDICATE_POLICY) === "block")
 -        return refuse("ruling-required", readEscalations);
        return conflict?.id === contesting &&
          conflict.state === "proven" &&

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/union.test.ts
+# kills: union.keeps-steps
+# why: a step only a later member planned is left out of the batch's plan
+diff --git a/packages/core/src/domain/verification/union.ts b/packages/core/src/domain/verification/union.ts
+index 4a74ac7..b91ae62 100644
+--- a/packages/core/src/domain/verification/union.ts
++++ b/packages/core/src/domain/verification/union.ts
+@@ -103,7 +103,7 @@ export const unionPlans = (
+       return Result.fail(new UnionVersionConflict({ stepId, versions: sortedUnion([...vs]) }));
+ 
+   const steps = new Map<string, PlanStep>();
+-  for (const m of members)
++  for (const m of [first])
+     for (const s of m.steps) {
+       const seen = steps.get(s.id);
+       steps.set(s.id, seen === undefined ? s : mergeStep(seen, s));

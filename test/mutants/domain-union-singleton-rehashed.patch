@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/union.test.ts
+# kills: union.singleton
+# why: a batch of one is wrapped as a union, so its plan hash is no longer the one Precheck stored
+diff --git a/packages/core/src/domain/verification/union.ts b/packages/core/src/domain/verification/union.ts
+index 4a74ac7..44e2023 100644
+--- a/packages/core/src/domain/verification/union.ts
++++ b/packages/core/src/domain/verification/union.ts
+@@ -90,7 +90,7 @@ export const unionPlans = (
+     (a, b) => byCodePoint(a.planHash, b.planHash),
+   );
+   const [first, ...rest] = members;
+-  if (first === undefined || rest.length === 0) return Result.succeed(first ?? plans[0]);
++  if (first === undefined) return Result.succeed(plans[0]);
+ 
+   const compilers = sortedUnion(members.map((m) => m.compiler));
+   if (compilers.length > 1) return Result.fail(new UnionVersionConflict({ versions: compilers }));

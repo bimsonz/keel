@@ -2,10 +2,10 @@
 # kills: flow.cost-sums-steps-per-world
 # why: A world-matrix step is costed once, not once per world
 diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
-index 04f37e3..b5e87a9 100644
+index dabfd31..a8f9a74 100644
 --- a/packages/core/src/domain/verification/compile.ts
 +++ b/packages/core/src/domain/verification/compile.ts
-@@ -446,10 +446,7 @@ export const compile = (
+@@ -483,10 +483,7 @@ export const compile = (
        },
      ];
    });
@@ -14,6 +14,6 @@ index 04f37e3..b5e87a9 100644
 -    0,
 -  );
 +  const costEstimate = planned.reduce((sum, p) => sum + (table.get(p.id)?.budget.usd ?? 0), 0);
-   const versions = Object.fromEntries(planned.map((p) => [p.id, table.get(p.id)?.version ?? ""]));
-   const overrides = Object.fromEntries(
-     planned.map((p) => [p.id, table.get(p.id)?.overrides ?? []]),
+   const versions = Object.fromEntries(
+     planned.flatMap((p) => {
+       const version = table.get(p.id)?.version;

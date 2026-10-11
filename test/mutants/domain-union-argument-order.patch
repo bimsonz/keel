@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/union.test.ts
+# kills: union.commutative
+# why: members are taken in argument order, so the same batch listed differently gets another plan hash
+diff --git a/packages/core/src/domain/verification/union.ts b/packages/core/src/domain/verification/union.ts
+index 4a74ac7..746244b 100644
+--- a/packages/core/src/domain/verification/union.ts
++++ b/packages/core/src/domain/verification/union.ts
+@@ -86,9 +86,7 @@ const mergeLists = (
+ export const unionPlans = (
+   plans: readonly [FlowPlan, ...FlowPlan[]],
+ ): Result.Result<FlowPlan, UnionVersionConflict> => {
+-  const members = [...new Map(plans.map((p) => [p.planHash, p] as const)).values()].toSorted(
+-    (a, b) => byCodePoint(a.planHash, b.planHash),
+-  );
++  const members = [...new Map(plans.map((p) => [p.planHash, p] as const)).values()];
+   const [first, ...rest] = members;
+   if (first === undefined || rest.length === 0) return Result.succeed(first ?? plans[0]);
+ 
