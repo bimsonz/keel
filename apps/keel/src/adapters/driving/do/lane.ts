@@ -3,17 +3,21 @@ import {
   laneProject,
   laneStep,
   recordVerdict,
+  reofferDue,
+  reofferVerified,
 } from "@keeltown/core/application/integration";
 import type { EventEnvelope } from "@keeltown/core/kernel";
 import { REDELIVERY_CAP_MS, redeliveryDelay, type Transaction } from "@keeltown/core/ports";
 import { Cause, Effect, Exit, Schema } from "effect";
 import { type LaneServices, laneServices } from "../../../composition/do.ts";
 import { LaneCodecs, type LaneRpc, RecordVerdictCommand } from "../../../rpc/lane.ts";
-import { type AlarmRequest, scheduleAlarm } from "./alarm.ts";
+import { type AlarmRequest, cancelAlarm, scheduleAlarm } from "./alarm.ts";
 import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 
 /** The lane's own deadline: one debounced step, after every delivery and verdict. */
 export const LANE_STEP = "lane step";
+/** While its green batch waits on trunk, the lane re-offers the batch's BatchVerified. */
+export const LANE_REOFFER = "lane reoffer";
 
 const decodeVerdict = Schema.decodeUnknownEffect(RecordVerdictCommand);
 
@@ -32,6 +36,8 @@ const laneIdOf = (name: string | undefined): string => {
  * delivery only records state, and the debounced `lane step` commits what
  * follows. A step that fails (a defect: a binding or a member's DO was
  * unreachable) is retried 1 s·2ⁿ up to 60 s, as deliveries are (ADR 0009).
+ * While a green batch has no answer from trunk, `lane reoffer` hands trunk
+ * its BatchVerified again (30 s after it, then every 60 s).
  * Repo-touching: callers place it with the deployment's `locationHint`.
  */
 export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<LaneRpc> {
@@ -72,10 +78,12 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
   }
 
   protected override async onDeadline(request: AlarmRequest): Promise<void> {
+    if (request.reason === LANE_REOFFER) return this.reoffer();
     if (request.reason !== LANE_STEP) return super.onDeadline(request);
     const exit = await this.runtime.runPromiseExit(laneStep(this.laneId));
     if (Exit.isSuccess(exit)) {
       this.failures = 0;
+      await this.armReoffer();
       return;
     }
     this.failures += 1;
@@ -85,6 +93,37 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
     if (delay >= REDELIVERY_CAP_MS) console.error(line, Cause.pretty(exit.cause));
     else console.warn(line, Cause.pretty(exit.cause));
     await this.step(Date.now() + delay);
+  }
+
+  /** Hands trunk the green batch's BatchVerified again, logged; a failed delivery waits for the next re-offer. */
+  private async reoffer(): Promise<void> {
+    const offered = await this.runtime.runPromiseExit(
+      Effect.flatMap(reofferVerified(this.laneId), (offer) =>
+        offer === undefined
+          ? Effect.succeed(undefined)
+          : this.fanOut.deliver(offer.subscriber, [offer.envelope]).pipe(
+              Effect.exit,
+              Effect.map((delivered) => ({ offer, delivered })),
+            ),
+      ),
+    );
+    if (Exit.isFailure(offered))
+      console.error(`lane ${this.laneId} could not re-offer`, Cause.pretty(offered.cause));
+    else if (offered.value !== undefined) {
+      const { offer, delivered } = offered.value;
+      const outcome = Exit.isSuccess(delivered) ? "taken" : Cause.pretty(delivered.cause);
+      console.warn(
+        `lane ${this.laneId} re-offered ${offer.envelope.entity.id} to ${offer.subscriber} (#${offer.count}): ${outcome}`,
+      );
+    }
+    await this.armReoffer();
+  }
+
+  /** Arms `lane reoffer` while a green batch waits on trunk, at the time its state gives, and clears it otherwise. */
+  private async armReoffer(): Promise<void> {
+    const due = await this.runtime.runPromise(reofferDue(this.laneId));
+    if (due === undefined) await cancelAlarm(this.ctx.storage, LANE_REOFFER);
+    else await scheduleAlarm(this.ctx.storage, { kind: "deadline", reason: LANE_REOFFER, at: due });
   }
 
   /** Arms the step: a debounce, so a burst of deliveries runs it once. */

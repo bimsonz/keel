@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.reoffer-held"
+# kills: trunk.reoffer-held
+# why: A re-offer that arrives after its batch landed queues it again, to be promoted twice or declined into a requeue
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index 1d72572..8805db2 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -191,8 +191,6 @@ export const trunkHeard = (
+     throw new Error(`BatchVerified ${verified.batchId} carries no members or base to promote`);
+   const before = trunkOf(tx.store, projectId);
+   // A batch the Lane re-offered after trunk promoted it (its TrunkAdvanced still on the way): taken, nothing changes.
+-  if (before !== undefined && members.every((member) => before.promoted.includes(member)))
+-    return true;
+   const decided = decidePromotion(
+     before,
+     {

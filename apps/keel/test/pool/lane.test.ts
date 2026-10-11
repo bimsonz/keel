@@ -7,7 +7,13 @@ import { env } from "cloudflare:workers";
 import { batchOf, projectRepos } from "@keeltown/core/application/integration";
 import { L1_SUITE_PLAN } from "@keeltown/core/application/verification";
 import { CommitSha, Instant, makeId, type ProjectId } from "@keeltown/core/kernel";
-import { Changes, CodeHost, EntityStore } from "@keeltown/core/ports";
+import {
+  Changes,
+  CodeHost,
+  EntityStore,
+  EventOutbox,
+  type VerificationJob,
+} from "@keeltown/core/ports";
 import {
   makeBatchVerificationMemory,
   makeCandidateBundlesMemory,
@@ -20,9 +26,9 @@ import {
 import { Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
-import { LANE_STEP, type LaneDO } from "../../src/adapters/driving/do/lane.ts";
+import { LANE_REOFFER, LANE_STEP, type LaneDO } from "../../src/adapters/driving/do/lane.ts";
 import type { TrunkDO } from "../../src/adapters/driving/do/trunk.ts";
-import { armedAlarms } from "../../src/adapters/driving/do/alarm.ts";
+import { armedAlarms, scheduleAlarm } from "../../src/adapters/driving/do/alarm.ts";
 import { backbone, type LaneServices } from "../../src/composition/do.ts";
 import { drainAfter, drainOutbox } from "./helpers.ts";
 import { decodeExit, EventCodecs, LaneCodecs } from "../../src/rpc/index.ts";
@@ -140,6 +146,29 @@ const queued = (laneId: string, n: number) => {
   };
 };
 
+/** KeelVerify's report on the batch: `land`, for the fence's `attempt`. */
+const landing = (job: VerificationJob, instanceId: string, attempt = 0) => ({
+  instanceId,
+  fence: { ...job.fence, attempt },
+  candidateId: job.candidateId,
+  verdictId: makeId("vrd", ulid()),
+  outcome: "land",
+  planHash: L1_SUITE_PLAN.planHash,
+  evidence: ["suite: 12 passed"],
+  failingTests: [],
+});
+
+/** The batch's state, as the Lane DO holds it. */
+const batchState = (
+  stub: DurableObjectStub<LaneDO>,
+  batchId: VerificationJob["fence"]["batchId"],
+) =>
+  runInDurableObject(stub, (_instance: LaneDO, state) =>
+    ManagedRuntime.make(backbone(state.storage)).runPromise(
+      Effect.map(EntityStore, (store) => batchOf(store, batchId)?.state),
+    ),
+  );
+
 describe("the Lane DO", () => {
   it("[lane.do.flow] a delivered ChangeQueued is batched by the lane's step; a fenced verdict is refused, and the right one lands through the Trunk", async () => {
     const { stub, laneId, verification, writer, pushCandidate } = await lane();
@@ -152,19 +181,9 @@ describe("the Lane DO", () => {
     expect(started?.[0]).toMatch(/^keel-verify-evt_/);
     const job = started?.[1];
     if (job === undefined) throw new Error("KeelVerify never started");
-    const command = (attempt: number, instanceId: string) => ({
-      instanceId,
-      fence: { ...job.fence, attempt },
-      candidateId: job.candidateId,
-      verdictId: makeId("vrd", ulid()),
-      outcome: "land",
-      planHash: L1_SUITE_PLAN.planHash,
-      evidence: ["suite: 12 passed"],
-      failingTests: [],
-    });
     const fenced = decodeExit(
       LaneCodecs.recordVerdict,
-      await stub.recordVerdict(command(1, "old")),
+      await stub.recordVerdict(landing(job, "old", 1)),
     );
     expect(Exit.isFailure(fenced) ? JSON.stringify(fenced.cause) : "success").toContain(
       "ResultFenced",
@@ -172,24 +191,67 @@ describe("the Lane DO", () => {
     const tip = await pushCandidate(job.candidateId);
     const landed = decodeExit(
       LaneCodecs.recordVerdict,
-      await stub.recordVerdict(command(0, started?.[0] ?? "")),
+      await stub.recordVerdict(landing(job, started?.[0] ?? "")),
     );
     expect(landed).toEqual(Exit.void);
     // BatchVerified reaches the Trunk, which lands the candidate; its TrunkAdvanced promotes the batch.
-    const batchState = () =>
-      runInDurableObject(stub, (_instance: LaneDO, state) =>
-        ManagedRuntime.make(backbone(state.storage)).runPromise(
-          Effect.map(EntityStore, (store) => batchOf(store, job.fence.batchId)?.state),
-        ),
-      );
     await vi.waitFor(
       async () => {
         expect(writer.head()).toBe(tip);
-        expect(await batchState()).toBe("promoted");
+        expect(await batchState(stub, job.fence.batchId)).toBe("promoted");
       },
       { timeout: 20_000, interval: 50 },
     );
     // The step and the verdicts committed real events; their flush must not outlive the file.
+    await drainOutbox(stub);
+  });
+
+  it("[lane.do.reoffer] a BatchVerified trunk never took is re-offered on the lane's deadline, and lands", async () => {
+    const { stub, laneId, projectId, verification, writer, pushCandidate } = await lane();
+    await stub.receive([queued(laneId, 1)]);
+    await runDurableObjectAlarm(stub);
+    await vi.waitFor(() => expect(verification.started.size).toBe(1), { timeout: 10_000 });
+    const [[instanceId, job] = []] = [...verification.started.entries()];
+    if (instanceId === undefined || job === undefined) throw new Error("KeelVerify never started");
+    // The delivery is lost, as the Trunk deployed before promotion spent it: trunk is owed nothing.
+    await runInDurableObject(stub, (_instance: LaneDO, state) =>
+      ManagedRuntime.make(backbone(state.storage)).runPromise(
+        Effect.map(EventOutbox, (outbox) => outbox.unsubscribe(`trunk:${projectId}`)),
+      ),
+    );
+    const tip = await pushCandidate(job.candidateId);
+    const verifiedAt = Date.now();
+    expect(
+      decodeExit(LaneCodecs.recordVerdict, await stub.recordVerdict(landing(job, instanceId))),
+    ).toEqual(Exit.void);
+    const armedReoffer = () =>
+      runInDurableObject(stub, (_instance: LaneDO, state) =>
+        armedAlarms(state.storage).find((a) => a.reason === LANE_REOFFER),
+      );
+    // The step after the verdict arms the re-offer 30 s after BatchVerified.
+    await vi.waitFor(
+      async () => {
+        const armed = await armedReoffer();
+        expect(armed?.at).toBeGreaterThanOrEqual(verifiedAt + 30_000);
+        expect(armed?.at).toBeLessThanOrEqual(Date.now() + 30_000);
+      },
+      { timeout: 10_000 },
+    );
+    expect(writer.head()).not.toBe(tip);
+    // Its time comes now.
+    await runInDurableObject(stub, (_instance: LaneDO, state) =>
+      scheduleAlarm(state.storage, { kind: "deadline", reason: LANE_REOFFER, at: Date.now() }),
+    );
+    await runDurableObjectAlarm(stub);
+    await vi.waitFor(
+      async () => {
+        expect(writer.head()).toBe(tip);
+        expect(await batchState(stub, job.fence.batchId)).toBe("promoted");
+        // Trunk answered, so nothing is re-offered any more.
+        expect(await armedReoffer()).toBeUndefined();
+      },
+      { timeout: 20_000, interval: 50 },
+    );
     await drainOutbox(stub);
   });
 

@@ -190,6 +190,9 @@ export const trunkHeard = (
   if (members === undefined || base === undefined)
     throw new Error(`BatchVerified ${verified.batchId} carries no members or base to promote`);
   const before = trunkOf(tx.store, projectId);
+  // A batch the Lane re-offered after trunk promoted it (its TrunkAdvanced still on the way): taken, nothing changes.
+  if (before !== undefined && members.every((member) => before.promoted.includes(member)))
+    return true;
   const decided = decidePromotion(
     before,
     {

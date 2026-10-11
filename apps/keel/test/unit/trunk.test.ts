@@ -245,6 +245,34 @@ describe("the Trunk's promotion", () => {
   );
 
   it.effect(
+    "[trunk.reoffer-held] a batch the lane re-offers while trunk holds it, and again once it landed, is still one promotion",
+    () => {
+      const w = promotion();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        const tip = yield* w.composed(1, base);
+        const offer = verified(1, base);
+        const again = (n: number) => ({ ...offer, dedupeKey: `${offer.dedupeKey}#reoffer-${n}` });
+        expect(yield* deliver(offer)).toBe(true);
+        expect(yield* deliver(again(1))).toBe(false);
+        expect(trunkOf(yield* EntityStore, PROJECT)?.queue).toHaveLength(1);
+        expect(yield* flushTrunk(PROJECT)).toBe("promoting");
+        expect(yield* deliver(again(2))).toBe(false);
+        expect(yield* pushPromotion(PROJECT)).toBe("advanced");
+        // Its TrunkAdvanced is still on the way to the lane, which re-offers once more.
+        yield* deliver(again(3));
+        expect(trunkOf(yield* EntityStore, PROJECT)).toMatchObject({
+          phase: "idle",
+          head: tip,
+          queue: [],
+        });
+        expect(w.writer.pushes()).toEqual([{ from: base, to: tip }]);
+        expect((yield* typesOf).filter((type) => type === "TrunkAdvanced")).toHaveLength(1);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
     "[trunk.before-init] a BatchVerified for a trunk not yet initialized is refused and queues nothing",
     () => {
       const w = promotion();

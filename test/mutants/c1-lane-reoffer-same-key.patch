@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.reoffer"
+# kills: lane.reoffer
+# why: The re-offer keeps the spent dedupe key, so the Trunk drops it as a duplicate
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index 92a44f1..3718775 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -830,7 +830,7 @@ export const reofferVerified = Effect.fn("integration/reofferVerified")(function
+   );
+   return {
+     subscriber: `trunk:${lane.projectId}`,
+-    envelope: { ...verified, dedupeKey: `${verified.dedupeKey}#reoffer-${count}` },
++    envelope: verified,
+     count,
+   } satisfies Reoffer;
+ });

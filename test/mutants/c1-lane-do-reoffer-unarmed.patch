@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/lane.test.ts -t "lane.do.reoffer"
+# kills: lane.do.reoffer
+# why: The re-offer is never armed, so a BatchVerified the Trunk spent leaves the lane waiting for good
+diff --git a/apps/keel/src/adapters/driving/do/lane.ts b/apps/keel/src/adapters/driving/do/lane.ts
+index 710ed50..96fd768 100644
+--- a/apps/keel/src/adapters/driving/do/lane.ts
++++ b/apps/keel/src/adapters/driving/do/lane.ts
+@@ -83,7 +83,6 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
+     const exit = await this.runtime.runPromiseExit(laneStep(this.laneId));
+     if (Exit.isSuccess(exit)) {
+       this.failures = 0;
+-      await this.armReoffer();
+       return;
+     }
+     this.failures += 1;

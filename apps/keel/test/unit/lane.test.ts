@@ -11,6 +11,8 @@ import {
   laneStep,
   projectRepos,
   recordVerdict,
+  reofferDue,
+  reofferVerified,
 } from "@keeltown/core/application/integration";
 import { L1_SUITE_PLAN } from "@keeltown/core/application/verification";
 import type { Change } from "@keeltown/core/domain/coordination";
@@ -706,6 +708,41 @@ describe("the Lane", () => {
           members: [change(2)],
           base: landed,
         });
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.reoffer] a green batch trunk has not answered is re-offered as its own BatchVerified under a fresh dedupe key, 30 s on and then every 60 s, until trunk answers",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        yield* queue(w, change(1));
+        const first = yield* toVerifying(w);
+        expect(yield* reofferDue(LANE)).toBeUndefined();
+        yield* recordVerdict(
+          LANE,
+          verdict(first.batchId, first.candidateId, first.instanceId, "land"),
+        );
+        const verified = (yield* committed).find((e) => e.type === "BatchVerified");
+        if (verified === undefined) throw new Error("the lane committed no BatchVerified");
+        expect(yield* reofferDue(LANE)).toBe(verified.at + 30_000);
+        w.clock.advance(30_000);
+        expect(yield* reofferVerified(LANE)).toEqual({
+          subscriber: `trunk:${PROJECT}`,
+          envelope: { ...verified, dedupeKey: `${verified.dedupeKey}#reoffer-1` },
+          count: 1,
+        });
+        expect(yield* reofferDue(LANE)).toBe(w.clock.now() + 60_000);
+        w.clock.advance(60_000);
+        expect((yield* reofferVerified(LANE))?.envelope.dedupeKey).toBe(
+          `${verified.dedupeKey}#reoffer-2`,
+        );
+        yield* advance(base, sha("e"), [change(1)]);
+        yield* laneStep(LANE);
+        expect(yield* reofferDue(LANE)).toBeUndefined();
+        expect(yield* reofferVerified(LANE)).toBeUndefined();
       }).pipe(Effect.provide(w.layer));
     },
   );

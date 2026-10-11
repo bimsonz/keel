@@ -2,18 +2,10 @@
 # kills: lane.verdict-replay
 # why: The verdict's cause carries the time, so KeelVerify's replayed step is not a no-op and commits again
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index a57774b..e523ada 100644
+index 92a44f1..4c174e7 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -39,6 +39,7 @@ import {
-   CandidateComposer,
-   type CandidateMember,
-   Changes,
-+  Clock,
-   CodeHost,
-   commit,
-   EntityStore,
-@@ -863,7 +864,7 @@ export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
+@@ -981,7 +981,7 @@ export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
    const committed = yield* onBatch(
      laneId,
      batch.id,

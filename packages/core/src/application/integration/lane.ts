@@ -40,6 +40,7 @@ import {
   CandidateComposer,
   type CandidateMember,
   Changes,
+  Clock,
   CodeHost,
   commit,
   EntityStore,
@@ -47,6 +48,7 @@ import {
   EventOutbox,
   Ids,
   Projects,
+  REDELIVERY_CAP_MS,
   type RepoRef,
   StagingWriter,
   type Transaction,
@@ -72,6 +74,13 @@ const MEMBER_EVENTS = [
 /** On this many consecutive infra failures of one change the Lane bounces it, so it never loops. */
 export const INFRA_FAILURE_LIMIT = 3;
 
+/** A green batch trunk has not answered is first re-offered this long after its BatchVerified. */
+export const REOFFER_AFTER_MS = 30_000;
+
+/** The wait before the re-offer after `count` of them: 30 s, doubling, capped as redeliveries are (60 s). */
+export const reofferDelay = (count: number): number =>
+  Math.min(REOFFER_AFTER_MS * 2 ** count, REDELIVERY_CAP_MS);
+
 /** The batch in flight and what the Lane learned composing and bundling it. */
 const ActiveBatch = Schema.Struct({
   batchId: BatchId,
@@ -89,6 +98,8 @@ const ActiveBatch = Schema.Struct({
   started: Schema.optional(Schema.Boolean),
   /** Trunk declined to promote the green batch: it is invalidated, and its members go back to the queue. */
   declined: Schema.optional(Schema.Boolean),
+  /** The green batch's BatchVerified re-offered to trunk so far, and when the last went (epoch ms). */
+  reoffered: Schema.optional(Schema.Struct({ count: Schema.Int, at: Schema.Number })),
 });
 type ActiveBatch = typeof ActiveBatch.Type;
 
@@ -764,6 +775,64 @@ const invalidateBatch = Effect.fn("integration/invalidateBatch")(function* (
     moves: batch.state === "green" ? [{ command: { _tag: "Invalidate" } }] : [],
     lane: () => ({ ...now, active: undefined }),
   })).pipe(Effect.orDie);
+});
+
+/** The green batch in flight that trunk has not answered (no TrunkAdvanced or PromotionDeclined yet), with its BatchVerified. */
+const unanswered = (store: Store, outbox: (typeof EventOutbox)["Service"], laneId: string) => {
+  const lane = laneOf(store, laneId);
+  const active = lane?.active;
+  if (lane === undefined || active === undefined || active.declined === true) return undefined;
+  if (batchOf(store, active.batchId)?.state !== "green") return undefined;
+  const verified = outbox
+    .log(batchRef(active.batchId))
+    .findLast((event) => event.type === "BatchVerified");
+  return verified === undefined ? undefined : { lane, active, verified };
+};
+
+/**
+ * When the lane next re-offers its green batch to trunk, or undefined when
+ * nothing waits on trunk. It is derived from state, so arming it again after
+ * every step never postpones it.
+ */
+export const reofferDue = Effect.fn("integration/reofferDue")(function* (laneId: string) {
+  const found = unanswered(yield* EntityStore, yield* EventOutbox, laneId);
+  if (found === undefined) return undefined;
+  const last = found.active.reoffered;
+  return (last?.at ?? found.verified.at) + reofferDelay(last?.count ?? 0);
+});
+
+/** A BatchVerified handed to trunk again: the same event under a fresh dedupe key. */
+export interface Reoffer {
+  readonly subscriber: string;
+  readonly envelope: EventEnvelope;
+  readonly count: number;
+}
+
+/**
+ * Re-offers the green batch's BatchVerified to `trunk:<prj>`. Delivery is at
+ * least once, but a receiver that records an event and has no reaction to it
+ * spends it: the Trunk deployed before promotion did, and the lane waited on
+ * it for good. The copy changes only its dedupe key, to `<key>#reoffer-<n>`,
+ * so the Trunk takes it; it holds a batch once and ignores one it promoted.
+ * The count is committed here; the Lane DO delivers.
+ */
+export const reofferVerified = Effect.fn("integration/reofferVerified")(function* (laneId: string) {
+  const store = yield* EntityStore;
+  const found = unanswered(store, yield* EventOutbox, laneId);
+  if (found === undefined) return undefined;
+  const { lane, active, verified } = found;
+  const count = (active.reoffered?.count ?? 0) + 1;
+  const at = yield* (yield* Clock).now;
+  yield* noteLane(lane, `reoffer:${active.batchId}#${count}`, (now) =>
+    now.active?.batchId === active.batchId
+      ? { ...now, active: { ...now.active, reoffered: { count, at } } }
+      : now,
+  );
+  return {
+    subscriber: `trunk:${lane.projectId}`,
+    envelope: { ...verified, dedupeKey: `${verified.dedupeKey}#reoffer-${count}` },
+    count,
+  } satisfies Reoffer;
 });
 
 /** Where a lane stands after a step: nothing to do, or waiting on a verdict, trunk, or the domain. */

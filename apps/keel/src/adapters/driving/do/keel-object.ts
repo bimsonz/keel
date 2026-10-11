@@ -67,7 +67,8 @@ export interface KeelObjectOptions {
 export abstract class KeelObjectWith<R> extends DurableObject<Env> implements EventReceiverRpc {
   protected readonly runtime: DurableObjectRuntime<R>;
   protected readonly waiters = new Waiters();
-  private readonly fanOut: FanOut;
+  /** How this object's events reach their subscribers; the Lane re-offers through it too. */
+  protected readonly fanOut: FanOut;
 
   /** `driven` holds the adapters the object's own use-cases need beyond the backbone, built in composition. */
   constructor(
