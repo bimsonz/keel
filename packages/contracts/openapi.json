@@ -9885,6 +9885,52 @@
         },
         "description": "The fields every record carries."
       },
+      "MemberCommit": {
+        "type": "object",
+        "required": [
+          "changeId",
+          "commitSha"
+        ],
+        "properties": {
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "commitSha": {
+            "$ref": "#/components/schemas/CommitSha"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One member's commit in a group's composed chain on trunk."
+      },
+      "MemberLanding": {
+        "type": "object",
+        "required": [
+          "changeId",
+          "commitSha",
+          "candidateId",
+          "proofId"
+        ],
+        "properties": {
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "commitSha": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "candidateId": {
+            "$ref": "#/components/schemas/CandidateId"
+          },
+          "proofId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "How one member landed: its commit on trunk, the candidate it was verified in, and its batch's proof."
+      },
       "MessagesCaptured": {
         "type": "object",
         "required": [
@@ -11010,7 +11056,8 @@
           "_tag",
           "projectId",
           "groupId",
-          "sha"
+          "sha",
+          "commits"
         ],
         "properties": {
           "_tag": {
@@ -11027,6 +11074,13 @@
           },
           "sha": {
             "$ref": "#/components/schemas/CommitSha"
+          },
+          "commits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberCommit"
+            },
+            "description": "Each member's commit in the composed chain, in group order: the commits the members land as."
           }
         },
         "additionalProperties": {
@@ -12267,8 +12321,7 @@
           "from",
           "to",
           "groupId",
-          "members",
-          "proofIds"
+          "landings"
         ],
         "properties": {
           "_tag": {
@@ -12289,17 +12342,12 @@
           "groupId": {
             "type": "string"
           },
-          "members": {
+          "landings": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ChangeId"
-            }
-          },
-          "proofIds": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+              "$ref": "#/components/schemas/MemberLanding"
+            },
+            "description": "Every member of the group, in group order, each with its own landing."
           },
           "verified": {
             "type": "boolean",

@@ -844,14 +844,29 @@ model CandidatePromoted {
   trunkSha: CommitSha;
 }
 
+/** One member's commit in a group's composed chain on trunk. */
+model MemberCommit {
+  changeId: ChangeId;
+  commitSha: CommitSha;
+}
+
+/** How one member landed: its commit on trunk, the candidate it was verified in, and its batch's proof. */
+model MemberLanding {
+  changeId: ChangeId;
+  commitSha: CommitSha;
+  candidateId: CandidateId;
+  proofId: string;
+}
+
 model TrunkAdvanced {
   _tag: "TrunkAdvanced";
   projectId: ProjectId;
   from: CommitSha;
   to: CommitSha;
   groupId: string;
-  members: ChangeId[];
-  proofIds: string[];
+
+  /** Every member of the group, in group order, each with its own landing. */
+  landings: MemberLanding[];
 
   /** False when any batch in the group was unverified; absent means every one was verified. */
   verified?: boolean;
@@ -938,6 +953,9 @@ model PromotionComposed {
   projectId: ProjectId;
   groupId: string;
   sha: CommitSha;
+
+  /** Each member's commit in the composed chain, in group order: the commits the members land as. */
+  commits: MemberCommit[];
 }
 
 model AuditCompleted {
