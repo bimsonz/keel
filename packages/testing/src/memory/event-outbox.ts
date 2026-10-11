@@ -6,10 +6,13 @@ import {
   type DueDeliveries,
   EntityStore,
   envelopesFor,
+  type EventAbout,
   EVERY_TYPE,
   EventOutbox,
   type FanOut,
+  isInScope,
   type PriorCommit,
+  scopeOf,
   type Stored,
   type Subscriber,
 } from "@keeltown/core/ports";
@@ -34,7 +37,11 @@ const StoredDelivery = Schema.Struct({
   attempts: Schema.Int,
   nextAt: Schema.Number,
 });
-const StoredSubscription = Schema.Struct({ subscriber: Schema.String, type: Schema.String });
+const StoredSubscription = Schema.Struct({
+  subscriber: Schema.String,
+  type: Schema.String,
+  scope: Schema.optional(Schema.String),
+});
 
 function isStored(value: unknown): value is Stored {
   if (
@@ -92,13 +99,17 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
       .toSorted(byId)
       .map((row) => ({ id: row.id, ...Schema.decodeUnknownSync(StoredDelivery)(row.value) }));
 
-  const subscribers = (type: string): readonly Subscriber[] =>
+  const subscribers = (type: string, about?: EventAbout): readonly Subscriber[] =>
     [
       ...new Set(
         store
           .list(SUBSCRIPTION)
           .map((row) => Schema.decodeUnknownSync(StoredSubscription)(row.value))
           .filter((row) => row.type === type || row.type === EVERY_TYPE)
+          .filter(
+            (row) =>
+              row.scope === undefined || (about !== undefined && isInScope(row.scope, about)),
+          )
           .map((row) => row.subscriber),
       ),
     ].toSorted();
@@ -168,12 +179,13 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
       return first.fingerprint === null ? prior : { ...prior, fingerprint: first.fingerprint };
     },
     log: (entity) => eventsOf(entity).map((row) => row.envelope),
-    subscribe: (subscriber, types) => {
+    subscribe: (subscriber, types, scope) => {
       for (const type of types === EVERY_TYPE ? [EVERY_TYPE] : types) {
+        const scoped = scope === undefined ? {} : { scope: scopeOf(scope) };
         store.put(
           SUBSCRIPTION,
-          `${subscriber}\u0000${type}`,
-          stored(StoredSubscription, { subscriber, type }),
+          `${subscriber}\u0000${type}\u0000${scoped.scope ?? ""}`,
+          stored(StoredSubscription, { subscriber, type, ...scoped }),
         );
       }
     },

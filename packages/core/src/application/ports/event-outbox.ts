@@ -23,6 +23,19 @@ export const EVERY_TYPE = "*";
 /** The Projector's address. At L1 it hears every event every other object commits. */
 export const PROJECTOR: Subscriber = "projector";
 
+/** An entity as a subscription's scope names it: `<kind>:<id>`. */
+export const scopeOf = (entity: EntityRef): string => `${entity.kind}:${entity.id}`;
+
+/** What a scoped subscription is matched against: the event's entity, and the entities it affects. */
+export interface EventAbout {
+  readonly entity: EntityRef;
+  readonly affected: readonly EntityRef[];
+}
+
+/** Whether a subscription scoped to `scope` hears this event: its entity is the scope, or it affects it. */
+export const isInScope = (scope: string, about: EventAbout): boolean =>
+  scopeOf(about.entity) === scope || about.affected.some((entity) => scopeOf(entity) === scope);
+
 /** An event as a decision proposes it: the encoded payload, before the outbox numbers it. */
 export interface EventDraft {
   /** The encoded payload of one of the contexts' tagged event schemas; its `_tag` is the event type. */
@@ -102,18 +115,27 @@ export class EventOutbox extends Context.Service<
     readonly committed: (entity: EntityRef, cause: string) => PriorCommit | undefined;
     /** The entity's events in `seq` order. Replaying them rebuilds its state. */
     readonly log: (entity: EntityRef) => readonly EventEnvelope[];
-    /** Owes `subscriber` every later event of these types (or of every type). */
+    /**
+     * Owes `subscriber` every later event of these types (or of every type).
+     * With a `scope`, only the events whose `entity` is that entity or whose
+     * `affected[]` holds it: a batch's member hears its own batch, and nothing
+     * once no event names it again.
+     */
     readonly subscribe: (
       subscriber: Subscriber,
       types: readonly string[] | typeof EVERY_TYPE,
+      scope?: EntityRef,
     ) => void;
-    /** Stops owing `subscriber` these types; every type when omitted. Deliveries already owed stay owed. */
+    /** Stops owing `subscriber` these types, scoped or not; every type when omitted. Deliveries already owed stay owed. */
     readonly unsubscribe: (
       subscriber: Subscriber,
       types?: readonly string[] | typeof EVERY_TYPE,
     ) => void;
-    /** The subscribers an event of this type would be delivered to now. */
-    readonly subscribers: (type: string) => readonly Subscriber[];
+    /**
+     * The subscribers an event of this type would be delivered to now: every
+     * unscoped one, and each scoped one whose scope `about` names.
+     */
+    readonly subscribers: (type: string, about?: EventAbout) => readonly Subscriber[];
     /**
      * The receiving side: records that an event with this `dedupeKey` arrived.
      * True the first time, false for a redelivery. Must run inside the
@@ -193,7 +215,7 @@ export function envelopesFor(
   previousSeq: (entity: EntityRef) => number,
   drafts: readonly EventDraft[],
   mintId: () => EventId,
-  subscribers: (type: string) => readonly Subscriber[],
+  subscribers: (type: string, about: EventAbout) => readonly Subscriber[],
 ): readonly EventEnvelope[] {
   const seqs = new Map<string, number>();
   const ordinals = new Map<string, number>();
@@ -216,7 +238,7 @@ export function envelopesFor(
       ...(spec.actor === undefined ? {} : { actor: spec.actor }),
       ...(spec.project === undefined ? {} : { project: spec.project }),
       affected: draft.affected ?? [],
-      notified: subscribers(type),
+      notified: subscribers(type, { entity, affected: draft.affected ?? [] }),
       payload: draft.payload,
     });
   });

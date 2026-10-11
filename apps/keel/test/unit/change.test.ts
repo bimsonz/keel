@@ -9,12 +9,13 @@ import {
   planCompiled,
   precheckRefused,
   precheckStarted,
+  reactToBatch,
   revise,
   submit,
 } from "@keeltown/core/application/coordination";
 import { LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
-import { ChangeId, CommitSha, makeId } from "@keeltown/core/kernel";
-import { CodeHost, EventOutbox } from "@keeltown/core/ports";
+import { ChangeId, CommitSha, type EntityRef, EventEnvelope, makeId } from "@keeltown/core/kernel";
+import { Clock, CodeHost, EntityStore, EventOutbox } from "@keeltown/core/ports";
 import {
   CodeHostFixture,
   makeCodeHostMemory,
@@ -25,6 +26,7 @@ import {
   sampleProjectId,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
+import { ulid } from "ulid";
 import {
   AbandonCommand,
   AdoptCommand,
@@ -396,7 +398,7 @@ const deriving = (instanceId: string) =>
 
 describe("a compiled plan", () => {
   it.effect(
-    "[b13.queued] queues the change on its project's lane in the plan's commit, and subscribes the lane to it",
+    "[b13.queued] queues the change on its project's lane in the plan's commit, and subscribes the lane to its queueing, requeues and ends",
     () => {
       const { layer } = changeObject();
       const lane = `lane:${sampleProjectId}:main`;
@@ -414,8 +416,250 @@ describe("a compiled plan", () => {
         expect(queued?.payload).toEqual({ _tag: "ChangeQueued", changeId, laneId: lane });
         expect(queued?.dedupeKey.split("/")[1]).toBe(plan?.dedupeKey.split("/")[1]);
         expect(queued?.notified).toContain(lane);
-        expect(outbox.subscribers("ChangeQueued")).toContain(lane);
+        for (const type of [
+          "ChangeQueued",
+          "ChangeRequeued",
+          "ChangeWithdrawn",
+          "ChangeSuperseded",
+        ])
+          expect(outbox.subscribers(type)).toContain(lane);
         expect(log.filter((event) => event.type === "ChangeQueued")).toHaveLength(1);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+});
+
+const changeRef: EntityRef = { kind: "change", id: changeId };
+const otherChange = Schema.decodeUnknownSync(ChangeId)("chg_01JZ8PT2C4E6G8J0M2N4Q6S8V9");
+const VERDICT = makeId("vrd", "01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const CANDIDATE = makeId("cnd", "01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const freshBatch = () => makeId("bat", ulid());
+
+/** An event another object committed about the change, as its outbox delivers it. */
+const arriving = (entity: EntityRef, payload: Record<string, unknown>) =>
+  Schema.decodeUnknownSync(EventEnvelope)({
+    eventId: makeId("evt", ulid()),
+    type: payload["_tag"],
+    entity,
+    seq: 1,
+    at: 0,
+    dedupeKey: `${entity.kind}:${entity.id}/cause-${ulid()}/${String(payload["_tag"])}#1`,
+    affected: [changeRef],
+    notified: [`change:${changeId}`],
+    payload,
+  });
+
+const formed = (batchId: string, members: readonly string[]) =>
+  arriving(
+    { kind: "batch", id: batchId },
+    {
+      _tag: "BatchFormed",
+      batchId,
+      laneId: `lane:${sampleProjectId}:main`,
+      members,
+      base: BASE,
+      attempt: 1,
+      chainEpoch: 0,
+    },
+  );
+const verdictOn = (batchId: string, evidence: readonly string[], extra: object = {}) =>
+  arriving(
+    { kind: "verdict", id: VERDICT },
+    {
+      _tag: "VerdictIssued",
+      verdictId: VERDICT,
+      subject: batchId,
+      outcome: "bounce",
+      evidence,
+      ...extra,
+    },
+  );
+const failed = (batchId: string, attribution: string) =>
+  arriving(
+    { kind: "batch", id: batchId },
+    { _tag: "BatchFailed", batchId, verdictId: VERDICT, attribution },
+  );
+const bisected = (batchId: string) =>
+  arriving(
+    { kind: "candidate", id: CANDIDATE },
+    { _tag: "CandidateBisected", candidateId: CANDIDATE, batchId, into: [] },
+  );
+const invalidated = (batchId: string) =>
+  arriving(
+    { kind: "candidate", id: CANDIDATE },
+    { _tag: "CandidateInvalidated", candidateId: CANDIDATE, batchId, reason: "head-moved" },
+  );
+
+/** Receives `event` as the Change DO does: recorded, reacted to and the reaction's events appended, in one transaction. */
+const receive = (event: EventEnvelope) =>
+  Effect.gen(function* () {
+    const store = yield* EntityStore;
+    const outbox = yield* EventOutbox;
+    const at = yield* (yield* Clock).now;
+    return store.transaction(() => {
+      if (!outbox.receive(event.dedupeKey, at)) return undefined;
+      const reaction = reactToBatch(changeId, event, { store, outbox, at });
+      if (reaction !== undefined && reaction.drafts.length > 0)
+        outbox.append(
+          {
+            entity: changeRef,
+            cause: event.dedupeKey,
+            causation: event.eventId,
+            ...(reaction.project === undefined ? {} : { project: reaction.project }),
+          },
+          at,
+          reaction.drafts,
+        );
+      return reaction;
+    });
+  });
+
+/** Declares, submits and compiles the change's plan, leaving it Queued on its lane. */
+const queued = Effect.gen(function* () {
+  yield* deriving("precheck-1");
+  yield* planCompiled(changeId, compiling(1, "precheck-1"));
+});
+
+/** Queues the change, then forms a batch of it. */
+const batched = Effect.gen(function* () {
+  yield* queued;
+  const batchId = freshBatch();
+  yield* receive(formed(batchId, [changeId]));
+  return batchId;
+});
+
+const lastEvent = Effect.map(EventOutbox, (outbox) => outbox.log(changeRef).at(-1));
+
+describe("the change's batch, delivered", () => {
+  it.effect(
+    "[b13.reacts] batches the change when a BatchFormed names it, once, and ignores one that does not",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* queued;
+        yield* receive(formed(freshBatch(), [otherChange]));
+        const untouched = yield* getChange(changeId);
+        const batchId = freshBatch();
+        const formation = formed(batchId, [changeId, otherChange]);
+        yield* receive(formation);
+        yield* receive(formation);
+        const log = (yield* EventOutbox).log(changeRef);
+
+        expect(untouched.state).toBe("queued");
+        expect(yield* getChange(changeId)).toMatchObject({ state: "integrating", batchId });
+        expect(log.filter((event) => event.type === "ChangeBatched")).toHaveLength(1);
+        expect(log.at(-1)).toMatchObject({
+          type: "ChangeBatched",
+          causation: formation.eventId,
+          project: sampleProjectId,
+        });
+        expect(log.at(-1)?.actor).toBeUndefined();
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[b13.reacts] bounces the change on a failure attributed to it, with its verdict's reasons and next actions",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        const batchId = yield* batched;
+        const remedy = {
+          kind: "call",
+          title: "Revise the change onto trunk, then submit it again",
+          operationId: "revise",
+        };
+        yield* receive(
+          verdictOn(batchId, ["composition-refused: conflict src/a.ts"], { nextActions: [remedy] }),
+        );
+        yield* receive(failed(batchId, changeId));
+
+        expect((yield* getChange(changeId)).state).toBe("bounced");
+        expect((yield* lastEvent)?.payload).toEqual({
+          _tag: "ChangeBounced",
+          changeId,
+          verdictId: VERDICT,
+          reasons: ["composition-refused: conflict src/a.ts"],
+          nextActions: [remedy],
+        });
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[b13.reacts] falls back to the machine's next action when the verdict names none, and to the verdict's id when it was never heard",
+    () => {
+      const first = changeObject();
+      const second = changeObject();
+      return Effect.gen(function* () {
+        const withoutActions = yield* Effect.gen(function* () {
+          const batchId = yield* batched;
+          yield* receive(verdictOn(batchId, ["test-failed: auth.test.ts"]));
+          yield* receive(failed(batchId, changeId));
+          return yield* lastEvent;
+        }).pipe(Effect.provide(first.layer));
+        const unheard = yield* Effect.gen(function* () {
+          const batchId = yield* batched;
+          const reaction = yield* receive(failed(batchId, changeId));
+          return { reaction, bounced: yield* lastEvent };
+        }).pipe(Effect.provide(second.layer));
+
+        expect(withoutActions?.payload).toMatchObject({
+          reasons: ["test-failed: auth.test.ts"],
+          nextActions: [{ kind: "call", operationId: "submit" }],
+        });
+        expect(unheard.bounced?.payload).toMatchObject({ reasons: [`verdict ${VERDICT}`] });
+        expect(unheard.reaction?.problem).toContain(VERDICT);
+      });
+    },
+  );
+
+  it.effect(
+    "[b13.reacts] requeues the change on an infra failure, a bisection or an invalidation of its batch",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* queued;
+        const reasons: unknown[] = [];
+        for (const requeueing of [
+          (batchId: string) => failed(batchId, "infra"),
+          bisected,
+          invalidated,
+        ]) {
+          const batchId = freshBatch();
+          yield* receive(formed(batchId, [changeId]));
+          yield* receive(requeueing(batchId));
+          const change = yield* getChange(changeId);
+          expect(change.state).toBe("queued");
+          expect(change.batchId).toBeUndefined();
+          reasons.push(Reflect.get(Object((yield* lastEvent)?.payload), "reason"));
+        }
+        expect(reasons).toEqual(["infra-failure", "bisection", "invalidated"]);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[b13.reacts] does nothing for another member's failure, an unattributed one, or another batch's events",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        const batchId = yield* batched;
+        const before = (yield* EventOutbox).log(changeRef).length;
+        const elsewhere = freshBatch();
+        for (const event of [
+          failed(batchId, otherChange),
+          failed(batchId, "unattributed"),
+          failed(batchId, "textual"),
+          verdictOn(elsewhere, ["not ours"]),
+          failed(elsewhere, changeId),
+          bisected(elsewhere),
+          invalidated(elsewhere),
+        ])
+          yield* receive(event);
+
+        expect(yield* getChange(changeId)).toMatchObject({ state: "integrating", batchId });
+        expect((yield* EventOutbox).log(changeRef)).toHaveLength(before);
       }).pipe(Effect.provide(layer));
     },
   );

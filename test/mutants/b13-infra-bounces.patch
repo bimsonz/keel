@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t b13
+# kills: b13.reacts
+# why: an infra failure bounces the change to its agent instead of requeueing it with no blame
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index bfaf830..0f1adaa 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -894,10 +894,7 @@ const commandFor = (
+       const failed = decodeFailed(event.payload);
+       if (Option.isNone(failed) || !ours(failed.value.batchId)) return undefined;
+       if (failed.value.attribution === change.id) return bounceFor(store, failed.value);
+-      if (failed.value.attribution === "infra")
+-        return {
+-          command: { _tag: "Requeue", batchId: failed.value.batchId, reason: "infra-failure" },
+-        };
++      if (failed.value.attribution === "infra") return bounceFor(store, failed.value);
+       // Another member, or not yet attributed: bisection or the lane moves the change next.
+       return undefined;
+     }

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t b13
+# kills: b13.reacts
+# why: the bounce names only the verdict's id, dropping the evidence the agent needs to fix the change
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index bfaf830..b970318 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -841,7 +841,7 @@ const bounceFor = (
+     command: {
+       _tag: "Bounce",
+       verdictId: failed.verdictId,
+-      reasons: verdict?.evidence ?? [`verdict ${failed.verdictId}`],
++      reasons: [`verdict ${failed.verdictId}`],
+       // Empty: the machine's own "fix and submit" is the fallback.
+       nextActions: verdict?.nextActions ?? [],
+       batchId: failed.batchId,

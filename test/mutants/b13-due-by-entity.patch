@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t b13
+# kills: b13.commit-order
+# why: due() orders a subscriber's deliveries by entity, not commit position, so BatchFailed overtakes the verdict committed before it
+diff --git a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
+index 866e30a..8aeb818 100644
+--- a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
++++ b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
+@@ -202,7 +202,7 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
+           const events = sql
+             .exec<{ envelope: string }>(
+               `SELECT e.envelope FROM keel_deliveries d JOIN keel_events e ON e.event_id = d.event_id
+-               WHERE d.subscriber = ? ORDER BY d.position LIMIT ?`,
++               WHERE d.subscriber = ? ORDER BY e.entity_kind, d.position LIMIT ?`,
+               head.subscriber,
+               limit,
+             )

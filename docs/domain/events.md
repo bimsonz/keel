@@ -190,5 +190,7 @@ Forks are not observed this way: the account's Artifacts lifecycle subscription 
 
 - An agent subscribes to a subject by relying on it.
 - Lanes subscribe to change events; the Trunk DO subscribes to `BatchVerified`; the Auditor to `TrunkAdvanced`.
+- **Scoped subscriptions.** A subscription may name an entity, its scope: it then matches only events whose `entity` is that entity or whose `affected[]` holds it. A batch's members subscribe scoped to their own `change:<id>`, and the emitter sets `affected` to the member changes (the Lane on its batch events and on a batch's `VerdictIssued`; the Trunk on `TrunkAdvanced`), so no change hears another batch, and a landed change's subscriptions never match again.
+- One commit's events reach each subscriber in commit order, retries included: a batch's `VerdictIssued` arrives before the `BatchFailed` committed after it.
 - `ChangeSubmitted` starts Precheck; `BatchFormed` starts KeelVerify; `RulingGiven` resumes a waiting Workflow through `sendEvent`.
 - Every outbox flush nudges the Projector, which drains the operation log and sleeps: the one sanctioned exception to "nothing polls".

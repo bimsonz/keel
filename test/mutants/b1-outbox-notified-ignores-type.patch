@@ -2,15 +2,15 @@
 # kills: b1.notified-at-commit
 # why: the subscriber lookup drops the type filter, so a subscriber is owed event types it never asked for
 diff --git a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
-index d38119f..d7a4a7f 100644
+index 866e30a..43f6082 100644
 --- a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
 +++ b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
-@@ -59,7 +59,7 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
-   const subscribers = (type: string): readonly string[] =>
-     sql
+@@ -66,7 +66,7 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
+   const subscribers = (type: string, about?: EventAbout): readonly string[] => {
+     const unscoped = sql
        .exec<{ subscriber: string }>(
--        "SELECT DISTINCT subscriber FROM keel_subscriptions WHERE type = ? OR type = ? ORDER BY subscriber",
-+        "SELECT DISTINCT subscriber FROM keel_subscriptions WHERE ? IS NOT NULL OR type = ? ORDER BY subscriber",
+-        "SELECT DISTINCT subscriber FROM keel_subscriptions WHERE type = ? OR type = ?",
++        "SELECT DISTINCT subscriber FROM keel_subscriptions WHERE ? IS NOT NULL OR type = ?",
          type,
          EVERY_TYPE,
        )

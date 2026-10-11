@@ -2,19 +2,11 @@
 # kills: b1.seq-gap-free
 # why: the next seq comes from a counter kept outside the transaction, so a rolled-back append still advances it
 diff --git a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
-index 7b2e288..3a4677b 100644
+index 866e30a..b6d6df8 100644
 --- a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
 +++ b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
-@@ -55,6 +55,7 @@ const encodeEnvelope = (envelope: EventEnvelope): string =>
- export function EventOutboxSql(storage: DurableObjectStorage) {
-   const sql = storage.sql;
-   const nextUlid = monotonicFactory();
-+  const heads = new Map<string, number>();
- 
-   const subscribers = (type: string): readonly string[] =>
-     sql
-@@ -67,14 +68,22 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
-       .map((row) => row.subscriber);
+@@ -87,14 +87,23 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
+   };
  
    /** The entity's last seq, or 0 before its first event. */
 -  const lastSeq = (entity: EntityRef) =>
@@ -25,6 +17,7 @@ index 7b2e288..3a4677b 100644
 -        entity.id,
 -      )
 -      .one().seq ?? 0;
++  const heads = new Map<string, number>();
 +  const lastSeq = (entity: EntityRef) => {
 +    const key = `${entity.kind}:${entity.id}`;
 +    const seq =

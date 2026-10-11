@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t b13
+# kills: b13.reacts
+# why: any failure that is not infra bounces this change, even one attributed to another member or to no one yet
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index bfaf830..8addb0a 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -893,7 +893,7 @@ const commandFor = (
+     case "BatchFailed": {
+       const failed = decodeFailed(event.payload);
+       if (Option.isNone(failed) || !ours(failed.value.batchId)) return undefined;
+-      if (failed.value.attribution === change.id) return bounceFor(store, failed.value);
++      if (failed.value.attribution !== "infra") return bounceFor(store, failed.value);
+       if (failed.value.attribution === "infra")
+         return {
+           command: { _tag: "Requeue", batchId: failed.value.batchId, reason: "infra-failure" },

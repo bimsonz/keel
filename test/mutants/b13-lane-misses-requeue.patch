@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t b13
+# kills: b13.queued
+# why: the lane is not told of a requeue, and it never re-enqueues by itself, so a requeued change is stranded
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index bfaf830..bfdb228 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -115,7 +115,6 @@ export const CHANGE_ENDS = ["ChangeLanded", "ChangeWithdrawn", "ChangeSuperseded
+  */
+ export const LANE_HEARS = [
+   "ChangeQueued",
+-  "ChangeRequeued",
+   "ChangeWithdrawn",
+   "ChangeSuperseded",
+ ] as const;

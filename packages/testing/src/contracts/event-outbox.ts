@@ -401,6 +401,109 @@ export function describeEventOutboxContract(adapter: string, harness: () => Outb
     );
 
     it.effect(
+      "[b13.scoped] owes a scoped subscriber only the events about its scope, by entity or by affected",
+      () =>
+        Effect.gen(function* () {
+          const h = harness();
+          const [mine, other] = [change(), change()];
+          const member = `change:${mine.id}`;
+          const batch: EntityRef = { kind: "batch", id: `bat_${randomUlid()}` };
+          const formed = (affected: readonly EntityRef[]): EventDraft => ({
+            entity: batch,
+            payload: { _tag: "BatchFormed", batchId: batch.id },
+            affected,
+          });
+          const outcome = yield* h.run(
+            Effect.gen(function* () {
+              const outbox = yield* EventOutbox;
+              const committed = yield* commit({ entity: batch, cause: cause() }, () => {
+                outbox.subscribe(member, ["BatchFormed", "PrecheckStarted"], mine);
+                return Result.succeed({
+                  drafts: [
+                    formed([other]),
+                    formed([other, mine]),
+                    { ...started(mine, 1), entity: mine },
+                  ],
+                  value: null,
+                });
+              });
+              const about = { entity: batch, affected: [mine] };
+              const heard = outbox.subscribers("BatchFormed", about);
+              const unaddressed = outbox.subscribers("BatchFormed");
+              outbox.unsubscribe(member);
+              return {
+                committed,
+                heard,
+                unaddressed,
+                after: outbox.subscribers("BatchFormed", about),
+              };
+            }),
+          );
+          const [another, ours, own] = outcome.committed.events;
+          expect(another?.notified).not.toContain(member);
+          expect(ours?.notified).toContain(member);
+          expect(own?.notified).toContain(member);
+          expect(outcome.heard).toContain(member);
+          expect(outcome.unaddressed).not.toContain(member);
+          expect(outcome.after).not.toContain(member);
+          yield* flush(h);
+          expect(ids(h.fanOut.deliveredTo(member))).toEqual(
+            ids([ours, own].filter((e) => e !== undefined)),
+          );
+        }),
+    );
+
+    it.effect(
+      "[b13.commit-order] delivers one commit's events to a subscriber in commit order, a retry included",
+      () =>
+        Effect.gen(function* () {
+          const h = harness();
+          const mine = change();
+          const member = `change:${mine.id}`;
+          const batch: EntityRef = { kind: "batch", id: `bat_${randomUlid()}` };
+          const verdict: EntityRef = { kind: "verdict", id: `vrd_${randomUlid()}` };
+          const committed = yield* h.run(
+            Effect.gen(function* () {
+              const outbox = yield* EventOutbox;
+              return yield* commit({ entity: batch, cause: cause() }, () => {
+                outbox.subscribe(member, ["VerdictIssued", "BatchFailed"], mine);
+                return Result.succeed({
+                  drafts: [
+                    {
+                      entity: verdict,
+                      payload: { _tag: "VerdictIssued", verdictId: verdict.id, subject: batch.id },
+                      affected: [mine],
+                    },
+                    {
+                      entity: batch,
+                      payload: { _tag: "BatchFailed", batchId: batch.id, verdictId: verdict.id },
+                      affected: [mine],
+                    },
+                  ],
+                  value: null,
+                });
+              });
+            }),
+          );
+          h.fanOut.failing.add(member);
+          yield* flush(h);
+          h.fanOut.failing.delete(member);
+          h.clock.advance(1000);
+          yield* flush(h);
+          // The failed attempt and the retry both carry the commit's order: the verdict first.
+          const tried = h.fanOut.attempts.filter((attempt) => attempt.subscriber === member);
+          expect(tried.map((attempt) => attempt.eventIds)).toEqual([
+            ids(committed.events),
+            ids(committed.events),
+          ]);
+          expect(h.fanOut.deliveredTo(member).map((event) => event.type)).toEqual([
+            "VerdictIssued",
+            "BatchFailed",
+          ]);
+        }),
+    );
+
+    it.effect(
       `reports a backlog stuck after ${STUCK_AFTER_ATTEMPTS} failed attempts, and keeps retrying it`,
       () =>
         Effect.gen(function* () {

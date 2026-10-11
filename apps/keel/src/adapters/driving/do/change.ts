@@ -10,6 +10,7 @@ import {
   planCompiled,
   precheckRefused,
   precheckStarted,
+  reactToBatch,
   revise,
   submissionStatus,
   submit,
@@ -172,12 +173,28 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
   }
 
   /**
-   * The change takes its workspace before it decides, so a WorkspaceGranted
-   * delivered later changes nothing. One for another workspace is a defect
-   * worth an alert; it still commits nothing.
+   * Its batch's events and trunk's move the change on (`reactToBatch`). The
+   * change takes its workspace before it decides, so a WorkspaceGranted
+   * delivered later changes nothing; one for another workspace is a defect
+   * worth an alert, and still commits nothing.
    */
   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
-    if (event.type !== "WorkspaceGranted") return undefined;
+    if (event.type !== "WorkspaceGranted") {
+      const reaction = reactToBatch(this.changeId, event, tx);
+      if (reaction === undefined) return undefined;
+      const { drafts, project, problem } = reaction;
+      if (problem !== undefined)
+        console.error(
+          "change reaction",
+          JSON.stringify({ changeId: this.changeId, eventId: event.eventId, problem }),
+        );
+      if (drafts.length === 0) return { drafts: [] };
+      return {
+        entity: { kind: "change", id: this.changeId },
+        drafts,
+        ...(project === undefined ? {} : { project }),
+      };
+    }
     const stored = tx.store.get(CHANGE_WORKSPACE, this.changeId);
     const held = stored === undefined ? undefined : Schema.decodeUnknownSync(HeldWorkspace)(stored);
     const { payload } = event;

@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t b13
+# kills: b13.scoped
+# why: a scoped subscription is stored unscoped, so a member hears every batch the lane forms
+diff --git a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
+index 866e30a..4e4ed16 100644
+--- a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
++++ b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
+@@ -164,10 +164,9 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
+             );
+           else
+             sql.exec(
+-              "INSERT INTO keel_subscription_scopes (subscriber, type, scope) VALUES (?, ?, ?) ON CONFLICT DO NOTHING",
++              "INSERT INTO keel_subscriptions (subscriber, type) VALUES (?, ?) ON CONFLICT DO NOTHING",
+               subscriber,
+               type,
+-              scopeOf(scope),
+             );
+         }
+       },

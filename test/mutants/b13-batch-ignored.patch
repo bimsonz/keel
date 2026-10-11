@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t b13
+# kills: b13.reacts
+# why: the change looks for itself among the batch's predecessors, not its members, so a BatchFormed naming it never batches it
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index bfaf830..687c4df 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -869,7 +869,7 @@ const commandFor = (
+   switch (event.type) {
+     case "BatchFormed": {
+       const formed = decodeFormed(event.payload);
+-      return Option.isSome(formed) && formed.value.members.includes(change.id)
++      return Option.isSome(formed) && formed.value.predecessors?.includes(change.id) === true
+         ? { command: { _tag: "Batch", batchId: formed.value.batchId, blockers: L1_UNBLOCKED } }
+         : undefined;
+     }

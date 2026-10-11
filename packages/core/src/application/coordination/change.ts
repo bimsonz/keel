@@ -1,4 +1,4 @@
-import { Effect, Result, Schema } from "effect";
+import { Effect, Option, Result, Schema } from "effect";
 import {
   type Blockers,
   Change,
@@ -24,6 +24,12 @@ import {
 } from "../../domain/coordination/index.ts";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import {
+  BatchFailed,
+  BatchFormed,
+  CandidateBisected,
+  CandidateInvalidated,
+} from "../../domain/integration/index.ts";
+import {
   type Actor,
   type AgentId,
   agentActor,
@@ -32,9 +38,10 @@ import {
   type ContentHash,
   contentHashOf,
   type EntityRef,
+  type EventEnvelope,
   type Json,
   type LeaseId,
-  type NextAction,
+  NextAction,
   ProjectId,
   type SketchId,
   type VerdictId,
@@ -102,6 +109,18 @@ export const laneOf = (projectId: ProjectId): string => `lane:${projectId}:main`
 export const PRECHECK = "workflow:Precheck";
 /** The events after which the change's pool collects its workspace. */
 export const CHANGE_ENDS = ["ChangeLanded", "ChangeWithdrawn", "ChangeSuperseded"] as const;
+/**
+ * What the change's lane hears from it: each queueing, each requeue (the lane
+ * re-enqueues only then, never by itself), and an end that drops it from the queue.
+ */
+export const LANE_HEARS = [
+  "ChangeQueued",
+  "ChangeRequeued",
+  "ChangeWithdrawn",
+  "ChangeSuperseded",
+] as const;
+/** Where the Change DO keeps the verdicts it heard on its batch, by verdict id, until BatchFailed names one. */
+export const CHANGE_BATCH_VERDICT = "change-batch-verdict";
 
 export interface DeclareChange {
   /** The id the agent's AgentSession reserved for `idempotencyKey`. */
@@ -705,7 +724,8 @@ export const precheckStarted: (
  * Precheck passed and compiled the Verification Plan: commits PlanCompiled,
  * then, since L1 has no step between the plan and the queue, ChangeQueued on
  * the project's lane in the same transaction, under the machine's guards. The
- * lane is subscribed to ChangeQueued there, so it hears the change it must batch.
+ * lane is subscribed there to ChangeQueued, ChangeRequeued and the change's
+ * ends, so it hears the change it must batch, re-enqueue or drop.
  */
 export const planCompiled: (
   changeId: ChangeId,
@@ -729,7 +749,7 @@ export const planCompiled: (
       "planCompiled",
       plan,
       [compile, { _tag: "Queue", laneId, blockers: L1_UNBLOCKED }],
-      { alongside: (tx) => tx.outbox.subscribe(laneId, ["ChangeQueued"]) },
+      { alongside: (tx) => tx.outbox.subscribe(laneId, LANE_HEARS) },
     );
     return compiled.change;
   });
@@ -783,3 +803,156 @@ export const precheckRefused: (
     verdictId: bounce === undefined ? minted : decodeBounced(bounce.payload).verdictId,
   };
 });
+
+/** A verdict the change heard on its batch: its evidence, and what to do about it when the issuer said. */
+const BatchVerdict = Schema.Struct({
+  evidence: Schema.Array(Schema.String),
+  nextActions: Schema.optional(Schema.Array(NextAction)),
+});
+
+const decodeBatchVerdict = Schema.decodeUnknownSync(BatchVerdict);
+const encodeBatchVerdict = Schema.encodeSync(BatchVerdict);
+const decodeFormed = Schema.decodeUnknownOption(BatchFormed);
+const decodeFailed = Schema.decodeUnknownOption(BatchFailed);
+const decodeBisected = Schema.decodeUnknownOption(CandidateBisected);
+const decodeInvalidated = Schema.decodeUnknownOption(CandidateInvalidated);
+const decodeVerdict = Schema.decodeUnknownOption(VerdictIssued);
+
+/** Every refusal a reaction may meet: none crosses as a defect, which would be redelivered forever. */
+const REACTION_REFUSALS: readonly Tag[] = [
+  "ChangeNotFound",
+  "ChangeStateRefused",
+  "ChangeBlocked",
+  "LeaseStale",
+  "LeaseNotLapsed",
+  "RevisionMismatch",
+  "CommitNotInWorkspace",
+];
+
+/** The bounce a failed batch attributed to this change: the reasons and next actions of the verdict it heard. */
+const bounceFor = (
+  store: Store,
+  failed: typeof BatchFailed.Type,
+): { readonly command: ChangeCommand; readonly problem?: string } => {
+  const stored = store.get(CHANGE_BATCH_VERDICT, failed.verdictId);
+  const verdict = stored === undefined ? undefined : decodeBatchVerdict(stored);
+  return {
+    command: {
+      _tag: "Bounce",
+      verdictId: failed.verdictId,
+      reasons: verdict?.evidence ?? [`verdict ${failed.verdictId}`],
+      // Empty: the machine's own "fix and submit" is the fallback.
+      nextActions: verdict?.nextActions ?? [],
+      batchId: failed.batchId,
+    },
+    ...(verdict === undefined
+      ? {
+          problem: `batch ${failed.batchId} failed naming verdict ${failed.verdictId}, never heard`,
+        }
+      : {}),
+  };
+};
+
+/**
+ * What the change does about an event on its batch, given the change it is.
+ * A VerdictIssued on its batch is kept for the BatchFailed that follows it in
+ * the same commit (delivered in commit order); every other event maps to the
+ * machine's command, or to nothing.
+ */
+const commandFor = (
+  store: Store,
+  change: Change,
+  event: EventEnvelope,
+): { readonly command: ChangeCommand; readonly problem?: string } | undefined => {
+  const ours = (batchId: string) => change.batchId !== undefined && batchId === change.batchId;
+  switch (event.type) {
+    case "BatchFormed": {
+      const formed = decodeFormed(event.payload);
+      return Option.isSome(formed) && formed.value.members.includes(change.id)
+        ? { command: { _tag: "Batch", batchId: formed.value.batchId, blockers: L1_UNBLOCKED } }
+        : undefined;
+    }
+    case "VerdictIssued": {
+      const verdict = decodeVerdict(event.payload);
+      if (Option.isNone(verdict) || !ours(verdict.value.subject)) return undefined;
+      const { verdictId, evidence, nextActions } = verdict.value;
+      store.put(
+        CHANGE_BATCH_VERDICT,
+        verdictId,
+        asStored(
+          encodeBatchVerdict({
+            evidence,
+            ...(nextActions === undefined ? {} : { nextActions }),
+          }),
+        ),
+      );
+      return undefined;
+    }
+    case "BatchFailed": {
+      const failed = decodeFailed(event.payload);
+      if (Option.isNone(failed) || !ours(failed.value.batchId)) return undefined;
+      if (failed.value.attribution === change.id) return bounceFor(store, failed.value);
+      if (failed.value.attribution === "infra")
+        return {
+          command: { _tag: "Requeue", batchId: failed.value.batchId, reason: "infra-failure" },
+        };
+      // Another member, or not yet attributed: bisection or the lane moves the change next.
+      return undefined;
+    }
+    case "CandidateBisected": {
+      const bisected = decodeBisected(event.payload);
+      return Option.isSome(bisected) && ours(bisected.value.batchId)
+        ? { command: { _tag: "Requeue", batchId: bisected.value.batchId, reason: "bisection" } }
+        : undefined;
+    }
+    case "CandidateInvalidated": {
+      const invalidated = decodeInvalidated(event.payload);
+      return Option.isSome(invalidated) && ours(invalidated.value.batchId)
+        ? {
+            command: { _tag: "Requeue", batchId: invalidated.value.batchId, reason: "invalidated" },
+          }
+        : undefined;
+    }
+    default:
+      return undefined;
+  }
+};
+
+/** What a reaction to the change's batch commits, and anything wrong with it worth an alert. */
+export interface BatchReaction {
+  readonly drafts: readonly EventDraft[];
+  readonly project?: ProjectId;
+  readonly problem?: string;
+}
+
+/**
+ * The Change DO's reaction to its batch's events, inside the
+ * transaction that records the delivery: BatchFormed naming it → ChangeBatched;
+ * BatchFailed attributed to it → ChangeBounced with the verdict's reasons and
+ * next actions; BatchFailed `infra`, CandidateBisected or CandidateInvalidated
+ * → ChangeRequeued. The cause is the delivery's dedupe key, so a redelivery is
+ * a no-op. A refusal by the machine commits nothing and is reported as a
+ * `problem`: a reaction never fails the delivery, which would be redelivered
+ * forever. Undefined when the event is none of these.
+ */
+export const reactToBatch = (
+  changeId: ChangeId,
+  event: EventEnvelope,
+  tx: Transaction,
+): BatchReaction | undefined => {
+  const change = storedChange(tx.store, changeId);
+  if (change === undefined) return undefined;
+  const reacting = commandFor(tx.store, change, event);
+  if (reacting === undefined) return { drafts: [] };
+  const decided = transition(tx, changeId, REACTION_REFUSALS, [reacting.command]);
+  if (Result.isFailure(decided))
+    return {
+      drafts: [],
+      problem: `${event.type} refused with ${decided.failure._tag} in state ${change.state}`,
+    };
+  return {
+    drafts: decided.success.drafts,
+    ...inProject(tx.store, changeId),
+    ...(reacting.problem === undefined ? {} : { problem: reacting.problem }),
+  };
+};

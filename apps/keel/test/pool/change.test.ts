@@ -1,16 +1,17 @@
 import { introspectWorkflow, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { isAgentOwned, LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
-import { makeId } from "@keeltown/core/kernel";
+import { type EntityRef, makeId } from "@keeltown/core/kernel";
+import { commit, type EventDraft, EventOutbox } from "@keeltown/core/ports";
 import { sampleProjectId } from "@keeltown/testing";
-import { EventOutbox } from "@keeltown/core/ports";
 import * as fc from "fast-check";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Result, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
 import { armedAlarms, scheduleAlarm } from "../../src/adapters/driving/do/alarm.ts";
 import type { ChangeDO } from "../../src/adapters/driving/do/change.ts";
-import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
+import type { LaneDO } from "../../src/adapters/driving/do/lane.ts";
+import { ChangeCodecs, decodeExit, exitCodec } from "../../src/rpc/index.ts";
 import {
   type ChangeUnderTest,
   changeUnderTest,
@@ -403,6 +404,176 @@ describe("a compiled change and its lane", () => {
       WAIT,
     );
     // The submission's own Precheck started, and was held inert.
+    await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);
+  });
+});
+
+/** Queues the change under test: declared, submitted, Precheck started and its plan compiled, all by hand. */
+async function queue(c: ChangeUnderTest) {
+  const lease = ok(await c.declare()).change.lease.id;
+  ok(await submit(c, lease, await c.push(), "submit-1"));
+  ok(
+    decodeExit(
+      ChangeCodecs.precheckStarted,
+      await c.stub.precheckStarted({ revision: 1, instanceId: "p-1" }),
+    ),
+  );
+  ok(
+    decodeExit(
+      ChangeCodecs.planCompiled,
+      await c.stub.planCompiled({
+        revision: 1,
+        instanceId: "p-1",
+        planHash: PLAN_HASH,
+        steps: 1,
+        costEstimate: 1,
+      }),
+    ),
+  );
+}
+
+const committedCodec = exitCodec(Schema.Null, Schema.Never);
+
+/**
+ * Commits `drafts` on a real Lane DO, as the Lane will: through its own
+ * outbox, after subscribing each `scoped` change to `types` on its own ref.
+ * The DO's answer arms its flush, so the events leave by its fan-out alone.
+ */
+async function laneCommits(
+  lane: DurableObjectStub<LaneDO>,
+  entity: EntityRef,
+  drafts: readonly EventDraft[],
+  scoped: readonly { readonly changeId: string; readonly types: readonly string[] }[] = [],
+) {
+  const committed = await runInDurableObject(lane, (instance: LaneDO) =>
+    instance["answer"](
+      committedCodec,
+      commit({ entity, cause: `test-${ulid()}` }, (tx) => {
+        for (const member of scoped)
+          tx.outbox.subscribe(`change:${member.changeId}`, member.types, {
+            kind: "change",
+            id: member.changeId,
+          });
+        return Result.succeed({ value: null, drafts });
+      }).pipe(Effect.as(null)),
+    ),
+  );
+  ok(decodeExit(committedCodec, committed));
+}
+
+/** The dedupe keys the change under test has received, among `keys`. */
+const received = (c: ChangeUnderTest, keys: readonly string[]) =>
+  runInDurableObject(c.stub, (_instance: ChangeDO, state) =>
+    keys.filter(
+      (key) =>
+        state.storage.sql.exec("SELECT 1 FROM keel_received WHERE dedupe_key = ?", key).toArray()
+          .length > 0,
+    ),
+  );
+
+const BATCH_EVENTS = [
+  "BatchFormed",
+  "BatchFailed",
+  "CandidateBisected",
+  "CandidateInvalidated",
+  "VerdictIssued",
+];
+
+describe("a change moved by its lane's delivered events", () => {
+  it("[b13.delivered] goes Queued → Integrating → Bounced with the verdict's reasons and next actions, hearing only its own batch", async () => {
+    await using precheck = await inertPrecheck();
+    const c = await changeUnderTest();
+    await queue(c);
+    const lane = env.LANE.get(env.LANE.idFromName(`lane:${sampleProjectId}:test-${ulid()}`));
+    const mine: EntityRef = { kind: "change", id: c.changeId };
+    const batchId = makeId("bat", ulid());
+    const batch: EntityRef = { kind: "batch", id: batchId };
+    const verdictId = makeId("vrd", ulid());
+    const otherBatch = makeId("bat", ulid());
+    const otherChange = makeId("chg", ulid());
+
+    await laneCommits(
+      lane,
+      batch,
+      [
+        {
+          payload: {
+            _tag: "BatchFormed",
+            batchId,
+            laneId: `lane:${sampleProjectId}:main`,
+            members: [c.changeId],
+            base: "b".repeat(40),
+            attempt: 1,
+            chainEpoch: 0,
+          },
+          affected: [mine],
+        },
+      ],
+      [{ changeId: c.changeId, types: BATCH_EVENTS }],
+    );
+    await vi.waitFor(async () => expect((await c.current()).state).toBe("integrating"), WAIT);
+
+    // Another batch, committed before this one fails: it names another change only.
+    await laneCommits(lane, { kind: "batch", id: otherBatch }, [
+      {
+        payload: {
+          _tag: "BatchFormed",
+          batchId: otherBatch,
+          laneId: `lane:${sampleProjectId}:main`,
+          members: [otherChange],
+          base: "b".repeat(40),
+          attempt: 1,
+          chainEpoch: 0,
+        },
+        affected: [{ kind: "change", id: otherChange }],
+      },
+    ]);
+    const otherFormed = (
+      await runInDurableObject(lane, (instance: LaneDO) =>
+        instance["runtime"].runPromise(
+          Effect.map(EventOutbox, (outbox) => outbox.log({ kind: "batch", id: otherBatch })),
+        ),
+      )
+    )[0];
+    const remedy = {
+      kind: "call",
+      title: "Revise the change onto trunk, then submit it again",
+      operationId: "revise",
+    };
+    await laneCommits(lane, batch, [
+      {
+        entity: { kind: "verdict", id: verdictId },
+        payload: {
+          _tag: "VerdictIssued",
+          verdictId,
+          subject: batchId,
+          outcome: "bounce",
+          evidence: ["composition-refused: conflict src/a.ts"],
+          nextActions: [remedy],
+        },
+        affected: [mine],
+      },
+      {
+        payload: { _tag: "BatchFailed", batchId, verdictId, attribution: c.changeId },
+        affected: [mine],
+      },
+    ]);
+    await vi.waitFor(async () => expect((await c.current()).state).toBe("bounced"), WAIT);
+    const log = await c.log();
+
+    expect(log.map((event) => event.type).slice(-3)).toEqual([
+      "ChangeQueued",
+      "ChangeBatched",
+      "ChangeBounced",
+    ]);
+    expect(log.at(-1)?.payload).toMatchObject({
+      verdictId,
+      reasons: ["composition-refused: conflict src/a.ts"],
+      nextActions: [remedy],
+    });
+    // Delivered in order, so the other batch's event would have arrived before the failure.
+    expect(otherFormed).toBeDefined();
+    expect(await received(c, [otherFormed?.dedupeKey ?? ""])).toEqual([]);
     await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);
   });
 });

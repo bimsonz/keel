@@ -3,9 +3,11 @@ import {
   type Backlog,
   type DueDeliveries,
   envelopesFor,
+  type EventAbout,
   EVERY_TYPE,
   EventOutbox,
   type PriorCommit,
+  scopeOf,
 } from "@keeltown/core/ports";
 import { Layer, Schema } from "effect";
 import { monotonicFactory } from "ulid";
@@ -15,6 +17,8 @@ import { monotonicFactory } from "ulid";
  * `blockConcurrencyWhile`:
  * - `keel_events`: each entity's events, numbered gap-free; the log replay reads.
  * - `keel_subscriptions`: who is owed which event types from now on.
+ * - `keel_subscription_scopes`: the same, owed only events about one entity
+ *   (its own, or one they affect), as `<kind>:<id>`.
  * - `keel_deliveries`: one row per event and subscriber still owed it, in commit order.
  * - `keel_received`: dedupe keys of events this object has received and reacted to.
  */
@@ -40,6 +44,9 @@ export function migrateEventOutbox(storage: DurableObjectStorage): void {
   sql.exec(
     "CREATE TABLE IF NOT EXISTS keel_received (dedupe_key TEXT PRIMARY KEY, at INTEGER NOT NULL)",
   );
+  sql.exec(
+    "CREATE TABLE IF NOT EXISTS keel_subscription_scopes (subscriber TEXT NOT NULL, type TEXT NOT NULL, scope TEXT NOT NULL, PRIMARY KEY (subscriber, type, scope))",
+  );
 }
 
 const decodeEnvelope = (json: string): EventEnvelope =>
@@ -56,15 +63,28 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
   const sql = storage.sql;
   const nextUlid = monotonicFactory();
 
-  const subscribers = (type: string): readonly string[] =>
-    sql
+  const subscribers = (type: string, about?: EventAbout): readonly string[] => {
+    const unscoped = sql
       .exec<{ subscriber: string }>(
-        "SELECT DISTINCT subscriber FROM keel_subscriptions WHERE type = ? OR type = ? ORDER BY subscriber",
+        "SELECT DISTINCT subscriber FROM keel_subscriptions WHERE type = ? OR type = ?",
         type,
         EVERY_TYPE,
       )
-      .toArray()
-      .map((row) => row.subscriber);
+      .toArray();
+    const scopes = about === undefined ? [] : [about.entity, ...about.affected].map(scopeOf);
+    const scoped =
+      scopes.length === 0
+        ? []
+        : sql
+            .exec<{ subscriber: string }>(
+              `SELECT DISTINCT subscriber FROM keel_subscription_scopes WHERE (type = ? OR type = ?) AND scope IN (${scopes.map(() => "?").join(", ")})`,
+              type,
+              EVERY_TYPE,
+              ...scopes,
+            )
+            .toArray();
+    return [...new Set([...unscoped, ...scoped].map((row) => row.subscriber))].toSorted();
+  };
 
   /** The entity's last seq, or 0 before its first event. */
   const lastSeq = (entity: EntityRef) =>
@@ -134,26 +154,32 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
           )
           .toArray()
           .map((row) => decodeEnvelope(row.envelope)),
-      subscribe: (subscriber, types) => {
+      subscribe: (subscriber, types, scope) => {
         for (const type of types === EVERY_TYPE ? [EVERY_TYPE] : types) {
-          sql.exec(
-            "INSERT INTO keel_subscriptions (subscriber, type) VALUES (?, ?) ON CONFLICT DO NOTHING",
-            subscriber,
-            type,
-          );
+          if (scope === undefined)
+            sql.exec(
+              "INSERT INTO keel_subscriptions (subscriber, type) VALUES (?, ?) ON CONFLICT DO NOTHING",
+              subscriber,
+              type,
+            );
+          else
+            sql.exec(
+              "INSERT INTO keel_subscription_scopes (subscriber, type, scope) VALUES (?, ?, ?) ON CONFLICT DO NOTHING",
+              subscriber,
+              type,
+              scopeOf(scope),
+            );
         }
       },
       unsubscribe: (subscriber, types) => {
-        if (types === undefined || types === EVERY_TYPE) {
-          sql.exec("DELETE FROM keel_subscriptions WHERE subscriber = ?", subscriber);
-          return;
+        for (const table of ["keel_subscriptions", "keel_subscription_scopes"]) {
+          if (types === undefined || types === EVERY_TYPE) {
+            sql.exec(`DELETE FROM ${table} WHERE subscriber = ?`, subscriber);
+            continue;
+          }
+          for (const type of types)
+            sql.exec(`DELETE FROM ${table} WHERE subscriber = ? AND type = ?`, subscriber, type);
         }
-        for (const type of types)
-          sql.exec(
-            "DELETE FROM keel_subscriptions WHERE subscriber = ? AND type = ?",
-            subscriber,
-            type,
-          );
       },
       subscribers,
       receive: (dedupeKey, at) =>

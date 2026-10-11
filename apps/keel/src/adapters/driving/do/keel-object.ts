@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import type { EntityRef, EventEnvelope } from "@keeltown/core/kernel";
+import type { EntityRef, EventEnvelope, ProjectId } from "@keeltown/core/kernel";
 import {
   Clock,
   EntityStore,
@@ -38,7 +38,12 @@ export const OUTBOX_REDELIVERY = "outbox redelivery";
  * entities, or nothing (the event is recorded and taken all the same).
  */
 export type Reaction =
-  | { readonly entity: EntityRef; readonly drafts: readonly EventDraft[] }
+  | {
+      readonly entity: EntityRef;
+      readonly drafts: readonly EventDraft[];
+      /** The project the entity belongs to, stamped on the events, as `CommitSpec.project`. */
+      readonly project?: ProjectId;
+    }
   | { readonly drafts: readonly [] };
 
 export interface KeelObjectOptions {
@@ -137,6 +142,7 @@ export abstract class KeelObjectWith<R> extends DurableObject<Env> implements Ev
               entity: reaction.entity,
               cause: arrival.dedupeKey,
               causation: arrival.envelope.eventId,
+              ...(reaction.project === undefined ? {} : { project: reaction.project }),
             },
             at,
             reaction.drafts,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t b13
+# kills: b13.scoped
+# why: a scope matches only the event's own entity, so a member never hears its batch's events, which affect it
+diff --git a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
+index 866e30a..b2e8732 100644
+--- a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
++++ b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
+@@ -71,7 +71,7 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
+         EVERY_TYPE,
+       )
+       .toArray();
+-    const scopes = about === undefined ? [] : [about.entity, ...about.affected].map(scopeOf);
++    const scopes = about === undefined ? [] : [about.entity].map(scopeOf);
+     const scoped =
+       scopes.length === 0
+         ? []
