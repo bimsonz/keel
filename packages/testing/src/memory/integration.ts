@@ -195,6 +195,13 @@ export function makeTrunksMemory(
             options.journal?.push(`initialize ${projectId}`);
             return Effect.void;
           }),
+        head: (projectId) =>
+          Effect.suspend(() => {
+            const head = heads.get(projectId);
+            return head === undefined
+              ? Effect.die(new Error(`${projectId} has no trunk yet`))
+              : Effect.succeed(head);
+          }),
         sync: (projectId) =>
           Effect.suspend(() => {
             if (failures > 0) {

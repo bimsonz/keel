@@ -10,15 +10,22 @@ import { FLUSH, type GitRemote, type PushOutcome, pkt, readPkts, receivePack } f
 /** The most a relay sends in one receive-pack request: Artifacts caps a request at about 64 MiB (spike S3). */
 export const MAX_RELAY_PACK_BYTES = 60 * 1024 * 1024;
 
-/** A relayed pack over the cap. Known limit until the pack can be split: it fails loudly, never truncates. */
+/**
+ * A relayed pack over the cap. Known limit until the pack can be split: it
+ * fails loudly, never truncates. `bytes` is what was read before giving up,
+ * which is at least the cap.
+ */
 export class PackTooLarge extends Error {
   constructor(
     readonly bytes: number,
     readonly limit: number,
   ) {
-    super(`the relayed pack is ${bytes} bytes, over the ${limit}-byte receive-pack cap`);
+    super(`the relayed pack is over the ${limit}-byte receive-pack cap (${bytes} bytes read)`);
   }
 }
+
+/** Side-band framing and acknowledgements around a pack of `limit` bytes: 5 bytes per 65,515, and a margin. */
+const framing = (limit: number) => Math.ceil(limit / 65_515) * 5 + 65_536;
 
 /** receive-pack answered `busy` on every attempt: nothing was applied, and the same pack may be sent again later. */
 export class ReceivePackBusy extends Error {
@@ -31,11 +38,14 @@ export class ReceivePackBusy extends Error {
  * Fetches the pack of everything reachable from `wants` that is not reachable
  * from `haves`. The answer is the raw pack (`PACK…`), demultiplexed from
  * side-band-64k; an error band or an HTTP error throws, never naming the remote.
+ * The answer is read as it streams: past `maxBytes` (and its framing) the read
+ * stops and PackTooLarge is thrown, so a pack over the cap is never held whole.
  */
 export async function uploadPack(
   remote: GitRemote,
   wants: readonly string[],
   haves: readonly string[],
+  options: { readonly maxBytes?: number } = {},
 ): Promise<Uint8Array> {
   if (wants.length === 0) throw new Error("a fetch needs at least one want");
   const caps = ["side-band-64k", "ofs-delta", "no-progress", "agent=keel-gitcore"].join(" ");
@@ -55,8 +65,26 @@ export async function uploadPack(
     },
     body,
   });
-  const answer = new Uint8Array(await res.arrayBuffer());
-  if (!res.ok) throw new Error(`upload-pack answered HTTP ${res.status}`);
+  if (!res.ok) {
+    await res.body?.cancel();
+    throw new Error(`upload-pack answered HTTP ${res.status}`);
+  }
+  const reader = res.body?.getReader();
+  if (reader === undefined) throw new Error("upload-pack answered without a body");
+  const limit = options.maxBytes ?? Number.POSITIVE_INFINITY;
+  const chunks: Uint8Array[] = [];
+  let read = 0;
+  for (;;) {
+    const next = await reader.read();
+    if (next.done) break;
+    read += next.value.length;
+    if (read > limit + framing(limit)) {
+      await reader.cancel();
+      throw new PackTooLarge(read, limit);
+    }
+    chunks.push(next.value);
+  }
+  const answer = concat(chunks);
   const pack: Uint8Array[] = [];
   for (const line of readPkts(answer)) {
     if (line === null) break;
@@ -81,6 +109,12 @@ export interface RelayMove {
   readonly ref: string;
   readonly from: string | null;
   readonly to: string;
+  /**
+   * Commits the target already holds, so the pack carries only what is past
+   * them; `[from]` when omitted. A new ref (`from` null) in a repo that holds
+   * the history names it here, or the whole history is sent.
+   */
+  readonly haves?: readonly string[];
 }
 
 /**
@@ -113,8 +147,9 @@ export async function relay(
   options: RelayOptions = {},
 ): Promise<RelayOutcome> {
   if (move.from === move.to) return { kind: "unchanged" };
-  const pack = await uploadPack(source, [move.to], move.from === null ? [] : [move.from]);
   const limit = options.maxPackBytes ?? MAX_RELAY_PACK_BYTES;
+  const haves = move.haves ?? (move.from === null ? [] : [move.from]);
+  const pack = await uploadPack(source, [move.to], haves, { maxBytes: limit });
   if (pack.length > limit) throw new PackTooLarge(pack.length, limit);
   const update = { ref: move.ref, old: move.from ?? ZERO_OID, new: move.to };
   const retries = options.busyRetries ?? 3;

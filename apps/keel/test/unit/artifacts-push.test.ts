@@ -68,6 +68,7 @@ describe("translating Artifacts pushes", () => {
     ["a tag", push(WORKSPACE, "refs/tags/v1", SHA)],
     ["a git note", push(WORKSPACE, "refs/notes/mfp", SHA)],
     ["a branch deletion", push(WORKSPACE, "refs/heads/main", "0".repeat(40))],
+    ["Keel's own trunk ref in the workspace", push(WORKSPACE, "refs/heads/keel/trunk", SHA)],
     ["the project's mirror", push(projectRepos(PROJECT).mirror.name, "refs/heads/main", SHA)],
     [
       "a sketch",
@@ -86,7 +87,7 @@ describe("translating Artifacts pushes", () => {
       { ...push(WORKSPACE, "refs/heads/main", SHA), type: "cf.artifacts.repo.cloned" },
     ],
     ["something unreadable", { hello: "world" }],
-  ])("drops %s", (_what, event) => {
+  ])("[push.translate] drops %s", (_what, event) => {
     expect(translateArtifactsPush(event)).toBeNull();
   });
 });

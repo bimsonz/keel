@@ -68,6 +68,15 @@ describe("the Trunk DO", () => {
     );
     expect(trunk).toEqual(Exit.succeed({ head, promotion: "idle", redCount: 0 }));
   });
+
+  it("[trunks.rpc.head] the Trunks port reads trunk's head as its Trunk DO records it", async () => {
+    const projectId = makeId("prj", ulid());
+    const head = Schema.decodeUnknownSync(CommitSha)("e".repeat(40));
+    await viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.initialize(projectId, head, "seed")));
+    expect(await viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.head(projectId)))).toEqual(
+      Exit.succeed(head),
+    );
+  });
 });
 
 /** A Trunk DO for a fresh project, initialized at staging's one commit, promoting through memory adapters. */

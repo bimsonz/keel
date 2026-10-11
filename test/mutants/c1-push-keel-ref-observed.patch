@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/artifacts-push.test.ts -t "push.translate"
+# kills: push.translate
+# why: Keel's own push of keel/trunk into a granted workspace is recorded as the agent's push, so Keel wakes itself
+diff --git a/apps/keel/src/adapters/driving/queue/artifacts-events.ts b/apps/keel/src/adapters/driving/queue/artifacts-events.ts
+index 33e7761..fbe3479 100644
+--- a/apps/keel/src/adapters/driving/queue/artifacts-events.ts
++++ b/apps/keel/src/adapters/driving/queue/artifacts-events.ts
+@@ -38,7 +38,7 @@ export function translateArtifactsPush(raw: unknown): WorkspacePush | null {
+   const decoded = Schema.decodeUnknownOption(ArtifactsRepoPushed)(raw);
+   if (Option.isNone(decoded)) return null;
+   const { source, payload } = decoded.value;
+-  if (!payload.ref.startsWith("refs/heads/") || payload.ref.startsWith(KEELS)) return null;
++  if (!payload.ref.startsWith("refs/heads/")) return null;
+   if (DELETED.test(payload.after)) return null;
+   const owner = ownerOfRepo(source.repoName);
+   const sha = Schema.decodeUnknownOption(CommitSha)(payload.after);

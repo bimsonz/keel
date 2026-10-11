@@ -23,10 +23,13 @@ export interface WorkspacePush {
 }
 
 const DELETED = /^0+$/;
+/** Refs Keel itself writes into a workspace (`keel/trunk`, a rebase's trunk head): never an agent's push. */
+const KEELS = "refs/heads/keel/";
 
 /**
  * A push to a workspace's branch, its project read from the repo's name
- * (`<prj>-ws-<ulid>`); null for tags, notes, deletions, a sketch's or any
+ * (`<prj>-ws-<ulid>`); null for tags, notes, deletions, Keel's own
+ * `refs/heads/keel/*` (no self-loops), a sketch's or any
  * other repo (the mirror, a name Keel never gave) and anything unreadable.
  * Whether the workspace is granted, so the push is an agent's, is the pool's
  * to decide.
@@ -35,7 +38,8 @@ export function translateArtifactsPush(raw: unknown): WorkspacePush | null {
   const decoded = Schema.decodeUnknownOption(ArtifactsRepoPushed)(raw);
   if (Option.isNone(decoded)) return null;
   const { source, payload } = decoded.value;
-  if (!payload.ref.startsWith("refs/heads/") || DELETED.test(payload.after)) return null;
+  if (!payload.ref.startsWith("refs/heads/") || payload.ref.startsWith(KEELS)) return null;
+  if (DELETED.test(payload.after)) return null;
   const owner = ownerOfRepo(source.repoName);
   const sha = Schema.decodeUnknownOption(CommitSha)(payload.after);
   if (owner?.kind !== "workspace" || Option.isNone(sha)) return null;

@@ -22,6 +22,12 @@ export class Trunks extends Context.Service<
       head: CommitSha,
       by: string,
     ) => Effect.Effect<void, PromotionStateRefused>;
+    /**
+     * Trunk's head as its Trunk DO records it: what the Lane composes onto,
+     * never a ref read that may lag or lead it. Dies for a trunk not yet
+     * initialized, since no change exists in such a project.
+     */
+    readonly head: (projectId: ProjectId) => Effect.Effect<CommitSha>;
     /** Brings staging and the project's mirror to trunk's head. Idempotent. */
     readonly sync: (projectId: ProjectId) => Effect.Effect<TrunkSynced>;
   }

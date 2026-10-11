@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/fetch.test.ts -t "relay.cap-streamed"
+# kills: relay.cap-streamed
+# why: The whole answer is buffered before the cap is checked, so a pack over the cap exhausts the Worker before PackTooLarge
+diff --git a/packages/gitcore/src/fetch.ts b/packages/gitcore/src/fetch.ts
+index f2c1667..aaddd82 100644
+--- a/packages/gitcore/src/fetch.ts
++++ b/packages/gitcore/src/fetch.ts
+@@ -69,7 +69,7 @@ export async function uploadPack(
+     await res.body?.cancel();
+     throw new Error(`upload-pack answered HTTP ${res.status}`);
+   }
+-  const reader = res.body?.getReader();
++  const reader = new Response(new Uint8Array(await res.arrayBuffer())).body?.getReader();
+   if (reader === undefined) throw new Error("upload-pack answered without a body");
+   const limit = options.maxBytes ?? Number.POSITIVE_INFINITY;
+   const chunks: Uint8Array[] = [];

@@ -27,6 +27,11 @@ export function TrunksRpc(
         callObject(TrunkCodecs.initialize, () => trunk(projectId).initialize(head, by)).pipe(
           Effect.asVoid,
         ),
+      head: (projectId) =>
+        callObject(TrunkCodecs.status, () => trunk(projectId).status()).pipe(
+          Effect.map((status) => status.head),
+          Effect.orDie,
+        ),
       sync: (projectId) =>
         callObject(TrunkCodecs.sync, () => trunk(projectId).sync()).pipe(
           Effect.map(({ head }) => ({ head, staging: head, mirror: head })),

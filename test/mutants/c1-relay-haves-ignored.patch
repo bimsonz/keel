@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/fetch.test.ts -t "relay.haves"
+# kills: relay.haves
+# why: A new ref is relayed with no haves, so the whole history goes into one pack: a rebase into a big workspace hits the cap
+diff --git a/packages/gitcore/src/fetch.ts b/packages/gitcore/src/fetch.ts
+index f2c1667..c5dbace 100644
+--- a/packages/gitcore/src/fetch.ts
++++ b/packages/gitcore/src/fetch.ts
+@@ -148,7 +148,7 @@ export async function relay(
+ ): Promise<RelayOutcome> {
+   if (move.from === move.to) return { kind: "unchanged" };
+   const limit = options.maxPackBytes ?? MAX_RELAY_PACK_BYTES;
+-  const haves = move.haves ?? (move.from === null ? [] : [move.from]);
++  const haves = move.from === null ? [] : [move.from];
+   const pack = await uploadPack(source, [move.to], haves, { maxBytes: limit });
+   if (pack.length > limit) throw new PackTooLarge(pack.length, limit);
+   const update = { ref: move.ref, old: move.from ?? ZERO_OID, new: move.to };

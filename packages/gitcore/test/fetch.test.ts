@@ -4,6 +4,7 @@
 
 import { spawnSync } from "node:child_process";
 import { afterAll, describe, expect, it } from "vitest";
+import { dec } from "../src/bytes.ts";
 import { PackTooLarge, relay, uploadPack } from "../src/fetch.ts";
 import type { GitRemote } from "../src/push.ts";
 import { git, GIT_ENV, smartHttp, tempRepo } from "./git-harness.ts";
@@ -108,6 +109,53 @@ describe("relay", { timeout: PROPERTY_TIMEOUT }, () => {
       relay(source, target, { ref: MAIN, from: before, to: big }, { maxPackBytes: 64 }),
     ).rejects.toBeInstanceOf(PackTooLarge);
     expect(headOf(repos.target.dir)).toBe(before);
+  });
+
+  it("[relay.haves] a new ref in a repo that holds the history carries only the commits past its haves", async () => {
+    const base = headOf(repos.source.dir) ?? commitFile(repos.source.dir, "a.txt", "x\n");
+    await relay(source, target, { ref: MAIN, from: headOf(repos.target.dir), to: base });
+    const tip = commitFile(repos.source.dir, "d.txt", "trunk moved on\n", base);
+    const sent: number[] = [];
+    const watched: GitRemote = {
+      ...target,
+      fetch: async (url, init) => {
+        const body = init?.body;
+        if (body instanceof Uint8Array) {
+          const at = dec.decode(body).indexOf("PACK");
+          if (at >= 0) sent.push(count(body.subarray(at)));
+        }
+        return http.fetch(url, init);
+      },
+    };
+    const ref = "refs/heads/keel/trunk";
+    const moved = await relay(source, watched, { ref, from: null, to: tip, haves: [base] });
+    expect(moved).toEqual({ kind: "advanced" });
+    // tip's commit, tree and blob, not the history the target already holds.
+    expect(sent).toEqual([3]);
+    expect(git(repos.target.dir, ["rev-parse", ref]).trim()).toBe(tip);
+    expect(connected(repos.target.dir, tip)).toEqual([]);
+  });
+
+  it("[relay.cap-streamed] an answer over the cap is abandoned as it streams, never read whole", async () => {
+    let pulled = 0;
+    const endless: GitRemote = {
+      ...source,
+      fetch: async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              pulled += 16_384;
+              if (pulled > 8 * 1024 * 1024) controller.close();
+              else controller.enqueue(new Uint8Array(16_384));
+            },
+          }),
+        ),
+    };
+    const tip = headOf(repos.source.dir) ?? commitFile(repos.source.dir, "a.txt", "x\n");
+    await expect(uploadPack(endless, [tip], [], { maxBytes: 1024 })).rejects.toBeInstanceOf(
+      PackTooLarge,
+    );
+    expect(pulled).toBeLessThan(256 * 1024);
   });
 
   it("[sync.upload-pack] fetches only what the haves lack", async () => {
