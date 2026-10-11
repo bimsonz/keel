@@ -412,6 +412,24 @@ describe("authorize", () => {
     ).toBe("ok:");
   });
 
+  it("[authz.member-management] a maintainer manages members but not owners, and only an owner deletes the org", () => {
+    fc.assert(
+      fc.property(roleArb, orgResArb, (role, resource) => {
+        const org = { ...resource, suspended: false };
+        const u = user({ memberships: [{ org: org.org, role }] });
+        const may = (action: Action) => outcome(decide(u, action, org)) === "ok:";
+        return (
+          may("ManageMembers") === (role !== "member") &&
+          may("ManageOwners") === (role === "owner") &&
+          may("DeleteOrg") === (role === "owner")
+        );
+      }),
+    );
+    const maintainer = user({ memberships: [{ org: ORG_1, role: "maintainer" }] });
+    expect(outcome(authorize(maintainer, "ManageMembers", into(ORG_1)))).toBe("ok:");
+    expect(outcome(authorize(maintainer, "ManageOwners", into(ORG_1)))).toBe("403:role");
+  });
+
   it("[authz.handle-first] a user without a handle may only choose one", () => {
     fc.assert(
       fc.property(userArb, requestArb, (u, { action, resource }) => {

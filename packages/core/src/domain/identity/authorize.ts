@@ -117,7 +117,10 @@ export const SPEC_ACTIONS = {
 export const NON_SPEC_ACTIONS = {
   SetHandle: rule("Self", "handle"),
   CreateOrg: rule("Instance", "user"),
-  ManageMembers: rule("Org", "own"),
+  /** Invite, remove, or move a member between member and maintainer. */
+  ManageMembers: rule("Org", "maintain"),
+  /** Make or unmake an owner. */
+  ManageOwners: rule("Org", "own"),
   DeleteOrg: rule("Org", "own"),
   ManageDeployTargets: rule("Project", "own"),
   DeleteProject: rule("Project", "own"),

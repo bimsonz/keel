@@ -40,6 +40,8 @@ Each action names the kind of resource it is decided on (`Instance`, `Self`, `Or
 5. An agent asking about a project of its org that is not its own is `foreign-project` (403); a public project of any org it may read, as the public.
 6. Otherwise the role decides (`role`, with who to ask), or the agent's scope (`scope`).
 
+Managing an org's members (inviting, removing, moving one between member and maintainer) needs a maintainer; making or unmaking an owner, and deleting the org, need an owner.
+
 A fork (`Fork {source, target}`) is granted when the caller can read the source and is a member of the target org. A private source forks only within its own org (`private-source`); an outsider gets the source's NotVisible.
 
 Every 401 and 403 names at least one next action.
