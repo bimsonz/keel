@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/charts/charts.test.ts
+# kills: charts.valid
+# why: Change's Parked names an initial sub-state it does not have; only xstate resolves a compound state's initial
+diff --git a/packages/core/test/charts/charts.ts b/packages/core/test/charts/charts.ts
+index 565fef7..13ccf49 100644
+--- a/packages/core/test/charts/charts.ts
++++ b/packages/core/test/charts/charts.ts
+@@ -76,7 +76,7 @@ export const changeChart: Chart = {
+       },
+     },
+     parked: {
+-      initial: "awaitingRuling",
++      initial: "awaitingReview",
+       on: { ...ends },
+       states: {
+         awaitingRuling: {

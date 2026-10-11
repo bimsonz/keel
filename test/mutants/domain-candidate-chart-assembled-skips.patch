@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.chart
+# why: evolve sends an assembled candidate straight to Verifying, an edge the chart does not have
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index 150f6c9..ed6fb39 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -324,7 +324,7 @@ export const evolveCandidate = (
+       return illegal(batch, event);
+     case "CandidateAssembled":
+       return batch.state === "forming"
+-        ? { ...batch, state: "assembled", candidateId: event.candidateId }
++        ? { ...batch, state: "verifying", candidateId: event.candidateId }
+         : illegal(batch, event);
+     case "VerificationStarted":
+       return batch.state === "assembled" ? { ...batch, state: "verifying" } : illegal(batch, event);
