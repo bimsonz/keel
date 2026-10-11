@@ -1,5 +1,5 @@
 import { introspectWorkflow, runInDurableObject } from "cloudflare:test";
-import { env } from "cloudflare:workers";
+import { env, exports } from "cloudflare:workers";
 import { laneOf } from "@keeltown/core/application/coordination";
 import { projectRepos } from "@keeltown/core/application/integration";
 import { L1_SUITE_PLAN } from "@keeltown/core/application/verification";
@@ -36,7 +36,7 @@ import {
   replayed,
   unrenewed,
 } from "./change-harness.ts";
-import { drainAfter } from "./helpers.ts";
+import { BASE, drainAfter, mcp, mcpResult, seedAgent, tokenFor } from "./helpers.ts";
 import { inertPrecheck } from "./inert-precheck.ts";
 
 /** How long a test waits for something the object does by itself (a flush, an alarm). */
@@ -707,6 +707,87 @@ describe("a change moved by its real lane's delivered events", () => {
       proofId: advanced.landings[0]?.proofId,
     });
     expect(trunk.writer.pushes()).toEqual([{ from: lane.base, to: tip }]);
+    await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);
+  });
+});
+
+/** KeelVerify's remedy for a red suite, naming the failing tests it read. */
+const RED_REMEDY: readonly NextAction[] = [
+  {
+    kind: "call",
+    title: "Fix the failing tests, push, and submit again",
+    operationId: "submit",
+    args: { failingTests: ["test/auth.test.ts"] },
+  },
+];
+
+interface StatusBody {
+  readonly summary: string;
+  readonly next: readonly NextAction[];
+}
+
+/** The change's submission status through REST, as its agent's harness reads it. */
+async function statusRest(c: ChangeUnderTest, token: string): Promise<StatusBody> {
+  const response = await exports.default.fetch(`${BASE}/v1/changes/${c.changeId}/submission`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  expect(response.status).toBe(200);
+  return response.json<StatusBody>();
+}
+
+/** The same read through the MCP tool `status`. */
+async function statusTool(c: ChangeUnderTest, token: string): Promise<unknown> {
+  const result = await mcpResult(
+    await mcp(
+      token,
+      "tools/call",
+      { name: "status", arguments: { changeId: c.changeId } },
+      "status",
+    ),
+  );
+  return result["structuredContent"];
+}
+
+describe("a parked change's next actions", () => {
+  it("[b11.parked-remedy] a bounced change whose lease lapses reads adopt and then its bounce's remedy, verbatim, through REST and MCP alike", async () => {
+    await using precheck = await inertPrecheck();
+    const projectId = makeId("prj", ulid());
+    const lane = await realLane(projectId);
+    const c = await changeUnderTest(projectId);
+    const token = await tokenFor(await seedAgent({ projectId }));
+
+    await queue(c);
+    await vi.waitFor(async () => expect((await c.current()).state).toBe("integrating"), WAIT);
+    const { lease, batchId } = await c.current();
+    await lane.verdict(batchId, "bounce", ["test-failed: test/auth.test.ts"], RED_REMEDY);
+    await vi.waitFor(async () => expect((await c.current()).state).toBe("bounced"), WAIT);
+    const bounced = await statusRest(c, token);
+    // The lease lapses through the object's own alarm, as [b11.lapse] runs it.
+    c.clock.advance(LEASE_TTL_MS);
+    await runInDurableObject(c.stub, async (instance: ChangeDO, { storage }) => {
+      await scheduleAlarm(storage, {
+        kind: "deadline",
+        reason: `lease ${lease.id} lapses`,
+        at: Date.now(),
+      });
+      await instance.alarm();
+    });
+    const parked = await statusRest(c, token);
+    const viaTool = await statusTool(c, token);
+
+    expect(await c.current()).toMatchObject({ state: "parked", parkReason: "lease-lapsed" });
+    expect(bounced.next).toEqual(RED_REMEDY);
+    expect(parked.next).toEqual([
+      {
+        kind: "call",
+        title: expect.any(String),
+        operationId: "adopt",
+        args: { changeId: c.changeId },
+      },
+      ...RED_REMEDY,
+    ]);
+    expect(parked.summary).toContain("test-failed: test/auth.test.ts");
+    expect(viaTool).toMatchObject({ next: parked.next, summary: parked.summary });
     await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), WAIT);
   });
 });

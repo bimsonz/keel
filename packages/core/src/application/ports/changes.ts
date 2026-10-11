@@ -11,7 +11,14 @@ import type {
   SketchNotFound,
 } from "../../domain/coordination/index.ts";
 import type { IdempotencyConflict, Principal } from "../../domain/identity/index.ts";
-import type { ChangeId, CommitSha, ProjectId, WorkspaceId } from "../../domain/kernel/index.ts";
+import type {
+  ChangeId,
+  CommitSha,
+  NextAction,
+  ProjectId,
+  VerdictId,
+  WorkspaceId,
+} from "../../domain/kernel/index.ts";
 import type {
   Adopted,
   AdoptInput,
@@ -21,10 +28,22 @@ import type {
 } from "../coordination/index.ts";
 import type { RepoRef } from "./code-host.ts";
 
-/** A change's submission as it stands: the change, and the commit last submitted for it. */
+/** What a bounce asked of the agent, verbatim: the verdict, its reasons and its next actions. */
+export interface Remedy {
+  readonly verdictId: VerdictId;
+  readonly reasons: readonly string[];
+  readonly nextActions: readonly NextAction[];
+}
+
+/**
+ * A change's submission as it stands: the change, the commit last submitted
+ * for it, and the remedy its last bounce asked for, until a submission
+ * answers it. A park keeps it: the lease lapsing changes who acts, not what to do.
+ */
 export interface SubmissionStatus {
   readonly change: Change;
   readonly commitSha: CommitSha | null;
+  readonly remedy?: Remedy;
 }
 
 /** Where a change's commits live: its workspace repo and the trunk commit it was granted at. */

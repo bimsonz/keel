@@ -5,11 +5,13 @@ import {
   IdempotencyConflict,
   ScopeNotGranted,
 } from "@keeltown/core/domain/identity";
-import { AgentId } from "@keeltown/core/kernel";
+import type { Change } from "@keeltown/core/domain/coordination";
+import { AgentId, CommitSha, Instant, makeId } from "@keeltown/core/kernel";
+import { ulid } from "ulid";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { tokenError, whoamiError } from "../../src/adapters/driving/http/mappers.ts";
-import { submitError } from "../../src/adapters/driving/http/work-loop.ts";
+import { statusOk, submitError } from "../../src/adapters/driving/http/work-loop.ts";
 import { makeHandlers } from "../../src/adapters/driving/http/handlers.ts";
 
 const agentId = Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
@@ -99,5 +101,46 @@ describe("stubbed operations", () => {
         expect.objectContaining({ code: "service.not_implemented", requestId: "req-1" }),
       ),
     );
+  });
+});
+
+describe("a status read's next actions", () => {
+  const holder = makeId("agt", ulid());
+  const change = (overrides: Partial<Change>): Change => ({
+    id: makeId("chg", ulid()),
+    agentId: holder,
+    origin: "agent",
+    state: "submitted",
+    intent: { revision: 1, goal: "Cache permission lookups", footprint: [], premises: [] },
+    lease: { id: makeId("lse", ulid()), agentId: holder, renewedAt: Instant(0), state: "active" },
+    createdAt: Instant(0),
+    ...overrides,
+  });
+  const SHA = CommitSha.make("a".repeat(40));
+
+  it("[b11.status-next] waits on the submission only while the platform moves it; a park waits on its ruling or on an adopter", () => {
+    const submitted = statusOk(caller, { change: change({}), commitSha: SHA });
+    const escalated = change({
+      state: "parked",
+      parkReason: "awaiting-ruling",
+      escalationId: makeId("esc", ulid()),
+    });
+    const ruling = statusOk(caller, { change: escalated, commitSha: SHA });
+    const lapsed = change({ state: "parked", parkReason: "lease-lapsed" });
+    const unsubmitted = statusOk(caller, { change: lapsed, commitSha: null });
+
+    expect(submitted.status === 200 && submitted.body.next).toEqual([
+      expect.objectContaining({ operationId: "status" }),
+    ]);
+    expect(ruling.status === 200 && ruling.body.next).toEqual([
+      expect.objectContaining({
+        kind: "read",
+        operationId: "inbox",
+        title: expect.stringContaining(escalated.escalationId ?? "?"),
+      }),
+    ]);
+    expect(unsubmitted.status === 404 && unsubmitted.body.nextActions).toEqual([
+      expect.objectContaining({ operationId: "adopt", args: { changeId: lapsed.id } }),
+    ]);
   });
 });

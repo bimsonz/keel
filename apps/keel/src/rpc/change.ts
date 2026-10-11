@@ -105,10 +105,17 @@ export const AdoptCommand = Schema.Struct({
 });
 export type AdoptCommand = typeof AdoptCommand.Type;
 
-/** A change's submission as it stands: the change, and the commit last submitted for it. */
+/** A change's submission as it stands: the change, the commit last submitted for it, and the remedy its last bounce asked for. */
 export const SubmissionStatus = Schema.Struct({
   change: Change,
   commitSha: Schema.NullOr(CommitSha),
+  remedy: Schema.optionalKey(
+    Schema.Struct({
+      verdictId: VerdictId,
+      reasons: Schema.Array(Schema.String),
+      nextActions: Schema.Array(NextAction),
+    }),
+  ),
 });
 
 /**

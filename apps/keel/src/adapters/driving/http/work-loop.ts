@@ -25,12 +25,13 @@ import type { IdempotencyConflict, InboxPage } from "@keeltown/core/domain/ident
 import {
   type Anchor,
   ChangeId,
+  type NextAction as DomainNextAction,
   type Citation,
   CommitSha,
   LeaseId,
   SketchId,
 } from "@keeltown/core/kernel";
-import type { SubmissionStatus } from "@keeltown/core/ports";
+import type { Remedy, SubmissionStatus } from "@keeltown/core/ports";
 import { Result, Schema, SchemaIssue } from "effect";
 import type {
   AdoptResult,
@@ -245,6 +246,33 @@ const statusOf = (changeId: ChangeId): NextAction => ({
   operationId: "status",
   args: { changeId, wait: 30 },
 });
+
+/** A parked change whose lease lapsed waits for an agent to take it back. */
+const adoptOf = (changeId: ChangeId): NextAction => ({
+  kind: "call",
+  title: "Adopt the change: its lease lapsed, so take it back with a fresh lease",
+  operationId: "adopt",
+  args: { changeId },
+});
+
+/** A change parked on an escalation waits for a person's ruling, which arrives in the inbox. */
+const rulingOf = (change: Change): NextAction => ({
+  kind: "read",
+  title: `Wait in your inbox for the ruling on ${change.escalationId ?? "its escalation"}`,
+  operationId: "inbox",
+  args: { wait: 30 },
+});
+
+/** The domain's next actions as the API declares them, absent fields left out. */
+const apiActions = (actions: readonly DomainNextAction[]): NextAction[] =>
+  actions.map(({ operationId, args, ...action }) => ({
+    ...action,
+    ...(operationId === undefined ? {} : { operationId }),
+    ...(args === undefined ? {} : { args }),
+  }));
+
+/** The envelope's `next` holds at most three. */
+const MAX_NEXT = 3;
 
 export function declareOk(declared: Declared): DeclareResult {
   const { change, preflight, workspace } = declared;
@@ -478,11 +506,7 @@ export function adoptError(
         status: 409,
         body: problem(409, "change.lease_not_lapsed", caller.requestId, {
           detail: `${error.changeId}'s lease lapses at ${iso(error.lapsesAt)}; it can be adopted after that.`,
-          nextActions: error.nextActions.map(({ operationId, args, ...action }) => ({
-            ...action,
-            ...(operationId === undefined ? {} : { operationId }),
-            ...(args === undefined ? {} : { args }),
-          })),
+          nextActions: apiActions(error.nextActions),
         }),
       };
     case "ChangeInOtherProject":
@@ -509,43 +533,69 @@ export function adoptError(
   }
 }
 
+/**
+ * What the agent does next about a change, by its state. A bounce's own
+ * remedy, verbatim; a park on a lapsed lease is adopt and then that remedy,
+ * since the lapse changes who acts, not what to do; a park on an escalation
+ * waits for the ruling. Only a change the platform is moving waits on its submission.
+ */
+function nextFor(change: Change, remedy: Remedy | undefined): NextAction[] {
+  const asked = apiActions(remedy?.nextActions ?? []);
+  switch (change.state) {
+    case "bounced":
+      return asked.length > 0
+        ? asked
+        : [
+            {
+              kind: "call",
+              title: "Fix what bounced it, push, and submit again",
+              operationId: "submit",
+              args: { changeId: change.id },
+            },
+          ];
+    case "parked":
+      return change.parkReason === "awaiting-ruling"
+        ? [rulingOf(change)]
+        : [adoptOf(change.id), ...asked].slice(0, MAX_NEXT);
+    case "landed":
+    case "withdrawn":
+    case "superseded":
+      return [];
+    default:
+      return [statusOf(change.id)];
+  }
+}
+
 export function statusOk(caller: Caller, status: SubmissionStatus): StatusResult {
-  const { change, commitSha } = status;
+  const { change, commitSha, remedy } = status;
+  const state =
+    change.parkReason === undefined ? change.state : `${change.state} (${change.parkReason})`;
   if (commitSha === null) {
     return {
       status: 404,
       body: problem(404, "resource.not_found", caller.requestId, {
-        detail: `${change.id} has no submission yet; it is ${change.state}.`,
-        nextActions: [
-          {
-            kind: "call",
-            title: "Submit a commit pushed to the change's workspace",
-            operationId: "submit",
-            args: { changeId: change.id },
-          },
-        ],
+        detail: `${change.id} has no submission yet; it is ${state}.`,
+        nextActions:
+          change.state === "parked"
+            ? nextFor(change, remedy)
+            : [
+                {
+                  kind: "call",
+                  title: "Submit a commit pushed to the change's workspace",
+                  operationId: "submit",
+                  args: { changeId: change.id },
+                },
+              ],
       }),
     };
   }
-  const next: readonly NextAction[] =
-    change.state === "bounced"
-      ? [
-          {
-            kind: "call",
-            title: "Fix what bounced it, push, and submit again",
-            operationId: "submit",
-            args: { changeId: change.id },
-          },
-        ]
-      : change.state === "landed" || change.state === "withdrawn" || change.state === "superseded"
-        ? []
-        : [statusOf(change.id)];
+  const bounced = remedy === undefined ? "" : ` It bounced: ${remedy.reasons.join("; ")}.`;
   return {
     status: 200,
     body: envelope(
-      `${change.id} is ${change.state} at ${commitSha.slice(0, 12)}.`,
+      `${change.id} is ${state} at ${commitSha.slice(0, 12)}.${bounced}`,
       submissionView(change, commitSha),
-      next,
+      nextFor(change, remedy),
     ),
   };
 }

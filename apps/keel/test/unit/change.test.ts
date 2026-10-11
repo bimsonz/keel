@@ -11,6 +11,7 @@ import {
   precheckStarted,
   reactToBatch,
   revise,
+  submissionStatus,
   submit,
 } from "@keeltown/core/application/coordination";
 import { LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
@@ -822,5 +823,47 @@ describe("reading a change", () => {
       const missing = yield* Effect.exit(getChange(makeId("chg", "01JZ8PT2C4E6G8J0M2N4Q6S8V9")));
       expect(failureTag(missing)).toContain("ChangeNotFound");
     }).pipe(Effect.provide(changeObject().layer)),
+  );
+});
+
+describe("the remedy a status read carries", () => {
+  it.effect(
+    "[b11.remedy-of] keeps the bounce's reasons and next actions verbatim through a lapse, and clears them on resubmission",
+    () => {
+      const { layer, clock } = changeObject();
+      return Effect.gen(function* () {
+        const declared = yield* declare(declaring());
+        const lease = declared.change.lease.id;
+        const sha = yield* pushToWorkspace;
+        yield* submit(changeId, submitting(lease, sha, "submit-1"));
+        yield* precheckStarted(changeId, starting(1, "p-1"));
+        yield* precheckRefused(changeId, refusing(1, "p-1"));
+        const bounced = yield* submissionStatus(changeId);
+        clock.advance(LEASE_TTL_MS);
+        yield* lapseLease(changeId, lease, "due");
+        const parked = yield* submissionStatus(changeId);
+        const adopted = yield* adopt(
+          changeId,
+          Schema.decodeUnknownSync(AdoptCommand)({
+            agentId: adopterId,
+            projectId: sampleProjectId,
+            idempotencyKey: "adopt-1",
+          }),
+        );
+        yield* submit(changeId, submitting(adopted.change.lease.id, sha, "submit-2"));
+        const resubmitted = yield* submissionStatus(changeId);
+
+        const asked = refusing(1, "p-1");
+        expect(bounced.change.state).toBe("bounced");
+        expect(bounced.remedy).toMatchObject({
+          reasons: asked.reasons,
+          nextActions: asked.nextActions,
+        });
+        expect(parked.change).toMatchObject({ state: "parked", parkReason: "lease-lapsed" });
+        expect(parked.remedy).toEqual(bounced.remedy);
+        expect(resubmitted.change.state).toBe("submitted");
+        expect(resubmitted.remedy).toBeUndefined();
+      }).pipe(Effect.provide(layer));
+    },
   );
 });

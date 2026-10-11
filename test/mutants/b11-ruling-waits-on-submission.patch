@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/mappers.test.ts -t b11.status-next
+# kills: b11.status-next
+# why: a change parked on an escalation tells its agent to wait on the submission, which never moves until a person rules
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index d7271b1..62ba76e 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -555,7 +555,7 @@ function nextFor(change: Change, remedy: Remedy | undefined): NextAction[] {
+           ];
+     case "parked":
+       return change.parkReason === "awaiting-ruling"
+-        ? [rulingOf(change)]
++        ? [statusOf(change.id)]
+         : [adoptOf(change.id), ...asked].slice(0, MAX_NEXT);
+     case "landed":
+     case "withdrawn":

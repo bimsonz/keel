@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/change.test.ts -t parked-remedy
+# kills: b11.parked-remedy
+# why: a parked change's status says only adopt, so the agent who adopts it no longer reads what its bounce asked it to fix
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index d7271b1..e3ce9b7 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -556,7 +556,7 @@ function nextFor(change: Change, remedy: Remedy | undefined): NextAction[] {
+     case "parked":
+       return change.parkReason === "awaiting-ruling"
+         ? [rulingOf(change)]
+-        : [adoptOf(change.id), ...asked].slice(0, MAX_NEXT);
++        : [adoptOf(change.id)];
+     case "landed":
+     case "withdrawn":
+     case "superseded":

@@ -57,9 +57,10 @@ import {
   type Committed,
   EntityStore,
   type EventDraft,
-  type EventOutbox,
+  EventOutbox,
   EVERY_TYPE,
   Ids,
+  type Remedy,
   type Stored,
   type SubmissionStatus,
   type Transaction,
@@ -347,14 +348,36 @@ export const getChange: (changeId: ChangeId) => Effect.Effect<Change, ChangeNotF
     return change;
   });
 
-/** The change's submission as it stands: the change, and the commit last submitted for it. */
+/**
+ * The remedy still owed on a change, from its log: its latest ChangeBounced
+ * after its latest ChangeSubmitted. A resubmission answers it, so it clears;
+ * a lapse and a park leave it standing.
+ */
+export const remedyOf = (log: readonly EventEnvelope[]): Remedy | undefined => {
+  let remedy: Remedy | undefined;
+  for (const event of log) {
+    if (event.type === "ChangeSubmitted") remedy = undefined;
+    if (event.type === "ChangeBounced") {
+      const { verdictId, reasons, nextActions } = decodeBounced(event.payload);
+      remedy = { verdictId, reasons, nextActions: nextActions ?? [] };
+    }
+  }
+  return remedy;
+};
+
+/** The change's submission as it stands: the change, the commit last submitted for it, and any remedy owed. */
 export const submissionStatus: (
   changeId: ChangeId,
-) => Effect.Effect<SubmissionStatus, ChangeNotFound, EntityStore> = Effect.fn(
+) => Effect.Effect<SubmissionStatus, ChangeNotFound, EntityStore | EventOutbox> = Effect.fn(
   "coordination/submissionStatus",
 )(function* (changeId: ChangeId) {
   const change = yield* getChange(changeId);
-  return { change, commitSha: change.commitSha ?? null };
+  const remedy = remedyOf((yield* EventOutbox).log(changeRef(changeId)));
+  return {
+    change,
+    commitSha: change.commitSha ?? null,
+    ...(remedy === undefined ? {} : { remedy }),
+  };
 });
 
 /** The workspace the change holds, for Precheck's diff. ChangeStateRefused before it holds one. */
