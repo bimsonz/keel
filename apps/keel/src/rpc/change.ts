@@ -218,7 +218,7 @@ const Mutation = Schema.Union([
 ]);
 
 export const ChangeCodecs = {
-  get: exitCodec(Change, ChangeNotFound),
+  get: exitCodec(Schema.Struct({ change: Change, projectId: ProjectId }), ChangeNotFound),
   declare: exitCodec(
     Schema.Struct({ change: Change, preflight: Preflight, grant: WorkspaceGrant }),
     Schema.Union([ChangeStateRefused, PoolExhausted, SketchNotFound, IdempotencyConflict]),

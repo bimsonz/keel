@@ -1,0 +1,30 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/get-change.test.ts
+# kills: b12.get-change-audience
+# why: another project's agent is refused 403, as listChanges refuses it, which confirms the private change exists
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 1fd73a4..7365e01 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -256,7 +256,8 @@ export function makeHandlers(run: Runner) {
+           readChange(caller.principal, decoded.success).pipe(
+             Effect.match({
+               onSuccess: ({ change }) => changeOk(change),
+-              onFailure: (error) => changeReadError(caller, error),
++              onFailure: (error) =>
++                error._tag === "ForeignProject" ? readRefused(caller, error) : changeReadError(caller, error),
+             }),
+           ),
+         );
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 53f52bf..4662cee 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -244,7 +244,7 @@ export const readChange: (
+   Changes.use((changes) => changes.get(changeId)).pipe(
+     Effect.tap(({ projectId }) =>
+       projectScope(principal, projectId).pipe(
+-        Effect.mapError(() => new ChangeNotFound({ changeId })),
++        Effect.catchTag("ProjectNotFound", () => Effect.fail(new ChangeNotFound({ changeId }))),
+       ),
+     ),
+   );

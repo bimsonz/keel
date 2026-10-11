@@ -619,9 +619,10 @@ export function makeChangesMemory(
         get: (changeId) =>
           Effect.suspend(() => {
             const change = changes.get(changeId);
-            return change === undefined
+            const projectId = projects.get(changeId);
+            return change === undefined || projectId === undefined
               ? Effect.fail(new ChangeNotFound({ changeId }))
-              : Effect.succeed(change);
+              : Effect.succeed({ change, projectId });
           }),
         awaitSubmission: (changeId, waitSeconds) =>
           Effect.gen(function* () {

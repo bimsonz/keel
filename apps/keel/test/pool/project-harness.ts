@@ -1,0 +1,76 @@
+// A real Project DO for the doorway's reads: created over in-memory code, trunk
+// and pool, private as created, and made public by an operator through the
+// settings route.
+import { runInDurableObject } from "cloudflare:test";
+import { env } from "cloudflare:workers";
+import { makeId } from "@keeltown/core/kernel";
+import { CodeHost } from "@keeltown/core/ports";
+import {
+  CodeHostFixture,
+  makeCodeHostMemory,
+  makeTrunksMemory,
+  makeWorkspacePoolMemory,
+  projectEvents,
+} from "@keeltown/testing";
+import { Effect, Layer, ManagedRuntime } from "effect";
+import { ulid } from "ulid";
+import { expect } from "vitest";
+import type { ProjectDO } from "../../src/adapters/driving/do/project.ts";
+import { backbone } from "../../src/composition/do.ts";
+import { decodeExit, ProjectCodecs } from "../../src/rpc/index.ts";
+import { ok } from "./change-harness.ts";
+import { BASE, drainAfter, drainOutbox, seedAgent, tokenFor, worker } from "./helpers.ts";
+
+const SOURCE = { namespace: "keel-core", name: "seed-app" };
+
+/** A created project, private as created; `open()` has an operator make it public through the settings route. */
+export async function project() {
+  const projectId = makeId("prj", ulid());
+  const stub = drainAfter(env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)));
+  const code = makeCodeHostMemory();
+  await runInDurableObject(stub, (instance: ProjectDO, state) => {
+    Reflect.set(
+      instance,
+      "runtime",
+      ManagedRuntime.make(
+        Layer.mergeAll(
+          backbone(state.storage),
+          code.layer,
+          makeTrunksMemory().layer,
+          makeWorkspacePoolMemory().layer,
+        ),
+      ),
+    );
+  });
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      yield* (yield* CodeHost).create(SOURCE);
+      yield* (yield* CodeHostFixture).commit(SOURCE, "refs/heads/main", { "a.txt": "a" });
+    }).pipe(Effect.provide(code.layer)),
+  );
+  ok(
+    decodeExit(
+      ProjectCodecs.createProject,
+      await stub.createProject({
+        projectId,
+        name: "Seed app",
+        source: SOURCE.name,
+        by: makeId("agt", ulid()),
+        idempotencyKey: "create-1",
+        fingerprint: "body-1",
+      }),
+    ),
+  );
+  await drainOutbox(stub);
+  const open = async () => {
+    const operator = await tokenFor(await seedAgent({}, ["operator"]));
+    const put = await worker(`${BASE}/v1/projects/${projectId}/settings`, {
+      method: "PUT",
+      headers: { authorization: `Bearer ${operator}`, "content-type": "application/json" },
+      body: JSON.stringify({ protectedPaths: [], maxBatchSize: 1, visibility: "public" }),
+    });
+    expect(put.status).toBe(200);
+    await drainOutbox(stub);
+  };
+  return { projectId, events: projectEvents(projectId), open };
+}

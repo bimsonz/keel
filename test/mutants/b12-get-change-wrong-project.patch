@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/get-change.test.ts
+# kills: b12.get-change-audience
+# why: the read is scoped to the caller's own project, not the change's, so any agent reads any change
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 53f52bf..be49448 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -243,7 +243,7 @@ export const readChange: (
+ ) => Effect.Effect<ChangeRead, ChangeNotFound, Changes | Projects> = (principal, changeId) =>
+   Changes.use((changes) => changes.get(changeId)).pipe(
+     Effect.tap(({ projectId }) =>
+-      projectScope(principal, projectId).pipe(
++      projectScope(principal, principal?.projectId ?? projectId).pipe(
+         Effect.mapError(() => new ChangeNotFound({ changeId })),
+       ),
+     ),

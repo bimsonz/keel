@@ -588,7 +588,7 @@ const composeBatch = Effect.fn("integration/composeBatch")(function* (
   const changes = yield* Changes;
   const members = yield* Effect.forEach(batch.members, (changeId) =>
     Effect.gen(function* () {
-      const change = yield* changes.get(changeId);
+      const { change } = yield* changes.get(changeId);
       const workspace = yield* changes.workspace(changeId);
       if (change.commitSha === undefined)
         return yield* Effect.die(new Error(`${changeId} is in a batch with no submitted commit`));

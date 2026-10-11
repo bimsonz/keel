@@ -164,9 +164,13 @@ interface Changes {
     @body body: DeclaredEnvelope;
   } | NotFound | Conflict | StandardErrors;
 
-  /** Read a change. */
+  /**
+   * Read a change, as its own Durable Object holds it. An observer or operator reads any change, an
+   * agent its own project's, and anyone (without a token too) a public project's. Any other change
+   * answers 404, as one that does not exist does, so a private change's existence does not leak.
+   */
   @summary("Get a change")
-  @useAuth(AgentRead | Observer)
+  @useAuth(NoAuth | AgentRead | Observer)
   @route("/{changeId}")
   @get
   getChange(...ChangePath): Change | NotFound | StandardErrors;

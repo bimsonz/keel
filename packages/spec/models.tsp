@@ -65,6 +65,13 @@ model Change {
   goal: string;
   footprint: MFP.FootprintEntry[];
   premises: MFP.Proposition[];
+
+  /** Effects the agent declared it expects to cause. Advisory only: Keel derives effects from the diff. */
+  declaredEffects?: MFP.Proposition[];
+
+  /** The commit last submitted; it is the commit that lands. */
+  commitSha?: CommitSha;
+
   createdAt: utcDateTime;
 }
 

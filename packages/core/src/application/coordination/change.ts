@@ -60,6 +60,7 @@ import {
 } from "../../domain/kernel/index.ts";
 import { VerdictIssued } from "../../domain/verification/index.ts";
 import {
+  type ChangeRead,
   Clock,
   CodeHost,
   commit,
@@ -471,6 +472,22 @@ export const getChange: (changeId: ChangeId) => Effect.Effect<Change, ChangeNotF
     if (change === undefined) return yield* notFound(changeId);
     return change;
   });
+
+/**
+ * The change with its project, as `Changes.get` answers. Declare records the
+ * project with the workspace in the change's own transaction and nothing
+ * removes it, so a change without one is a defect.
+ */
+export const changeRead: (
+  changeId: ChangeId,
+) => Effect.Effect<ChangeRead, ChangeNotFound, EntityStore> = Effect.fn("coordination/changeRead")(
+  function* (changeId: ChangeId) {
+    const change = yield* getChange(changeId);
+    const projectId = heldWorkspace(yield* EntityStore, changeId)?.projectId;
+    if (projectId === undefined) return yield* Effect.die(`${changeId} has no project recorded`);
+    return { change, projectId };
+  },
+);
 
 /**
  * The remedy still owed on a change, from its log: its latest ChangeBounced

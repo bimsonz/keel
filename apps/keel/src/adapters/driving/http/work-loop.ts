@@ -45,6 +45,7 @@ import { Result, Schema, SchemaIssue } from "effect";
 import type {
   AbandonResult,
   AdoptResult,
+  Changes_getChangeResult,
   DeclareResult,
   InboxResult,
   NearbyResult,
@@ -224,6 +225,10 @@ function changeView(change: Change) {
     goal: change.intent.goal,
     footprint: change.intent.footprint.map(footprintView),
     premises: change.intent.premises.map(propositionView),
+    ...(change.intent.declaredEffects === undefined
+      ? {}
+      : { declaredEffects: change.intent.declaredEffects.map(propositionView) }),
+    ...(change.commitSha === undefined ? {} : { commitSha: change.commitSha }),
     createdAt: iso(change.createdAt),
   };
 }
@@ -742,6 +747,15 @@ export function relyError(
       return unmapped;
     }
   }
+}
+
+/** A change read by id: the change itself, bare, as the spec's `Change`. */
+export function changeOk(change: Change): Changes_getChangeResult {
+  return { status: 200, body: changeView(change) };
+}
+
+export function changeReadError(caller: Caller, error: ChangeNotFound): Changes_getChangeResult {
+  return changeNotFound(caller, error);
 }
 
 export function nearbyOk(changeId: ChangeId, preflight: Preflight): NearbyResult {

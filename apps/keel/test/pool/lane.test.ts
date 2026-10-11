@@ -84,16 +84,19 @@ async function lane(options: { readonly noStaging?: boolean } = {}) {
       abandon: () => Effect.die(new Error("the Lane never abandons")),
       get: (id) =>
         Effect.succeed({
-          id,
-          agentId,
-          origin: "agent",
-          state: "queued",
-          intent: { revision: 1, goal: `goal of ${id}`, footprint: [], premises: [] },
-          lease: { id: makeId("lse", ulid()), agentId, renewedAt: Instant(0), state: "active" },
-          createdAt: Instant(0),
-          baseSha: sha("0"),
-          commitSha: sha("c"),
-          laneId,
+          change: {
+            id,
+            agentId,
+            origin: "agent",
+            state: "queued",
+            intent: { revision: 1, goal: `goal of ${id}`, footprint: [], premises: [] },
+            lease: { id: makeId("lse", ulid()), agentId, renewedAt: Instant(0), state: "active" },
+            createdAt: Instant(0),
+            baseSha: sha("0"),
+            commitSha: sha("c"),
+            laneId,
+          },
+          projectId,
         }),
       workspace: (id) =>
         Effect.succeed({

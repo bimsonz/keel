@@ -112,7 +112,7 @@ const deadline = (c: ChangeUnderTest, leaseId: string) =>
 async function expectStateIsTheLog(c: ChangeUnderTest) {
   // Both in one turn of the object, so nothing (a Precheck the outbox started) commits between them.
   const { stored, log } = await runInDurableObject(c.stub, async (instance: ChangeDO) => ({
-    stored: ok(decodeExit(ChangeCodecs.get, await instance.get())),
+    stored: ok(decodeExit(ChangeCodecs.get, await instance.get())).change,
     log: await instance["runtime"].runPromise(
       Effect.map(EventOutbox, (outbox) => outbox.log({ kind: "change", id: c.changeId })),
     ),
@@ -321,7 +321,7 @@ describe("the lease's deadline", () => {
         });
         await instance.alarm();
         return {
-          change: ok(decodeExit(ChangeCodecs.get, await instance.get())),
+          change: ok(decodeExit(ChangeCodecs.get, await instance.get())).change,
           armed: armedAlarms(storage).filter((alarm) => alarm.reason.startsWith("lease ")),
         };
       },

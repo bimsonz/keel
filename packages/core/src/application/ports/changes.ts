@@ -58,6 +58,12 @@ export interface SubmissionStatus {
   readonly remedy?: Remedy;
 }
 
+/** A change as its own DO holds it, with the project it was declared in. */
+export interface ChangeRead {
+  readonly change: Change;
+  readonly projectId: ProjectId;
+}
+
 /**
  * Where a change's commits live: its workspace repo, its base (the grant's
  * until a rebase moves it) and the trunk commit it was granted at, which never moves.
@@ -165,7 +171,8 @@ export class Changes extends Context.Service<
       Change,
       ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict
     >;
-    readonly get: (changeId: ChangeId) => Effect.Effect<Change, ChangeNotFound>;
+    /** The change and its project, read from its own DO: read-your-writes, whatever its state. */
+    readonly get: (changeId: ChangeId) => Effect.Effect<ChangeRead, ChangeNotFound>;
     /**
      * The change once its submission state moves, or as it stands when
      * `waitSeconds` (0–30) runs out. A DO evicted mid-wait answers its current

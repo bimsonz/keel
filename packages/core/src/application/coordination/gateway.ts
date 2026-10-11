@@ -1,23 +1,24 @@
 import { Effect, Schema } from "effect";
-import type {
-  Change,
-  ChangeInOtherProject,
+import {
+  type Change,
+  type ChangeInOtherProject,
   ChangeNotFound,
-  ChangeStateRefused,
-  CommitNotInWorkspace,
-  LeaseNotLapsed,
-  LeaseStale,
-  PoolExhausted,
-  Preflight,
-  RevisionMismatch,
-  SketchNotFound,
-  WithdrawAuthority,
+  type ChangeStateRefused,
+  type CommitNotInWorkspace,
+  type LeaseNotLapsed,
+  type LeaseStale,
+  type PoolExhausted,
+  type Preflight,
+  type RevisionMismatch,
+  type SketchNotFound,
+  type WithdrawAuthority,
 } from "../../domain/coordination/index.ts";
 import type { IdempotencyConflict, InboxPage, AgentToken } from "../../domain/identity/index.ts";
 import { ChangeId, type LeaseId, type ProjectId } from "../../domain/kernel/index.ts";
 import {
   type ChangeListPage,
   type ChangeListRead,
+  type ChangeRead,
   Changes,
   EventFeed,
   type EventFeedPage,
@@ -42,7 +43,7 @@ import type {
   Revised,
   SubmitInput,
 } from "./index.ts";
-import { audienceOf, type ReadRefused, readScope, viewScope } from "./read-scope.ts";
+import { audienceOf, projectScope, type ReadRefused, readScope, viewScope } from "./read-scope.ts";
 
 /**
  * The isolate's side of the work loop. The doorways have already checked the
@@ -228,6 +229,24 @@ export const readChangeList: (
 ) => Effect.Effect<ChangeListPage, ReadRefused, ProjectViews | Projects> = (principal, read) =>
   Effect.flatMap(viewScope(principal, read.project), ({ project }) =>
     ProjectViews.use((views) => views.changes({ ...read, project })),
+  );
+
+/**
+ * A change by id, from its own DO, if `projectScope` lets the caller read its
+ * project. A change the caller may not read answers ChangeNotFound, as an
+ * unknown one does: the caller names the change, so any other refusal would
+ * tell it that the change exists.
+ */
+export const readChange: (
+  principal: AgentToken | null,
+  changeId: ChangeId,
+) => Effect.Effect<ChangeRead, ChangeNotFound, Changes | Projects> = (principal, changeId) =>
+  Changes.use((changes) => changes.get(changeId)).pipe(
+    Effect.tap(({ projectId }) =>
+      projectScope(principal, projectId).pipe(
+        Effect.mapError(() => new ChangeNotFound({ changeId })),
+      ),
+    ),
   );
 
 /** A project's changes and trunk at the feed's head, with the cursor to fold forward from. */

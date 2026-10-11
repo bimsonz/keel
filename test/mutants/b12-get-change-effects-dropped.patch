@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/get-change.test.ts
+# kills: b12.get-change
+# why: the change answers without its declared effects, so comparing two attempts cannot see what each claims to cause
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index 6e997dd..7ca3849 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -227,7 +227,7 @@ function changeView(change: Change) {
+     premises: change.intent.premises.map(propositionView),
+     ...(change.intent.declaredEffects === undefined
+       ? {}
+-      : { declaredEffects: change.intent.declaredEffects.map(propositionView) }),
++      : {}),
+     ...(change.commitSha === undefined ? {} : { commitSha: change.commitSha }),
+     createdAt: iso(change.createdAt),
+   };

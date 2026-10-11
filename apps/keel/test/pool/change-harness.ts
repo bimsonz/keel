@@ -116,7 +116,8 @@ export async function changeUnderTest(
     clock.layer,
   );
 
-  const get = async () => decodeExit(ChangeCodecs.get, await stub.get());
+  const get = async () =>
+    Exit.map(decodeExit(ChangeCodecs.get, await stub.get()), (read) => read.change);
   return {
     changeId,
     agentId,

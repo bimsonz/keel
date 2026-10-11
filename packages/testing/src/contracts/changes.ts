@@ -152,7 +152,9 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
         const { who, result, commitSha, submit } = yield* declared(harness);
         const submitted = yield* changes.submit(who, submit());
         expect(submitted).toMatchObject({ id: result.change.id, state: "submitted" });
-        expect((yield* changes.get(result.change.id)).state).toBe("submitted");
+        const read = yield* changes.get(result.change.id);
+        expect(read.change.state).toBe("submitted");
+        expect(read.projectId).toBe(who.projectId);
         const status = yield* changes.awaitSubmission(result.change.id, 0);
         expect(status.commitSha).toBe(commitSha);
         expect(status.change.state).toBe("submitted");
@@ -291,7 +293,9 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
           expect(error).toMatchObject({ _tag: "LeaseNotLapsed", changeId: result.change.id });
           expect(error._tag === "LeaseNotLapsed" ? error.lapsesAt : 0).toBeGreaterThan(Date.now());
           expect(error._tag === "LeaseNotLapsed" ? error.nextActions.length : 0).toBeGreaterThan(0);
-          expect((yield* changes.get(result.change.id)).lease.id).toBe(result.change.lease.id);
+          expect((yield* changes.get(result.change.id)).change.lease.id).toBe(
+            result.change.lease.id,
+          );
         }).pipe(Effect.provide(harness.layer));
       },
     );
@@ -320,7 +324,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
             _tag: "IdempotencyConflict",
             idempotencyKey: input.idempotencyKey,
           });
-          expect((yield* changes.get(result.change.id)).agentId).toBe(adopter.agentId);
+          expect((yield* changes.get(result.change.id)).change.agentId).toBe(adopter.agentId);
         }).pipe(Effect.provide(harness.layer));
       },
     );
@@ -340,7 +344,9 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
             changes.adopt(foreign, { changeId: result.change.id, idempotencyKey: "adopt-foreign" }),
           );
           expect(error).toMatchObject({ _tag: "ChangeInOtherProject", changeId: result.change.id });
-          expect((yield* changes.get(result.change.id)).lease.id).toBe(result.change.lease.id);
+          expect((yield* changes.get(result.change.id)).change.lease.id).toBe(
+            result.change.lease.id,
+          );
         }).pipe(Effect.provide(harness.layer));
       },
     );
@@ -384,7 +390,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
             }),
           );
           expect(fenced).toMatchObject({ _tag: "LeaseStale" });
-          expect((yield* changes.get(result.change.id)).intent.revision).toBe(2);
+          expect((yield* changes.get(result.change.id)).change.intent.revision).toBe(2);
         }).pipe(Effect.provide(harness.layer));
       },
     );
@@ -414,7 +420,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
             }),
           );
           expect(fenced).toMatchObject({ _tag: "LeaseStale", changeId: result.change.id });
-          expect((yield* changes.get(result.change.id)).intent.revision).toBe(2);
+          expect((yield* changes.get(result.change.id)).change.intent.revision).toBe(2);
         }).pipe(Effect.provide(harness.layer));
       },
     );
@@ -440,7 +446,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
           const changeId = Schema.decodeUnknownSync(ChangeId)(fresh("chg"));
           const missing = yield* Effect.flip(changes.nearby(who, changeId));
           expect(missing).toMatchObject({ _tag: "ChangeNotFound", changeId });
-          expect((yield* changes.get(result.change.id)).intent.revision).toBe(1);
+          expect((yield* changes.get(result.change.id)).change.intent.revision).toBe(1);
         }).pipe(Effect.provide(harness.layer));
       },
     );
@@ -477,7 +483,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
             state: "withdrawn",
             lease: { id: lease, state: "released" },
           });
-          expect((yield* changes.get(result.change.id)).state).toBe("withdrawn");
+          expect((yield* changes.get(result.change.id)).change.state).toBe("withdrawn");
         }).pipe(Effect.provide(harness.layer));
       },
     );
@@ -520,7 +526,7 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
             }),
           );
           expect(error).toMatchObject({ _tag: "LeaseStale", leaseId: other });
-          expect((yield* changes.get(result.change.id)).state).toBe("working");
+          expect((yield* changes.get(result.change.id)).change.state).toBe("working");
         }).pipe(Effect.provide(harness.layer));
       },
     );

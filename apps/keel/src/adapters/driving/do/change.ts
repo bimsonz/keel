@@ -2,6 +2,7 @@ import {
   abandon,
   adopt,
   CHANGE_WORKSPACE,
+  changeRead,
   changeWorkspace,
   declare,
   getChange,
@@ -92,7 +93,7 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
   }
 
   async get() {
-    return this.answer(ChangeCodecs.get, getChange(this.changeId));
+    return this.answer(ChangeCodecs.get, changeRead(this.changeId));
   }
 
   async declare(command: typeof DeclareCommand.Encoded) {

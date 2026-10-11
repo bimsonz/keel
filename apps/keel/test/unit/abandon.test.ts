@@ -99,7 +99,9 @@ describe("abandonChange", () => {
         );
         expect(error).toMatchObject({ _tag: "LeaseRequired", changeId: change.id });
         expect(sent).toEqual([]);
-        expect((yield* Changes.use((changes) => changes.get(change.id))).state).toBe("working");
+        expect((yield* Changes.use((changes) => changes.get(change.id))).change.state).toBe(
+          "working",
+        );
       }).pipe(Effect.provide(layer));
     },
   );

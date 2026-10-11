@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/get-change.test.ts
+# kills: b12.get-change-audience
+# why: a public project's change is read only by its members, so public = live stops at the list
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 53f52bf..7573f09 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -244,6 +244,9 @@ export const readChange: (
+   Changes.use((changes) => changes.get(changeId)).pipe(
+     Effect.tap(({ projectId }) =>
+       projectScope(principal, projectId).pipe(
++        Effect.flatMap((scope) =>
++          scope.audience === "public" ? Effect.fail(new ChangeNotFound({ changeId })) : Effect.void,
++        ),
+         Effect.mapError(() => new ChangeNotFound({ changeId })),
+       ),
+     ),

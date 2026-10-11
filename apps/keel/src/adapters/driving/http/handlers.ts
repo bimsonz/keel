@@ -7,6 +7,7 @@ import {
   getSettings,
   nearbyOf,
   putSettings,
+  readChange,
   readChangeList,
   readEvents,
   readInbox,
@@ -88,6 +89,8 @@ import {
   nearbyError,
   nearbyOk,
   changeIdInput,
+  changeOk,
+  changeReadError,
   declareError,
   declareInput,
   declareOk,
@@ -245,7 +248,19 @@ export function makeHandlers(run: Runner) {
           ),
         );
       },
-      Changes_getChange: notYet,
+      Changes_getChange: (caller: Caller, input: Input<"Changes_getChange">) => {
+        const decoded = changeIdInput(input.changeId);
+        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+        return run(
+          caller,
+          readChange(caller.principal, decoded.success).pipe(
+            Effect.match({
+              onSuccess: ({ change }) => changeOk(change),
+              onFailure: (error) => changeReadError(caller, error),
+            }),
+          ),
+        );
+      },
       revise: (caller: Caller, input: Input<"revise">) => {
         const decoded = reviseInput(input);
         if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);

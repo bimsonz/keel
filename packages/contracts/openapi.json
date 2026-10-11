@@ -1148,7 +1148,7 @@
       "get": {
         "operationId": "Changes_getChange",
         "summary": "Get a change",
-        "description": "Read a change.",
+        "description": "Read a change, as its own Durable Object holds it. An observer or operator reads any change, an\nagent its own project's, and anyone (without a token too) a public project's. Any other change\nanswers 404, as one that does not exist does, so a private change's existence does not leak.",
         "parameters": [
           {
             "$ref": "#/components/parameters/ChangePath"
@@ -1258,6 +1258,7 @@
           "Changes"
         ],
         "security": [
+          {},
           {
             "OAuth2Auth": [
               "agent:read"
@@ -7114,6 +7115,21 @@
             "items": {
               "$ref": "#/components/schemas/MFP.Proposition"
             }
+          },
+          "declaredEffects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MFP.Proposition"
+            },
+            "description": "Effects the agent declared it expects to cause. Advisory only: Keel derives effects from the diff."
+          },
+          "commitSha": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The commit last submitted; it is the commit that lands."
           },
           "createdAt": {
             "type": "string",

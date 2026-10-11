@@ -110,7 +110,9 @@ function world(options: WorldOptions = {}) {
       get: (id) =>
         Effect.suspend(() => {
           const found = changes.get(id);
-          return found === undefined ? Effect.die(new Error(`no ${id}`)) : Effect.succeed(found);
+          return found === undefined
+            ? Effect.die(new Error(`no ${id}`))
+            : Effect.succeed({ change: found, projectId: PROJECT });
         }),
       workspace: (id) =>
         Effect.succeed({
