@@ -117,6 +117,10 @@ function render(
     );
   }
   set(["vars", "KEEL_HOST"], `${name}.${subdomain}.workers.dev`);
+  // A Worker that names Keel's own host (the console) gets this environment's.
+  const vars = committed["vars"];
+  if (isObject(vars) && "KEEL_API_HOST" in vars)
+    set(["vars", "KEEL_API_HOST"], `keel.${subdomain}.workers.dev`);
 
   const rendered = parseConfig(text, `apps/${dir}/wrangler.deploy.jsonc`);
   const leftover = SENTINEL.exec(JSON.stringify(rendered));
@@ -160,6 +164,42 @@ async function workerExists(name: string): Promise<boolean> {
   }
 }
 
+/** 32 random bytes, base64url: a key the console signs or unlocks with. */
+function randomKey(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return Buffer.from(bytes).toString("base64url");
+}
+
+/** The console's credentials, from the seed (scripts/seed.ts) of this environment. */
+function seededCredential(
+  role: "observer" | "operator",
+  part: "clientId" | "clientSecret",
+): string {
+  const path = join(root, ".keel", `${environment}.json`);
+  if (!existsSync(path)) {
+    throw new Error(
+      `The console needs the ${role}'s credential from ${path}, which does not exist: run \`node scripts/seed.ts ${environment}\` (Keel is deployed by now), then deploy again.`,
+    );
+  }
+  const value: unknown = Reflect.get(
+    Object(Reflect.get(Object(JSON.parse(readFileSync(path, "utf8"))), role)),
+    part,
+  );
+  if (typeof value !== "string" || value === "")
+    throw new Error(`${path} holds no ${role} ${part}`);
+  return value;
+}
+
+const SEEDED: Readonly<
+  Record<string, readonly ["observer" | "operator", "clientId" | "clientSecret"]>
+> = {
+  KEEL_OBSERVER_CLIENT_ID: ["observer", "clientId"],
+  KEEL_OBSERVER_CLIENT_SECRET: ["observer", "clientSecret"],
+  KEEL_OPERATOR_CLIENT_ID: ["operator", "clientId"],
+  KEEL_OPERATOR_CLIENT_SECRET: ["operator", "clientSecret"],
+};
+const GENERATED_ONCE = new Set(["CONSOLE_CAPABILITY_KEY", "CONSOLE_PRESENTER_KEY"]);
+
 async function signingKey(): Promise<string> {
   const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
   if (!("privateKey" in pair)) throw new Error("Ed25519 did not generate a key pair");
@@ -171,7 +211,9 @@ async function signingKey(): Promise<string> {
  * The value of every secret the config requires. CLOUDFLARE_ACCOUNT_ID and
  * KEEL_BOOTSTRAP_SECRET (Terraform's output, so replacing it there rotates it
  * here) are set on every deploy; KEEL_SIGNING_KEY only when the Worker lacks
- * one, because a new key invalidates every token already issued.
+ * one, because a new key invalidates every token already issued. The
+ * console's observer and operator credentials come from the seed on every
+ * deploy; its capability and presenter keys are generated only when absent.
  */
 async function secretsFor(
   name: string,
@@ -202,6 +244,17 @@ async function secretsFor(
       } else {
         values[secret] = await signingKey();
         console.log(`${name}: KEEL_SIGNING_KEY generated (the Worker had none)`);
+      }
+    } else if (SEEDED[secret] !== undefined) {
+      const [role, part] = SEEDED[secret];
+      values[secret] = seededCredential(role, part);
+    } else if (GENERATED_ONCE.has(secret)) {
+      // A new key would void every link or session made with the old one.
+      if (existing.has(secret)) {
+        console.log(`${name}: ${secret} kept`);
+      } else {
+        values[secret] = randomKey();
+        console.log(`${name}: ${secret} generated (the Worker had none)`);
       }
     } else {
       throw new Error(
@@ -264,6 +317,8 @@ try {
         stream: true,
       });
     }
+    // A Worker with a build step (the console's vite build) builds before it deploys.
+    execFileSync("pnpm", ["--dir", cwd, "run", "--if-present", "build"], { stdio: "inherit" });
     const secrets = await secretsFor(app.name, app.config, outputs);
     const containers = objectsAt(app.config, "containers").length > 0;
     console.log(

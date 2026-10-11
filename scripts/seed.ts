@@ -11,11 +11,21 @@
 // 4. Everything a run needs is written to .keel/<env>.json (gitignored, 0600).
 //
 // Every call carries the Idempotency-Key `seed:<env>:<role>`, so a second run
-// reaches the same ids. An enrolment replayed under its key re-issues the
-// credential, so the file always holds secrets that work. KEEL_URL overrides
-// the workers.dev URL.
+// reaches the same ids. A credential the file already holds is kept while it
+// still exchanges for a token, because replaying an enrolment re-issues its
+// secret and would void the copy a deployed console holds; one that no longer
+// works is re-issued under the same key. KEEL_URL overrides the workers.dev URL.
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { KeelClient, KeelProblem } from "../packages/sdk/src/index.ts";
@@ -142,11 +152,53 @@ interface Credential {
   readonly clientSecret: string;
 }
 
+const out = join(root, ".keel", `${environment}.json`);
+
+/** The credentials an earlier seed wrote, by role, so a second seed need not rotate them. */
+function previousCredentials(): Map<string, Credential> {
+  const previous = new Map<string, Credential>();
+  if (!existsSync(out)) return previous;
+  const seeded: unknown = JSON.parse(readFileSync(out, "utf8"));
+  const put = (role: string, value: unknown) => {
+    const c = Object(value);
+    if (typeof c.agentId === "string" && typeof c.clientSecret === "string") previous.set(role, c);
+  };
+  put("operator", Reflect.get(Object(seeded), "operator"));
+  put("observer", Reflect.get(Object(seeded), "observer"));
+  const projects = Object(Reflect.get(Object(seeded), "projects"));
+  for (const [name, project] of Object.entries<unknown>(projects)) {
+    const agents: unknown = Reflect.get(Object(project), "agents");
+    if (Array.isArray(agents)) agents.forEach((agent, i) => put(`${name}:a${i + 1}`, agent));
+  }
+  return previous;
+}
+const previous = previousCredentials();
+
+/** Whether a stored credential still exchanges for a token. */
+async function stillWorks(credential: Credential): Promise<boolean> {
+  try {
+    await new KeelClient({ baseUrl: keelUrl, ...credential }).token({ fresh: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Enrols `role` under its key, unless the credential an earlier seed stored
+ * still works: a replayed enrolment re-issues the secret, which would void
+ * the copy a deployed console holds.
+ */
 async function enrol(
   by: KeelClient,
   role: string,
   request: Parameters<KeelClient["enrolAgent"]>[0],
 ): Promise<Credential> {
+  const kept = previous.get(role);
+  if (kept !== undefined && (await stillWorks(kept))) {
+    console.log(`ok   ${role}: ${kept.agentId} in ${kept.projectId} (credential kept)`);
+    return kept;
+  }
   const enrolled = await by.enrolAgent(request, { idempotencyKey: key(role) });
   console.log(`ok   ${role}: ${enrolled.agent.id} in ${enrolled.agent.projectId}`);
   return {
@@ -209,7 +261,6 @@ try {
     projects[name] = { id: project.id, verification: settings.verification ?? "required", agents };
   }
 
-  const out = join(root, ".keel", `${environment}.json`);
   mkdirSync(join(root, ".keel"), { recursive: true, mode: 0o700 });
   writeFileSync(
     out,
