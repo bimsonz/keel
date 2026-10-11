@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/proven.test.ts
+# kills: b21.proven-blocks
+# why: the compiled plan's policy is not kept, so the batch reads no policy and a proven conflict never blocks it
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 3974448..f4c1ebc 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1146,7 +1146,6 @@ export const planCompiled: (
+     ],
+     {
+       alongside: (tx) => {
+-        keepPlanPolicy(tx.store, changeId, plan.predicatePolicy);
+         tx.outbox.subscribe(laneId, LANE_HEARS);
+       },
+       refusals: ["ChangeBlocked"],

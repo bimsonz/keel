@@ -1,5 +1,6 @@
 import {
   Change,
+  ChangeBlocked,
   ChangeInOtherProject,
   ChangeNotFound,
   ChangeOrigin,
@@ -9,10 +10,12 @@ import {
   LeaseNotLapsed,
   LeaseStale,
   PoolExhausted,
+  PredicatePolicies,
   Preflight,
   Proposition,
   RevisionMismatch,
   SketchNotFound,
+  SubjectKey,
 } from "@keeltown/core/domain/coordination";
 import { IdempotencyConflict } from "@keeltown/core/domain/identity";
 import { PushRejected } from "@keeltown/core/domain/integration";
@@ -147,7 +150,9 @@ export const SubmissionStatus = Schema.Struct({
  * Where Precheck diffs a change: its workspace repo; its base (the change's
  * own `baseSha`: the grant's until a rebase moves it); the commit it was
  * granted at (`grantedSha`, its fork point, which never moves, so an ancestry
- * walk can stop there); and the project whose settings hold `protectedPaths`.
+ * walk can stop there); the project whose settings hold `protectedPaths`;
+ * and the subjects the change's intent names, which the plan's guards are
+ * compiled against.
  */
 export const ChangeWorkspace = Schema.Struct({
   workspaceId: WorkspaceId,
@@ -155,6 +160,7 @@ export const ChangeWorkspace = Schema.Struct({
   baseSha: CommitSha,
   grantedSha: CommitSha,
   projectId: ProjectId,
+  subjects: Schema.Array(SubjectKey),
 });
 export type ChangeWorkspace = typeof ChangeWorkspace.Type;
 
@@ -184,13 +190,19 @@ export const PrecheckRefusedCommand = Schema.Struct({
 });
 export type PrecheckRefusedCommand = typeof PrecheckRefusedCommand.Type;
 
-/** Precheck passed and compiled the change's Verification Plan: commits PlanCompiled. */
+/**
+ * Precheck passed and compiled the change's Verification Plan: commits
+ * PlanCompiled and queues the change, unless a conflict proven against it
+ * blocks under the plan's predicate policy (absent, or a predicate left out,
+ * is `advise`).
+ */
 export const PlanCompiledCommand = Schema.Struct({
   revision: Schema.Int,
   instanceId: Schema.NonEmptyString,
   planHash: ContentHash,
   steps: Schema.Int,
   costEstimate: Schema.Number,
+  predicatePolicy: Schema.optional(PredicatePolicies),
 });
 export type PlanCompiledCommand = typeof PlanCompiledCommand.Type;
 
@@ -268,7 +280,10 @@ export const ChangeCodecs = {
     Schema.Struct({ change: Change, verdictId: VerdictId }),
     PrecheckRefusal,
   ),
-  planCompiled: exitCodec(Change, PrecheckRefusal),
+  planCompiled: exitCodec(
+    Change,
+    Schema.Union([ChangeNotFound, ChangeStateRefused, ChangeBlocked]),
+  ),
 };
 
 /**

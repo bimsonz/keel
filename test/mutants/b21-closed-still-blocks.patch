@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/party-conflicts.test.ts
+# kills: b21.proven-blocks
+# why: a proven conflict since resolved still blocks the change
+diff --git a/packages/core/src/application/coordination/party-conflicts.ts b/packages/core/src/application/coordination/party-conflicts.ts
+index c42ea43..756989e 100644
+--- a/packages/core/src/application/coordination/party-conflicts.ts
++++ b/packages/core/src/application/coordination/party-conflicts.ts
+@@ -151,7 +151,11 @@ export const blockersOf = (store: Store, policies: PredicatePolicies | undefined
+   openProvenConflicts: store
+     .list(PARTY_CONFLICT)
+     .map((row) => decodeRow(row.value))
+-    .filter((row) => row.state === "proven" && policyFor(policies, row.predicate) === "block")
++    .filter(
++      (row) =>
++        (row.state === "proven" || row.state === "resolved") &&
++        policyFor(policies, row.predicate) === "block",
++    )
+     .map((row) => row.conflictId),
+   failingGuards: [],
+   unresolvedHighDrift: [],

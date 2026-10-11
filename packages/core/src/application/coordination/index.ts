@@ -111,6 +111,7 @@ export const openSketch: (
 /** The Change DO's use-cases. */
 export * from "./change.ts";
 export * from "./live-index.ts";
+export * from "./party-conflicts.ts";
 export * from "./preflight.ts";
 export * from "./probe-ledger.ts";
 export * from "./read-scope.ts";

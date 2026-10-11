@@ -208,6 +208,7 @@ function memoryChangePrecheckHarness(): ChangePrecheckHarness {
           baseSha: GENESIS,
           grantedSha: GENESIS,
           projectId: freshId("prj"),
+          subjects: [],
         };
         memory.submit(changeId, 1, workspace);
         return { changeId, revision: 1, workspace };

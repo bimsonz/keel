@@ -118,6 +118,7 @@ function precheckWorld(options: { readonly protectedPaths?: readonly string[] } 
       baseSha: base ?? granted,
       grantedSha: granted,
       projectId,
+      subjects: [],
     };
     changes.submit(changeId, 1, workspace);
     return { changeId, revision: 1, commitSha, baseSha: base, instanceId };

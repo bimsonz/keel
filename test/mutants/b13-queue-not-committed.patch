@@ -2,15 +2,18 @@
 # kills: b13.queued
 # why: planCompiled stops at PlanCompiled, so the change waits in Verifying for a step L1 does not have
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index bfaf830..041ed79 100644
+index 3974448..c1d7525 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -748,7 +748,7 @@ export const planCompiled: (
-       changeId,
-       "planCompiled",
-       plan,
--      [compile, { _tag: "Queue", laneId, blockers: L1_UNBLOCKED }],
-+      [compile],
-       { alongside: (tx) => tx.outbox.subscribe(laneId, LANE_HEARS) },
-     );
-     return compiled.change;
+@@ -1140,10 +1140,7 @@ export const planCompiled: (
+     changeId,
+     "planCompiled",
+     plan,
+-    (store) => [
+-      compile,
+-      { _tag: "Queue", laneId, blockers: blockersOf(store, plan.predicatePolicy) },
+-    ],
++    () => [compile],
+     {
+       alongside: (tx) => {
+         keepPlanPolicy(tx.store, changeId, plan.predicatePolicy);

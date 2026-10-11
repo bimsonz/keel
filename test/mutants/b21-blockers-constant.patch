@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/proven.test.ts
+# kills: b21.proven-blocks
+# why: planCompiled queues with no blockers, so a change with a conflict proven against it under block queues anyway
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 3974448..0584a96 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1142,7 +1142,11 @@ export const planCompiled: (
+     plan,
+     (store) => [
+       compile,
+-      { _tag: "Queue", laneId, blockers: blockersOf(store, plan.predicatePolicy) },
++      {
++        _tag: "Queue",
++        laneId,
++        blockers: { openProvenConflicts: [], failingGuards: [], unresolvedHighDrift: [] },
++      },
+     ],
+     {
+       alongside: (tx) => {

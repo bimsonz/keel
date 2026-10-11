@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel apps/keel/test/unit/party-conflicts.test.ts apps/keel/test/pool/proven.test.ts
+# kills: b21.proven-blocks
+# why: the plan's predicate policy is never read, so a proven conflict only ever advises and nothing blocks
+diff --git a/packages/core/src/application/coordination/party-conflicts.ts b/packages/core/src/application/coordination/party-conflicts.ts
+index c42ea43..57c57f6 100644
+--- a/packages/core/src/application/coordination/party-conflicts.ts
++++ b/packages/core/src/application/coordination/party-conflicts.ts
+@@ -124,7 +124,7 @@ export const policyFor = (
+   policies: PredicatePolicies | undefined,
+   predicate: Predicate | undefined,
+ ): PredicatePolicy =>
+-  (predicate === undefined ? undefined : policies?.[predicate]) ?? DEFAULT_PREDICATE_POLICY;
++  DEFAULT_PREDICATE_POLICY;
+ 
+ /** Keeps the compiled plan's predicate policy; a plan without one clears the last plan's. */
+ export function keepPlanPolicy(

@@ -54,6 +54,9 @@ export function ChangePrecheckRpc(changes: Env["CHANGE"]): Layer.Layer<ChangePre
               planHash: plan.planHash,
               steps: plan.steps,
               costEstimate: plan.costEstimate,
+              ...(plan.predicatePolicy === undefined
+                ? {}
+                : { predicatePolicy: plan.predicatePolicy }),
             }),
           ),
         ).pipe(Effect.asVoid),

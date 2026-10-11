@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/proven.test.ts
+# kills: b21.party-hears
+# why: a conflict's moves name no party as affected, so no party's scoped subscription hears them
+diff --git a/packages/core/src/application/coordination/probe-ledger.ts b/packages/core/src/application/coordination/probe-ledger.ts
+index 875df71..e5519c6 100644
+--- a/packages/core/src/application/coordination/probe-ledger.ts
++++ b/packages/core/src/application/coordination/probe-ledger.ts
+@@ -62,7 +62,6 @@ const ledgerDraft = (
+   conflict: Conflict,
+ ): EventDraft => ({
+   payload: payloadOf(encodeLedgerEvent(payload)),
+-  ...(PARTY_MOVES.has(payload._tag) ? { affected: affectingParties(conflict.parties) } : {}),
+ });
+ const probeRef = (id: ProbeId): EntityRef => ({ kind: "probe", id });
+ 

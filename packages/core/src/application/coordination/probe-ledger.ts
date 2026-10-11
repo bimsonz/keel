@@ -32,6 +32,7 @@ import {
   type ProbeCell,
   type WorldCheckCell,
 } from "../ports/index.ts";
+import { affectingParties, PARTY_HEARS, subscribeParties } from "./party-conflicts.ts";
 import { hashedIdBody } from "./subject.ts";
 
 type Store = Transaction["store"];
@@ -52,6 +53,17 @@ const payloadOf = (encoded: unknown): EventDraft["payload"] => JSON.parse(JSON.s
 const asStored = (encoded: unknown): Stored => JSON.parse(JSON.stringify(encoded));
 
 const conflictRef = (id: ConflictId): EntityRef => ({ kind: "conflict", id });
+
+const PARTY_MOVES: ReadonlySet<string> = new Set(PARTY_HEARS);
+
+/** A conflict's event as a draft: a move its parties hear names them as affected, so each party's scoped subscription takes it. */
+const ledgerDraft = (
+  payload: typeof ConflictEvent.Type | typeof ProbeEvent.Type,
+  conflict: Conflict,
+): EventDraft => ({
+  payload: payloadOf(encodeLedgerEvent(payload)),
+  ...(PARTY_MOVES.has(payload._tag) ? { affected: affectingParties(conflict.parties) } : {}),
+});
 const probeRef = (id: ProbeId): EntityRef => ({ kind: "probe", id });
 
 const storedConflict = (store: Store, conflictId: ConflictId): Conflict | undefined => {
@@ -111,7 +123,7 @@ function ledgerStep(
   for (const payload of decided.success) {
     if (isConflictEvent(payload)) conflict = evolveConflict(conflict, { at: tx.at, payload });
     if (isProbeEvent(payload)) probe = evolveProbe(probe, { at: tx.at, payload });
-    drafts.push({ payload: payloadOf(encodeLedgerEvent(payload)) });
+    drafts.push(ledgerDraft(payload, conflict));
   }
   tx.store.put(CONFLICT, conflictId, asStored(encodeConflict(conflict)));
   if (probe !== undefined) {
@@ -278,8 +290,9 @@ export const worldCheckRan = Effect.fn("coordination/worldCheckRan")(function* (
 });
 
 /**
- * Opens a conflict on this subject: ConflictSuspected. Fallout calls it;
- * until then only the ledger's test harnesses do.
+ * Opens a conflict on this subject: ConflictSuspected, and each party's Change
+ * DO is subscribed to the conflict's moves. Fallout calls it; until then
+ * only the ledger's test harnesses do.
  */
 export const suspectConflict = Effect.fn("coordination/suspectConflict")(function* (
   projectId: ProjectId,
@@ -298,10 +311,12 @@ export const suspectConflict = Effect.fn("coordination/suspectConflict")(functio
       const drafts: EventDraft[] = [];
       for (const payload of decided.success) {
         conflict = evolveConflict(conflict, { at: tx.at, payload });
-        drafts.push({ payload: payloadOf(encodeLedgerEvent(payload)) });
+        drafts.push(ledgerDraft(payload, conflict));
       }
-      if (conflict !== undefined)
+      if (conflict !== undefined) {
         tx.store.put(CONFLICT, conflictId, asStored(encodeConflict(conflict)));
+        subscribeParties(tx.outbox, conflict.parties);
+      }
       return Result.succeed({ drafts, value: undefined });
     },
   );

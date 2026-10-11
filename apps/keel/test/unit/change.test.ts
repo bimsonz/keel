@@ -148,6 +148,7 @@ describe("declare", () => {
           baseSha: BASE,
           grantedSha: BASE,
           projectId: sampleProjectId,
+          subjects: [],
         });
         expect(yield* types).toEqual(["IntentDeclared", "PreflightIssued", "ChangeStarted"]);
         expect(outbox.subscribers("ChangeSubmitted")).toEqual(

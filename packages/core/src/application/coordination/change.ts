@@ -1,8 +1,8 @@
 import { Effect, Option, Result, Schema } from "effect";
 import {
-  type Blockers,
   canonicalProposition,
   Change,
+  type ChangeBlocked,
   type ChangeCommand,
   ChangeBounced,
   ChangeEvent,
@@ -21,6 +21,7 @@ import {
   type IntentRevision,
   type LiveChange,
   type PoolExhausted,
+  type PredicatePolicies,
   Preflight,
   type Proposition,
   renew,
@@ -81,6 +82,7 @@ import {
   type WorkspaceGrant,
   WorkspaceRebaser,
 } from "../ports/index.ts";
+import { blockersOf, hearConflict, keepPlanPolicy, planPolicyOf } from "./party-conflicts.ts";
 import { preflightFor } from "./preflight.ts";
 
 /**
@@ -117,14 +119,20 @@ export type HeldWorkspace = typeof HeldWorkspace.Type;
  */
 export interface WorkspaceView extends HeldWorkspace {
   readonly baseSha: CommitSha;
+  /** The subject of each premise and declared effect of the current intent, each once and without ancestors. */
+  readonly subjects: readonly SubjectKey[];
 }
 
-/** At L1 nothing blocks a change: conflicts and drift arrive with L2, and Precheck refuses guard edits itself. */
-export const L1_UNBLOCKED: Blockers = {
-  openProvenConflicts: [],
-  failingGuards: [],
-  unresolvedHighDrift: [],
-};
+/** The subjects an intent's premises and declared effects name, each once: what Precheck compiles the plan's guards against. */
+export const intentSubjects = (
+  intent: Pick<Intent, "premises" | "declaredEffects">,
+): readonly SubjectKey[] => [
+  ...new Set(
+    [...intent.premises, ...(intent.declaredEffects ?? [])].map(
+      (proposition) => proposition.subject,
+    ),
+  ),
+];
 
 /** The lane a project's changes queue on: at L1, one lane per project, for trunk's `main`. */
 export const laneOf = (projectId: ProjectId): string => `lane:${projectId}:main`;
@@ -283,6 +291,8 @@ export interface CompiledPlan extends PrecheckStep {
   readonly planHash: ContentHash;
   readonly steps: number;
   readonly costEstimate: number;
+  /** Per predicate, what a conflict proven against the change does; absent, or a predicate left out, is `advise`. */
+  readonly predicatePolicy?: PredicatePolicies | undefined;
 }
 
 type Store = Transaction["store"];
@@ -509,7 +519,7 @@ export const changeWorkspace: (
   const held = heldWorkspace(yield* EntityStore, changeId);
   if (held === undefined || change.baseSha === undefined)
     return yield* refused(change, "workspace");
-  return { ...held, baseSha: change.baseSha };
+  return { ...held, baseSha: change.baseSha, subjects: intentSubjects(change.intent) };
 });
 
 /** Gives a grant back unless the change holds it: `grant` is idempotent per holder, so a live change's own workspace stays. */
@@ -1040,21 +1050,26 @@ export const lapseLease: (
 /**
  * One of Precheck's commands: idempotent by `instanceId` (the cause is
  * `<instanceId>:<method>`), and refused when Precheck checked a revision other
- * than the change's current one. `before` commits ahead of the change's own
- * events in the same transaction (a refusal's verdict); `alongside` runs once
- * the commands are decided, before the events are appended (a subscription).
+ * than the change's current one. `commands` may read the change's store
+ * inside the transaction (its blockers). `before` commits ahead of the
+ * change's own events in the same transaction (a refusal's verdict);
+ * `alongside` runs once the commands are decided, before the events are
+ * appended (a subscription).
  */
-const precheckCommand = (
+const precheckCommand = <T extends Tag = "ChangeNotFound" | "ChangeStateRefused">(
   changeId: ChangeId,
   method: string,
   step: PrecheckStep,
-  commands: readonly ChangeCommand[],
+  commands: readonly ChangeCommand[] | ((store: Store) => readonly ChangeCommand[]),
   {
     before = [],
     alongside,
+    refusals = [],
   }: {
     readonly before?: readonly EventDraft[];
     readonly alongside?: (tx: Transaction) => void;
+    /** Refusals beyond not-found and wrong-state that the commands may meet. */
+    readonly refusals?: readonly T[];
   } = {},
 ) =>
   Effect.gen(function* () {
@@ -1069,7 +1084,12 @@ const precheckCommand = (
         if (stored !== undefined && stored.intent.revision !== step.revision)
           return Result.fail(refused(stored, method));
         return Result.map(
-          transition(tx, changeId, ["ChangeNotFound", "ChangeStateRefused"], commands),
+          transition(
+            tx,
+            changeId,
+            [...refusals, "ChangeNotFound" as const, "ChangeStateRefused" as const],
+            typeof commands === "function" ? commands(tx.store) : commands,
+          ),
           (decided) => {
             alongside?.(tx);
             return { value: decided.change, drafts: [...before, ...decided.drafts] };
@@ -1095,36 +1115,50 @@ export const precheckStarted: (
 /**
  * Precheck passed and compiled the Verification Plan: commits PlanCompiled,
  * then, since L1 has no step between the plan and the queue, ChangeQueued on
- * the project's lane in the same transaction, under the machine's guards. The
- * lane is subscribed there to ChangeQueued, ChangeRequeued and the change's
- * ends, so it hears the change it must batch, re-enqueue or drop.
+ * the project's lane in the same transaction, under the machine's guards. A
+ * conflict proven against the change under its plan's `block` policy refuses
+ * the queue as blocked. The lane is subscribed there to ChangeQueued,
+ * ChangeRequeued and the change's ends, so it hears the change it must batch,
+ * re-enqueue or drop; the plan's predicate policy is kept for the batch.
  */
 export const planCompiled: (
   changeId: ChangeId,
   plan: CompiledPlan,
-) => Effect.Effect<Change, ChangeNotFound | ChangeStateRefused, Clock | EntityStore | EventOutbox> =
-  Effect.fn("coordination/planCompiled")(function* (changeId: ChangeId, plan: CompiledPlan) {
-    const project = heldWorkspace(yield* EntityStore, changeId)?.projectId;
-    const compile: ChangeCommand = {
-      _tag: "CompilePlan",
-      drift: [],
-      planHash: plan.planHash,
-      steps: plan.steps,
-      costEstimate: plan.costEstimate,
-    };
-    // A change with no workspace was never declared: CompilePlan alone refuses it.
-    if (project === undefined)
-      return (yield* precheckCommand(changeId, "planCompiled", plan, [compile])).change;
-    const laneId = laneOf(project);
-    const compiled = yield* precheckCommand(
-      changeId,
-      "planCompiled",
-      plan,
-      [compile, { _tag: "Queue", laneId, blockers: L1_UNBLOCKED }],
-      { alongside: (tx) => tx.outbox.subscribe(laneId, LANE_HEARS) },
-    );
-    return compiled.change;
-  });
+) => Effect.Effect<
+  Change,
+  ChangeNotFound | ChangeStateRefused | ChangeBlocked,
+  Clock | EntityStore | EventOutbox
+> = Effect.fn("coordination/planCompiled")(function* (changeId: ChangeId, plan: CompiledPlan) {
+  const project = heldWorkspace(yield* EntityStore, changeId)?.projectId;
+  const compile: ChangeCommand = {
+    _tag: "CompilePlan",
+    drift: [],
+    planHash: plan.planHash,
+    steps: plan.steps,
+    costEstimate: plan.costEstimate,
+  };
+  // A change with no workspace was never declared: CompilePlan alone refuses it.
+  if (project === undefined)
+    return (yield* precheckCommand(changeId, "planCompiled", plan, [compile])).change;
+  const laneId = laneOf(project);
+  const compiled = yield* precheckCommand(
+    changeId,
+    "planCompiled",
+    plan,
+    (store) => [
+      compile,
+      { _tag: "Queue", laneId, blockers: blockersOf(store, plan.predicatePolicy) },
+    ],
+    {
+      alongside: (tx) => {
+        keepPlanPolicy(tx.store, changeId, plan.predicatePolicy);
+        tx.outbox.subscribe(laneId, LANE_HEARS);
+      },
+      refusals: ["ChangeBlocked"],
+    },
+  );
+  return compiled.change;
+});
 
 /**
  * Precheck refused the submission: issues a ruling-class verdict on its own
@@ -1244,9 +1278,23 @@ const commandFor = (
     case "BatchFormed": {
       const formed = decodeFormed(event.payload);
       return Option.isSome(formed) && formed.value.members.includes(change.id)
-        ? { command: { _tag: "Batch", batchId: formed.value.batchId, blockers: L1_UNBLOCKED } }
+        ? {
+            command: {
+              _tag: "Batch",
+              batchId: formed.value.batchId,
+              blockers: blockersOf(store, planPolicyOf(store, change.id)),
+            },
+          }
         : undefined;
     }
+    case "ConflictSuspected":
+    case "ConflictProven":
+    case "ConflictDismissed":
+    case "ConflictEscalated":
+    case "ConflictResolved":
+      // The change keeps the conflicts it is a party to; its queue and batch read them as blockers.
+      hearConflict(store, event);
+      return undefined;
     case "VerdictIssued": {
       const verdict = decodeVerdict(event.payload);
       if (Option.isNone(verdict) || !ours(verdict.value.subject)) return undefined;

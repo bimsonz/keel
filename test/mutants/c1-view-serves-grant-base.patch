@@ -2,15 +2,15 @@
 # kills: rebase.moves-base
 # why: The workspace view serves the grant's commit as the base, so after a rebase Precheck and the Lane diff against a base the change left
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index e3214e6..314adb6 100644
+index 3974448..78f59ec 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -422,7 +422,7 @@ export const changeWorkspace: (
+@@ -514,7 +514,7 @@ export const changeWorkspace: (
    const held = heldWorkspace(yield* EntityStore, changeId);
    if (held === undefined || change.baseSha === undefined)
      return yield* refused(change, "workspace");
--  return { ...held, baseSha: change.baseSha };
-+  return { ...held, baseSha: held.grantedSha };
+-  return { ...held, baseSha: change.baseSha, subjects: intentSubjects(change.intent) };
++  return { ...held, baseSha: held.grantedSha, subjects: intentSubjects(change.intent) };
  });
  
  /** Gives a grant back unless the change holds it: `grant` is idempotent per holder, so a live change's own workspace stays. */

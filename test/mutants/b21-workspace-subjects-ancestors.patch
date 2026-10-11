@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/proven.test.ts
+# kills: b21.workspace-subjects
+# why: the workspace names every ancestor of each subject too, which Precheck's exposure adds again itself
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 3974448..09a307e 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -128,9 +128,10 @@ export const intentSubjects = (
+   intent: Pick<Intent, "premises" | "declaredEffects">,
+ ): readonly SubjectKey[] => [
+   ...new Set(
+-    [...intent.premises, ...(intent.declaredEffects ?? [])].map(
+-      (proposition) => proposition.subject,
+-    ),
++    [...intent.premises, ...(intent.declaredEffects ?? [])].flatMap((proposition) => [
++      proposition.subject,
++      ...subjectAncestors(proposition.subject),
++    ]),
+   ),
+ ];
+ 

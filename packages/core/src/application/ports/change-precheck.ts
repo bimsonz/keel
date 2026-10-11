@@ -1,5 +1,11 @@
 import { Context, type Effect } from "effect";
-import type { ChangeNotFound, ChangeStateRefused } from "../../domain/coordination/index.ts";
+import type {
+  ChangeBlocked,
+  ChangeNotFound,
+  ChangeStateRefused,
+  PredicatePolicies,
+  SubjectKey,
+} from "../../domain/coordination/index.ts";
 import type {
   ChangeId,
   CommitSha,
@@ -23,6 +29,8 @@ export interface PrecheckWorkspace {
   readonly baseSha: CommitSha;
   readonly grantedSha: CommitSha;
   readonly projectId: ProjectId;
+  /** The subject of each premise and declared effect of the change's current intent, each once and without ancestors. */
+  readonly subjects: readonly SubjectKey[];
 }
 
 /** Which submission a Precheck step is about, and which Workflow instance is taking it. */
@@ -42,6 +50,8 @@ export interface PrecheckCompiled extends PrecheckCall {
   readonly planHash: ContentHash;
   readonly steps: number;
   readonly costEstimate: number;
+  /** The plan's predicate policy, read at the base commit; absent, or a predicate left out, is `advise`. */
+  readonly predicatePolicy?: PredicatePolicies | undefined;
 }
 
 type Refusal = ChangeNotFound | ChangeStateRefused;
@@ -65,7 +75,10 @@ export class ChangePrecheck extends Context.Service<
       changeId: ChangeId,
       refusal: PrecheckRefused,
     ) => Effect.Effect<VerdictId, Refusal>;
-    /** Commits PlanCompiled. */
-    readonly compiled: (changeId: ChangeId, plan: PrecheckCompiled) => Effect.Effect<void, Refusal>;
+    /** Commits PlanCompiled and queues the change; ChangeBlocked while a conflict proven against it blocks under the plan's policy. */
+    readonly compiled: (
+      changeId: ChangeId,
+      plan: PrecheckCompiled,
+    ) => Effect.Effect<void, Refusal | ChangeBlocked>;
   }
 >()("keel/ChangePrecheck") {}
