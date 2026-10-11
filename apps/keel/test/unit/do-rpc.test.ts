@@ -18,6 +18,7 @@ import { InboxRpc } from "../../src/adapters/driven/do-rpc/inbox.ts";
 import {
   AgentSessionCodecs,
   ChangeCodecs,
+  ChangeWorkspace,
   type DeclareCommand,
   encodeExit,
   type SubmitCommand,
@@ -56,6 +57,13 @@ const grant = {
   baseSha: "0".repeat(40),
   repo: { namespace: "keel-ws-00", name: "wsp-01jz8pt2c4e6g8j0m2n4q6s8v4" },
 };
+/** What the change's DO answers for `workspace()`: its repo and the base it was granted at. */
+const granted = {
+  workspaceId: grant.workspaceId,
+  repo: grant.repo,
+  baseSha: grant.baseSha,
+  projectId: "prj_01JZ8PT2C4E6G8J0M2N4Q6S8V5",
+};
 const input = {
   goal: "Cache permission lookups",
   footprint: [Schema.decodeUnknownSync(FootprintEntry)({ path: "src/authz/**", op: "edit" })],
@@ -77,7 +85,8 @@ function objects(answers: {
     declare: Array<{ name: string; command: typeof DeclareCommand.Encoded }>;
     submit: Array<{ name: string; command: typeof SubmitCommand.Encoded }>;
     waits: number[];
-  } = { reserve: [], declare: [], submit: [], waits: [] };
+    workspaces: string[];
+  } = { reserve: [], declare: [], submit: [], waits: [], workspaces: [] };
   const fake: ChangeObjects = {
     agentSession: () => ({
       reserveChange: async (request) => {
@@ -112,6 +121,13 @@ function objects(answers: {
       submission: async (waitMs) => {
         sent.waits.push(waitMs);
         return encodeExit(ChangeCodecs.submission, Exit.succeed({ change, commitSha: null }));
+      },
+      workspace: async () => {
+        sent.workspaces.push(id);
+        return encodeExit(
+          ChangeCodecs.workspace,
+          Exit.succeed(Schema.decodeUnknownSync(ChangeWorkspace)(granted)),
+        );
       },
     }),
   };
@@ -254,6 +270,14 @@ describe("Changes over Durable Object RPC", () => {
       const status = yield* (yield* Changes).awaitSubmission(changeId, 7);
       expect(status).toEqual({ change, commitSha: null });
       expect(sent.waits).toEqual([7_000]);
+    }).pipe(Effect.provide(ChangesRpc(fake)));
+  });
+
+  it.effect("[changes.workspace] reads a change's workspace from its own DO", () => {
+    const { fake, sent } = objects({});
+    return Effect.gen(function* () {
+      expect(yield* (yield* Changes).workspace(changeId)).toEqual(granted);
+      expect(sent.workspaces).toEqual([changeId]);
     }).pipe(Effect.provide(ChangesRpc(fake)));
   });
 });

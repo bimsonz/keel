@@ -19,6 +19,7 @@ export interface ChangeStub {
   submit(command: typeof SubmitCommand.Encoded): Promise<unknown>;
   get(): Promise<unknown>;
   submission(waitMs: number): Promise<unknown>;
+  workspace(): Promise<unknown>;
 }
 
 /** The AgentSession DO methods the isolate calls (`agent:<id>`), answering Exit envelopes. */
@@ -98,6 +99,8 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           ),
         ),
       get: (changeId) => callObject(ChangeCodecs.get, () => objects.change(changeId).get()),
+      workspace: (changeId) =>
+        callObject(ChangeCodecs.workspace, () => objects.change(changeId).workspace()),
       awaitSubmission: (changeId, waitSeconds) =>
         callObject(ChangeCodecs.submission, () =>
           objects.change(changeId).submission(waitSeconds * 1000),

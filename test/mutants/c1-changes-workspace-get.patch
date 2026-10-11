@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/do-rpc.test.ts -t changes.workspace
+# kills: changes.workspace
+# why: The workspace is read from the change's get(), which answers the change, not its workspace
+diff --git a/apps/keel/src/adapters/driven/do-rpc/changes.ts b/apps/keel/src/adapters/driven/do-rpc/changes.ts
+index 4b8cdd6..c007fde 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/changes.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/changes.ts
+@@ -98,7 +98,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
+         ),
+       get: (changeId) => callObject(ChangeCodecs.get, () => objects.change(changeId).get()),
+       workspace: (changeId) =>
+-        callObject(ChangeCodecs.workspace, () => objects.change(changeId).workspace()),
++        callObject(ChangeCodecs.workspace, () => objects.change(changeId).get()),
+       awaitSubmission: (changeId, waitSeconds) =>
+         callObject(ChangeCodecs.submission, () =>
+           objects.change(changeId).submission(waitSeconds * 1000),

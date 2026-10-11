@@ -190,7 +190,12 @@ function makeWaiters<K>() {
  * for `settle` (or a submit) to move the change, up to its deadline.
  * `capacity` bounds the workspaces it will grant.
  */
-export function makeChangesMemory(options: { readonly capacity?: number } = {}) {
+/** The project every in-memory change's workspace belongs to, unless a test names another. */
+const MEMORY_PROJECT = makeId("prj", "00000000000000000000000000");
+
+export function makeChangesMemory(
+  options: { readonly capacity?: number; readonly projectId?: ProjectId } = {},
+) {
   const changes = new Map<ChangeId, Change>();
   const commits = new Map<ChangeId, CommitSha>();
   const workspaces = new Map<ChangeId, WorkspaceId>();
@@ -323,6 +328,24 @@ export function makeChangesMemory(options: { readonly capacity?: number } = {}) 
             submits.set(`${input.changeId} ${input.idempotencyKey}`, submitted);
             waiters.wake(change.id);
             return submitted;
+          }),
+        workspace: (changeId) =>
+          Effect.gen(function* () {
+            const change = changes.get(changeId);
+            if (change === undefined) return yield* new ChangeNotFound({ changeId });
+            const workspaceId = workspaces.get(changeId);
+            if (workspaceId === undefined)
+              return yield* new ChangeStateRefused({
+                changeId,
+                state: change.state,
+                command: "workspace",
+              });
+            return {
+              workspaceId,
+              repo: { namespace: "memory", name: workspaceId },
+              baseSha: MEMORY_BASE,
+              projectId: options.projectId ?? MEMORY_PROJECT,
+            };
           }),
         get: (changeId) =>
           Effect.suspend(() => {

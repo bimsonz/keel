@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/candidate-bundles.test.ts -t bundles.candidate
+# kills: bundles.candidate
+# why: Executables are bundled as plain files, so a candidate's scripts lose their mode in the sandbox
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+index ebcb9db..3755cd7 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-bundles.ts
+@@ -19,7 +19,7 @@ async function filesOf(reader: ObjectReader, tree: string, prefix: string): Prom
+       if (e.mode === MODE_TREE) return filesOf(reader, e.oid, path);
+       if (e.mode !== MODE_FILE && e.mode !== MODE_EXEC)
+         throw new Unbundlable(`${path} has mode ${e.mode}: a bundle carries regular files only`);
+-      return [{ path, bytes: await reader.readBlob(e.oid), executable: e.mode === MODE_EXEC }];
++      return [{ path, bytes: await reader.readBlob(e.oid), executable: false }];
+     }),
+   );
+   return nested.flat();

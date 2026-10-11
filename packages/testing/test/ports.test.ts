@@ -31,6 +31,8 @@ const CONTRACT_PORTS = [
   "ChangePrecheck",
   "GuardRepo",
   "CandidateComposer",
+  "CandidateBundles",
+  "BatchVerification",
   "TrunkWriter",
   "Trunks",
   "SessionStore",

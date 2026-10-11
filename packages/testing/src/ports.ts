@@ -269,6 +269,14 @@ export const PORTS = {
     () => integration.makeCandidateComposerMemory().layer,
     pending("CandidateComposer", ["compose"]),
   ),
+  CandidateBundles: port(
+    () => integration.makeCandidateBundlesMemory().layer,
+    pending("CandidateBundles", ["bundle"]),
+  ),
+  BatchVerification: port(
+    () => integration.makeBatchVerificationMemory().layer,
+    pending("BatchVerification", ["start"]),
+  ),
   TrunkWriter: port(
     () => integration.makeTrunkWriterMemory(GENESIS).layer,
     pending("TrunkWriter", ["head", "push", "sync"]),

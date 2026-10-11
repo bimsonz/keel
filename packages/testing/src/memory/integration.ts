@@ -3,13 +3,17 @@ import {
   PromotionStateRefused,
   UnexpectedHead,
 } from "@keeltown/core/domain/integration";
-import { type ChangeId, CommitSha, type ProjectId } from "@keeltown/core/kernel";
+import { type ChangeId, CommitSha, ContentHash, type ProjectId } from "@keeltown/core/kernel";
 import {
+  BatchVerification,
+  BundleRefused,
+  CandidateBundles,
   CandidateComposer,
   type RepoRef,
   type SyncOutcome,
   TrunkWriter,
   Trunks,
+  type VerificationJob,
 } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 
@@ -144,6 +148,54 @@ export function makeTrunksMemory(
             syncs.set(projectId, (syncs.get(projectId) ?? 0) + 1);
             options.journal?.push(`sync ${projectId}`);
             return Effect.succeed({ head, staging: head, mirror: head });
+          }),
+      }),
+    ),
+  };
+}
+
+/**
+ * Bundles by address only: a commit's bundle is `sha256:` of the staging repo
+ * and the commit, so one commit always has one address. `refuse` lists commits
+ * whose tree the bundle format cannot carry. `bundled` records each call.
+ */
+export function makeCandidateBundlesMemory(options: { readonly refuse?: readonly string[] } = {}) {
+  const bundled: CommitSha[] = [];
+  return {
+    bundled,
+    layer: Layer.succeed(
+      CandidateBundles,
+      CandidateBundles.of({
+        bundle: (staging, commit) =>
+          Effect.gen(function* () {
+            bundled.push(commit);
+            if (options.refuse?.includes(commit) === true)
+              return yield* new BundleRefused({ reason: `symlink in ${commit}` });
+            const digest = yield* Effect.promise(() =>
+              crypto.subtle.digest(
+                "SHA-256",
+                new TextEncoder().encode(`${staging.namespace}/${staging.name} ${commit}`),
+              ),
+            );
+            const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0"));
+            return Schema.decodeUnknownSync(ContentHash)(`sha256:${hex.join("")}`);
+          }),
+      }),
+    ),
+  };
+}
+
+/** KeelVerify's starts, by instance id; starting an id again starts nothing new. */
+export function makeBatchVerificationMemory() {
+  const started = new Map<string, VerificationJob>();
+  return {
+    started,
+    layer: Layer.succeed(
+      BatchVerification,
+      BatchVerification.of({
+        start: (instanceId, job) =>
+          Effect.sync(() => {
+            if (!started.has(instanceId)) started.set(instanceId, job);
           }),
       }),
     ),
