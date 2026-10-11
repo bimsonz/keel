@@ -13,7 +13,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BUNDLE_MANIFEST,
   type BundleFile,
@@ -56,6 +56,14 @@ const walk = (root: string, dir = root): string[] =>
   });
 
 const LONG = `${"deep/".repeat(30)}file.ts`;
+
+/**
+ * Every case runs the real POSIX scripts through sh, tar and curl, so its time
+ * is process spawns, which a loaded machine stretches far past vitest's 5 s
+ * default (bundle.rehydrate-once timed out at load, and passes alone). The
+ * bound is the property files' 60 s: it catches a hang, not a slow machine.
+ */
+vi.setConfig({ testTimeout: 60_000 });
 
 describe("candidate bundles", () => {
   it("extract under --strip-components=1 to exactly the files plus the manifest", async () => {
