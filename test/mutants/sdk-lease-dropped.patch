@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/client.test.ts -t "sdk.request"
+# kills: sdk.request
+# why: submit sends no Keel-Lease header, so the DO cannot authorise it
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index 727c71c..263aeaa 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -157,7 +157,7 @@ export class KeelClient {
+   ): Promise<WireOutputs["submit"]> {
+     return this.call(
+       "submit",
+-      { ...submission, "keel-lease": options.lease, "idempotency-key": keyOf(options) },
++      { ...submission, "idempotency-key": keyOf(options) },
+       options,
+     );
+   }

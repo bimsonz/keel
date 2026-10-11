@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/cli/test/cli.test.ts -t "cli.status"
+# kills: cli.status
+# why: keeltown status ignores --wait
+diff --git a/packages/cli/src/run.ts b/packages/cli/src/run.ts
+index a467448..84b7486 100644
+--- a/packages/cli/src/run.ts
++++ b/packages/cli/src/run.ts
+@@ -88,7 +88,7 @@ async function dispatch(
+ ): Promise<unknown> {
+   const idempotent = values.key === undefined ? {} : { idempotencyKey: values.key };
+   const wait = count(values.wait, "wait");
+-  const waiting = wait === undefined ? {} : { wait };
++  const waiting = {};
+   const cursor = values.cursor === undefined ? {} : { cursor: values.cursor };
+   switch (command.join(" ")) {
+     case "whoami":
