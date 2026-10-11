@@ -21,15 +21,15 @@ const mailing = makeIsolate(env, isolateLayer(env), {
 const call = caller(async (request) => mailing.app.fetch(request, env, createExecutionContext()));
 
 /** Signs a new person up and in by an email code; the user has no handle yet. */
-async function signUpByCode(email: string) {
+async function signUpByCode(email: string, via = call) {
   const jar = new Jar();
-  const sent = await call("/email-otp/send-verification-otp", { body: { email, type: "sign-in" } });
+  const sent = await via("/email-otp/send-verification-otp", { body: { email, type: "sign-in" } });
   answered(sent, 200);
   const otp = outbox.findLast((m) => m.to === email)?.otp;
   expect(otp).toMatch(/^\d{6}$/);
-  const signed = await call("/sign-in/email-otp", { body: { email, otp }, jar });
+  const signed = await via("/sign-in/email-otp", { body: { email, otp }, jar });
   answered(signed, 200);
-  const session = await call("/get-session", { jar });
+  const session = await via("/get-session", { jar });
   const userId: unknown = session.json.user.id;
   if (typeof userId !== "string") throw new Error(`no user in ${session.text}`);
   return { jar, signed, userId };
@@ -120,18 +120,35 @@ describe("Better Auth at /v1/auth", () => {
     expect(session.json.session.userId).toBe(session.json.user.id);
   });
 
-  it("[ba.cross-site] refuses a cookie-carrying write from another site, and takes the same from keel.town", async () => {
-    const { jar } = await signUpByCode("csrf@example.com");
-    const forged = await call("/update-user", {
-      body: { username: "csrf" },
-      jar,
-      origin: "https://evil.example",
-    });
-    answered(forged, 403);
-    const unchanged = await call("/get-session", { jar });
-    expect(unchanged.json.user.username).toBeNull();
-    const own = await call("/update-user", { body: { username: "csrf" }, jar });
-    answered(own, 200);
+  it("[ba.cross-site] refuses a cookie-carrying write from another site, and takes the same from keel.town, even where the environment looks like a test runner's", async () => {
+    // Better Auth skips its origin check when NODE_ENV is test or TEST is set, and
+    // nodejs_compat puts a Worker's vars in process.env, so one stray var would turn
+    // it off. Keel sets the check on explicitly; this case runs where the default is off.
+    const runner = globalThis.process.env;
+    runner["TEST"] = "true";
+    try {
+      const isolate = makeIsolate(env, isolateLayer(env), {
+        sendOtp: async (message) => {
+          outbox.push(message);
+        },
+      });
+      const viaRunner = caller(async (request) =>
+        isolate.app.fetch(request, env, createExecutionContext()),
+      );
+      const { jar } = await signUpByCode("csrf@example.com", viaRunner);
+      const forged = await viaRunner("/update-user", {
+        body: { username: "csrf" },
+        jar,
+        origin: "https://evil.example",
+      });
+      answered(forged, 403);
+      const unchanged = await viaRunner("/get-session", { jar });
+      expect(unchanged.json.user.username).toBeNull();
+      const own = await viaRunner("/update-user", { body: { username: "csrf" }, jar });
+      answered(own, 200);
+    } finally {
+      delete runner["TEST"];
+    }
   });
 
   it("[ba.handle-first] a user without a handle may only choose one or sign out; the handle makes its personal org", async () => {
