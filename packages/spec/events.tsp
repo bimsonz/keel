@@ -127,6 +127,12 @@ union EntityKind {
   tenet: "tenet",
   escalation: "escalation",
   deployment: "deployment",
+
+  /** A user's tenancy events (`user:<userId>`), committed from Better Auth's after-hooks. */
+  user: "user",
+
+  /** An org's tenancy events (`org:<orgId>`), committed from Better Auth's after-hooks. */
+  org: "org",
 }
 
 /** An entity a Durable Object owns. */

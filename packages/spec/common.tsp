@@ -66,6 +66,12 @@ scalar TenetId extends string;
 @pattern("^dpl_[0-9A-HJKMNP-TV-Z]{26}$")
 scalar DeploymentId extends string;
 
+@pattern("^usr_[0-9A-HJKMNP-TV-Z]{26}$")
+scalar UserId extends string;
+
+@pattern("^org_[0-9A-HJKMNP-TV-Z]{26}$")
+scalar OrgId extends string;
+
 /**
  * A sponsor: the human an agent acts on behalf of, accountable for its changes
  * and the first person an escalation goes to. A `scheme:value` address, e.g.

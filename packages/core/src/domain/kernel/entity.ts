@@ -21,6 +21,10 @@ export const EntityKind = Schema.Literals([
   "tenet",
   "escalation",
   "deployment",
+  /** A user's tenancy events (`user:<userId>`), committed from Better Auth's after-hooks. */
+  "user",
+  /** An org's tenancy events (`org:<orgId>`), committed from Better Auth's after-hooks. */
+  "org",
 ]);
 export type EntityKind = typeof EntityKind.Type;
 

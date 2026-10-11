@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { AgentId } from "../kernel/index.ts";
+import { AgentId, NextAction } from "../kernel/index.ts";
 import { AgentState, Sponsor } from "./agent.ts";
 
 /** No agent has this id. */
@@ -61,3 +61,52 @@ export class AgentStateRefused extends Schema.TaggedError<AgentStateRefused>()(
     command: Schema.String,
   },
 ) {}
+
+/** 401: an anonymous caller asked for something only a signed-in user or an agent may do. */
+export class AuthenticationRequired extends Schema.TaggedError<AuthenticationRequired>()(
+  "AuthenticationRequired",
+  {
+    nextActions: Schema.Array(NextAction),
+  },
+) {}
+
+/**
+ * 404: the caller may not see this, or it does not exist; the two read the
+ * same. No fields, so nothing tells them apart: the gate answers the
+ * operation's own not-found.
+ */
+export class NotVisible extends Schema.TaggedError<NotVisible>()("NotVisible", {}) {}
+
+/**
+ * Why a caller who sees the resource may not act on it:
+ * - `user-suspended`, `org-suspended`, `sponsor-suspended`: suspended by the instance admin;
+ * - `sponsor-left`: the agent's sponsor is no longer a member of its org;
+ * - `handle-required`: a user must choose a handle before anything else;
+ * - `role`: the caller's role in the org is too low;
+ * - `agents-only`: work is done by agents; `users-only`: governance is done by people;
+ * - `foreign-project`: an agent's request on a project of its org that is not its own;
+ * - `scope`: the agent's token lacks the scope;
+ * - `bootstrap-confined`: the bootstrap credential may only start the instance;
+ * - `private-source`: a private project forks only within its own org.
+ */
+export const RefusalReason = Schema.Literals([
+  "user-suspended",
+  "handle-required",
+  "role",
+  "agents-only",
+  "users-only",
+  "sponsor-suspended",
+  "sponsor-left",
+  "org-suspended",
+  "foreign-project",
+  "scope",
+  "bootstrap-confined",
+  "private-source",
+]);
+export type RefusalReason = typeof RefusalReason.Type;
+
+/** 403: the caller sees the resource but may not do this. */
+export class AccessRefused extends Schema.TaggedError<AccessRefused>()("AccessRefused", {
+  reason: RefusalReason,
+  nextActions: Schema.Array(NextAction),
+}) {}

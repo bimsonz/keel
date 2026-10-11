@@ -25,6 +25,8 @@ export const ID_PREFIXES = {
   escalation: "esc",
   deployment: "dpl",
   project: "prj",
+  user: "usr",
+  org: "org",
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;
@@ -78,6 +80,12 @@ export const DeploymentId = prefixed("dpl").pipe(Schema.brand("DeploymentId"));
 export type DeploymentId = typeof DeploymentId.Type;
 export const ProjectId = prefixed("prj").pipe(Schema.brand("ProjectId"));
 export type ProjectId = typeof ProjectId.Type;
+/** A user, minted by Better Auth's `generateId`. */
+export const UserId = prefixed("usr").pipe(Schema.brand("UserId"));
+export type UserId = typeof UserId.Type;
+/** An org: a tenant owning projects, agents and members. */
+export const OrgId = prefixed("org").pipe(Schema.brand("OrgId"));
+export type OrgId = typeof OrgId.Type;
 
 /** The branded id type for each prefix, so `Ids.next("chg")` returns a `ChangeId`. */
 export interface IdOf {
@@ -100,6 +108,8 @@ export interface IdOf {
   esc: EscalationId;
   dpl: DeploymentId;
   prj: ProjectId;
+  usr: UserId;
+  org: OrgId;
 }
 
 /** A point in time, as milliseconds since the Unix epoch. Time reaches the domain only as a value. */

@@ -8728,7 +8728,9 @@
           "decision",
           "tenet",
           "escalation",
-          "deployment"
+          "deployment",
+          "user",
+          "org"
         ]
       },
       "EntityRef": {
@@ -12440,6 +12442,10 @@
           "not": {}
         }
       },
+      "OrgId": {
+        "type": "string",
+        "pattern": "^org_[0-9A-HJKMNP-TV-Z]{26}$"
+      },
       "OverruleRequested": {
         "type": "object",
         "required": [
@@ -15185,6 +15191,10 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "UserId": {
+        "type": "string",
+        "pattern": "^usr_[0-9A-HJKMNP-TV-Z]{26}$"
       },
       "VerdictId": {
         "type": "string",
