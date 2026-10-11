@@ -1,6 +1,11 @@
 {
   "extends": "../tsconfig.base.json",
-  // Scenarios talk to a deployed Keel with the platform's own fetch, as any outside client would.
-  "compilerOptions": { "lib": ["ES2023", "DOM", "DOM.Iterable"] },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  // Scenarios talk to a deployed Keel with the platform's own fetch, as any outside client would,
+  // and drive a workspace with system git, as an agent's harness does. Node runs them, stripping types.
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "erasableSyntaxOnly": true
+  },
+  "include": ["src/**/*.ts", "agents/**/*.ts", "test/**/*.ts"]
 }

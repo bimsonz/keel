@@ -2,6 +2,7 @@ import type {
   CreateProjectRequest,
   DeclareRequest,
   EnrolAgentRequest,
+  ProjectSettings,
   SubmitRequest,
   TokenResponse,
   WireOutputs,
@@ -110,7 +111,8 @@ export class KeelClient {
     if (response.status === 401) response = await send(await this.token({ fresh: true }));
     if (!response.ok) throw await KeelProblem.from(response);
     // The body is the contract's: Keel validates every response against the published schemas.
-    const answer: WireOutputs[Op] = await response.json();
+    // Parsed from text, because `json()` is typed `any` in DOM's lib but `unknown` in Node's.
+    const answer: WireOutputs[Op] = JSON.parse(await response.text());
     return answer;
   }
 
@@ -210,6 +212,23 @@ export class KeelClient {
       { ...project, "idempotency-key": keyOf(options) },
       options,
     );
+  }
+
+  /** Operator: a project's settings, as its Project DO holds them. */
+  settings(projectId: string, options?: CallOptions): Promise<WireOutputs["Operator_getSettings"]> {
+    return this.call("Operator_getSettings", { projectId }, options);
+  }
+
+  /**
+   * Operator: replaces a project's settings. A PUT of what is already there
+   * commits nothing, so a retry is safe; an absent `verification` means `required`.
+   */
+  putSettings(
+    projectId: string,
+    settings: ProjectSettings,
+    options?: CallOptions,
+  ): Promise<WireOutputs["Operator_putSettings"]> {
+    return this.call("Operator_putSettings", { ...settings, projectId }, options);
   }
 
   /** Operator: enrols an agent. The client secret in the answer is shown once. */

@@ -7,6 +7,8 @@
 import { isDeepStrictEqual } from "node:util";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { clientFor, readSeeded } from "../e2e/src/lib/seeded.ts";
+import { workLoopSmoke } from "../e2e/src/smoke/work-loop.ts";
 import { whoamiSmoke, type WhoamiSmokeResult } from "../e2e/src/smoke/whoami.ts";
 import { cloudflare, root, wrangler } from "./env.ts";
 
@@ -93,6 +95,22 @@ try {
     !isDeepStrictEqual(results[0]?.rest, results[1]?.tool),
     "two agents' identities differ across surfaces (the comparison can fail)",
   );
+  // The work loop needs a project with a stocked pool: the seed's forge-lite (scripts/seed.ts).
+  if (existsSync(join(root, ".keel", `${environment}.json`))) {
+    const s0 = readSeeded(root, environment);
+    const agent = s0.projects["forge-lite"]?.agents[0];
+    if (agent === undefined) throw new Error("the seed holds no forge-lite agent");
+    const run = new Date().toISOString().replace(/[:.]/g, "-");
+    for (const c of await workLoopSmoke(keelUrl, clientFor(keelUrl, agent), run)) {
+      check(c.ok, c.what);
+      if (!c.ok) console.log(JSON.stringify(c.detail, null, 2));
+    }
+  } else {
+    check(
+      false,
+      `no .keel/${environment}.json: run \`node scripts/seed.ts ${environment}\` for the work-loop smoke`,
+    );
+  }
   if (repeat > 0 && seeded[0] !== undefined) {
     const rounds: WhoamiSmokeResult[] = [];
     for (let i = 0; i < repeat; i += 1) rounds.push(await whoamiSmoke(keelUrl, seeded[0]));

@@ -17,7 +17,10 @@
     "check": "pnpm gen && pnpm lint && pnpm format:check && pnpm typecheck && pnpm guards && pnpm test && pnpm test:pool && pnpm deploy:dry",
     "prove:red": "node scripts/prove-red.ts",
     "deploy:staging": "node scripts/deploy.ts staging",
-    "smoke": "node scripts/smoke.ts staging"
+    "smoke": "node scripts/smoke.ts staging",
+    "seed": "node scripts/seed.ts",
+    "e2e:s0": "node e2e/src/s0.ts",
+    "e2e:agents": "node e2e/agents/two-agents.ts"
   },
   "devDependencies": {
     "@keeltown/tooling": "workspace:*",

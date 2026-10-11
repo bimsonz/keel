@@ -243,7 +243,14 @@ importers:
         version: 4.149.0(@types/node@22.20.5)
 
   e2e:
+    dependencies:
+      '@keeltown/sdk':
+        specifier: workspace:*
+        version: link:../packages/sdk
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.20.5
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

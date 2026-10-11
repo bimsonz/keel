@@ -1,0 +1,5 @@
+{
+  "//": "Copy to .keel/agents.json (gitignored) and name an MCP-capable agent CLI that runs headless. {prompt}, {mcpConfig} and {workdir} are filled in per agent. The arguments must make {mcpConfig} the agent's only MCP server and allow only that server's tools, git, and file edits inside {workdir}.",
+  "command": "your-agent-cli",
+  "args": ["--prompt", "{prompt}", "--mcp-config", "{mcpConfig}", "--workdir", "{workdir}"]
+}

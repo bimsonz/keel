@@ -24,6 +24,8 @@ export const ROUTES = {
   Inbox_listEvents: { method: "GET", path: "/events", query: ["cursor", "wait", "limit"] },
   Views_getTrunk: { method: "GET", path: "/projects/{projectId}/trunk" },
   Operator_createProject: { method: "POST", path: "/projects", headers: ["idempotency-key"] },
+  Operator_getSettings: { method: "GET", path: "/projects/{projectId}/settings" },
+  Operator_putSettings: { method: "PUT", path: "/projects/{projectId}/settings" },
   Operator_enrolAgent: { method: "POST", path: "/agents", headers: ["idempotency-key"] },
 } as const satisfies Partial<Record<keyof WireOutputs, Route>>;
 
