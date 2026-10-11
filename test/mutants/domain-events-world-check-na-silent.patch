@@ -2,10 +2,10 @@
 # kills: events.world-check-na-reason
 # why: An n/a suite cell decodes without saying why the suite did not apply
 diff --git a/packages/core/src/domain/verification/events.ts b/packages/core/src/domain/verification/events.ts
-index 44cac2c..746f41c 100644
+index d09eb6b..5d3d767 100644
 --- a/packages/core/src/domain/verification/events.ts
 +++ b/packages/core/src/domain/verification/events.ts
-@@ -61,7 +61,7 @@ export const WorldCheckRan = Schema.TaggedStruct("WorldCheckRan", {
+@@ -63,7 +63,7 @@ export const WorldCheckRan = Schema.TaggedStruct("WorldCheckRan", {
    reason: Schema.optional(Schema.NonEmptyString),
  }).check(
    Schema.makeFilter(
@@ -13,4 +13,4 @@ index 44cac2c..746f41c 100644
 +    () => true,
    ),
  );
- export const ProbeDiscarded = Schema.TaggedStruct("ProbeDiscarded", {
+ /**

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/tenancy.test.ts
+# kills: quota.retry-at
+# why: a daily kind refused may retry 24 hours later, not at the next UTC midnight
+diff --git a/packages/core/src/domain/identity/quota.ts b/packages/core/src/domain/identity/quota.ts
+index fa5bea0..cb5394b 100644
+--- a/packages/core/src/domain/identity/quota.ts
++++ b/packages/core/src/domain/identity/quota.ts
+@@ -46,7 +46,7 @@ const DAY_MS = 86_400_000;
+ 
+ /** When a daily kind's count resets after `now`: the next UTC midnight. Undefined for a running total. */
+ export const resetAt = (kind: QuotaKind, now: Instant): Instant | undefined =>
+-  DAILY_QUOTAS.has(kind) ? Instant((Math.floor(now / DAY_MS) + 1) * DAY_MS) : undefined;
++  DAILY_QUOTAS.has(kind) ? Instant(now + DAY_MS) : undefined;
+ 
+ /** An admission to decide: `amount` more of `kind`, on top of the org's `used` in the current window. */
+ export interface QuotaAsk {

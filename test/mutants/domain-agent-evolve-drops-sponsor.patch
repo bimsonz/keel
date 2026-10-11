@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.enrol-tenancy
+# why: the Agent forgets the user who sponsored it, so no membership change can revoke it
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index b4a86b4..431296c 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -125,7 +125,6 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
+           scopes: event.scopes,
+           ...(event.onBehalfOf === undefined ? {} : { onBehalfOf: event.onBehalfOf }),
+           ...(event.org === undefined ? {} : { org: event.org }),
+-          ...(event.sponsor === undefined ? {} : { sponsor: event.sponsor }),
+           state: "active",
+           revocationEpoch: 0,
+           createdAt: committed.at,

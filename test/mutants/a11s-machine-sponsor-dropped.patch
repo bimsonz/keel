@@ -2,14 +2,14 @@
 # kills: agent.sponsor
 # why: decide drops Enroll's sponsor, so AgentEnrolled and the Agent never carry it
 diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
-index 2972b45..e7b832e 100644
+index b4a86b4..1a54174 100644
 --- a/packages/core/src/domain/identity/agent-machine.ts
 +++ b/packages/core/src/domain/identity/agent-machine.ts
-@@ -63,7 +63,6 @@ export const decideAgent = (
+@@ -64,7 +64,6 @@ export const decideAgent = (
              name: command.name,
              kind: command.kind,
              scopes: command.scopes,
 -            ...(command.onBehalfOf === undefined ? {} : { onBehalfOf: command.onBehalfOf }),
+             ...(command.org === undefined ? {} : { org: command.org }),
+             ...(command.sponsor === undefined ? {} : { sponsor: command.sponsor }),
            }),
-         ])
-       : Result.fail(new AgentNotKnown({ agentId: facts.agentId }));

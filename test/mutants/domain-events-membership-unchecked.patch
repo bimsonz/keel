@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/tenancy.test.ts
+# kills: events.membership-changed
+# why: a membership change that names no role, or the same role twice, decodes
+diff --git a/packages/core/src/domain/identity/events.ts b/packages/core/src/domain/identity/events.ts
+index 928afbd..cc16a96 100644
+--- a/packages/core/src/domain/identity/events.ts
++++ b/packages/core/src/domain/identity/events.ts
+@@ -71,7 +71,7 @@ export const MembershipChanged = Schema.TaggedStruct("MembershipChanged", {
+ }).check(
+   Schema.makeFilter(
+     (e) =>
+-      e.from !== e.to ||
++      true ||
+       "a membership change names the role left or the role taken, and they differ",
+   ),
+ );

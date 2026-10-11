@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/tenancy.test.ts
+# kills: tenancy.ended-membership-revokes
+# why: leaving one org revokes the agents the user sponsored in every org
+diff --git a/packages/core/src/domain/identity/revocation.ts b/packages/core/src/domain/identity/revocation.ts
+index 83efbd6..807ab8f 100644
+--- a/packages/core/src/domain/identity/revocation.ts
++++ b/packages/core/src/domain/identity/revocation.ts
+@@ -18,7 +18,6 @@ export const revokedBy = (
+         .filter(
+           (agent) =>
+             agent.state !== "revoked" &&
+-            agent.org === change.orgId &&
+             agent.sponsor === change.userId,
+         )
+         .map((agent) => agent.id);

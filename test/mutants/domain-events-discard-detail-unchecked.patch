@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: events.discard-detail
+# why: a probe discarded for another reason decodes with a draft failure's detail
+diff --git a/packages/core/src/domain/verification/events.ts b/packages/core/src/domain/verification/events.ts
+index d09eb6b..589f1cc 100644
+--- a/packages/core/src/domain/verification/events.ts
++++ b/packages/core/src/domain/verification/events.ts
+@@ -92,8 +92,7 @@ export const ProbeDiscarded = Schema.TaggedStruct("ProbeDiscarded", {
+ }).check(
+   Schema.makeFilter(
+     (e) =>
+-      e.detail === undefined ||
+-      e.reason === "draft-failed" ||
++      true ||
+       "a detail is given only when the drafts failed",
+   ),
+ );
