@@ -57,18 +57,37 @@ const declaredFrom = (derived: readonly DerivedEffect[]): fc.Arbitrary<readonly 
       }),
     );
 
-const scenarioArb = changeIdArb.chain((self) =>
-  fc.array(derivedEffectArb(), { maxLength: 4 }).chain((derived) =>
-    fc.record({
-      self: fc.constant(self),
-      derived: fc.constant(derived),
-      declared: declaredFrom(derived),
-      footprint: footprintArb,
-      touched: touchedArb,
-      premises: fc.array(heldPremiseArb, { maxLength: 5 }),
-      tenets: fc.array(tenetArb, { maxLength: 2 }),
-    }),
+/**
+ * One run in four also carries S-1's pair, a per-session cache against a
+ * premise of at most per-request, which certainly contradicts. Generated pairs
+ * alone retracted about 5 times in 300 runs, so an unseeded run now and then
+ * saw none.
+ */
+const witnessArb = fc.tuple(
+  fc.oneof(
+    { weight: 3, arbitrary: fc.constant(false) },
+    { weight: 1, arbitrary: fc.constant(true) },
   ),
+  fc.constantFrom<DerivedEffect["evidenceClass"]>("ruling", "opinion"),
+);
+
+const scenarioArb = changeIdArb.chain((self) =>
+  fc
+    .tuple(fc.array(derivedEffectArb(), { maxLength: 4 }), witnessArb)
+    .chain(([generated, [witnessed, evidenceClass]]) => {
+      const derived = witnessed ? [cache("per-session", evidenceClass), ...generated] : generated;
+      return fc.record({
+        self: fc.constant(self),
+        derived: fc.constant(derived),
+        declared: declaredFrom(derived),
+        footprint: footprintArb,
+        touched: touchedArb,
+        premises: fc
+          .array(heldPremiseArb, { maxLength: 5 })
+          .map((held) => (witnessed ? [premiseA, ...held] : held)),
+        tenets: fc.array(tenetArb, { maxLength: 2 }),
+      });
+    }),
 );
 
 type Scenario = {
