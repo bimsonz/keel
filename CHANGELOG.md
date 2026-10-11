@@ -8,7 +8,6 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 
 ### Added
 
-- Port `EventFeed.read({cursor?, limit?, waitSeconds})` → `EventFeedPage {events: EventFeedEntry[], cursor}` (new; `EventFeedEntry` is an `EventEnvelope` with an optional `label`), over the existing `ProjectorRpc.read`, with an in-memory adapter and a contract suite. `GET /v1/events` (`Inbox_listEvents`) is served over it: `nextCursor` on every page, an empty one included; a cursor that is not a feed position is a 400 naming `cursor`. An agent reads only its own project's events; an observer or operator reads the whole instance.
 - `Changes.workspace(changeId)` answers `ChangeWorkspace {workspaceId, repo, baseSha, projectId}` (new in the ports) and fails `ChangeNotFound | ChangeStateRefused`, over the existing `ChangeRpc.workspace()`; the Lane reads a member's repo and base there.
 - Port `CandidateBundles.bundle(staging, commit)` → the bundle's `ContentHash`, failing `BundleRefused {reason}` (new) for a tree the bundle format cannot carry (a symlink, a submodule, an unsafe path). The GitCore adapter reads the tree through the binding and writes it with the runner protocol's `writeBundle`.
 - Port `BatchVerification.start(instanceId, job: VerificationJob {jobId, laneId, candidateId, bundle, fence, planHash})` starts KeelVerify once per instance id; an id that already exists counts as started.

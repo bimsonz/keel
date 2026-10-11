@@ -3,7 +3,6 @@ import {
   makeChangesMemory,
   makeClockMemory,
   makeEnrolmentsMemory,
-  makeEventFeedMemory,
   makeInboxMemory,
   makeIdsMemory,
   makeProjectsMemory,
@@ -27,7 +26,6 @@ const runtime = ManagedRuntime.make(
     makeChangesMemory().layer,
     inbox.layer,
     inbox.notifier,
-    makeEventFeedMemory().layer,
   ),
 );
 const run = makeRunner(runtime);

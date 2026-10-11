@@ -19,7 +19,6 @@ const CONTRACT_PORTS = [
   "Enrolments",
   "EntityStore",
   "EventOutbox",
-  "EventFeed",
   "EventLog",
   "WorkQueue",
   "DecisionModel",

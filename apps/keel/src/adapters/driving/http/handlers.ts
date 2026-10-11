@@ -3,7 +3,6 @@ import {
   declareChange,
   getSettings,
   putSettings,
-  readEvents,
   readInbox,
   submissionOf,
   submitChange,
@@ -27,7 +26,6 @@ import {
   settingsOk,
   settingsProject,
 } from "./operator.ts";
-import { eventsInput, eventsOk } from "./events.ts";
 import { piggyback } from "./piggyback.ts";
 import { notImplemented } from "./problems.ts";
 import type { Runner } from "./run.ts";
@@ -199,17 +197,7 @@ export function makeHandlers(run: Runner) {
             Effect.map(inboxOk),
           ),
         ),
-      Inbox_listEvents: (caller: Caller, input: Input<"Inbox_listEvents">) => {
-        const decoded = eventsInput(input);
-        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-        return run(
-          caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) => readEvents(principal, decoded.success)),
-            Effect.map(eventsOk),
-          ),
-        );
-      },
+      Inbox_listEvents: notYet,
       Lattices_listLattices: latticesOk,
       Views_getVerdict: notYet,
       Views_getCandidate: notYet,

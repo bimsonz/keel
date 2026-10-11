@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import type { Effect } from "effect";
 import type {
   Change,
   ChangeNotFound,
@@ -10,13 +10,7 @@ import type {
 } from "../../domain/coordination/index.ts";
 import type { IdempotencyConflict, InboxPage, Principal } from "../../domain/identity/index.ts";
 import type { ChangeId } from "../../domain/kernel/index.ts";
-import {
-  Changes,
-  EventFeed,
-  type EventFeedPage,
-  Inbox,
-  type SubmissionStatus,
-} from "../ports/index.ts";
+import { Changes, Inbox, type SubmissionStatus } from "../ports/index.ts";
 import type { Declared, DeclareInput, SubmitInput } from "./index.ts";
 
 /**
@@ -62,34 +56,3 @@ export const readInbox: (
   waitSeconds?: number,
 ) => Effect.Effect<InboxPage, never, Inbox> = (principal, cursor, waitSeconds) =>
   Inbox.use((inbox) => inbox.read(principal.agentId, cursor, clampWait(waitSeconds)));
-
-/**
- * Who reads the whole feed at L1: an observer, because Mission Control shows
- * every project (S-0's control project too), and an operator, whose authority
- * is instance-wide. Anyone else reads only the events of its own project.
- */
-const readsInstanceWide = (principal: Principal): boolean =>
-  principal.scopes.includes("observer") || principal.scopes.includes("operator");
-
-/**
- * The event feed after `cursor`, waiting up to `waitSeconds` (0–30) for an
- * event. An agent's page keeps only its project's events, so it may hold fewer
- * than `limit`, or none, while its cursor still moves past the rest.
- */
-export const readEvents: (
-  principal: Principal,
-  input: { readonly cursor?: string; readonly limit?: number; readonly waitSeconds?: number },
-) => Effect.Effect<EventFeedPage, never, EventFeed> = (principal, input) =>
-  EventFeed.use((feed) =>
-    feed.read({
-      ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-      ...(input.limit === undefined ? {} : { limit: input.limit }),
-      waitSeconds: clampWait(input.waitSeconds),
-    }),
-  ).pipe(
-    Effect.map((page) =>
-      readsInstanceWide(principal)
-        ? page
-        : { ...page, events: page.events.filter((e) => e.project === principal.projectId) },
-    ),
-  );

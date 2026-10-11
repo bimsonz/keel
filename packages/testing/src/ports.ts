@@ -12,7 +12,6 @@ import {
 import { describeChangesContract, type ChangesHarness } from "./contracts/changes.ts";
 import { describeCodeHostContract } from "./contracts/code-host.ts";
 import { describeEnrolmentsContract, type EnrolmentsHarness } from "./contracts/enrolments.ts";
-import { describeEventFeedContract, type EventFeedHarness } from "./contracts/event-feed.ts";
 import { describeInboxContract, type InboxHarness } from "./contracts/inbox.ts";
 import { describeNotifierContract, type NotifierHarness } from "./contracts/notifier.ts";
 import { describeWorkspacePoolContract, type StockedPool } from "./contracts/workspace-pool.ts";
@@ -30,7 +29,6 @@ import { describeProjectsContract, type ProjectsHarness } from "./contracts/proj
 import * as codeHost from "./memory/code-host.ts";
 import * as coordination from "./memory/coordination.ts";
 import * as delivery from "./memory/delivery.ts";
-import * as feed from "./memory/event-feed.ts";
 import * as outbox from "./memory/event-outbox.ts";
 import * as identity from "./memory/identity.ts";
 import * as integration from "./memory/integration.ts";
@@ -44,7 +42,6 @@ import type {
   ChangePrecheck,
   Changes,
   Enrolments,
-  EventFeed,
   Inbox,
   Notifier,
   Projects,
@@ -105,11 +102,6 @@ function memoryChangesHarness(): ChangesHarness {
         return sha;
       }),
   };
-}
-
-function memoryEventFeedHarness(): EventFeedHarness {
-  const memory = feed.makeEventFeedMemory();
-  return { layer: memory.layer, arrive: (event) => Effect.sync(() => memory.append(event)) };
 }
 
 function memoryInboxHarness(): InboxHarness {
@@ -241,10 +233,6 @@ export const PORTS = {
   ),
   EntityStore: port(() => storage.makeEntityStoreMemory().layer, describeEntityStoreContract),
   EventOutbox: eventOutbox,
-  EventFeed: harnessed<EventFeed, EventFeedHarness>(
-    memoryEventFeedHarness,
-    describeEventFeedContract,
-  ),
   EventLog: port(() => storage.makeEventLogMemory().layer, pending("EventLog", ["publish"])),
   WorkQueue: port(() => storage.makeWorkQueueMemory().layer, pending("WorkQueue", ["enqueue"])),
   DecisionModel: port(

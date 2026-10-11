@@ -4,10 +4,8 @@ import {
   type AgentDirectory,
   type Changes,
   type Enrolments,
-  type EventFeed,
   Inbox,
   type Notifier,
-  PROJECTOR,
   type Projects,
   TokenIssuer,
 } from "@keeltown/core/ports";
@@ -16,7 +14,6 @@ import { AgentDirectoryWithBootstrap } from "../adapters/driven/bootstrap/direct
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { EnrolmentsRpc } from "../adapters/driven/do-rpc/enrolments.ts";
-import { EventFeedRpc } from "../adapters/driven/do-rpc/event-feed.ts";
 import { InboxRpc } from "../adapters/driven/do-rpc/inbox.ts";
 import { NotifierRpc } from "../adapters/driven/do-rpc/notifier.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
@@ -44,14 +41,12 @@ export function isolateLayer(
     env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`));
   const project = (projectId: ProjectId) =>
     env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`));
-  const projector = () => env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR));
   const directory = AgentDirectoryWithBootstrap(env.KEEL_BOOTSTRAP_SECRET).pipe(
     Layer.provide(AgentDirectoryD1(env.DB)),
   );
   return Layer.mergeAll(
     overrides.changes ?? ChangesRpc({ change, agentSession }),
     overrides.inbox ?? InboxRpc(agentSession),
-    overrides.eventFeed ?? EventFeedRpc(projector),
     overrides.notifier ?? NotifierRpc(agentSession),
     overrides.projects ?? ProjectsRpc(project),
     (overrides.enrolments ?? EnrolmentsRpc(agentSession)).pipe(Layer.provide(directory)),
@@ -67,7 +62,6 @@ export function isolateLayer(
 export interface IsolateOverrides {
   readonly changes?: Layer.Layer<Changes>;
   readonly inbox?: Layer.Layer<Inbox>;
-  readonly eventFeed?: Layer.Layer<EventFeed>;
   /** The piggyback; pass it with `inbox` when both read one memory. */
   readonly notifier?: Layer.Layer<Notifier>;
   readonly projects?: Layer.Layer<Projects>;

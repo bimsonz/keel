@@ -19,7 +19,6 @@ export * from "./decision-model.ts";
 export * from "./deployer.ts";
 export * from "./enrolments.ts";
 export * from "./entity-store.ts";
-export * from "./event-feed.ts";
 export * from "./evidence-store.ts";
 export * from "./event-log.ts";
 export * from "./event-outbox.ts";
