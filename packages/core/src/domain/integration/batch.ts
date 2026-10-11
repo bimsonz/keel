@@ -8,7 +8,7 @@ import {
   ProjectId,
   VerdictId,
 } from "../kernel/index.ts";
-import { BatchAttribution } from "./events.ts";
+import { BatchAttribution, MemberCommit } from "./events.ts";
 
 export const CandidateState = Schema.Literals([
   "forming",
@@ -84,6 +84,8 @@ export const PendingGroup = Schema.Struct({
   proofIds: Schema.Array(Schema.String),
   committerTime: InstantSchema,
   composed: Schema.optional(CommitSha),
+  /** Each member's commit in the composed chain, recorded with `composed`. */
+  commits: Schema.optional(Schema.Array(MemberCommit)),
 });
 export type PendingGroup = typeof PendingGroup.Type;
 

@@ -39,6 +39,8 @@ const AGENT = makeId("agt", ulid(1));
 const NEVER_ISSUED = makeId("lse", "Z".repeat(26));
 const SHA = CommitSha.make("c".repeat(40));
 const BASE = CommitSha.make("b".repeat(40));
+/** The member's commit on trunk, as TrunkAdvanced's landing carries it: never the submitted one. */
+const ON_TRUNK = CommitSha.make("e".repeat(40));
 const preflight: Preflight = {
   neighbours: [],
   contradictions: [],
@@ -324,6 +326,7 @@ const build = (
     case "Land":
       return {
         _tag: "Land",
+        commitSha: ON_TRUNK,
         trunkSha: CommitSha.make("d".repeat(40)),
         candidateId: mint.next("cnd"),
         proofId: "proof",
@@ -621,6 +624,7 @@ const BATCH = makeId("bat", ulid(4));
 const batch: ChangeCommand = { _tag: "Batch", batchId: BATCH, blockers: clear };
 const land: ChangeCommand = {
   _tag: "Land",
+  commitSha: ON_TRUNK,
   trunkSha: CommitSha.make("d".repeat(40)),
   candidateId: makeId("cnd", ulid(5)),
   proofId: "proof",
@@ -948,6 +952,37 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
       reason: undefined,
       next: ["declare"],
     });
+  });
+
+  it("[change.landed-from-landing] a change lands as TrunkAdvanced's landing says: its commit on trunk, the trunk head, its candidate and its proof", () => {
+    let landed = 0;
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        run(plan).records.every((r) =>
+          r.probes.every((probe) => {
+            const c = probe.command;
+            if (c._tag !== "Land" || !Result.isSuccess(probe.result)) return true;
+            landed++;
+            const [e, ...rest] = probe.result.success;
+            return (
+              rest.length === 0 &&
+              e?._tag === "ChangeLanded" &&
+              e.changeId === r.before?.id &&
+              e.commitSha === c.commitSha &&
+              e.trunkSha === c.trunkSha &&
+              e.candidateId === c.candidateId &&
+              e.proofId === c.proofId
+            );
+          }),
+        ),
+      ),
+    );
+    expect(landed).toBeGreaterThan(0);
+    const s0 = drive(
+      [declare, start, submit, precheck, compile, queue, batch, land].map((c) => [c, 1] as const),
+    );
+    // Submitted as SHA, landed as the restacked commit with its trailers.
+    expect(s0.log.at(-1)).toMatchObject({ _tag: "ChangeLanded", commitSha: ON_TRUNK });
   });
 });
 

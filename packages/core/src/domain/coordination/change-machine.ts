@@ -177,7 +177,10 @@ export type ChangeCommand =
       readonly batchId?: BatchId;
     }
   | {
+      /** TrunkAdvanced's landing for this change, with the head trunk advanced to. */
       readonly _tag: "Land";
+      /** Its commit on trunk, carrying its trailers: not the commit it was submitted as. */
+      readonly commitSha: CommitSha;
       readonly trunkSha: CommitSha;
       readonly candidateId: CandidateId;
       readonly proofId: string;
@@ -522,11 +525,11 @@ export const decideChange = (
     }
 
     case "Land":
-      return at("integrating") && change.commitSha !== undefined
+      return at("integrating")
         ? Result.succeed([
             ChangeLanded.make({
               changeId: id,
-              commitSha: change.commitSha,
+              commitSha: command.commitSha,
               trunkSha: command.trunkSha,
               candidateId: command.candidateId,
               proofId: command.proofId,

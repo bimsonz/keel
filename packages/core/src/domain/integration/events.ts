@@ -81,13 +81,33 @@ export const CandidatePromoted = Schema.TaggedStruct("CandidatePromoted", {
   batchId: BatchId,
   trunkSha: CommitSha,
 });
+/** One member's commit in a group's composed chain on trunk. */
+export const MemberCommit = Schema.Struct({
+  changeId: ChangeId,
+  commitSha: CommitSha,
+});
+export type MemberCommit = typeof MemberCommit.Type;
+
+/**
+ * How one member landed: its commit on trunk (the one carrying its trailers),
+ * the candidate it was verified in, and the proof that let its batch land.
+ * Everything its Change DO needs to commit `ChangeLanded`.
+ */
+export const MemberLanding = Schema.Struct({
+  changeId: ChangeId,
+  commitSha: CommitSha,
+  candidateId: CandidateId,
+  proofId: Schema.String,
+});
+export type MemberLanding = typeof MemberLanding.Type;
+
 export const TrunkAdvanced = Schema.TaggedStruct("TrunkAdvanced", {
   projectId: ProjectId,
   from: CommitSha,
   to: CommitSha,
   groupId: Schema.String,
-  members: Schema.Array(ChangeId),
-  proofIds: Schema.Array(Schema.String),
+  /** Every member of the group, in group order, each with its own landing. */
+  landings: Schema.Array(MemberLanding),
   /** False when any batch in the group was unverified; absent means every one was verified. */
   verified: Schema.optional(Schema.Boolean),
   /** Trunk's height after this advance: TrunkInitialized is height 0, and each advance adds 1. */
@@ -154,6 +174,8 @@ export const PromotionComposed = Schema.TaggedStruct("PromotionComposed", {
   projectId: ProjectId,
   groupId: Schema.String,
   sha: CommitSha,
+  /** Each member's commit in the composed chain, in group order: the commits the members land as. */
+  commits: Schema.Array(MemberCommit),
 });
 export const AuditCompleted = Schema.TaggedStruct("AuditCompleted", {
   projectId: ProjectId,

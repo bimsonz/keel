@@ -1,5 +1,12 @@
 import { Schema } from "effect";
-import { BatchId, CandidateId, CommitSha, ProjectId } from "../kernel/index.ts";
+import {
+  BatchId,
+  CandidateId,
+  ChangeId,
+  CommitSha,
+  NextAction,
+  ProjectId,
+} from "../kernel/index.ts";
 import { CandidateState, PromotionState } from "./batch.ts";
 
 export class CandidateNotFound extends Schema.TaggedError<CandidateNotFound>()(
@@ -47,6 +54,21 @@ export class PromotionStateRefused extends Schema.TaggedError<PromotionStateRefu
     projectId: ProjectId,
     phase: PromotionState,
     command: Schema.String,
+  },
+) {}
+
+/**
+ * The composer reported a chain whose members are not the group's, in the
+ * group's order: a composer defect, so nothing is recorded or pushed.
+ */
+export class CompositionMismatch extends Schema.TaggedError<CompositionMismatch>()(
+  "CompositionMismatch",
+  {
+    projectId: ProjectId,
+    groupId: Schema.String,
+    expected: Schema.Array(ChangeId),
+    got: Schema.Array(ChangeId),
+    nextActions: Schema.Array(NextAction),
   },
 ) {}
 

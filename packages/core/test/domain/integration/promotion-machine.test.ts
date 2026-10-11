@@ -11,6 +11,8 @@ import {
   evolveCandidate,
   evolvePromotion,
   type Footprints,
+  type MemberCommit,
+  type PendingGroup,
   type PromotionCommand,
   replayPromotion,
   Trunk,
@@ -42,6 +44,16 @@ const H0 = sha(1);
 const STRAY = sha(0xdead);
 const PATHS = ["src/a.ts", "src/b.ts", "src/c.ts", "pnpm-lock.yaml"] as const;
 const BARRIERS = [Glob.make("pnpm-lock.yaml")];
+/** Each member's commit on trunk, as an honest composer reports it: one per change, fixed by its id. */
+const memberSha = (changeId: ChangeId): CommitSha =>
+  CommitSha.make(changeId.slice(-26).padStart(40, "e"));
+const membersOf = (wal: PendingGroup | undefined): readonly ChangeId[] =>
+  (wal?.batches ?? []).flatMap((b) => b.members);
+const commitsFor = (members: readonly ChangeId[]): readonly MemberCommit[] =>
+  members.map((changeId) => ({ changeId, commitSha: memberSha(changeId) }));
+/** A composer's report names exactly the group's members, in the group's order. */
+const matchesGroup = (commits: readonly MemberCommit[], wal: PendingGroup): boolean =>
+  commits.map((c) => c.changeId).join() === membersOf(wal).join();
 
 type Kind = PromotionCommand["_tag"];
 type Phase = "none" | Trunk["phase"];
@@ -138,7 +150,11 @@ const build = (
         batchId,
         candidateId: makeId("cnd", ulid(n)),
         verdictId: makeId("vrd", ulid(n)),
-        members: [makeId("chg", ulid(n))],
+        // Now and then a batch of two, so a member's place in the group is not its batch's.
+        members:
+          n % 3 === 0
+            ? [makeId("chg", ulid(n)), makeId("chg", ulid(400_000 + n))]
+            : [makeId("chg", ulid(n))],
         base: state?.head ?? H0,
         predecessors,
         ...flagOf(n),
@@ -153,11 +169,20 @@ const build = (
         barriers: BARRIERS,
         inputs: state === undefined ? [] : factsFor(state, world),
       };
-    case "Composed":
+    case "Composed": {
+      const honest = commitsFor(membersOf(state?.wal));
       return {
         _tag: "Composed",
         sha: step.honest ? (state?.wal?.composed ?? sha(0x1000 + n)) : sha(0x2000 + n),
+        // Now and then a composer that reports a chain other than the group's.
+        commits:
+          step.honest || step.pick % 2 === 0
+            ? honest
+            : honest.length > 1
+              ? honest.toReversed()
+              : [],
       };
+    }
     case "ReadBack": {
       const wal = state?.wal;
       const observed = !step.honest
@@ -307,6 +332,7 @@ const oracle = (
     }
     case "Composed":
       if (before.phase !== "promoting" || wal === undefined) return "refused";
+      if (!matchesGroup(command.commits, wal)) return "refused";
       if (wal.composed === undefined) return "promoting";
       return command.sha === wal.composed ? "noop" : "frozen";
     case "ReadBack":
@@ -386,7 +412,12 @@ const flush = (
   inputs,
 });
 const NEW = sha(0x1001);
-const composed: PromotionCommand = { _tag: "Composed", sha: NEW };
+const composedAs = (members: readonly ChangeId[], at: CommitSha = NEW): PromotionCommand => ({
+  _tag: "Composed",
+  sha: at,
+  commits: commitsFor(members),
+});
+const composed = composedAs([C1]);
 const readBack = (observed: CommitSha): PromotionCommand => ({ _tag: "ReadBack", observed });
 const l1Path = [init, enqueue(1, C1), flush([facts(1, C1, "src/a.ts")]), composed];
 
@@ -505,6 +536,9 @@ describe("trunk promotion", { timeout: PROPERTY_TIMEOUT }, () => {
             const keeps = p.after?.phase !== "promoting" || p.after.wal?.composed === recorded;
             if (p.command._tag !== "Composed" || p.command.sha === recorded)
               return keeps && advanced.every((to) => to === recorded);
+            // A report naming another chain is refused before its SHA is looked at.
+            if (r.before?.wal !== undefined && !matchesGroup(p.command.commits, r.before.wal))
+              return Result.isFailure(p.result);
             recomposes++;
             return tagsOf(p.result).join() === "PromotionFrozen";
           });
@@ -512,7 +546,7 @@ describe("trunk promotion", { timeout: PROPERTY_TIMEOUT }, () => {
       ),
     );
     expect(recomposes).toBeGreaterThan(0);
-    expect(drive([...l1Path, { _tag: "Composed", sha: sha(0x3000) }]).tags.at(-1)).toEqual([
+    expect(drive([...l1Path, composedAs([C1], sha(0x3000))]).tags.at(-1)).toEqual([
       "PromotionFrozen",
     ]);
   });
@@ -689,6 +723,116 @@ describe("trunk promotion", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(failureTag(done.results.at(-1))).toBe("PromotionStateRefused");
   });
 
+  it("[promotion.landings] an advance lands every member of its group once, in order, each with its own batch's candidate and proof and its commit on trunk", () => {
+    let advances = 0;
+    let doubles = 0;
+    fc.assert(
+      fc.property(planArb, (steps) =>
+        run(steps).every((r) =>
+          [r.taken, ...r.probes].every((p) => {
+            const wal = r.before?.wal;
+            return eventsOf(p.result).every((e) => {
+              if (e._tag !== "TrunkAdvanced") return true;
+              if (wal === undefined) return false;
+              advances++;
+              if (wal.batches.some((b) => b.members.length > 1)) doubles++;
+              const expected = wal.batches.flatMap((b, i) =>
+                b.members.map((changeId) => ({
+                  changeId,
+                  commitSha: memberSha(changeId),
+                  candidateId: b.candidateId,
+                  proofId: wal.proofIds[i],
+                })),
+              );
+              return canonicalJson(asJson(e.landings)) === canonicalJson(asJson(expected));
+            });
+          }),
+        ),
+      ),
+    );
+    expect(advances).toBeGreaterThan(0);
+    expect(doubles).toBeGreaterThan(0);
+    // A batch of two, then a batch of one, promoted in one group: each member lands with its own batch's proof.
+    const C3 = makeId("chg", ulid(3));
+    const pair: PromotionCommand = {
+      _tag: "Enqueue",
+      batchId: makeId("bat", ulid(1)),
+      candidateId: makeId("cnd", ulid(1)),
+      verdictId: makeId("vrd", ulid(1)),
+      members: [C1, C2],
+      base: H0,
+      predecessors: [],
+    };
+    const group = drive([
+      init,
+      pair,
+      enqueue(2, C3),
+      flush([
+        { ...facts(1, C1, "src/a.ts"), touched: footprints([C1, C2], ["src/a.ts"]) },
+        facts(2, C3, "src/c.ts"),
+      ]),
+      composedAs([C1, C2, C3]),
+      readBack(NEW),
+    ]);
+    const started = eventsOf(group.results[3] ?? Result.succeed([])).find(
+      (e) => e._tag === "PromotionStarted",
+    );
+    const advanced = eventsOf(group.results.at(-1) ?? Result.succeed([])).find(
+      (e) => e._tag === "TrunkAdvanced",
+    );
+    const proofs = started?._tag === "PromotionStarted" ? started.proofIds : [];
+    expect(proofs).toHaveLength(2);
+    expect(advanced?._tag === "TrunkAdvanced" ? advanced.landings : []).toEqual([
+      {
+        changeId: C1,
+        commitSha: memberSha(C1),
+        candidateId: makeId("cnd", ulid(1)),
+        proofId: proofs[0],
+      },
+      {
+        changeId: C2,
+        commitSha: memberSha(C2),
+        candidateId: makeId("cnd", ulid(1)),
+        proofId: proofs[0],
+      },
+      {
+        changeId: C3,
+        commitSha: memberSha(C3),
+        candidateId: makeId("cnd", ulid(2)),
+        proofId: proofs[1],
+      },
+    ]);
+  });
+
+  it("[promotion.composed-matches-group] a composer's report naming any chain but the group's members, in order, is refused and records nothing", () => {
+    let mismatches = 0;
+    fc.assert(
+      fc.property(planArb, (steps) =>
+        run(steps).every((r) =>
+          r.probes.every((p) => {
+            const wal = r.before?.wal;
+            if (
+              p.command._tag !== "Composed" ||
+              r.before?.phase !== "promoting" ||
+              wal === undefined
+            )
+              return true;
+            if (matchesGroup(p.command.commits, wal)) return Result.isSuccess(p.result);
+            mismatches++;
+            return (
+              failureTag(p.result) === "CompositionMismatch" &&
+              comparable(p.after) === comparable(r.before)
+            );
+          }),
+        ),
+      ),
+    );
+    expect(mismatches).toBeGreaterThan(0);
+    const wrong = drive([...l1Path.slice(0, -1), composedAs([C2])]);
+    expect(failureTag(wrong.results.at(-1))).toBe("CompositionMismatch");
+    expect(wrong.state?.wal?.composed).toBeUndefined();
+  });
+
   it("[promotion.initialized-first] nothing is queued or promoted before the trunk's first head is known", () => {
     fc.assert(
       fc.property(planArb, (steps) =>
@@ -841,7 +985,13 @@ const carry = (flags: readonly Flag[]) => {
   );
   const queued = drive([init, ...enqueues]).state;
   const grouped = drive([init, ...enqueues, flush(inputs)]).state;
-  const done = drive([init, ...enqueues, flush(inputs), composed, readBack(NEW)]);
+  const done = drive([
+    init,
+    ...enqueues,
+    flush(inputs),
+    composedAs(enqueues.flatMap((e) => (e._tag === "Enqueue" ? e.members : []))),
+    readBack(NEW),
+  ]);
   const advanced = eventsOf(done.results.at(-1) ?? Result.succeed([])).find(
     (e) => e._tag === "TrunkAdvanced",
   );
@@ -890,7 +1040,7 @@ describe("trunk height", { timeout: PROPERTY_TIMEOUT }, () => {
       readBack(NEW),
       enqueue(2, C2),
       flush([facts(2, C2, "src/b.ts")], NEW, "group-2"),
-      { _tag: "Composed", sha: sha(0x1002) },
+      composedAs([C2], sha(0x1002)),
       readBack(sha(0x1002)),
     ]);
     const advanced = twice.results.flatMap((r) =>

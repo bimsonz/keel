@@ -125,7 +125,7 @@ stateDiagram-v2
 | Queued | Bounced | A conflict is proven against the change (caused by `ConflictProven`), or it is blocked when batched | — | `ChangeBounced` |
 | Integrating | Queued | Caused by `BatchFailed {infra}`, `CandidateBisected` or `CandidateInvalidated` | Two infra failures requeue with no blame | `ChangeRequeued` |
 | Integrating | Bounced | Caused by `BatchFailed` attributed to this change | — | `ChangeBounced` |
-| Integrating | Landed | Caused by `TrunkAdvanced` | None: `TrunkAdvanced` is a fact, so landing is never refused. The invariant is enforced before trunk moves: at queueing, by Queued → Bounced, and by the lane pulling a blocked member out before promotion (`CandidateInvalidated`, then `ChangeRequeued {reason: invalidated}`) | `ChangeLanded` |
+| Integrating | Landed | Caused by `TrunkAdvanced` | None: `TrunkAdvanced` is a fact, so landing is never refused. The invariant is enforced before trunk moves: at queueing, by Queued → Bounced, and by the lane pulling a blocked member out before promotion (`CandidateInvalidated`, then `ChangeRequeued {reason: invalidated}`) | `ChangeLanded`, copied from the change's landing in `TrunkAdvanced`: its commit on trunk, the trunk head, its candidate and its proof |
 | Parked (awaiting-ruling) | Verifying | Caused by `RulingGiven` | — | `ChangeResumed` |
 | Parked (awaiting-ruling) | Bounced | Caused by `RulingGiven` choosing to bounce | — | `ChangeBounced` |
 | Parked (lease-lapsed) | Working | `adopt` | The lease is Lapsed | `ChangeAdopted` (new lease; the old token is fenced). A change parked before its workspace was granted returns to Declared |
@@ -360,9 +360,9 @@ The Trunk DO's state is folded from its own events and from the `BatchVerified` 
 | Debouncing | Promoting | The debounce deadline fires | The observed head is trunk's known head; queued batches are taken first in, first out: one that commutes (C1–C6) joins the group, one that does not is declined, one that must wait stops the queue there | `PromotionDeclined` for each declined batch, then `PromotionStarted {old, members, batches, proofIds, committerTime}`: the WAL entry |
 | Debouncing | Idle, or Debouncing | The commutation rule admits no batch | — | `PromotionDeclined` for each declined batch; Debouncing again while batches still wait |
 | Debouncing | Frozen | The observed head is not trunk's known head | — | `PromotionFrozen` |
-| Promoting | Promoting | The group is composed, before the first push | — | `PromotionComposed {sha}`: every retry pushes this SHA |
+| Promoting | Promoting | The group is composed, before the first push | The composer's chain names exactly the group's members, in group order (otherwise refused: composition mismatch) | `PromotionComposed {sha, commits}`: every retry pushes this SHA, and each member lands as its commit in `commits` |
 | Promoting | Promoting | Read-back shows the head is still `old` | — | none: the push is retried with the recorded SHA. A recompose that differs from it is never pushed: `PromotionFrozen` |
-| Promoting | Idle, or Debouncing | Read-back shows the head is the recorded SHA | — | `TrunkAdvanced`; Debouncing again if batches arrived meanwhile |
+| Promoting | Idle, or Debouncing | Read-back shows the head is the recorded SHA | — | `TrunkAdvanced {landings}`: one per member, in group order, with its commit on trunk and its own batch's candidate and proof; Debouncing again if batches arrived meanwhile |
 | Promoting | Frozen | Read-back shows any other head | — | `PromotionFrozen` |
 | Frozen | Idle, or Debouncing | An operator releases the freeze, confirming trunk's head | Scope `operator` | `PromotionDeclined {reason: frozen}` for each batch of the stopped group, then `PromotionResumed {head}` |
 

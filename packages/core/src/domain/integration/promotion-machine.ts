@@ -11,11 +11,13 @@ import {
   type ProjectId,
   type VerdictId,
 } from "../kernel/index.ts";
-import { isVerified, type QueuedBatch, type Trunk } from "./batch.ts";
+import { isVerified, type PendingGroup, type QueuedBatch, type Trunk } from "./batch.ts";
 import { commutation, type Footprints } from "./commutation.ts";
-import { PromotionStateRefused, TrunkNotInitialized } from "./errors.ts";
+import { CompositionMismatch, PromotionStateRefused, TrunkNotInitialized } from "./errors.ts";
 import {
   BatchVerified,
+  type MemberCommit,
+  type MemberLanding,
   PromotionComposed,
   PromotionDeclined,
   PromotionFrozen,
@@ -74,7 +76,12 @@ export type PromotionCommand =
       readonly barriers: readonly Glob[];
       readonly inputs: readonly CommutationFacts[];
     }
-  | { readonly _tag: "Composed"; readonly sha: CommitSha }
+  | {
+      /** The group's composed chain: its last commit, and each member's commit in group order. */
+      readonly _tag: "Composed";
+      readonly sha: CommitSha;
+      readonly commits: readonly MemberCommit[];
+    }
   | { readonly _tag: "ReadBack"; readonly observed: CommitSha }
   | { readonly _tag: "Resume"; readonly by: string; readonly head: CommitSha };
 
@@ -84,7 +91,7 @@ export interface PromotionFacts {
   readonly projectId: ProjectId;
 }
 
-export type PromotionRejection = TrunkNotInitialized | PromotionStateRefused;
+export type PromotionRejection = TrunkNotInitialized | PromotionStateRefused | CompositionMismatch;
 
 type Decision = Result.Result<readonly TrunkEvent[], PromotionRejection>;
 
@@ -94,6 +101,27 @@ const refuse = (trunk: Trunk, command: PromotionCommand): Decision =>
       projectId: trunk.projectId,
       phase: trunk.phase,
       command: command._tag,
+    }),
+  );
+
+/** The group's members in group order: its batches front to back, each batch's members in its own order. */
+const membersOf = (group: PendingGroup): readonly ChangeId[] =>
+  group.batches.flatMap((b) => b.members);
+
+const sameChain = (commits: readonly MemberCommit[], group: PendingGroup): boolean => {
+  const members = membersOf(group);
+  return commits.length === members.length && commits.every((c, i) => c.changeId === members[i]);
+};
+
+/** Each member's landing: its commit on trunk, and its own batch's candidate and proof. */
+const landingsOf = (group: PendingGroup, commits: readonly MemberCommit[]): MemberLanding[] =>
+  group.batches.flatMap((batch, i) =>
+    batch.members.flatMap((changeId) => {
+      const commit = commits.find((c) => c.changeId === changeId);
+      const proofId = group.proofIds[i];
+      return commit === undefined || proofId === undefined
+        ? []
+        : [{ changeId, commitSha: commit.commitSha, candidateId: batch.candidateId, proofId }];
     }),
   );
 
@@ -220,9 +248,29 @@ export const decidePromotion = (
 
     case "Composed":
       if (trunk.phase !== "promoting" || wal === undefined) return refuse(trunk, command);
+      if (!sameChain(command.commits, wal))
+        return Result.fail(
+          new CompositionMismatch({
+            projectId,
+            groupId: wal.groupId,
+            expected: membersOf(wal),
+            got: command.commits.map((c) => c.changeId),
+            nextActions: [
+              {
+                kind: "escalate",
+                title: "The composer's chain does not match the promotion group; ask an operator",
+              },
+            ],
+          }),
+        );
       if (wal.composed === undefined)
         return Result.succeed([
-          PromotionComposed.make({ projectId, groupId: wal.groupId, sha: command.sha }),
+          PromotionComposed.make({
+            projectId,
+            groupId: wal.groupId,
+            sha: command.sha,
+            commits: command.commits,
+          }),
         ]);
       // A recompose that disagrees with the recorded SHA is never pushed: it is an alert.
       return command.sha === wal.composed
@@ -237,7 +285,8 @@ export const decidePromotion = (
           ]);
 
     case "ReadBack":
-      if (trunk.phase !== "promoting" || wal?.composed === undefined) return refuse(trunk, command);
+      if (trunk.phase !== "promoting" || wal?.composed === undefined || wal.commits === undefined)
+        return refuse(trunk, command);
       if (command.observed === wal.old) return Result.succeed([]);
       if (command.observed === wal.composed) {
         return Result.succeed([
@@ -246,8 +295,7 @@ export const decidePromotion = (
             from: wal.old,
             to: wal.composed,
             groupId: wal.groupId,
-            members: wal.batches.flatMap((b) => b.members),
-            proofIds: wal.proofIds,
+            landings: landingsOf(wal, wal.commits),
             // One unverified batch makes the whole advance unverified.
             ...(wal.batches.every(isVerified) ? {} : { verified: false }),
             ...(trunk.height === undefined ? {} : { height: trunk.height + 1 }),
@@ -402,8 +450,9 @@ export const evolvePromotion = (
       return trunk.phase === "promoting" &&
         wal !== undefined &&
         wal.groupId === event.groupId &&
-        wal.composed === undefined
-        ? { ...trunk, wal: { ...wal, composed: event.sha } }
+        wal.composed === undefined &&
+        sameChain(event.commits, wal)
+        ? { ...trunk, wal: { ...wal, composed: event.sha, commits: event.commits } }
         : illegal(trunk, event);
 
     case "TrunkAdvanced":
@@ -412,6 +461,7 @@ export const evolvePromotion = (
         wal.groupId === event.groupId &&
         wal.old === event.from &&
         wal.composed === event.to &&
+        event.landings.map((l) => l.changeId).join() === membersOf(wal).join() &&
         (event.height === undefined ||
           trunk.height === undefined ||
           event.height === trunk.height + 1)
@@ -419,7 +469,7 @@ export const evolvePromotion = (
             // An advance without a height (an older Trunk DO's) leaves the height unknown.
             ...without(trunk, "wal", "height"),
             head: event.to,
-            promoted: [...trunk.promoted, ...event.members],
+            promoted: [...trunk.promoted, ...event.landings.map((l) => l.changeId)],
             phase: settled(trunk.queue),
             ...(event.height === undefined ? {} : { height: event.height }),
           }
