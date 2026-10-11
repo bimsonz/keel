@@ -101,10 +101,18 @@ export const createProject: (
 
   const repos = projectRepos(projectId);
   const host = yield* CodeHost;
+  // A repo made by a concurrent bootstrap between the check and the call is already done.
+  const alreadyMade = () => Effect.void;
   if (!(yield* exists(repos.trunk)))
-    yield* host.fork({ namespace: repos.trunk.namespace, name: command.source }, repos.trunk);
-  if (!(yield* exists(repos.staging))) yield* Effect.orDie(host.fork(repos.trunk, repos.staging));
-  if (!(yield* exists(repos.mirror))) yield* host.create(repos.mirror);
+    yield* host
+      .fork({ namespace: repos.trunk.namespace, name: command.source }, repos.trunk)
+      .pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade));
+  if (!(yield* exists(repos.staging)))
+    yield* host
+      .fork(repos.trunk, repos.staging)
+      .pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade), Effect.orDie);
+  if (!(yield* exists(repos.mirror)))
+    yield* host.create(repos.mirror).pipe(Effect.catchTag("RepoAlreadyExists", alreadyMade));
 
   const { defaultBranch } = yield* Effect.orDie(host.info(repos.trunk));
   const head = yield* Effect.orDie(host.head(repos.trunk, `refs/heads/${defaultBranch}`));

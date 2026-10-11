@@ -3,6 +3,7 @@ import {
   CodeHost,
   ObjectNotFound,
   RefNotFound,
+  RepoAlreadyExists,
   RepoNotFound,
   type RepoRef,
   type TreeEntry,
@@ -35,7 +36,22 @@ const isRepoNotFound = (e: unknown): boolean =>
 const repoMissing = (repo: RepoRef, e: unknown) =>
   isRepoNotFound(e) && new RepoNotFound({ repo: plain(repo) });
 
+/** `ALREADY_EXISTS` on the edge; through wrangler's proxy, which drops `code`, the message alone (live, 11 Oct). */
+const isRepoAlreadyExists = (e: unknown): boolean =>
+  e instanceof Error &&
+  ((e as Error & { readonly code?: unknown }).code === "ALREADY_EXISTS" ||
+    /^(ArtifactsError: )?repo already exists\b/i.test(e.message));
+
+/** A create or fork onto a taken name, typed; anything else from the call dies. */
+const unlessTaken = (repo: RepoRef) => (e: unknown) =>
+  isRepoAlreadyExists(e)
+    ? Effect.fail(new RepoAlreadyExists({ repo: plain(repo) }))
+    : Effect.die(e);
+
 const BRANCH = "refs/heads/";
+
+/** A fork whose target name was taken, carried out of the binding call to become RepoAlreadyExists. */
+const TAKEN = Symbol("taken");
 
 /** A ref's commit. The binding's `log` resolves branch names (`main`) but not full ref names, so other refs are read from the advertisement with a minute-long read token. */
 async function resolveRef(handle: ArtifactsRepo, ref: string): Promise<string | undefined> {
@@ -145,18 +161,32 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
     CodeHost.of({
       // create() and fork() each return a day-long write token Keel never uses: revoke it at once, so no pooled repo carries a standing credential.
       create: (repo) =>
-        Effect.promise(async () => {
-          const created = await binding(repo).create(repo.name);
-          await revoke(binding(repo), repo.name, created.token);
-          return repo;
-        }),
+        Effect.tryPromise({
+          try: async () => {
+            const created = await binding(repo).create(repo.name);
+            await revoke(binding(repo), repo.name, created.token);
+            return repo;
+          },
+          catch: (e) => e,
+        }).pipe(Effect.catch(unlessTaken(repo))),
       fork: (source, target) =>
         source.namespace === target.namespace
           ? onRepo(source, async (handle) => {
-              const forked = await handle.fork(target.name, { defaultBranchOnly: true });
-              await revoke(binding(target), target.name, forked.token);
-              return target;
-            })
+              try {
+                const forked = await handle.fork(target.name, { defaultBranchOnly: true });
+                await revoke(binding(target), target.name, forked.token);
+                return target;
+              } catch (e) {
+                if (isRepoAlreadyExists(e)) return TAKEN;
+                throw e;
+              }
+            }).pipe(
+              Effect.flatMap((forked) =>
+                forked === TAKEN
+                  ? Effect.fail(new RepoAlreadyExists({ repo: plain(target) }))
+                  : Effect.succeed(forked),
+              ),
+            )
           : Effect.die(
               new Error("a fork lands in its source's namespace; the target names another"),
             ),

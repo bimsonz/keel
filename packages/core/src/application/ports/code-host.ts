@@ -57,6 +57,14 @@ export class RepoNotFound extends Schema.TaggedError<RepoNotFound>()("RepoNotFou
   repo: RepoRefSchema,
 }) {}
 
+/** A repository by this name already exists in this namespace (create, or fork onto it). */
+export class RepoAlreadyExists extends Schema.TaggedError<RepoAlreadyExists>()(
+  "RepoAlreadyExists",
+  {
+    repo: RepoRefSchema,
+  },
+) {}
+
 /** The repository exists but has no such ref. */
 export class RefNotFound extends Schema.TaggedError<RefNotFound>()("RefNotFound", {
   repo: RepoRefSchema,
@@ -77,8 +85,13 @@ export class ObjectNotFound extends Schema.TaggedError<ObjectNotFound>()("Object
 export class CodeHost extends Context.Service<
   CodeHost,
   {
-    readonly create: (repo: RepoRef) => Effect.Effect<RepoRef>;
-    readonly fork: (source: RepoRef, target: RepoRef) => Effect.Effect<RepoRef, RepoNotFound>;
+    /** Fails RepoAlreadyExists when the name is taken; the existing repo is left as it was. */
+    readonly create: (repo: RepoRef) => Effect.Effect<RepoRef, RepoAlreadyExists>;
+    /** Fails RepoAlreadyExists when the target's name is taken; the existing repo is left as it was. */
+    readonly fork: (
+      source: RepoRef,
+      target: RepoRef,
+    ) => Effect.Effect<RepoRef, RepoNotFound | RepoAlreadyExists>;
     readonly mintToken: (
       repo: RepoRef,
       access: "read" | "write",

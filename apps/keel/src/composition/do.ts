@@ -7,16 +7,16 @@ import {
   type FanOut,
   type Ids,
   type TrunkWriter,
-  Trunks,
+  type Trunks,
   type WorkspacePool,
 } from "@keeltown/core/ports";
 import { projectRepos } from "@keeltown/core/application/integration";
 import type { ProjectId } from "@keeltown/core/kernel";
-import { NotImplemented } from "@keeltown/core/not-implemented";
-import { Effect, Layer, ManagedRuntime } from "effect";
+import { Layer, ManagedRuntime } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { FanOutRpc } from "../adapters/driven/do-rpc/fan-out.ts";
+import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
 import { TrunkWriterGitCore } from "../adapters/driven/gitcore/trunk-writer.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { EntityStoreSql, migrateEntityStore } from "../adapters/driven/do-storage/entity-store.ts";
@@ -50,18 +50,14 @@ export type ProjectServices = CodeHost | Trunks | WorkspacePool;
 /** How many ready workspaces a new project's pool keeps forked, until `vars.POOL_TARGET` is declared. */
 export const DEFAULT_POOL_TARGET = 2;
 
-const trunksPending = () => Effect.die(new NotImplemented("Trunks RPC adapter"));
-
 /**
  * The Project DO forks and creates repos through the code host, initializes
  * and syncs trunk through the Trunk DO, and configures the project's pool.
- * The Trunks RPC adapter replaces the placeholder, which dies with
- * NotImplemented, so a bootstrap fails loudly instead of skipping trunk.
  */
 export function projectServices(env: Env): Layer.Layer<ProjectServices> {
   return Layer.mergeAll(
     codeHostLayer(env),
-    Layer.succeed(Trunks, Trunks.of({ initialize: trunksPending, sync: trunksPending })),
+    TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
     WorkspacePoolRpc(env.WORKSPACE_POOL, artifactsLocationHint(env)),
   );
 }

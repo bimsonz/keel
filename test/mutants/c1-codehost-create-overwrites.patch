@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t codehost.exists
+# kills: codehost.exists
+# why: Creating a repo under a taken name replaces it, so a racing bootstrap wipes the trunk another one just forked
+diff --git a/packages/testing/src/memory/code-host.ts b/packages/testing/src/memory/code-host.ts
+index b3b54f9..98787cc 100644
+--- a/packages/testing/src/memory/code-host.ts
++++ b/packages/testing/src/memory/code-host.ts
+@@ -94,7 +94,6 @@ export function makeCodeHostMemory() {
+   const host = CodeHost.of({
+     create: (repo) =>
+       Effect.suspend(() => {
+-        if (repos.has(repoKey(repo))) return Effect.fail(alreadyExists(repo));
+         repos.set(repoKey(repo), { refs: new Map(), objects: new Map() });
+         return Effect.succeed(repo);
+       }),

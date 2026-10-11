@@ -3,6 +3,7 @@ import {
   CodeHost,
   ObjectNotFound,
   RefNotFound,
+  RepoAlreadyExists,
   RepoNotFound,
   type RepoRef,
   type TreeEntry,
@@ -49,6 +50,8 @@ export function makeCodeHostMemory() {
   let scratch = 0;
   let tokens = 0;
 
+  const alreadyExists = (repo: RepoRef) => new RepoAlreadyExists({ repo: plain(repo) });
+
   const find = (repo: RepoRef) =>
     Effect.suspend(() => {
       const found = repos.get(repoKey(repo));
@@ -90,11 +93,16 @@ export function makeCodeHostMemory() {
 
   const host = CodeHost.of({
     create: (repo) =>
-      Effect.sync(() => (repos.set(repoKey(repo), { refs: new Map(), objects: new Map() }), repo)),
+      Effect.suspend(() => {
+        if (repos.has(repoKey(repo))) return Effect.fail(alreadyExists(repo));
+        repos.set(repoKey(repo), { refs: new Map(), objects: new Map() });
+        return Effect.succeed(repo);
+      }),
     fork: (source, target) =>
-      Effect.map(find(source), (from) => {
+      Effect.flatMap(find(source), (from) => {
+        if (repos.has(repoKey(target))) return Effect.fail(alreadyExists(target));
         repos.set(repoKey(target), { refs: new Map(from.refs), objects: new Map(from.objects) });
-        return target;
+        return Effect.succeed(target);
       }),
     mintToken: (repo, access, ttlSeconds) =>
       Effect.gen(function* () {

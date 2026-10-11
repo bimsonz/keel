@@ -170,6 +170,28 @@ export function describeCodeHostContract(
         }).pipe(Effect.provide(make())),
     );
 
+    it.live(
+      "[codehost.exists] create or fork onto a taken name fails RepoAlreadyExists and leaves that repo as it was",
+      () =>
+        Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const fixture = yield* CodeHostFixture;
+          const source = yield* freshRepo;
+          yield* fixture.commit(source, MAIN, BASE);
+          const taken = yield* freshRepo;
+          const kept = yield* fixture.commit(taken, MAIN, HEAD);
+          expect(yield* Effect.flip(host.create(taken))).toMatchObject({
+            _tag: "RepoAlreadyExists",
+            repo: { namespace: taken.namespace, name: taken.name },
+          });
+          expect(yield* Effect.flip(host.fork(source, taken))).toMatchObject({
+            _tag: "RepoAlreadyExists",
+            repo: { namespace: taken.namespace, name: taken.name },
+          });
+          expect(yield* host.head(taken, MAIN)).toBe(kept);
+        }).pipe(Effect.provide(make())),
+    );
+
     it.live("[codehost.info] info gives each repo its own git remote and the default branch", () =>
       Effect.gen(function* () {
         const host = yield* CodeHost;
