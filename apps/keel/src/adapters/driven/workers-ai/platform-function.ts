@@ -29,6 +29,13 @@ export const modelPins = (raw: unknown): ModelPins => {
   return pins;
 };
 
+/**
+ * The most tokens a call may spend. A slot reply is a few hundred tokens, but
+ * the model's output can run far past it: 1 of 10 S-1 drafts was cut at 4096,
+ * so the 90th percentile sat at that cap. The deadline still bounds the time.
+ */
+export const MAX_TOKENS = 8192;
+
 /** How long one call may take, from the request to the stream's last event, before it abstains as a timeout. */
 export const PLATFORM_FUNCTION_DEADLINE_MS = 240_000;
 
@@ -36,7 +43,8 @@ const SYSTEM =
   "Reply with exactly one JSON object that satisfies the response schema, and nothing else.";
 
 type Reason = ModelAbstained["reason"];
-const abstain = (reason: Reason) => new ModelAbstained({ reason });
+const abstain = (reason: Reason, detail?: string) =>
+  new ModelAbstained(detail === undefined ? { reason } : { reason, detail });
 
 /** A capacity or rate limit answers rate-limited; any other AI failure, unavailable. */
 const reasonOf = (error: unknown): Reason =>
@@ -109,7 +117,7 @@ async function complete(
         { role: "user", content: prompt },
       ],
       response_format: { type: "json_schema", json_schema: call.outputSchema },
-      max_tokens: 4096,
+      max_tokens: MAX_TOKENS,
       stream: true,
     });
   } catch (error) {
@@ -120,13 +128,15 @@ async function complete(
   try {
     read = await readStream(answer, signal);
   } catch (error) {
-    throw abstain(error instanceof SyntaxError ? "schema" : reasonOf(error));
+    throw error instanceof SyntaxError
+      ? abstain("schema", `a streamed event: ${error.message}`)
+      : abstain(reasonOf(error));
   }
-  if (read.truncated) throw abstain("truncated");
+  if (read.truncated) throw abstain("truncated", String(MAX_TOKENS));
   try {
     return JSON.parse(read.text);
-  } catch {
-    throw abstain("schema");
+  } catch (error) {
+    throw abstain("schema", error instanceof Error ? error.message : String(error));
   }
 }
 

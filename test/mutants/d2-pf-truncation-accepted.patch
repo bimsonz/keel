@@ -2,15 +2,15 @@
 # kills: pf.truncated
 # why: A reply cut at the token limit is parsed and answered as if the model had finished
 diff --git a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
-index aa90a92..6794660 100644
+index 2125f23..59786e5 100644
 --- a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
 +++ b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
-@@ -122,7 +122,7 @@ async function complete(
-   } catch (error) {
-     throw abstain(error instanceof SyntaxError ? "schema" : reasonOf(error));
+@@ -132,7 +132,7 @@ async function complete(
+       ? abstain("schema", `a streamed event: ${error.message}`)
+       : abstain(reasonOf(error));
    }
--  if (read.truncated) throw abstain("truncated");
-+  if (read.truncated && read.text === "") throw abstain("truncated");
+-  if (read.truncated) throw abstain("truncated", String(MAX_TOKENS));
++  if (read.truncated && read.text === "") throw abstain("truncated", String(MAX_TOKENS));
    try {
      return JSON.parse(read.text);
-   } catch {
+   } catch (error) {

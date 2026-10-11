@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/platform-function.test.ts -t pf.unparseable
+# kills: pf.unparseable
+# why: An abstain drops the parser's message, so a repair is told nothing it can act on
+diff --git a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+index 2125f23..1404006 100644
+--- a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
++++ b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+@@ -44,7 +44,7 @@ const SYSTEM =
+ 
+ type Reason = ModelAbstained["reason"];
+ const abstain = (reason: Reason, detail?: string) =>
+-  new ModelAbstained(detail === undefined ? { reason } : { reason, detail });
++  new ModelAbstained(detail === undefined ? { reason } : { reason });
+ 
+ /** A capacity or rate limit answers rate-limited; any other AI failure, unavailable. */
+ const reasonOf = (error: unknown): Reason =>

@@ -145,9 +145,8 @@ function drafting(script: Script, matrix: Matrix) {
           Effect.suspend(() => {
             calls.push(call);
             const reply = script(calls.length);
-            return reply === ABSTAIN
-              ? Effect.fail(new ModelAbstained({ reason: "timeout" }))
-              : Effect.succeed(reply);
+            if (reply === ABSTAIN) return Effect.fail(new ModelAbstained({ reason: "timeout" }));
+            return reply instanceof ModelAbstained ? Effect.fail(reply) : Effect.succeed(reply);
           }),
       }),
     ),
@@ -302,6 +301,31 @@ describe("draftProbe: template first, repaired from deterministic text only", ()
     expect(await d.run()).toEqual({ _tag: "Abstained", reason: "timeout", attempts: 1 });
     expect(d.calls).toHaveLength(1);
     expect(d.requests).toHaveLength(0);
+  });
+
+  it("[draft.unparsed-repair] repairs a reply that did not parse, with the parser's message", async () => {
+    const d = drafting(
+      (n) =>
+        n === 1
+          ? new ModelAbstained({ reason: "schema", detail: "Unexpected end of JSON input" })
+          : good(),
+      (_, world) => discriminates(world),
+    );
+    expect(await d.run()).toMatchObject({ _tag: "Admitted", attempts: 2 });
+    expect(d.promptOf(2)).toContain(
+      "- attempt 1: reply did not parse as the slot schema: Unexpected end of JSON input",
+    );
+  });
+
+  it("[draft.unparsed-repair] repairs a reply cut at the token limit, asking for the slots alone", async () => {
+    const d = drafting(
+      (n) => (n === 1 ? new ModelAbstained({ reason: "truncated", detail: "8192" }) : good()),
+      (_, world) => discriminates(world),
+    );
+    expect(await d.run()).toMatchObject({ _tag: "Admitted", attempts: 2 });
+    expect(d.promptOf(2)).toContain(
+      "- attempt 1: reply cut at the token limit (8192); return only the slots",
+    );
   });
 
   it("[draft.feedback-deterministic] never feeds the model's own rationale back", async () => {

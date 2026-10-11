@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { PlatformFunction, type PlatformFunctionCall } from "@keeltown/core/ports";
 import { Effect } from "effect";
 import {
+  MAX_TOKENS,
   modelPins,
   PlatformFunctionWorkersAI,
   type StreamingAi,
@@ -50,6 +51,8 @@ const call = (ai: StreamingAi, c: PlatformFunctionCall = CALL, deadlineMs?: numb
 const reasonOf = (ai: StreamingAi, c?: PlatformFunctionCall, deadlineMs?: number) =>
   Effect.flip(call(ai, c, deadlineMs)).pipe(Effect.map((e) => e.reason));
 
+const detailOf = (ai: StreamingAi) => Effect.flip(call(ai)).pipe(Effect.map((e) => e.detail));
+
 describe("PlatformFunction over Workers AI", () => {
   it.effect(
     "[pf.streams-json] streams the pinned model under the call's schema, and parses what it says",
@@ -64,6 +67,7 @@ describe("PlatformFunction over Workers AI", () => {
         expect(runs[0]?.model).toBe(KIMI);
         expect(runs[0]?.inputs).toMatchObject({
           stream: true,
+          max_tokens: MAX_TOKENS,
           response_format: { type: "json_schema", json_schema: SCHEMA },
           messages: [{ role: "system" }, { role: "user", content: "fill the freshness template" }],
         });
@@ -113,6 +117,8 @@ describe("PlatformFunction over Workers AI", () => {
     );
     return Effect.gen(function* () {
       expect(yield* reasonOf(ai)).toBe("schema");
+      // The parser's own message, which a repair is told.
+      expect(yield* detailOf(ai)).toMatch(/JSON/);
     });
   });
 
@@ -122,6 +128,7 @@ describe("PlatformFunction over Workers AI", () => {
       const { ai } = fakeAi(async () => streamOf([delta('{"a":1}', "length")]));
       return Effect.gen(function* () {
         expect(yield* reasonOf(ai)).toBe("truncated");
+        expect(yield* detailOf(ai)).toBe(String(MAX_TOKENS));
       });
     },
   );

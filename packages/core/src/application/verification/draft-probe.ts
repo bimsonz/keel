@@ -1,7 +1,12 @@
 import { Effect, Result } from "effect";
 import type { Proposition } from "../../domain/coordination/index.ts";
 import type { ContentHash } from "../../domain/kernel/index.ts";
-import { ADMISSION_RUNS, admit, type World } from "../../domain/verification/index.ts";
+import {
+  ADMISSION_RUNS,
+  admit,
+  type ModelAbstained,
+  type World,
+} from "../../domain/verification/index.ts";
 import {
   PlatformFunction,
   type ProbeRunner,
@@ -101,6 +106,23 @@ export const draftPrompt = <S>(
         ]),
   ].join("\n\n");
 
+/**
+ * What a repair is told when the model's reply was unusable: a reply that did
+ * not parse, or was cut at the token limit, is repaired with the parser's
+ * message or the limit. A timeout, a rate limit or an unavailable model ends
+ * the draft: nothing deterministic would fix it.
+ */
+const abstainFeedback = (attempt: number, error: ModelAbstained): string | undefined => {
+  switch (error.reason) {
+    case "schema":
+      return `attempt ${attempt}: reply did not parse as the slot schema: ${error.detail ?? "no parser message"}`;
+    case "truncated":
+      return `attempt ${attempt}: reply cut at the token limit (${error.detail ?? "max_tokens"}); return only the slots`;
+    default:
+      return undefined;
+  }
+};
+
 /** Harness errors, one line per distinct reason, naming every world#run that gave it. */
 const harnessFeedback = (attempt: number, errors: readonly MatrixHarnessError[]): string[] => {
   const byReason = new Map<string, string[]>();
@@ -164,15 +186,20 @@ export const draftProbe = <S>(
         .pipe(
           Effect.map((value) => ({ _tag: "Replied", value }) as const),
           Effect.catchTag("ModelAbstained", (e) =>
-            Effect.succeed({ _tag: "Abstained", reason: e.reason } as const),
+            Effect.succeed({ _tag: "Abstained", error: e } as const),
           ),
         );
-      if (reply._tag === "Abstained")
-        return {
-          _tag: "Abstained",
-          reason: reply.reason,
-          attempts: attempt,
-        } satisfies DraftOutcome;
+      if (reply._tag === "Abstained") {
+        const told = abstainFeedback(attempt, reply.error);
+        if (told === undefined)
+          return {
+            _tag: "Abstained",
+            reason: reply.error.reason,
+            attempts: attempt,
+          } satisfies DraftOutcome;
+        feedback.push(told);
+        continue;
+      }
       const slots = template.validate(reply.value);
       if (Result.isFailure(slots)) {
         feedback.push(`attempt ${attempt}: slots: ${slots.failure}`);

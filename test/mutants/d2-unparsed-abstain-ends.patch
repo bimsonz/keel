@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/draft-probe.test.ts -t draft.unparsed-repair
+# kills: draft.unparsed-repair
+# why: A reply that did not parse ends the draft, though the parser's message is deterministic text a repair could fix
+diff --git a/packages/core/src/application/verification/draft-probe.ts b/packages/core/src/application/verification/draft-probe.ts
+index 1cabf17..43c09da 100644
+--- a/packages/core/src/application/verification/draft-probe.ts
++++ b/packages/core/src/application/verification/draft-probe.ts
+@@ -115,7 +115,7 @@ export const draftPrompt = <S>(
+ const abstainFeedback = (attempt: number, error: ModelAbstained): string | undefined => {
+   switch (error.reason) {
+     case "schema":
+-      return `attempt ${attempt}: reply did not parse as the slot schema: ${error.detail ?? "no parser message"}`;
++      return undefined;
+     case "truncated":
+       return `attempt ${attempt}: reply cut at the token limit (${error.detail ?? "max_tokens"}); return only the slots`;
+     default:
