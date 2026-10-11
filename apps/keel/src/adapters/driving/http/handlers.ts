@@ -10,7 +10,7 @@ import { isBootstrap, Scope } from "@keeltown/core/domain/identity";
 import { Effect, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
 import type { Caller, Principal } from "./caller.ts";
-import { tokenError, tokenOk, whoamiError, whoamiOk } from "./mappers.ts";
+import { latticesOk, tokenError, tokenOk, whoamiError, whoamiOk } from "./mappers.ts";
 import {
   bootstrapConfined,
   createProjectError,
@@ -191,6 +191,7 @@ export function makeHandlers(run: Runner) {
           ),
         ),
       Inbox_listEvents: notYet,
+      Lattices_listLattices: latticesOk,
       Views_getVerdict: notYet,
       Views_getCandidate: notYet,
       Views_listLanes: notYet,

@@ -37,6 +37,9 @@
       "name": "Memory"
     },
     {
+      "name": "Lattices"
+    },
+    {
       "name": "Inbox"
     },
     {
@@ -2612,6 +2615,119 @@
           "mcp"
         ],
         "security": [
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          }
+        ]
+      }
+    },
+    "/lattices": {
+      "get": {
+        "operationId": "Lattices_listLattices",
+        "summary": "List the lattices",
+        "description": "Each predicate's lattice, as data: what a premise or an effect can say, and how values order.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatticeSet"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Lattices"
+        ],
+        "security": [
+          {
+            "OAuth2Auth": [
+              "observer"
+            ]
+          },
           {
             "OAuth2Auth": [
               "agent:read"
@@ -7973,6 +8089,128 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "Lattice": {
+        "type": "object",
+        "required": [
+          "predicate",
+          "values",
+          "covers"
+        ],
+        "properties": {
+          "predicate": {
+            "$ref": "#/components/schemas/MFP.Predicate"
+          },
+          "shape": {
+            "type": "string",
+            "enum": [
+              "set",
+              "numeric",
+              "structural",
+              "sequence",
+              "free-form"
+            ]
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LatticeValue"
+            }
+          },
+          "covers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LatticeCover"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A predicate's lattice, on the order claims are read on (`at-most v` is\neverything at or below v). Without `shape` it is the finite order its values\nand covers draw; values with no covers are unordered. With `shape` its values\nare not enumerable: writer sets under ⊆ (`set`), numbers per unit\n(`numeric`), structural types under subtyping (`structural`), before/after\npairs (`sequence`), or free text a model compares (`free-form`)."
+      },
+      "LatticeCover": {
+        "type": "object",
+        "required": [
+          "lower",
+          "upper"
+        ],
+        "properties": {
+          "lower": {
+            "type": "string"
+          },
+          "upper": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One edge of the Hasse diagram: `lower` is immediately below `upper`."
+      },
+      "LatticeFamily": {
+        "type": "object",
+        "required": [
+          "name",
+          "higher"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "ttl",
+              "bounded"
+            ]
+          },
+          "higher": {
+            "type": "string",
+            "enum": [
+              "larger",
+              "smaller"
+            ],
+            "description": "`larger`: a larger parameter sits higher (`ttl:10` ≤ `ttl:20`)."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A parametric family drawn as one value, e.g. `ttl:<n>`, its members ordered by the parameter."
+      },
+      "LatticeSet": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Lattice"
+            },
+            "description": "One per predicate."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "LatticeValue": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "family": {
+            "$ref": "#/components/schemas/LatticeFamily"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A value as a proposition writes it, or a family's placeholder."
       },
       "Lease": {
         "type": "object",

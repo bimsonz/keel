@@ -12,6 +12,7 @@ export * from "./exposure.ts";
 export * from "./fallout.ts";
 export * from "./graph.ts";
 export * from "./lattice.ts";
+export * from "./lattice-data.ts";
 export * from "./lease.ts";
 export * from "./preflight.ts";
 export * from "./proposition.ts";

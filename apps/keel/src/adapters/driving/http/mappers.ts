@@ -7,7 +7,12 @@ import type {
   ScopeNotGranted,
 } from "@keeltown/core/domain/identity";
 import type { GrantedToken } from "@keeltown/core/application/identity";
-import type { Auth_exchangeTokenResult, WhoamiResult } from "../../../generated/http/app.gen.ts";
+import { LATTICES } from "@keeltown/core/domain/coordination";
+import type {
+  Auth_exchangeTokenResult,
+  Lattices_listLatticesResult,
+  WhoamiResult,
+} from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
 import { problem } from "./problems.ts";
 
@@ -33,6 +38,25 @@ export function agentProfile(agent: Agent) {
     ...(agent.onBehalfOf === undefined ? {} : { onBehalfOf: agent.onBehalfOf }),
     revocationEpoch: agent.revocationEpoch,
     createdAt: iso(agent.createdAt),
+  };
+}
+
+/** Every predicate's lattice, as the domain publishes it (`LATTICES`). The same for every project at L1. */
+export function latticesOk(): Lattices_listLatticesResult {
+  return {
+    status: 200,
+    body: {
+      items: LATTICES.map((lattice) => ({
+        predicate: lattice.predicate,
+        ...(lattice.shape === undefined ? {} : { shape: lattice.shape }),
+        values: lattice.values.map((value) =>
+          value.family === undefined
+            ? { id: value.id }
+            : { id: value.id, family: { ...value.family } },
+        ),
+        covers: lattice.covers.map((cover) => ({ lower: cover.lower, upper: cover.upper })),
+      })),
+    },
   };
 }
 

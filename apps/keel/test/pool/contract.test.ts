@@ -1,4 +1,5 @@
 import { openApiDocument } from "@keeltown/contracts";
+import { LATTICES } from "@keeltown/core/domain/coordination";
 import { exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { BASE, mcp, mcpResult, seedAgent, tokenFor } from "./helpers.ts";
@@ -76,6 +77,20 @@ describe("the published contract, through the Worker's fetch handler", () => {
     expect(response.status).toBe(503);
     expect((await response.json<{ code: string }>()).code).toBe("service.not_implemented");
     expect(toolNames(await mcpResult(await mcp(observer, "tools/list")))).toContain("why");
+  });
+
+  it("[lattice.rest] answers an observer every predicate's lattice, exactly as the domain publishes it", async () => {
+    const observer = await tokenFor(await seedAgent({}, ["observer"]));
+    const response = await exports.default.fetch(`${BASE}/v1/lattices`, {
+      headers: { authorization: `Bearer ${observer}` },
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ items: JSON.parse(JSON.stringify(LATTICES)) });
+    const worker = await tokenFor(await seedAgent({}, ["agent:work"]));
+    const refused = await exports.default.fetch(`${BASE}/v1/lattices`, {
+      headers: { authorization: `Bearer ${worker}` },
+    });
+    expect(refused.status).toBe(403);
   });
 
   it("refuses the MCP endpoint without a token", async () => {
