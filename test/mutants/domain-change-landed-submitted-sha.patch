@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.landed-from-landing
+# why: a change lands as the commit it was submitted as, not its commit on trunk that carries the trailers
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 20f9f7b..7c33e29 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -529,7 +529,7 @@ export const decideChange = (
+         ? Result.succeed([
+             ChangeLanded.make({
+               changeId: id,
+-              commitSha: command.commitSha,
++              commitSha: change.commitSha ?? command.commitSha,
+               trunkSha: command.trunkSha,
+               candidateId: command.candidateId,
+               proofId: command.proofId,

@@ -2,11 +2,11 @@
 # kills: promotion.height
 # why: The advance reports how many changes it carried as trunk's height, so the height stops counting advances
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index b870c26..b44d7a5 100644
+index a939ecd..2f77c33 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -250,7 +250,7 @@ export const decidePromotion = (
-             proofIds: wal.proofIds,
+@@ -298,7 +298,7 @@ export const decidePromotion = (
+             landings: landingsOf(wal, wal.commits),
              // One unverified batch makes the whole advance unverified.
              ...(wal.batches.every(isVerified) ? {} : { verified: false }),
 -            ...(trunk.height === undefined ? {} : { height: trunk.height + 1 }),

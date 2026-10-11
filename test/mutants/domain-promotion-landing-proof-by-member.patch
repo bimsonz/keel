@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.landings
+# why: a member's proof is read from proofIds by its place among the members, not its batch's, the parallel-array mistake landings replaced
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index a939ecd..fcbfd0b 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -118,7 +118,7 @@ const landingsOf = (group: PendingGroup, commits: readonly MemberCommit[]): Memb
+   group.batches.flatMap((batch, i) =>
+     batch.members.flatMap((changeId) => {
+       const commit = commits.find((c) => c.changeId === changeId);
+-      const proofId = group.proofIds[i];
++      const proofId = group.proofIds[membersOf(group).indexOf(changeId)];
+       return commit === undefined || proofId === undefined
+         ? []
+         : [{ changeId, commitSha: commit.commitSha, candidateId: batch.candidateId, proofId }];

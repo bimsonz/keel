@@ -2,15 +2,15 @@
 # kills: promotion.retry-same-wal
 # why: A retry on the old head records the group again instead of re-pushing it
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index 4658b75..388aa0a 100644
+index a939ecd..f21f9ea 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -187,7 +187,7 @@ export const decidePromotion = (state: Trunk | undefined, command: PromotionComm
- 
+@@ -287,7 +287,7 @@ export const decidePromotion = (
      case "ReadBack":
-       if (trunk.phase !== "promoting" || wal?.composed === undefined) return refuse(trunk, command);
+       if (trunk.phase !== "promoting" || wal?.composed === undefined || wal.commits === undefined)
+         return refuse(trunk, command);
 -      if (command.observed === wal.old) return Result.succeed([]);
-+      if (command.observed === wal.old) return Result.succeed([PromotionComposed.make({ projectId, groupId: wal.groupId, sha: wal.composed })]);
++      if (command.observed === wal.old) return Result.succeed([PromotionComposed.make({ projectId, groupId: wal.groupId, sha: wal.composed, commits: wal.commits })]);
        if (command.observed === wal.composed) {
          return Result.succeed([
            TrunkAdvanced.make({

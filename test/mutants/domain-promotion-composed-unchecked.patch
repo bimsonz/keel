@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.composed-matches-group, promotion.decide-evolvable
+# why: a composer report naming another chain is recorded, so members would land as commits that are not theirs
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index a939ecd..3801ab3 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -248,7 +248,7 @@ export const decidePromotion = (
+ 
+     case "Composed":
+       if (trunk.phase !== "promoting" || wal === undefined) return refuse(trunk, command);
+-      if (!sameChain(command.commits, wal))
++      if (false && !sameChain(command.commits, wal))
+         return Result.fail(
+           new CompositionMismatch({
+             projectId,

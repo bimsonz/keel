@@ -2,15 +2,15 @@
 # kills: promotion.retry-pushes-recorded
 # why: A recompose that differs replaces the recorded SHA instead of freezing
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index b565488..7956112 100644
+index a939ecd..2274465 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -217,7 +217,7 @@ export const decidePromotion = (
- 
-     case "Composed":
-       if (trunk.phase !== "promoting" || wal === undefined) return refuse(trunk, command);
+@@ -263,7 +263,7 @@ export const decidePromotion = (
+             ],
+           }),
+         );
 -      if (wal.composed === undefined)
 +      if (wal.composed === undefined || command.sha !== wal.composed)
          return Result.succeed([
-           PromotionComposed.make({ projectId, groupId: wal.groupId, sha: command.sha }),
-         ]);
+           PromotionComposed.make({
+             projectId,
