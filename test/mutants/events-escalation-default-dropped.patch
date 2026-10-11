@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/event-catalogue.test.ts -t "events.conform"
+# kills: events.conform
+# why: the catalogue drops EscalationRaised's default, which core's event carries, so the console could not show the hold option
+# regen
+diff --git a/packages/spec/events.tsp b/packages/spec/events.tsp
+index 4827d7f..ecd9ec0 100644
+--- a/packages/spec/events.tsp
++++ b/packages/spec/events.tsp
+@@ -769,9 +769,7 @@ model EscalationRaised {
+   evidence: EscalationEvidence[];
+   precedents: DecisionId[];
+ 
+-  /** The option suggested to the person: one of `options`, never applied on a timeout. */
+-  @minLength(1)
+-  default: string;
++
+ }
+ 
+ model EscalationWithdrawn {

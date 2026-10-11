@@ -6801,6 +6801,18 @@
         },
         "description": "An entity a Durable Object owns."
       },
+      "EscalationCategory": {
+        "type": "string",
+        "enum": [
+          "permission-semantics",
+          "destructive-migration",
+          "ambiguous-requirement",
+          "unprovable-conflict",
+          "overrule-request",
+          "frozen-trunk"
+        ],
+        "description": "What kind of question a person is asked to rule on."
+      },
       "EscalationEvidence": {
         "type": "object",
         "required": [
@@ -6917,15 +6929,7 @@
             "$ref": "#/components/schemas/EntityRef"
           },
           "category": {
-            "type": "string",
-            "enum": [
-              "permission-semantics",
-              "destructive-migration",
-              "ambiguous-requirement",
-              "unprovable-conflict",
-              "overrule-request",
-              "frozen-trunk"
-            ]
+            "$ref": "#/components/schemas/EscalationCategory"
           },
           "evidence": {
             "type": "array",
@@ -6955,6 +6959,11 @@
           "id",
           "question",
           "options",
+          "about",
+          "category",
+          "evidence",
+          "precedents",
+          "default",
           "raisedAt",
           "state"
         ],
@@ -6968,8 +6977,39 @@
           "options": {
             "type": "array",
             "items": {
-              "type": "string"
-            }
+              "$ref": "#/components/schemas/EscalationOption"
+            },
+            "description": "At least two, with unique ids; a ruling names one by `id`."
+          },
+          "about": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EntityRef"
+              }
+            ],
+            "description": "What the question is about."
+          },
+          "category": {
+            "$ref": "#/components/schemas/EscalationCategory"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EscalationEvidence"
+            },
+            "description": "Keel's evidence, put before the person."
+          },
+          "precedents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DecisionId"
+            },
+            "description": "Earlier decisions on the same subject."
+          },
+          "default": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The option suggested while the question is open: one of `options`, never applied on a timeout."
           },
           "raisedAt": {
             "type": "string",
@@ -6986,7 +7026,8 @@
         },
         "additionalProperties": {
           "not": {}
-        }
+        },
+        "description": "A question put to a person, as Mission Control's inbox shows it: what EscalationRaised carried, and where it stands."
       },
       "EscalationWithdrawn": {
         "type": "object",

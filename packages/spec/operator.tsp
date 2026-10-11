@@ -63,10 +63,29 @@ model EnrolledAgent {
   clientSecret: string;
 }
 
+/** A question put to a person, as Mission Control's inbox shows it: what EscalationRaised carried, and where it stands. */
 model EscalationView {
   id: EscalationId;
   question: string;
-  options: string[];
+
+  /** At least two, with unique ids; a ruling names one by `id`. */
+  options: EscalationOption[];
+
+  /** What the question is about. */
+  about: EntityRef;
+
+  category: EscalationCategory;
+
+  /** Keel's evidence, put before the person. */
+  evidence: EscalationEvidence[];
+
+  /** Earlier decisions on the same subject. */
+  precedents: DecisionId[];
+
+  /** The option suggested while the question is open: one of `options`, never applied on a timeout. */
+  @minLength(1)
+  default: string;
+
   raisedAt: utcDateTime;
   state: "open" | "ruled" | "withdrawn";
 }

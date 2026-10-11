@@ -734,6 +734,16 @@ model EscalationOption {
   consequence: string;
 }
 
+/** What kind of question a person is asked to rule on. */
+union EscalationCategory {
+  "permission-semantics",
+  "destructive-migration",
+  "ambiguous-requirement",
+  "unprovable-conflict",
+  "overrule-request",
+  "frozen-trunk",
+}
+
 /** One piece of evidence put before the person, by class. */
 model EscalationEvidence {
   class: "proof" | "ruling" | "testimony" | "opinion";
@@ -755,13 +765,7 @@ model EscalationRaised {
   options: EscalationOption[];
 
   about: EntityRef;
-  category:
-    | "permission-semantics"
-    | "destructive-migration"
-    | "ambiguous-requirement"
-    | "unprovable-conflict"
-    | "overrule-request"
-    | "frozen-trunk";
+  category: EscalationCategory;
   evidence: EscalationEvidence[];
   precedents: DecisionId[];
 
