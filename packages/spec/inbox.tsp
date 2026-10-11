@@ -17,6 +17,17 @@ model InboxPage {
 
 model InboxEnvelope is AgentEnvelope<InboxPage>;
 
+/** The principal whose command caused an event: `agent:<agent id>` or `operator:<by>`. */
+@pattern("^(agent:agt_[0-9A-HJKMNP-TV-Z]{26}|operator:.*)$")
+scalar EventActor extends string;
+
+/**
+ * A short label for the entity an event created, numbered per project and kind:
+ * `D-n` decisions, `G-n` guards, `C-n` conflicts, `E-n` escalations, `P-n` probes.
+ */
+@pattern("^[DGCEP]-[1-9][0-9]*$")
+scalar EventLabel extends string;
+
 /** One entry of the operation log, as published. */
 model EventRecord {
   eventId: EventId;
@@ -27,6 +38,15 @@ model EventRecord {
   };
   seq: int32;
   at: utcDateTime;
+
+  /** Who caused the event. Absent when the platform did: Precheck, alarms, reactions, a landing. */
+  actor?: EventActor;
+
+  /** The project the event belongs to. */
+  project?: ProjectId;
+
+  /** Set on the event that created a labelled entity, by the Projector when it first records it. */
+  label?: EventLabel;
 
   /** The event itself; `type` is its `_tag`. */
   payload: KeelEvent;

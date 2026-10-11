@@ -494,6 +494,9 @@ model AgentEnrolled {
 
   kind: AgentKind;
   scopes: Scope[];
+
+  /** The human the agent acts on behalf of, when the operator named one. */
+  onBehalfOf?: Sponsor;
 }
 
 model AgentSuspended {
@@ -524,12 +527,17 @@ union Party {
   TenetId,
 }
 
-/** One combination of changes evaluated together. */
+/**
+ * One combination of changes evaluated together, or `A-noop`: the premise
+ * holder's world with the premised behaviour removed. A probe that passes there
+ * does not test the premise, so it is never admitted.
+ */
 union World {
   trunk: "trunk",
   a: "A",
   b: "B",
   ab: "AB",
+  aNoop: "A-noop",
 }
 
 model ConflictSuspected {
@@ -539,6 +547,9 @@ model ConflictSuspected {
   parties: Party[];
   subjectId?: SubjectId;
   predicate?: MFP.Predicate;
+
+  /** Absent means `fallout`; `opinion` is a decision model's suspicion, which only a probe or a person settles. */
+  origin?: "fallout" | "opinion";
 }
 
 model ProbeDrafted {
@@ -563,6 +574,9 @@ model ProbeDiscarded {
   _tag: "ProbeDiscarded";
   probeId: ProbeId;
   reason: "non-discriminating" | "unstable" | "draft-failed";
+
+  /** Always set (optional only so older events decode): a probe whose drafts all failed begins with this event. */
+  conflictId?: ConflictId;
 }
 
 model ConflictProven {
@@ -579,6 +593,10 @@ model ConflictProven {
       }
     | {
         _tag: "merge-refused";
+        batchId: BatchId;
+      }
+    | {
+        _tag: "interaction";
         batchId: BatchId;
       };
 }
@@ -634,6 +652,9 @@ model VerdictIssued {
 
   /** The plan the verdict was reached under. Absent means no plan, never a fabricated hash. */
   planHash?: ContentHash;
+
+  /** False when the project's verification is off and the plan was not run. Absent means true. */
+  verified?: boolean;
 }
 
 model EscalationRaised {
@@ -721,6 +742,9 @@ model BatchVerified {
 
   base?: CommitSha;
   predecessors?: ChangeId[];
+
+  /** Carried unchanged from the batch's `VerdictIssued.verified`. Absent means true. */
+  verified?: boolean;
 }
 
 model BatchFailed {
@@ -760,6 +784,9 @@ model TrunkAdvanced {
   groupId: string;
   members: ChangeId[];
   proofIds: string[];
+
+  /** False when any batch in the group was unverified; absent means every one was verified. */
+  verified?: boolean;
 }
 
 model PromotionDeclined {
@@ -788,6 +815,29 @@ model PromotionResumed {
 
   /** The head the operator confirms trunk is at; optional only so older events still decode. */
   head?: CommitSha;
+}
+
+/** A project was created: its trunk, staging, mirror and pool exist, and trunk has its first head. */
+model ProjectCreated {
+  _tag: "ProjectCreated";
+  projectId: ProjectId;
+  name: string;
+  by: string;
+}
+
+/** One setting an operator changed: its name, and its JSON value before and after. */
+model ProjectSettingChange {
+  field: string;
+  from: unknown;
+  to: unknown;
+}
+
+/** An operator changed the project's settings: every change is audited, e.g. turning verification off. */
+model ProjectSettingsChanged {
+  _tag: "ProjectSettingsChanged";
+  projectId: ProjectId;
+  changes: ProjectSettingChange[];
+  by: string;
 }
 
 /** The trunk's first known head, from the project's seed or an operator. Nothing promotes before it. */
@@ -1069,6 +1119,8 @@ union KeelEvent {
   PromotionStarted,
   PromotionComposed,
   AuditCompleted,
+  ProjectCreated,
+  ProjectSettingsChanged,
 
   // Memory
   RulingGiven,

@@ -4634,6 +4634,14 @@
             "items": {
               "$ref": "#/components/schemas/Scope"
             }
+          },
+          "onBehalfOf": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Sponsor"
+              }
+            ],
+            "description": "The human the agent acts on behalf of, when the operator named one."
           }
         },
         "additionalProperties": {
@@ -4988,6 +4996,10 @@
             "items": {
               "$ref": "#/components/schemas/ChangeId"
             }
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Carried unchanged from the batch's `VerdictIssued.verified`. Absent means true."
           }
         },
         "additionalProperties": {
@@ -5868,6 +5880,27 @@
                 "additionalProperties": {
                   "not": {}
                 }
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "_tag": {
+                    "type": "string",
+                    "enum": [
+                      "interaction"
+                    ]
+                  },
+                  "batchId": {
+                    "$ref": "#/components/schemas/BatchId"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "batchId"
+                ],
+                "additionalProperties": {
+                  "not": {}
+                }
               }
             ]
           }
@@ -5947,6 +5980,14 @@
           },
           "predicate": {
             "$ref": "#/components/schemas/MFP.Predicate"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "fallout",
+              "opinion"
+            ],
+            "description": "Absent means `fallout`; `opinion` is a decision model's suspicion, which only a probe or a person settles."
           }
         },
         "additionalProperties": {
@@ -6765,6 +6806,11 @@
           "not": {}
         }
       },
+      "EventActor": {
+        "type": "string",
+        "pattern": "^(agent:agt_[0-9A-HJKMNP-TV-Z]{26}|operator:.*)$",
+        "description": "The principal whose command caused an event: `agent:<agent id>` or `operator:<by>`."
+      },
       "EventAnchor": {
         "type": "object",
         "required": [
@@ -6893,6 +6939,11 @@
       "EventId": {
         "type": "string",
         "pattern": "^evt_[0-9A-HJKMNP-TV-Z]{26}$"
+      },
+      "EventLabel": {
+        "type": "string",
+        "pattern": "^[DGCEP]-[1-9][0-9]*$",
+        "description": "A short label for the entity an event created, numbered per project and kind:\n`D-n` decisions, `G-n` guards, `C-n` conflicts, `E-n` escalations, `P-n` probes."
       },
       "EventMessageCitation": {
         "type": "object",
@@ -7149,6 +7200,30 @@
           "at": {
             "type": "string",
             "format": "date-time"
+          },
+          "actor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EventActor"
+              }
+            ],
+            "description": "Who caused the event. Absent when the platform did: Precheck, alarms, reactions, a landing."
+          },
+          "project": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectId"
+              }
+            ],
+            "description": "The project the event belongs to."
+          },
+          "label": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EventLabel"
+              }
+            ],
+            "description": "Set on the event that created a labelled entity, by the Projector when it first records it."
           },
           "payload": {
             "allOf": [
@@ -7780,6 +7855,12 @@
           },
           {
             "$ref": "#/components/schemas/AuditCompleted"
+          },
+          {
+            "$ref": "#/components/schemas/ProjectCreated"
+          },
+          {
+            "$ref": "#/components/schemas/ProjectSettingsChanged"
           },
           {
             "$ref": "#/components/schemas/RulingGiven"
@@ -10205,6 +10286,14 @@
               "unstable",
               "draft-failed"
             ]
+          },
+          "conflictId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ConflictId"
+              }
+            ],
+            "description": "Always set (optional only so older events decode): a probe whose drafts all failed begins with this event."
           }
         },
         "additionalProperties": {
@@ -10388,6 +10477,36 @@
         },
         "description": "The body of every error: RFC 9457 problem details, plus Keel's fields."
       },
+      "ProjectCreated": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "name",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ProjectCreated"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "name": {
+            "type": "string"
+          },
+          "by": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A project was created: its trunk, staging, mirror and pool exist, and trunk has its first head."
+      },
       "ProjectId": {
         "type": "string",
         "pattern": "^prj_[0-9A-HJKMNP-TV-Z]{26}$"
@@ -10412,6 +10531,25 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "ProjectSettingChange": {
+        "type": "object",
+        "required": [
+          "field",
+          "from",
+          "to"
+        ],
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "from": {},
+          "to": {}
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One setting an operator changed: its name, and its JSON value before and after."
       },
       "ProjectSettings": {
         "type": "object",
@@ -10438,6 +10576,39 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "ProjectSettingsChanged": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "changes",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ProjectSettingsChanged"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectSettingChange"
+            }
+          },
+          "by": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An operator changed the project's settings: every change is audited, e.g. turning verification off."
       },
       "ProjectView": {
         "type": "object",
@@ -11758,6 +11929,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "False when any batch in the group was unverified; absent means every one was verified."
           }
         },
         "additionalProperties": {
@@ -11876,6 +12051,10 @@
               }
             ],
             "description": "The plan the verdict was reached under. Absent means no plan, never a fabricated hash."
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "False when the project's verification is off and the plan was not run. Absent means true."
           }
         },
         "additionalProperties": {
@@ -12348,9 +12527,10 @@
           "trunk",
           "A",
           "B",
-          "AB"
+          "AB",
+          "A-noop"
         ],
-        "description": "One combination of changes evaluated together."
+        "description": "One combination of changes evaluated together, or `A-noop`: the premise\nholder's world with the premised behaviour removed. A probe that passes there\ndoes not test the premise, so it is never admitted."
       }
     },
     "securitySchemes": {
