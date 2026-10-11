@@ -64,6 +64,7 @@ async function lane(options: { readonly noStaging?: boolean } = {}) {
     protectedPaths: [],
     maxBatchSize: 1,
     verification: "required",
+    visibility: "private",
   });
   const agentId = makeId("agt", ulid());
   const changes = Layer.succeed(

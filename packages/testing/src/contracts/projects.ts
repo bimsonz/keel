@@ -101,28 +101,33 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
           protectedPaths: [Glob.make("infra/**"), Glob.make(".github/workflows/*")],
           maxBatchSize: 4,
           verification: "required",
+          visibility: "public",
         };
         const projectId = yield* harness.withSettings(settings);
         expect(yield* (yield* Projects).settings(projectId)).toEqual(settings);
       }).pipe(Effect.provide(harness.layer));
     });
 
-    it.live("holds the defaults until a PUT: no protected paths, batches of one, verified", () => {
-      const harness = make();
-      return Effect.gen(function* () {
-        const projects = yield* Projects;
-        const project = yield* projects.create(operator(), {
-          name: "forge",
-          source: harness.source,
-          idempotencyKey: key(),
-        });
-        expect(yield* projects.settings(project.id)).toEqual({
-          protectedPaths: [],
-          maxBatchSize: 1,
-          verification: "required",
-        });
-      }).pipe(Effect.provide(harness.layer));
-    });
+    it.live(
+      "holds the defaults until a PUT: no protected paths, batches of one, verified, private",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const projects = yield* Projects;
+          const project = yield* projects.create(operator(), {
+            name: "forge",
+            source: harness.source,
+            idempotencyKey: key(),
+          });
+          expect(yield* projects.settings(project.id)).toEqual({
+            protectedPaths: [],
+            maxBatchSize: 1,
+            verification: "required",
+            visibility: "private",
+          });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
 
     it.live("replaces the settings a PUT names, an absent verification meaning required", () => {
       const harness = make();
@@ -144,12 +149,42 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
         const readOff = yield* projects.settings(project.id);
         const turnedOn = yield* projects.putSettings(by, project.id, off, "req-2");
 
-        expect(turnedOff).toEqual({ ...off, verification: "off" });
+        expect(turnedOff).toEqual({ ...off, verification: "off", visibility: "private" });
         expect(readOff).toEqual(turnedOff);
-        expect(turnedOn).toEqual({ ...off, verification: "required" });
+        expect(turnedOn).toEqual({ ...off, verification: "required", visibility: "private" });
         expect(yield* projects.settings(project.id)).toEqual(turnedOn);
       }).pipe(Effect.provide(harness.layer));
     });
+
+    it.live(
+      "[b12.settings-visibility] keeps the visibility a PUT names, an absent one meaning private",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const projects = yield* Projects;
+          const by = operator();
+          const project = yield* projects.create(by, {
+            name: "forge",
+            source: harness.source,
+            idempotencyKey: key(),
+          });
+          const put = { protectedPaths: [], maxBatchSize: 1 } as const;
+          const published = yield* projects.putSettings(
+            by,
+            project.id,
+            { ...put, visibility: "public" },
+            "req-1",
+          );
+          const readPublic = yield* projects.settings(project.id);
+          const hidden = yield* projects.putSettings(by, project.id, put, "req-2");
+
+          expect(published.visibility).toBe("public");
+          expect(readPublic.visibility).toBe("public");
+          expect(hidden.visibility).toBe("private");
+          expect((yield* projects.settings(project.id)).visibility).toBe("private");
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
 
     it.live("refuses other settings under a used request id with IdempotencyConflict", () => {
       const harness = make();

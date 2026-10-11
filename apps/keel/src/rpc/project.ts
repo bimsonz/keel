@@ -9,16 +9,20 @@ import { RepoRef } from "./workspace-pool.ts";
 /** Whether the project's lane verifies each batch: `off` only on S-0's control project. */
 export const Verification = Schema.Literals(["required", "off"]);
 
-/** The project's settings as the Project DO answers them: `verification` always present. */
+/** Who may read the project: `public` lets anonymous readers in; `private` is the default. */
+export const Visibility = Schema.Literals(["private", "public"]);
+
+/** The project's settings as the Project DO answers them: `verification` and `visibility` always present. */
 export const ProjectSettings = Schema.Struct({
   protectedPaths: Schema.Array(Glob),
   maxBatchSize: Schema.Int,
   verification: Verification,
+  visibility: Visibility,
 });
 
 /**
  * An operator replaces the project's settings (an absent `verification` is
- * `required`). The Project DO commits one ProjectSettingsChanged naming every
+ * `required`, an absent `visibility` `private`). The Project DO commits one ProjectSettingsChanged naming every
  * changed field, with `by` and the actor `operator:<by>`; an unchanged PUT
  * commits nothing. `requestId` keys the commit: a replay answers the settings
  * as they stand, and the same id with other settings is IdempotencyConflict.
@@ -29,6 +33,7 @@ export const PutSettingsCommand = Schema.Struct({
     protectedPaths: Schema.Array(Glob),
     maxBatchSize: Schema.Int,
     verification: Schema.optional(Verification),
+    visibility: Schema.optional(Visibility),
   }),
   by: AgentId,
   requestId: Schema.NonEmptyString,

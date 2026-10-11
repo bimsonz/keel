@@ -88,6 +88,7 @@ function world(options: WorldOptions = {}) {
     protectedPaths: [],
     maxBatchSize: 1,
     verification: options.verification ?? "required",
+    visibility: "private",
   });
   const changes = new Map<ChangeId, Change>();
   const changesLayer = Layer.succeed(

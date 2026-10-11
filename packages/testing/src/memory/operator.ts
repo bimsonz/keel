@@ -96,6 +96,7 @@ export function makeProjectsMemory(options: { readonly sources?: Iterable<string
                 protectedPaths: put.protectedPaths,
                 maxBatchSize: put.maxBatchSize,
                 verification: put.verification ?? "required",
+                visibility: put.visibility ?? "private",
               };
               const fingerprint = JSON.stringify(replaced);
               const key = `${projectId}\u0000${requestId}`;

@@ -11178,6 +11178,14 @@
               "off"
             ],
             "description": "Whether the project's lane verifies each batch before it lands. Absent in a PUT means `required`;\nKeel always answers it. `off` is for a negative-control project only: the lane then skips verification\nand marks what lands unverified. Every change is audited by ProjectSettingsChanged."
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public"
+            ],
+            "description": "Who may read the project. `public` lets anonymous readers see it through the repo read API; absent in a\nPUT means `private`, and Keel always answers it. Every change is audited by ProjectSettingsChanged."
           }
         },
         "additionalProperties": {

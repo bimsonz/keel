@@ -56,7 +56,7 @@ export function settingsProject(projectId: string): Result.Result<ProjectId, Iss
     : Result.fail([{ path: ["path", "projectId"], message: "Expected a project id (prj_…)" }]);
 }
 
-/** A PUT's settings: the project's protected globs, its batch size, and `verification` only when given. */
+/** A PUT's settings: the project's protected globs, its batch size, and `verification` and `visibility` only when given. */
 export function putSettingsInput(
   input: Input<"Operator_putSettings">,
 ): Result.Result<{ readonly projectId: ProjectId; readonly settings: PutProjectSettings }, Issues> {
@@ -71,11 +71,12 @@ export function putSettingsInput(
       protectedPaths: protectedPaths.value,
       maxBatchSize: input.maxBatchSize,
       ...(input.verification === undefined ? {} : { verification: input.verification }),
+      ...(input.visibility === undefined ? {} : { visibility: input.visibility }),
     },
   });
 }
 
-/** The project's settings, `verification` always present. GET and PUT answer the same body. */
+/** The project's settings, `verification` and `visibility` always present. GET and PUT answer the same body. */
 export function settingsOk(
   settings: ProjectSettings,
 ): Extract<Operator_getSettingsResult, { readonly status: 200 }> {
@@ -85,6 +86,7 @@ export function settingsOk(
       protectedPaths: [...settings.protectedPaths],
       maxBatchSize: settings.maxBatchSize,
       verification: settings.verification,
+      visibility: settings.visibility,
     },
   };
 }

@@ -1,7 +1,8 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { type AgentId, makeId, type ProjectId } from "@keeltown/core/kernel";
-import { CodeHost, EventOutbox } from "@keeltown/core/ports";
+import { PROJECT_SETTINGS } from "@keeltown/core/application/integration";
+import { CodeHost, EntityStore, EventOutbox } from "@keeltown/core/ports";
 import {
   CodeHostFixture,
   makeCodeHostMemory,
@@ -66,6 +67,7 @@ async function projectUnderTest() {
       readonly protectedPaths: string[];
       readonly maxBatchSize: number;
       readonly verification?: "required" | "off";
+      readonly visibility?: "private" | "public";
     },
     requestId: string,
   ) =>
@@ -80,7 +82,19 @@ async function projectUnderTest() {
         Effect.map(EventOutbox, (outbox) => outbox.log({ kind: "project", id: projectId })),
       ),
     );
-  return { projectId, operator, journal, trunks, pool, head, create, settings, putSettings, log };
+  return {
+    projectId,
+    stub,
+    operator,
+    journal,
+    trunks,
+    pool,
+    head,
+    create,
+    settings,
+    putSettings,
+    log,
+  };
 }
 
 const settingsChanges = async (p: Awaited<ReturnType<typeof projectUnderTest>>) =>
@@ -129,8 +143,18 @@ describe("a project's settings over real RPC", () => {
     const changes = await settingsChanges(p);
 
     expect(refusal(beforeCreate)).toContain("ProjectNotFound");
-    expect(defaults).toEqual({ protectedPaths: [], maxBatchSize: 1, verification: "required" });
-    expect(off).toEqual({ protectedPaths: [], maxBatchSize: 1, verification: "off" });
+    expect(defaults).toEqual({
+      protectedPaths: [],
+      maxBatchSize: 1,
+      verification: "required",
+      visibility: "private",
+    });
+    expect(off).toEqual({
+      protectedPaths: [],
+      maxBatchSize: 1,
+      verification: "off",
+      visibility: "private",
+    });
     expect(ok(await p.settings())).toEqual(off);
     expect([unchanged, retried]).toEqual([off, off]);
     expect(changes).toHaveLength(1);
@@ -156,6 +180,7 @@ describe("a project's settings over real RPC", () => {
       protectedPaths: ["infra/**"],
       maxBatchSize: 4,
       verification: "required",
+      visibility: "private",
     });
     expect(changes.map((event) => event.payload)).toMatchObject([
       { changes: [{ field: "verification", from: "required", to: "off" }] },
@@ -202,9 +227,9 @@ describe("a project's settings through the operator routes", () => {
     expect(sampleProjectId).not.toBe(p.projectId);
     expect([agentGet.status, agentPut.status]).toEqual([403, 403]);
     expect(put.status).toBe(200);
-    expect(await put.json()).toEqual(off);
+    expect(await put.json()).toEqual({ ...off, visibility: "private" });
     expect(got.status).toBe(200);
-    expect(await got.json()).toEqual(off);
+    expect(await got.json()).toEqual({ ...off, visibility: "private" });
     expect(changes).toHaveLength(1);
     expect(changes[0]).toMatchObject({
       actor: `operator:${operatorAgent.agent.id}`,
@@ -242,11 +267,50 @@ describe("a project's settings through the operator routes", () => {
     const body = await reused.json<{ code: string; nextActions: { operationId?: string }[] }>();
 
     expect([first.status, replayed.status, unchanged.status]).toEqual([200, 200, 200]);
-    expect(await replayed.json()).toEqual(off);
+    expect(await replayed.json()).toEqual({ ...off, visibility: "private" });
     expect([reused.status, reusedUnchanged.status]).toEqual([409, 409]);
     expect(body.code).toBe("request.idempotency_conflict");
     expect(body.nextActions.map((action) => action.operationId)).toEqual(["Operator_putSettings"]);
-    expect(ok(await p.settings())).toEqual(off);
+    expect(ok(await p.settings())).toEqual({ ...off, visibility: "private" });
     expect(await settingsChanges(p)).toHaveLength(1);
+  });
+
+  it("[b12.settings-visibility] keeps a public project public, audits each change, and reads settings stored before visibility as private", async () => {
+    const p = await projectUnderTest();
+    ok(await p.create());
+    const operator = await tokenFor(await seedAgent({}, ["operator"]));
+    const put = { protectedPaths: [], maxBatchSize: 1 };
+
+    const published = await settingsCall(operator, p.projectId, { ...put, visibility: "public" });
+    const readPublic = await settingsCall(operator, p.projectId);
+    const hidden = await settingsCall(operator, p.projectId, put);
+    const changes = await settingsChanges(p);
+    // A row written before `visibility` existed: the stored settings hold none.
+    await runInDurableObject(p.stub, (instance: ProjectDO) =>
+      instance["runtime"].runPromise(
+        Effect.map(EntityStore, (store) =>
+          store.put(PROJECT_SETTINGS, p.projectId, {
+            protectedPaths: [],
+            maxBatchSize: 3,
+            verification: "required",
+          }),
+        ),
+      ),
+    );
+
+    expect(published.status).toBe(200);
+    expect(await published.json()).toMatchObject({ visibility: "public" });
+    expect(await readPublic.json()).toMatchObject({ visibility: "public" });
+    expect(await hidden.json()).toMatchObject({ visibility: "private" });
+    expect(changes.map((event) => event.payload)).toMatchObject([
+      { changes: [{ field: "visibility", from: "private", to: "public" }] },
+      { changes: [{ field: "visibility", from: "public", to: "private" }] },
+    ]);
+    expect(ok(await p.settings())).toEqual({
+      protectedPaths: [],
+      maxBatchSize: 3,
+      verification: "required",
+      visibility: "private",
+    });
   });
 });

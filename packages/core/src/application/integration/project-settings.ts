@@ -35,6 +35,7 @@ export const DEFAULT_SETTINGS: ProjectSettings = {
   protectedPaths: [],
   maxBatchSize: 1,
   verification: "required",
+  visibility: "private",
 };
 
 /**
@@ -46,14 +47,16 @@ export const SETTINGS_REQUEST = "settings-request";
 
 const SettingsRequest = Schema.Struct({ fingerprint: Schema.String });
 
+/** Settings stored before `visibility` existed hold none, and read as `private`. */
 const StoredSettings = Schema.Struct({
   protectedPaths: Schema.Array(Glob),
   maxBatchSize: Schema.Int,
   verification: Schema.Literals(["required", "off"]),
+  visibility: Schema.optional(Schema.Literals(["private", "public"])),
 });
 
 /** The fields a PUT replaces, in the order ProjectSettingsChanged lists them. */
-const FIELDS = ["protectedPaths", "maxBatchSize", "verification"] as const;
+const FIELDS = ["protectedPaths", "maxBatchSize", "verification", "visibility"] as const;
 
 export interface ChangeSettings {
   readonly projectId: ProjectId;
@@ -79,7 +82,9 @@ const created = (store: Store, projectId: ProjectId): boolean =>
 
 const held = (store: Store, projectId: ProjectId): ProjectSettings => {
   const value = store.get(PROJECT_SETTINGS, projectId);
-  return value === undefined ? DEFAULT_SETTINGS : decodeSettings(value);
+  if (value === undefined) return DEFAULT_SETTINGS;
+  const stored = decodeSettings(value);
+  return { ...stored, visibility: stored.visibility ?? "private" };
 };
 
 /** Each field whose JSON value differs between the two, with both values. */
@@ -105,7 +110,7 @@ export const settingsOf: (
 
 /**
  * Replaces the project's settings under operator authority (an absent
- * `verification` is `required`). One ProjectSettingsChanged audits every field
+ * `verification` is `required`, an absent `visibility` `private`). One ProjectSettingsChanged audits every field
  * the PUT changes, from and to; an unchanged PUT commits nothing, so a retry
  * is a no-op by content. The cause is `settings:<requestId>`: a replay of the
  * request answers the settings as they stand, and the same request id with
@@ -123,6 +128,7 @@ export const changeSettings: (
     protectedPaths: command.settings.protectedPaths,
     maxBatchSize: command.settings.maxBatchSize,
     verification: command.settings.verification ?? "required",
+    visibility: command.settings.visibility ?? "private",
   };
   const fingerprint = contentHashOf(asJson(next));
   const conflict = new IdempotencyConflict({ idempotencyKey: requestId });

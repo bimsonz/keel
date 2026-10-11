@@ -512,6 +512,7 @@ async function realLane(projectId: ProjectId) {
     protectedPaths: [],
     maxBatchSize: 1,
     verification: "required",
+    visibility: "private",
   });
   const changes = ChangesRpc({
     change: (id) => env.CHANGE.get(env.CHANGE.idFromName(`change:${id}`)),

@@ -37,6 +37,12 @@ model ProjectSettings {
    * and marks what lands unverified. Every change is audited by ProjectSettingsChanged.
    */
   verification?: "required" | "off";
+
+  /**
+   * Who may read the project. `public` lets anonymous readers see it through the repo read API; absent in a
+   * PUT means `private`, and Keel always answers it. Every change is audited by ProjectSettingsChanged.
+   */
+  visibility?: "private" | "public";
 }
 
 model ProjectPage is Page<ProjectView>;

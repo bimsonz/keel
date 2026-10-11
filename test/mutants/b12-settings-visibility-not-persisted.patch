@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project.test.ts -t visibility
+# kills: b12.settings-visibility
+# why: the Project DO answers a PUT's visibility but reads every stored row back as private, so a public project turns private on the next read
+diff --git a/packages/core/src/application/integration/project-settings.ts b/packages/core/src/application/integration/project-settings.ts
+index 2416824..0abf105 100644
+--- a/packages/core/src/application/integration/project-settings.ts
++++ b/packages/core/src/application/integration/project-settings.ts
+@@ -84,7 +84,7 @@ const held = (store: Store, projectId: ProjectId): ProjectSettings => {
+   const value = store.get(PROJECT_SETTINGS, projectId);
+   if (value === undefined) return DEFAULT_SETTINGS;
+   const stored = decodeSettings(value);
+-  return { ...stored, visibility: stored.visibility ?? "private" };
++  return { ...stored, visibility: "private" };
+ };
+ 
+ /** Each field whose JSON value differs between the two, with both values. */
