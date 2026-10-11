@@ -193,10 +193,23 @@ describe("run-plan: the compiled plan's flow, executed", () => {
         if (root._tag !== "seq") return;
         const overridden = new Set(ran.flatMap((r) => coerce(plan, r).overrides ?? []));
         const byStep = new Map(ran.map((r) => [r.stepId, r]));
-        const firstBlock = root.items.findIndex((item) => {
+        // A fail that a human step still to come may override does not block: that person must be asked.
+        const overriders = (id: string) =>
+          Object.entries(plan.overrides)
+            .filter(
+              ([h, targets]) =>
+                plan.steps.find((x) => x.id === h)?.kind === "human" && targets.includes(id),
+            )
+            .map(([h]) => h);
+        const firstBlock = root.items.findIndex((item, i) => {
           if (item._tag !== "step") return false;
           const r = byStep.get(item.step);
-          return r !== undefined && blocks(plan, r, overridden);
+          const earlier = new Set(root.items.slice(0, i).flatMap(stepsUnder));
+          return (
+            r !== undefined &&
+            blocks(plan, r, overridden) &&
+            overriders(item.step).every((h) => earlier.has(h))
+          );
         });
         if (firstBlock === -1) return;
         const after = new Set(root.items.slice(firstBlock + 1).flatMap(stepsUnder));
@@ -206,6 +219,20 @@ describe("run-plan: the compiled plan's flow, executed", () => {
     const { calls, runner } = recording((s, w) => report(s, w, s.id === "a" ? "fail" : "pass"));
     await run(handPlan([proofStep("a"), proofStep("b")], seq(leaf("a"), leaf("b"))), runner);
     expect(calls).toEqual(["a"]);
+    // Seed -544302715: a fail that a later human step may override does not stop the seq.
+    const human = proofStep("h", {
+      kind: "human",
+      evidenceCeiling: "ruling",
+      outcomes: ["pass", "abstain"],
+      overrides: ["a"],
+      suite: false,
+    });
+    const asked = recording((s, w) => report(s, w, s.id === "a" ? "fail" : "pass"));
+    await run(
+      handPlan([proofStep("a"), proofStep("b"), human], seq(leaf("a"), leaf("b"), leaf("h"))),
+      asked.runner,
+    );
+    expect(asked.calls).toEqual(["a", "b", "h"]);
   });
 
   it("[run-plan.seq-in-order] a seq runs its items one after another, in order", async () => {
