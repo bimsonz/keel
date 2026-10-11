@@ -41,7 +41,7 @@ export function makeCandidateComposerMemory(options: { readonly refuse?: readonl
           Effect.gen(function* () {
             const refused = request.members.filter((m) => options.refuse?.includes(m.changeId));
             if (refused.length > 0)
-              return yield* new CompositionRefused({ reason: "overlap", paths: [] });
+              return yield* new CompositionRefused({ reason: "both-modified", paths: [] });
             const commits: { changeId: ChangeId; sha: CommitSha }[] = [];
             let parent: string = request.base;
             for (const m of request.members) {

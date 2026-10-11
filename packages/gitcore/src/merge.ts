@@ -1,14 +1,11 @@
-// Three-way merge of trees (ported from spike S13, which ran 10,000
-// differential histories against `git merge-tree` with no wrong tree). For
-// every path it takes the one side that changed, takes a result both sides
-// agree on byte for byte (same object id), merges a text file both changed by
-// hunk as git does (`merge-text.ts`), or refuses. It also refuses whole
-// classes of input where git's merge machinery (rename detection, recursive
-// virtual bases, mode handling, merge attributes) could produce a different
-// tree. Refusing is always safe: MergeBox takes over.
+// Path-level three-way merge (ported from spike S13, which ran 10,000
+// differential histories against `git merge-tree` with no wrong tree). It
+// never merges file contents: for every path it takes the one side that
+// changed, takes a result both sides agree on byte for byte (same object id),
+// or refuses. It also refuses whole classes of input where git's merge
+// machinery (rename detection, recursive virtual bases, mode handling) could
+// produce a different tree. Refusing is always safe: MergeBox takes over.
 
-import { dec } from "./bytes.ts";
-import { mergeText, type TextRefusal } from "./merge-text.ts";
 import {
   type CommitInfo,
   decodeCommit,
@@ -41,8 +38,7 @@ export type RefusalReason =
   | "binary"
   | "rename-exact"
   | "rename-similar"
-  | TextRefusal
-  | "attributes"
+  | "both-modified"
   | "add-add"
   | "modify-delete";
 
@@ -61,7 +57,7 @@ export interface MergeOptions {
   readonly renameThreshold?: number;
 }
 
-/** A merged tree and the trees and merged blobs written to build it, which the target repo may lack. */
+/** A merged tree and the tree objects written to build it, which the target repo may lack. */
 export interface MergedTree {
   readonly tree: string;
   readonly newObjects: ReadonlyMap<string, GitObject>;
@@ -330,33 +326,6 @@ async function guardRenames(
 
 // ---------------------------------------------------------------- merge
 
-/** A `.gitattributes` naming either word may pick another merge driver (`merge=union`, `-merge`, `binary`). */
-const MERGE_ATTRIBUTES = /merge|binary/;
-
-/**
- * Both sides changed one text file (same mode as its base, not binary: the
- * guards ran first): merged by hunk, the blob written to `out`, or refused.
- * `attributes` are the `.gitattributes` blobs on its directory chain in any
- * of the three trees.
- */
-async function mergeFile(
-  r: ObjectReader,
-  [base, ours, theirs]: readonly [TreeEntry, TreeEntry, TreeEntry],
-  path: string,
-  attributes: readonly string[],
-  out: Map<string, GitObject>,
-): Promise<TreeEntry> {
-  for (const oid of attributes)
-    if (MERGE_ATTRIBUTES.test(dec.decode(await r.readBlob(oid))))
-      throw new Refusal("attributes", path);
-  const [b, o, t] = await Promise.all([base, ours, theirs].map((e) => r.readBlob(e.oid)));
-  const merged = mergeText(b ?? new Uint8Array(0), o ?? new Uint8Array(0), t ?? new Uint8Array(0));
-  if (!merged.ok) throw new Refusal(merged.reason, path);
-  const oid = await hashObject("blob", merged.merged);
-  out.set(oid, { type: "blob", body: merged.merged });
-  return { name: ours.name, mode: ours.mode, oid };
-}
-
 async function mergeTree(
   r: ObjectReader,
   base: string | null,
@@ -364,7 +333,6 @@ async function mergeTree(
   theirs: string | null,
   prefix: string,
   out: Map<string, GitObject>,
-  attributes: readonly string[] = [],
 ): Promise<string | null> {
   if (ours === theirs) return ours;
   if (base === ours) return theirs;
@@ -372,13 +340,6 @@ async function mergeTree(
   const eb = await entries(r, base);
   const eo = await entries(r, ours);
   const et = await entries(r, theirs);
-  const here = [
-    ...attributes,
-    ...[eb, eo, et].flatMap((level) => {
-      const found = level.get(".gitattributes");
-      return found === undefined || isTree(found) ? [] : [found.oid];
-    }),
-  ];
   const result: TreeEntry[] = [];
   for (const name of new Set([...eb.keys(), ...eo.keys(), ...et.keys()])) {
     const b = eb.get(name) ?? null;
@@ -392,15 +353,7 @@ async function mergeTree(
     else {
       const present = [b, o, t].filter((e): e is TreeEntry => e !== null);
       if (present.every(isTree)) {
-        const oid = await mergeTree(
-          r,
-          b?.oid ?? null,
-          o?.oid ?? null,
-          t?.oid ?? null,
-          path,
-          out,
-          here,
-        );
+        const oid = await mergeTree(r, b?.oid ?? null, o?.oid ?? null, t?.oid ?? null, path, out);
         pick = oid === null ? null : { name, mode: MODE_TREE, oid };
       } else if (present.some(isTree)) {
         throw new Refusal("dir-file", path);
@@ -409,7 +362,7 @@ async function mergeTree(
       } else if (o === null || t === null) {
         throw new Refusal("modify-delete", path);
       } else {
-        pick = await mergeFile(r, [b, o, t], path, here, out);
+        throw new Refusal("both-modified", path);
       }
     }
     if (pick !== null) result.push(pick);
