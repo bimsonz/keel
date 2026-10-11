@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts -t trunkwriter.cas
+# kills: trunkwriter.cas
+# why: The push takes its old value from trunk's current head instead of the WAL, so a trunk that moved under the promotion is overwritten (a bare --force lost 3 of 30 updates in S1)
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index 6fb65a0..fb89db7 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -88,8 +88,9 @@ export const TrunkWriterGitCore = ({ trunk, staging }: { trunk: RepoRef; staging
+           Effect.gen(function* () {
+             const source = yield* remoteOf(staging, "read");
+             const target = yield* remoteOf(trunk, "write");
++            const old = yield* headOf(trunk);
+             const outcome = yield* Effect.tryPromise({
+-              try: () => relay(source, target, { ref: MAIN, from, to }),
++              try: () => relay(source, target, { ref: MAIN, from: old ?? from, to }),
+               catch: (cause) => cause,
+             }).pipe(
+               Effect.catch((cause): Effect.Effect<never, PackTooLarge | PushRejected> =>

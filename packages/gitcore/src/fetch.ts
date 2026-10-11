@@ -20,6 +20,13 @@ export class PackTooLarge extends Error {
   }
 }
 
+/** receive-pack answered `busy` on every attempt: nothing was applied, and the same pack may be sent again later. */
+export class ReceivePackBusy extends Error {
+  constructor(readonly attempts: number) {
+    super(`receive-pack stayed busy after ${attempts} attempts`);
+  }
+}
+
 /**
  * Fetches the pack of everything reachable from `wants` that is not reachable
  * from `haves`. The answer is the raw pack (`PACK…`), demultiplexed from
@@ -96,7 +103,8 @@ export interface RelayOptions {
  * Copies `move.to` from `source` into `target`'s `move.ref`: fetches the pack
  * of what the target lacks (have = `from`) and pushes it with `from` as the
  * explicit old value (zero for an empty target), so a target that moved
- * meanwhile refuses it. A pack over the cap throws `PackTooLarge`.
+ * meanwhile refuses it. A pack over the cap throws `PackTooLarge`, and a
+ * target still busy after the retries `ReceivePackBusy`.
  */
 export async function relay(
   source: GitRemote,
@@ -118,8 +126,7 @@ export async function relay(
       case "rejected":
         return { kind: "rejected", outcome };
       case "busy":
-        if (attempt >= retries)
-          throw new Error(`receive-pack stayed busy after ${retries + 1} attempts`);
+        if (attempt >= retries) throw new ReceivePackBusy(retries + 1);
         // Another push holds the repo: back off briefly, then send the same pack again.
         await new Promise((resolve) => setTimeout(resolve, 50 * 2 ** attempt));
         continue;

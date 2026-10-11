@@ -1,7 +1,8 @@
-// TrunkWriter's sync against Artifacts itself: a scratch "trunk" in the
-// staging workspace namespace is relayed into an empty scratch repo, as a new
-// project's mirror is, then again after trunk advances. Every repo it makes is
-// deleted afterwards.
+// TrunkWriter against Artifacts itself, on scratch repos in the staging
+// workspace namespace. Sync: a scratch "trunk" is relayed into an empty repo,
+// as a new project's mirror is, then again after trunk advances. Push: a
+// candidate in a scratch "staging" lands on trunk only while trunk still holds
+// the WAL's old value. Every repo it makes is deleted afterwards.
 import { CodeHost, TrunkWriter } from "@keeltown/core/ports";
 import { CodeHostFixture } from "@keeltown/testing";
 import { env } from "cloudflare:workers";
@@ -28,7 +29,11 @@ it("[sync.live] relays trunk into an empty repo, then each new head, keeping com
     Effect.runPromise(
       program.pipe(
         Effect.provide(
-          Layer.mergeAll(TrunkWriterGitCore(trunk).pipe(Layer.provide(host)), host, fixture.layer),
+          Layer.mergeAll(
+            TrunkWriterGitCore({ trunk, staging: trunk }).pipe(Layer.provide(host)),
+            host,
+            fixture.layer,
+          ),
         ),
       ),
     );
@@ -60,4 +65,49 @@ it("[sync.live] relays trunk into an empty repo, then each new head, keeping com
   expect(report.afterSecond).toBe(report.second);
   expect(report.again).toEqual({ head: report.second, outcomes: ["unchanged"] });
   expect(report.notThere._tag).toBe("RepoNotFound");
+});
+
+it("[trunkwriter.live] lands a staging commit on trunk byte for byte, and refuses it once trunk has moved past the old value", async () => {
+  const trunk = fixture.fixture.scratch();
+  const staging = fixture.fixture.scratch();
+  const run = <A, E>(program: Effect.Effect<A, E, CodeHost | CodeHostFixture | TrunkWriter>) =>
+    Effect.runPromise(
+      program.pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            TrunkWriterGitCore({ trunk, staging }).pipe(Layer.provide(host)),
+            host,
+            fixture.layer,
+          ),
+        ),
+      ),
+    );
+
+  const report = await run(
+    Effect.gen(function* () {
+      const codeHost = yield* CodeHost;
+      const writer = yield* TrunkWriter;
+      const commit = (yield* CodeHostFixture).commit;
+      yield* codeHost.create(trunk);
+      yield* codeHost.create(staging);
+      const base = yield* commit(trunk, MAIN, { "README.md": "base\n" });
+      expect(yield* commit(staging, MAIN, { "README.md": "base\n" })).toBe(base);
+      const first = yield* commit(staging, MAIN, { "README.md": "first\n" });
+      const second = yield* commit(staging, MAIN, { "README.md": "second\n" });
+      yield* writer.push(base, first);
+      const landed = yield* codeHost.head(trunk, MAIN);
+      const stale = yield* Effect.flip(writer.push(base, second));
+      const afterStale = yield* codeHost.head(trunk, MAIN);
+      yield* writer.push(first, second);
+      const afterSecond = yield* codeHost.head(trunk, MAIN);
+      return { base, first, second, landed, stale, afterStale, afterSecond };
+    }),
+  );
+  console.log(
+    `LIVE push: base → first ${report.landed === report.first ? "landed" : "did not land"}; stale base → second ${report.stale._tag}${report.stale._tag === "PushRejected" ? ` (${report.stale.reason})` : ""}, trunk ${report.afterStale === report.first ? "still at first" : "moved"}; first → second ${report.afterSecond === report.second ? "landed" : "did not land"}`,
+  );
+  expect(report.landed).toBe(report.first);
+  expect(report.stale).toMatchObject({ _tag: "PushRejected", reason: "stale" });
+  expect(report.afterStale).toBe(report.first);
+  expect(report.afterSecond).toBe(report.second);
 });

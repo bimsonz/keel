@@ -22,11 +22,18 @@ export class TrunkWriter extends Context.Service<
   TrunkWriter,
   {
     readonly head: Effect.Effect<CommitSha>;
-    /** Pushes `from → to`; the caller reads the head back to learn the outcome. */
+    /**
+     * Moves trunk's main `from → to`, `from` being the WAL's old value, sent
+     * explicitly whatever trunk's head reads now. `to` is a commit in staging
+     * (a verified candidate), carried byte for byte. PushRejected: trunk no
+     * longer held `from` (`stale`) or stayed busy (`busy`); nothing landed. A
+     * pack over the receive-pack cap is PackTooLarge and lands nothing. The
+     * caller reads the head back to learn the outcome.
+     */
     readonly push: (
       from: CommitSha,
       to: CommitSha,
-    ) => Effect.Effect<void, PushRejected | UnexpectedHead>;
+    ) => Effect.Effect<void, PushRejected | UnexpectedHead | PackTooLarge>;
     /**
      * Copies trunk's head into each target's main (staging, the mirror),
      * relaying trunk's own pack so commit ids survive. Idempotent: a target

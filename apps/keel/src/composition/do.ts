@@ -85,7 +85,7 @@ export type TrunkServices = TrunkWriter;
  */
 export function trunkServices(env: Env, projectId: () => ProjectId): Layer.Layer<TrunkServices> {
   return Layer.suspend(() =>
-    TrunkWriterGitCore(projectRepos(projectId()).trunk).pipe(Layer.provide(codeHostLayer(env))),
+    TrunkWriterGitCore(projectRepos(projectId())).pipe(Layer.provide(codeHostLayer(env))),
   );
 }
 

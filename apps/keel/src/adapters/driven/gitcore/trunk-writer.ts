@@ -1,4 +1,5 @@
 import type { CommitSha } from "@keeltown/core/kernel";
+import { PushRejected } from "@keeltown/core/domain/integration";
 import {
   CodeHost,
   PackTooLarge,
@@ -6,7 +7,12 @@ import {
   type SyncOutcome,
   TrunkWriter,
 } from "@keeltown/core/ports";
-import { type GitRemote, PackTooLarge as GitPackTooLarge, relay } from "@keeltown/gitcore";
+import {
+  type GitRemote,
+  PackTooLarge as GitPackTooLarge,
+  ReceivePackBusy,
+  relay,
+} from "@keeltown/gitcore";
 import { Effect, Layer } from "effect";
 
 const MAIN = "refs/heads/main";
@@ -17,12 +23,28 @@ const TOKEN_TTL_SECONDS = 60;
 /** How many times a target that moved under a relay is read again before the sync gives up. */
 const STALE_RETRIES = 3;
 
+/** Over the cap is the one expected failure of a relay; anything else from git is a defect. */
+const tooLarge =
+  (target: RepoRef) =>
+  (cause: unknown): Effect.Effect<never, PackTooLarge> =>
+    cause instanceof GitPackTooLarge
+      ? Effect.fail(
+          new PackTooLarge({
+            repo: { namespace: target.namespace, name: target.name },
+            bytes: cause.bytes,
+            limit: cause.limit,
+          }),
+        )
+      : Effect.die(cause);
+
 /**
- * TrunkWriter over GitCore and the code host: tokens are minted per call and
- * never leave this adapter; remotes carry the account id, so neither is ever
- * put in an error or a log.
+ * TrunkWriter over GitCore and the code host. A promotion relays the
+ * candidate's own pack from staging into trunk, so the commit the verdict
+ * covered lands byte for byte. Tokens are minted per call and never leave
+ * this adapter; remotes carry the account id, so neither is ever put in an
+ * error or a log.
  */
-export const TrunkWriterGitCore = (trunk: RepoRef) =>
+export const TrunkWriterGitCore = ({ trunk, staging }: { trunk: RepoRef; staging: RepoRef }) =>
   Layer.effect(
     TrunkWriter,
     Effect.gen(function* () {
@@ -52,20 +74,7 @@ export const TrunkWriterGitCore = (trunk: RepoRef) =>
             const outcome = yield* Effect.tryPromise({
               try: () => relay(source, remote, { ref: MAIN, from, to: head }),
               catch: (cause) => cause,
-            }).pipe(
-              // Over the cap is the one expected failure; anything else from git is a defect.
-              Effect.catch((cause) =>
-                cause instanceof GitPackTooLarge
-                  ? Effect.fail(
-                      new PackTooLarge({
-                        repo: { namespace: target.namespace, name: target.name },
-                        bytes: cause.bytes,
-                        limit: cause.limit,
-                      }),
-                    )
-                  : Effect.die(cause),
-              ),
-            );
+            }).pipe(Effect.catch(tooLarge(target)));
             if (outcome.kind !== "rejected") return outcome.kind satisfies SyncOutcome;
           }
           return yield* Effect.die(
@@ -75,7 +84,24 @@ export const TrunkWriterGitCore = (trunk: RepoRef) =>
 
       return TrunkWriter.of({
         head: trunkHead.pipe(Effect.catchTag("RepoNotFound", Effect.die)),
-        push: () => Effect.die(new Error("TrunkWriter.push arrives with C1.2's TrunkWriter step")),
+        push: (from, to) =>
+          Effect.gen(function* () {
+            const source = yield* remoteOf(staging, "read");
+            const target = yield* remoteOf(trunk, "write");
+            const outcome = yield* Effect.tryPromise({
+              try: () => relay(source, target, { ref: MAIN, from, to }),
+              catch: (cause) => cause,
+            }).pipe(
+              Effect.catch((cause): Effect.Effect<never, PackTooLarge | PushRejected> =>
+                cause instanceof ReceivePackBusy
+                  ? Effect.fail(new PushRejected({ reason: "busy" }))
+                  : tooLarge(trunk)(cause),
+              ),
+            );
+            // A relay is never `unchanged` here: a promotion's `to` is never its `from`.
+            if (outcome.kind === "rejected")
+              yield* Effect.fail(new PushRejected({ reason: "stale" }));
+          }).pipe(Effect.catchTag("RepoNotFound", Effect.die)),
         sync: (targets) =>
           Effect.gen(function* () {
             const head = yield* trunkHead;
