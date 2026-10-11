@@ -1,7 +1,8 @@
+import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { EventEnvelope, makeId } from "@keeltown/core/kernel";
 import type { AgentId } from "@keeltown/core/kernel";
-import { type AgentNotice, Enrolments } from "@keeltown/core/ports";
+import { type AgentNotice, Enrolments, Sessions } from "@keeltown/core/ports";
 import {
   describeAgentDirectoryContract,
   describeNotifierContract,
@@ -13,6 +14,7 @@ import { Effect, Layer, Schema } from "effect";
 import { ulid } from "ulid";
 import { AgentDirectoryD1 } from "../../src/adapters/driven/d1/agent-directory.ts";
 import { EnrolmentsRpc } from "../../src/adapters/driven/do-rpc/enrolments.ts";
+import { SessionsRpc } from "../../src/adapters/driven/do-rpc/sessions.ts";
 import { InboxRpc } from "../../src/adapters/driven/do-rpc/inbox.ts";
 import { NotifierRpc } from "../../src/adapters/driven/do-rpc/notifier.ts";
 import { TokenIssuerJose } from "../../src/adapters/driven/jose/token-issuer.ts";
@@ -85,4 +87,43 @@ const drainedEnrolments = Layer.effect(
 
 PORTS.Enrolments.contract("AgentSession DO over RPC", () => ({
   layer: Layer.merge(drainedEnrolments, AgentDirectoryD1(env.DB)),
+}));
+
+/** Opening a session commits SessionOpened on the agent's AgentSession DO; each open waits for its outbox to go quiet. */
+const drainedSessions = Layer.effect(
+  Sessions,
+  Effect.gen(function* () {
+    const sessions = yield* Sessions;
+    return Sessions.of({
+      ...sessions,
+      open: (principal, input) =>
+        sessions
+          .open(principal, input)
+          .pipe(
+            Effect.ensuring(Effect.promise(() => drainOutbox(agentSession(principal.agentId)))),
+          ),
+    });
+  }),
+).pipe(Layer.provide(SessionsRpc(agentSession)));
+
+PORTS.Sessions.contract("AgentSession DO over RPC", () => ({
+  layer: Layer.mergeAll(drainedSessions, drainedEnrolments, AgentDirectoryD1(env.DB)),
+  // The DO holds the agent; push P brings the operator's suspend, so the harness rewrites the row.
+  suspend: (agentId) =>
+    Effect.promise(() =>
+      runInDurableObject(agentSession(agentId), (_instance, state) => {
+        const [row] = state.storage.sql
+          .exec<{ value: string }>(
+            "SELECT value FROM entities WHERE kind = 'agent' AND id = ?",
+            agentId,
+          )
+          .toArray();
+        if (row === undefined) throw new Error(`${agentId} is not enrolled`);
+        state.storage.sql.exec(
+          "UPDATE entities SET value = ? WHERE kind = 'agent' AND id = ?",
+          JSON.stringify({ ...JSON.parse(row.value), state: "suspended" }),
+          agentId,
+        );
+      }),
+    ),
 }));

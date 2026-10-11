@@ -10,18 +10,18 @@ import {
   type Principal,
   type Scope,
   ScopeNotGranted,
-  type Sponsor,
+  type SessionSponsorRefused,
 } from "../../domain/identity/index.ts";
 import type { Session } from "../../domain/memory/index.ts";
-import { stub } from "../not-implemented.ts";
 import {
   AgentDirectory,
   type Clock,
   type EnrolInput,
   type Enrolment,
   Enrolments,
-  type Ids,
   type IssuedToken,
+  type OpenSessionInput,
+  Sessions,
   TokenIssuer,
 } from "../ports/index.ts";
 
@@ -36,24 +36,35 @@ function refusal(agent: Agent, principal: Principal | null): AgentNotAdmitted["r
 }
 
 /**
- * Who the caller is: the agent behind a verified token, if it may still act.
- * The token's revocation epoch must match the agent's current one.
+ * The agent behind a verified token, if it may still act: the token's
+ * revocation epoch must match the agent's current one. It reads only the
+ * AgentDirectory, so the request gate never calls an AgentSession DO.
  */
-export const whoami: (
+export const admit: (
   principal: Principal,
-) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted, AgentDirectory> = Effect.fn(
-  "identity/whoami",
+) => Effect.Effect<Agent, AgentNotKnown | AgentNotAdmitted, AgentDirectory> = Effect.fn(
+  "identity/admit",
 )(function* (principal: Principal) {
   const directory = yield* AgentDirectory;
   const agent = yield* directory.findAgent(principal.agentId);
   if (Option.isNone(agent)) return yield* new AgentNotKnown({ agentId: principal.agentId });
   const reason = refusal(agent.value, principal);
   if (reason !== null) return yield* new AgentNotAdmitted({ agentId: principal.agentId, reason });
-  // Sessions are the AgentSession DO's; until they are opened, an agent has none.
-  return principal.onBehalfOf === undefined
-    ? { agent: agent.value, session: null }
-    : { agent: agent.value, session: null, onBehalfOf: principal.onBehalfOf };
+  return agent.value;
 });
+
+/** Who the caller is: its admitted agent, its current session, and the sponsor its token acts for. */
+export const whoami: (
+  principal: Principal,
+) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted, AgentDirectory | Sessions> =
+  Effect.fn("identity/whoami")(function* (principal: Principal) {
+    const agent = yield* admit(principal);
+    const current = yield* (yield* Sessions).current(agent.id);
+    const session = current === null ? null : { id: current.id };
+    return principal.onBehalfOf === undefined
+      ? { agent, session }
+      : { agent, session, onBehalfOf: principal.onBehalfOf };
+  });
 
 export interface TokenRequest {
   readonly clientId: string;
@@ -116,11 +127,17 @@ export const enrolAgent: (
 ) => Effect.Effect<Enrolment, IdempotencyConflict, Enrolments> = (principal, input) =>
   Enrolments.use((enrolments) => enrolments.enrol(principal, input));
 
-export const openSession: (
+/** Opens a session for the caller's agent in its AgentSession DO, which makes it the agent's current one. */
+export const openAgentSession: (
   principal: Principal,
-  details: { readonly harness?: string; readonly model?: string; readonly onBehalfOf?: Sponsor },
-) => Effect.Effect<Session, AgentNotKnown, Ids | Clock> = stub("identity/openSession");
+  input: OpenSessionInput,
+) => Effect.Effect<
+  Session,
+  AgentNotKnown | AgentNotAdmitted | IdempotencyConflict | SessionSponsorRefused,
+  Sessions
+> = (principal, input) => Sessions.use((sessions) => sessions.open(principal, input));
 
 export * from "./enrol.ts";
 export * from "./inbox.ts";
 export * from "./reservations.ts";
+export * from "./session.ts";

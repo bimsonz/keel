@@ -5,7 +5,7 @@
 //   node apps/keel/test/bench/runtime.ts
 // Node runs V8 as workerd does; inside a Worker the clock is frozen during CPU
 // work, so the per-request CPU cost is measured here, not there.
-import { whoami } from "@keeltown/core/application/identity";
+import { admit } from "@keeltown/core/application/identity";
 import type { Agent } from "@keeltown/core/domain/identity";
 import { Instant, makeId } from "@keeltown/core/kernel";
 import { TokenIssuer } from "@keeltown/core/ports";
@@ -47,8 +47,8 @@ const { token } = await runtime.runPromise(
   ),
 );
 
-const request = TokenIssuer.use((issuer) => issuer.verify(token)).pipe(Effect.flatMap(whoami));
-const bare = whoami({
+const request = TokenIssuer.use((issuer) => issuer.verify(token)).pipe(Effect.flatMap(admit));
+const bare = admit({
   agentId: agent.id,
   projectId: agent.projectId,
   scopes: agent.scopes,
@@ -72,10 +72,10 @@ async function measure(
   console.log(`${label.padEnd(58)} p50 ${at(0.5)} ms  p95 ${at(0.95)} ms  p99 ${at(0.99)} ms`);
 }
 
-console.log("bearer gate (verify an Ed25519 token, then whoami):");
+console.log("bearer gate (verify an Ed25519 token, then admit):");
 await measure("  runtime per isolate (what Keel does)", () => runtime.runPromise(request));
 await measure("  Layer per request", () => Effect.runPromise(request.pipe(Effect.provide(layer))));
-console.log("the runtime alone (whoami against the in-memory directory, no crypto):");
+console.log("the runtime alone (admit against the in-memory directory, no crypto):");
 await measure("  runtime per isolate", () => runtime.runPromise(bare));
 await measure("  Layer per request", () =>
   Effect.runPromise(bare.pipe(Effect.provide(directory.layer))),

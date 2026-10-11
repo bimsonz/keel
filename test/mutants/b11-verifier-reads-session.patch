@@ -1,0 +1,13 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/sessions.test.ts
+# kills: b11.gate-no-hop
+# why: the request gate runs whoami, so every authenticated request calls the agent's AgentSession DO
+diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
+index 7ea55b8..1ca6e10 100644
+--- a/apps/keel/src/composition/isolate.ts
++++ b/apps/keel/src/composition/isolate.ts
+@@ -1,4 +1,4 @@
+-import { admit } from "@keeltown/core/application/identity";
++import { whoami as admit } from "@keeltown/core/application/identity";
+ import type { AgentId, ChangeId, ProjectId } from "@keeltown/core/kernel";
+ import {
+   type AgentDirectory,

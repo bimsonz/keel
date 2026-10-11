@@ -42,6 +42,7 @@ const CONTRACT_PORTS = [
   "StagingWriter",
   "Trunks",
   "SessionStore",
+  "Sessions",
   "MfpWriter",
   "HumanGate",
   "Deployer",

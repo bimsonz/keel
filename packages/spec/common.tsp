@@ -147,6 +147,7 @@ union ProblemCode {
   sketchNotFound: "sketch.not_found",
   repoRefNotFound: "repo.ref_not_found",
   repoPathNotFound: "repo.path_not_found",
+  sessionSponsorRefused: "session.sponsor_refused",
 }
 
 /** What an agent can do next. Each one can be fed straight into the matching tool. */

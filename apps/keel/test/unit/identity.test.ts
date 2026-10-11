@@ -11,9 +11,11 @@ import {
   hashSecret,
   makeAgentDirectoryMemory,
   makeClockMemory,
+  makeSessionsMemory,
   makeTokenIssuerMemory,
   sampleProjectId,
 } from "@keeltown/testing";
+import { Sessions } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 
 const agentId = Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
@@ -38,6 +40,7 @@ function layers(override: Partial<Agent> = {}) {
   return Layer.mergeAll(
     directory.layer,
     makeTokenIssuerMemory().layer.pipe(Layer.provide(clock)),
+    makeSessionsMemory().layer.pipe(Layer.provide(directory.layer)),
     clock,
   );
 }
@@ -52,6 +55,20 @@ describe("identity/whoami", () => {
         revocationEpoch: 2,
       });
       expect(identity).toEqual({ agent, session: null });
+    }).pipe(Effect.provide(layers())),
+  );
+
+  it.effect("answers the agent's current session once it has opened one", () =>
+    Effect.gen(function* () {
+      const principal = {
+        agentId,
+        projectId: sampleProjectId,
+        scopes: ["agent:work" as const],
+        revocationEpoch: 2,
+      };
+      const opened = yield* (yield* Sessions).open(principal, { idempotencyKey: "session-1" });
+      const identity = yield* whoami(principal);
+      expect(identity).toEqual({ agent, session: { id: opened.id } });
     }).pipe(Effect.provide(layers())),
   );
 

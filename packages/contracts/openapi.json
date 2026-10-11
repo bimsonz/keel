@@ -4621,7 +4621,7 @@
       "post": {
         "operationId": "Sessions_openSession",
         "summary": "Open a session",
-        "description": "Open a session: the record of the agent's working conversation, independent of commits.",
+        "description": "Open a session: the record of the agent's working conversation, independent\nof commits. It becomes the agent's current session, replacing any other.\nA retry with the same Idempotency-Key and body answers the same session.",
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
@@ -4660,6 +4660,16 @@
           },
           "403": {
             "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11591,7 +11601,7 @@
                 "$ref": "#/components/schemas/Sponsor"
               }
             ],
-            "description": "The human the agent acts for in this session."
+            "description": "The human the agent acts for in this session. Optional: the session takes\nthe token's sponsor, else the enrolment's. Naming any other is refused\n(`session.sponsor_refused`); an agent never names its own sponsor."
           }
         },
         "additionalProperties": {
@@ -12224,7 +12234,8 @@
           "workspace.pool_exhausted",
           "sketch.not_found",
           "repo.ref_not_found",
-          "repo.path_not_found"
+          "repo.path_not_found",
+          "session.sponsor_refused"
         ],
         "description": "Machine-readable reason for a problem. Dotted; lanes add codes as they build."
       },
@@ -13353,7 +13364,7 @@
                 "$ref": "#/components/schemas/Sponsor"
               }
             ],
-            "description": "The human the agent acts for in this session, when it named one."
+            "description": "The human the agent acts for in this session: its token's sponsor, else its enrolment's."
           },
           "openedAt": {
             "type": "string",
@@ -13393,6 +13404,14 @@
           },
           "model": {
             "type": "string"
+          },
+          "onBehalfOf": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Sponsor"
+              }
+            ],
+            "description": "The human the agent acts for in this session, when it has a sponsor."
           }
         },
         "additionalProperties": {

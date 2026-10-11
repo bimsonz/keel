@@ -13,6 +13,8 @@ import { describeChangesContract, type ChangesHarness } from "./contracts/change
 import type { CodeHostFixture } from "./code-host-fixture.ts";
 import { describeCodeHostContract } from "./contracts/code-host.ts";
 import { describeEnrolmentsContract, type EnrolmentsHarness } from "./contracts/enrolments.ts";
+import { describeSessionsContract, type SessionsHarness } from "./contracts/sessions.ts";
+import { makeSessionsMemory } from "./memory/sessions.ts";
 import { describeEventFeedContract, type EventFeedHarness } from "./contracts/event-feed.ts";
 import {
   describeProjectViewsContract,
@@ -70,6 +72,7 @@ import type {
   Projects,
   ProjectViews,
   WorkspaceRebaser,
+  Sessions,
 } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 
@@ -237,6 +240,21 @@ function memoryEnrolmentsHarness(): EnrolmentsHarness {
   };
 }
 
+/** In-memory Sessions read the agents that in-memory Enrolments write into one in-memory AgentDirectory. */
+function memorySessionsHarness(): SessionsHarness {
+  const directory = identity.makeAgentDirectoryMemory();
+  return {
+    layer: Layer.mergeAll(makeSessionsMemory().layer, operator.makeEnrolmentsMemory().layer).pipe(
+      Layer.provideMerge(directory.layer),
+    ),
+    suspend: (agentId) =>
+      Effect.sync(() => {
+        const agent = directory.agents.get(agentId);
+        if (agent !== undefined) directory.agents.set(agentId, { ...agent, state: "suspended" });
+      }),
+  };
+}
+
 const GENESIS = Schema.decodeUnknownSync(CommitSha)("0".repeat(40));
 
 export const PORTS = {
@@ -279,6 +297,10 @@ export const PORTS = {
   Enrolments: harnessed<Enrolments | AgentDirectory, EnrolmentsHarness>(
     memoryEnrolmentsHarness,
     describeEnrolmentsContract,
+  ),
+  Sessions: harnessed<Sessions | Enrolments | AgentDirectory, SessionsHarness>(
+    memorySessionsHarness,
+    describeSessionsContract,
   ),
   EntityStore: port(() => storage.makeEntityStoreMemory().layer, describeEntityStoreContract),
   EventOutbox: eventOutbox,

@@ -2,13 +2,13 @@
 # kills: b12.ws-post-commit
 # why: the reaction pushes to the sockets inside its transaction, so a delivery that rolls back has already been sent
 diff --git a/apps/keel/src/adapters/driving/do/agent-session.ts b/apps/keel/src/adapters/driving/do/agent-session.ts
-index 61adda2..877a225 100644
+index 571da2a..5696520 100644
 --- a/apps/keel/src/adapters/driving/do/agent-session.ts
 +++ b/apps/keel/src/adapters/driving/do/agent-session.ts
-@@ -83,6 +83,8 @@ export class AgentSessionDO
+@@ -77,6 +77,8 @@ export class AgentSessionDO
    protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
      const agentId = agentIdOf(this.ctx.id.name);
-     if (notifies(agentId, event)) recordDelivery(tx.store, event);
+     hearEvent(tx.store, agentId, event);
 +    for (const socket of this.ctx.getWebSockets())
 +      socket.send(JSON.stringify({ type: "notices", notices: [{ id: event.eventId }], cursor: "" }));
      return { entity: { kind: "agent", id: agentId }, drafts: [] };

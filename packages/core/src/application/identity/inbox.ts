@@ -43,6 +43,12 @@ const piggybackedOf = (store: Store): string => {
   return typeof at === "string" ? at : START;
 };
 
+/**
+ * How many notices wait unread: those after the `piggybacked` cursor.
+ * Positions are dense from 1 to the head, and reads clamp the cursor to it.
+ */
+export const inboxDepth = (store: Store): number => headOf(store) - Number(piggybackedOf(store));
+
 /** Records a delivered event as the inbox's next entry. Synchronous: it runs inside the reaction's transaction. */
 export function recordDelivery(store: Store, event: EventEnvelope): void {
   const next = headOf(store) + 1;

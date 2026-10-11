@@ -9,6 +9,7 @@ import {
   makeInboxMemory,
   makeIdsMemory,
   makeProjectsMemory,
+  makeSessionsMemory,
   makeTokenIssuerMemory,
 } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime } from "effect";
@@ -23,6 +24,7 @@ const runtime = ManagedRuntime.make(
     directory,
     makeProjectsMemory().layer,
     makeEnrolmentsMemory().layer.pipe(Layer.provide(directory)),
+    makeSessionsMemory().layer.pipe(Layer.provide(directory)),
     makeTokenIssuerMemory().layer.pipe(Layer.provide(clock)),
     clock,
     makeIdsMemory().layer,

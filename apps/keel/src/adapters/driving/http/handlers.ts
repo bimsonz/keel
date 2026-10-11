@@ -12,7 +12,12 @@ import {
   submitChange,
   viewedProject,
 } from "@keeltown/core/application/coordination";
-import { enrolAgent, exchangeToken, whoami } from "@keeltown/core/application/identity";
+import {
+  enrolAgent,
+  exchangeToken,
+  openAgentSession,
+  whoami,
+} from "@keeltown/core/application/identity";
 import {
   listRepoCommits,
   readRepoBlob,
@@ -50,6 +55,7 @@ import {
   repoError,
   treeOk,
 } from "./repo.ts";
+import { sessionError, sessionInput, sessionOk } from "./sessions.ts";
 import { notImplemented } from "./problems.ts";
 import type { Runner } from "./run.ts";
 import {
@@ -159,7 +165,17 @@ export function makeHandlers(run: Runner) {
             Effect.match({ onSuccess: whoamiOk, onFailure: (error) => whoamiError(caller, error) }),
           ),
         ),
-      Sessions_openSession: notYet,
+      Sessions_openSession: (caller: Caller, input: Input<"Sessions_openSession">) =>
+        run(
+          caller,
+          principalOf(caller).pipe(
+            Effect.flatMap((principal) => openAgentSession(principal, sessionInput(input))),
+            Effect.match({
+              onSuccess: sessionOk,
+              onFailure: (error) => sessionError(caller, error),
+            }),
+          ),
+        ),
       declare: (caller: Caller, input: Input<"declare">) => {
         const decoded = declareInput(input);
         if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);

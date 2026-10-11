@@ -1,24 +1,23 @@
 import {
   enrol,
+  hearEvent,
   INBOX_PAGE,
+  openSession,
   readInbox,
-  recordDelivery,
   reserveChange,
   takeNotices,
+  viewSession,
 } from "@keeltown/core/application/identity";
-import { AgentNotKnown, notifies } from "@keeltown/core/domain/identity";
-import { NotImplemented } from "@keeltown/core/not-implemented";
 import { AgentId, type EventEnvelope } from "@keeltown/core/kernel";
-import { EntityStore, type Transaction } from "@keeltown/core/ports";
+import type { Transaction } from "@keeltown/core/ports";
 import { Effect, Schema } from "effect";
 import {
   AgentSessionCodecs,
   type AgentSessionRpc,
   EnrolCommand,
   InboxRead,
-  type OpenSession,
+  OpenSession,
   ReserveChange,
-  SessionSnapshot,
   TakeNotices,
 } from "../../../rpc/index.ts";
 import { type AgentSessionServices, agentSessionServices } from "../../../composition/do.ts";
@@ -40,9 +39,6 @@ function cursorOf(socket: WebSocket): string | undefined {
     : undefined;
 }
 
-/** Where the snapshot of this agent's session state lives in the DO's EntityStore. */
-export const SNAPSHOT = { kind: "agent-session", id: "self" } as const;
-
 /**
  * The AgentSession DO (`agent:<id>`): inbox, cursor, leases, fidelity and the
  * agent's live connections. Every RPC answers with an Exit envelope.
@@ -55,34 +51,32 @@ export class AgentSessionDO
     super(ctx, env, agentSessionServices(env));
   }
 
+  /** The agent's snapshot, computed from its rows. Declaration fidelity stays null until Keel derives effects. */
   async describe() {
-    const name = this.ctx.id.name;
-    const program = Effect.gen(function* () {
-      const agentId = agentIdOf(name);
-      const store = yield* EntityStore;
-      const stored = store.get(SNAPSHOT.kind, SNAPSHOT.id);
-      if (stored === undefined) return yield* new AgentNotKnown({ agentId });
-      // A stored snapshot that no longer decodes is a defect: it crosses as `Die`.
-      return Schema.decodeUnknownSync(SessionSnapshot)(stored);
-    });
+    const agentId = agentIdOf(this.ctx.id.name);
+    const program = viewSession(agentId).pipe(
+      Effect.map((view) => ({ agentId, ...view, fidelity: null })),
+    );
     return this.answer(AgentSessionCodecs.describe, program);
   }
 
-  async openSession(_details: typeof OpenSession.Encoded) {
-    return this.answer(
-      AgentSessionCodecs.openSession,
-      Effect.die(new NotImplemented("identity/openSession")),
+  async openSession(command: typeof OpenSession.Encoded) {
+    const agentId = agentIdOf(this.ctx.id.name);
+    const program = Schema.decodeUnknownEffect(OpenSession)(command).pipe(
+      Effect.orDie,
+      Effect.flatMap((opening) => openSession(agentId, opening)),
     );
+    return this.answer(AgentSessionCodecs.openSession, program);
   }
 
   /**
    * Every event delivered to the agent joins its inbox, except one it caused
-   * itself: its own tool result already reported that. `answer` then wakes any
-   * inbox waiting on it.
+   * itself, and moves the leases it holds (`hearEvent`). `answer` then wakes
+   * any inbox waiting on it.
    */
   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
     const agentId = agentIdOf(this.ctx.id.name);
-    if (notifies(agentId, event)) recordDelivery(tx.store, event);
+    hearEvent(tx.store, agentId, event);
     return { entity: { kind: "agent", id: agentId }, drafts: [] };
   }
 

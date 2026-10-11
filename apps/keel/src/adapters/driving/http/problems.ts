@@ -30,6 +30,7 @@ const TITLES: Record<ProblemCode, string> = {
   "sketch.not_found": "No such sketch",
   "repo.ref_not_found": "The project's trunk has no such branch or commit",
   "repo.path_not_found": "Nothing of that kind at this path",
+  "session.sponsor_refused": "The session names a sponsor the agent does not act for",
 };
 
 export interface ProblemExtras {

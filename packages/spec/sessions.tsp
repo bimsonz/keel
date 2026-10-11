@@ -12,7 +12,11 @@ model OpenSessionRequest {
   /** The model, pinned to a revision where the provider allows. */
   `model`?: string;
 
-  /** The human the agent acts for in this session. */
+  /**
+   * The human the agent acts for in this session. Optional: the session takes
+   * the token's sponsor, else the enrolment's. Naming any other is refused
+   * (`session.sponsor_refused`); an agent never names its own sponsor.
+   */
   onBehalfOf?: Sponsor;
 }
 
@@ -20,7 +24,7 @@ model Session {
   id: SessionId;
   agentId: AgentId;
 
-  /** The human the agent acts for in this session, when it named one. */
+  /** The human the agent acts for in this session: its token's sponsor, else its enrolment's. */
   onBehalfOf?: Sponsor;
 
   openedAt: utcDateTime;
@@ -29,7 +33,11 @@ model Session {
 @tag("Sessions")
 @route("/sessions")
 interface Sessions {
-  /** Open a session: the record of the agent's working conversation, independent of commits. */
+  /**
+   * Open a session: the record of the agent's working conversation, independent
+   * of commits. It becomes the agent's current session, replacing any other.
+   * A retry with the same Idempotency-Key and body answers the same session.
+   */
   @summary("Open a session")
   @useAuth(AgentWork)
   @post
@@ -39,5 +47,5 @@ interface Sessions {
   ): {
     @statusCode statusCode: 201;
     @body body: Session;
-  } | StandardErrors;
+  } | Conflict | StandardErrors;
 }

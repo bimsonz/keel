@@ -14,7 +14,7 @@ import type {
   WhoamiResult,
 } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
-import { problem } from "./problems.ts";
+import { problem, type ProblemBody } from "./problems.ts";
 
 /**
  * Pure mappers between the use-cases' domain results and the generated wire
@@ -81,6 +81,14 @@ export function whoamiOk(identity: Identity): WhoamiResult {
 }
 
 export function whoamiError(caller: Caller, error: AgentNotKnown | AgentNotAdmitted): WhoamiResult {
+  return admissionRefused(caller, error);
+}
+
+/** A token whose agent is unknown or may not act: 401, with the way back. */
+export function admissionRefused(
+  caller: Caller,
+  error: AgentNotKnown | AgentNotAdmitted,
+): { readonly status: 401; readonly body: ProblemBody } {
   switch (error._tag) {
     case "AgentNotKnown":
       return {

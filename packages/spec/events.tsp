@@ -1174,6 +1174,9 @@ model SessionOpened {
   agentId: AgentId;
   harness?: string;
   `model`?: string;
+
+  /** The human the agent acts for in this session, when it has a sponsor. */
+  onBehalfOf?: Sponsor;
 }
 
 model MessagesCaptured {

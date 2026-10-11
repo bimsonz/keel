@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/session.test.ts
+# kills: b11.session-idem
+# why: a used key answers its session whatever body comes with it, so a different request is silently taken for a retry
+diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
+index b22f33b..3550306 100644
+--- a/packages/core/src/application/identity/session.ts
++++ b/packages/core/src/application/identity/session.ts
+@@ -104,7 +104,7 @@ export const openSession: (
+       const prior = tx.store.get(SESSION.opened, command.idempotencyKey);
+       if (prior !== undefined) {
+         const opened = decodeOpened(prior);
+-        return opened.fingerprint === command.fingerprint
++        return opened.fingerprint === opened.fingerprint
+           ? Result.succeed({ drafts: [], value: opened.session })
+           : Result.fail(new IdempotencyConflict({ idempotencyKey: command.idempotencyKey }));
+       }

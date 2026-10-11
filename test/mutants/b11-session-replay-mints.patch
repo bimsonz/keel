@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/session.test.ts
+# kills: b11.session-open
+# why: a retried open with the same key and body mints a second session instead of answering the first
+diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
+index b22f33b..4bef631 100644
+--- a/packages/core/src/application/identity/session.ts
++++ b/packages/core/src/application/identity/session.ts
+@@ -102,7 +102,7 @@ export const openSession: (
+     },
+     (tx) => {
+       const prior = tx.store.get(SESSION.opened, command.idempotencyKey);
+-      if (prior !== undefined) {
++      if (prior !== undefined && decodeOpened(prior).fingerprint !== command.fingerprint) {
+         const opened = decodeOpened(prior);
+         return opened.fingerprint === command.fingerprint
+           ? Result.succeed({ drafts: [], value: opened.session })

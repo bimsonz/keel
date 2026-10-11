@@ -162,7 +162,7 @@ A **Batch** is a set of Changes verified together; its **Candidate** is the comp
 | `TenetReaffirmed` | Subject DO | `tenetId, conflictId` | — | relying changes' agents | The contest was dismissed or resolved in the tenet's favour |
 | `TenetRetracted` | Subject DO | `tenetId, changeId, conflictId, decisionId?` | — | relying changes' agents | A change landed against the tenet: on a ruling (`decisionId`), or on its proven conflict where the predicate's policy let it land |
 | `TenetSuperseded` | Subject DO | `tenetId, by: tenetId` | — | relying changes' agents | — |
-| `SessionOpened` | AgentSession DO | `sessionId, agentId, harness?, model?` | — | Projector | Session messages are captured against this ID |
+| `SessionOpened` | AgentSession DO | `sessionId, agentId, harness?, model?, onBehalfOf?` | — | Projector | Session messages are captured against this ID |
 | `MessagesCaptured` | AgentSession DO | `sessionId, fromSeq, toSeq, bundleRef` | — | Projector | Messages are immutable and addressed by number |
 | `SessionRedacted` | AgentSession DO | `sessionId, ranges[], reason` | — | Projector | Citations into redacted ranges resolve to a redaction marker |
 

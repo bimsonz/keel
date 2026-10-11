@@ -1,10 +1,11 @@
-import { whoami } from "@keeltown/core/application/identity";
+import { admit } from "@keeltown/core/application/identity";
 import type { AgentId, ChangeId, ProjectId } from "@keeltown/core/kernel";
 import {
   type AgentDirectory,
   type Changes,
   type CodeHost,
   type Enrolments,
+  type Sessions,
   type EventFeed,
   Inbox,
   type Notifier,
@@ -18,6 +19,7 @@ import { AgentDirectoryWithBootstrap } from "../adapters/driven/bootstrap/direct
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { EnrolmentsRpc } from "../adapters/driven/do-rpc/enrolments.ts";
+import { SessionsRpc } from "../adapters/driven/do-rpc/sessions.ts";
 import { EventFeedRpc } from "../adapters/driven/do-rpc/event-feed.ts";
 import { ProjectViewsRpc } from "../adapters/driven/do-rpc/project-views.ts";
 import { InboxRpc } from "../adapters/driven/do-rpc/inbox.ts";
@@ -59,6 +61,7 @@ export function isolateLayer(
     overrides.notifier ?? NotifierRpc(agentSession),
     overrides.projects ?? ProjectsRpc(project),
     (overrides.enrolments ?? EnrolmentsRpc(agentSession)).pipe(Layer.provide(directory)),
+    overrides.sessions ?? SessionsRpc(agentSession),
     directory,
     // The repo read API reads trunks, which live in the core namespace alone.
     overrides.codeHost ?? CodeHostArtifacts({ "keel-core": env.ARTIFACTS }),
@@ -80,17 +83,22 @@ export interface IsolateOverrides {
   /** May need the AgentDirectory, as the in-memory enrolments project into it. */
   readonly enrolments?: Layer.Layer<Enrolments, never, AgentDirectory>;
   readonly codeHost?: Layer.Layer<CodeHost>;
+  readonly sessions?: Layer.Layer<Sessions>;
 }
 
 export type IsolateRuntime = ManagedRuntime.ManagedRuntime<IsolateServices, never>;
 
-/** A bearer token is good if it verifies and its agent may still act at the token's epoch. */
+/**
+ * A bearer token is good if it verifies and its agent may still act at the
+ * token's epoch. `admit` reads only the AgentDirectory: the gate never calls
+ * an AgentSession DO.
+ */
 function makeVerifier(runtime: IsolateRuntime): TokenVerifier {
   return (token) =>
     runtime.runPromise(
       TokenIssuer.use((issuer) => issuer.verify(token)).pipe(
         Effect.flatMap((principal) =>
-          whoami(principal).pipe(
+          admit(principal).pipe(
             Effect.as<Verification>({ principal }),
             Effect.catchTag("AgentNotAdmitted", () =>
               Effect.succeed<Verification>({ refused: "revoked" }),

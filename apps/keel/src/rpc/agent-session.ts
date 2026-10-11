@@ -7,9 +7,11 @@ import {
   IdempotencyConflict,
   InboxPage,
   Scope,
+  SessionSponsorRefused,
   Sponsor,
 } from "@keeltown/core/domain/identity";
-import { AgentId, ChangeId, InstantSchema, ProjectId, SessionId } from "@keeltown/core/kernel";
+import { Session } from "@keeltown/core/domain/memory";
+import { AgentId, ChangeId, ProjectId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
@@ -17,19 +19,32 @@ import { exitCodec, type ExitJson } from "./exit.ts";
 /** What the AgentSession DO (`agent:<id>`) knows about its agent right now. */
 export const SessionSnapshot = Schema.Struct({
   agentId: AgentId,
-  session: Schema.NullOr(Schema.Struct({ id: SessionId, openedAt: InstantSchema })),
+  /** The agent's current session: the last it opened. */
+  session: Schema.NullOr(Session),
+  /** Notices no inbox read or tool result has carried yet. */
   inboxDepth: Schema.Int,
+  /** Changes whose lease the agent holds. */
   openLeases: Schema.Int,
-  /** The share of the agent's derived effects it had declared. Routes review; never judges. */
+  /** The share of the agent's derived effects it had declared. Routes review; never judges. Null until Keel derives effects. */
   fidelity: Schema.NullOr(Schema.Number),
 });
 export type SessionSnapshot = typeof SessionSnapshot.Type;
 
+/**
+ * Open a session for the agent this DO is named for. The session acts for
+ * `tokenObo`, the caller's token's sponsor, else the enrolment's; a request
+ * `onBehalfOf` naming another is refused. `fingerprint` hashes the request
+ * body: the same key with another body is an IdempotencyConflict.
+ */
 export const OpenSession = Schema.Struct({
   harness: Schema.optional(Schema.String),
   model: Schema.optional(Schema.String),
-  /** The human the agent acts for in this session. */
+  /** The sponsor the request names. */
   onBehalfOf: Schema.optional(Sponsor),
+  /** The `obo` claim of the caller's token. */
+  tokenObo: Schema.optional(Sponsor),
+  idempotencyKey: Schema.String,
+  fingerprint: Schema.String,
 });
 
 /** Reserve a change id for a declare's Idempotency-Key. `fingerprint` hashes the request body. */
@@ -72,8 +87,8 @@ export const EnrolCommand = Schema.Struct({
 export const AgentSessionCodecs = {
   describe: exitCodec(SessionSnapshot, AgentNotKnown),
   openSession: exitCodec(
-    Schema.Struct({ id: SessionId, openedAt: InstantSchema }),
-    Schema.Union([AgentNotKnown, AgentNotAdmitted]),
+    Session,
+    Schema.Union([AgentNotKnown, AgentNotAdmitted, IdempotencyConflict, SessionSponsorRefused]),
   ),
   reserveChange: exitCodec(ChangeId, IdempotencyConflict),
   inbox: exitCodec(InboxPage, AgentNotKnown),
@@ -83,8 +98,14 @@ export const AgentSessionCodecs = {
 
 /** The AgentSession DO: inbox, cursor, leases, fidelity and the agent's live connections. */
 export interface AgentSessionRpc extends EventReceiverRpc {
+  /** The agent's session, inbox depth and held leases, computed from its rows. AgentNotKnown before it is enrolled. */
   describe(): Promise<ExitJson>;
-  openSession(details: typeof OpenSession.Encoded): Promise<ExitJson>;
+  /**
+   * Opens a session and makes it the agent's current one. Commits
+   * SessionOpened on the session's entity; a replayed key and body answers
+   * the same session without committing.
+   */
+  openSession(command: typeof OpenSession.Encoded): Promise<ExitJson>;
   /**
    * The change id for this Idempotency-Key: minted on first use and kept for
    * 24 h, so a retried declare reaches the same change. The same key with a

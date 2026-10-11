@@ -17,7 +17,7 @@ import { hashSecret } from "./identity.ts";
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 /** A ULID body for a counter: zero-padded Crockford base32, so ids stay valid and distinct. */
-function ulidOf(n: number): string {
+export function ulidOf(n: number): string {
   let body = "";
   for (let rest = n; rest > 0; rest = Math.floor(rest / 32)) body = CROCKFORD[rest % 32] + body;
   return body.padStart(26, "0");
