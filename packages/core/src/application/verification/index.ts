@@ -69,6 +69,7 @@ export * from "./flow-spec.ts";
 export * from "./packs.ts";
 export * from "./plan-codec.ts";
 export * from "./precheck.ts";
+export * from "./probe-run.ts";
 export * from "./redact.ts";
 export * from "./run-plan.ts";
 export * from "./runner-output.ts";

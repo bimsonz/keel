@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/probe-run.test.ts
+# kills: probe-run.one-json-line
+# why: Only the last line is checked for JSON, so a probe that prints a second outcome line earlier is read as if it had printed one
+diff --git a/packages/core/src/application/verification/probe-run.ts b/packages/core/src/application/verification/probe-run.ts
+index eff094e..7e3bc2e 100644
+--- a/packages/core/src/application/verification/probe-run.ts
++++ b/packages/core/src/application/verification/probe-run.ts
+@@ -61,7 +61,7 @@ export const readProbeRun = (stdout: string | undefined, exit: number | undefine
+   if (stdout === undefined) return harness("missing JSON line: the runner returned no output");
+   const lines = stdout.replace(/\n$/, "").split("\n");
+   const observations = lines.slice(0, -1);
+-  const json = lines.flatMap((line, i) => (isJsonObject(line) ? [i] : []));
++  const json = isJsonObject(lines.at(-1) ?? "") ? [lines.length - 1] : [];
+   if (json.length === 0)
+     return harness(
+       `missing JSON line: no {"outcome","reason"} line in the output: ${stdout.slice(0, 300)}`,

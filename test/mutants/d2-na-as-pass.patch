@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/probe-run.test.ts
+# kills: probe-run.reads, probe-run.na-never-passes
+# why: A probe whose precondition is absent (n/a) is read as a pass, so a world where it never applied counts as passing
+diff --git a/packages/core/src/application/verification/probe-run.ts b/packages/core/src/application/verification/probe-run.ts
+index eff094e..e6438ed 100644
+--- a/packages/core/src/application/verification/probe-run.ts
++++ b/packages/core/src/application/verification/probe-run.ts
+@@ -96,5 +96,5 @@ export const readProbeRun = (stdout: string | undefined, exit: number | undefine
+       `invalid JSON line: exit ${String(exit)} does not match outcome ${outcome}`,
+       observations,
+     );
+-  return { _tag: "ran", outcome, reason, observations };
++  return { _tag: "ran", outcome: outcome === "n/a" ? "pass" : outcome, reason, observations };
+ };
