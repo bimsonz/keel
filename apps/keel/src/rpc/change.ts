@@ -21,6 +21,7 @@ import {
   AgentId,
   ChangeId,
   CommitSha,
+  ConflictId,
   ContentHash,
   LeaseId,
   NextAction,
@@ -134,7 +135,8 @@ export const SubmissionStatus = Schema.Struct({
   commitSha: Schema.NullOr(CommitSha),
   remedy: Schema.optionalKey(
     Schema.Struct({
-      verdictId: VerdictId,
+      verdictId: Schema.optionalKey(VerdictId),
+      conflictId: Schema.optionalKey(ConflictId),
       reasons: Schema.Array(Schema.String),
       nextActions: Schema.Array(NextAction),
     }),

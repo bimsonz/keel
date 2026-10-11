@@ -52,6 +52,7 @@ import {
   ChangeSubmitted,
   ChangeSuperseded,
   ChangeWithdrawn,
+  ConflictNoted,
   DriftDetected,
   EffectsDerived,
   IntentDeclared,
@@ -65,7 +66,7 @@ import {
 import { reviseIntent } from "./intent.ts";
 import { checkLease, isLapsed, lapsesAt } from "./lease.ts";
 import type { Preflight } from "./preflight.ts";
-import type { FootprintEntry, Proposition } from "./proposition.ts";
+import type { FootprintEntry, Predicate, PredicatePolicies, Proposition } from "./proposition.ts";
 
 /** The events a Change DO commits for a change and its lease, in the order `evolve` folds them. */
 export const ChangeEvent = Schema.Union([
@@ -85,6 +86,7 @@ export const ChangeEvent = Schema.Union([
   ChangeRequeued,
   ChangeLanded,
   ChangeBounced,
+  ConflictNoted,
   ChangeParked,
   ChangeResumed,
   ChangeAdopted,
@@ -169,6 +171,8 @@ export type ChangeCommand =
       readonly planHash: ContentHash;
       readonly steps: number;
       readonly costEstimate: number;
+      /** The predicate policy compiled for the change, carried onto PlanCompiled. */
+      readonly predicatePolicy?: PredicatePolicies;
     }
   | { readonly _tag: "Queue"; readonly laneId: string; readonly blockers: Blockers }
   | { readonly _tag: "Park"; readonly escalationId: EscalationId }
@@ -178,13 +182,20 @@ export type ChangeCommand =
       readonly batchId: BatchId;
       readonly reason: RequeueReason;
     }
-  | {
+  | ({
       readonly _tag: "Bounce";
-      readonly verdictId: VerdictId;
       readonly reasons: readonly string[];
       readonly nextActions: readonly NextAction[];
       /** The failed batch, when the bounce comes from Integrating. */
       readonly batchId?: BatchId;
+    } & BounceCause)
+  | {
+      /** A conflict proven against the change under `advise` or `annotate`: recorded, nothing moves. */
+      readonly _tag: "NoteConflict";
+      readonly conflictId: ConflictId;
+      readonly predicate: Predicate;
+      readonly policy: "advise" | "annotate";
+      readonly evidenceRef?: string;
     }
   | {
       /** TrunkAdvanced's landing for this change, with the head trunk advanced to. */
@@ -205,6 +216,15 @@ export type ChangeCommand =
   | { readonly _tag: "Lapse"; readonly leaseId: LeaseId }
   | { readonly _tag: "Withdraw"; readonly authority: WithdrawAuthority; readonly reason?: string }
   | { readonly _tag: "Supersede"; readonly by: ChangeId; readonly decisionId?: DecisionId };
+
+/**
+ * Why a change bounces: the verdict that failed it, or a conflict proven
+ * against it under `block`. A conflict bounces a change only before it is
+ * batched (Deriving, Verifying, Queued).
+ */
+export type BounceCause =
+  | { readonly verdictId: VerdictId; readonly conflictId?: undefined }
+  | { readonly conflictId: ConflictId; readonly verdictId?: undefined };
 
 /** Facts from I/O that every decision may read: the time, and the change this DO holds (its key). */
 export interface ChangeFacts {
@@ -269,6 +289,32 @@ const defaultBounceActions = (changeId: ChangeId): readonly NextAction[] => [
     title: "Fix the change, then submit it again",
     operationId: "submit",
     args: { changeId },
+  },
+];
+
+/** The plan the change was compiled to, for an enqueue event to carry, when it has one. */
+const planOf = (change: Change): { readonly planHash?: ContentHash } =>
+  change.planHash === undefined ? {} : { planHash: change.planHash };
+
+/** The ways forward from a conflict proven against a change: read it, revise around it, or resolve it. */
+const conflictActions = (changeId: ChangeId, conflictId: ConflictId): readonly NextAction[] => [
+  {
+    kind: "read",
+    title: "Read the conflict and the proof against the change",
+    operationId: "Conflicts_getConflict",
+    args: { conflictId },
+  },
+  {
+    kind: "call",
+    title: "Revise the change's intent around the conflict",
+    operationId: "revise",
+    args: { changeId },
+  },
+  {
+    kind: "call",
+    title: "Resolve the conflict with a move",
+    operationId: "resolve",
+    args: { conflictId },
   },
 ];
 
@@ -498,6 +544,9 @@ export const decideChange = (
               planHash: command.planHash,
               steps: command.steps,
               costEstimate: command.costEstimate,
+              ...(command.predicatePolicy === undefined
+                ? {}
+                : { predicatePolicy: command.predicatePolicy }),
             }),
           ])
         : refuse(change, command);
@@ -506,7 +555,9 @@ export const decideChange = (
       if (!at("verifying")) return refuse(change, command);
       return (
         blocked(change, command.blockers) ??
-        Result.succeed([ChangeQueued.make({ changeId: id, laneId: command.laneId })])
+        Result.succeed([
+          ChangeQueued.make({ changeId: id, laneId: command.laneId, ...planOf(change) }),
+        ])
       );
 
     case "Park":
@@ -530,28 +581,51 @@ export const decideChange = (
     case "Requeue":
       return at("integrating") && command.batchId === change.batchId
         ? Result.succeed([
-            ChangeRequeued.make({ changeId: id, batchId: command.batchId, reason: command.reason }),
+            ChangeRequeued.make({
+              changeId: id,
+              batchId: command.batchId,
+              reason: command.reason,
+              ...planOf(change),
+            }),
           ])
         : refuse(change, command);
 
     case "Bounce": {
       const awaitingRuling = at("parked") && change.parkReason === "awaiting-ruling";
       const fromBatch = at("integrating") && command.batchId === change.batchId;
-      if (!(at("deriving", "verifying", "queued") || fromBatch || awaitingRuling))
+      const beforeBatch = at("deriving", "verifying", "queued");
+      const cause =
+        command.conflictId === undefined
+          ? { verdictId: command.verdictId }
+          : { conflictId: command.conflictId };
+      if (!(beforeBatch || ("verdictId" in cause && (fromBatch || awaitingRuling))))
         return refuse(change, command);
       const nextActions =
-        command.nextActions.length > 0 ? command.nextActions : defaultBounceActions(id);
+        command.nextActions.length > 0
+          ? command.nextActions
+          : "conflictId" in cause
+            ? conflictActions(id, cause.conflictId)
+            : defaultBounceActions(id);
       return intoAgentOwned(
         change,
         now,
-        ChangeBounced.make({
-          changeId: id,
-          verdictId: command.verdictId,
-          reasons: command.reasons,
-          nextActions,
-        }),
+        ChangeBounced.make({ changeId: id, ...cause, reasons: command.reasons, nextActions }),
       );
     }
+
+    case "NoteConflict":
+      return Result.succeed([
+        ConflictNoted.make({
+          changeId: id,
+          conflictId: command.conflictId,
+          predicate: command.predicate,
+          policy: command.policy,
+          ...(command.evidenceRef === undefined ? {} : { evidenceRef: command.evidenceRef }),
+          ...(command.policy === "advise"
+            ? { nextActions: conflictActions(id, command.conflictId) }
+            : {}),
+        }),
+      ]);
 
     case "Land":
       return at("integrating")
@@ -739,7 +813,9 @@ export const evolveChange = (
     case "ChangeDrifted":
       return from("deriving") ? moveTo(change, "drifted") : illegal(change, event);
     case "PlanCompiled":
-      return from("deriving") ? moveTo(change, "verifying") : illegal(change, event);
+      return from("deriving")
+        ? { ...moveTo(change, "verifying"), planHash: event.planHash }
+        : illegal(change, event);
     case "ChangeQueued":
       return from("verifying")
         ? { ...moveTo(change, "queued"), laneId: event.laneId }
@@ -755,10 +831,13 @@ export const evolveChange = (
     case "ChangeLanded":
       return from("integrating") ? released(change, "landed") : illegal(change, event);
     case "ChangeBounced":
-      return from("deriving", "verifying", "queued", "integrating") ||
-        (from("parked") && change.parkReason === "awaiting-ruling")
+      return from("deriving", "verifying", "queued") ||
+        (event.conflictId === undefined &&
+          (from("integrating") || (from("parked") && change.parkReason === "awaiting-ruling")))
         ? moveTo(change, "bounced", ["parkReason", "escalationId", "batchId", "laneId"])
         : illegal(change, event);
+    case "ConflictNoted":
+      return change;
     case "ChangeParked":
       if (event.reason === "awaiting-ruling") {
         return from("verifying")

@@ -79,6 +79,7 @@ const RULES: Record<EventType, Rule[]> = {
   ChangeRequeued: [change(["integrating"], "queued")],
   ChangeLanded: [change(["integrating"], "landed")],
   ChangeBounced: [change(["deriving", "verifying", "integrating", "parked"], "bounced")],
+  ConflictNoted: [change([...WITHDRAWABLE, "integrating"])],
   ChangeParked: [change(["verifying", ...AGENT_OWNED], "parked")],
   ChangeResumed: [change(["parked"], "verifying")],
   ChangeAdopted: [change(["parked"], "working")],

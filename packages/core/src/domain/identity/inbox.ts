@@ -54,10 +54,15 @@ export const noticeOf = (entry: InboxEntry, position: string): AgentNotice => ({
   cursor: position,
 });
 
+const isAnnotation = Schema.is(
+  Schema.Struct({ _tag: Schema.Literal("ConflictNoted"), policy: Schema.Literal("annotate") }),
+);
+
 /**
  * No self-loops: an agent is never notified of an event it caused, because its
  * own tool result already reported it. So it is never woken by its own push,
- * and a fix → notice → fix loop cannot form.
+ * and a fix → notice → fix loop cannot form. A conflict noted under `annotate`
+ * is recorded for the record only, so it notifies no one.
  */
 export const notifies = (agentId: AgentId, event: EventEnvelope): boolean =>
-  event.actor !== agentActor(agentId);
+  event.actor !== agentActor(agentId) && !isAnnotation(event.payload);

@@ -6,6 +6,7 @@ import {
   CandidateId,
   ChangeId,
   CommitSha,
+  ConflictId,
   ContentHash,
   DecisionId,
   EscalationId,
@@ -20,7 +21,13 @@ import {
 import { ChangeOrigin, ParkReason } from "./change.ts";
 import { DerivedEffect, Drift } from "./derivation.ts";
 import { Contradiction, MoveBasis, Neighbour, PrecedentRef } from "./preflight.ts";
-import { FootprintEntry, PredicatePolicies, Proposition, SubjectKey } from "./proposition.ts";
+import {
+  FootprintEntry,
+  Predicate,
+  PredicatePolicies,
+  Proposition,
+  SubjectKey,
+} from "./proposition.ts";
 import { Move } from "./change.ts";
 
 // Changes
@@ -115,6 +122,8 @@ export const PlanCompiled = Schema.TaggedStruct("PlanCompiled", {
 export const ChangeQueued = Schema.TaggedStruct("ChangeQueued", {
   changeId: ChangeId,
   laneId: Schema.String,
+  /** The plan the change was verified under: its PlanCompiled's hash. Optional only so older events still decode. */
+  planHash: Schema.optional(ContentHash),
 });
 export const ChangeBatched = Schema.TaggedStruct("ChangeBatched", {
   changeId: ChangeId,
@@ -138,6 +147,8 @@ export const ChangeRequeued = Schema.TaggedStruct("ChangeRequeued", {
   changeId: ChangeId,
   batchId: BatchId,
   reason: RequeueReason,
+  /** The plan the change was verified under, so the Lane re-adds it from this event alone. Optional only so older events still decode. */
+  planHash: Schema.optional(ContentHash),
 });
 export const ChangeLanded = Schema.TaggedStruct("ChangeLanded", {
   changeId: ChangeId,
@@ -146,11 +157,37 @@ export const ChangeLanded = Schema.TaggedStruct("ChangeLanded", {
   candidateId: CandidateId,
   proofId: Schema.String,
 });
+/**
+ * The change went back to its agent, for one cause: the verdict that failed
+ * it, or the conflict proven against it under a `block` policy (proof, ADR 0005).
+ */
 export const ChangeBounced = Schema.TaggedStruct("ChangeBounced", {
   changeId: ChangeId,
-  verdictId: VerdictId,
+  verdictId: Schema.optional(VerdictId),
+  conflictId: Schema.optional(ConflictId),
   reasons: Schema.Array(Schema.String),
   /** Always set, never empty, by `decideChange`; optional only so events committed before it was added still decode. */
+  nextActions: Schema.optional(Schema.Array(NextAction)),
+}).check(
+  Schema.makeFilter(
+    (e) =>
+      (e.verdictId === undefined) !== (e.conflictId === undefined) ||
+      "a bounce names exactly one cause: its verdict or its conflict",
+  ),
+);
+/**
+ * A conflict proven against the change under an `advise` or `annotate`
+ * policy: recorded on the change, which stays where it is. Advise names the
+ * ways forward; annotate notifies no one.
+ */
+export const ConflictNoted = Schema.TaggedStruct("ConflictNoted", {
+  changeId: ChangeId,
+  conflictId: ConflictId,
+  predicate: Predicate,
+  policy: Schema.Literals(["advise", "annotate"]),
+  /** The proof's evidence, as the Change DO refers to it (`probe:<probeId>`). */
+  evidenceRef: Schema.optional(Schema.NonEmptyString),
+  /** Set for `advise` only: view the conflict, revise, resolve. */
   nextActions: Schema.optional(Schema.Array(NextAction)),
 });
 export const ChangeParked = Schema.TaggedStruct("ChangeParked", {
@@ -269,6 +306,7 @@ export const CoordinationEvent = Schema.Union([
   ChangeRequeued,
   ChangeLanded,
   ChangeBounced,
+  ConflictNoted,
   ChangeParked,
   ChangeResumed,
   ChangeAdopted,

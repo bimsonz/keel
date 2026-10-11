@@ -60,6 +60,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
   ChangeRequeued: "public",
   ChangeLanded: "public",
   ChangeBounced: "public",
+  ConflictNoted: "public",
   ChangeParked: "public",
   ChangeResumed: "public",
   ChangeAdopted: "public",

@@ -7175,7 +7175,6 @@
         "required": [
           "_tag",
           "changeId",
-          "verdictId",
           "reasons"
         ],
         "properties": {
@@ -7189,7 +7188,20 @@
             "$ref": "#/components/schemas/ChangeId"
           },
           "verdictId": {
-            "$ref": "#/components/schemas/VerdictId"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VerdictId"
+              }
+            ],
+            "description": "The verdict that failed the change. Exactly one of `verdictId` and `conflictId` is set."
+          },
+          "conflictId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ConflictId"
+              }
+            ],
+            "description": "The conflict proven against the change under a `block` policy. Exactly one of `verdictId` and `conflictId` is set."
           },
           "reasons": {
             "type": "array",
@@ -7207,7 +7219,8 @@
         },
         "additionalProperties": {
           "not": {}
-        }
+        },
+        "description": "The change went back to its agent for exactly one cause: the verdict that failed it, or the conflict proven against it under `block`."
       },
       "ChangeDrifted": {
         "type": "object",
@@ -7337,6 +7350,14 @@
           },
           "laneId": {
             "type": "string"
+          },
+          "planHash": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContentHash"
+              }
+            ],
+            "description": "The plan the change was verified under: its PlanCompiled's hash. Optional only so older events still decode."
           }
         },
         "additionalProperties": {
@@ -7404,6 +7425,14 @@
               "textual",
               "interaction"
             ]
+          },
+          "planHash": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContentHash"
+              }
+            ],
+            "description": "The plan the change was verified under, so the Lane re-adds it from this event alone. Optional only so older events still decode."
           }
         },
         "additionalProperties": {
@@ -7742,6 +7771,56 @@
           "precedent",
           "interaction"
         ]
+      },
+      "ConflictNoted": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "changeId",
+          "conflictId",
+          "predicate",
+          "policy"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "ConflictNoted"
+            ]
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "conflictId": {
+            "$ref": "#/components/schemas/ConflictId"
+          },
+          "predicate": {
+            "$ref": "#/components/schemas/MFP.Predicate"
+          },
+          "policy": {
+            "type": "string",
+            "enum": [
+              "advise",
+              "annotate"
+            ]
+          },
+          "evidenceRef": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The proof's evidence, as the Change DO refers to it (`probe:<probeId>`)."
+          },
+          "nextActions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventNextAction"
+            },
+            "description": "Set for `advise` only: read the conflict, revise, resolve."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A conflict proven against the change under `advise` or `annotate`: recorded on the change, which stays where it is. Annotate notifies no one."
       },
       "ConflictPage": {
         "type": "object",
@@ -10091,6 +10170,9 @@
           },
           {
             "$ref": "#/components/schemas/ChangeBounced"
+          },
+          {
+            "$ref": "#/components/schemas/ConflictNoted"
           },
           {
             "$ref": "#/components/schemas/ChangeParked"

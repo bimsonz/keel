@@ -4,6 +4,7 @@ import {
   BatchId,
   ChangeId,
   CommitSha,
+  ContentHash,
   EscalationId,
   InstantSchema,
   LeaseId,
@@ -95,6 +96,8 @@ export const Change = Schema.Struct({
   batchId: Schema.optional(BatchId),
   /** The escalation it waits on, while Parked awaiting a ruling. */
   escalationId: Schema.optional(EscalationId),
+  /** The plan it was last compiled to (PlanCompiled), carried onto ChangeQueued and ChangeRequeued. */
+  planHash: Schema.optional(ContentHash),
 });
 export type Change = typeof Change.Type;
 

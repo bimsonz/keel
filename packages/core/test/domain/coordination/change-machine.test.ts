@@ -39,6 +39,7 @@ const AGENT = makeId("agt", ulid(1));
 const NEVER_ISSUED = makeId("lse", "Z".repeat(26));
 const SHA = CommitSha.make("c".repeat(40));
 const BASE = CommitSha.make("b".repeat(40));
+const PLAN_HASH = ContentHash.make(`sha256:${"0".repeat(64)}`);
 /** The member's commit on trunk, as TrunkAdvanced's landing carries it: never the submitted one. */
 const ON_TRUNK = CommitSha.make("e".repeat(40));
 /** The commits a workspace is rebased onto, and a base the change never had. */
@@ -80,6 +81,7 @@ const ALL: readonly Kind[] = [
   "Lapse",
   "Withdraw",
   "Supersede",
+  "NoteConflict",
   "Renew",
 ];
 
@@ -305,9 +307,10 @@ const build = (
         drift: step.flag
           ? []
           : [{ class: "footprint", severity: "low", detail: "outside the footprint" }],
-        planHash: ContentHash.make(`sha256:${"0".repeat(64)}`),
+        planHash: PLAN_HASH,
         steps: 3,
         costEstimate: 1.5,
+        ...(step.operator ? { predicatePolicy: { freshness: "block" } } : {}),
       };
     case "Queue":
       return { _tag: "Queue", laneId: "lane:default", blockers: blockersFor(step, mint) };
@@ -324,7 +327,8 @@ const build = (
     case "Bounce":
       return {
         _tag: "Bounce",
-        verdictId: mint.next("vrd"),
+        // A conflict proven under block half the time, else the verdict that failed it.
+        ...(step.operator ? { conflictId: mint.next("cfl") } : { verdictId: mint.next("vrd") }),
         reasons: ["a guard failed"],
         nextActions: step.flag
           ? [{ kind: "call", title: "Revise and resubmit", operationId: "revise" }]
@@ -361,6 +365,14 @@ const build = (
       };
     case "Supersede":
       return { _tag: "Supersede", by: mint.next("chg") };
+    case "NoteConflict":
+      return {
+        _tag: "NoteConflict",
+        conflictId: mint.next("cfl"),
+        predicate: "freshness",
+        policy: step.operator ? "advise" : "annotate",
+        ...(step.flag ? { evidenceRef: `probe:${makeId("prb", ulid(step.pick % 1000))}` } : {}),
+      };
     default: {
       const unreachable: never = kind;
       return unreachable;
@@ -524,13 +536,17 @@ const oracle = (
     case "Requeue":
       return key === "integrating" && batchMatches(command.batchId) ? "queued" : "refused";
     case "Bounce":
+      // A conflict bounces a change only before it is batched; a verdict also from a batch or a ruling.
       return key === "deriving" ||
         key === "verifying" ||
         key === "queued" ||
-        key === "parked:awaiting-ruling" ||
-        (key === "integrating" && batchMatches(command.batchId))
+        (command.conflictId === undefined &&
+          (key === "parked:awaiting-ruling" ||
+            (key === "integrating" && batchMatches(command.batchId))))
         ? intoAgent("bounced")
         : "refused";
+    case "NoteConflict":
+      return key;
     case "Land":
       return key === "integrating" ? "landed" : "refused";
     case "Resume":
@@ -1394,6 +1410,184 @@ const changeView: View<Change, ChangeEvent> = {
 const leaseView: View<Change, ChangeEvent> = { from: leaseFrom, to: leaseTo };
 
 describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
+  it("[change.bounce-conflict-cause] a conflict bounces a change only before it is batched, and the bounce names that conflict and no verdict", () => {
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        run(plan).records.every((r) =>
+          r.probes.every((p) => {
+            if (p.command._tag !== "Bounce") return true;
+            const command = p.command;
+            const bounces = Result.isSuccess(p.result)
+              ? p.result.success.filter((e) => e._tag === "ChangeBounced")
+              : [];
+            if (command.conflictId === undefined)
+              return bounces.every(
+                (e) => e.verdictId === command.verdictId && e.conflictId === undefined,
+              );
+            const k = keyOf(r.before);
+            const beforeBatch = k === "deriving" || k === "verifying" || k === "queued";
+            return Result.isSuccess(p.result)
+              ? beforeBatch &&
+                  bounces.length === 1 &&
+                  bounces.every(
+                    (e) => e.conflictId === command.conflictId && e.verdictId === undefined,
+                  )
+              : !beforeBatch;
+          }),
+        ),
+      ),
+    );
+    const CONFLICT = makeId("cfl", ulid(9));
+    const proven: ChangeCommand = {
+      _tag: "Bounce",
+      conflictId: CONFLICT,
+      reasons: ["a must premise is contradicted under block"],
+      nextActions: [],
+    };
+    const queued = drive([
+      [declare, 0],
+      [start, 0],
+      [submit, 0],
+      [precheck, 0],
+      [compile, 0],
+      [queue, 0],
+      [proven, 0],
+    ]);
+    expect(queued.keys.at(-1)).toBe("bounced");
+    expect(queued.log.at(-1)).toMatchObject({ _tag: "ChangeBounced", conflictId: CONFLICT });
+    // With no next actions given, the bounce names the conflict's ways forward.
+    const bounced = queued.log.at(-1);
+    expect(
+      bounced?._tag === "ChangeBounced" && bounced.nextActions?.map((a) => a.operationId),
+    ).toEqual(["Conflicts_getConflict", "revise", "resolve"]);
+    // Once batched, a conflict no longer bounces the change: the batch's verdict does.
+    const batched = drive([
+      [declare, 0],
+      [start, 0],
+      [submit, 0],
+      [precheck, 0],
+      [compile, 0],
+      [queue, 0],
+      [batch, 0],
+      [{ ...proven, batchId: BATCH }, 0],
+    ]);
+    expect(failureTag(batched.results.at(-1))).toBe("ChangeStateRefused");
+  });
+
+  it("[change.conflict-noted] a conflict noted under advise or annotate is recorded in every non-terminal state and moves nothing; advise names the ways forward, annotate none", () => {
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        run(plan).records.every((r) =>
+          r.probes.every((p) => {
+            if (p.command._tag !== "NoteConflict") return true;
+            const command = p.command;
+            const before = r.before;
+            if (before === undefined || terminal(keyOf(before))) return Result.isFailure(p.result);
+            if (!Result.isSuccess(p.result) || p.result.success.length !== 1) return false;
+            const [noted] = p.result.success;
+            return (
+              noted?._tag === "ConflictNoted" &&
+              noted.changeId === CHANGE &&
+              noted.conflictId === command.conflictId &&
+              noted.predicate === command.predicate &&
+              noted.policy === command.policy &&
+              noted.evidenceRef === command.evidenceRef &&
+              (command.policy === "advise"
+                ? noted.nextActions?.map((a) => a.operationId).join() ===
+                  "Conflicts_getConflict,revise,resolve"
+                : noted.nextActions === undefined) &&
+              comparable(evolveChange(before, { at: r.now, payload: noted })) === comparable(before)
+            );
+          }),
+        ),
+      ),
+    );
+    const note = (policy: "advise" | "annotate"): ChangeCommand => ({
+      _tag: "NoteConflict",
+      conflictId: makeId("cfl", ulid(9)),
+      predicate: "freshness",
+      policy,
+    });
+    const verifying = drive([
+      [declare, 0],
+      [start, 0],
+      [submit, 0],
+      [precheck, 0],
+      [compile, 0],
+      [note("annotate"), 0],
+      [note("advise"), 0],
+    ]);
+    expect(verifying.keys.slice(-3)).toEqual(["verifying", "verifying", "verifying"]);
+    expect(tags(verifying.log).slice(-2)).toEqual(["ConflictNoted", "ConflictNoted"]);
+    const landed = drive([
+      [declare, 0],
+      [start, 0],
+      [submit, 0],
+      [precheck, 0],
+      [compile, 0],
+      [queue, 0],
+      [batch, 0],
+      [land, 0],
+      [note("advise"), 0],
+    ]);
+    expect(failureTag(landed.results.at(-1))).toBe("ChangeStateRefused");
+  });
+
+  it("[change.plan-policy] a compiled plan's predicate policy reaches PlanCompiled unchanged, and an absent one stays absent", () => {
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        run(plan).records.every((r) =>
+          r.probes.every((p) => {
+            if (p.command._tag !== "CompilePlan" || !Result.isSuccess(p.result)) return true;
+            const compiled = p.result.success.find((e) => e._tag === "PlanCompiled");
+            return (
+              compiled?._tag === "PlanCompiled" &&
+              JSON.stringify(compiled.predicatePolicy) === JSON.stringify(p.command.predicatePolicy)
+            );
+          }),
+        ),
+      ),
+    );
+    const compiled = drive([
+      [declare, 0],
+      [start, 0],
+      [submit, 0],
+      [precheck, 0],
+      [{ ...compile, predicatePolicy: { freshness: "block" } }, 0],
+    ]);
+    expect(compiled.log.at(-1)).toMatchObject({
+      _tag: "PlanCompiled",
+      predicatePolicy: { freshness: "block" },
+    });
+  });
+
+  it("[change.queued-plan-hash] every enqueue, first or after a requeue, carries the hash of the plan the change was last compiled to", () => {
+    fc.assert(
+      fc.property(planArb, (plan) => {
+        let compiled: ContentHash | undefined;
+        return run(plan).log.every(({ payload }) => {
+          if (payload._tag === "PlanCompiled") compiled = payload.planHash;
+          return payload._tag === "ChangeQueued" || payload._tag === "ChangeRequeued"
+            ? compiled !== undefined && payload.planHash === compiled
+            : true;
+        });
+      }),
+    );
+    const requeued = drive([
+      [declare, 0],
+      [start, 0],
+      [submit, 0],
+      [precheck, 0],
+      [compile, 0],
+      [queue, 0],
+      [batch, 0],
+      [{ _tag: "Requeue", batchId: BATCH, reason: "infra-failure" }, 0],
+    ]);
+    expect(
+      requeued.log.filter((e) => e._tag === "ChangeQueued" || e._tag === "ChangeRequeued"),
+    ).toMatchObject([{ planHash: PLAN_HASH }, { planHash: PLAN_HASH }]);
+  });
+
   it("[change.chart] every state change a run makes is an edge of the Change chart, and a tour of the machine exercises every edge", () => {
     fc.assert(
       fc.property(planArb, (plan) =>

@@ -61,8 +61,12 @@ export type ConflictCommand =
   | { readonly _tag: "Prove"; readonly evidence: ProofWithoutProbe }
   /** A ruling: `decide` compares the two itself, and only a compatible or refining effect dismisses. */
   | { readonly _tag: "Dismiss"; readonly premise: Proposition; readonly effect: Proposition }
-  /** React to the conflict's probe (in `facts.probe`) once it is admitted or discarded. */
-  | { readonly _tag: "Settle"; readonly escalationId: EscalationId }
+  /**
+   * React to the conflict's probe (in `facts.probe`) once it is admitted or
+   * discarded. Proven and dismissed need no escalation; an unprovable conflict
+   * escalates, so it is refused without one.
+   */
+  | { readonly _tag: "Settle"; readonly escalationId?: EscalationId }
   /** The conflict is human-class: permission semantics, a destructive migration, an ambiguous requirement. */
   | { readonly _tag: "Escalate"; readonly escalationId: EscalationId }
   | { readonly _tag: "Resolve"; readonly move: Move; readonly decisionId?: DecisionId }
@@ -104,6 +108,10 @@ const awaitProbe: NextAction = {
 const askAPerson: NextAction = {
   kind: "escalate",
   title: "Escalate to a person: only a ruling resolves an escalated conflict",
+};
+const raiseFirst: NextAction = {
+  kind: "escalate",
+  title: "Raise an escalation for the unprovable conflict, then settle again with its id",
 };
 
 /** The suite cell already recorded at the same world, check and run, if any. */
@@ -236,15 +244,16 @@ export const decideConflict = (
       const unprovable =
         (probe.state === "discarded" && probe.discarded === "unstable" && drafted) ||
         (probe.state === "discarded" && probe.discarded === "draft-failed" && !drafted);
-      return unprovable
-        ? Result.succeed([
+      if (!unprovable) return refuse("probe-pending", awaitProbe);
+      return command.escalationId === undefined
+        ? refuse("escalation-required", raiseFirst)
+        : Result.succeed([
             ConflictEscalated.make({
               conflictId: conflict.id,
               escalationId: command.escalationId,
               reason: "unprovable",
             }),
-          ])
-        : refuse("probe-pending", awaitProbe);
+          ]);
     }
     case "Escalate":
       return conflict.state === "proven"

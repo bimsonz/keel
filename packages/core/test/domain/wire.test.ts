@@ -6,6 +6,7 @@
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
+  ChangeBounced,
   DecisionModelEffect,
   DerivedEffect,
   InvalidProbeCost,
@@ -150,6 +151,37 @@ describe("the wire", () => {
     expect(decodesGuard(guardFailed({}))).toBe(false);
     expect(decodesGuard(guardFailed(BATCH))).toBe(false);
     expect(decodesGuard(guardFailed(CANDIDATE))).toBe(false);
+  });
+
+  it("[events.bounce-cause] a bounce names exactly one cause, its verdict or its conflict, and that cause survives the wire", () => {
+    const VERDICT = { verdictId: makeId("vrd", ulid(6)) };
+    const CONFLICT = { conflictId: makeId("cfl", ulid(7)) };
+    const bounce = (cause: object) => ({
+      _tag: "ChangeBounced",
+      changeId: CHANGE,
+      ...cause,
+      reasons: ["a must premise is contradicted"],
+    });
+    fc.assert(
+      fc.property(fc.boolean(), fc.boolean(), (verdict, conflict) => {
+        const sent = bounce({ ...(verdict ? VERDICT : {}), ...(conflict ? CONFLICT : {}) });
+        if (verdict === conflict) return !decodes(ChangeBounced)(sent);
+        const back = Schema.decodeUnknownSync(ChangeBounced)(
+          JSON.parse(
+            JSON.stringify(
+              Schema.encodeSync(ChangeBounced)(Schema.decodeUnknownSync(ChangeBounced)(sent)),
+            ),
+          ),
+        );
+        return (
+          back.verdictId === (verdict ? VERDICT.verdictId : undefined) &&
+          back.conflictId === (conflict ? CONFLICT.conflictId : undefined)
+        );
+      }),
+    );
+    expect(decodes(ChangeBounced)(bounce(CONFLICT))).toBe(true);
+    expect(decodes(ChangeBounced)(bounce({ ...VERDICT, ...CONFLICT }))).toBe(false);
+    expect(decodes(ChangeBounced)(bounce({}))).toBe(false);
   });
 
   it("[derivation.record-shape] a derived effect's method fixes its evidence class and probability: an extractor rules and carries no p, a decision model is opinion with p in [0, 1]", () => {

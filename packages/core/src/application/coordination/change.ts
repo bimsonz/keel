@@ -472,8 +472,13 @@ export const remedyOf = (log: readonly EventEnvelope[]): Remedy | undefined => {
   for (const event of log) {
     if (event.type === "ChangeSubmitted") remedy = undefined;
     if (event.type === "ChangeBounced") {
-      const { verdictId, reasons, nextActions } = decodeBounced(event.payload);
-      remedy = { verdictId, reasons, nextActions: nextActions ?? [] };
+      const { verdictId, conflictId, reasons, nextActions } = decodeBounced(event.payload);
+      remedy = {
+        ...(verdictId === undefined ? {} : { verdictId }),
+        ...(conflictId === undefined ? {} : { conflictId }),
+        reasons,
+        nextActions: nextActions ?? [],
+      };
     }
   }
   return remedy;
@@ -1167,7 +1172,8 @@ export const precheckRefused: (
   const bounce = bounced.events.find((event) => event.type === "ChangeBounced");
   return {
     change: bounced.change,
-    verdictId: bounce === undefined ? minted : decodeBounced(bounce.payload).verdictId,
+    verdictId:
+      (bounce === undefined ? undefined : decodeBounced(bounce.payload).verdictId) ?? minted,
   };
 });
 

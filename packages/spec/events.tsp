@@ -414,6 +414,9 @@ model ChangeQueued {
   _tag: "ChangeQueued";
   changeId: ChangeId;
   laneId: string;
+
+  /** The plan the change was verified under: its PlanCompiled's hash. Optional only so older events still decode. */
+  planHash?: ContentHash;
 }
 
 model ChangeBatched {
@@ -427,6 +430,9 @@ model ChangeRequeued {
   changeId: ChangeId;
   batchId: BatchId;
   reason: "infra-failure" | "bisection" | "invalidated" | "co-member-failed" | "textual" | "interaction";
+
+  /** The plan the change was verified under, so the Lane re-adds it from this event alone. Optional only so older events still decode. */
+  planHash?: ContentHash;
 }
 
 model ChangeLanded {
@@ -438,13 +444,36 @@ model ChangeLanded {
   proofId: string;
 }
 
+/** The change went back to its agent for exactly one cause: the verdict that failed it, or the conflict proven against it under `block`. */
 model ChangeBounced {
   _tag: "ChangeBounced";
   changeId: ChangeId;
-  verdictId: VerdictId;
+
+  /** The verdict that failed the change. Exactly one of `verdictId` and `conflictId` is set. */
+  verdictId?: VerdictId;
+
+  /** The conflict proven against the change under a `block` policy. Exactly one of `verdictId` and `conflictId` is set. */
+  conflictId?: ConflictId;
+
   reasons: string[];
 
   /** Always set, never empty; optional only so events committed before it was added still decode. */
+  nextActions?: EventNextAction[];
+}
+
+/** A conflict proven against the change under `advise` or `annotate`: recorded on the change, which stays where it is. Annotate notifies no one. */
+model ConflictNoted {
+  _tag: "ConflictNoted";
+  changeId: ChangeId;
+  conflictId: ConflictId;
+  predicate: MFP.Predicate;
+  policy: "advise" | "annotate";
+
+  /** The proof's evidence, as the Change DO refers to it (`probe:<probeId>`). */
+  @minLength(1)
+  evidenceRef?: string;
+
+  /** Set for `advise` only: read the conflict, revise, resolve. */
   nextActions?: EventNextAction[];
 }
 
@@ -1292,6 +1321,7 @@ union KeelEvent {
   ChangeRequeued,
   ChangeLanded,
   ChangeBounced,
+  ConflictNoted,
   ChangeParked,
   ChangeResumed,
   ChangeAdopted,

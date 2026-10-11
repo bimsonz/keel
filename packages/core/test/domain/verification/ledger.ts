@@ -322,7 +322,8 @@ export const build = (
         effect: EFFECTS[step.pick % EFFECTS.length] ?? PREMISE,
       });
     case "Settle":
-      return toConflict({ _tag: "Settle", escalationId: ESCALATION });
+      // Without an escalation a quarter of the time: proven and dismissed need none.
+      return toConflict({ _tag: "Settle", ...(step.flag ? { escalationId: ESCALATION } : {}) });
     case "Escalate":
       return toConflict({ _tag: "Escalate", escalationId: ESCALATION });
     case "Resolve":
@@ -458,7 +459,10 @@ export const conflictOracle = (
           : "refused";
       }
       if (command._tag === "Settle")
-        return ours && probe.state === "discarded" && probe.discarded === "draft-failed"
+        return ours &&
+          probe.state === "discarded" &&
+          probe.discarded === "draft-failed" &&
+          command.escalationId !== undefined
           ? "escalated"
           : "refused";
       return "refused";
@@ -480,7 +484,8 @@ export const conflictOracle = (
       if (probe.state === "admitted") return "proven";
       if (probe.state === "discarded" && probe.discarded === "non-discriminating")
         return "dismissed";
-      if (probe.state === "discarded" && probe.discarded === "unstable") return "escalated";
+      if (probe.state === "discarded" && probe.discarded === "unstable")
+        return command.escalationId === undefined ? "refused" : "escalated";
       return "refused";
     case "proven":
       return command._tag === "Escalate"

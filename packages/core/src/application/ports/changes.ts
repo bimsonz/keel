@@ -16,6 +16,7 @@ import type { IdempotencyConflict, AgentToken } from "../../domain/identity/inde
 import type {
   ChangeId,
   CommitSha,
+  ConflictId,
   NextAction,
   ProjectId,
   VerdictId,
@@ -38,9 +39,10 @@ import type {
 } from "../coordination/index.ts";
 import type { RepoRef } from "./code-host.ts";
 
-/** What a bounce asked of the agent, verbatim: the verdict, its reasons and its next actions. */
+/** What a bounce asked of the agent, verbatim: its cause (a verdict or a conflict), its reasons and its next actions. */
 export interface Remedy {
-  readonly verdictId: VerdictId;
+  readonly verdictId?: VerdictId;
+  readonly conflictId?: ConflictId;
   readonly reasons: readonly string[];
   readonly nextActions: readonly NextAction[];
 }

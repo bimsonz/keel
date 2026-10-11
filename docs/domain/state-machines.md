@@ -121,8 +121,8 @@ stateDiagram-v2
 | Deriving | Drifted | Precheck: drift needs the agent (an undeclared proof-class effect) | — | `ChangeDrifted` |
 | Deriving | Verifying | Precheck: effects derived, drift classified, plan compiled | — | `EffectsDerived`, `DriftDetected`, then `PlanCompiled` |
 | Drifted, Bounced | Working | `revise` | Valid lease | `IntentRevised` |
-| Verifying | Queued | The plan's pre-queue steps pass | No Proven conflict is open, no guard fails, no high-severity drift is unresolved; otherwise the command is refused as blocked, with no event | `ChangeQueued` |
-| Verifying | Bounced | A conflict is proven against the change, or a guard fails | — | `ChangeBounced` |
+| Verifying | Queued | The plan's pre-queue steps pass | No Proven conflict is open, no guard fails, no high-severity drift is unresolved; otherwise the command is refused as blocked, with no event | `ChangeQueued`, carrying the hash of the plan the change was compiled to (as does `ChangeRequeued`) |
+| Verifying | Bounced | A conflict is proven against the change under a `block` policy, or a guard fails | — | `ChangeBounced`, naming exactly one cause: the verdict, or the conflict (a conflict bounces a change only from Deriving, Verifying or Queued) |
 | Verifying | Parked | A human-class conflict or step | — | `ChangeParked {reason: awaiting-ruling}` |
 | Queued | Integrating | Caused by `BatchFormed` | Nothing blocks it, as for queueing; a blocked change refuses the batch and is bounced | `ChangeBatched` |
 | Queued | Bounced | A conflict is proven against the change (caused by `ConflictProven`), or it is blocked when batched | — | `ChangeBounced` |
@@ -135,6 +135,7 @@ stateDiagram-v2
 | any other non-terminal state | the same state | `adopt` | The lease is Lapsed | `ChangeAdopted`: the change keeps waiting (e.g. Parked awaiting-ruling, Verifying), now with the new lease |
 | an agent-owned state | Parked (lease-lapsed) | The lease's deadline alarm | The lease lapsed: 15 minutes since `renewedAt` | `LeaseLapsed`, then `ChangeParked {reason: lease-lapsed}` |
 | a platform-owned state | an agent-owned state, with a Lapsed lease | Any transition into Bounced, Drifted, or Working after a ruling | The lease lapsed while the platform owned the change | that transition's event, then `ChangeParked {reason: lease-lapsed}` in the same transaction |
+| any non-terminal state | the same state | A conflict is proven against the change under an `advise` or `annotate` policy | — | `ConflictNoted {policy}`: nothing moves. Under `advise` it names the ways forward (read the conflict, revise, resolve); under `annotate` it notifies no one |
 | any but Integrating and terminal | Withdrawn | `abandon` | Valid lease, or scope `operator` | `ChangeWithdrawn` |
 | any but Integrating and terminal | Superseded | A ruling chooses an alternative; or, by policy, an alternative that retracts a tenet loses automatically when the winner lands | — | `ChangeSuperseded` (caused by `RulingGiven` or by the winner's `ChangeLanded`) |
 
@@ -227,12 +228,12 @@ stateDiagram-v2
 | Suspected | Proven | Proof without a probe: a merge GitCore and MergeBox both refuse (textual), a failing guard (precedent), or a batch whose union fails while every subset passes (interaction) | The proof matches the kind | `ConflictProven` |
 | Suspected | Dismissed | A deterministic lattice comparison shows the propositions are compatible (a ruling) | `decide` compares the premise and the effect itself: compatible or refines. Never for a conflict a decision model raised (`origin: opinion`), because a comparison over an opinion-derived effect is tainted, not a ruling | `ConflictDismissed` |
 | Suspected | Probing | A probe compiles and runs | — | `ProbeDrafted` |
-| Suspected | Escalated | Three drafts fail: the conflict is unprovable | — | `ProbeDiscarded {draft-failed}`, then `ConflictEscalated {reason: unprovable}` |
+| Suspected | Escalated | Three drafts fail: the conflict is unprovable | The settle names the escalation it opened; without one it is refused (`escalation-required`). A settle that proves or dismisses needs none | `ProbeDiscarded {draft-failed}`, then `ConflictEscalated {reason: unprovable}` |
 | Probing | Probing | One world-matrix cell completes | — | `ProbeRan` |
 | Probing | Probing | A project suite's cell of the matrix (`suite:<changeId>`, any world, run 1–3) completes | The same cell again commits nothing; a different answer for it is refused; an n/a cell says why | `WorldCheckRan` |
 | Probing | Proven | The probe discriminates | It passes on trunk (or does not apply), passes in the premise-holder's world, fails in the combined world and fails in A-noop, three runs in a row | `GuardAdmitted`, then `ConflictProven` |
 | Probing | Dismissed | The probe gives the same answer in every world | — | `ProbeDiscarded {non-discriminating}`, then `ConflictDismissed` |
-| Probing | Escalated | The probe is unstable across runs | — | `ProbeDiscarded {unstable}`, then `ConflictEscalated {reason: unprovable}` |
+| Probing | Escalated | The probe is unstable across runs | The settle names the escalation it opened, as above | `ProbeDiscarded {unstable}`, then `ConflictEscalated {reason: unprovable}` |
 | Proven | Escalated | The conflict is human-class | Permission semantics, destructive migrations, ambiguous requirements | `ConflictEscalated {reason: human-class}` |
 | Proven | Resolved | A Move is applied (bounce, sequence, yield, merge, distinguish…) | — | `ConflictResolved` |
 | Escalated | Resolved | Caused by `RulingGiven` | A Decision: an escalated conflict resolves only on a ruling | `ConflictResolved` (with `decisionId`) |

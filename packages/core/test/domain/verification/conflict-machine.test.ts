@@ -269,6 +269,51 @@ describe("the Conflict machine", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(failureReason(opinion.results[1])).toBe("opinion-is-not-a-ruling");
   });
 
+  it("[conflict.settle-escalation-optional] a settle that proves or dismisses needs no escalation; one that would escalate is refused without one, and commits nothing", () => {
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        run(plan).every((r) =>
+          conflictTries(r).every((p) => {
+            if (p.command._tag !== "Settle" || p.command.escalationId !== undefined) return true;
+            const withOne = conflictOracle(r.before, { _tag: "Settle", escalationId: ESCALATION });
+            if (withOne === "escalated") return failureReason(p.result) === "escalation-required";
+            return withOne === "refused"
+              ? Result.isFailure(p.result)
+              : Result.isSuccess(p.result) && p.after?.conflict?.state === withOne;
+          }),
+        ),
+      ),
+    );
+    const bare = C({ _tag: "Settle" });
+    // Proven by an admitted probe, and dismissed by one that never discriminates: no escalation either way.
+    expect(drive([C(suspectSemantic), draft, ...cells(3), bare]).state?.conflict?.state).toBe(
+      "proven",
+    );
+    const vacuous = [
+      C(suspectSemantic),
+      draft,
+      ...cells(1, { run: 1, world: "A-noop", outcome: "pass" }),
+    ];
+    expect(drive([...vacuous, bare]).state?.conflict?.state).toBe("dismissed");
+    // An unstable probe escalates the conflict, so the settle needs the escalation it opens.
+    const unstable = [
+      C(suspectSemantic),
+      draft,
+      ...cells(2, { run: 2, world: "A-noop", outcome: "pass" }),
+    ];
+    const refused = drive([...unstable, bare]);
+    expect(failureReason(refused.results.at(-1))).toBe("escalation-required");
+    expect(refused.state?.conflict?.state).toBe("probing");
+    expect(drive([...unstable, bare, settle]).state?.conflict?.state).toBe("escalated");
+    // So does a probe whose every draft failed.
+    const failed = drive([
+      C(suspectSemantic),
+      P({ _tag: "DraftFailed", conflictId: CONFLICT }),
+      bare,
+    ]);
+    expect(failureReason(failed.results.at(-1))).toBe("escalation-required");
+  });
+
   it("[conflict.dismiss-by-lattice] a suspected conflict is dismissed by a lattice comparison exactly when the effect is compatible with the premise or refines it", () => {
     fc.assert(
       fc.property(planArb, (plan) =>
