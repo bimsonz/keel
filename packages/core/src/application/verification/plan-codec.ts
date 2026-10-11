@@ -1,11 +1,14 @@
-import { Schema } from "effect";
+import { Result, Schema } from "effect";
 import { SubjectKey } from "../../domain/coordination/index.ts";
-import { ContentHash, EvidenceClass, Glob, Tier } from "../../domain/kernel/index.ts";
+import { CommitSha, ContentHash, EvidenceClass, Glob, Tier } from "../../domain/kernel/index.ts";
 import {
   type Budget,
   type Condition,
   type Flow,
+  type FlowPlan,
   FlowWorld,
+  PlanStep,
+  planHashOf,
   type Read,
   StepKind,
   StepOutcome,
@@ -116,3 +119,55 @@ export const StepFileJson = Schema.Struct({
   optional: Schema.optionalKey(Schema.Boolean),
 });
 export type StepFileJson = typeof StepFileJson.Type;
+
+/** A compiled plan as the plan store keeps it: every field, the hashed ones and the advisory cost. */
+export const FlowPlanJson: Schema.Codec<FlowPlan, unknown> = Schema.Struct({
+  planHash: ContentHash,
+  steps: Schema.Array(PlanStep),
+  costEstimate: Schema.Finite,
+  flow: FlowJson,
+  baseCommit: CommitSha,
+  compiler: Schema.String,
+  versions: Schema.Record(Schema.String, ContentHash),
+  humanClass: Schema.Boolean,
+  overrides: Schema.Record(Schema.String, Schema.Array(Schema.String)),
+  mayskip: Schema.Record(Schema.String, Schema.Array(Schema.String)),
+  members: Schema.optionalKey(Schema.Array(ContentHash)),
+});
+
+/**
+ * The text a plan store keeps for a plan, or why it must not keep it: a plan
+ * whose `planHash` is not its own preimage's (`planHashOf`) could never be
+ * read back, so storing it is refused.
+ */
+export const storedPlanText = (plan: FlowPlan): Result.Result<string, string> => {
+  const rehashed = planHashOf(plan);
+  return rehashed === plan.planHash
+    ? Result.succeed(JSON.stringify(Schema.encodeSync(FlowPlanJson)(plan)))
+    : Result.fail(`plan ${plan.planHash} rehashes to ${rehashed}`);
+};
+
+/**
+ * Reads back a plan stored under `hash`: the text must be a plan, and the plan
+ * must rehash to `hash` (`planHashOf`) and claim it as its `planHash`. So a
+ * plan read back is the plan that was compiled, never one edited at rest or
+ * filed under another plan's key. Anything else is corrupt, with why.
+ */
+export const readStoredPlan = (
+  hash: ContentHash,
+  text: string,
+): Result.Result<FlowPlan, string> => {
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return Result.fail("not JSON");
+  }
+  const decoded = Schema.decodeUnknownResult(FlowPlanJson)(json);
+  if (Result.isFailure(decoded)) return Result.fail("not a plan");
+  const plan = decoded.success;
+  const rehashed = planHashOf(plan);
+  if (rehashed !== hash) return Result.fail(`rehashes to ${rehashed}`);
+  if (plan.planHash !== hash) return Result.fail(`claims ${plan.planHash}`);
+  return Result.succeed(plan);
+};

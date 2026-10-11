@@ -28,8 +28,10 @@ import {
   describeChangePrecheckContract,
   describeEvidenceStoreContract,
   describeFlowSpecSourceContract,
+  describePlanStoreContract,
   describeVerifierRuntimeContract,
   type FlowSpecSourceHarness,
+  type PlanStoreHarness,
   freshId,
 } from "./contracts/verification.ts";
 import { describeProjectsContract, type ProjectsHarness } from "./contracts/projects.ts";
@@ -53,6 +55,7 @@ import type {
   Enrolments,
   EventFeed,
   FlowSpecSource,
+  PlanStore,
   Inbox,
   Notifier,
   Projects,
@@ -283,6 +286,10 @@ export const PORTS = {
   ),
   BundleStore: port(() => storage.makeBundleStoreMemory().layer, describeBundleStoreContract),
   EvidenceStore: port(() => storage.makeEvidenceStoreMemory().layer, describeEvidenceStoreContract),
+  PlanStore: harnessed<PlanStore, PlanStoreHarness>(
+    storage.makePlanStoreMemory,
+    describePlanStoreContract,
+  ),
   BatchVerdicts: harnessed<BatchVerdicts, BatchVerdictsHarness>(
     memoryBatchVerdictsHarness,
     describeBatchVerdictsContract,

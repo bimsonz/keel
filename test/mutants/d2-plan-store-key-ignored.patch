@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts packages/core/test/application/verification/plan-codec.test.ts
+# kills: plan-store.keyed
+# why: A stored plan is checked against its own claimed hash, not the key it was read under, so a genuine plan filed under another plan's hash runs in its place
+diff --git a/packages/core/src/application/verification/plan-codec.ts b/packages/core/src/application/verification/plan-codec.ts
+index e26c5ae..7ae1bee 100644
+--- a/packages/core/src/application/verification/plan-codec.ts
++++ b/packages/core/src/application/verification/plan-codec.ts
+@@ -167,7 +167,6 @@ export const readStoredPlan = (
+   if (Result.isFailure(decoded)) return Result.fail("not a plan");
+   const plan = decoded.success;
+   const rehashed = planHashOf(plan);
+-  if (rehashed !== hash) return Result.fail(`rehashes to ${rehashed}`);
+-  if (plan.planHash !== hash) return Result.fail(`claims ${plan.planHash}`);
++  if (rehashed !== plan.planHash) return Result.fail(`rehashes to ${rehashed}`);
+   return Result.succeed(plan);
+ };

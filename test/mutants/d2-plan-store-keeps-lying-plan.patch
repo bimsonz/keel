@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts packages/core/test/application/verification/plan-codec.test.ts
+# kills: plan-store.refuses-lying-plan
+# why: A plan whose own hash lies is stored, where no verified read can ever return it
+diff --git a/packages/core/src/application/verification/plan-codec.ts b/packages/core/src/application/verification/plan-codec.ts
+index e26c5ae..e1d3766 100644
+--- a/packages/core/src/application/verification/plan-codec.ts
++++ b/packages/core/src/application/verification/plan-codec.ts
+@@ -142,7 +142,7 @@ export const FlowPlanJson: Schema.Codec<FlowPlan, unknown> = Schema.Struct({
+  */
+ export const storedPlanText = (plan: FlowPlan): Result.Result<string, string> => {
+   const rehashed = planHashOf(plan);
+-  return rehashed === plan.planHash
++  return rehashed === plan.planHash || rehashed !== plan.planHash
+     ? Result.succeed(JSON.stringify(Schema.encodeSync(FlowPlanJson)(plan)))
+     : Result.fail(`plan ${plan.planHash} rehashes to ${rehashed}`);
+ };

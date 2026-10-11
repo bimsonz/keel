@@ -1,5 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
-import { L1_SUITE_PLAN } from "@keeltown/core/application/verification";
+import {
+  L1_SUITE_PLAN,
+  storedPlanText,
+  WORKER_APP_PACK,
+} from "@keeltown/core/application/verification";
 import {
   canBlock,
   CommitSha,
@@ -8,7 +12,12 @@ import {
   makeId,
   weakest,
 } from "@keeltown/core/kernel";
-import type { PlanStep, VerificationJob } from "@keeltown/core/domain/verification";
+import {
+  compile,
+  type FlowPlan,
+  type PlanStep,
+  type VerificationJob,
+} from "@keeltown/core/domain/verification";
 import {
   type BatchVerdict,
   BatchVerdicts,
@@ -16,11 +25,12 @@ import {
   ChangePrecheck,
   EvidenceStore,
   FlowSpecSource,
+  PlanStore,
   type PrecheckWorkspace,
   type RepoRef,
   VerifierRuntime,
 } from "@keeltown/core/ports";
-import { Effect, type Layer, Schema } from "effect";
+import { Effect, Exit, type Layer, Result, Schema } from "effect";
 import type { LayerFactory } from "./index.ts";
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -92,6 +102,103 @@ export function describeEvidenceStoreContract(adapter: string, make: LayerFactor
         expect(error._tag).toBe("EvidenceMissing");
       }).pipe(Effect.provide(make())),
     );
+  });
+}
+
+export interface PlanStoreHarness {
+  readonly layer: Layer.Layer<PlanStore>;
+  /** Files raw text under a plan hash, as storage at rest might hold it. */
+  readonly plant: (hash: ContentHash, text: string) => Effect.Effect<void>;
+}
+
+/** A worker-app plan on a fresh base, so no two tests share a hash. */
+const freshPlan = (): FlowPlan =>
+  Result.getOrThrow(
+    compile(
+      undefined,
+      {
+        baseCommit: Schema.decodeUnknownSync(CommitSha)(random(20)),
+        touchedPaths: ["src/a.ts"],
+        subjects: [],
+        facts: {},
+      },
+      WORKER_APP_PACK,
+    ),
+  );
+
+const textOf = (plan: FlowPlan): string => Result.getOrThrow(storedPlanText(plan));
+
+export function describePlanStoreContract(adapter: string, make: () => PlanStoreHarness) {
+  describe(`PlanStore contract: ${adapter}`, () => {
+    it.effect(
+      "[plan-store.round-trip] keeps a plan under its planHash and gives back an equal one",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const store = yield* PlanStore;
+          const plan = freshPlan();
+          expect(yield* store.put(plan)).toBe(plan.planHash);
+          expect(yield* store.put(plan)).toBe(plan.planHash);
+          expect(yield* store.get(plan.planHash)).toEqual(plan);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+    it.effect("[plan-store.missing] fails PlanMissing for a hash it never stored", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const missing = Schema.decodeUnknownSync(ContentHash)(`sha256:${random(32)}`);
+        const error = yield* Effect.flip((yield* PlanStore).get(missing));
+        expect(error).toMatchObject({ _tag: "PlanMissing", hash: missing });
+      }).pipe(Effect.provide(harness.layer));
+    });
+    it.effect(
+      "[plan-store.verified] refuses a plan edited at rest: it no longer rehashes to its key",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const plan = freshPlan();
+          const edited = { ...JSON.parse(textOf(plan)), humanClass: !plan.humanClass };
+          yield* harness.plant(plan.planHash, JSON.stringify(edited));
+          const error = yield* Effect.flip((yield* PlanStore).get(plan.planHash));
+          expect(error).toMatchObject({ _tag: "PlanCorrupt", hash: plan.planHash });
+          const dropped = { ...JSON.parse(textOf(plan)), steps: [] };
+          yield* harness.plant(plan.planHash, JSON.stringify(dropped));
+          expect((yield* Effect.flip((yield* PlanStore).get(plan.planHash)))._tag).toBe(
+            "PlanCorrupt",
+          );
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+    it.effect("[plan-store.keyed] refuses a genuine plan filed under another plan's hash", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const [wanted, other] = [freshPlan(), freshPlan()];
+        yield* harness.plant(wanted.planHash, textOf(other));
+        const error = yield* Effect.flip((yield* PlanStore).get(wanted.planHash));
+        expect(error).toMatchObject({ _tag: "PlanCorrupt", hash: wanted.planHash });
+      }).pipe(Effect.provide(harness.layer));
+    });
+    it.effect("refuses text that is not a plan", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const store = yield* PlanStore;
+        for (const text of ["not json", "{}", JSON.stringify({ planHash: "sha256:x" })]) {
+          const hash = Schema.decodeUnknownSync(ContentHash)(`sha256:${random(32)}`);
+          yield* harness.plant(hash, text);
+          expect((yield* Effect.flip(store.get(hash)))._tag).toBe("PlanCorrupt");
+        }
+      }).pipe(Effect.provide(harness.layer));
+    });
+    it.effect("[plan-store.refuses-lying-plan] never stores a plan whose own hash lies", () => {
+      const harness = make();
+      return Effect.gen(function* () {
+        const store = yield* PlanStore;
+        const plan = freshPlan();
+        const lying = { ...plan, humanClass: !plan.humanClass };
+        expect(Exit.isFailure(yield* Effect.exit(store.put(lying)))).toBe(true);
+        expect((yield* Effect.flip(store.get(plan.planHash)))._tag).toBe("PlanMissing");
+      }).pipe(Effect.provide(harness.layer));
+    });
   });
 }
 

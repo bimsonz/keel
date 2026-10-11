@@ -29,6 +29,7 @@ const CONTRACT_PORTS = [
   "FlowSpecSource",
   "BundleStore",
   "EvidenceStore",
+  "PlanStore",
   "BatchVerdicts",
   "ChangePrecheck",
   "GuardRepo",

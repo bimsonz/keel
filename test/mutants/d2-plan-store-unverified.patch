@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts packages/core/test/application/verification/plan-codec.test.ts
+# kills: plan-store.verified, plan-codec.any-edit-refused
+# why: A stored plan is trusted without rehashing it, so a plan edited at rest runs under its old hash
+diff --git a/packages/core/src/application/verification/plan-codec.ts b/packages/core/src/application/verification/plan-codec.ts
+index e26c5ae..8f93ea2 100644
+--- a/packages/core/src/application/verification/plan-codec.ts
++++ b/packages/core/src/application/verification/plan-codec.ts
+@@ -167,7 +167,6 @@ export const readStoredPlan = (
+   if (Result.isFailure(decoded)) return Result.fail("not a plan");
+   const plan = decoded.success;
+   const rehashed = planHashOf(plan);
+-  if (rehashed !== hash) return Result.fail(`rehashes to ${rehashed}`);
+   if (plan.planHash !== hash) return Result.fail(`claims ${plan.planHash}`);
+   return Result.succeed(plan);
+ };

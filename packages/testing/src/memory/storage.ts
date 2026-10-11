@@ -1,3 +1,4 @@
+import { readStoredPlan, storedPlanText } from "@keeltown/core/application/verification";
 import { BundleMissing } from "@keeltown/core/domain/verification";
 import { SecretMissing } from "@keeltown/core/domain/delivery";
 import type { ContentHash, EventEnvelope, SessionId } from "@keeltown/core/kernel";
@@ -18,6 +19,9 @@ import {
   Metrics,
   type MfpRecord,
   MfpWriter,
+  PlanCorrupt,
+  PlanMissing,
+  PlanStore,
   SecretsProvider,
   type SessionMessage,
   SessionStore,
@@ -25,7 +29,7 @@ import {
   WorkQueue,
 } from "@keeltown/core/ports";
 import { SessionNotFound } from "@keeltown/core/domain/memory";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer, Result, Schema } from "effect";
 
 /**
  * A Durable Object's storage, in a Map. `transaction` snapshots the map and
@@ -225,6 +229,39 @@ export function makeEvidenceStoreMemory() {
           return stored === undefined
             ? Effect.fail(new EvidenceMissing({ hash }))
             : Effect.sync((): Json => JSON.parse(stored));
+        },
+      }),
+    ),
+  };
+}
+
+/**
+ * Plans in a Map, as the text a store keeps, so a test can plant what storage
+ * at rest might hold. Every read is verified exactly as the R2 adapter's is.
+ */
+export function makePlanStoreMemory() {
+  const plans = new Map<ContentHash, string>();
+  return {
+    plans,
+    plant: (hash: ContentHash, text: string) => Effect.sync(() => void plans.set(hash, text)),
+    layer: Layer.succeed(
+      PlanStore,
+      PlanStore.of({
+        put: (plan) => {
+          const text = storedPlanText(plan);
+          if (Result.isFailure(text)) return Effect.die(new Error(text.failure));
+          return Effect.sync(() => {
+            plans.set(plan.planHash, text.success);
+            return plan.planHash;
+          });
+        },
+        get: (hash) => {
+          const stored = plans.get(hash);
+          if (stored === undefined) return Effect.fail(new PlanMissing({ hash }));
+          const read = readStoredPlan(hash, stored);
+          return Result.isFailure(read)
+            ? Effect.fail(new PlanCorrupt({ hash, reason: read.failure }))
+            : Effect.succeed(read.success);
         },
       }),
     ),
