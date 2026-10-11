@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/ordering.test.ts
+# kills: ordering.canonical-form
+# why: an ordering is written from the greater of its two events
+diff --git a/packages/core/src/domain/coordination/claim.ts b/packages/core/src/domain/coordination/claim.ts
+index fe4b066..79d84ee 100644
+--- a/packages/core/src/domain/coordination/claim.ts
++++ b/packages/core/src/domain/coordination/claim.ts
+@@ -283,7 +283,7 @@ const SWAPPED = { before: "after", after: "before" } as const;
+ export const canonicalProposition = (p: Proposition): Proposition => {
+   if (p.predicate !== "ordering" || (p.relation !== "before" && p.relation !== "after")) return p;
+   const other = p.value;
+-  if (typeof other !== "string" || !EVENT_KEY.test(other) || other >= p.subject) return p;
++  if (typeof other !== "string" || !EVENT_KEY.test(other) || other <= p.subject) return p;
+   return { ...p, subject: SubjectKey.make(other), relation: SWAPPED[p.relation], value: p.subject };
+ };
+ 

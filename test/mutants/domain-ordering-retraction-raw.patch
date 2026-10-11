@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/ordering.test.ts
+# kills: ordering.declared-canonical
+# why: a revision's retractions are committed as written, so one written from the other event retracts nothing
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 77e63e3..9659fbd 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -395,7 +395,7 @@ export const decideChange = (
+           ...(command.goal === undefined ? {} : { goal: command.goal }),
+           ...(command.footprint === undefined ? {} : { footprint: command.footprint }),
+           premisesAdded: canonical(command.premisesAdded),
+-          premisesRetracted: canonical(command.premisesRetracted),
++          premisesRetracted: command.premisesRetracted,
+           ...(command.declaredEffects === undefined
+             ? {}
+             : { declaredEffects: canonical(command.declaredEffects) }),

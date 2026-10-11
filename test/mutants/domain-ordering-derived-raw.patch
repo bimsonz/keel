@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/ordering.test.ts
+# kills: ordering.declared-canonical
+# why: derived effects are committed as the derivation wrote them, never canonical
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 77e63e3..cde6516 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -484,7 +484,7 @@ export const decideChange = (
+                     revision,
+                     effects: command.derivation.effects.map((effect) => ({
+                       ...effect,
+-                      proposition: canonicalProposition(effect.proposition),
++                      proposition: effect.proposition,
+                     })),
+                     derivationRef: command.derivation.derivationRef,
+                   }),

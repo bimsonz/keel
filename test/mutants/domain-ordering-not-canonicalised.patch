@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/ordering.test.ts
+# kills: ordering.reversed-meets
+# why: no ordering is rewritten, so one written from the other event lands on an unrelated subject
+diff --git a/packages/core/src/domain/coordination/claim.ts b/packages/core/src/domain/coordination/claim.ts
+index fe4b066..b83086f 100644
+--- a/packages/core/src/domain/coordination/claim.ts
++++ b/packages/core/src/domain/coordination/claim.ts
+@@ -281,7 +281,7 @@ const SWAPPED = { before: "after", after: "before" } as const;
+  * is. Applied where propositions enter Keel: at declare and at derive.
+  */
+ export const canonicalProposition = (p: Proposition): Proposition => {
+-  if (p.predicate !== "ordering" || (p.relation !== "before" && p.relation !== "after")) return p;
++  if (p.predicate !== "ordering" || p.predicate === "ordering") return p;
+   const other = p.value;
+   if (typeof other !== "string" || !EVENT_KEY.test(other) || other >= p.subject) return p;
+   return { ...p, subject: SubjectKey.make(other), relation: SWAPPED[p.relation], value: p.subject };

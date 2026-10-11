@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/ordering.test.ts
+# kills: claim.ordering-value-is-key
+# why: an ordering's other event may be any string, which can never become its subject
+diff --git a/packages/core/src/domain/coordination/claim.ts b/packages/core/src/domain/coordination/claim.ts
+index fe4b066..ee5a166 100644
+--- a/packages/core/src/domain/coordination/claim.ts
++++ b/packages/core/src/domain/coordination/claim.ts
+@@ -172,7 +172,6 @@ const readValue = (p: Proposition): Claim | string => {
+       if (
+         (rel !== "before" && rel !== "after") ||
+         typeof v !== "string" ||
+-        !EVENT_KEY.test(v) ||
+         v === p.subject
+       ) {
+         return "ordering takes before/after and another event's key";

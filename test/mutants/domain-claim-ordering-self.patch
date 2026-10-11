@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/ordering.test.ts
+# kills: claim.ordering-distinct
+# why: an ordering of an event against itself is read, though it contradicts itself
+diff --git a/packages/core/src/domain/coordination/claim.ts b/packages/core/src/domain/coordination/claim.ts
+index fe4b066..6714e36 100644
+--- a/packages/core/src/domain/coordination/claim.ts
++++ b/packages/core/src/domain/coordination/claim.ts
+@@ -172,8 +172,7 @@ const readValue = (p: Proposition): Claim | string => {
+       if (
+         (rel !== "before" && rel !== "after") ||
+         typeof v !== "string" ||
+-        !EVENT_KEY.test(v) ||
+-        v === p.subject
++        !EVENT_KEY.test(v)
+       ) {
+         return "ordering takes before/after and another event's key";
+       }
