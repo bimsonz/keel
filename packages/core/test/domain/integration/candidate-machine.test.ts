@@ -42,6 +42,7 @@ const KINDS: readonly Kind[] = [
   "Assemble",
   "RefuseComposition",
   "StartVerification",
+  "RefuseBundle",
   "Verified",
   "Failed",
   "Bisect",
@@ -64,7 +65,7 @@ const PROGRESS: Readonly<Record<Key, readonly Kind[]>> = {
 const SIDE: Readonly<Record<Key, readonly Kind[]>> = {
   none: ["Form"],
   forming: ["RefuseComposition"],
-  assembled: ["StartVerification"],
+  assembled: ["RefuseBundle"],
   verifying: ["Failed", "Failed"],
   green: ["Invalidate"],
   red: ["Bisect"],
@@ -150,6 +151,17 @@ const blameFor = (state: Batch | undefined, plan: Plan, step: Step): BatchAttrib
   return choices[step.blame] ?? "infra";
 };
 
+/** A refused bundle's blame: a member, the infrastructure, or now and then a stranger. */
+const bundleBlameFor = (state: Batch | undefined, plan: Plan, step: Step): ChangeId | "infra" => {
+  const members = state?.members ?? plan.members;
+  const choices: readonly (ChangeId | "infra")[] = [
+    members[step.pick % Math.max(1, members.length)] ?? STRANGER,
+    "infra",
+    STRANGER,
+  ];
+  return choices[step.blame % choices.length] ?? "infra";
+};
+
 const build = (
   kind: Kind,
   state: Batch | undefined,
@@ -188,6 +200,12 @@ const build = (
       return { _tag: "RefuseComposition", verdictId: makeId("vrd", ulid(n)) };
     case "StartVerification":
       return { _tag: "StartVerification", instanceId: `verify-${n}`, planHash: PLAN };
+    case "RefuseBundle":
+      return {
+        _tag: "RefuseBundle",
+        verdictId: makeId("vrd", ulid(n)),
+        attribution: bundleBlameFor(state, plan, step),
+      };
     case "Verified":
       return {
         _tag: "Verified",
@@ -310,6 +328,11 @@ const oracle = (before: Batch | undefined, command: CandidateCommand): Key | "re
       return before.state === "forming" ? "red" : "refused";
     case "StartVerification":
       return before.state === "assembled" ? "verifying" : "refused";
+    case "RefuseBundle": {
+      const a = command.attribution;
+      const valid = a === "infra" || before.members.some((m) => m === a);
+      return before.state === "assembled" && valid ? "red" : "refused";
+    }
     case "Verified":
       return before.state === "verifying" && fresh(command) ? "green" : "refused";
     case "Failed": {
@@ -404,6 +427,15 @@ const bisect: CandidateCommand = {
   _tag: "Bisect",
   into: [makeId("bat", ulid(2)), makeId("bat", ulid(3))],
 };
+const refuseComposition: CandidateCommand = {
+  _tag: "RefuseComposition",
+  verdictId: makeId("vrd", ulid(3)),
+};
+const refuseBundle = (attribution: ChangeId | "infra"): CandidateCommand => ({
+  _tag: "RefuseBundle",
+  verdictId: makeId("vrd", ulid(4)),
+  attribution,
+});
 
 /**
  * Each property plays hundreds of seeded runs through decide and evolve. Run
@@ -430,10 +462,7 @@ describe("the Candidate machine", { timeout: PROPERTY_TIMEOUT }, () => {
     // L1's path: a batch of one, formed, assembled by GitCore, verified green, promoted when trunk advances.
     const l1 = drive([form([A]), assemble, start, verified, { _tag: "Promote", trunkSha: SHA }]);
     expect(l1.state?.state).toBe("promoted");
-    expect(
-      drive([form([A]), { _tag: "RefuseComposition", verdictId: makeId("vrd", ulid(3)) }]).state
-        ?.state,
-    ).toBe("red");
+    expect(drive([form([A]), refuseComposition]).state?.state).toBe("red");
   });
 
   it("[candidate.one-terminal] a batch ends at most once, and a terminal batch takes no command", () => {
@@ -565,6 +594,88 @@ describe("the Candidate machine", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(failureTag(drive([form([A]), assemble, start, failed(STRANGER)]).results[3])).toBe(
       "InvalidBatch",
     );
+  });
+
+  it("[candidate.bundle-refused] a bundle refused for an assembled batch turns it Red, blamed on a member or the infrastructure, and is never bisected", () => {
+    let refused = 0;
+    let strangers = 0;
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        run(plan).every((r) =>
+          r.probes.every((p) => {
+            const c = p.command;
+            const before = r.before;
+            if (c._tag !== "RefuseBundle" || before === undefined) return true;
+            const a = c.attribution;
+            const valid =
+              before.state === "assembled" && (a === "infra" || before.members.includes(a));
+            if (before.state === "assembled" && !valid) strangers++;
+            if (!valid) return Result.isFailure(p.result);
+            refused++;
+            const events = eventsOf(p.result);
+            const e = events[0];
+            return (
+              events.length === 1 &&
+              e?._tag === "BatchFailed" &&
+              e.attribution === a &&
+              e.verdictId === c.verdictId &&
+              e.candidateId === before.candidateId &&
+              p.after?.state === "red" &&
+              !bisectable(p.after) &&
+              terminal(p.after)
+            );
+          }),
+        ),
+      ),
+    );
+    expect(refused).toBeGreaterThan(0);
+    expect(strangers).toBeGreaterThan(0);
+    // A symlink in the bundle, introduced by B's restacked commit: B is blamed, and nothing is bisected.
+    const blamed = drive([form([A, B]), assemble, refuseBundle(B), bisect]);
+    expect(blamed.state).toMatchObject({ state: "red", attribution: B });
+    expect(failureTag(blamed.results[3])).toBe("CandidateStateRefused");
+    expect(drive([form([A, B]), assemble, refuseBundle("infra")]).state?.attribution).toBe("infra");
+    expect(failureTag(drive([form([A]), assemble, refuseBundle(STRANGER)]).results[2])).toBe(
+      "InvalidBatch",
+    );
+    expect(failureTag(drive([form([A]), assemble, start, refuseBundle(A)]).results[3])).toBe(
+      "CandidateStateRefused",
+    );
+  });
+
+  it("[candidate.refused-composition-blames] a refused composition is blamed on the sole member of a batch of one, and is textual for a larger batch", () => {
+    let single = 0;
+    let larger = 0;
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        run(plan).every((r) =>
+          r.probes.every((p) => {
+            const before = r.before;
+            if (p.command._tag !== "RefuseComposition" || before?.state !== "forming") return true;
+            const expected = before.members.length === 1 ? before.members[0] : "textual";
+            if (before.members.length === 1) single++;
+            else larger++;
+            const blamed = eventsOf(p.result).flatMap((e) =>
+              e._tag === "BatchFailed" ? [e.attribution] : [],
+            );
+            return (
+              blamed.length === 1 && blamed[0] === expected && p.after?.attribution === expected
+            );
+          }),
+        ),
+      ),
+    );
+    expect(single).toBeGreaterThan(0);
+    expect(larger).toBeGreaterThan(0);
+    // A batch of one whose merge is refused names its change, so the Change DO bounces it.
+    expect(drive([form([A]), refuseComposition]).state).toMatchObject({
+      state: "red",
+      attribution: A,
+    });
+    expect(drive([form([A, B]), refuseComposition]).state).toMatchObject({
+      state: "red",
+      attribution: "textual",
+    });
   });
 });
 

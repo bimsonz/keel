@@ -10,6 +10,7 @@ import {
   EscalationId,
   GuardId,
   idPattern,
+  NextAction,
   ProbeId,
   SubjectId,
   VerdictId,
@@ -141,6 +142,12 @@ export const VerdictIssued = Schema.TaggedStruct("VerdictIssued", {
    * the verdict was reached without running the plan. Absent means true.
    */
   verified: Schema.optional(Schema.Boolean),
+  /**
+   * The remedy, named by the issuer that knows it (the Lane for a refused
+   * composition or bundle, KeelVerify for a failing test). The Change DO copies
+   * it onto `ChangeBounced`, and falls back to its own default only when absent.
+   */
+  nextActions: Schema.optional(Schema.Array(NextAction)),
 });
 export const EscalationRaised = Schema.TaggedStruct("EscalationRaised", {
   escalationId: EscalationId,

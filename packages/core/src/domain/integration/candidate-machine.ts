@@ -67,6 +67,16 @@ export type CandidateCommand =
     }
   | { readonly _tag: "RefuseComposition"; readonly verdictId: VerdictId }
   | {
+      /**
+       * The assembled candidate cannot be bundled (a symlink, a gitlink, an unsafe
+       * path): blamed on the member whose commit introduced the entry, or on
+       * `infra` when the base already holds it. Never bisected.
+       */
+      readonly _tag: "RefuseBundle";
+      readonly verdictId: VerdictId;
+      readonly attribution: ChangeId | "infra";
+    }
+  | {
       readonly _tag: "StartVerification";
       readonly instanceId: string;
       readonly planHash: ContentHash;
@@ -181,12 +191,33 @@ export const decideCandidate = (
           ])
         : refuse(batchId, batch.state, command);
 
-    case "RefuseComposition":
-      return batch.state === "forming"
-        ? Result.succeed([
-            BatchFailed.make({ batchId, verdictId: command.verdictId, attribution: "textual" }),
-          ])
-        : refuse(batchId, batch.state, command);
+    case "RefuseComposition": {
+      if (batch.state !== "forming") return refuse(batchId, batch.state, command);
+      // A batch of one names its change, so the change bounces; a textual blame would strand it.
+      const [sole, ...others] = batch.members;
+      const attribution = sole !== undefined && others.length === 0 ? sole : "textual";
+      return Result.succeed([
+        BatchFailed.make({ batchId, verdictId: command.verdictId, attribution }),
+      ]);
+    }
+
+    case "RefuseBundle": {
+      if (batch.state !== "assembled" || batch.candidateId === undefined)
+        return refuse(batchId, batch.state, command);
+      const blamed = command.attribution;
+      if (blamed !== "infra" && !batch.members.includes(blamed))
+        return Result.fail(
+          new InvalidBatch({ batchId, reason: `${blamed} is not a member of the batch` }),
+        );
+      return Result.succeed([
+        BatchFailed.make({
+          batchId,
+          candidateId: batch.candidateId,
+          verdictId: command.verdictId,
+          attribution: blamed,
+        }),
+      ]);
+    }
 
     case "StartVerification":
       return batch.state === "assembled" && batch.candidateId !== undefined
@@ -294,6 +325,29 @@ export const decideCandidate = (
   }
 };
 
+/**
+ * Which blame a failure may carry from each state: a refused composition is
+ * `textual`, or the sole member of a batch of one; a refused bundle is a change
+ * or `infra`; a failed verification is anything but `textual`.
+ */
+const failsFrom = (batch: Batch, attribution: BatchAttribution): boolean => {
+  switch (batch.state) {
+    case "forming":
+      return (
+        attribution === "textual" ||
+        (batch.members.length === 1 && attribution === batch.members[0])
+      );
+    case "assembled":
+      return (
+        attribution !== "textual" && attribution !== "interaction" && attribution !== "unattributed"
+      );
+    case "verifying":
+      return attribution !== "textual";
+    default:
+      return false;
+  }
+};
+
 const illegal = (state: Batch | undefined, event: CandidateEvent): never => {
   throw new IllegalTransition(
     `${event._tag} cannot apply to a batch in ${state === undefined ? "no state" : state.state}`,
@@ -337,8 +391,7 @@ export const evolveCandidate = (
     case "BatchVerified":
       return batch.state === "verifying" ? { ...batch, state: "green" } : illegal(batch, event);
     case "BatchFailed":
-      return (batch.state === "forming" && event.attribution === "textual") ||
-        (batch.state === "verifying" && event.attribution !== "textual")
+      return failsFrom(batch, event.attribution)
         ? { ...batch, state: "red", attribution: event.attribution }
         : illegal(batch, event);
     case "CandidateBisected":

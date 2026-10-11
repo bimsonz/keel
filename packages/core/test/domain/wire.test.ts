@@ -20,6 +20,7 @@ import {
   GuardFailed,
   OpinionAsk,
   StepResult,
+  VerdictIssued,
   VerificationPlan,
   WorldCheckRan,
 } from "../../src/domain/verification/index.ts";
@@ -92,6 +93,30 @@ const effect = (fields: object) => ({
   ...fields,
 });
 
+const nextActionArb = fc.record(
+  {
+    kind: fc.constantFrom("call" as const, "wait" as const, "read" as const, "escalate" as const),
+    title: fc.string({ minLength: 1, maxLength: 12 }),
+    operationId: fc.constantFrom("revise", "submit", "adopt"),
+    args: fc.dictionary(fc.string({ maxLength: 6 }), fc.oneof(fc.string(), fc.integer())),
+  },
+  { requiredKeys: ["kind", "title"] },
+);
+const verdictArb = fc.record(
+  {
+    verdictId: fc.constant(makeId("vrd", ulid(6))),
+    subject: fc.constantFrom(CHANGE, makeId("bat", ulid(7))),
+    outcome: fc.constantFrom("land" as const, "bounce" as const, "park" as const),
+    evidence: fc.array(fc.string(), { maxLength: 3 }),
+    nextActions: fc.array(nextActionArb, { minLength: 1, maxLength: 3 }),
+  },
+  { requiredKeys: ["verdictId", "subject", "outcome", "evidence"] },
+);
+const throughJson = (verdict: typeof VerdictIssued.Type): typeof VerdictIssued.Type =>
+  Schema.decodeUnknownSync(VerdictIssued)(
+    JSON.parse(JSON.stringify(Schema.encodeSync(VerdictIssued)(verdict))),
+  );
+
 describe("the wire", () => {
   it("[wire.finite] every number that crosses the wire refuses NaN and ±Infinity at decode", () => {
     fc.assert(
@@ -149,5 +174,31 @@ describe("the wire", () => {
       effect({ method: "extractor", evidenceClass: "ruling", p: 0.9 }),
     );
     expect(ruled).not.toHaveProperty("p");
+  });
+
+  it("[events.verdict-next-actions] a verdict's next actions, set by its issuer, survive the wire unchanged; a verdict without them stays without", () => {
+    let carried = 0;
+    fc.assert(
+      fc.property(verdictArb, (fields) => {
+        const verdict = VerdictIssued.make(fields);
+        const back = throughJson(verdict);
+        if (fields.nextActions !== undefined) carried++;
+        return JSON.stringify(back.nextActions) === JSON.stringify(fields.nextActions);
+      }),
+    );
+    expect(carried).toBeGreaterThan(0);
+    // A composition refusal names the remedy, which the Change DO copies onto its bounce.
+    const refused = throughJson(
+      VerdictIssued.make({
+        verdictId: makeId("vrd", ulid(8)),
+        subject: makeId("bat", ulid(9)),
+        outcome: "bounce",
+        evidence: ["composition-refused: both sides edit src/a.ts"],
+        nextActions: [{ kind: "call", title: "Rebase onto trunk", operationId: "revise" }],
+      }),
+    );
+    expect(refused.nextActions).toEqual([
+      { kind: "call", title: "Rebase onto trunk", operationId: "revise" },
+    ]);
   });
 });

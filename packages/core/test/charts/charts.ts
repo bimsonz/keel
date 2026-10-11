@@ -143,7 +143,8 @@ export const candidateChart: Chart = {
   meta: { createdBy: "BatchFormed", section: "Candidate" },
   states: {
     forming: { on: { CandidateAssembled: b("assembled"), BatchFailed: b("red") } },
-    assembled: { on: { VerificationStarted: b("verifying") } },
+    // A refused bundle fails the batch before verification starts.
+    assembled: { on: { VerificationStarted: b("verifying"), BatchFailed: b("red") } },
     verifying: { on: { BatchVerified: b("green"), BatchFailed: b("red") } },
     green: { on: { CandidatePromoted: b("promoted"), CandidateInvalidated: b("invalidated") } },
     // Terminal unless several members failed and nobody is blamed yet: then it is bisected.

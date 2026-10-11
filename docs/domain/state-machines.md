@@ -293,6 +293,7 @@ stateDiagram-v2
   Forming --> Assembled: CandidateAssembled
   Forming --> Red: BatchFailed
   Assembled --> Verifying: VerificationStarted
+  Assembled --> Red: BatchFailed
   Verifying --> Green: BatchVerified
   Verifying --> Red: BatchFailed
   Green --> Promoted: CandidatePromoted
@@ -309,8 +310,9 @@ stateDiagram-v2
 |---|---|---|---|---|
 | — | Forming | The lane forms a batch | N = clamp(ln 0.8 / ln(1−p), 1, 16); no two members with an open suspected conflict or opposite effects on one subject; risky changes alone; speculation ≤ 4 deep | `BatchFormed` |
 | Forming | Assembled | GitCore composes the tree (Tier 0), or MergeBox when GitCore refuses (Tier 2) | — | `CandidateAssembled` (with tier and reason) |
-| Forming | Red | GitCore and MergeBox both refuse to compose | — | `BatchFailed {attribution: textual}`, then a textual `ConflictSuspected` → `ConflictProven`, owned by the Lane DO |
+| Forming | Red | GitCore and MergeBox both refuse to compose | — | `BatchFailed`: for a batch of one, attributed to its member, so the change bounces with next actions; for a larger batch, `textual`, then a textual `ConflictSuspected` → `ConflictProven`, owned by the Lane DO |
 | Assembled | Verifying | KeelVerify instance created | — | `VerificationStarted` |
+| Assembled | Red | The candidate cannot be bundled (a symlink, a gitlink, an unsafe path) | The blame is a member (the one whose restacked commit introduces the entry) or `infra` (the base already holds it) | `BatchFailed` with that attribution; never bisected |
 | Verifying | Green | The union of the members' plans passes | Results fenced on `(batchId, attempt, chainEpoch)`: a result for another attempt or epoch is refused and never retried | `BatchVerified` (with the members, base and predecessors the Trunk DO needs) |
 | Verifying | Red | A step fails after a flake rerun | Fenced as above; a blamed change is a member | `BatchFailed` (attribution: a change, `interaction`, `infra`, or `unattributed` when several members could be to blame) |
 | Red | Bisected | More than one member, and the failure is `unattributed` | — | `CandidateBisected` (new batches) |
