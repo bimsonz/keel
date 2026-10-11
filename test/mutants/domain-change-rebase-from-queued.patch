@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.rebase-only-agent-owned-work
+# why: a queued change may be rebased under its batch's feet
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 9c8f6f6..8e3d737 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -412,7 +412,7 @@ export const decideChange = (
+         : refuse(change, command);
+ 
+     case "Rebase":
+-      return at("working", "bounced") &&
++      return at("working", "bounced", "queued") &&
+         change.baseSha !== undefined &&
+         command.from === change.baseSha &&
+         command.onto !== command.from

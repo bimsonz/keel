@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.rebase-stale-from
+# why: a rebase from a base the change never had is accepted
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 9c8f6f6..a134c48 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -414,7 +414,6 @@ export const decideChange = (
+     case "Rebase":
+       return at("working", "bounced") &&
+         change.baseSha !== undefined &&
+-        command.from === change.baseSha &&
+         command.onto !== command.from
+         ? Result.succeed([
+             ChangeRebased.make({ changeId: id, from: command.from, to: command.onto }),

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.rebase-moves-base, change.transitions
+# why: a rebase from Bounced also moves the change to Working
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 9c8f6f6..bd7818c 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -720,7 +720,7 @@ export const evolveChange = (
+         : illegal(change, event);
+     case "ChangeRebased":
+       return from("working", "bounced") && event.from === change.baseSha
+-        ? { ...change, baseSha: event.to }
++        ? { ...moveTo(change, "working"), baseSha: event.to }
+         : illegal(change, event);
+     case "PrecheckStarted":
+       return from("submitted") ? moveTo(change, "deriving") : illegal(change, event);
