@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/subject.test.ts
+# kills: b21.subject-id
+# why: the subject id hashes the key alone, so one key in two projects is one subject
+diff --git a/packages/core/src/application/coordination/subject.ts b/packages/core/src/application/coordination/subject.ts
+index 59fc567..312967d 100644
+--- a/packages/core/src/application/coordination/subject.ts
++++ b/packages/core/src/application/coordination/subject.ts
+@@ -33,7 +33,7 @@ const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+  * subjects.
+  */
+ export function subjectIdOf(projectId: ProjectId, key: SubjectKey): SubjectId {
+-  const bits = Array.from(sha256Hex(`${projectId}\n${key}`).split(""), (digit) =>
++  const bits = Array.from(sha256Hex(`${key}`).split(""), (digit) =>
+     Number.parseInt(digit, 16).toString(2).padStart(4, "0"),
+   )
+     .join("")

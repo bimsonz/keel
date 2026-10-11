@@ -119,6 +119,15 @@ function objects(answers: {
       rebase: async () => {
         throw new Error("this test never rebases");
       },
+      revise: async () => {
+        throw new Error("this test never revises");
+      },
+      rely: async () => {
+        throw new Error("this test never relies");
+      },
+      nearby: async () => {
+        throw new Error("this test never reads nearby");
+      },
       submit: async (command) => {
         sent.submit.push({ name: id, command });
         return encodeExit(ChangeCodecs.submit, answers.submit ?? Exit.succeed(change));

@@ -5,6 +5,9 @@ import type {
   DeclareInput,
   RebasedChange,
   RebaseInput,
+  RelyInput,
+  ReviseInput,
+  Revised,
   SubmitInput,
 } from "@keeltown/core/application/coordination";
 import type { PushRejected } from "@keeltown/core/domain/integration";
@@ -22,6 +25,7 @@ import {
   type PoolExhausted,
   type Preflight,
   Proposition,
+  type RevisionMismatch,
   type SketchNotFound,
 } from "@keeltown/core/domain/coordination";
 import type { IdempotencyConflict, InboxPage } from "@keeltown/core/domain/identity";
@@ -40,8 +44,11 @@ import type {
   AdoptResult,
   DeclareResult,
   InboxResult,
+  NearbyResult,
   Operations,
   RebaseResult,
+  RelyResult,
+  ReviseResult,
   StatusResult,
   SubmitResult,
 } from "../../../generated/http/app.gen.ts";
@@ -547,6 +554,233 @@ export function rebaseError(
           nextActions: [
             { kind: "escalate", title: "Ask an operator to move this change onto trunk by hand" },
           ],
+        }),
+      };
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
+}
+
+/**
+ * The revision an If-Match names: the strong tag `"<n>"`, or the bare `n` an
+ * MCP agent passes, read from the change's `revision`. A weak tag never
+ * matches under RFC 9110's strong comparison, so it is refused with the rest.
+ */
+const IF_MATCH = /^(?:"([1-9][0-9]{0,8})"|([1-9][0-9]{0,8}))$/;
+
+function ifMatchInput(value: string): Result.Result<number, Issues> {
+  const matched = IF_MATCH.exec(value.trim());
+  const digits = matched?.[1] ?? matched?.[2];
+  return digits === undefined
+    ? Result.fail([
+        {
+          path: ["if-match"],
+          message:
+            'Send the revision you last read as "<n>" or n (the change\'s `revision`); a weak tag never matches',
+        },
+      ])
+    : Result.succeed(Number(digits));
+}
+
+const ReviseFields = Schema.Struct({
+  changeId: ChangeId,
+  lease: LeaseId,
+  goal: Schema.optional(Schema.NonEmptyString),
+  footprint: Schema.optional(Schema.Array(FootprintEntry)),
+  premisesAdded: Schema.Array(Proposition),
+  premisesRetracted: Schema.Array(Proposition),
+  declaredEffects: Schema.optional(Schema.Array(Proposition)),
+});
+
+export function reviseInput(input: Input<"revise">): Result.Result<ReviseInput, Issues> {
+  const fields = decodeWith(ReviseFields, {
+    changeId: input.changeId,
+    lease: input["keel-lease"],
+    ...(input.goal === undefined ? {} : { goal: input.goal }),
+    ...(input.footprint === undefined ? {} : { footprint: input.footprint }),
+    premisesAdded: (input.premisesAdded ?? []).map(propositionInput),
+    premisesRetracted: (input.premisesRetracted ?? []).map(propositionInput),
+    ...(input.declaredEffects === undefined
+      ? {}
+      : { declaredEffects: input.declaredEffects.map(propositionInput) }),
+  });
+  const revision = ifMatchInput(input["if-match"]);
+  if (Result.isFailure(fields) || Result.isFailure(revision))
+    return Result.fail([
+      ...(Result.isFailure(fields) ? fields.failure : []),
+      ...(Result.isFailure(revision) ? revision.failure : []),
+    ]);
+  const { goal, footprint, declaredEffects, ...rest } = fields.success;
+  return Result.succeed({
+    ...rest,
+    ifMatchRevision: revision.success,
+    ...(goal === undefined ? {} : { goal }),
+    ...(footprint === undefined ? {} : { footprint }),
+    ...(declaredEffects === undefined ? {} : { declaredEffects }),
+    idempotencyKey: input["idempotency-key"],
+  });
+}
+
+/** What a revision or a rely leaves: the change at its new revision, and the preflight of its intent now. */
+function revisedBody(verb: string, revised: Revised) {
+  const { change, preflight } = revised;
+  const found = preflight.contradictions.length;
+  return envelope(
+    `${verb} ${change.id}, now at revision ${change.intent.revision}.` +
+      (found === 0
+        ? ""
+        : ` Preflight found ${found} contradiction${found === 1 ? "" : "s"} with another change: refine before you build on it.`),
+    { change: changeView(change), preflight: preflightView(preflight) },
+    [
+      {
+        kind: "call",
+        title: "Submit a commit once it is pushed to the workspace",
+        operationId: "submit",
+        args: { changeId: change.id },
+      },
+    ],
+  );
+}
+
+export function reviseOk(revised: Revised): ReviseResult {
+  return { status: 200, body: revisedBody("Revised", revised) };
+}
+
+function leaseStale(caller: Caller, error: LeaseStale) {
+  return {
+    status: 409 as const,
+    body: problem(409, "change.lease_stale", caller.requestId, {
+      detail: `Lease ${error.leaseId} is not the active lease on ${error.changeId}.`,
+      nextActions: [
+        {
+          kind: "read",
+          title: "Read the change to see who holds its lease now",
+          operationId: "Changes_getChange",
+          args: { changeId: error.changeId },
+        },
+      ],
+    }),
+  };
+}
+
+function reusedKey(caller: Caller, error: IdempotencyConflict, operationId: string, verb: string) {
+  return {
+    status: 409 as const,
+    body: problem(409, "request.idempotency_conflict", caller.requestId, {
+      detail: `Idempotency-Key ${error.idempotencyKey} was used for a different request.`,
+      nextActions: [{ kind: "call", title: `${verb} with a fresh Idempotency-Key`, operationId }],
+    }),
+  };
+}
+
+function stateRefused(caller: Caller, error: ChangeStateRefused) {
+  return {
+    status: 409 as const,
+    body: problem(409, "change.state_refused", caller.requestId, {
+      detail: `${error.changeId} is ${error.state}, where ${error.command} is not allowed.`,
+      nextActions: [statusOf(error.changeId)],
+    }),
+  };
+}
+
+export function reviseError(
+  caller: Caller,
+  error: ChangeNotFound | LeaseStale | RevisionMismatch | ChangeStateRefused | IdempotencyConflict,
+): ReviseResult {
+  switch (error._tag) {
+    case "ChangeNotFound":
+      return changeNotFound(caller, error);
+    case "LeaseStale":
+      return leaseStale(caller, error);
+    case "RevisionMismatch":
+      return {
+        status: 412,
+        body: problem(412, "change.revision_mismatch", caller.requestId, {
+          detail: `If-Match named revision ${error.expected}, but ${error.changeId} is at revision ${error.actual}.`,
+          nextActions: [
+            statusOf(error.changeId),
+            {
+              kind: "call",
+              title: `Once you have read what changed, revise again with If-Match "${error.actual}"`,
+              operationId: "revise",
+              args: { changeId: error.changeId, "if-match": `"${error.actual}"` },
+            },
+          ],
+        }),
+      };
+    case "ChangeStateRefused":
+      return stateRefused(caller, error);
+    case "IdempotencyConflict":
+      return reusedKey(caller, error, "revise", "Revise");
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
+}
+
+const RelyFields = Schema.Struct({ changeId: ChangeId, lease: LeaseId, premise: Proposition });
+
+export function relyInput(input: Input<"rely">): Result.Result<RelyInput, Issues> {
+  return Result.map(
+    decodeWith(RelyFields, {
+      changeId: input.changeId,
+      lease: input["keel-lease"],
+      premise: propositionInput(input.premise),
+    }),
+    (fields) => ({ ...fields, idempotencyKey: input["idempotency-key"] }),
+  );
+}
+
+export function relyOk(relied: Revised): RelyResult {
+  return { status: 200, body: revisedBody("Added the premise to", relied) };
+}
+
+export function relyError(
+  caller: Caller,
+  error: ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict,
+): RelyResult {
+  switch (error._tag) {
+    case "ChangeNotFound":
+      return changeNotFound(caller, error);
+    case "LeaseStale":
+      return leaseStale(caller, error);
+    case "ChangeStateRefused":
+      return stateRefused(caller, error);
+    case "IdempotencyConflict":
+      return reusedKey(caller, error, "rely", "Rely");
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
+}
+
+export function nearbyOk(changeId: ChangeId, preflight: Preflight): NearbyResult {
+  const found = preflight.contradictions.length;
+  return {
+    status: 200,
+    body: envelope(
+      `${preflight.neighbours.length} change${preflight.neighbours.length === 1 ? "" : "s"} near ${changeId}, ${found} contradiction${found === 1 ? "" : "s"}.`,
+      { preflight: preflightView(preflight) },
+    ),
+  };
+}
+
+export function nearbyError(
+  caller: Caller,
+  error: ChangeNotFound | ChangeInOtherProject,
+): NearbyResult {
+  switch (error._tag) {
+    case "ChangeNotFound":
+      return changeNotFound(caller, error);
+    case "ChangeInOtherProject":
+      return {
+        status: 403,
+        body: problem(403, "auth.insufficient_scope", caller.requestId, {
+          detail: `${error.changeId} is in another project; your token is bound to your own.`,
         }),
       };
     default: {

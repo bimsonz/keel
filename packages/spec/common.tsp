@@ -142,6 +142,7 @@ union ProblemCode {
   changeLeaseStale: "change.lease_stale",
   changeLeaseNotLapsed: "change.lease_not_lapsed",
   changeStateRefused: "change.state_refused",
+  changeRevisionMismatch: "change.revision_mismatch",
   changeCommitNotInWorkspace: "change.commit_not_in_workspace",
   workspacePoolExhausted: "workspace.pool_exhausted",
   workspaceBusy: "workspace.busy",

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel apps/keel/test/unit/subject.test.ts apps/keel/test/pool/relying.test.ts
+# kills: b21.relying-subscribes
+# why: the subject keeps the premise but never commits PremiseRelied for it
+diff --git a/packages/core/src/application/coordination/subject.ts b/packages/core/src/application/coordination/subject.ts
+index 59fc567..30d43fb 100644
+--- a/packages/core/src/application/coordination/subject.ts
++++ b/packages/core/src/application/coordination/subject.ts
+@@ -156,7 +156,7 @@ export function hearSubject(
+     if (premise.subject !== key) continue;
+     if (before.premises.some((held) => sameProposition(held, premise))) continue;
+     const relied = PremiseRelied.make({ subjectId, changeId: relier, premise });
+-    drafts.push({ payload: payloadOf(Schema.encodeSync(PremiseRelied)(relied)) });
++    void relied;
+   }
+   return drafts.length === 0
+     ? { drafts: [] }

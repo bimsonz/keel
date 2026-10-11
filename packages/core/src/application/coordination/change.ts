@@ -16,11 +16,17 @@ import {
   type FootprintEntry,
   type LeaseNotLapsed,
   type LeaseStale,
+  type Intent,
+  type IntentRevision,
+  type LiveChange,
   type PoolExhausted,
-  type Preflight,
+  Preflight,
   type Proposition,
   renew,
+  reviseIntent,
   type RevisionMismatch,
+  type SubjectKey,
+  subjectAncestors,
   type WithdrawAuthority,
 } from "../../domain/coordination/index.ts";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
@@ -61,6 +67,7 @@ import {
   EventOutbox,
   EVERY_TYPE,
   Ids,
+  LiveChanges,
   type Remedy,
   type Stored,
   type SubmissionStatus,
@@ -73,6 +80,7 @@ import {
   type WorkspaceGrant,
   WorkspaceRebaser,
 } from "../ports/index.ts";
+import { preflightFor } from "./preflight.ts";
 
 /**
  * The Change DO's use-cases (`change:<ULID>`). Each takes what it must look up
@@ -110,14 +118,6 @@ export interface WorkspaceView extends HeldWorkspace {
   readonly baseSha: CommitSha;
 }
 
-/** At L1 no premise is compared yet, so preflight finds nothing and suggests proceeding. */
-export const L1_PREFLIGHT: Preflight = {
-  neighbours: [],
-  contradictions: [],
-  precedents: [],
-  suggestedMove: "proceed",
-};
-
 /** At L1 nothing blocks a change: conflicts and drift arrive with L2, and Precheck refuses guard edits itself. */
 export const L1_UNBLOCKED: Blockers = {
   openProvenConflicts: [],
@@ -132,6 +132,35 @@ export const laneOf = (projectId: ProjectId): string => `lane:${projectId}:main`
 export const PRECHECK = "workflow:Precheck";
 /** The events after which the change's pool collects its workspace. */
 export const CHANGE_ENDS = ["ChangeLanded", "ChangeWithdrawn", "ChangeSuperseded"] as const;
+
+/** The events its project's live-change index hears of each change, subscribed at declare. */
+export const LIVE_INDEX_HEARS = [
+  "IntentDeclared",
+  "IntentRevised",
+  "EffectsDerived",
+  ...CHANGE_ENDS,
+] as const;
+
+/** What a Subject DO hears of each change relying on or affecting its key, or a key beneath it. */
+export const SUBJECT_HEARS = ["IntentDeclared", "IntentRevised", ...CHANGE_ENDS] as const;
+
+/** A project's Subject DO for a key. */
+export const subjectAddress = (projectId: ProjectId, key: SubjectKey): string =>
+  `subj:${projectId}:${key}`;
+
+/**
+ * Every subject an intent's premises and declared effects name, with each
+ * one's ancestors: the Subject DOs that keep the change. Relying is subscribing.
+ */
+export function subjectKeysOf(
+  intent: Pick<Intent, "premises" | "declaredEffects">,
+): readonly SubjectKey[] {
+  const keys = new Set<SubjectKey>();
+  for (const proposition of [...intent.premises, ...(intent.declaredEffects ?? [])])
+    for (const key of [proposition.subject, ...subjectAncestors(proposition.subject)])
+      keys.add(key);
+  return [...keys];
+}
 /**
  * What the change's lane hears from it: each queueing, each requeue (the lane
  * re-enqueues only then, never by itself), and an end that drops it from the queue.
@@ -182,6 +211,19 @@ export interface ReviseChange {
 export interface RevisedChange {
   readonly change: Change;
   readonly preflight: Preflight;
+}
+
+/** Add one premise under the lease: a revision of one, and a subscription to its subject. */
+export interface RelyChange {
+  readonly agentId: AgentId;
+  readonly leaseId: LeaseId;
+  readonly premise: Proposition;
+  readonly idempotencyKey: string;
+}
+
+/** Read what is near a change: the reader's project, from its token, must be the change's. */
+export interface NearbyChange {
+  readonly projectId: ProjectId;
 }
 
 export interface SubmitChange {
@@ -275,6 +317,37 @@ const inProject = (store: Store, changeId: ChangeId): { readonly project?: Proje
   const project = heldWorkspace(store, changeId)?.projectId;
   return project === undefined ? {} : { project };
 };
+
+const decodePreflight = Schema.decodeUnknownSync(Preflight);
+
+/** The preflight a committed declare, revise or rely issued: what its retry answers. */
+function issuedPreflight(events: readonly EventEnvelope[]): Preflight {
+  const issued = events.find((event) => event.type === "PreflightIssued");
+  if (issued === undefined) throw new Error("the commit issued no preflight");
+  return decodePreflight(issued.payload);
+}
+
+/** The project's live changes, read once before a command's commit; none for a change that holds no workspace. */
+const liveOf = (projectId: ProjectId | undefined) =>
+  projectId === undefined
+    ? Effect.succeed<readonly LiveChange[]>([])
+    : LiveChanges.use((index) => index.of(projectId));
+
+/**
+ * Subscribes the Subject DO of every key the intent names (ancestors
+ * included) to the change, scoped to it. Subscribing again is a no-op, and a
+ * subject the change stops naming keeps hearing it, and drops it.
+ */
+function subscribeSubjects(
+  tx: Transaction,
+  changeId: ChangeId,
+  intent: Pick<Intent, "premises" | "declaredEffects">,
+): void {
+  const projectId = heldWorkspace(tx.store, changeId)?.projectId;
+  if (projectId === undefined) return;
+  for (const key of subjectKeysOf(intent))
+    tx.outbox.subscribe(subjectAddress(projectId, key), SUBJECT_HEARS, changeRef(changeId));
+}
 
 const readChange = (changeId: ChangeId): NextAction => ({
   kind: "read",
@@ -445,10 +518,11 @@ export const declare: (
 ) => Effect.Effect<
   DeclaredChange,
   ChangeStateRefused | PoolExhausted | IdempotencyConflict,
-  Clock | Ids | EntityStore | EventOutbox | WorkspacePool
+  Clock | Ids | EntityStore | EventOutbox | WorkspacePool | LiveChanges
 > = Effect.fn("coordination/declare")(function* (command: DeclareChange) {
   const { changeId } = command;
   const leaseId = yield* (yield* Ids).next("lse");
+  const live = yield* liveOf(command.projectId);
   const grant = yield* (yield* WorkspacePool).grant(command.projectId, changeId);
   const committed = yield* commit(
     {
@@ -459,6 +533,16 @@ export const declare: (
       project: command.projectId,
     },
     (tx) => {
+      const intent: Intent = {
+        revision: 1,
+        goal: command.goal,
+        footprint: command.footprint,
+        premises: command.premises,
+        ...(command.declaredEffects === undefined
+          ? {}
+          : { declaredEffects: command.declaredEffects }),
+      };
+      const { preflight } = preflightFor(changeId, intent, live);
       const decided = transition(
         tx,
         changeId,
@@ -477,7 +561,7 @@ export const declare: (
               ? {}
               : { declaredEffects: command.declaredEffects }),
             leaseId,
-            preflight: L1_PREFLIGHT,
+            preflight,
           },
           { _tag: "Start", workspaceId: grant.workspaceId, baseSha: grant.baseSha },
         ],
@@ -496,10 +580,13 @@ export const declare: (
       tx.outbox.subscribe(`agent:${command.agentId}`, EVERY_TYPE);
       tx.outbox.subscribe(PRECHECK, ["ChangeSubmitted"]);
       tx.outbox.subscribe(`pool:${command.projectId}`, CHANGE_ENDS);
+      tx.outbox.subscribe(`project:${command.projectId}`, LIVE_INDEX_HEARS, changeRef(changeId));
+      subscribeSubjects(tx, changeId, intent);
       return Result.succeed(asTransition(decided.success));
     },
   ).pipe(Effect.onError(() => releaseUnheld(changeId, command.projectId, grant)));
-  if (!committed.duplicate) return { change: committed.value, preflight: L1_PREFLIGHT, grant };
+  if (!committed.duplicate)
+    return { change: committed.value, preflight: issuedPreflight(committed.events), grant };
   yield* releaseUnheld(changeId, command.projectId, grant);
   if (!committed.sameCommand)
     return yield* new IdempotencyConflict({ idempotencyKey: command.idempotencyKey });
@@ -508,7 +595,7 @@ export const declare: (
   // A retry after the change ended (and its workspace was collected) has no workspace to hand back.
   if (heldWorkspace(yield* EntityStore, changeId)?.workspaceId !== grant.workspaceId)
     return yield* refused(change, "Declare");
-  return { change, preflight: L1_PREFLIGHT, grant };
+  return { change, preflight: issuedPreflight(committed.events), grant };
 });
 
 /** Revises the intent under the lease, at the revision the caller last read. */
@@ -518,8 +605,9 @@ export const revise: (
 ) => Effect.Effect<
   RevisedChange,
   ChangeNotFound | LeaseStale | RevisionMismatch | ChangeStateRefused | IdempotencyConflict,
-  Clock | EntityStore | EventOutbox
+  Clock | EntityStore | EventOutbox | LiveChanges
 > = Effect.fn("coordination/revise")(function* (changeId: ChangeId, command: ReviseChange) {
+  const live = yield* liveOf(heldWorkspace(yield* EntityStore, changeId)?.projectId);
   const committed = yield* commit(
     {
       entity: changeRef(changeId),
@@ -528,35 +616,138 @@ export const revise: (
       actor: agentActor(command.agentId),
       ...inProject(yield* EntityStore, changeId),
     },
-    (tx) =>
-      Result.map(
-        transition(
-          tx,
-          changeId,
-          ["ChangeNotFound", "LeaseStale", "RevisionMismatch", "ChangeStateRefused"],
-          [
-            {
-              _tag: "Revise",
-              leaseId: command.leaseId,
-              ifMatchRevision: command.ifMatchRevision,
-              ...(command.goal === undefined ? {} : { goal: command.goal }),
-              ...(command.footprint === undefined ? {} : { footprint: command.footprint }),
-              premisesAdded: command.premisesAdded,
-              premisesRetracted: command.premisesRetracted,
-              ...(command.declaredEffects === undefined
-                ? {}
-                : { declaredEffects: command.declaredEffects }),
-              preflight: L1_PREFLIGHT,
-            },
-          ],
-          command.leaseId,
-        ),
-        asTransition,
-      ),
+    (tx) => {
+      const after = intentAfter(tx, changeId, {
+        ...(command.goal === undefined ? {} : { goal: command.goal }),
+        ...(command.footprint === undefined ? {} : { footprint: command.footprint }),
+        premisesAdded: command.premisesAdded,
+        premisesRetracted: command.premisesRetracted,
+        ...(command.declaredEffects === undefined
+          ? {}
+          : { declaredEffects: command.declaredEffects }),
+      });
+      const decided = transition(
+        tx,
+        changeId,
+        ["ChangeNotFound", "LeaseStale", "RevisionMismatch", "ChangeStateRefused"],
+        [
+          {
+            _tag: "Revise",
+            preflight: preflightOf(changeId, after, live),
+            leaseId: command.leaseId,
+            ifMatchRevision: command.ifMatchRevision,
+            ...(command.goal === undefined ? {} : { goal: command.goal }),
+            ...(command.footprint === undefined ? {} : { footprint: command.footprint }),
+            premisesAdded: command.premisesAdded,
+            premisesRetracted: command.premisesRetracted,
+            ...(command.declaredEffects === undefined
+              ? {}
+              : { declaredEffects: command.declaredEffects }),
+          },
+        ],
+        command.leaseId,
+      );
+      if (Result.isFailure(decided)) return Result.fail(decided.failure);
+      if (after !== undefined) subscribeSubjects(tx, changeId, after);
+      return Result.succeed(asTransition(decided.success));
+    },
   );
   const change = yield* settled(changeId, command.idempotencyKey, committed);
-  return { change, preflight: L1_PREFLIGHT };
+  return { change, preflight: issuedPreflight(committed.events) };
 });
+
+/**
+ * Adds one premise under the lease: the domain's Rely, a revision of one
+ * whose preflight reads the intent it leaves. Relying is subscribing: the
+ * premise's subject and its ancestors hear the change from now on.
+ */
+export const rely: (
+  changeId: ChangeId,
+  command: RelyChange,
+) => Effect.Effect<
+  RevisedChange,
+  ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict,
+  Clock | EntityStore | EventOutbox | LiveChanges
+> = Effect.fn("coordination/rely")(function* (changeId: ChangeId, command: RelyChange) {
+  const live = yield* liveOf(heldWorkspace(yield* EntityStore, changeId)?.projectId);
+  const committed = yield* commit(
+    {
+      entity: changeRef(changeId),
+      cause: command.idempotencyKey,
+      fingerprint: fingerprintOf("rely", command),
+      actor: agentActor(command.agentId),
+      ...inProject(yield* EntityStore, changeId),
+    },
+    (tx) => {
+      const after = intentAfter(tx, changeId, {
+        premisesAdded: [command.premise],
+        premisesRetracted: [],
+      });
+      const decided = transition(
+        tx,
+        changeId,
+        ["ChangeNotFound", "LeaseStale", "ChangeStateRefused"],
+        [
+          {
+            _tag: "Rely",
+            leaseId: command.leaseId,
+            premise: command.premise,
+            preflight: preflightOf(changeId, after, live),
+          },
+        ],
+        command.leaseId,
+      );
+      if (Result.isFailure(decided)) return Result.fail(decided.failure);
+      subscribeSubjects(tx, changeId, { premises: [command.premise] });
+      return Result.succeed(asTransition(decided.success));
+    },
+  );
+  const change = yield* settled(changeId, command.idempotencyKey, committed);
+  return { change, preflight: issuedPreflight(committed.events) };
+});
+
+/**
+ * What is near a change now: the preflight of its stored intent against its
+ * project's live changes. Read-only: it commits nothing. Only an agent of the
+ * change's project may read it.
+ */
+export const nearby: (
+  changeId: ChangeId,
+  command: NearbyChange,
+) => Effect.Effect<Preflight, ChangeNotFound | ChangeInOtherProject, EntityStore | LiveChanges> =
+  Effect.fn("coordination/nearby")(function* (changeId: ChangeId, command: NearbyChange) {
+    const store = yield* EntityStore;
+    const change = storedChange(store, changeId);
+    if (change === undefined) return yield* notFound(changeId);
+    const projectId = heldWorkspace(store, changeId)?.projectId;
+    if (projectId !== command.projectId) return yield* new ChangeInOtherProject({ changeId });
+    return preflightFor(changeId, change.intent, yield* liveOf(projectId)).preflight;
+  });
+
+/**
+ * The intent a revision would leave: the change's stored intent revised as
+ * asked. Undefined for a change with no state, which the domain refuses
+ * before its preflight matters.
+ */
+function intentAfter(
+  tx: Transaction,
+  changeId: ChangeId,
+  revision: Omit<IntentRevision, "revision">,
+): Intent | undefined {
+  const change = storedChange(tx.store, changeId);
+  if (change === undefined) return undefined;
+  return reviseIntent(change.intent, { ...revision, revision: change.intent.revision + 1 });
+}
+
+/** The preflight of an intent against the project's live changes; nothing to find for a change with no state. */
+const preflightOf = (
+  changeId: ChangeId,
+  intent: Intent | undefined,
+  live: readonly LiveChange[],
+): Preflight =>
+  intent === undefined
+    ? { neighbours: [], contradictions: [], precedents: [], suggestedMove: "proceed" }
+    : preflightFor(changeId, intent, live).preflight;
 
 /**
  * Submits a commit under the lease. Whether the commit is in the change's

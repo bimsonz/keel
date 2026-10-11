@@ -1,6 +1,7 @@
+import { DerivedEffect, Intent } from "@keeltown/core/domain/coordination";
 import { IdempotencyConflict } from "@keeltown/core/domain/identity";
 import { ProjectNotFound } from "@keeltown/core/domain/integration";
-import { AgentId, Glob, InstantSchema, ProjectId } from "@keeltown/core/kernel";
+import { AgentId, ChangeId, Glob, InstantSchema, ProjectId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
@@ -70,7 +71,15 @@ export const ProjectView = Schema.Struct({
  */
 export const RepoNotFound = Schema.TaggedStruct("RepoNotFound", { repo: RepoRef });
 
+/** One live change in the project's index: its current intent and the effects last derived for it. */
+export const LiveChangeView = Schema.Struct({
+  id: ChangeId,
+  intent: Intent,
+  derived: Schema.Array(DerivedEffect),
+});
+
 export const ProjectCodecs = {
+  liveChanges: exitCodec(Schema.Array(LiveChangeView), Schema.Never),
   settings: exitCodec(ProjectSettings, ProjectNotFound),
   putSettings: exitCodec(ProjectSettings, Schema.Union([ProjectNotFound, IdempotencyConflict])),
   createProject: exitCodec(ProjectView, Schema.Union([IdempotencyConflict, RepoNotFound])),
@@ -78,6 +87,8 @@ export const ProjectCodecs = {
 
 /** The Project DO (`project:<id>`): settings and the subject registry. */
 export interface ProjectRpc extends EventReceiverRpc {
+  /** The project's live changes, from each one's declare until it ends, for preflight. */
+  liveChanges(): Promise<ExitJson>;
   settings(): Promise<ExitJson>;
   putSettings(command: typeof PutSettingsCommand.Encoded): Promise<ExitJson>;
   createProject(command: typeof CreateProjectCommand.Encoded): Promise<ExitJson>;

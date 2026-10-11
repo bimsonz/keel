@@ -8,6 +8,8 @@ import type {
   LeaseNotLapsed,
   LeaseStale,
   PoolExhausted,
+  Preflight,
+  RevisionMismatch,
   SketchNotFound,
 } from "../../domain/coordination/index.ts";
 import type { IdempotencyConflict, Principal } from "../../domain/identity/index.ts";
@@ -28,6 +30,9 @@ import type {
   DeclareInput,
   RebasedChange,
   RebaseInput,
+  RelyInput,
+  ReviseInput,
+  Revised,
   SubmitInput,
 } from "../coordination/index.ts";
 import type { RepoRef } from "./code-host.ts";
@@ -120,6 +125,31 @@ export class Changes extends Context.Service<
       | PushRejected
       | PackTooLarge
     >;
+    /**
+     * Revises the intent under the lease, at the revision the caller last read
+     * (RevisionMismatch otherwise), and answers the preflight of the intent it
+     * leaves. Idempotent by Idempotency-Key per change.
+     */
+    readonly revise: (
+      principal: Principal,
+      input: ReviseInput,
+    ) => Effect.Effect<
+      Revised,
+      ChangeNotFound | LeaseStale | RevisionMismatch | ChangeStateRefused | IdempotencyConflict
+    >;
+    /** Adds one premise under the lease, subscribing the change to its subject; idempotent by Idempotency-Key per change. */
+    readonly rely: (
+      principal: Principal,
+      input: RelyInput,
+    ) => Effect.Effect<
+      Revised,
+      ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict
+    >;
+    /** The preflight of the change's intent as it stands; commits nothing. Only for an agent of the change's project. */
+    readonly nearby: (
+      principal: Principal,
+      changeId: ChangeId,
+    ) => Effect.Effect<Preflight, ChangeNotFound | ChangeInOtherProject>;
     readonly get: (changeId: ChangeId) => Effect.Effect<Change, ChangeNotFound>;
     /**
      * The change once its submission state moves, or as it stands when

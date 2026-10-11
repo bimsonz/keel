@@ -1,4 +1,4 @@
-import type { RebasedChange } from "@keeltown/core/application/coordination";
+import type { LeasedCall, RebasedChange, Revised } from "@keeltown/core/application/coordination";
 import {
   AGENT_OWNED,
   type Change,
@@ -12,7 +12,10 @@ import {
   LeaseStale,
   lapsesAt,
   PoolExhausted,
+  type Intent,
   type Preflight,
+  reviseIntent,
+  RevisionMismatch,
   SketchNotFound,
   type SubjectKey,
   TERMINAL,
@@ -53,6 +56,16 @@ const rebasedAnswer = (change: Change): RebasedChange => ({
 });
 /** The states a rebase is taken in, as the domain's Rebase allows. */
 const REBASABLE: ReadonlySet<ChangeState> = new Set(["working", "bounced"]);
+/** The states a revision is taken in, as the domain's Revise allows; a rely is taken only while working. */
+const REVISABLE: ReadonlySet<ChangeState> = new Set(["working", "drifted", "bounced"]);
+const RELIABLE: ReadonlySet<ChangeState> = new Set(["working"]);
+/** No live index in memory: preflight finds nothing near. */
+const NOTHING_NEAR: Preflight = {
+  neighbours: [],
+  contradictions: [],
+  precedents: [],
+  suggestedMove: "proceed",
+};
 /** Trunk's head as the in-memory Trunk DO reports it, which a rebase moves a change onto. */
 const MEMORY_TRUNK_HEAD = CommitSha.make("7".repeat(40));
 
@@ -247,6 +260,40 @@ export function makeChangesMemory(
   const adoptions = new Map<string, { readonly caller: string; readonly change: Change }>();
   /** Changes whose lease has lapsed by `lapse`, as the deadline passing would leave them. */
   const lapsed = new Set<ChangeId>();
+  /** A revise or rely replays by its key per change; the same key with another body is a conflict. */
+  const amendments = new Map<string, { readonly body: string; readonly answer: Revised }>();
+  /**
+   * Revises a change's intent under its lease, as the DO decides it: the
+   * change, then the lease, then its state, then `check`, then `next`.
+   */
+  const amend = <E>(
+    input: LeasedCall,
+    command: "Revise" | "Rely",
+    body: unknown,
+    states: ReadonlySet<ChangeState>,
+    check: (change: Change) => Effect.Effect<void, E>,
+    next: (intent: Intent) => Intent,
+  ) =>
+    Effect.gen(function* () {
+      const key = `${input.changeId} ${input.idempotencyKey}`;
+      const replayed = amendments.get(key);
+      if (replayed !== undefined)
+        return replayed.body === JSON.stringify(body)
+          ? replayed.answer
+          : yield* new IdempotencyConflict({ idempotencyKey: input.idempotencyKey });
+      const change = changes.get(input.changeId);
+      if (change === undefined) return yield* new ChangeNotFound({ changeId: input.changeId });
+      if (change.lease.id !== input.lease || change.lease.state !== "active")
+        return yield* new LeaseStale({ changeId: input.changeId, leaseId: input.lease });
+      if (!states.has(change.state))
+        return yield* new ChangeStateRefused({ changeId: change.id, state: change.state, command });
+      yield* check(change);
+      const amended: Change = { ...change, intent: next(change.intent) };
+      changes.set(change.id, amended);
+      const answer: Revised = { change: amended, preflight: NOTHING_NEAR };
+      amendments.set(key, { body: JSON.stringify(body), answer });
+      return answer;
+    });
   let sequence = 0;
   let tokens = 0;
   const grant = (changeId: ChangeId, now: Instant): WorkspaceGrant => {
@@ -475,6 +522,58 @@ export function makeChangesMemory(
             changes.set(change.id, rebased);
             rebases.set(`${input.changeId} ${input.idempotencyKey}`, rebased);
             return rebasedAnswer(rebased);
+          }),
+        revise: (_principal, input) => {
+          const { idempotencyKey: _key, ...body } = input;
+          return amend(
+            input,
+            "Revise",
+            body,
+            REVISABLE,
+            (change) =>
+              change.intent.revision === input.ifMatchRevision
+                ? Effect.void
+                : Effect.fail(
+                    new RevisionMismatch({
+                      changeId: change.id,
+                      expected: input.ifMatchRevision,
+                      actual: change.intent.revision,
+                      nextActions: [],
+                    }),
+                  ),
+            (intent) =>
+              reviseIntent(intent, {
+                revision: intent.revision + 1,
+                ...(input.goal === undefined ? {} : { goal: input.goal }),
+                ...(input.footprint === undefined ? {} : { footprint: input.footprint }),
+                premisesAdded: input.premisesAdded,
+                premisesRetracted: input.premisesRetracted,
+                ...(input.declaredEffects === undefined
+                  ? {}
+                  : { declaredEffects: input.declaredEffects }),
+              }),
+          );
+        },
+        rely: (_principal, input) =>
+          amend(
+            input,
+            "Rely",
+            { premise: input.premise },
+            RELIABLE,
+            () => Effect.void,
+            (intent) =>
+              reviseIntent(intent, {
+                revision: intent.revision + 1,
+                premisesAdded: [input.premise],
+                premisesRetracted: [],
+              }),
+          ),
+        nearby: (principal, changeId) =>
+          Effect.gen(function* () {
+            if (!changes.has(changeId)) return yield* new ChangeNotFound({ changeId });
+            if (projects.get(changeId) !== principal.projectId)
+              return yield* new ChangeInOtherProject({ changeId });
+            return NOTHING_NEAR;
           }),
         get: (changeId) =>
           Effect.suspend(() => {

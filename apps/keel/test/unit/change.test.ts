@@ -22,6 +22,7 @@ import {
   makeCodeHostMemory,
   makeEventOutboxMemory,
   makeIdsMemory,
+  makeLiveChangesMemory,
   makeManualClock,
   makeWorkspacePoolMemory,
   sampleProjectId,
@@ -49,14 +50,16 @@ function changeObject(options: { readonly capacity?: number } = {}) {
   const clock = makeManualClock();
   const pool = makeWorkspacePoolMemory({ baseSha: BASE, ...options });
   const code = makeCodeHostMemory();
+  const live = makeLiveChangesMemory();
   const layer = Layer.mergeAll(
     makeEventOutboxMemory().layer,
     makeIdsMemory().layer,
     clock.layer,
     pool.layer,
     code.layer,
+    live.layer,
   );
-  return { clock, pool, layer };
+  return { clock, pool, live, layer };
 }
 
 const declaring = (overrides: Record<string, unknown> = {}) =>

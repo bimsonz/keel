@@ -111,6 +111,9 @@ async function promoting() {
       Changes.of({
         adopt: () => Effect.die(new Error("the Lane never adopts")),
         rebase: () => Effect.die(new Error("the Lane never rebases")),
+        revise: () => Effect.die(new Error("the Lane never revises")),
+        rely: () => Effect.die(new Error("the Lane never relies")),
+        nearby: () => Effect.die(new Error("the Lane never reads nearby")),
         get: () => Effect.die(new Error("no change is queued in a trunk test")),
         workspace: () => Effect.die(new Error("no change is queued in a trunk test")),
         declare: () => Effect.die(new Error("the Lane never declares")),

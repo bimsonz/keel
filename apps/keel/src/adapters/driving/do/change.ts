@@ -7,11 +7,13 @@ import {
   getChange,
   HeldWorkspace,
   lapseLease,
+  nearby,
   planCompiled,
   precheckRefused,
   precheckStarted,
   reactToBatch,
   rebase,
+  rely,
   revise,
   submissionStatus,
   submit,
@@ -31,11 +33,13 @@ import {
   ChangeCodecs,
   type ChangeRpc,
   DeclareCommand,
+  NearbyCommand,
   type ExitCodec,
   PlanCompiledCommand,
   PrecheckRefusedCommand,
   PrecheckStartedCommand,
   RebaseCommand,
+  RelyCommand,
   ReviseCommand,
   SubmitCommand,
 } from "../../../rpc/index.ts";
@@ -109,6 +113,22 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
       Effect.flatMap((revising) => revise(changeId, revising)),
     );
     return this.answer(ChangeCodecs.revise, program);
+  }
+
+  async rely(command: typeof RelyCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(RelyCommand, command).pipe(
+      Effect.flatMap((relying) => rely(changeId, relying)),
+    );
+    return this.answer(ChangeCodecs.rely, program);
+  }
+
+  async nearby(command: typeof NearbyCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(NearbyCommand, command).pipe(
+      Effect.flatMap((reading) => nearby(changeId, reading)),
+    );
+    return this.answer(ChangeCodecs.nearby, program);
   }
 
   async submit(command: typeof SubmitCommand.Encoded) {

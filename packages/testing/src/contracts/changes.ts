@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { type DeclareInput, type SubmitInput } from "@keeltown/core/application/coordination";
-import { FootprintEntry } from "@keeltown/core/domain/coordination";
+import { FootprintEntry, Proposition } from "@keeltown/core/domain/coordination";
 import type { Principal } from "@keeltown/core/domain/identity";
 import { AgentId, ChangeId, CommitSha, LeaseId, ProjectId } from "@keeltown/core/kernel";
 import { Changes, type WorkspaceGrant } from "@keeltown/core/ports";
@@ -47,6 +47,13 @@ function declaration(goal = "Cache permission lookups per request"): DeclareInpu
 }
 
 const NOWHERE = Schema.decodeUnknownSync(CommitSha)("f".repeat(40));
+
+const premise = Schema.decodeUnknownSync(Proposition)({
+  subject: "authz.permission-evaluation",
+  predicate: "freshness",
+  relation: "at-most",
+  value: "per-request",
+});
 
 /** A declared change with a commit pushed to its workspace, and a submit for it. */
 /** A caller of the harness's making, or a fresh one. */
@@ -327,6 +334,106 @@ export function describeChangesContract(adapter: string, make: () => ChangesHarn
           );
           expect(error).toMatchObject({ _tag: "ChangeInOtherProject", changeId: result.change.id });
           expect((yield* changes.get(result.change.id)).lease.id).toBe(result.change.lease.id);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[b21.changes-revise] revises at the revision last read, replays its key, and refuses a stale revision as RevisionMismatch",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const changes = yield* Changes;
+          const { who, result } = yield* declared(harness);
+          const input = {
+            changeId: result.change.id,
+            lease: result.change.lease.id,
+            idempotencyKey: `revise-${crypto.randomUUID()}`,
+            ifMatchRevision: 1,
+            goal: "Cache permission lookups per session",
+            premisesAdded: [premise],
+            premisesRetracted: [],
+          };
+          const revised = yield* changes.revise(who, input);
+          expect(revised.change.intent).toMatchObject({
+            revision: 2,
+            goal: "Cache permission lookups per session",
+            premises: [premise],
+          });
+          expect(revised.preflight.contradictions).toEqual([]);
+          expect((yield* changes.revise(who, input)).change.intent.revision).toBe(2);
+          const reused = yield* Effect.flip(changes.revise(who, { ...input, goal: "another" }));
+          expect(reused).toMatchObject({ _tag: "IdempotencyConflict" });
+          const stale = yield* Effect.flip(
+            changes.revise(who, { ...input, idempotencyKey: `revise-${crypto.randomUUID()}` }),
+          );
+          expect(stale).toMatchObject({ _tag: "RevisionMismatch", expected: 1, actual: 2 });
+          const fenced = yield* Effect.flip(
+            changes.revise(who, {
+              ...input,
+              ifMatchRevision: 2,
+              lease: Schema.decodeUnknownSync(LeaseId)(fresh("lse")),
+              idempotencyKey: `revise-${crypto.randomUUID()}`,
+            }),
+          );
+          expect(fenced).toMatchObject({ _tag: "LeaseStale" });
+          expect((yield* changes.get(result.change.id)).intent.revision).toBe(2);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[b21.changes-rely] adds one premise at the next revision, replays its key, and refuses another lease",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const changes = yield* Changes;
+          const { who, result } = yield* declared(harness);
+          const input = {
+            changeId: result.change.id,
+            lease: result.change.lease.id,
+            idempotencyKey: `rely-${crypto.randomUUID()}`,
+            premise,
+          };
+          const relied = yield* changes.rely(who, input);
+          expect(relied.change.intent).toMatchObject({ revision: 2, premises: [premise] });
+          expect(relied.preflight.suggestedMove).toBe("proceed");
+          expect((yield* changes.rely(who, input)).change.intent.revision).toBe(2);
+          const fenced = yield* Effect.flip(
+            changes.rely(who, {
+              ...input,
+              lease: Schema.decodeUnknownSync(LeaseId)(fresh("lse")),
+              idempotencyKey: `rely-${crypto.randomUUID()}`,
+            }),
+          );
+          expect(fenced).toMatchObject({ _tag: "LeaseStale", changeId: result.change.id });
+          expect((yield* changes.get(result.change.id)).intent.revision).toBe(2);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[b21.changes-nearby] reads what is near for an agent of the change's project, and refuses another project",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const changes = yield* Changes;
+          const { who, result } = yield* declared(harness);
+          const near = yield* changes.nearby(who, result.change.id);
+          expect(near).toMatchObject({ contradictions: [], suggestedMove: "proceed" });
+          const foreign: Principal = {
+            ...who,
+            projectId: Schema.decodeUnknownSync(ProjectId)(fresh("prj")),
+          };
+          const refused = yield* Effect.flip(changes.nearby(foreign, result.change.id));
+          expect(refused).toMatchObject({
+            _tag: "ChangeInOtherProject",
+            changeId: result.change.id,
+          });
+          const changeId = Schema.decodeUnknownSync(ChangeId)(fresh("chg"));
+          const missing = yield* Effect.flip(changes.nearby(who, changeId));
+          expect(missing).toMatchObject({ _tag: "ChangeNotFound", changeId });
+          expect((yield* changes.get(result.change.id)).intent.revision).toBe(1);
         }).pipe(Effect.provide(harness.layer));
       },
     );

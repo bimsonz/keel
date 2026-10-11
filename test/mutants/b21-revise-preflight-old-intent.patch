@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/preflight.test.ts
+# kills: b21.revise-preflight
+# why: a revision's preflight reads the stored intent, not the one the revision leaves, so a contradiction it adds goes unseen
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index c8dce43..939aba8 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -633,7 +633,7 @@ export const revise: (
+         [
+           {
+             _tag: "Revise",
+-            preflight: preflightOf(changeId, after, live),
++            preflight: preflightOf(changeId, storedChange(tx.store, changeId)?.intent, live),
+             leaseId: command.leaseId,
+             ifMatchRevision: command.ifMatchRevision,
+             ...(command.goal === undefined ? {} : { goal: command.goal }),

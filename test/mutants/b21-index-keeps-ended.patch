@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel packages/testing/test/ports.test.ts apps/keel/test/pool/adapters.test.ts
+# kills: b21.live-index
+# why: the index keeps an ended change, so preflight keeps reporting a change that can no longer land
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index d6dca6b..a6a614e 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -75,8 +75,7 @@ export function hearLiveChange(store: Store, event: EventEnvelope): void {
+       return;
+     }
+     default:
+-      if ((CHANGE_ENDS as readonly string[]).includes(event.type))
+-        store.remove(LIVE_CHANGE, changeId);
++      return;
+   }
+ }
+ 

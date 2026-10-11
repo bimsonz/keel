@@ -2,15 +2,15 @@
 # kills: b11.stale-lease
 # why: revise authorises with the lease the change holds instead of the caller's, so a fenced token still writes
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 29e615f..dca9c00 100644
+index c8dce43..92685a1 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -428,7 +428,7 @@ export const revise: (
-           [
-             {
-               _tag: "Revise",
--              leaseId: command.leaseId,
-+              leaseId: storedChange(tx.store, changeId)?.lease.id ?? command.leaseId,
-               ifMatchRevision: command.ifMatchRevision,
-               ...(command.goal === undefined ? {} : { goal: command.goal }),
-               ...(command.footprint === undefined ? {} : { footprint: command.footprint }),
+@@ -634,7 +634,7 @@ export const revise: (
+           {
+             _tag: "Revise",
+             preflight: preflightOf(changeId, after, live),
+-            leaseId: command.leaseId,
++            leaseId: storedChange(tx.store, changeId)?.lease.id ?? command.leaseId,
+             ifMatchRevision: command.ifMatchRevision,
+             ...(command.goal === undefined ? {} : { goal: command.goal }),
+             ...(command.footprint === undefined ? {} : { footprint: command.footprint }),

@@ -1,10 +1,7 @@
 import type { Effect } from "effect";
 import type {
   Change,
-  ChangeNotFound,
-  ChangeStateRefused,
   FootprintEntry,
-  LeaseStale,
   PoolExhausted,
   Preflight,
   Proposition,
@@ -12,15 +9,7 @@ import type {
 import type { Principal } from "../../domain/identity/index.ts";
 import type { ChangeId, CommitSha, Instant, LeaseId, SketchId } from "../../domain/kernel/index.ts";
 import { stub } from "../not-implemented.ts";
-import type {
-  Clock,
-  EntityStore,
-  EventOutbox,
-  Ids,
-  SubjectRegistry,
-  WorkspacePool,
-  WorkspaceGrant,
-} from "../ports/index.ts";
+import type { Clock, Ids, WorkspacePool, WorkspaceGrant } from "../ports/index.ts";
 
 /**
  * coordination use-cases. The isolate reaches a change through the `Changes`
@@ -70,6 +59,11 @@ export interface ReviseInput extends LeasedCall {
   readonly declaredEffects?: readonly Proposition[];
 }
 
+/** Add one premise: the caller holds the lease. */
+export interface RelyInput extends LeasedCall {
+  readonly premise: Proposition;
+}
+
 export interface SubmitInput extends LeasedCall {
   readonly commitSha: CommitSha;
 }
@@ -88,23 +82,6 @@ export interface SketchOpened {
   readonly expiresAt: Instant;
 }
 
-type ChangePorts = Clock | EntityStore | EventOutbox;
-
-export const rely: (
-  principal: Principal,
-  input: LeasedCall & { readonly premise: Proposition },
-) => Effect.Effect<
-  Revised,
-  ChangeNotFound | LeaseStale | ChangeStateRefused,
-  ChangePorts | SubjectRegistry
-> = stub("coordination/rely");
-
-export const nearby: (
-  principal: Principal,
-  changeId: ChangeId,
-) => Effect.Effect<Preflight, ChangeNotFound, EntityStore | SubjectRegistry> =
-  stub("coordination/nearby");
-
 export const openSketch: (
   principal: Principal,
   purpose: string | undefined,
@@ -113,6 +90,9 @@ export const openSketch: (
 
 /** The Change DO's use-cases. */
 export * from "./change.ts";
+export * from "./live-index.ts";
+export * from "./preflight.ts";
+export * from "./subject.ts";
 
 /** The WorkspacePool use-cases. */
 export * from "./workspace-pool/index.ts";

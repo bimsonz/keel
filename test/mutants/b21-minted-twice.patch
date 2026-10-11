@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel apps/keel/test/unit/subject.test.ts apps/keel/test/pool/relying.test.ts
+# kills: b21.relying-subscribes
+# why: a subject commits SubjectMinted again for every change that touches it
+diff --git a/packages/core/src/application/coordination/subject.ts b/packages/core/src/application/coordination/subject.ts
+index 59fc567..4635381 100644
+--- a/packages/core/src/application/coordination/subject.ts
++++ b/packages/core/src/application/coordination/subject.ts
+@@ -140,7 +140,7 @@ export function hearSubject(
+   const subjectId = subjectIdOf(projectId, key);
+   const drafts: EventDraft[] = [];
+   const touched = [...after.premises, ...after.declaredEffects];
+-  if (touched.length > 0 && store.get(SUBJECT_MINTED, subjectId) === undefined) {
++  if (touched.length > 0) {
+     const own = touched.find((proposition) => proposition.subject === key);
+     const minted = SubjectMinted.make({
+       subjectId,

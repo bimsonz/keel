@@ -87,6 +87,19 @@ export const ReviseCommand = Schema.Struct({
 });
 export type ReviseCommand = typeof ReviseCommand.Type;
 
+/** Add one premise to a change under its lease. */
+export const RelyCommand = Schema.Struct({
+  agentId: AgentId,
+  leaseId: LeaseId,
+  premise: Proposition,
+  idempotencyKey: Schema.String,
+});
+export type RelyCommand = typeof RelyCommand.Type;
+
+/** Read what is near a change. `projectId` is the reader's, from its token: a change in another project is ChangeInOtherProject. */
+export const NearbyCommand = Schema.Struct({ projectId: ProjectId });
+export type NearbyCommand = typeof NearbyCommand.Type;
+
 /** Who may withdraw a change: the holder of its lease, or an operator (a parked change, say). */
 export const WithdrawAuthority = Schema.Union([
   Schema.TaggedStruct("Lease", { leaseId: LeaseId }),
@@ -197,6 +210,12 @@ export const ChangeCodecs = {
     Schema.Union([ChangeStateRefused, PoolExhausted, SketchNotFound, IdempotencyConflict]),
   ),
   revise: exitCodec(Schema.Struct({ change: Change, preflight: Preflight }), Mutation),
+  // A rely names no revision: RevisionMismatch belongs to revise alone.
+  rely: exitCodec(
+    Schema.Struct({ change: Change, preflight: Preflight }),
+    Schema.Union([ChangeNotFound, LeaseStale, ChangeStateRefused, IdempotencyConflict]),
+  ),
+  nearby: exitCodec(Preflight, Schema.Union([ChangeNotFound, ChangeInOtherProject])),
   // Submit carries no revision: RevisionMismatch belongs to revise alone.
   submit: exitCodec(
     Change,
@@ -254,6 +273,10 @@ export interface ChangeRpc extends EventReceiverRpc {
   get(): Promise<ExitJson>;
   declare(command: typeof DeclareCommand.Encoded): Promise<ExitJson>;
   revise(command: typeof ReviseCommand.Encoded): Promise<ExitJson>;
+  /** Adds one premise under the lease; the premise's subject and its ancestors hear the change from then on. */
+  rely(command: typeof RelyCommand.Encoded): Promise<ExitJson>;
+  /** The preflight of the change's intent as it stands, for an agent of its project; commits nothing. */
+  nearby(command: typeof NearbyCommand.Encoded): Promise<ExitJson>;
   submit(command: typeof SubmitCommand.Encoded): Promise<ExitJson>;
   /** Puts trunk's head on the workspace's keel/trunk and moves the change's base there. */
   rebase(command: typeof RebaseCommand.Encoded): Promise<ExitJson>;

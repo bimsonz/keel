@@ -1,7 +1,7 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { EventEnvelope, makeId } from "@keeltown/core/kernel";
-import type { AgentId } from "@keeltown/core/kernel";
+import type { AgentId, ProjectId } from "@keeltown/core/kernel";
 import { type AgentNotice, Enrolments, Sessions } from "@keeltown/core/ports";
 import {
   describeAgentDirectoryContract,
@@ -14,11 +14,12 @@ import { Effect, Layer, Schema } from "effect";
 import { ulid } from "ulid";
 import { AgentDirectoryD1 } from "../../src/adapters/driven/d1/agent-directory.ts";
 import { EnrolmentsRpc } from "../../src/adapters/driven/do-rpc/enrolments.ts";
+import { LiveChangesRpc } from "../../src/adapters/driven/do-rpc/live-changes.ts";
 import { SessionsRpc } from "../../src/adapters/driven/do-rpc/sessions.ts";
 import { InboxRpc } from "../../src/adapters/driven/do-rpc/inbox.ts";
 import { NotifierRpc } from "../../src/adapters/driven/do-rpc/notifier.ts";
 import { TokenIssuerJose } from "../../src/adapters/driven/jose/token-issuer.ts";
-import { drainOutbox } from "./helpers.ts";
+import { drainAfter, drainOutbox } from "./helpers.ts";
 
 // The real adapters pass the same contract suites as the in-memory ones, inside workerd.
 describeAgentDirectoryContract("d1", () => AgentDirectoryD1(env.DB));
@@ -60,6 +61,18 @@ describeNotifierContract("AgentSession DO over RPC", () => ({
 PORTS.Inbox.contract("AgentSession DO over RPC", () => ({
   layer: InboxRpc(agentSession),
   deliver,
+}));
+
+const projectObject = (projectId: ProjectId) =>
+  drainAfter(env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)));
+
+// The live-change index on each project's Project DO, fed through its `receive` as the fan-out feeds it.
+PORTS.LiveChanges.contract("Project DO over RPC", () => ({
+  layer: LiveChangesRpc(projectObject),
+  hear: (projectId, event) =>
+    Effect.promise(async () => {
+      await projectObject(projectId).receive([Schema.encodeSync(EventEnvelope)(event)]);
+    }),
 }));
 
 /**

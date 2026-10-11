@@ -43,6 +43,7 @@ const CONTRACT_PORTS = [
   "Trunks",
   "SessionStore",
   "Sessions",
+  "LiveChanges",
   "MfpWriter",
   "HumanGate",
   "Deployer",

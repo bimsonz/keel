@@ -2,12 +2,12 @@
 # kills: b11.declare-working
 # why: declare commits no ChangeStarted, leaving the change Declared until a WorkspaceGranted reaction, so an immediate submit is refused
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 29e615f..0413d07 100644
+index c8dce43..7e20822 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -372,7 +372,6 @@ export const declare: (
+@@ -563,7 +563,6 @@ export const declare: (
              leaseId,
-             preflight: L1_PREFLIGHT,
+             preflight,
            },
 -          { _tag: "Start", workspaceId: grant.workspaceId, baseSha: grant.baseSha },
          ],

@@ -14,6 +14,8 @@ import type { CodeHostFixture } from "./code-host-fixture.ts";
 import { describeCodeHostContract } from "./contracts/code-host.ts";
 import { describeEnrolmentsContract, type EnrolmentsHarness } from "./contracts/enrolments.ts";
 import { describeSessionsContract, type SessionsHarness } from "./contracts/sessions.ts";
+import { describeLiveChangesContract, type LiveChangesHarness } from "./contracts/live-changes.ts";
+import { makeLiveChangesMemory } from "./memory/live-changes.ts";
 import { makeSessionsMemory } from "./memory/sessions.ts";
 import { describeEventFeedContract, type EventFeedHarness } from "./contracts/event-feed.ts";
 import {
@@ -68,6 +70,7 @@ import type {
   PlanStore,
   ProbeRunner,
   Inbox,
+  LiveChanges,
   Notifier,
   Projects,
   ProjectViews,
@@ -242,6 +245,15 @@ function memoryEnrolmentsHarness(): EnrolmentsHarness {
   };
 }
 
+/** The in-memory index folds what the suite feeds it with the Project DO's own `hearLiveChange`. */
+function memoryLiveChangesHarness(): LiveChangesHarness {
+  const memory = makeLiveChangesMemory();
+  return {
+    layer: memory.layer,
+    hear: (projectId, event) => Effect.sync(() => memory.hear(projectId, event)),
+  };
+}
+
 /** In-memory Sessions read the agents that in-memory Enrolments write into one in-memory AgentDirectory. */
 function memorySessionsHarness(): SessionsHarness {
   const directory = identity.makeAgentDirectoryMemory();
@@ -299,6 +311,10 @@ export const PORTS = {
   Enrolments: harnessed<Enrolments | AgentDirectory, EnrolmentsHarness>(
     memoryEnrolmentsHarness,
     describeEnrolmentsContract,
+  ),
+  LiveChanges: harnessed<LiveChanges, LiveChangesHarness>(
+    memoryLiveChangesHarness,
+    describeLiveChangesContract,
   ),
   Sessions: harnessed<Sessions | Enrolments | AgentDirectory, SessionsHarness>(
     memorySessionsHarness,

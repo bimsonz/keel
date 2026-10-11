@@ -8,6 +8,8 @@ import type {
   LeaseNotLapsed,
   LeaseStale,
   PoolExhausted,
+  Preflight,
+  RevisionMismatch,
   SketchNotFound,
 } from "../../domain/coordination/index.ts";
 import type { IdempotencyConflict, InboxPage, Principal } from "../../domain/identity/index.ts";
@@ -32,6 +34,9 @@ import type {
   Declared,
   DeclareInput,
   RebaseInput,
+  RelyInput,
+  ReviseInput,
+  Revised,
   SubmitInput,
 } from "./index.ts";
 
@@ -88,6 +93,35 @@ export const rebaseChange: (
   | PackTooLarge,
   Changes
 > = (principal, input) => Changes.use((changes) => changes.rebase(principal, input));
+
+/** Revises a change's intent at the revision the caller last read. The Change DO checks the lease and the revision. */
+export const reviseChange: (
+  principal: Principal,
+  input: ReviseInput,
+) => Effect.Effect<
+  Revised,
+  ChangeNotFound | LeaseStale | RevisionMismatch | ChangeStateRefused | IdempotencyConflict,
+  Changes
+> = (principal, input) => Changes.use((changes) => changes.revise(principal, input));
+
+/** Adds one premise to a change; relying on a subject subscribes the change to it. */
+export const relyOn: (
+  principal: Principal,
+  input: RelyInput,
+) => Effect.Effect<
+  Revised,
+  ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict,
+  Changes
+> = (principal, input) => Changes.use((changes) => changes.rely(principal, input));
+
+/** What is near a change now, for an agent of its project. */
+export const nearbyOf: (
+  principal: Principal,
+  changeId: ChangeId,
+) => Effect.Effect<Preflight, ChangeNotFound | ChangeInOtherProject, Changes> = (
+  principal,
+  changeId,
+) => Changes.use((changes) => changes.nearby(principal, changeId));
 
 /** Where a change's submission stands, waiting up to `waitSeconds` (0–30) for it to move. */
 export const submissionOf: (

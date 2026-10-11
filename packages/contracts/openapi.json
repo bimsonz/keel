@@ -12372,6 +12372,7 @@
           "change.lease_stale",
           "change.lease_not_lapsed",
           "change.state_refused",
+          "change.revision_mismatch",
           "change.commit_not_in_workspace",
           "workspace.pool_exhausted",
           "workspace.busy",

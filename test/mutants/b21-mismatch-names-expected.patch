@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/relying.test.ts
+# kills: b21.revise-route
+# why: the 412's revise action names the stale revision the caller sent, so following it fails again
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index d39b20e..d2ed116 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -705,7 +705,7 @@ export function reviseError(
+               kind: "call",
+               title: `Once you have read what changed, revise again with If-Match "${error.actual}"`,
+               operationId: "revise",
+-              args: { changeId: error.changeId, "if-match": `"${error.actual}"` },
++              args: { changeId: error.changeId, "if-match": `"${error.expected}"` },
+             },
+           ],
+         }),

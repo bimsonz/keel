@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel apps/keel/test/unit/subject.test.ts apps/keel/test/pool/relying.test.ts
+# kills: b21.relying-subscribes
+# why: a change subscribes only the exact subjects it names, so an ancestor never hears of a premise beneath it and fallout at the ancestor never runs
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index c8dce43..d8916e7 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -157,7 +157,7 @@ export function subjectKeysOf(
+ ): readonly SubjectKey[] {
+   const keys = new Set<SubjectKey>();
+   for (const proposition of [...intent.premises, ...(intent.declaredEffects ?? [])])
+-    for (const key of [proposition.subject, ...subjectAncestors(proposition.subject)])
++    for (const key of [proposition.subject])
+       keys.add(key);
+   return [...keys];
+ }

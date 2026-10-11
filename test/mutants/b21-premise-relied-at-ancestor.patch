@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel apps/keel/test/unit/subject.test.ts apps/keel/test/pool/relying.test.ts
+# kills: b21.relying-subscribes
+# why: every ancestor of the premise's subject commits PremiseRelied too, not only the premise's own key's DO
+diff --git a/packages/core/src/application/coordination/subject.ts b/packages/core/src/application/coordination/subject.ts
+index 59fc567..889706f 100644
+--- a/packages/core/src/application/coordination/subject.ts
++++ b/packages/core/src/application/coordination/subject.ts
+@@ -153,7 +153,6 @@ export function hearSubject(
+     drafts.push({ payload: payloadOf(Schema.encodeSync(SubjectMinted)(minted)) });
+   }
+   for (const premise of after.premises) {
+-    if (premise.subject !== key) continue;
+     if (before.premises.some((held) => sameProposition(held, premise))) continue;
+     const relied = PremiseRelied.make({ subjectId, changeId: relier, premise });
+     drafts.push({ payload: payloadOf(Schema.encodeSync(PremiseRelied)(relied)) });

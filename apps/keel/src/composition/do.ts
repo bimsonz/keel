@@ -16,6 +16,7 @@ import {
   type Trunks,
   type WorkspaceRebaser,
   type WorkspacePool,
+  type LiveChanges,
 } from "@keeltown/core/ports";
 import { projectRepos } from "@keeltown/core/application/integration";
 import type { AgentId, ChangeId, ProjectId } from "@keeltown/core/kernel";
@@ -34,6 +35,7 @@ import { TrunkWriterGitCore } from "../adapters/driven/gitcore/trunk-writer.ts";
 import { WorkspaceRebaserGitCore } from "../adapters/driven/gitcore/workspace-rebaser.ts";
 import { BundleStoreR2 } from "../adapters/driven/r2/bundle-store.ts";
 import { BatchVerificationWorkflow } from "../adapters/driven/workflow/batch-verification.ts";
+import { LiveChangesRpc } from "../adapters/driven/do-rpc/live-changes.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { EntityStoreSql, migrateEntityStore } from "../adapters/driven/do-storage/entity-store.ts";
 import { EventOutboxSql, migrateEventOutbox } from "../adapters/driven/do-storage/event-outbox.ts";
@@ -79,7 +81,7 @@ export function projectServices(env: Env): Layer.Layer<ProjectServices> {
 }
 
 /** The Change DO's driven adapters beyond the backbone. */
-export type ChangeServices = WorkspacePool | CodeHost | Trunks | WorkspaceRebaser;
+export type ChangeServices = WorkspacePool | CodeHost | Trunks | WorkspaceRebaser | LiveChanges;
 
 /**
  * The Change DO takes its workspace from its project's WorkspacePool DO and
@@ -94,6 +96,7 @@ export function changeServices(env: Env): Layer.Layer<ChangeServices> {
     host,
     TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
     WorkspaceRebaserGitCore().pipe(Layer.provide(host)),
+    liveChangesLayer(env),
   );
 }
 
@@ -215,6 +218,13 @@ export function durableObjectRuntime<R>(
  * bound to in wrangler.jsonc: `keel-core` (trunk, staging, guards) and
  * `keel-ws-00` (workspaces and their mirror).
  */
+/** Each project's live-change index, kept by its Project DO: what a change's preflight reads. */
+export function liveChangesLayer(env: Env): Layer.Layer<LiveChanges> {
+  return LiveChangesRpc((projectId) =>
+    env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)),
+  );
+}
+
 export function codeHostLayer(env: Env): Layer.Layer<CodeHost> {
   return CodeHostArtifacts({ "keel-core": env.ARTIFACTS, "keel-ws-00": workspaces(env) });
 }

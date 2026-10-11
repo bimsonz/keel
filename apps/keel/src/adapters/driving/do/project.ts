@@ -1,5 +1,7 @@
+import { hearLiveChange, liveChanges } from "@keeltown/core/application/coordination";
 import { changeSettings, createProject, settingsOf } from "@keeltown/core/application/integration";
-import { ProjectId } from "@keeltown/core/kernel";
+import { type EventEnvelope, ProjectId } from "@keeltown/core/kernel";
+import { EntityStore, type Transaction } from "@keeltown/core/ports";
 import { Effect, Schema } from "effect";
 import {
   DEFAULT_POOL_TARGET,
@@ -12,7 +14,7 @@ import {
   type ProjectRpc,
   PutSettingsCommand,
 } from "../../../rpc/index.ts";
-import { KeelObjectWith } from "./keel-object.ts";
+import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 
 /** The Project DO is named `project:<projectId>`. */
 const projectIdOf = (name: string | undefined) =>
@@ -24,7 +26,7 @@ const projectIdOf = (name: string | undefined) =>
  */
 export class ProjectDO
   extends KeelObjectWith<ProjectServices>
-  implements Pick<ProjectRpc, "createProject" | "settings" | "putSettings">
+  implements Pick<ProjectRpc, "createProject" | "settings" | "putSettings" | "liveChanges">
 {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env, projectServices(env));
@@ -42,6 +44,23 @@ export class ProjectDO
       ),
     );
     return this.answer(ProjectCodecs.createProject, program);
+  }
+
+  /**
+   * The live-change index: each change of the project subscribes it, scoped,
+   * at declare, and every event folds in the transaction that receives it.
+   */
+  protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
+    hearLiveChange(tx.store, event);
+    return { drafts: [] };
+  }
+
+  /** The project's live changes, read once by each preflight. */
+  async liveChanges() {
+    return this.answer(
+      ProjectCodecs.liveChanges,
+      EntityStore.use((store) => Effect.succeed(liveChanges(store))),
+    );
   }
 
   /** The project's settings: the defaults until an operator changes them; ProjectNotFound before createProject. */

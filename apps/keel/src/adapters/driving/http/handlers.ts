@@ -4,11 +4,14 @@ import {
   rebaseChange,
   declareChange,
   getSettings,
+  nearbyOf,
   putSettings,
   readChangeList,
   readEvents,
   readInbox,
   readSnapshot,
+  relyOn,
+  reviseChange,
   submissionOf,
   submitChange,
   viewedProject,
@@ -66,6 +69,14 @@ import {
   rebaseError,
   rebaseInput,
   rebaseOk,
+  relyError,
+  relyInput,
+  relyOk,
+  reviseError,
+  reviseInput,
+  reviseOk,
+  nearbyError,
+  nearbyOk,
   changeIdInput,
   declareError,
   declareInput,
@@ -211,9 +222,43 @@ export function makeHandlers(run: Runner) {
         );
       },
       Changes_getChange: notYet,
-      revise: notYet,
-      rely: notYet,
-      nearby: notYet,
+      revise: (caller: Caller, input: Input<"revise">) => {
+        const decoded = reviseInput(input);
+        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+        return run(
+          caller,
+          principalOf(caller).pipe(
+            Effect.flatMap((principal) => reviseChange(principal, decoded.success)),
+            Effect.match({ onSuccess: reviseOk, onFailure: (error) => reviseError(caller, error) }),
+          ),
+        );
+      },
+      rely: (caller: Caller, input: Input<"rely">) => {
+        const decoded = relyInput(input);
+        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+        return run(
+          caller,
+          principalOf(caller).pipe(
+            Effect.flatMap((principal) => relyOn(principal, decoded.success)),
+            Effect.match({ onSuccess: relyOk, onFailure: (error) => relyError(caller, error) }),
+          ),
+        );
+      },
+      nearby: (caller: Caller, input: Input<"nearby">) => {
+        const decoded = changeIdInput(input.changeId);
+        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+        const changeId = decoded.success;
+        return run(
+          caller,
+          principalOf(caller).pipe(
+            Effect.flatMap((principal) => nearbyOf(principal, changeId)),
+            Effect.match({
+              onSuccess: (preflight) => nearbyOk(changeId, preflight),
+              onFailure: (error) => nearbyError(caller, error),
+            }),
+          ),
+        );
+      },
       Changes_abandon: notYet,
       adopt: (caller: Caller, input: Input<"adopt">) => {
         const decoded = adoptInput(input);

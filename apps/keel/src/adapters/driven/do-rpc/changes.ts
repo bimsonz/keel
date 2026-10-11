@@ -3,7 +3,10 @@ import { Changes, PackTooLarge } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 import {
   AdoptCommand,
+  NearbyCommand,
   RebaseCommand,
+  RelyCommand,
+  ReviseCommand,
   AgentSessionCodecs,
   ChangeCodecs,
   DeclareCommand,
@@ -19,6 +22,9 @@ import { callObject, fingerprintOf } from "./answer.ts";
 /** The Change DO methods the isolate calls (`change:<id>`), answering Exit envelopes. */
 export interface ChangeStub {
   declare(command: typeof DeclareCommand.Encoded): Promise<unknown>;
+  revise(command: typeof ReviseCommand.Encoded): Promise<unknown>;
+  rely(command: typeof RelyCommand.Encoded): Promise<unknown>;
+  nearby(command: typeof NearbyCommand.Encoded): Promise<unknown>;
   submit(command: typeof SubmitCommand.Encoded): Promise<unknown>;
   adopt(command: typeof AdoptCommand.Encoded): Promise<unknown>;
   rebase(command: typeof RebaseCommand.Encoded): Promise<unknown>;
@@ -46,6 +52,9 @@ const encodeDeclare = Schema.encodeSync(DeclareCommand);
 const encodeSubmit = Schema.encodeSync(SubmitCommand);
 const encodeAdopt = Schema.encodeSync(AdoptCommand);
 const encodeRebase = Schema.encodeSync(RebaseCommand);
+const encodeRevise = Schema.encodeSync(ReviseCommand);
+const encodeRely = Schema.encodeSync(RelyCommand);
+const encodeNearby = Schema.encodeSync(NearbyCommand);
 
 /**
  * `Changes` over Durable Object RPC. A declare first asks the agent's
@@ -135,6 +144,39 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
           Effect.catchTag("PackTooLarge", (e) =>
             Effect.fail(new PackTooLarge({ repo: e.repo, bytes: e.bytes, limit: e.limit })),
           ),
+        ),
+      revise: (principal, input) =>
+        callObject(ChangeCodecs.revise, () =>
+          objects.change(input.changeId).revise(
+            encodeRevise({
+              agentId: principal.agentId,
+              leaseId: input.lease,
+              ifMatchRevision: input.ifMatchRevision,
+              ...(input.goal === undefined ? {} : { goal: input.goal }),
+              ...(input.footprint === undefined ? {} : { footprint: input.footprint }),
+              premisesAdded: input.premisesAdded,
+              premisesRetracted: input.premisesRetracted,
+              ...(input.declaredEffects === undefined
+                ? {}
+                : { declaredEffects: input.declaredEffects }),
+              idempotencyKey: input.idempotencyKey,
+            }),
+          ),
+        ),
+      rely: (principal, input) =>
+        callObject(ChangeCodecs.rely, () =>
+          objects.change(input.changeId).rely(
+            encodeRely({
+              agentId: principal.agentId,
+              leaseId: input.lease,
+              premise: input.premise,
+              idempotencyKey: input.idempotencyKey,
+            }),
+          ),
+        ),
+      nearby: (principal, changeId) =>
+        callObject(ChangeCodecs.nearby, () =>
+          objects.change(changeId).nearby(encodeNearby({ projectId: principal.projectId })),
         ),
       get: (changeId) => callObject(ChangeCodecs.get, () => objects.change(changeId).get()),
       workspace: (changeId) =>

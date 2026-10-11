@@ -29,6 +29,7 @@ export * from "./guard-repo.ts";
 export * from "./human-gate.ts";
 export * from "./ids.ts";
 export * from "./inbox.ts";
+export * from "./live-changes.ts";
 export * from "./metrics.ts";
 export * from "./mfp-writer.ts";
 export * from "./notifier.ts";

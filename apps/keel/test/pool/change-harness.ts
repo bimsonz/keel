@@ -1,11 +1,17 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { type Change, ChangeEvent, evolveChange } from "@keeltown/core/domain/coordination";
+import {
+  type Change,
+  ChangeEvent,
+  evolveChange,
+  type Proposition,
+} from "@keeltown/core/domain/coordination";
 import { type ChangeId, type EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
 import { CodeHost, type Clock, EventOutbox } from "@keeltown/core/ports";
 import {
   CodeHostFixture,
   makeCodeHostMemory,
+  makeLiveChangesMemory,
   makeManualClock,
   makeTrunksMemory,
   makeWorkspacePoolMemory,
@@ -15,7 +21,7 @@ import {
 import { Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
 import type { ChangeDO } from "../../src/adapters/driving/do/change.ts";
-import { backbone, type ChangeServices } from "../../src/composition/do.ts";
+import { backbone, type ChangeServices, liveChangesLayer } from "../../src/composition/do.ts";
 import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
 import { drainAfter } from "./helpers.ts";
 
@@ -31,11 +37,16 @@ export const changeStub = (changeId = makeId("chg", ulid())) =>
  */
 export function rewire(
   stub: DurableObjectStub<ChangeDO>,
-  driven: Layer.Layer<ChangeServices>,
+  driven: Layer.Layer<ChangeServices> | ((objectEnv: Env) => Layer.Layer<ChangeServices>),
   clock?: Layer.Layer<Clock>,
 ): Promise<void> {
   return runInDurableObject(stub, (instance: ChangeDO, state) => {
-    const services = Layer.mergeAll(backbone(state.storage), driven);
+    // An adapter that reaches other objects must be built from the object's own env: a test's stubs belong to the test.
+    const objectEnv: Env = Reflect.get(instance, "env");
+    const services = Layer.mergeAll(
+      backbone(state.storage),
+      typeof driven === "function" ? driven(objectEnv) : driven,
+    );
     Reflect.set(
       instance,
       "runtime",
@@ -74,8 +85,13 @@ export const unrenewed = (change: Change | undefined) =>
  * host, and a clock that starts now and moves only when told, so a lease can
  * lapse without waiting and no deadline it arms is in the past. It belongs to
  * `projectId` (the sample project unless given), whose lane it queues on.
+ * Its preflight reads an empty in-memory index unless `live` is "project":
+ * then it reads the project's real Project DO, as in production.
  */
-export async function changeUnderTest(projectId: ProjectId = sampleProjectId) {
+export async function changeUnderTest(
+  projectId: ProjectId = sampleProjectId,
+  live: "memory" | "project" = "memory",
+) {
   const changeId: ChangeId = makeId("chg", ulid());
   const agentId = makeId("agt", ulid());
   const stub = changeStub(changeId);
@@ -83,14 +99,20 @@ export async function changeUnderTest(projectId: ProjectId = sampleProjectId) {
   drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)));
   drainAfter(env.WORKSPACE_POOL.get(env.WORKSPACE_POOL.idFromName(`pool:${projectId}`)));
   drainAfter(env.LANE.get(env.LANE.idFromName(`lane:${projectId}:main`)));
+  drainAfter(env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)));
   const clock = makeManualClock(Date.now());
   const pool = makeWorkspacePoolMemory();
   const code = makeCodeHostMemory();
   const trunks = makeTrunksMemory();
   const rebaser = makeWorkspaceRebaserMemory(code);
+  const fixed = Layer.mergeAll(pool.layer, code.layer, trunks.layer, rebaser.layer);
   await rewire(
     stub,
-    Layer.mergeAll(pool.layer, code.layer, trunks.layer, rebaser.layer),
+    (objectEnv) =>
+      Layer.merge(
+        fixed,
+        live === "project" ? liveChangesLayer(objectEnv) : makeLiveChangesMemory().layer,
+      ),
     clock.layer,
   );
 
@@ -109,7 +131,13 @@ export async function changeUnderTest(projectId: ProjectId = sampleProjectId) {
     get,
     /** The change as it stands; throws if it cannot be read. */
     current: async () => ok(await get()),
-    declare: async (idempotencyKey = "declare-1") =>
+    declare: async (
+      idempotencyKey = "declare-1",
+      intent: {
+        readonly premises?: readonly Proposition[];
+        readonly declaredEffects?: readonly Proposition[];
+      } = {},
+    ) =>
       decodeExit(
         ChangeCodecs.declare,
         await stub.declare({
@@ -118,7 +146,10 @@ export async function changeUnderTest(projectId: ProjectId = sampleProjectId) {
           projectId,
           goal: "Cache permission lookups per request",
           footprint: [{ path: "src/authz/**", op: "edit" }],
-          premises: [],
+          premises: intent.premises ?? [],
+          ...(intent.declaredEffects === undefined
+            ? {}
+            : { declaredEffects: intent.declaredEffects }),
           idempotencyKey,
           fingerprint: `body-${idempotencyKey}`,
         }),

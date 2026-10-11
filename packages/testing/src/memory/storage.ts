@@ -39,37 +39,32 @@ const key = (kind: string, id: string) => `${kind}\u0000${id}`;
 
 export function makeEntityStoreMemory() {
   let rows = new Map<string, Stored>();
-  return {
-    rows: () => rows,
-    layer: Layer.succeed(
-      EntityStore,
-      EntityStore.of({
-        get: (kind, id) => {
-          const value = rows.get(key(kind, id));
-          return value === undefined ? undefined : structuredClone(value);
-        },
-        put: (kind, id, value) => {
-          rows.set(key(kind, id), structuredClone(value));
-        },
-        remove: (kind, id) => {
-          rows.delete(key(kind, id));
-        },
-        list: (kind) =>
-          [...rows.entries()]
-            .filter(([k]) => k.startsWith(`${kind}\u0000`))
-            .map(([k, value]) => ({ id: k.slice(kind.length + 1), value: structuredClone(value) })),
-        transaction: (body) => {
-          const snapshot = new Map(rows);
-          try {
-            return body();
-          } catch (error) {
-            rows = snapshot;
-            throw error;
-          }
-        },
-      }),
-    ),
-  };
+  const service = EntityStore.of({
+    get: (kind, id) => {
+      const value = rows.get(key(kind, id));
+      return value === undefined ? undefined : structuredClone(value);
+    },
+    put: (kind, id, value) => {
+      rows.set(key(kind, id), structuredClone(value));
+    },
+    remove: (kind, id) => {
+      rows.delete(key(kind, id));
+    },
+    list: (kind) =>
+      [...rows.entries()]
+        .filter(([k]) => k.startsWith(`${kind}\u0000`))
+        .map(([k, value]) => ({ id: k.slice(kind.length + 1), value: structuredClone(value) })),
+    transaction: (body) => {
+      const snapshot = new Map(rows);
+      try {
+        return body();
+      } catch (error) {
+        rows = snapshot;
+        throw error;
+      }
+    },
+  });
+  return { rows: () => rows, service, layer: Layer.succeed(EntityStore, service) };
 }
 
 export function makeEventLogMemory() {

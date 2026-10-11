@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel packages/testing/test/ports.test.ts apps/keel/test/pool/adapters.test.ts
+# kills: b21.live-index
+# why: the index keeps a change's declared intent through its revisions, so preflight compares stale premises
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index d6dca6b..17e6c93 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -64,7 +64,7 @@ export function hearLiveChange(store: Store, event: EventEnvelope): void {
+       store.put(
+         LIVE_CHANGE,
+         changeId,
+-        encodeRow({ ...live, intent: reviseIntent(live.intent, revised) }),
++        encodeRow(live),
+       );
+       return;
+     }

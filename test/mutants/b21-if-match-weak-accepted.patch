@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/relying.test.ts
+# kills: b21.revise-route
+# why: a weak If-Match tag is read as the revision, though under strong comparison a weak tag never matches
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index d39b20e..b9a6e56 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -568,7 +568,7 @@ export function rebaseError(
+  * MCP agent passes, read from the change's `revision`. A weak tag never
+  * matches under RFC 9110's strong comparison, so it is refused with the rest.
+  */
+-const IF_MATCH = /^(?:"([1-9][0-9]{0,8})"|([1-9][0-9]{0,8}))$/;
++const IF_MATCH = /^(?:W\/)?(?:"([1-9][0-9]{0,8})"|([1-9][0-9]{0,8}))$/;
+ 
+ function ifMatchInput(value: string): Result.Result<number, Issues> {
+   const matched = IF_MATCH.exec(value.trim());

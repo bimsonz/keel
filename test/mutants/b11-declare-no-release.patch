@@ -2,15 +2,15 @@
 # kills: b11.declare-release
 # why: a refused declare keeps the workspace it was granted, so the workspace leaks to a change that never existed
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 29e615f..51344f2 100644
+index c8dce43..7aae9a2 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -391,7 +391,7 @@ export const declare: (
-       tx.outbox.subscribe(`pool:${command.projectId}`, CHANGE_ENDS);
+@@ -584,7 +584,7 @@ export const declare: (
+       subscribeSubjects(tx, changeId, intent);
        return Result.succeed(asTransition(decided.success));
      },
 -  ).pipe(Effect.onError(() => releaseUnheld(changeId, command.projectId, grant)));
 +  );
-   if (!committed.duplicate) return { change: committed.value, preflight: L1_PREFLIGHT, grant };
+   if (!committed.duplicate)
+     return { change: committed.value, preflight: issuedPreflight(committed.events), grant };
    yield* releaseUnheld(changeId, command.projectId, grant);
-   if (!committed.sameCommand)

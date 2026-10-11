@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel apps/keel/test/unit/preflight.test.ts apps/keel/test/pool/preflight.test.ts
+# kills: b21.contradiction
+# why: a command never reads its project's live-change index, so preflight compares the intent with nothing
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index c8dce43..b3cd0ff 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -331,7 +331,7 @@ function issuedPreflight(events: readonly EventEnvelope[]): Preflight {
+ const liveOf = (projectId: ProjectId | undefined) =>
+   projectId === undefined
+     ? Effect.succeed<readonly LiveChange[]>([])
+-    : LiveChanges.use((index) => index.of(projectId));
++    : Effect.succeed<readonly LiveChange[]>([]);
+ 
+ /**
+  * Subscribes the Subject DO of every key the intent names (ancestors

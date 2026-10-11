@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel apps/keel/test/unit/preflight.test.ts apps/keel/test/pool/preflight.test.ts
+# kills: b21.contradiction
+# why: preflight reports no neighbour and no contradiction whatever the project holds, as L1_PREFLIGHT did
+diff --git a/packages/core/src/application/coordination/preflight.ts b/packages/core/src/application/coordination/preflight.ts
+index 806faea..bbbea0f 100644
+--- a/packages/core/src/application/coordination/preflight.ts
++++ b/packages/core/src/application/coordination/preflight.ts
+@@ -28,8 +28,8 @@ export function preflightFor(
+   const found = exposure(self, intent, live);
+   return {
+     preflight: {
+-      neighbours: found.neighbours,
+-      contradictions: found.contradictions,
++      neighbours: [],
++      contradictions: [],
+       precedents: [],
+       suggestedMove: found.contradictions.length > 0 ? "refine" : "proceed",
+     },
