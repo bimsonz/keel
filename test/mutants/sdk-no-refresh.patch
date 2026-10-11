@@ -2,10 +2,10 @@
 # kills: sdk.token
 # why: a 401 is thrown instead of exchanging the credentials once more
 diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
-index 727c71c..b850f11 100644
+index 07e28bc..ff2673a 100644
 --- a/packages/sdk/src/client.ts
 +++ b/packages/sdk/src/client.ts
-@@ -107,7 +107,7 @@ export class KeelClient {
+@@ -108,7 +108,7 @@ export class KeelClient {
          ...(options.signal === undefined ? {} : { signal: options.signal }),
        });
      let response = await send(await this.token());
@@ -13,4 +13,4 @@ index 727c71c..b850f11 100644
 +
      if (!response.ok) throw await KeelProblem.from(response);
      // The body is the contract's: Keel validates every response against the published schemas.
-     const answer: WireOutputs[Op] = await response.json();
+     // Parsed from text, because `json()` is typed `any` in DOM's lib but `unknown` in Node's.
