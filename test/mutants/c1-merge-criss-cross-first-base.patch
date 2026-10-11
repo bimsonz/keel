@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/merge.test.ts -t merge.counterexample
+# kills: merge.counterexample
+# why: A criss-cross is merged on its first base instead of refused, so a candidate can differ from git's virtual-base merge (or exist where git cannot merge at all)
+diff --git a/packages/gitcore/src/merge.ts b/packages/gitcore/src/merge.ts
+index c9dc953..22d63ba 100644
+--- a/packages/gitcore/src/merge.ts
++++ b/packages/gitcore/src/merge.ts
+@@ -410,7 +410,7 @@ export async function mergeCommits(
+     const bases = await mergeBases(r, ours, theirs);
+     const [base] = bases;
+     if (base === undefined) throw new Refusal("no-merge-base", "");
+-    if (bases.length > 1) throw new Refusal("criss-cross", "");
++    // criss-cross: merge on the first base
+     const [b, o, t] = await Promise.all([
+       r.readCommit(base),
+       r.readCommit(ours),

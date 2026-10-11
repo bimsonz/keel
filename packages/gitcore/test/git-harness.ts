@@ -164,21 +164,34 @@ export function fastImport(dir: string, commits: CommitPlan[]): Map<number, stri
 
 // ------------------------------------------------------------ merge-tree
 
-export interface GitMerge {
+export type GitMerge =
   /** The merged tree git wrote (with conflict markers when `conflicted`). */
-  readonly tree: string;
-  readonly conflicted: boolean;
-  readonly output: string;
-}
+  | { readonly outcome: "clean" | "conflicted"; readonly tree: string; readonly output: string }
+  /**
+   * git died on a signal instead of answering. git 2.50's merge-ort aborts on
+   * an assertion when a criss-cross's virtual base meets a gitlink and a
+   * symlink at one path (`handle_content_merge`, merge-ort.c:2153): there is
+   * no tree to compare with, so GitCore must refuse such a history.
+   */
+  | { readonly outcome: "crashed"; readonly signal: string; readonly stderr: string };
 
-/** `git merge-tree --write-tree ours theirs`: exit 0 is clean, 1 is conflicted, anything else fails. */
+/**
+ * `git merge-tree --write-tree ours theirs`: exit 0 is clean, 1 is conflicted,
+ * death by a signal is a crash; anything else (git missing, a bad argument) fails.
+ */
 export function gitMergeTree(dir: string, ours: string, theirs: string): GitMerge {
   const r = spawnSync("git", ["merge-tree", "--write-tree", ours, theirs], {
     cwd: dir,
     env: GIT_ENV,
   });
+  if (r.error === undefined && r.status === null && r.signal !== null)
+    return { outcome: "crashed", signal: r.signal, stderr: r.stderr.toString() };
   if (r.status !== 0 && r.status !== 1)
     throw new Error(`merge-tree failed (${r.status}): ${r.stderr.toString()}`);
   const output = r.stdout.toString();
-  return { tree: output.split("\n")[0] ?? "", conflicted: r.status === 1, output };
+  return {
+    outcome: r.status === 1 ? "conflicted" : "clean",
+    tree: output.split("\n")[0] ?? "",
+    output,
+  };
 }
