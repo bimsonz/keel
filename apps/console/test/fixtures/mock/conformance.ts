@@ -88,6 +88,8 @@ const RULES: Record<EventType, Rule[]> = {
   ChangeLanded: [change(["integrating"], "landed")],
   ChangeBounced: [change(["deriving", "verifying", "integrating", "parked"], "bounced")],
   ConflictNoted: [change([...WITHDRAWABLE, "integrating"])],
+  AlternativeDeclared: [{ kind: "project", idField: "projectId", from: ["created"] }],
+  AlternativeLanded: [{ kind: "project", idField: "projectId", from: ["created"] }],
   ChangeParked: [change(["verifying", ...AGENT_OWNED], "parked")],
   ChangeResumed: [change(["parked"], "verifying")],
   ChangeAdopted: [change(["parked"], "working")],

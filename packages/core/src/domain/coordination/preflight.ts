@@ -51,6 +51,8 @@ export const Preflight = Schema.Struct({
   suggestedMove: Move,
   /** What the move rests on; absent exactly when the move is `proceed`. */
   basis: Schema.optional(MoveBasis),
+  /** The live changes with the same intent, as exposure listed them, never ranked. Absent when there are none; the move never reads them. */
+  alternatives: Schema.optional(Schema.Array(ChangeId)),
 });
 export type Preflight = typeof Preflight.Type;
 
@@ -88,7 +90,9 @@ const cites = (index: number): MoveBasis => ({ _tag: "contradiction", index });
  * 5. Otherwise `proceed`. A neighbour alone is proceed: overlap isn't conflict.
  * Each move cites the earliest contradiction or precedent it rests on.
  * `merge`, `yield` and `escalate` are not suggested yet. Unreadable
- * propositions stay notices and never move.
+ * propositions stay notices and never move. Alternatives (live changes with
+ * the same intent) are copied from exposure as they are: they inform, and
+ * neither the move nor what it cites reads them.
  */
 export const preflight = (
   self: ChangeId,
@@ -96,14 +100,16 @@ export const preflight = (
   exposure: {
     readonly neighbours: readonly Neighbour[];
     readonly contradictions: readonly Contradiction[];
+    readonly alternatives?: readonly ChangeId[];
   },
   precedents: readonly ScopedPrecedent[],
 ): Preflight => {
-  const { neighbours, contradictions } = exposure;
+  const { neighbours, contradictions, alternatives = [] } = exposure;
   const listed = {
     neighbours,
     contradictions,
     precedents: precedents.map((p) => p.ref),
+    ...(alternatives.length === 0 ? {} : { alternatives }),
   };
   const breaks = contradictions.findIndex((c) => c.holder !== self && isMust(c.premise));
   if (breaks !== -1) return { ...listed, suggestedMove: "refine", basis: cites(breaks) };

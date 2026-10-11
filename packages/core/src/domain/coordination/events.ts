@@ -13,6 +13,7 @@ import {
   InstantSchema,
   LeaseId,
   NextAction,
+  ProjectId,
   SketchId,
   SubjectId,
   VerdictId,
@@ -53,6 +54,8 @@ export const PreflightIssued = Schema.TaggedStruct("PreflightIssued", {
   suggestedMove: Move,
   /** What the move rests on: a contradiction above, by index, or a precedent. Absent exactly when the move is `proceed`. */
   basis: Schema.optional(MoveBasis),
+  /** The live changes with the same intent, in the order the live index gave them, never ranked. Absent when there are none. */
+  alternatives: Schema.optional(Schema.Array(ChangeId)),
 });
 export const IntentRevised = Schema.TaggedStruct("IntentRevised", {
   changeId: ChangeId,
@@ -190,6 +193,27 @@ export const ConflictNoted = Schema.TaggedStruct("ConflictNoted", {
   /** Set for `advise` only: view the conflict, revise, resolve. */
   nextActions: Schema.optional(Schema.Array(NextAction)),
 });
+/**
+ * Another live change was declared with the same intent as `changeId`: their
+ * declared effects make the same claims. A notice for `changeId`'s agent,
+ * committed on the project. Keel shows alternatives to each other and never
+ * picks one.
+ */
+export const AlternativeDeclared = Schema.TaggedStruct("AlternativeDeclared", {
+  projectId: ProjectId,
+  changeId: ChangeId,
+  alternativeId: ChangeId,
+  /** Compare the two (read the other change, read what is near your own), rebase, or withdraw. */
+  nextActions: Schema.Array(NextAction),
+});
+/** A change with the same intent as `changeId` landed. A notice for `changeId`'s agent, committed on the project. */
+export const AlternativeLanded = Schema.TaggedStruct("AlternativeLanded", {
+  projectId: ProjectId,
+  changeId: ChangeId,
+  landedChangeId: ChangeId,
+  /** Compare the two (read the landed change, read what is near your own), rebase, or withdraw. */
+  nextActions: Schema.Array(NextAction),
+});
 export const ChangeParked = Schema.TaggedStruct("ChangeParked", {
   changeId: ChangeId,
   reason: ParkReason,
@@ -307,6 +331,8 @@ export const CoordinationEvent = Schema.Union([
   ChangeLanded,
   ChangeBounced,
   ConflictNoted,
+  AlternativeDeclared,
+  AlternativeLanded,
   ChangeParked,
   ChangeResumed,
   ChangeAdopted,

@@ -11,9 +11,11 @@ import {
   type Proposition,
   renew,
   replayChange,
+  SubjectKey,
 } from "../../../src/domain/coordination/index.ts";
 import {
   canonicalJson,
+  type ChangeId,
   CommitSha,
   type Committed,
   ContentHash,
@@ -633,7 +635,7 @@ const drive = (script: readonly (readonly [ChangeCommand, number])[]) => {
 };
 
 const LEASE = makeId("lse", ulid(2));
-const declare: ChangeCommand = {
+const declaring = (answered: Preflight): ChangeCommand => ({
   _tag: "Declare",
   changeId: CHANGE,
   agentId: AGENT,
@@ -642,8 +644,9 @@ const declare: ChangeCommand = {
   footprint: [],
   premises: [],
   leaseId: LEASE,
-  preflight,
-};
+  preflight: answered,
+});
+const declare = declaring(preflight);
 const start: ChangeCommand = { _tag: "Start", workspaceId: makeId("wsp", ulid(3)), baseSha: BASE };
 const submit: ChangeCommand = { _tag: "Submit", leaseId: LEASE, commitSha: SHA, inWorkspace: true };
 const precheck: ChangeCommand = { _tag: "StartPrecheck", instanceId: "precheck-1" };
@@ -687,6 +690,36 @@ const revise = (leaseId: LeaseId, ifMatchRevision: number): ChangeCommand => ({
   premisesRetracted: [],
   preflight,
 });
+/** The preflight an agent is answered when exposure found these alternatives. */
+const seeing = (alternatives: readonly ChangeId[]): Preflight =>
+  alternatives.length === 0 ? preflight : { ...preflight, alternatives };
+
+/**
+ * The PreflightIssued events of a declare, a revise and a rely, each answered
+ * a preflight naming its own list of alternatives, as the outbox stores them.
+ */
+const preflightsIssued = (lists: readonly (readonly ChangeId[])[], premise: Proposition) => {
+  const [atDeclare = [], atRevise = [], atRely = []] = lists;
+  const { log } = drive([
+    [declaring(seeing(atDeclare)), 0],
+    [start, 0],
+    [
+      {
+        _tag: "Revise",
+        leaseId: LEASE,
+        ifMatchRevision: 1,
+        premisesAdded: [],
+        premisesRetracted: [],
+        preflight: seeing(atRevise),
+      },
+      0,
+    ],
+    [{ _tag: "Rely", leaseId: LEASE, premise, preflight: seeing(atRely) }, 0],
+  ]);
+  return throughTheWire(log.map((payload) => ({ at: T0, payload })))
+    .map((e) => e.payload)
+    .flatMap((e) => (e._tag === "PreflightIssued" ? [e] : []));
+};
 const note = (policy: "advise" | "annotate"): ChangeCommand => ({
   _tag: "NoteConflict",
   conflictId: makeId("cfl", ulid(9)),
@@ -1600,6 +1633,41 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
     ]).state;
     expect(recompiled?.state).toBe("verifying");
     expect(recompiled).not.toHaveProperty("predicatePolicy");
+  });
+
+  it("[change.preflight-alternatives] PreflightIssued carries the preflight's alternatives as they were given, on declare, revise and rely, and none when the preflight names none", () => {
+    const others = [31, 32, 33].map((n) => makeId("chg", ulid(n)));
+    fc.assert(
+      fc.property(
+        fc.array(fc.shuffledSubarray(others), { minLength: 3, maxLength: 3 }),
+        propositionArb(),
+        (lists, premise) => {
+          const events = preflightsIssued(lists, premise);
+          return (
+            events.length === 3 &&
+            lists.every((given, i) => {
+              const event = events[i];
+              return (
+                event !== undefined &&
+                (given.length === 0
+                  ? !("alternatives" in event)
+                  : JSON.stringify(event.alternatives) === JSON.stringify(given))
+              );
+            })
+          );
+        },
+      ),
+    );
+    const [first, second, third] = others;
+    if (first === undefined || second === undefined || third === undefined) throw new Error("ids");
+    const events = preflightsIssued([[third, first], [], [second]], {
+      subject: SubjectKey.make("authz.permission-evaluation"),
+      predicate: "freshness",
+      relation: "at-most",
+      value: "per-request",
+    });
+    expect(events.map((e) => e.alternatives)).toEqual([[third, first], undefined, [second]]);
+    expect(events[1]).not.toHaveProperty("alternatives");
   });
 
   it("[change.queued-plan-hash] every enqueue, first or after a requeue, carries the hash of the plan the change was last compiled to", () => {

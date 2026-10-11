@@ -6659,6 +6659,82 @@
           "not": {}
         }
       },
+      "AlternativeDeclared": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "changeId",
+          "alternativeId",
+          "nextActions"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AlternativeDeclared"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "alternativeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "nextActions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventNextAction"
+            },
+            "description": "Compare the two (read the other change, read what is near your own), rebase, or withdraw."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Another live change was declared with the same intent as `changeId`: their declared effects make the same claims. A notice for `changeId`'s agent, committed on the project. Keel shows alternatives to each other and never picks one."
+      },
+      "AlternativeLanded": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "changeId",
+          "landedChangeId",
+          "nextActions"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "AlternativeLanded"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "landedChangeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "nextActions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventNextAction"
+            },
+            "description": "Compare the two (read the landed change, read what is near your own), rebase, or withdraw."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A change with the same intent as `changeId` landed. A notice for `changeId`'s agent, committed on the project."
+      },
       "AuditCompleted": {
         "type": "object",
         "required": [
@@ -10254,6 +10330,12 @@
             "$ref": "#/components/schemas/ConflictNoted"
           },
           {
+            "$ref": "#/components/schemas/AlternativeDeclared"
+          },
+          {
+            "$ref": "#/components/schemas/AlternativeLanded"
+          },
+          {
             "$ref": "#/components/schemas/ChangeParked"
           },
           {
@@ -13031,6 +13113,13 @@
               }
             ],
             "description": "What the move rests on. Absent exactly when the move is `proceed`."
+          },
+          "alternatives": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeId"
+            },
+            "description": "The live changes with the same intent, in the order the live index gave them, never ranked. Absent when there are none."
           }
         },
         "additionalProperties": {

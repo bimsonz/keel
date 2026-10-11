@@ -7,7 +7,7 @@ import {
   noticeOf,
 } from "../../domain/identity/index.ts";
 import type { EventEnvelope } from "../../domain/kernel/index.ts";
-import { EntityStore } from "../ports/index.ts";
+import { EntityStore, type Stored } from "../ports/index.ts";
 
 /**
  * Where an agent's inbox lives in its AgentSession DO's store: one entry per
@@ -32,6 +32,9 @@ const START = position(0);
 const POSITION = /^\d{12}$/;
 
 type Store = (typeof EntityStore)["Service"];
+
+/** An entry as the store keeps it: its optional fields are left out, never stored as undefined. */
+const asStored = (encoded: unknown): Stored => JSON.parse(JSON.stringify(encoded));
 
 const headOf = (store: Store): number => {
   const head = store.get(INBOX.head.kind, INBOX.head.id);
@@ -59,7 +62,7 @@ export function recordDelivery(store: Store, event: EventEnvelope): void {
     seq: event.seq,
     at: event.at,
   };
-  store.put(INBOX.kind, position(next), entry);
+  store.put(INBOX.kind, position(next), asStored(entry));
   store.put(INBOX.head.kind, INBOX.head.id, next);
 }
 

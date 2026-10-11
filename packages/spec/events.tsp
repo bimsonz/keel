@@ -301,6 +301,9 @@ model PreflightIssued {
 
   /** What the move rests on. Absent exactly when the move is `proceed`. */
   basis?: EventMoveBasis;
+
+  /** The live changes with the same intent, in the order the live index gave them, never ranked. Absent when there are none. */
+  alternatives?: ChangeId[];
 }
 
 model IntentRevised {
@@ -481,6 +484,28 @@ model ConflictNoted {
 
   /** Set for `advise` only: read the conflict, revise, resolve. */
   nextActions?: EventNextAction[];
+}
+
+/** Another live change was declared with the same intent as `changeId`: their declared effects make the same claims. A notice for `changeId`'s agent, committed on the project. Keel shows alternatives to each other and never picks one. */
+model AlternativeDeclared {
+  _tag: "AlternativeDeclared";
+  projectId: ProjectId;
+  changeId: ChangeId;
+  alternativeId: ChangeId;
+
+  /** Compare the two (read the other change, read what is near your own), rebase, or withdraw. */
+  nextActions: EventNextAction[];
+}
+
+/** A change with the same intent as `changeId` landed. A notice for `changeId`'s agent, committed on the project. */
+model AlternativeLanded {
+  _tag: "AlternativeLanded";
+  projectId: ProjectId;
+  changeId: ChangeId;
+  landedChangeId: ChangeId;
+
+  /** Compare the two (read the landed change, read what is near your own), rebase, or withdraw. */
+  nextActions: EventNextAction[];
 }
 
 model ChangeParked {
@@ -1459,6 +1484,8 @@ union KeelEvent {
   ChangeLanded,
   ChangeBounced,
   ConflictNoted,
+  AlternativeDeclared,
+  AlternativeLanded,
   ChangeParked,
   ChangeResumed,
   ChangeAdopted,

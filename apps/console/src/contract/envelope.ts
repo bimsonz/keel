@@ -41,6 +41,8 @@ export const EVENT_TYPES = [
   "ChangeLanded",
   "ChangeBounced",
   "ConflictNoted",
+  "AlternativeDeclared",
+  "AlternativeLanded",
   "ChangeParked",
   "ChangeResumed",
   "ChangeAdopted",

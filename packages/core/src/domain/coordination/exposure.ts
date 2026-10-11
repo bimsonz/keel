@@ -1,6 +1,7 @@
 import { Result } from "effect";
 import type { ChangeId } from "../kernel/index.ts";
 import { globsMayOverlap } from "../kernel/index.ts";
+import { alternativesOf } from "./alternatives.ts";
 import type { Intent } from "./change.ts";
 import { readClaim } from "./claim.ts";
 import { compare } from "./compare.ts";
@@ -20,6 +21,8 @@ export type Exposure = {
   readonly contradictions: readonly Contradiction[];
   /** The intent's own propositions that do not read on their lattice: each becomes a notice with the grammar. */
   readonly unreadable: readonly UnreadableProposition[];
+  /** The live changes with the same intent (`alternativesOf`), in the order given, never ranked. */
+  readonly alternatives: readonly ChangeId[];
 };
 
 /** The paths the propositions' anchors pin. */
@@ -91,5 +94,10 @@ export const exposure = (
     ...myPremises.map((p) => readClaim(p, "premise")),
     ...myEffects.map((e) => readClaim(e)),
   ].flatMap((read) => (Result.isFailure(read) ? [read.failure] : []));
-  return { neighbours, contradictions, unreadable };
+  return {
+    neighbours,
+    contradictions,
+    unreadable,
+    alternatives: alternativesOf(self, intent, liveChanges),
+  };
 };

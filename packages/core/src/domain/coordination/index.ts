@@ -1,4 +1,5 @@
 /** coordination: changes, intents, propositions, subjects, preflight, leases, sketches and fallout. */
+export * from "./alternatives.ts";
 export * from "./bets.ts";
 export * from "./change.ts";
 export * from "./change-machine.ts";

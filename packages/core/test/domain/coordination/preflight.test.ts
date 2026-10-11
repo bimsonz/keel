@@ -338,6 +338,51 @@ describe("preflight: the suggested move, first match wins, ordered by who breaks
     expect(later).toBeGreaterThan(0);
   });
 
+  it("[preflight.alternatives-unranked] preflight lists the alternatives exposure found, in exposure's order and only when there are some, and they change neither the move nor what it cites", () => {
+    fc.assert(
+      fc.property(
+        scenarioArb,
+        fc.shuffledSubarray([...changeIds].filter((id) => id !== self)),
+        (s, alternatives) => {
+          const without = run(s);
+          const { alternatives: listed, ...rest } = preflight(
+            self,
+            s.intent,
+            { neighbours: s.neighbours, contradictions: s.contradictions, alternatives },
+            s.precedents,
+          );
+          return (
+            !("alternatives" in without) &&
+            JSON.stringify(rest) === JSON.stringify(without) &&
+            (alternatives.length === 0
+              ? listed === undefined && !("alternatives" in rest)
+              : JSON.stringify(listed) === JSON.stringify(alternatives))
+          );
+        },
+      ),
+    );
+    // Two changes declaring the same effect: each sees the other, and each still proceeds.
+    const mine = live(self, [], [S1_EFFECT]);
+    const theirs = live(other, [], [S1_EFFECT]);
+    const third = live(idAt(2), [], [S1_EFFECT]);
+    const got = preflight(
+      self,
+      mine.intent,
+      exposure(self, mine.intent, [third, mine, theirs]),
+      [],
+    );
+    expect(got.alternatives).toEqual([idAt(2), other]);
+    expect(got.suggestedMove).toBe("proceed");
+    expect(got.basis).toBeUndefined();
+    // With no alternative the preflight carries no such field at all.
+    expect(
+      preflight(self, mine.intent, exposure(self, mine.intent, [mine]), []),
+    ).not.toHaveProperty("alternatives");
+    expect(
+      preflight(self, mine.intent, { neighbours: [], contradictions: [], alternatives: [] }, []),
+    ).not.toHaveProperty("alternatives");
+  });
+
   it("[preflight.premise-pair] my must premise against another change's premise coordinates, never sequences: neither alters anything", () => {
     fc.assert(
       fc.property(fc.array(contradictionArb, { minLength: 1, maxLength: 4 }), (cs) => {
