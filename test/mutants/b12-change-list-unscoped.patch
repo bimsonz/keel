@@ -1,16 +1,16 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/views.test.ts
 # kills: b12.change-list-scope
 # why: an agent's `project` is honoured, so it reads another project's changes
-diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
-index 563ab77..facdcb7 100644
---- a/packages/core/src/application/coordination/gateway.ts
-+++ b/packages/core/src/application/coordination/gateway.ts
-@@ -106,7 +106,7 @@ export const readEvents: (
-  */
- export const viewedProject = (principal: Principal, asked?: ProjectId): ProjectId | undefined => {
-   if (asked === undefined || asked === principal.projectId) return principal.projectId;
--  return readsInstanceWide(principal) ? asked : undefined;
-+  return asked;
- };
- 
- /** A project's changes from the Projector's read model, newest `#n` first. */
+diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
+index 66bc55e..a2d72bf 100644
+--- a/packages/core/src/application/coordination/read-scope.ts
++++ b/packages/core/src/application/coordination/read-scope.ts
+@@ -192,7 +192,7 @@ export const projectScope = (
+   principal: Principal | null,
+   project: ProjectId,
+ ): Effect.Effect<ProjectScope, ProjectNotFound | ForeignProject, Projects> => {
+-  if (principal !== null && (readsInstanceWide(principal) || principal.projectId === project))
++  if (principal !== null)
+     return Effect.succeed({ project, audience: "members" });
+   return isPublic(project).pipe(
+     Effect.flatMap((open): Effect.Effect<ProjectScope, ProjectNotFound | ForeignProject> =>

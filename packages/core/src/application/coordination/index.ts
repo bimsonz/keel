@@ -112,6 +112,7 @@ export const openSketch: (
 export * from "./change.ts";
 export * from "./live-index.ts";
 export * from "./preflight.ts";
+export * from "./read-scope.ts";
 export * from "./subject.ts";
 
 /** The WorkspacePool use-cases. */

@@ -22,6 +22,7 @@ import {
   EventFeed,
   type EventFeedPage,
   Inbox,
+  type Projects,
   ProjectViews,
   type SubmissionStatus,
   type ViewSnapshot,
@@ -41,6 +42,7 @@ import type {
   Revised,
   SubmitInput,
 } from "./index.ts";
+import { audienceOf, type ReadRefused, readScope, viewScope } from "./read-scope.ts";
 
 /**
  * The isolate's side of the work loop. The doorways have already checked the
@@ -180,55 +182,59 @@ export const readInbox: (
   Inbox.use((inbox) => inbox.read(principal.agentId, cursor, clampWait(waitSeconds)));
 
 /**
- * Who reads the whole feed at L1: an observer, because Mission Control shows
- * every project (S-0's control project too), and an operator, whose authority
- * is instance-wide. Anyone else reads only the events of its own project.
- */
-const readsInstanceWide = (principal: Principal): boolean =>
-  principal.scopes.includes("observer") || principal.scopes.includes("operator");
-
-/**
- * The event feed after `cursor`, waiting up to `waitSeconds` (0–30) for an
- * event. An agent's page keeps only its project's events, so it may hold fewer
- * than `limit`, or none, while its cursor still moves past the rest.
+ * The event feed after `cursor`, waiting up to `waitSeconds` (0–30, with a
+ * token or without) for an event, as far as `readScope` lets the caller read.
+ * A one-project page keeps only that project's events, and only the public
+ * ones for a reader outside it, so it may hold fewer than `limit`, or none,
+ * while its cursor still moves past the rest. A refusal answers at once,
+ * before any wait.
  */
 export const readEvents: (
-  principal: Principal,
-  input: { readonly cursor?: string; readonly limit?: number; readonly waitSeconds?: number },
-) => Effect.Effect<EventFeedPage, never, EventFeed> = (principal, input) =>
-  EventFeed.use((feed) =>
-    feed.read({
-      ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-      ...(input.limit === undefined ? {} : { limit: input.limit }),
-      waitSeconds: clampWait(input.waitSeconds),
-    }),
-  ).pipe(
-    Effect.map((page) =>
-      readsInstanceWide(principal)
-        ? page
-        : { ...page, events: page.events.filter((e) => e.project === principal.projectId) },
+  principal: Principal | null,
+  input: {
+    readonly cursor?: string;
+    readonly limit?: number;
+    readonly waitSeconds?: number;
+    readonly project?: ProjectId;
+  },
+) => Effect.Effect<EventFeedPage, ReadRefused, EventFeed | Projects> = (principal, input) =>
+  Effect.flatMap(readScope(principal, input.project), (scope) =>
+    EventFeed.use((feed) =>
+      feed.read({
+        ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+        ...(input.limit === undefined ? {} : { limit: input.limit }),
+        waitSeconds: clampWait(input.waitSeconds),
+      }),
+    ).pipe(
+      Effect.map((page) =>
+        scope._tag === "instance"
+          ? page
+          : {
+              ...page,
+              events: page.events.filter(
+                (e) =>
+                  e.project === scope.project &&
+                  (scope.audience === "members" || audienceOf(e.type) === "public"),
+              ),
+            },
+      ),
     ),
   );
 
-/**
- * The project a read of a project's views is about: the one asked for, or the
- * token's when none is. An agent reads its own project only, so asking for
- * another, whether or not it exists, is undefined (a 403); an observer or an
- * operator reads any.
- */
-export const viewedProject = (principal: Principal, asked?: ProjectId): ProjectId | undefined => {
-  if (asked === undefined || asked === principal.projectId) return principal.projectId;
-  return readsInstanceWide(principal) ? asked : undefined;
-};
-
-/** A project's changes from the Projector's read model, newest `#n` first. */
+/** A project's changes from the Projector's read model, newest `#n` first, as far as `viewScope` lets the caller read. */
 export const readChangeList: (
-  read: ChangeListRead,
-) => Effect.Effect<ChangeListPage, never, ProjectViews> = (read) =>
-  ProjectViews.use((views) => views.changes(read));
+  principal: Principal | null,
+  read: Omit<ChangeListRead, "project"> & { readonly project?: ProjectId },
+) => Effect.Effect<ChangeListPage, ReadRefused, ProjectViews | Projects> = (principal, read) =>
+  Effect.flatMap(viewScope(principal, read.project), ({ project }) =>
+    ProjectViews.use((views) => views.changes({ ...read, project })),
+  );
 
 /** A project's changes and trunk at the feed's head, with the cursor to fold forward from. */
 export const readSnapshot: (
-  project: ProjectId,
-) => Effect.Effect<ViewSnapshot, never, ProjectViews> = (project) =>
-  ProjectViews.use((views) => views.snapshot(project));
+  principal: Principal | null,
+  project: ProjectId | undefined,
+) => Effect.Effect<ViewSnapshot, ReadRefused, ProjectViews | Projects> = (principal, asked) =>
+  Effect.flatMap(viewScope(principal, asked), ({ project }) =>
+    ProjectViews.use((views) => views.snapshot(project)),
+  );

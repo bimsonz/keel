@@ -1,0 +1,28 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/public-reads.test.ts
+# kills: b12.public-refused
+# why: without a token, a private project answers 403 and a missing one 404, so a private project's existence leaks
+diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
+index 66bc55e..4f9f734 100644
+--- a/packages/core/src/application/coordination/read-scope.ts
++++ b/packages/core/src/application/coordination/read-scope.ts
+@@ -178,7 +178,6 @@ const readsInstanceWide = (principal: Principal): boolean =>
+ const isPublic = (projectId: ProjectId): Effect.Effect<boolean, never, Projects> =>
+   Projects.use((projects) => projects.settings(projectId)).pipe(
+     Effect.map((settings) => settings.visibility === "public"),
+-    Effect.catchTag("ProjectNotFound", () => Effect.succeed(false)),
+   );
+ 
+ /**
+@@ -198,11 +197,7 @@ export const projectScope = (
+     Effect.flatMap((open): Effect.Effect<ProjectScope, ProjectNotFound | ForeignProject> =>
+       open
+         ? Effect.succeed({ project, audience: "public" })
+-        : Effect.fail(
+-            principal === null
+-              ? new ProjectNotFound({ projectId: project })
+-              : new ForeignProject({ projectId: project }),
+-          ),
++        : Effect.fail(new ForeignProject({ projectId: project })),
+     ),
+   );
+ };

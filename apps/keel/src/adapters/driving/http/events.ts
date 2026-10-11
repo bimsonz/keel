@@ -4,6 +4,7 @@ import { IdentityEvent } from "@keeltown/core/domain/identity";
 import { IntegrationEvent } from "@keeltown/core/domain/integration";
 import { MemoryEvent } from "@keeltown/core/domain/memory";
 import { VerificationEvent } from "@keeltown/core/domain/verification";
+import { ProjectId } from "@keeltown/core/kernel";
 import type { EventFeedEntry, EventFeedPage } from "@keeltown/core/ports";
 import { Result, Schema } from "effect";
 import type { Inbox_listEventsResult } from "../../../generated/http/app.gen.ts";
@@ -49,6 +50,7 @@ export interface EventsInput {
   readonly cursor?: string;
   readonly limit?: number;
   readonly waitSeconds?: number;
+  readonly project?: ProjectId;
 }
 
 /** The query, with a cursor that is not a feed position refused as a 400 naming it. */
@@ -62,6 +64,7 @@ export function eventsInput(input: Input<"Inbox_listEvents">): Result.Result<Eve
     ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
     ...(input.limit === undefined ? {} : { limit: input.limit }),
     ...(input.wait === undefined ? {} : { waitSeconds: input.wait }),
+    ...(input.project === undefined ? {} : { project: ProjectId.make(input.project) }),
   });
 }
 

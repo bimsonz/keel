@@ -75,23 +75,35 @@ interface Inbox {
   @get
   inbox(@query cursor?: string, ...WaitQuery): InboxEnvelope | StandardErrors;
 
-  /** The operation log, oldest first from `cursor`. `?wait` long-polls for the next event. */
+  /**
+   * The operation log, oldest first from `cursor`. `?wait` long-polls for the next event, up to the
+   * same bound with a token or without. `project` keeps one project's events: an agent reads its own
+   * (the default) or a public one; an observer or operator reads any, and the whole log without it.
+   * Without a token, `project` names a public project (otherwise 404, as for one that does not exist)
+   * and only its public events are served: escalations, rulings, sessions, settings and operator
+   * moves stay with the project's members. Without a token and without `project`, 401.
+   */
   @summary("Read events")
-  @useAuth(Observer | AgentRead)
+  @useAuth(NoAuth | Observer | AgentRead)
   @route("/events")
   @get
-  listEvents(@query cursor?: string, ...WaitQuery, @query @minValue(1) @maxValue(500) limit?: int32): EventPage | StandardErrors;
+  listEvents(
+    @query cursor?: string,
+    @query project?: ProjectId,
+    ...WaitQuery,
+    @query @minValue(1) @maxValue(500) limit?: int32,
+  ): EventPage | NotFound | StandardErrors;
 
   /**
    * A project's changes and trunk at the head of the operation log, with the cursor they were taken at:
    * `listEvents` from that cursor returns exactly what the snapshot does not hold, so a console folds
-   * forward from it. Head only. Scoped as `listChanges`.
+   * forward from it. Head only. Scoped as `listChanges`, a public project's without a token too.
    */
   @summary("Snapshot at the head")
-  @useAuth(Observer | AgentRead)
+  @useAuth(NoAuth | Observer | AgentRead)
   @route("/events/snapshot")
   @get
-  getSnapshot(@query project?: ProjectId): FeedSnapshot | StandardErrors;
+  getSnapshot(@query project?: ProjectId): FeedSnapshot | NotFound | StandardErrors;
 }
 
 /** Trunk's head commit and height: 0 at initialization, one more per advance. */

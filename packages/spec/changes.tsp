@@ -140,17 +140,18 @@ model ChangeSummaryPage is Page<ChangeSummary>;
 interface Changes {
   /**
    * A project's changes, newest `#n` first, from the Projector's read model; `cursor` is a page's
-   * `nextCursor`. An agent reads its own project only (another `project` is 403); an observer or
-   * operator reads any, its token's project when `project` is absent.
+   * `nextCursor`. An agent reads its own project or a public one (another `project` is 403); an
+   * observer or operator reads any, its token's project when `project` is absent. Without a token,
+   * `project` names a public project (otherwise 404, as for one that does not exist); without either, 401.
    */
   @summary("List changes")
-  @useAuth(Observer | AgentRead)
+  @useAuth(NoAuth | Observer | AgentRead)
   @get
   listChanges(
     @query state?: ChangeState,
     @query project?: ProjectId,
     ...PageQuery,
-  ): ChangeSummaryPage | StandardErrors;
+  ): ChangeSummaryPage | NotFound | StandardErrors;
 
   /** Declare an intent before writing code. Returns preflight, a workspace to push to, and a lease. */
   @summary("Declare a change")

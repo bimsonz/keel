@@ -2,15 +2,15 @@
 # kills: sdk.routes
 # why: the client calls a status path the published document does not have
 diff --git a/packages/sdk/src/routes.ts b/packages/sdk/src/routes.ts
-index f4b1e17..c826d5e 100644
+index cba7f2d..bbb266b 100644
 --- a/packages/sdk/src/routes.ts
 +++ b/packages/sdk/src/routes.ts
-@@ -19,7 +19,7 @@ export const ROUTES = {
+@@ -28,7 +28,7 @@ export const ROUTES = {
    declare: { method: "POST", path: "/changes", headers: ["idempotency-key"] },
    Changes_getChange: { method: "GET", path: "/changes/{changeId}" },
    submit: { method: "POST", path: "/submissions", headers: ["idempotency-key", "keel-lease"] },
 -  status: { method: "GET", path: "/changes/{changeId}/submission", query: ["wait"] },
 +  status: { method: "GET", path: "/changes/{changeId}/submissions", query: ["wait"] },
    inbox: { method: "GET", path: "/inbox", query: ["cursor", "wait"] },
-   Inbox_listEvents: { method: "GET", path: "/events", query: ["cursor", "wait", "limit"] },
-   Views_getTrunk: { method: "GET", path: "/projects/{projectId}/trunk" },
+   Inbox_listEvents: {
+     method: "GET",

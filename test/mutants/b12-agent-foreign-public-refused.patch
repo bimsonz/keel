@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/public-reads.test.ts
+# kills: b12.public-refused
+# why: an agent of another project is refused a public project that anyone without a token may read
+diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
+index 66bc55e..72aaeb5 100644
+--- a/packages/core/src/application/coordination/read-scope.ts
++++ b/packages/core/src/application/coordination/read-scope.ts
+@@ -196,7 +196,7 @@ export const projectScope = (
+     return Effect.succeed({ project, audience: "members" });
+   return isPublic(project).pipe(
+     Effect.flatMap((open): Effect.Effect<ProjectScope, ProjectNotFound | ForeignProject> =>
+-      open
++      open && principal === null
+         ? Effect.succeed({ project, audience: "public" })
+         : Effect.fail(
+             principal === null

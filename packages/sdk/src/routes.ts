@@ -30,7 +30,11 @@ export const ROUTES = {
   submit: { method: "POST", path: "/submissions", headers: ["idempotency-key", "keel-lease"] },
   status: { method: "GET", path: "/changes/{changeId}/submission", query: ["wait"] },
   inbox: { method: "GET", path: "/inbox", query: ["cursor", "wait"] },
-  Inbox_listEvents: { method: "GET", path: "/events", query: ["cursor", "wait", "limit"] },
+  Inbox_listEvents: {
+    method: "GET",
+    path: "/events",
+    query: ["cursor", "project", "wait", "limit"],
+  },
   Views_getTrunk: { method: "GET", path: "/projects/{projectId}/trunk" },
   abandon: {
     method: "POST",

@@ -15,7 +15,6 @@ import {
   reviseChange,
   submissionOf,
   submitChange,
-  viewedProject,
 } from "@keeltown/core/application/coordination";
 import {
   enrolAgent,
@@ -56,7 +55,7 @@ import {
   standingOk,
 } from "./operator.ts";
 import { eventsInput, eventsOk } from "./events.ts";
-import { changeListInput, changesOk, foreignProject, snapshotOk } from "./views.ts";
+import { changeListInput, changesOk, readRefused, snapshotOk } from "./views.ts";
 import { piggyback } from "./piggyback.ts";
 import {
   blobOk,
@@ -239,16 +238,10 @@ export function makeHandlers(run: Runner) {
       Changes_listChanges: (caller: Caller, input: Input<"Changes_listChanges">) => {
         const decoded = changeListInput(input);
         if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-        const { project: asked, ...read } = decoded.success;
         return run(
           caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) => {
-              const project = viewedProject(principal, asked);
-              return project === undefined
-                ? Effect.succeed(foreignProject(caller))
-                : Effect.map(readChangeList({ ...read, project }), changesOk);
-            }),
+          readChangeList(caller.principal, decoded.success).pipe(
+            Effect.match({ onSuccess: changesOk, onFailure: (e) => readRefused(caller, e) }),
           ),
         );
       },
@@ -375,24 +368,18 @@ export function makeHandlers(run: Runner) {
         if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
         return run(
           caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) => readEvents(principal, decoded.success)),
-            Effect.map(eventsOk),
+          readEvents(caller.principal, decoded.success).pipe(
+            Effect.match({ onSuccess: eventsOk, onFailure: (e) => readRefused(caller, e) }),
           ),
         );
       },
       Inbox_getSnapshot: (caller: Caller, input: Input<"Inbox_getSnapshot">) =>
         run(
           caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) => {
-              const asked = input.project === undefined ? undefined : ProjectId.make(input.project);
-              const project = viewedProject(principal, asked);
-              return project === undefined
-                ? Effect.succeed(foreignProject(caller))
-                : Effect.map(readSnapshot(project), snapshotOk);
-            }),
-          ),
+          readSnapshot(
+            caller.principal,
+            input.project === undefined ? undefined : ProjectId.make(input.project),
+          ).pipe(Effect.match({ onSuccess: snapshotOk, onFailure: (e) => readRefused(caller, e) })),
         ),
       Lattices_listLattices: latticesOk,
       // The repo reads admit a caller without a token: the use-case decides by the project's visibility.

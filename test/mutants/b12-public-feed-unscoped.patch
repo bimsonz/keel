@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/public-reads.test.ts
+# kills: b12.public-feed
+# why: a public read is not kept to the project it names, so other projects' events leak to it
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 9f3620f..c5c39db 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -172,7 +172,7 @@ export const readEvents: (
+               ...page,
+               events: page.events.filter(
+                 (e) =>
+-                  e.project === scope.project &&
++                  (scope.audience === "public" || e.project === scope.project) &&
+                   (scope.audience === "members" || audienceOf(e.type) === "public"),
+               ),
+             },

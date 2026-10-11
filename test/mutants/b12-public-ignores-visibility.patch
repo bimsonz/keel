@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/public-reads.test.ts
+# kills: b12.public-refused
+# why: every existing project reads as public, so a private project's activity is served without a token
+diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
+index 66bc55e..8901e96 100644
+--- a/packages/core/src/application/coordination/read-scope.ts
++++ b/packages/core/src/application/coordination/read-scope.ts
+@@ -177,7 +177,7 @@ const readsInstanceWide = (principal: Principal): boolean =>
+ 
+ const isPublic = (projectId: ProjectId): Effect.Effect<boolean, never, Projects> =>
+   Projects.use((projects) => projects.settings(projectId)).pipe(
+-    Effect.map((settings) => settings.visibility === "public"),
++    Effect.map(() => true),
+     Effect.catchTag("ProjectNotFound", () => Effect.succeed(false)),
+   );
+ 
