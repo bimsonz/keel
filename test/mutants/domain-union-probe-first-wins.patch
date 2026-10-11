@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/union.test.ts
+# kills: union.guard-probe-conflict
+# why: members pinning different probes for one guard step cannot share a run; here the union silently keeps the stricter member's probe
+diff --git a/packages/core/src/domain/verification/union.ts b/packages/core/src/domain/verification/union.ts
+index a40f5df..e5ac90b 100644
+--- a/packages/core/src/domain/verification/union.ts
++++ b/packages/core/src/domain/verification/union.ts
+@@ -103,7 +103,7 @@ export const unionPlans = (
+       if (s.guards !== undefined)
+         probes.set(s.id, (probes.get(s.id) ?? new Set()).add(s.guards.probe));
+   }
+-  for (const pinned of [versions, probes])
++  for (const pinned of [versions])
+     for (const [stepId, vs] of [...pinned].toSorted(([a], [b]) => byCodePoint(a, b)))
+       if (vs.size > 1)
+         return Result.fail(new UnionVersionConflict({ stepId, versions: sortedUnion([...vs]) }));

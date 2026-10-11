@@ -2,15 +2,15 @@
 # kills: flow.guard-policy
 # why: a predicate the change's policy leaves out blocks, where the default is advise
 diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
-index dabfd31..6f1d9b2 100644
+index e093244..3fc4471 100644
 --- a/packages/core/src/domain/verification/compile.ts
 +++ b/packages/core/src/domain/verification/compile.ts
 @@ -477,7 +477,7 @@ export const compile = (
            : {
                guards: {
-                 predicate: s.guards,
--                policy: facts.predicatePolicy?.[s.guards] ?? DEFAULT_PREDICATE_POLICY,
-+                policy: facts.predicatePolicy?.[s.guards] ?? "block",
+                 predicate: s.guards.predicate,
+-                policy: facts.predicatePolicy?.[s.guards.predicate] ?? DEFAULT_PREDICATE_POLICY,
++                policy: facts.predicatePolicy?.[s.guards.predicate] ?? "block",
+                 probe: s.guards.probe,
                },
              }),
-       },
