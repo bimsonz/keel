@@ -8,6 +8,7 @@ import { isDeepStrictEqual } from "node:util";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { clientFor, readSeeded } from "../e2e/src/lib/seeded.ts";
+import { documentSmoke } from "../e2e/src/smoke/document.ts";
 import { workLoopSmoke } from "../e2e/src/smoke/work-loop.ts";
 import { whoamiSmoke, type WhoamiSmokeResult } from "../e2e/src/smoke/whoami.ts";
 import { root, siteHost, wrangler } from "./env.ts";
@@ -74,6 +75,9 @@ const check = (ok: boolean, what: string) => {
 };
 
 try {
+  const document = await documentSmoke(keelUrl);
+  check(document.ok, document.what);
+  if (!document.ok) console.log(JSON.stringify(document.detail));
   seeded.push(await seed("smoke-a"), await seed("smoke-b"));
   const results: WhoamiSmokeResult[] = [];
   for (const agent of seeded) results.push(await whoamiSmoke(keelUrl, agent));

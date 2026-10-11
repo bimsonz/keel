@@ -1,4 +1,4 @@
-import { openApiDocument, OPENAPI_DOCUMENT_PATH } from "@keeltown/contracts";
+import { openApiDocument } from "@keeltown/contracts";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { requestId } from "hono/request-id";
@@ -28,6 +28,9 @@ export interface AppOptions {
   readonly rethrowContractDrift: boolean;
 }
 
+/** The OpenAPI document, under /v1 so keel.town routes it to Keel ahead of the console. */
+export const DOCUMENT_PATH = "/v1/openapi.json";
+
 /** The HTTP doorway: middleware, the generated routes, the agent's inbox streams, the MCP endpoint, Better Auth and the document. */
 export function makeApp(options: AppOptions) {
   const app = new Hono<AppEnv>();
@@ -46,7 +49,7 @@ export function makeApp(options: AppOptions) {
   );
 
   app.get("/healthz", (c) => c.json({ ok: true, service: "keel" }));
-  app.get(OPENAPI_DOCUMENT_PATH, (c) => c.json(openApiDocument));
+  app.get(DOCUMENT_PATH, (c) => c.json(openApiDocument));
   app.all("/mcp", (c) => options.mcp(c.req.raw));
   registerAuth(app, options.auth);
   const deps = routeDeps(options.verify);

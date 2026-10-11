@@ -12,10 +12,12 @@ function toolNames(result: Record<string, unknown>): string[] {
 }
 
 describe("the published contract, through the Worker's fetch handler", () => {
-  it("serves the committed OpenAPI document", async () => {
-    const response = await exports.default.fetch(`${BASE}/openapi.json`);
+  it("serves the committed OpenAPI document under /v1, and nowhere else", async () => {
+    const response = await exports.default.fetch(`${BASE}/v1/openapi.json`);
     expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toMatch(/^application\/json/);
     expect(await response.json()).toEqual(openApiDocument);
+    expect((await exports.default.fetch(`${BASE}/openapi.json`)).status).toBe(404);
   });
 
   it("refuses an authenticated operation without a token, as problem+json naming the way forward", async () => {
