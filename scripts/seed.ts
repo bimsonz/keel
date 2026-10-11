@@ -8,7 +8,8 @@
 // 3. The operator creates forge-lite and forge-lite-control, switches
 //    verification off in the control project only (S-0's negative control),
 //    and enrols an observer and agents a1..aN in each project.
-// 4. Everything a run needs is written to .keel/<env>.json (gitignored, 0600).
+// 4. Everything a run needs is written to .keel/<env>.json (gitignored, 0600),
+//    keeping what scripts/deploy.ts put there (the console's keys).
 //
 // Every call carries the Idempotency-Key `seed:<env>:<role>`, so a second run
 // reaches the same ids. A credential the file already holds is kept while it
@@ -154,11 +155,18 @@ interface Credential {
 
 const out = join(root, ".keel", `${environment}.json`);
 
+/**
+ * What an earlier seed wrote. Its keys this script does not write (deploy.ts's
+ * `console` keys) are kept as they are when the file is written again.
+ */
+const earlier: Record<string, unknown> = existsSync(out)
+  ? Object(JSON.parse(readFileSync(out, "utf8")))
+  : {};
+
 /** The credentials an earlier seed wrote, by role, so a second seed need not rotate them. */
 function previousCredentials(): Map<string, Credential> {
   const previous = new Map<string, Credential>();
-  if (!existsSync(out)) return previous;
-  const seeded: unknown = JSON.parse(readFileSync(out, "utf8"));
+  const seeded: unknown = earlier;
   const put = (role: string, value: unknown) => {
     const c = Object(value);
     if (typeof c.agentId === "string" && typeof c.clientSecret === "string") previous.set(role, c);
@@ -264,7 +272,7 @@ try {
   mkdirSync(join(root, ".keel"), { recursive: true, mode: 0o700 });
   writeFileSync(
     out,
-    `${JSON.stringify({ environment, keelUrl, fixture: { repo: `${CORE}/${FIXTURE}`, sha: fixtureSha }, operator, observer, projects }, null, 2)}\n`,
+    `${JSON.stringify({ ...earlier, environment, keelUrl, fixture: { repo: `${CORE}/${FIXTURE}`, sha: fixtureSha }, operator, observer, projects }, null, 2)}\n`,
     { mode: 0o600 },
   );
   chmodSync(out, 0o600);
