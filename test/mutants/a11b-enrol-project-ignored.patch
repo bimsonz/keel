@@ -2,11 +2,11 @@
 # kills: a11b.enrol
 # why: enrolAgent drops the requested projectId, so every agent lands in the operator's project
 diff --git a/apps/keel/src/adapters/driving/http/operator.ts b/apps/keel/src/adapters/driving/http/operator.ts
-index f03a226..58c9b99 100644
+index 6a8c3da..94af00a 100644
 --- a/apps/keel/src/adapters/driving/http/operator.ts
 +++ b/apps/keel/src/adapters/driving/http/operator.ts
-@@ -29,7 +29,7 @@ export function enrolInput(input: Input<"Operator_enrolAgent">): Result.Result<E
-     scopes: [...input.scopes],
+@@ -30,7 +30,7 @@ export function enrolInput(input: Input<"Operator_enrolAgent">): Result.Result<E
+     ...(input.onBehalfOf === undefined ? {} : { onBehalfOf: input.onBehalfOf }),
      idempotencyKey: input["idempotency-key"],
    };
 -  if (input.projectId === undefined) return Result.succeed(base);
