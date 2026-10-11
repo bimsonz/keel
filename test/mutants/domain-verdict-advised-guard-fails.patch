@@ -2,15 +2,15 @@
 # kills: verdict.guard-policy
 # why: a guard's proof fail bounces the change whatever its predicate's policy, so a tenet blocks by itself
 diff --git a/packages/core/src/domain/verification/verdict.ts b/packages/core/src/domain/verification/verdict.ts
-index b90adf2..b2d4949 100644
+index 3caaabc..3e2d59c 100644
 --- a/packages/core/src/domain/verification/verdict.ts
 +++ b/packages/core/src/domain/verification/verdict.ts
-@@ -130,7 +130,7 @@ const leaf = (ctx: Context, id: string, world: World | undefined): Value => {
-       // A tenet never blocks by itself: its guard's fail blocks only where the
-       // project chose block. Otherwise the flow reads the step as a pass (a
-       // cascade accepts it), and the fail is kept as advice.
--      return step?.guards !== undefined && step.guards.policy !== "block"
-+      return false
-         ? { ...as("pass"), outcome: "pass", advisories: [r] }
-         : as("fail");
+@@ -134,7 +134,7 @@ const leaf = (ctx: Context, id: string, world: World | undefined): Value => {
+     case "fail":
+       if (!canBlock(r.evidenceClass)) return as("escalate");
+       if (ctx.overridden.has(id)) return as("pass");
+-      return advised ? advice : as("fail");
++      return as("fail");
      case "escalate":
+       return as("escalate");
+     default:

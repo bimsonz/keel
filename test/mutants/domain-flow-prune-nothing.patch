@@ -2,13 +2,13 @@
 # kills: flow.steps-cited-and-pruned
 # why: Every step runs whatever the change touched
 diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
-index 04f37e3..1e30671 100644
+index a536a2f..9095d1c 100644
 --- a/packages/core/src/domain/verification/compile.ts
 +++ b/packages/core/src/domain/verification/compile.ts
-@@ -407,7 +407,7 @@ export const compile = (
-   const reasons = new Map(
-     used.map((id) => [id, applies(table.get(id) ?? humanClassStep, facts)] as const),
-   );
+@@ -444,7 +444,7 @@ export const compile = (
+     ...used.map((id) => [id, applies(table.get(id) ?? humanClassStep, facts)] as const),
+     ...guards.map((g) => [g.spec.id, { applies: true, because: g.because }] as const),
+   ]);
 -  const kept = new Set(used.filter((id) => reasons.get(id)?.applies === true));
 +  const kept = new Set(used);
    const touchesFlow = facts.touchedPaths.filter((p) =>

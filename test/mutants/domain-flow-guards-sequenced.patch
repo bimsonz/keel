@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.guards-parallel
+# why: guards run alongside the project's flow; here they run only after it passes
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index a536a2f..edc79e1 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -459,7 +459,7 @@ export const compile = (
+       ? project
+       : project === undefined
+         ? guarded
+-        : { _tag: "par", items: [project, guarded] };
++        : { _tag: "seq", exitOn: "fail", items: [project, guarded] };
+   const gate: Flow = { _tag: "step", step: HUMAN_CLASS_STEP };
+   const compiled: Flow =
+     touchesFlow.length === 0

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/guards.test.ts
+# kills: guards.anchored-edit
+# why: a change that edits a path the tenet anchors runs its guard, declared or not; here touched paths are ignored
+diff --git a/packages/core/src/domain/verification/guards.ts b/packages/core/src/domain/verification/guards.ts
+index 6da8783..7d21d31 100644
+--- a/packages/core/src/domain/verification/guards.ts
++++ b/packages/core/src/domain/verification/guards.ts
+@@ -31,7 +31,7 @@ const exposedBy = (tenet: Proposition, change: GuardExposure): readonly string[]
+       .filter((s) => subjectsNear(s, tenet.subject))
+       .map((s) => `relies on or alters ${s}, near ${tenet.subject}`),
+     ...change.touchedPaths
+-      .filter((p) => anchored.has(p))
++      .filter(() => false)
+       .map((p) => `edits ${p}, anchored by the tenet`),
+   ];
+ };

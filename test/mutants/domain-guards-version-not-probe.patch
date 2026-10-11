@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/guards.test.ts
+# kills: guards.step-shape
+# why: a guard step's version is the admitted bundle it runs; here it is derived from the guard's id
+diff --git a/packages/core/src/domain/verification/guards.ts b/packages/core/src/domain/verification/guards.ts
+index 6da8783..743d623 100644
+--- a/packages/core/src/domain/verification/guards.ts
++++ b/packages/core/src/domain/verification/guards.ts
+@@ -38,7 +38,7 @@ const exposedBy = (tenet: Proposition, change: GuardExposure): readonly string[]
+ 
+ const stepOf = (g: AdmittedGuard): StepSpec => ({
+   id: guardStepId(g.guardId),
+-  version: g.probe,
++  version: guardStepId(g.guardId) as unknown as typeof g.probe,
+   kind: "probe",
+   evidenceCeiling: "proof",
+   appliesTo: { paths: [], subjects: [g.tenet.proposition.subject] },

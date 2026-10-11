@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/compile.test.ts
+# kills: flow.guards-appended
+# why: compile runs every admitted guard the change is exposed to; here it ignores the admitted guards
+diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
+index a536a2f..4d2d41a 100644
+--- a/packages/core/src/domain/verification/compile.ts
++++ b/packages/core/src/domain/verification/compile.ts
+@@ -420,7 +420,7 @@ export const compile = (
+   for (const s of [...defaults.steps, ...(spec?.steps ?? [])]) table.set(s.id, s);
+   const flow = spec?.flow ?? defaults.flow;
+   // Guards come from the guard store, never the project's flow: a step id they share is refused.
+-  const guards = selectGuards(facts.admittedGuards ?? [], facts);
++  const guards = selectGuards([], facts);
+   for (const g of guards) {
+     if (table.has(g.spec.id)) errors.push(new StepUsedTwice({ step: g.spec.id }));
+     table.set(g.spec.id, g.spec);

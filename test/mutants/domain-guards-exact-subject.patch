@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/guards.test.ts
+# kills: guards.apply-by-subject
+# why: a guard applies to any change exposed to its tenet; here only a change naming the tenet's exact subject runs it, so an ancestor, a descendant or a sibling skips it
+diff --git a/packages/core/src/domain/verification/guards.ts b/packages/core/src/domain/verification/guards.ts
+index 6da8783..89434c8 100644
+--- a/packages/core/src/domain/verification/guards.ts
++++ b/packages/core/src/domain/verification/guards.ts
+@@ -28,7 +28,7 @@ const exposedBy = (tenet: Proposition, change: GuardExposure): readonly string[]
+   const anchored = anchorPathsOf([tenet]);
+   return [
+     ...change.subjects
+-      .filter((s) => subjectsNear(s, tenet.subject))
++      .filter((s) => s === tenet.subject)
+       .map((s) => `relies on or alters ${s}, near ${tenet.subject}`),
+     ...change.touchedPaths
+       .filter((p) => anchored.has(p))

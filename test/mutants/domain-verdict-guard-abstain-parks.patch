@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/verdict.test.ts
+# kills: verdict.guard-abstain-policy
+# why: a guard's abstain takes its predicate's policy as a fail does; here it parks whatever the policy
+diff --git a/packages/core/src/domain/verification/verdict.ts b/packages/core/src/domain/verification/verdict.ts
+index 3caaabc..556b4ff 100644
+--- a/packages/core/src/domain/verification/verdict.ts
++++ b/packages/core/src/domain/verification/verdict.ts
+@@ -138,7 +138,6 @@ const leaf = (ctx: Context, id: string, world: World | undefined): Value => {
+     case "escalate":
+       return as("escalate");
+     default:
+-      if (advised) return advice;
+       return optional ? as("pass") : as("escalate");
+   }
+ };
