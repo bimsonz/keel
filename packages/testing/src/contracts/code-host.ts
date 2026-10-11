@@ -45,6 +45,8 @@ const freshRepo = Effect.gen(function* () {
 const oidAt = (entries: readonly { readonly path: string; readonly oid: string }[], path: string) =>
   entries.find((e) => e.path === path)?.oid ?? "";
 
+const shas = (commits: readonly { readonly sha: string }[]) => commits.map((c) => c.sha);
+
 const tagOf = <A, E extends { readonly _tag: string }, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.map(Effect.flip(effect), (e) => e._tag);
 
@@ -122,8 +124,11 @@ export function describeCodeHostContract(
             yield* tagOf(host.info(ghost)),
             yield* tagOf(host.hasCommit(ghost, sha)),
             yield* tagOf(host.fork(ghost, fixture.scratch())),
+            yield* tagOf(host.listDir(ghost, sha, "")),
+            yield* tagOf(host.readCommit(ghost, sha)),
+            yield* tagOf(host.log(ghost, sha, 5)),
           ];
-          expect(tags).toEqual(Array.from({ length: 8 }, () => "RepoNotFound"));
+          expect(tags).toEqual(Array.from({ length: 11 }, () => "RepoNotFound"));
           expect(yield* Effect.flip(host.head(ghost, MAIN))).toMatchObject({
             repo: { namespace: ghost.namespace, name: ghost.name },
           });
@@ -144,10 +149,89 @@ export function describeCodeHostContract(
             yield* Effect.flip(host.readBlob(repo, missing)),
             yield* Effect.flip(host.diffTrees(repo, missing, known)),
             yield* Effect.flip(host.diffTrees(repo, known, missing)),
+            yield* Effect.flip(host.listDir(repo, missing, "")),
+            yield* Effect.flip(host.readCommit(repo, missing)),
+            yield* Effect.flip(host.log(repo, missing, 5)),
           ];
           expect(errors).toMatchObject(
-            Array.from({ length: 4 }, () => ({ _tag: "ObjectNotFound", oid: missing })),
+            Array.from({ length: 7 }, () => ({ _tag: "ObjectNotFound", oid: missing })),
           );
+        }).pipe(Effect.provide(make())),
+    );
+
+    it.live(
+      "[codehost.list-dir] listDir lists one directory's entries in git order with repo paths; a file or absent path fails PathNotFound",
+      () =>
+        Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const fixture = yield* CodeHostFixture;
+          const repo = yield* freshRepo;
+          const head = yield* fixture.commit(repo, MAIN, HEAD);
+          const all = yield* host.readTree(repo, head);
+          const root = yield* host.listDir(repo, head, "");
+          expect(root.map((e) => [e.path, e.type])).toEqual([
+            ["a", "blob"],
+            ["b", "tree"],
+            ["g", "commit"],
+            ["keep", "tree"],
+            ["l", "blob"],
+            ["m", "blob"],
+            ["new.txt", "blob"],
+          ]);
+          expect(root.find((e) => e.path === "l")?.mode).toBe("120000");
+          expect(root.find((e) => e.path === "m")?.mode).toBe("100755");
+          const deep = yield* host.listDir(repo, head, "keep/deep");
+          expect(deep).toEqual([
+            {
+              path: "keep/deep/file",
+              mode: "100644",
+              oid: oidAt(all, "keep/deep/file"),
+              type: "blob",
+            },
+          ]);
+          expect((yield* host.listDir(repo, head, "keep")).map((e) => e.path)).toEqual([
+            "keep/deep",
+          ]);
+          for (const path of ["new.txt", "nope", "keep/nope", "keep/deep/file/x", "g"])
+            expect(yield* Effect.flip(host.listDir(repo, head, path))).toMatchObject({
+              _tag: "PathNotFound",
+              path,
+              commit: head,
+            });
+        }).pipe(Effect.provide(make())),
+    );
+
+    it.live(
+      "[codehost.log] log walks the first-parent chain from the given commit, newest first, as many as asked; readCommit decodes one",
+      () =>
+        Effect.gen(function* () {
+          const host = yield* CodeHost;
+          const fixture = yield* CodeHostFixture;
+          const repo = yield* freshRepo;
+          const first = yield* fixture.commit(repo, MAIN, { f: "1\n" });
+          const second = yield* fixture.commit(repo, MAIN, { f: "2\n" });
+          const third = yield* fixture.commit(repo, MAIN, { f: "3\n" });
+          expect(shas(yield* host.log(repo, third, 10))).toEqual([third, second, first]);
+          expect(shas(yield* host.log(repo, third, 2))).toEqual([third, second]);
+          expect(shas(yield* host.log(repo, second, 10))).toEqual([second, first]);
+          expect(shas(yield* host.log(repo, first, 1))).toEqual([first]);
+          const read = yield* host.readCommit(repo, second);
+          const who = {
+            name: "keel fixture",
+            email: "fixture@keel.invalid",
+            at: 1_760_000_000_000,
+          };
+          expect(read).toEqual({
+            sha: second,
+            tree: read.tree,
+            parents: [first],
+            message: "fixture",
+            author: who,
+            committer: who,
+          });
+          expect(read.tree).toMatch(/^[0-9a-f]{40}$/);
+          expect((yield* host.readCommit(repo, first)).parents).toEqual([]);
+          expect((yield* host.log(repo, third, 10))[1]).toEqual(read);
         }).pipe(Effect.provide(make())),
     );
 

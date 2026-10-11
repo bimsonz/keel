@@ -52,6 +52,25 @@ export interface TreeChange {
   readonly newMode?: string;
 }
 
+/** Who a commit names, and when (the commit's own timestamp). */
+export interface CommitIdentity {
+  readonly name: string;
+  readonly email: string;
+  readonly at: Instant;
+}
+
+/** A commit as the host decodes it. `parents` are in git order; a root commit has none. */
+export interface CommitInfo {
+  readonly sha: CommitSha;
+  /** The root tree's id. */
+  readonly tree: string;
+  readonly parents: readonly CommitSha[];
+  /** The message with one trailing newline removed, as git log shows it. */
+  readonly message: string;
+  readonly author: CommitIdentity;
+  readonly committer: CommitIdentity;
+}
+
 /** No repository by this name in this namespace (never created, or deleted). */
 export class RepoNotFound extends Schema.TaggedError<RepoNotFound>()("RepoNotFound", {
   repo: RepoRefSchema,
@@ -77,9 +96,16 @@ export class ObjectNotFound extends Schema.TaggedError<ObjectNotFound>()("Object
   oid: Schema.String,
 }) {}
 
+/** The commit holds nothing at this path, or nothing of the kind asked for (a directory where a file was wanted, or the reverse). */
+export class PathNotFound extends Schema.TaggedError<PathNotFound>()("PathNotFound", {
+  repo: RepoRefSchema,
+  commit: Schema.String,
+  path: Schema.String,
+}) {}
+
 /**
- * Repositories on the code host: create, fork, mint scoped tokens, read, diff
- * and delete. **Never writes git content**: every write is a git push.
+ * Repositories on the code host: create, fork, mint scoped tokens, read
+ * (trees, files, commits and first-parent history), diff and delete. **Never writes git content**: every write is a git push.
  * Missing repos, refs and objects are typed errors; transport failures are defects.
  */
 export class CodeHost extends Context.Service<
@@ -114,6 +140,29 @@ export class CodeHost extends Context.Service<
       repo: RepoRef,
       oid: string,
     ) => Effect.Effect<Uint8Array, RepoNotFound | ObjectNotFound>;
+    /**
+     * The immediate entries of the directory at `path` in the commit (`""` is
+     * the root), in git order, each `path` repo-relative. Only the trees on the
+     * way are read. Fails PathNotFound when the path is absent or not a directory.
+     */
+    readonly listDir: (
+      repo: RepoRef,
+      commit: CommitSha,
+      path: string,
+    ) => Effect.Effect<readonly TreeEntry[], RepoNotFound | ObjectNotFound | PathNotFound>;
+    readonly readCommit: (
+      repo: RepoRef,
+      sha: CommitSha,
+    ) => Effect.Effect<CommitInfo, RepoNotFound | ObjectNotFound>;
+    /**
+     * Up to `limit` commits along the first-parent chain, newest first, starting
+     * with `from` itself. Fewer means the chain ended at a root commit.
+     */
+    readonly log: (
+      repo: RepoRef,
+      from: CommitSha,
+      limit: number,
+    ) => Effect.Effect<readonly CommitInfo[], RepoNotFound | ObjectNotFound>;
     /** The leaves that differ from `base` to `head`; unchanged subtrees are skipped by id. */
     readonly diffTrees: (
       repo: RepoRef,

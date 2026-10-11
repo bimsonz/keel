@@ -3,6 +3,7 @@ import type { AgentId, ChangeId, ProjectId } from "@keeltown/core/kernel";
 import {
   type AgentDirectory,
   type Changes,
+  type CodeHost,
   type Enrolments,
   type EventFeed,
   Inbox,
@@ -12,6 +13,7 @@ import {
   TokenIssuer,
 } from "@keeltown/core/ports";
 import { Effect, Layer, ManagedRuntime } from "effect";
+import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
 import { AgentDirectoryWithBootstrap } from "../adapters/driven/bootstrap/directory.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
@@ -58,6 +60,8 @@ export function isolateLayer(
     overrides.projects ?? ProjectsRpc(project),
     (overrides.enrolments ?? EnrolmentsRpc(agentSession)).pipe(Layer.provide(directory)),
     directory,
+    // The repo read API reads trunks, which live in the core namespace alone.
+    overrides.codeHost ?? CodeHostArtifacts({ "keel-core": env.ARTIFACTS }),
     TokenIssuerJose({ privateJwk: env.KEEL_SIGNING_KEY, issuer: env.KEEL_HOST }).pipe(
       Layer.provide(ClockLive),
     ),
@@ -75,6 +79,7 @@ export interface IsolateOverrides {
   readonly projects?: Layer.Layer<Projects>;
   /** May need the AgentDirectory, as the in-memory enrolments project into it. */
   readonly enrolments?: Layer.Layer<Enrolments, never, AgentDirectory>;
+  readonly codeHost?: Layer.Layer<CodeHost>;
 }
 
 export type IsolateRuntime = ManagedRuntime.ManagedRuntime<IsolateServices, never>;

@@ -1,7 +1,9 @@
 import { CommitSha, Instant } from "@keeltown/core/kernel";
 import {
   CodeHost,
+  type CommitInfo,
   ObjectNotFound,
+  PathNotFound,
   RefNotFound,
   RepoAlreadyExists,
   RepoNotFound,
@@ -9,6 +11,7 @@ import {
   type TreeEntry,
 } from "@keeltown/core/ports";
 import {
+  compareTreeEntries,
   decodeCommit,
   decodeTree,
   diffTrees,
@@ -29,6 +32,32 @@ const repoKey = (repo: RepoRef) => `${repo.namespace}/${repo.name}`;
 const plain = (repo: RepoRef) => ({ namespace: repo.namespace, name: repo.name });
 const alreadyExists = (repo: RepoRef) => new RepoAlreadyExists({ repo: plain(repo) });
 const toCommitSha = Schema.decodeUnknownSync(CommitSha);
+
+/** `Name <email> <unix seconds> <offset>` from a commit header line, as the identity it names. */
+function identity(line: string | undefined) {
+  const m = /^(.*) <([^<>]*)> (\d+) [+-]\d{4}$/.exec(line ?? "");
+  if (m === null) throw new Error(`bad commit identity: ${line}`);
+  return { name: m[1] ?? "", email: m[2] ?? "", at: Instant(Number(m[3]) * 1000) };
+}
+
+/** A commit object decoded as a host reports it: the message loses one trailing newline. */
+function commitInfo(sha: string, body: Uint8Array): CommitInfo {
+  const { tree, parents } = decodeCommit(body);
+  const text = new TextDecoder().decode(body);
+  const split = text.indexOf("\n\n");
+  const header = (split < 0 ? text : text.slice(0, split)).split("\n");
+  const field = (name: string) =>
+    header.find((l) => l.startsWith(`${name} `))?.slice(name.length + 1);
+  const message = split < 0 ? "" : text.slice(split + 2);
+  return {
+    sha: toCommitSha(sha),
+    tree,
+    parents: parents.map((p) => toCommitSha(p)),
+    message: message.endsWith("\n") ? message.slice(0, -1) : message,
+    author: identity(field("author")),
+    committer: identity(field("committer")),
+  };
+}
 
 /** Runs a gitcore read; a missing object becomes `ObjectNotFound`, anything else a defect. */
 const fromGit = <A>(repo: RepoRef, run: () => Promise<A>) =>
@@ -137,6 +166,46 @@ export function makeCodeHostMemory() {
       Effect.gen(function* () {
         const found = yield* find(repo);
         return (yield* object(repo, found, oid, "blob")).body;
+      }),
+    listDir: (repo, commit, path) =>
+      Effect.gen(function* () {
+        const found = yield* find(repo);
+        let tree = yield* rootTree(repo, found, commit);
+        const missing = new PathNotFound({ repo: plain(repo), commit, path });
+        for (const name of path === "" ? [] : path.split("/")) {
+          const entry = decodeTree((yield* object(repo, found, tree, "tree")).body).find(
+            (e) => e.name === name,
+          );
+          if (entry?.mode !== MODE_TREE) return yield* Effect.fail(missing);
+          tree = entry.oid;
+        }
+        const entries = decodeTree((yield* object(repo, found, tree, "tree")).body);
+        return entries.toSorted(compareTreeEntries).map((e): TreeEntry => {
+          const type = e.mode === MODE_TREE ? "tree" : e.mode === MODE_GITLINK ? "commit" : "blob";
+          return {
+            path: path === "" ? e.name : `${path}/${e.name}`,
+            mode: e.mode,
+            oid: e.oid,
+            type,
+          };
+        });
+      }),
+    readCommit: (repo, sha) =>
+      Effect.gen(function* () {
+        const found = yield* find(repo);
+        return commitInfo(sha, (yield* object(repo, found, sha, "commit")).body);
+      }),
+    log: (repo, from, limit) =>
+      Effect.gen(function* () {
+        const found = yield* find(repo);
+        const out: CommitInfo[] = [];
+        let next: string | undefined = from;
+        while (next !== undefined && out.length < limit) {
+          const commit = commitInfo(next, (yield* object(repo, found, next, "commit")).body);
+          out.push(commit);
+          next = commit.parents[0];
+        }
+        return out;
       }),
     diffTrees: (repo, base, head) =>
       Effect.gen(function* () {

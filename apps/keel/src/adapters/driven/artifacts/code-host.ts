@@ -1,7 +1,9 @@
 import { CommitSha, Instant } from "@keeltown/core/kernel";
 import {
   CodeHost,
+  type CommitInfo,
   ObjectNotFound,
+  PathNotFound,
   RefNotFound,
   RepoAlreadyExists,
   RepoNotFound,
@@ -89,6 +91,44 @@ async function listTree(reader: TreeReader, tree: string, prefix: string): Promi
     }),
   );
   return nested.flat();
+}
+
+/** The binding's commit metadata as the port's commit; its timestamps are Unix seconds. */
+const commitInfo = (c: ArtifactsCommitMetadata): CommitInfo => ({
+  sha: toCommitSha(c.hash),
+  tree: c.treeHash,
+  parents: c.parents.map((p) => toCommitSha(p)),
+  message: c.message,
+  author: { name: c.author.name, email: c.author.email, at: Instant(c.authoredAt * 1000) },
+  committer: {
+    name: c.committer.name,
+    email: c.committer.email,
+    at: Instant(c.committedAt * 1000),
+  },
+});
+
+/** A path absent from the commit, or naming something other than a directory. */
+const NO_DIRECTORY = Symbol("no-directory");
+
+/** The directory at `path`, walked one tree read per segment from the commit's root. */
+async function directory(
+  handle: ArtifactsRepo,
+  commit: string,
+  path: string,
+): Promise<TreeEntry[] | typeof NO_DIRECTORY> {
+  let tree = await rootTree(handle, commit);
+  for (const name of path === "" ? [] : path.split("/")) {
+    const entries = await handle.readTree(tree);
+    if (entries === null) throw new MissingObject(tree);
+    const entry = entries.find((e) => e.name === name);
+    if (entry?.mode !== MODE_TREE) return NO_DIRECTORY;
+    tree = entry.hash;
+  }
+  const entries = await objectsOf(handle).readTree(tree);
+  return entries.toSorted(compareTreeEntries).map((e) => {
+    const type = e.mode === MODE_TREE ? "tree" : e.mode === MODE_GITLINK ? "commit" : "blob";
+    return { path: path === "" ? e.name : `${path}/${e.name}`, mode: e.mode, oid: e.oid, type };
+  });
 }
 
 /**
@@ -213,6 +253,29 @@ export function CodeHostArtifacts(namespaces: Readonly<Record<string, Artifacts>
           if (blob === null) throw new MissingObject(oid);
           return new Uint8Array(await blob.arrayBuffer());
         }),
+      listDir: (repo, commit, path) =>
+        onObjects(repo, (handle) => directory(handle, commit, path)).pipe(
+          Effect.flatMap((entries) =>
+            entries === NO_DIRECTORY
+              ? Effect.fail(new PathNotFound({ repo: plain(repo), commit, path }))
+              : Effect.succeed(entries),
+          ),
+        ),
+      readCommit: (repo, sha) =>
+        onObjects(repo, async (handle) => {
+          const read = await handle.readCommit(sha);
+          if (read === null) throw new MissingObject(sha);
+          return commitInfo(read);
+        }),
+      // The binding's log takes a commit id as its ref (live, 11 Oct) and answers [] for one it lacks.
+      log: (repo, from, limit) =>
+        limit < 1
+          ? Effect.succeed([])
+          : onObjects(repo, async (handle) => {
+              const chain = await handle.log({ ref: from, limit });
+              if (chain[0]?.hash !== from) throw new MissingObject(from);
+              return chain.map(commitInfo);
+            }),
       diffTrees: (repo, base, head) =>
         onObjects(repo, async (handle) => {
           const [before, after] = await Promise.all([

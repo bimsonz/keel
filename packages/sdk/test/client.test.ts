@@ -134,4 +134,28 @@ describe("the Keel client", () => {
     expect(error).toBeInstanceOf(KeelTokenError);
     expect(error).toMatchObject({ error: "invalid_client", status: 401 });
   });
+
+  it("[sdk.public] a client with no credentials sends no token, never asks for one, and is refused as itself", async () => {
+    const sent: { url: string; headers: Record<string, string> }[] = [];
+    const client = createKeelClient({
+      baseUrl: "https://keel.test",
+      fetch: async (url, init) => {
+        sent.push({ url, headers: Object.fromEntries(new Headers(init.headers).entries()) });
+        return url.includes("/repo/blob")
+          ? problem(404, "resource.not_found")
+          : ok({ commit: "a".repeat(40), path: "", entries: [] });
+      },
+    });
+    await client.tree("prj_25R7GR504NN2N2MB7JTCFBPPQ8", { path: "src" });
+    const refused = await client
+      .blob("prj_25R7GR504NN2N2MB7JTCFBPPQ8", "src/index.ts")
+      .catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(KeelProblem);
+    expect(sent.map((s) => s.url)).toEqual([
+      "https://keel.test/v1/projects/prj_25R7GR504NN2N2MB7JTCFBPPQ8/repo/tree?path=src",
+      "https://keel.test/v1/projects/prj_25R7GR504NN2N2MB7JTCFBPPQ8/repo/blob?path=src%2Findex.ts",
+    ]);
+    expect(sent.every((s) => s.headers["authorization"] === undefined)).toBe(true);
+    await expect(client.token()).rejects.toBeInstanceOf(KeelTokenError);
+  });
 });

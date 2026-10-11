@@ -12,6 +12,7 @@ import "./submissions.tsp";
 import "./conflicts.tsp";
 import "./memory.tsp";
 import "./lattices.tsp";
+import "./repo.tsp";
 import "./events.tsp";
 import "./inbox.tsp";
 import "./views.tsp";

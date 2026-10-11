@@ -21,6 +21,15 @@ export interface KeelClientOptions {
   readonly fetch?: (input: string, init: RequestInit) => Promise<Response>;
 }
 
+/**
+ * A client with no credentials: it calls only what Keel serves without a
+ * token, such as a public project's code, and sends no Authorization header.
+ */
+export interface PublicClientOptions {
+  readonly baseUrl: string;
+  readonly fetch?: (input: string, init: RequestInit) => Promise<Response>;
+}
+
 export interface CallOptions {
   readonly signal?: AbortSignal;
 }
@@ -40,11 +49,11 @@ const EXPIRY_MARGIN_MS = 30_000;
  * Idempotency-Key. A refusal throws `KeelProblem`, carrying the next actions.
  */
 export class KeelClient {
-  readonly #options: KeelClientOptions;
+  readonly #options: KeelClientOptions | PublicClientOptions;
   readonly #fetch: (input: string, init: RequestInit) => Promise<Response>;
   #token: { readonly value: string; readonly expiresAt: number } | undefined;
 
-  constructor(options: KeelClientOptions) {
+  constructor(options: KeelClientOptions | PublicClientOptions) {
     this.#options = options;
     this.#fetch = options.fetch ?? ((input, init) => fetch(input, init));
   }
@@ -57,12 +66,15 @@ export class KeelClient {
   async token(options: { readonly fresh?: boolean } = {}): Promise<string> {
     if (options.fresh !== true && this.#token !== undefined && Date.now() < this.#token.expiresAt)
       return this.#token.value;
+    const credentials = this.#options;
+    if (!("clientId" in credentials))
+      throw new KeelTokenError("invalid_client", 0, "This client has no credentials.");
     const form = new URLSearchParams({
       grant_type: "client_credentials",
-      client_id: this.#options.clientId,
-      client_secret: this.#options.clientSecret,
+      client_id: credentials.clientId,
+      client_secret: credentials.clientSecret,
     });
-    if (this.#options.scopes !== undefined) form.set("scope", this.#options.scopes.join(" "));
+    if (credentials.scopes !== undefined) form.set("scope", credentials.scopes.join(" "));
     const response = await this.#fetch(`${this.#api}/oauth/token`, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -100,15 +112,20 @@ export class KeelClient {
     options: CallOptions = {},
   ): Promise<WireOutputs[Op]> {
     const request = this.#request(operation, input);
-    const send = async (token: string) =>
+    const send = async (token: string | undefined) =>
       this.#fetch(request.url, {
         method: request.method,
-        headers: { ...request.headers, authorization: `Bearer ${token}` },
+        headers:
+          token === undefined
+            ? request.headers
+            : { ...request.headers, authorization: `Bearer ${token}` },
         ...(request.body === undefined ? {} : { body: request.body }),
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       });
-    let response = await send(await this.token());
-    if (response.status === 401) response = await send(await this.token({ fresh: true }));
+    const credentialed = "clientId" in this.#options;
+    let response = await send(credentialed ? await this.token() : undefined);
+    if (credentialed && response.status === 401)
+      response = await send(await this.token({ fresh: true }));
     if (!response.ok) throw await KeelProblem.from(response);
     // The body is the contract's: Keel validates every response against the published schemas.
     // Parsed from text, because `json()` is typed `any` in DOM's lib but `unknown` in Node's.
@@ -231,6 +248,48 @@ export class KeelClient {
     return this.call("Operator_putSettings", { ...settings, projectId }, options);
   }
 
+  /** A directory of a project's trunk at `ref` (trunk's head when absent); the root without `path`. */
+  tree(
+    projectId: string,
+    options: CallOptions & { readonly ref?: string; readonly path?: string } = {},
+  ): Promise<WireOutputs["Repo_getTree"]> {
+    return this.call("Repo_getTree", { projectId, ref: options.ref, path: options.path }, options);
+  }
+
+  /** A file of a project's trunk at `ref`: its text inline up to 1 MiB, unless it is binary. */
+  blob(
+    projectId: string,
+    path: string,
+    options: CallOptions & { readonly ref?: string } = {},
+  ): Promise<WireOutputs["Repo_getBlob"]> {
+    return this.call("Repo_getBlob", { projectId, path, ref: options.ref }, options);
+  }
+
+  /** Trunk's history from `ref`, newest first; pass a page's `nextCursor` for the next. */
+  commits(
+    projectId: string,
+    options: CallOptions & {
+      readonly ref?: string;
+      readonly cursor?: string;
+      readonly limit?: number;
+    } = {},
+  ): Promise<WireOutputs["Repo_listCommits"]> {
+    return this.call(
+      "Repo_listCommits",
+      { projectId, ref: options.ref, cursor: options.cursor, limit: options.limit },
+      options,
+    );
+  }
+
+  /** A commit of a project's trunk and the files it changed, with their text on each side. */
+  commit(
+    projectId: string,
+    sha: string,
+    options?: CallOptions,
+  ): Promise<WireOutputs["Repo_getCommit"]> {
+    return this.call("Repo_getCommit", { projectId, sha }, options);
+  }
+
   /** Operator: enrols an agent. The client secret in the answer is shown once. */
   enrolAgent(
     agent: EnrolAgentRequest,
@@ -262,6 +321,6 @@ function isTokenResponse(body: unknown): body is TokenResponse {
 
 const keyOf = (options: Idempotent) => options.idempotencyKey ?? crypto.randomUUID();
 
-export function createKeelClient(options: KeelClientOptions): KeelClient {
+export function createKeelClient(options: KeelClientOptions | PublicClientOptions): KeelClient {
   return new KeelClient(options);
 }

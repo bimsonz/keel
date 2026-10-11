@@ -3,6 +3,7 @@ import type {
   AgentDirectory,
   Changes,
   Clock,
+  CodeHost,
   Enrolments,
   EventFeed,
   Ids,
@@ -28,7 +29,8 @@ export type IsolateServices =
   | Notifier
   | Projects
   | ProjectViews
-  | Enrolments;
+  | Enrolments
+  | CodeHost;
 
 /** What a request answers with when its effect dies rather than failing with a declared error. */
 export type DefectResult =

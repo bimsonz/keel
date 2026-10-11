@@ -145,6 +145,8 @@ union ProblemCode {
   changeCommitNotInWorkspace: "change.commit_not_in_workspace",
   workspacePoolExhausted: "workspace.pool_exhausted",
   sketchNotFound: "sketch.not_found",
+  repoRefNotFound: "repo.ref_not_found",
+  repoPathNotFound: "repo.path_not_found",
 }
 
 /** What an agent can do next. Each one can be fed straight into the matching tool. */

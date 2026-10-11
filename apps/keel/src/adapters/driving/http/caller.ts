@@ -44,6 +44,13 @@ export function admitsAnonymous(
   );
 }
 
+/** Whether any requirement asks for a scheme: false for an operation published as anonymous only. */
+export function namesScheme(
+  requirements: readonly Readonly<Record<string, readonly string[]>>[],
+): boolean {
+  return requirements.some((requirement) => Object.keys(requirement).length > 0);
+}
+
 export function bearerToken(header: string | undefined): string | null {
   if (header === undefined) return null;
   return /^Bearer\s+(\S+)$/i.exec(header)?.[1] ?? null;

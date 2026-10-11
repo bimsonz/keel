@@ -6,6 +6,7 @@ import {
   hashSecret,
   makeAgentDirectoryMemory,
   makeChangesMemory,
+  makeCodeHostMemory,
   makeEnrolmentsMemory,
   makeIdsMemory,
   makeEventFeedMemory,
@@ -72,6 +73,7 @@ describe("the token endpoint", () => {
         makeProjectViewsMemory().layer,
         makeProjectsMemory().layer,
         makeEnrolmentsMemory().layer.pipe(Layer.provide(directory.layer)),
+        makeCodeHostMemory().layer,
       ),
     );
     const handlers = makeHandlers(makeRunner(runtime));

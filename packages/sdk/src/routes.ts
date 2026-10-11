@@ -27,6 +27,14 @@ export const ROUTES = {
   Operator_getSettings: { method: "GET", path: "/projects/{projectId}/settings" },
   Operator_putSettings: { method: "PUT", path: "/projects/{projectId}/settings" },
   Operator_enrolAgent: { method: "POST", path: "/agents", headers: ["idempotency-key"] },
+  Repo_getTree: { method: "GET", path: "/projects/{projectId}/repo/tree", query: ["ref", "path"] },
+  Repo_getBlob: { method: "GET", path: "/projects/{projectId}/repo/blob", query: ["ref", "path"] },
+  Repo_listCommits: {
+    method: "GET",
+    path: "/projects/{projectId}/repo/commits",
+    query: ["ref", "cursor", "limit"],
+  },
+  Repo_getCommit: { method: "GET", path: "/projects/{projectId}/repo/commits/{sha}" },
 } as const satisfies Partial<Record<keyof WireOutputs, Route>>;
 
 export type RoutedOperation = keyof typeof ROUTES;

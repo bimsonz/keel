@@ -2,6 +2,7 @@ import {
   makeAgentDirectoryMemory,
   makeChangesMemory,
   makeClockMemory,
+  makeCodeHostMemory,
   makeEnrolmentsMemory,
   makeEventFeedMemory,
   makeProjectViewsMemory,
@@ -30,6 +31,7 @@ const runtime = ManagedRuntime.make(
     inbox.notifier,
     makeEventFeedMemory().layer,
     makeProjectViewsMemory().layer,
+    makeCodeHostMemory().layer,
   ),
 );
 const run = makeRunner(runtime);

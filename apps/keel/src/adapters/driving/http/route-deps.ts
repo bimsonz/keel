@@ -3,6 +3,7 @@ import {
   admitsAnonymous,
   bearerToken,
   type Caller,
+  namesScheme,
   satisfies,
   type TokenVerifier,
 } from "./caller.ts";
@@ -49,9 +50,14 @@ function issuesOf(result: { readonly success: boolean }): Issues {
 export function routeDeps(verify: TokenVerifier): RouteDeps<AppEnv, Caller> {
   return {
     authorize: (requirements) => async (c, next) => {
-      if (admitsAnonymous(requirements)) return next();
+      const header = c.req.header("authorization");
+      // An optional route (anonymous beside a real scheme) still reads a presented
+      // credential, so a token's own access applies; a bad one is refused, never
+      // read as anonymous. A route with no real scheme ignores it.
+      if (admitsAnonymous(requirements) && (header === undefined || !namesScheme(requirements)))
+        return next();
       const requestId = c.get("requestId");
-      const token = bearerToken(c.req.header("authorization"));
+      const token = bearerToken(header);
       const verification = token === null ? ({ refused: "invalid" } as const) : await verify(token);
       if ("refused" in verification) {
         return verification.refused === "revoked"

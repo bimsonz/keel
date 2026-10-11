@@ -13,6 +13,12 @@ import {
   viewedProject,
 } from "@keeltown/core/application/coordination";
 import { enrolAgent, exchangeToken, whoami } from "@keeltown/core/application/identity";
+import {
+  listRepoCommits,
+  readRepoBlob,
+  readRepoCommit,
+  readRepoTree,
+} from "@keeltown/core/application/integration";
 import { isBootstrap, Scope } from "@keeltown/core/domain/identity";
 import { ProjectId } from "@keeltown/core/kernel";
 import { Effect, Result, Schema } from "effect";
@@ -35,6 +41,15 @@ import {
 import { eventsInput, eventsOk } from "./events.ts";
 import { changeListInput, changesOk, foreignProject, snapshotOk } from "./views.ts";
 import { piggyback } from "./piggyback.ts";
+import {
+  blobOk,
+  commitOk,
+  commitParam,
+  commitsFrom,
+  commitsOk,
+  repoError,
+  treeOk,
+} from "./repo.ts";
 import { notImplemented } from "./problems.ts";
 import type { Runner } from "./run.ts";
 import {
@@ -260,6 +275,55 @@ export function makeHandlers(run: Runner) {
           ),
         ),
       Lattices_listLattices: latticesOk,
+      // The repo reads admit a caller without a token: the use-case decides by the project's visibility.
+      Repo_getTree: (caller: Caller, input: Input<"Repo_getTree">) => {
+        const projectId = settingsProject(input.projectId);
+        if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+        return run(
+          caller,
+          readRepoTree(caller.principal, projectId.success, {
+            ...(input.ref === undefined ? {} : { ref: input.ref }),
+            path: input.path ?? "",
+          }).pipe(Effect.match({ onSuccess: treeOk, onFailure: (e) => repoError(caller, e) })),
+        );
+      },
+      Repo_getBlob: (caller: Caller, input: Input<"Repo_getBlob">) => {
+        const projectId = settingsProject(input.projectId);
+        if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+        return run(
+          caller,
+          readRepoBlob(caller.principal, projectId.success, {
+            ...(input.ref === undefined ? {} : { ref: input.ref }),
+            path: input.path,
+          }).pipe(Effect.match({ onSuccess: blobOk, onFailure: (e) => repoError(caller, e) })),
+        );
+      },
+      Repo_listCommits: (caller: Caller, input: Input<"Repo_listCommits">) => {
+        const projectId = settingsProject(input.projectId);
+        if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+        const from = commitsFrom(input.cursor);
+        if (Result.isFailure(from)) return invalid(caller, from.failure);
+        return run(
+          caller,
+          listRepoCommits(caller.principal, projectId.success, {
+            ...(input.ref === undefined ? {} : { ref: input.ref }),
+            ...(from.success === undefined ? {} : { from: from.success }),
+            ...(input.limit === undefined ? {} : { limit: input.limit }),
+          }).pipe(Effect.match({ onSuccess: commitsOk, onFailure: (e) => repoError(caller, e) })),
+        );
+      },
+      Repo_getCommit: (caller: Caller, input: Input<"Repo_getCommit">) => {
+        const projectId = settingsProject(input.projectId);
+        if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+        const sha = commitParam(input.sha);
+        if (Result.isFailure(sha)) return invalid(caller, sha.failure);
+        return run(
+          caller,
+          readRepoCommit(caller.principal, projectId.success, sha.success).pipe(
+            Effect.match({ onSuccess: commitOk, onFailure: (e) => repoError(caller, e) }),
+          ),
+        );
+      },
       Views_getVerdict: notYet,
       Views_getCandidate: notYet,
       Views_listLanes: notYet,

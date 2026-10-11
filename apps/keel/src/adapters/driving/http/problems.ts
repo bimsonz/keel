@@ -28,6 +28,8 @@ const TITLES: Record<ProblemCode, string> = {
   "change.commit_not_in_workspace": "The commit is not in the change's workspace",
   "workspace.pool_exhausted": "No workspace is ready yet",
   "sketch.not_found": "No such sketch",
+  "repo.ref_not_found": "The project's trunk has no such branch or commit",
+  "repo.path_not_found": "Nothing of that kind at this path",
 };
 
 export interface ProblemExtras {

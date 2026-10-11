@@ -40,6 +40,9 @@
       "name": "Lattices"
     },
     {
+      "name": "Repo"
+    },
+    {
       "name": "Inbox"
     },
     {
@@ -3620,6 +3623,594 @@
           {
             "OAuth2Auth": [
               "observer"
+            ]
+          }
+        ]
+      }
+    },
+    "/projects/{projectId}/repo/blob": {
+      "get": {
+        "operationId": "Repo_getBlob",
+        "summary": "Read a file",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "name": "ref",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RepoRefName"
+            },
+            "explode": false
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RepoPath"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoBlob"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Repo"
+        ],
+        "security": [
+          {},
+          {
+            "OAuth2Auth": [
+              "observer"
+            ]
+          },
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          }
+        ]
+      }
+    },
+    "/projects/{projectId}/repo/commits": {
+      "get": {
+        "operationId": "Repo_listCommits",
+        "summary": "List commits",
+        "description": "Newest first along the first-parent chain. The cursor names a commit, so a page holds still while trunk moves.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "name": "ref",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RepoRefName"
+            },
+            "explode": false
+          },
+          {
+            "$ref": "#/components/parameters/PageQuery.cursor"
+          },
+          {
+            "$ref": "#/components/parameters/PageQuery.limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoCommitPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Repo"
+        ],
+        "security": [
+          {},
+          {
+            "OAuth2Auth": [
+              "observer"
+            ]
+          },
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          }
+        ]
+      }
+    },
+    "/projects/{projectId}/repo/commits/{sha}": {
+      "get": {
+        "operationId": "Repo_getCommit",
+        "summary": "Read a commit and the files it changed",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "name": "sha",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/CommitSha"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoCommitDiff"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Repo"
+        ],
+        "security": [
+          {},
+          {
+            "OAuth2Auth": [
+              "observer"
+            ]
+          },
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          }
+        ]
+      }
+    },
+    "/projects/{projectId}/repo/tree": {
+      "get": {
+        "operationId": "Repo_getTree",
+        "summary": "List a directory",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            }
+          },
+          {
+            "name": "ref",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RepoRefName"
+            },
+            "explode": false
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RepoPath"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepoTree"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Repo"
+        ],
+        "security": [
+          {},
+          {
+            "OAuth2Auth": [
+              "observer"
+            ]
+          },
+          {
+            "OAuth2Auth": [
+              "agent:read"
             ]
           }
         ]
@@ -11590,7 +12181,9 @@
           "change.state_refused",
           "change.commit_not_in_workspace",
           "workspace.pool_exhausted",
-          "sketch.not_found"
+          "sketch.not_found",
+          "repo.ref_not_found",
+          "repo.path_not_found"
         ],
         "description": "Machine-readable reason for a problem. Dotted; lanes add codes as they build."
       },
@@ -12136,6 +12729,311 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "RepoBlob": {
+        "type": "object",
+        "required": [
+          "commit",
+          "path",
+          "sha",
+          "mode",
+          "size",
+          "binary",
+          "truncated"
+        ],
+        "properties": {
+          "commit": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "path": {
+            "$ref": "#/components/schemas/RepoPath"
+          },
+          "sha": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Its size in bytes."
+          },
+          "binary": {
+            "type": "boolean",
+            "description": "It holds a NUL byte in its first 8,000 bytes, as git decides."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "It is larger than the 1 MiB Keel serves inline."
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A file at a commit. `content` is its text, present only when the file is not binary and not truncated."
+      },
+      "RepoCommit": {
+        "type": "object",
+        "required": [
+          "sha",
+          "parents",
+          "message",
+          "author",
+          "committer"
+        ],
+        "properties": {
+          "sha": {
+            "$ref": "#/components/schemas/CommitSha"
+          },
+          "parents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommitSha"
+            },
+            "description": "In git order; empty for a root commit."
+          },
+          "message": {
+            "type": "string"
+          },
+          "author": {
+            "$ref": "#/components/schemas/RepoIdentity"
+          },
+          "committer": {
+            "$ref": "#/components/schemas/RepoIdentity"
+          },
+          "changeId": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChangeId"
+              }
+            ],
+            "description": "The change this commit landed, from its `Change-Id` trailer; absent on a commit Keel did not land."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A commit on trunk. Each change Keel lands is one commit, which keeps its\nsubmitted author, names Keel as committer (so `committer.at` is when it\nlanded), and names the change in a `Change-Id` trailer."
+      },
+      "RepoCommitDiff": {
+        "type": "object",
+        "required": [
+          "commit",
+          "files"
+        ],
+        "properties": {
+          "commit": {
+            "$ref": "#/components/schemas/RepoCommit"
+          },
+          "base": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The first parent the files are compared with; absent for a root commit, whose every file is added."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepoFileChange"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A commit and the files it changed against its first parent, with their text on each side."
+      },
+      "RepoCommitPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepoCommit"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "Absent on the last page."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "RepoEntry": {
+        "type": "object",
+        "required": [
+          "name",
+          "path",
+          "kind",
+          "mode",
+          "sha"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The entry's own name."
+          },
+          "path": {
+            "type": "string",
+            "description": "Its path from the repository's root."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "blob",
+              "tree",
+              "symlink",
+              "submodule"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "description": "Its git mode, canonical with no leading zero: `100644`, `100755`, `120000`, `40000` or `160000`."
+          },
+          "sha": {
+            "type": "string",
+            "description": "The object id: a blob, a tree, or for a submodule its commit."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One entry of a directory. A symlink's target and a submodule's commit are not followed."
+      },
+      "RepoFileChange": {
+        "type": "object",
+        "required": [
+          "path",
+          "status",
+          "binary",
+          "truncated",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "added",
+              "deleted",
+              "modified",
+              "type-changed"
+            ]
+          },
+          "oldSha": {
+            "type": "string"
+          },
+          "newSha": {
+            "type": "string"
+          },
+          "oldMode": {
+            "type": "string"
+          },
+          "newMode": {
+            "type": "string"
+          },
+          "binary": {
+            "type": "boolean",
+            "description": "Either side holds a NUL byte in its first 8,000 bytes."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "A side is over 1 MiB, or the commit's files passed 300 or 8 MiB before this one."
+          },
+          "before": {
+            "type": "string",
+            "nullable": true
+          },
+          "after": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One file a commit changed, as `git diff-tree -r --no-renames` reports it, so\na rename is a deletion and an addition. `before` and `after` are its text on\neach side, null where that side has none: the file was added or deleted on\nit, or it is binary, or it was not served inline (`truncated`)."
+      },
+      "RepoIdentity": {
+        "type": "object",
+        "required": [
+          "name",
+          "email",
+          "at"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Who a commit names, and when."
+      },
+      "RepoPath": {
+        "type": "string",
+        "maxLength": 4096,
+        "pattern": "^(?:(?!\\.\\.?(?:/|$))[^/]+(?:/(?!\\.\\.?(?:/|$))[^/]+)*)?$",
+        "description": "A path inside a repository: `/`-separated, with no leading or trailing\nslash and no empty, `.` or `..` segment. The empty string is the root."
+      },
+      "RepoRefName": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "description": "What to read: a branch name (`main`), a full branch ref (`refs/heads/main`)\nor a commit id. Absent means the project's `main`."
+      },
+      "RepoTree": {
+        "type": "object",
+        "required": [
+          "commit",
+          "path",
+          "entries"
+        ],
+        "properties": {
+          "commit": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CommitSha"
+              }
+            ],
+            "description": "The commit the ref resolved to; every read of it answers the same."
+          },
+          "path": {
+            "$ref": "#/components/schemas/RepoPath"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepoEntry"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A directory at a commit, its entries in git order."
       },
       "ResolveRequest": {
         "type": "object",
