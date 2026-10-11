@@ -148,6 +148,8 @@ export interface CommitPlan {
   parents: number[];
   tree: TreeModel;
   message: string;
+  /** `Name <email> <seconds> <offset>`; the committer's identity when absent. */
+  author?: string;
 }
 
 /** Feed commits to `git fast-import`; returns mark -> commit oid. */
@@ -157,7 +159,9 @@ export function fastImport(dir: string, commits: CommitPlan[]): Map<number, stri
     chunks.push(typeof s === "string" ? Buffer.from(s) : Buffer.from(s));
   for (const c of commits) {
     w(`reset ${c.ref}\n`);
-    w(`commit ${c.ref}\nmark :${c.mark}\ncommitter t <t@example.com> 1700000000 +0000\n`);
+    w(`commit ${c.ref}\nmark :${c.mark}\n`);
+    if (c.author !== undefined) w(`author ${c.author}\n`);
+    w("committer t <t@example.com> 1700000000 +0000\n");
     const msg = Buffer.from(c.message);
     w(`data ${msg.length}\n`);
     w(msg);

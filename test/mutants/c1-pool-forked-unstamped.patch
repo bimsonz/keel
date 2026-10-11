@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t pool.project
+# kills: pool.project
+# why: WorkspaceForked carries no project, so project readers never see the pool fill
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index cf7b6ab..6f236cf 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -201,7 +201,7 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
+     }
+     const at = yield* (yield* Clock).now;
+     yield* commit(
+-      { entity: { kind: "workspace", id: slot.id }, cause: `forked:${slot.id}`, project },
++      { entity: { kind: "workspace", id: slot.id }, cause: `forked:${slot.id}` },
+       (tx) => {
+         const current = slotOf(tx.store, slot.id);
+         if (current?.state !== "forking") return Result.succeed({ value: undefined, drafts: [] });

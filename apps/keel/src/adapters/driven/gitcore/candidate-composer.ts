@@ -34,10 +34,11 @@ const TIER_REASON = "GitCore: a path-level three-way merge per member, one commi
 export type OpenObjects = (repo: RepoRef) => Promise<ObjectReader & Disposable>;
 
 /**
- * What gitcore restacks for a request: the agent as author and Keel as
- * committer, both at BatchFormed's time, the intent's title as the message
- * and the change's `Change-Id` trailer. Everything comes from the request,
- * so a recompose gives the same SHAs.
+ * What gitcore restacks for a request: Keel as committer at BatchFormed's
+ * time, the intent's title as the message and the change's `Change-Id`
+ * trailer. Each commit keeps its submitted commit's author, which gitcore
+ * reads from the head. Everything comes from the request and its commits, so
+ * a recompose gives the same SHAs.
  */
 export function restackSpec(request: CandidateRequest): {
   readonly ref: string;
@@ -51,7 +52,6 @@ export function restackSpec(request: CandidateRequest): {
     members: request.members.map((m) => ({
       base: m.base,
       head: m.head,
-      author: { name: m.author, email: `${m.author}@agents.keel.invalid`, time },
       message: m.title,
       trailers: [["Change-Id", m.changeId]],
     })),

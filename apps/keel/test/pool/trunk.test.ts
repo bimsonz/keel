@@ -7,8 +7,11 @@ import { Effect, Exit, Schema } from "effect";
 import { ulid } from "ulid";
 import { TrunksRpc } from "../../src/adapters/driven/do-rpc/trunks.ts";
 import { decodeExit, TrunkCodecs } from "../../src/rpc/index.ts";
+import { drainAfter } from "./helpers.ts";
 
-const trunkStub = (projectId: string) => env.TRUNK.get(env.TRUNK.idFromName(`trunk:${projectId}`));
+// Each trunk's events owe the Projector a delivery, drained after every case.
+const trunkStub = (projectId: string) =>
+  drainAfter(env.TRUNK.get(env.TRUNK.idFromName(`trunk:${projectId}`)));
 
 /** Runs a program against the Trunks port over the Trunk DO's RPC. */
 const viaTrunks = <A, E>(program: Effect.Effect<A, E, Trunks>) =>

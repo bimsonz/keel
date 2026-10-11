@@ -116,13 +116,17 @@ it("[composer.live] composes a three-change candidate through the binding and pu
       const refusedRef = yield* Effect.flip(
         codeHost.head(staging, `refs/heads/cand/${candidateId(2)}`),
       );
-      return { base, composed, ms, pushedHead, again, tree, refused, refusedRef };
+      return { base, heads, composed, ms, pushedHead, again, tree, refused, refusedRef };
     }),
   );
   const chain = await Promise.all(report.composed.commits.map((c) => readBack(staging, c.sha)));
+  // What each agent pushed: the restacked commit keeps its author, as git rebase does.
+  const submitted = await Promise.all(
+    [0, 1, 2].map((i) => readBack(workspaceAt(i), report.heads[i] ?? report.base)),
+  );
   const refusal = report.refused;
   console.log(
-    `LIVE compose: ${report.composed.commits.length} commits in ${report.ms} ms, ref ${report.pushedHead === report.composed.commitSha ? "==" : "!="} last commit, again ${report.again.commitSha === report.composed.commitSha ? "same SHA" : "different SHA"}; chain ${JSON.stringify(chain.map((c) => ({ changeId: c.changeId, author: c.author.split(" <")[0], committer: c.committer })))}; conflicting batch ${refusal._tag} ${refusal.reason} ${JSON.stringify(refusal.paths)}, its ref ${report.refusedRef._tag}`,
+    `LIVE compose: ${report.composed.commits.length} commits in ${report.ms} ms, ref ${report.pushedHead === report.composed.commitSha ? "==" : "!="} last commit, again ${report.again.commitSha === report.composed.commitSha ? "same SHA" : "different SHA"}; chain ${JSON.stringify(chain.map((c) => ({ changeId: c.changeId, author: c.author, committer: c.committer })))}, submitted authors ${JSON.stringify(submitted.map((c) => c.author))}; conflicting batch ${refusal._tag} ${refusal.reason} ${JSON.stringify(refusal.paths)}, its ref ${report.refusedRef._tag}`,
   );
   expect(report.composed.commits).toHaveLength(3);
   expect(report.pushedHead).toBe(report.composed.commitSha);
@@ -133,10 +137,12 @@ it("[composer.live] composes a three-change candidate through the binding and pu
     [report.composed.commits[1]?.sha],
   ]);
   const seconds = AT / 1000;
+  // The pushed commits are not the agents' identities, so a composer stamping the agent fails here.
+  expect(submitted.filter((c) => c.author.includes("@agents.keel.invalid"))).toEqual([]);
   expect(chain).toEqual(
     [0, 1, 2].map((i) => ({
       parents: expect.any(Array),
-      author: `${agentId(i)} <${agentId(i)}@agents.keel.invalid> ${seconds}`,
+      author: submitted[i]?.author,
       committer: `Keel <keel@keel.invalid> ${seconds}`,
       changeId: changeId(i),
       title: `change ${i}`,

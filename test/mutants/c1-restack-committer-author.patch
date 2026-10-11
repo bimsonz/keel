@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/compose.test.ts apps/keel/test/unit/candidate-composer.test.ts -t keeps-author
+# kills: restack.keeps-author, composer.keeps-author
+# why: Every restacked commit is authored by Keel, so the submitted commit's author and date are lost
+diff --git a/packages/gitcore/src/compose.ts b/packages/gitcore/src/compose.ts
+index 364d132..e461e9c 100644
+--- a/packages/gitcore/src/compose.ts
++++ b/packages/gitcore/src/compose.ts
+@@ -102,7 +102,7 @@ export async function restack(
+     const body = encodeCommit({
+       tree: merged.tree,
+       parents: [parent],
+-      author: to.author,
++      author: committer,
+       committer,
+       message: m.message,
+       trailers: m.trailers,

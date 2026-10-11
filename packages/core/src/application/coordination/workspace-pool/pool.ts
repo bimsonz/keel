@@ -10,6 +10,7 @@ import {
   type ChangeId,
   type CommitSha,
   Instant,
+  type ProjectId,
   type SketchId,
   type WorkspaceId,
 } from "../../../domain/kernel/index.ts";
@@ -65,9 +66,10 @@ const handout = (slot: Slot) =>
  * re-mints the token for the same workspace. The choice is re-checked inside
  * the transaction, so concurrent grants never share a workspace; the loser
  * takes the next ready one. The write token is minted after the commit and
- * never stored.
+ * never stored. Every pool commit is stamped with the pool's `project`.
  */
 export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function* (
+  project: ProjectId,
   holder: ChangeId | SketchId,
 ) {
   const store = yield* EntityStore;
@@ -96,7 +98,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
     }
     const now = yield* (yield* Clock).now;
     yield* commit(
-      { entity: { kind: "workspace", id: candidate.id }, cause: `grant:${holder}` },
+      { entity: { kind: "workspace", id: candidate.id }, cause: `grant:${holder}`, project },
       (tx) => {
         const chosen = slotOf(tx.store, candidate.id);
         if (
@@ -155,13 +157,13 @@ const forkOne = (source: RepoName, repo: RepoName) =>
  * Names come from fresh workspace ids, so a name is never reused. A slot left
  * forking by a refill that died is collected.
  */
-export const refillPool = Effect.fn("coordination/refillPool")(function* () {
+export const refillPool = Effect.fn("coordination/refillPool")(function* (project: ProjectId) {
   const store = yield* EntityStore;
   const ids = yield* Ids;
   const now = yield* (yield* Clock).now;
   const settings = settingsOf(store);
   const stuck = slots(store).filter((s) => s.state === "forking" && now - s.since > STUCK_FORK_MS);
-  for (const slot of stuck) yield* markCollecting(slot.id, "fork-abandoned");
+  for (const slot of stuck) yield* markCollecting(project, slot.id, "fork-abandoned");
   const source = settings.source;
   const need = settings.target - countIn(store, "ready") - countIn(store, "forking");
   if (source === null || need <= 0)
@@ -176,10 +178,13 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* () {
       state: "forking",
       since: now,
     };
-    yield* commit({ entity: { kind: "workspace", id }, cause: `fork-start:${id}` }, (tx) => {
-      putSlot(tx.store, slot);
-      return Result.succeed({ value: undefined, drafts: [] });
-    });
+    yield* commit(
+      { entity: { kind: "workspace", id }, cause: `fork-start:${id}`, project },
+      (tx) => {
+        putSlot(tx.store, slot);
+        return Result.succeed({ value: undefined, drafts: [] });
+      },
+    );
     fresh.push(slot);
   }
 
@@ -191,12 +196,12 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* () {
     const slot = fresh[i];
     if (slot === undefined) continue;
     if (Exit.isFailure(outcome)) {
-      yield* markCollecting(slot.id, "fork-failed");
+      yield* markCollecting(project, slot.id, "fork-failed");
       continue;
     }
     const at = yield* (yield* Clock).now;
     yield* commit(
-      { entity: { kind: "workspace", id: slot.id }, cause: `forked:${slot.id}` },
+      { entity: { kind: "workspace", id: slot.id }, cause: `forked:${slot.id}`, project },
       (tx) => {
         const current = slotOf(tx.store, slot.id);
         if (current?.state !== "forking") return Result.succeed({ value: undefined, drafts: [] });
@@ -231,10 +236,10 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* () {
 });
 
 /** Moves a slot that never became a workspace (its fork failed or was abandoned) to collection; no event, as no workspace existed. */
-const markCollecting = (id: WorkspaceId, why: string) =>
+const markCollecting = (project: ProjectId, id: WorkspaceId, why: string) =>
   Effect.gen(function* () {
     const now = yield* (yield* Clock).now;
-    yield* commit({ entity: { kind: "workspace", id }, cause: `${why}:${id}` }, (tx) => {
+    yield* commit({ entity: { kind: "workspace", id }, cause: `${why}:${id}`, project }, (tx) => {
       const slot = slotOf(tx.store, id);
       if (slot?.state === "forking")
         putSlot(tx.store, { ...slot, state: "collecting", since: now });
@@ -242,7 +247,6 @@ const markCollecting = (id: WorkspaceId, why: string) =>
     });
   });
 
-/** Releases a workspace: it is collected (its repo deleted) for `reason`. Releasing it again is a no-op. */
 /**
  * Inside a transaction: moves a workspace to collection and drafts its
  * `WorkspaceCollected`. A workspace already being collected drafts nothing,
@@ -263,12 +267,13 @@ const collectIn = (
 
 /** Releases a workspace: it is collected (its repo deleted) for `reason`. Releasing it again is a no-op. */
 export const releaseWorkspace = Effect.fn("coordination/releaseWorkspace")(function* (
+  project: ProjectId,
   workspaceId: WorkspaceId,
   reason: CollectionReason,
 ) {
   const now = yield* (yield* Clock).now;
   yield* commit(
-    { entity: { kind: "workspace", id: workspaceId }, cause: `release:${workspaceId}` },
+    { entity: { kind: "workspace", id: workspaceId }, cause: `release:${workspaceId}`, project },
     (tx) =>
       slotOf(tx.store, workspaceId) === undefined
         ? Result.fail(new WorkspaceNotFound({ workspaceId }))
@@ -313,7 +318,9 @@ export interface CollectReport {
 }
 
 /** Deletes the repo of every slot being collected. A failed deletion stays pending for the next pass. */
-export const collectWorkspaces = Effect.fn("coordination/collectWorkspaces")(function* () {
+export const collectWorkspaces = Effect.fn("coordination/collectWorkspaces")(function* (
+  project: ProjectId,
+) {
   const store = yield* EntityStore;
   const host = yield* CodeHost;
   const due = slots(store).filter((s) => s.state === "collecting");
@@ -330,6 +337,7 @@ export const collectWorkspaces = Effect.fn("coordination/collectWorkspaces")(fun
       {
         entity: { kind: "workspace", id: slot.id },
         cause: `collect:${slot.id}:${slot.attempts ?? 0}`,
+        project,
       },
       (tx) => {
         const current = slotOf(tx.store, slot.id);
@@ -374,12 +382,12 @@ export const poolStatus = Effect.fn("coordination/poolStatus")(function* () {
 
 /** Sets what the pool forks from and how many ready workspaces it keeps. `project` is the pool's project, the entity the change is recorded on. */
 export const configurePool = Effect.fn("coordination/configurePool")(function* (
-  project: string,
+  project: ProjectId,
   settings: PoolSettings,
 ) {
   const now = yield* (yield* Clock).now;
   yield* commit(
-    { entity: { kind: "project", id: project }, cause: `configure-pool@${now}` },
+    { entity: { kind: "project", id: project }, cause: `configure-pool@${now}`, project },
     (tx) => {
       putSettings(tx.store, settings);
       return Result.succeed({ value: undefined, drafts: [] });

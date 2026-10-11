@@ -15,6 +15,7 @@ import { WorkspacePoolRpc } from "../../src/adapters/driven/do-rpc/workspace-poo
 import { armedAlarms } from "../../src/adapters/driving/do/alarm.ts";
 import { POOL_REFILL, type WorkspacePoolDO } from "../../src/adapters/driving/do/workspace-pool.ts";
 import { artifactsLocationHint } from "../../src/composition/do.ts";
+import { drainAfter } from "./helpers.ts";
 import {
   decodeExit,
   EventCodecs,
@@ -27,8 +28,9 @@ const WAIT = { timeout: 20_000, interval: 25 };
 
 const freshProject = (): ProjectId => makeId("prj", ulid());
 const holder = (): ChangeId => makeId("chg", ulid());
+// Each pool's events owe the Projector a delivery, drained after every case.
 const poolStub = (projectId: string) =>
-  env.WORKSPACE_POOL.get(env.WORKSPACE_POOL.idFromName(`pool:${projectId}`));
+  drainAfter(env.WORKSPACE_POOL.get(env.WORKSPACE_POOL.idFromName(`pool:${projectId}`)));
 
 /** A method's answer, decoded; a failure or defect throws with the answer. */
 function valueOf<A, E>(codec: ExitCodec<A, E>, answer: unknown): A {
@@ -254,5 +256,7 @@ describe("the WorkspacePool DO", () => {
       "WorkspaceCollected",
     ]);
     expect(log.at(-1)?.payload).toMatchObject({ reason: "landed" });
+    // Every event the pool commits, the reaction's included, carries its project.
+    expect(log.map((e) => e.project)).toEqual([projectId, projectId, projectId]);
   });
 });

@@ -11,7 +11,7 @@ import {
   refillPool,
   releaseWorkspace,
 } from "@keeltown/core/application/coordination";
-import { ChangeId, Instant, type WorkspaceId } from "@keeltown/core/kernel";
+import { ChangeId, Instant, ProjectId, type WorkspaceId } from "@keeltown/core/kernel";
 import { Clock, CodeHost, EntityStore, EventOutbox } from "@keeltown/core/ports";
 import {
   CodeHostFixture,
@@ -22,7 +22,7 @@ import {
 import { Clock as EffectClock, Deferred, Effect, Fiber, Layer, Schema } from "effect";
 
 const MIRROR = { namespace: "keel-ws-00", name: "mirror" };
-const PROJECT = "prj_00000000000000000000000001";
+const PROJECT = Schema.decodeUnknownSync(ProjectId)("prj_00000000000000000000000001");
 const holder = (n: number) =>
   Schema.decodeUnknownSync(ChangeId)(`chg_${String(n).padStart(26, "0")}`);
 
@@ -88,8 +88,13 @@ describe("WorkspacePool", () => {
       Effect.gen(function* () {
         const base = yield* seedMirror;
         yield* configurePool(PROJECT, { source: MIRROR, target: 3 });
-        expect(yield* refillPool()).toEqual({ started: 3, ready: 3, failed: 0, abandoned: 0 });
-        const grant = yield* grantWorkspace(holder(1));
+        expect(yield* refillPool(PROJECT)).toEqual({
+          started: 3,
+          ready: 3,
+          failed: 0,
+          abandoned: 0,
+        });
+        const grant = yield* grantWorkspace(PROJECT, holder(1));
         expect(grant.baseSha).toBe(base);
         expect(grant.token.length).toBeGreaterThan(0);
         expect(yield* poolStatus()).toMatchObject({ ready: 2, granted: 1, forking: 0 });
@@ -108,10 +113,10 @@ describe("WorkspacePool", () => {
       Effect.gen(function* () {
         yield* seedMirror;
         yield* configurePool(PROJECT, { source: MIRROR, target: 5 });
-        yield* refillPool();
+        yield* refillPool(PROJECT);
         const outcomes = yield* Effect.forEach(
           Array.from({ length: 10 }, (_, i) => holder(i + 1)),
-          (h) => Effect.result(grantWorkspace(h)),
+          (h) => Effect.result(grantWorkspace(PROJECT, h)),
           { concurrency: "unbounded" },
         );
         const granted = outcomes.flatMap((o) =>
@@ -134,9 +139,9 @@ describe("WorkspacePool", () => {
       Effect.gen(function* () {
         yield* seedMirror;
         yield* configurePool(PROJECT, { source: MIRROR, target: 2 });
-        yield* refillPool();
-        const first = yield* grantWorkspace(holder(7));
-        const again = yield* grantWorkspace(holder(7));
+        yield* refillPool(PROJECT);
+        const first = yield* grantWorkspace(PROJECT, holder(7));
+        const again = yield* grantWorkspace(PROJECT, holder(7));
         expect(again.workspaceId).toBe(first.workspaceId);
         expect(again.token).not.toBe(first.token);
         expect(
@@ -155,15 +160,15 @@ describe("WorkspacePool", () => {
         yield* Effect.gen(function* () {
           yield* seedMirror;
           yield* configurePool(PROJECT, { source: MIRROR, target: 2 });
-          const refill = yield* Effect.forkChild(refillPool());
+          const refill = yield* Effect.forkChild(refillPool(PROJECT));
           // Let the refill commit its slots; its forks then wait on the gate.
           for (let i = 0; i < 100 && (yield* poolStatus()).forking < 2; i++) yield* Effect.yieldNow;
           expect(yield* poolStatus()).toMatchObject({ forking: 2, ready: 0 });
-          const early = yield* Effect.flip(grantWorkspace(holder(1)));
+          const early = yield* Effect.flip(grantWorkspace(PROJECT, holder(1)));
           expect(early).toMatchObject({ _tag: "PoolExhausted", retryAfterMs: 5_000 });
           yield* Deferred.succeed(gate, undefined);
           yield* Fiber.join(refill);
-          expect((yield* grantWorkspace(holder(1))).workspaceId).toMatch(/^wsp_/);
+          expect((yield* grantWorkspace(PROJECT, holder(1))).workspaceId).toMatch(/^wsp_/);
         }).pipe(Effect.provide(pool({ forkGate: gate })));
       }),
   );
@@ -171,7 +176,7 @@ describe("WorkspacePool", () => {
   it.effect("[pool.exhausted] an empty pool refuses with PoolExhausted and a retry hint", () =>
     Effect.gen(function* () {
       yield* seedMirror;
-      const refused = yield* Effect.flip(grantWorkspace(holder(1)));
+      const refused = yield* Effect.flip(grantWorkspace(PROJECT, holder(1)));
       expect(refused._tag).toBe("PoolExhausted");
       expect(refused.retryAfterMs).toBeGreaterThan(0);
     }).pipe(Effect.provide(pool())),
@@ -183,12 +188,12 @@ describe("WorkspacePool", () => {
       Effect.gen(function* () {
         yield* seedMirror;
         yield* configurePool(PROJECT, { source: MIRROR, target: 1 });
-        yield* refillPool();
-        const grant = yield* grantWorkspace(holder(3));
-        yield* releaseWorkspace(grant.workspaceId, "landed");
-        yield* releaseWorkspace(grant.workspaceId, "landed");
+        yield* refillPool(PROJECT);
+        const grant = yield* grantWorkspace(PROJECT, holder(3));
+        yield* releaseWorkspace(PROJECT, grant.workspaceId, "landed");
+        yield* releaseWorkspace(PROJECT, grant.workspaceId, "landed");
         expect(yield* poolStatus()).toMatchObject({ granted: 0, collecting: 1 });
-        expect(yield* collectWorkspaces()).toEqual({ deleted: 1, pending: 0 });
+        expect(yield* collectWorkspaces(PROJECT)).toEqual({ deleted: 1, pending: 0 });
         const host = yield* CodeHost;
         const repo = {
           namespace: MIRROR.namespace,
@@ -203,8 +208,26 @@ describe("WorkspacePool", () => {
         });
         expect(events.filter((p) => tagOf(p) === "WorkspaceCollected").length).toBe(1);
         // The holder is free again: a new grant is a new workspace.
-        yield* refillPool();
-        expect((yield* grantWorkspace(holder(3))).workspaceId).not.toBe(grant.workspaceId);
+        yield* refillPool(PROJECT);
+        expect((yield* grantWorkspace(PROJECT, holder(3))).workspaceId).not.toBe(grant.workspaceId);
+      }).pipe(Effect.provide(pool())),
+  );
+
+  it.effect(
+    "[pool.project] WorkspaceForked, WorkspaceGranted and WorkspaceCollected carry the pool's project",
+    () =>
+      Effect.gen(function* () {
+        yield* seedMirror;
+        yield* configurePool(PROJECT, { source: MIRROR, target: 1 });
+        yield* refillPool(PROJECT);
+        const grant = yield* grantWorkspace(PROJECT, holder(5));
+        yield* releaseWorkspace(PROJECT, grant.workspaceId, "withdrawn");
+        const log = (yield* EventOutbox).log({ kind: "workspace", id: grant.workspaceId });
+        expect(log.map((e) => [e.type, e.project])).toEqual([
+          ["WorkspaceForked", PROJECT],
+          ["WorkspaceGranted", PROJECT],
+          ["WorkspaceCollected", PROJECT],
+        ]);
       }).pipe(Effect.provide(pool())),
   );
 
@@ -214,13 +237,13 @@ describe("WorkspacePool", () => {
       yield* configurePool(PROJECT, { source: MIRROR, target: 2 });
       const repos: string[] = [];
       for (let round = 0; round < 3; round++) {
-        yield* refillPool();
+        yield* refillPool(PROJECT);
         for (const n of [1, 2]) {
-          const grant = yield* grantWorkspace(holder(round * 10 + n));
+          const grant = yield* grantWorkspace(PROJECT, holder(round * 10 + n));
           repos.push(grant.repo.name);
-          yield* releaseWorkspace(grant.workspaceId, "withdrawn");
+          yield* releaseWorkspace(PROJECT, grant.workspaceId, "withdrawn");
         }
-        yield* collectWorkspaces();
+        yield* collectWorkspaces(PROJECT);
       }
       const host = yield* CodeHost;
       expect(new Set(repos).size).toBe(6);
@@ -237,8 +260,8 @@ describe("WorkspacePool", () => {
       Effect.gen(function* () {
         yield* seedMirror;
         yield* configurePool(PROJECT, { source: MIRROR, target: 1 });
-        yield* refillPool();
-        const grant = yield* grantWorkspace(holder(4));
+        yield* refillPool(PROJECT);
+        const grant = yield* grantWorkspace(PROJECT, holder(4));
         const store = yield* EntityStore;
         const outbox = yield* EventOutbox;
         const host = yield* CodeHost;
@@ -265,7 +288,7 @@ describe("WorkspacePool", () => {
           ],
         });
         expect(again).toBeUndefined();
-        expect(yield* collectWorkspaces()).toEqual({ deleted: 1, pending: 0 });
+        expect(yield* collectWorkspaces(PROJECT)).toEqual({ deleted: 1, pending: 0 });
         expect((yield* Effect.flip(host.info(grant.repo)))._tag).toBe("RepoNotFound");
         const queued = {
           type: "ChangeQueued",
@@ -283,9 +306,9 @@ describe("WorkspacePool", () => {
       Effect.gen(function* () {
         yield* seedMirror;
         yield* configurePool(PROJECT, { source: MIRROR, target: 1 });
-        yield* refillPool();
+        yield* refillPool(PROJECT);
         const now = yield* EffectClock.currentTimeMillis;
-        const grant = yield* grantWorkspace(holder(9));
+        const grant = yield* grantWorkspace(PROJECT, holder(9));
         expect(GRANT_TTL_SECONDS).toBeLessThanOrEqual(7_200);
         expect(grant.expiresAt - now).toBeLessThanOrEqual(7_200_000);
         expect(grant.expiresAt).toBeGreaterThan(now);

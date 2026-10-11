@@ -36,6 +36,14 @@ describe("the Trunk's Initialize", () => {
       }).pipe(Effect.provide(ports())),
   );
 
+  it.effect("[trunk.project] TrunkInitialized carries the trunk's project", () =>
+    Effect.gen(function* () {
+      yield* initializeTrunk(PROJECT, sha("a"), "seed");
+      const log = (yield* EventOutbox).log({ kind: "trunk", id: PROJECT });
+      expect(log.map((e) => [e.type, e.project])).toEqual([["TrunkInitialized", PROJECT]]);
+    }).pipe(Effect.provide(ports())),
+  );
+
   it.effect(
     "[trunk.init-once] another head is PromotionStateRefused and trunk keeps its first head",
     () =>

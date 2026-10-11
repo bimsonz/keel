@@ -22,6 +22,7 @@ export interface TreeEntry {
 export interface CommitInfo {
   readonly tree: string;
   readonly parents: readonly string[];
+  readonly author: Signature;
 }
 
 export interface GitObject {
@@ -101,12 +102,22 @@ export function decodeCommit(body: Uint8Array): CommitInfo {
   const header = headerEnd < 0 ? text : text.slice(0, headerEnd);
   let tree = "";
   const parents: string[] = [];
+  let author: Signature | undefined;
   for (const line of header.split("\n")) {
     if (line.startsWith("tree ")) tree = line.slice(5);
     else if (line.startsWith("parent ")) parents.push(line.slice(7));
+    else if (line.startsWith("author ")) author = decodeSignature(line.slice(7));
   }
   if (!tree) throw new Error("commit without tree");
-  return { tree, parents };
+  if (author === undefined) throw new Error("commit without author");
+  return { tree, parents, author };
+}
+
+/** `Name <email> <unix seconds> <offset>`, as a commit header writes an identity. */
+function decodeSignature(text: string): Signature {
+  const m = /^(.*) <([^<>]*)> (\d+) ([+-]\d{4})$/.exec(text);
+  if (m === null) throw new Error(`bad identity: ${text}`);
+  return { name: m[1] ?? "", email: m[2] ?? "", time: Number(m[3]), tz: m[4] ?? "+0000" };
 }
 
 export interface Signature {

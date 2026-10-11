@@ -45,7 +45,6 @@ afterAll(() => {
 const memberOf = (i: number, base: string, head: string): RestackMember => ({
   base,
   head,
-  author: { name: `agt_${i}`, email: `agt_${i}@agents.keel.invalid`, time: KEEL.time },
   message: `member ${i}\n`,
   trailers: [["Change-Id", `chg_${i}`]],
 });
@@ -185,6 +184,44 @@ describe("restack", { timeout: PROPERTY_TIMEOUT }, () => {
     );
     expect(refusal).toBeInstanceOf(MemberRefused);
     expect(refusal).toMatchObject({ member: 1, reason: "both-modified", path: "src/a.ts" });
+  });
+
+  it("[restack.keeps-author] each restacked commit keeps its submitted commit's author, date and offset, with Keel as committer", async () => {
+    const ada = "Ada Lovelace <ada@example.com> 1712345678 +0200";
+    const grace = "Grace Hopper <grace@example.org> 1712000000 -0500";
+    const authors = [ada, grace];
+    const { base, heads } = seed([
+      { ...edit(2, (t) => t.set("src/a.ts", file("export const a = 11;\n"))), author: ada },
+      { ...edit(3, (t) => t.set("lib/e.ts", file("export const e = 5;\n"))), author: grace },
+    ]);
+    const staging = stagingWith(trunkOf(BASE));
+    try {
+      const out = await restack(
+        new FallbackReader([staging.reader, wsReader]),
+        base,
+        heads.map((h, i) => memberOf(i, base, h)),
+        KEEL,
+      );
+      const tip = out.commits.at(-1)?.oid ?? "";
+      expect(await pushTo(staging.dir, CAND, tip, out.objects)).toEqual({ kind: "applied" });
+      // What git itself reads back from staging, not gitcore's own decoding.
+      const identities = out.commits.map((c) =>
+        git(staging.dir, [
+          "show",
+          "-s",
+          "--format=%an <%ae> %at %ad%n%cn <%ce> %ct",
+          "--date=format:%z",
+          c.oid,
+        ])
+          .trim()
+          .split("\n"),
+      );
+      expect(identities).toEqual(
+        authors.map((author) => [author, `Keel <keel@keel.invalid> ${KEEL.time}`]),
+      );
+    } finally {
+      staging.cleanup();
+    }
   });
 
   it("[restack.deterministic] restacks one batch to the same commits and objects every time", async () => {

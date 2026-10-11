@@ -7,7 +7,13 @@ import {
   refillPool,
   releaseWorkspace,
 } from "@keeltown/core/application/coordination";
-import { ChangeId, type EventEnvelope, SketchId, WorkspaceId } from "@keeltown/core/kernel";
+import {
+  ChangeId,
+  type EventEnvelope,
+  ProjectId,
+  SketchId,
+  WorkspaceId,
+} from "@keeltown/core/kernel";
 import type { CodeHost, Transaction } from "@keeltown/core/ports";
 import { Effect, type Layer, Schema } from "effect";
 import { codeHostLayer } from "../../../composition/do.ts";
@@ -30,6 +36,7 @@ const decodeHolder = Schema.decodeUnknownEffect(Schema.Union([ChangeId, SketchId
 const decodeWorkspaceId = Schema.decodeUnknownEffect(WorkspaceId);
 const decodeReason = Schema.decodeUnknownEffect(CollectionReason);
 const decodeConfig = Schema.decodeUnknownEffect(PoolConfig);
+const decodeProject = Schema.decodeUnknownSync(ProjectId);
 
 /**
  * The WorkspacePool DO (`pool:<project>`): pre-forked workspaces. A workspace
@@ -41,18 +48,19 @@ const decodeConfig = Schema.decodeUnknownEffect(PoolConfig);
 export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
   private readonly codeHost: Layer.Layer<CodeHost> = codeHostLayer(this.env);
 
-  /** The project this pool serves, from the object's name. */
-  private get project(): string {
+  /** The project this pool serves, from the object's name; stamped on every event it commits. */
+  private get project(): ProjectId {
     const name = this.ctx.id.name;
     if (name?.startsWith("pool:") !== true)
       throw new Error("a WorkspacePool DO is addressed as pool:<project>");
-    return name.slice("pool:".length);
+    return decodeProject(name.slice("pool:".length));
   }
 
   async grant(holder: string) {
+    const project = this.project;
     const program = decodeHolder(holder).pipe(
       Effect.orDie,
-      Effect.flatMap(grantWorkspace),
+      Effect.flatMap((h) => grantWorkspace(project, h)),
       Effect.provide(this.codeHost),
     );
     const answer = await this.answer(WorkspacePoolCodecs.grant, program);
@@ -61,9 +69,10 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
   }
 
   async release(workspaceId: string, reason: string = "withdrawn") {
+    const project = this.project;
     const program = Effect.all([decodeWorkspaceId(workspaceId), decodeReason(reason)]).pipe(
       Effect.orDie,
-      Effect.flatMap(([id, why]) => releaseWorkspace(id, why)),
+      Effect.flatMap(([id, why]) => releaseWorkspace(project, id, why)),
     );
     const answer = await this.answer(WorkspacePoolCodecs.release, program);
     await scheduleAlarm(this.ctx.storage, {
@@ -94,7 +103,11 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
     const collected = collectOnChangeEnd(tx, event, Date.now());
     return collected === undefined
       ? undefined
-      : { entity: { kind: "workspace", id: collected.workspaceId }, drafts: collected.drafts };
+      : {
+          entity: { kind: "workspace", id: collected.workspaceId },
+          drafts: collected.drafts,
+          project: this.project,
+        };
   }
 
   override async receive(envelopes: unknown) {
@@ -112,7 +125,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
   protected override async onDeadline(request: AlarmRequest): Promise<void> {
     if (request.reason === POOL_REFILL) {
       const report = await this.runtime.runPromise(
-        refillPool().pipe(Effect.provide(this.codeHost)),
+        refillPool(this.project).pipe(Effect.provide(this.codeHost)),
       );
       if (report.failed + report.abandoned > 0) {
         await scheduleAlarm(this.ctx.storage, {
@@ -132,7 +145,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
     }
     if (request.reason === POOL_COLLECT) {
       const report = await this.runtime.runPromise(
-        collectWorkspaces().pipe(Effect.provide(this.codeHost)),
+        collectWorkspaces(this.project).pipe(Effect.provide(this.codeHost)),
       );
       if (report.pending > 0) {
         await scheduleAlarm(this.ctx.storage, {

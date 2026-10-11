@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t pool.project
+# kills: pool.project
+# why: WorkspaceGranted carries no project, so project readers never see a workspace handed out
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index cf7b6ab..cc54059 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -98,7 +98,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+     }
+     const now = yield* (yield* Clock).now;
+     yield* commit(
+-      { entity: { kind: "workspace", id: candidate.id }, cause: `grant:${holder}`, project },
++      { entity: { kind: "workspace", id: candidate.id }, cause: `grant:${holder}` },
+       (tx) => {
+         const chosen = slotOf(tx.store, candidate.id);
+         if (

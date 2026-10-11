@@ -13,10 +13,15 @@ export const objectsOf = (handle: ArtifactsRepo): ObjectReader => ({
     if (blob === null) throw new MissingObject(oid);
     return new Uint8Array(await blob.arrayBuffer());
   },
+  // The binding reads no offset, so an author's date keeps its instant at +0000.
   readCommit: async (oid) => {
     const commit = await handle.readCommit(oid);
     if (commit === null) throw new MissingObject(oid);
-    return { tree: commit.treeHash, parents: commit.parents };
+    return {
+      tree: commit.treeHash,
+      parents: commit.parents,
+      author: { name: commit.author.name, email: commit.author.email, time: commit.authoredAt },
+    };
   },
 });
 

@@ -59,6 +59,7 @@ export const promote = Effect.fn("integration/promote")(function* (
     {
       entity: { kind: "trunk", id: projectId },
       cause,
+      project: projectId,
       ...(fingerprint === undefined ? {} : { fingerprint }),
     },
     (tx) =>

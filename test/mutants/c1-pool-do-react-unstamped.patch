@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts -t "pool.do.react"
+# kills: pool.do.react
+# why: The WorkspaceCollected a landed change's end produces carries no project
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index 0d7c1b5..0f8c661 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -106,7 +106,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+       : {
+           entity: { kind: "workspace", id: collected.workspaceId },
+           drafts: collected.drafts,
+-          project: this.project,
+         };
+   }
+ 

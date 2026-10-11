@@ -1,0 +1,31 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/candidate-composer.test.ts -t composer.keeps-author
+# kills: composer.keeps-author
+# why: The composer stamps the agent as each commit's author at the batch's time, as it did before 11 Oct
+diff --git a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
+index d23b7c5..f8a3c6c 100644
+--- a/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/candidate-composer.ts
+@@ -73,7 +73,22 @@ const restacked = (
+     Effect.promise(() => Promise.all([...repos.values()].map(open))),
+     (readers) =>
+       Effect.tryPromise({
+-        try: () => restack(new FallbackReader(readers), request.base, members, committer),
++        try: () => {
++          const fallback = new FallbackReader(readers);
++          const agents = new Map(request.members.map((m) => [m.head, m.author]));
++          const stamped = {
++            readTree: (oid: string) => fallback.readTree(oid),
++            readBlob: (oid: string) => fallback.readBlob(oid),
++            readCommit: async (oid: string) => {
++              const c = await fallback.readCommit(oid);
++              const agent = agents.get(oid as never);
++              return agent === undefined
++                ? c
++                : { ...c, author: { name: agent, email: `${agent}@agents.keel.invalid`, time: committer.time } };
++            },
++          };
++          return restack(stamped, request.base, members, committer);
++        },
+         catch: (cause) => cause,
+       }).pipe(
+         Effect.catch((cause) =>

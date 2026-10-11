@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t trunk.project
+# kills: trunk.project
+# why: Trunk's commits carry no project, so the Projector cannot label TrunkInitialized and project readers never see it
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index 511f19f..c8085af 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -59,7 +59,6 @@ export const promote = Effect.fn("integration/promote")(function* (
+     {
+       entity: { kind: "trunk", id: projectId },
+       cause,
+-      project: projectId,
+       ...(fingerprint === undefined ? {} : { fingerprint }),
+     },
+     (tx) =>

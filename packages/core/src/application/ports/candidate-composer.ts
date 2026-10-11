@@ -18,7 +18,7 @@ export interface CandidateMember {
   /** Its workspace's head when granted: the base its change is merged against. */
   readonly base: CommitSha;
   readonly head: CommitSha;
-  /** The agent that made the change: its commit's author. */
+  /** The agent that made the change. Not the git author: the restacked commit keeps its submitted commit's author. */
   readonly author: AgentId;
   /** The intent's title: its commit's message. */
   readonly title: string;
@@ -30,7 +30,7 @@ export interface CandidateRequest {
   readonly staging: RepoRef;
   /** The trunk commit the batch is composed onto. */
   readonly base: CommitSha;
-  /** BatchFormed's time: every commit's author and committer time, so a recompose gives the same SHAs. */
+  /** BatchFormed's time: every commit's committer time, so a recompose gives the same SHAs. */
   readonly at: Instant;
   readonly members: readonly CandidateMember[];
 }
@@ -52,8 +52,8 @@ export interface ComposedCandidate {
 
 /**
  * Restacks queued changes onto trunk: one commit per member, chained in batch
- * order, each with its `Change-Id` trailer, the agent as author and Keel as
- * committer at the batch's time, refusing whenever unsure. Composing a
+ * order, each with its `Change-Id` trailer, its submitted commit's author and
+ * Keel as committer at the batch's time, refusing whenever unsure. Composing a
  * candidate again gives the same commits and leaves its ref as it was.
  */
 export class CandidateComposer extends Context.Service<

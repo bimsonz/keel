@@ -2,10 +2,10 @@
 # kills: pool.do.react
 # why: The DO ignores delivered events, so a landed change's workspace is never collected
 diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
-index ef80f26..488f847 100644
+index 0d7c1b5..8478341 100644
 --- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
 +++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
-@@ -91,7 +91,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+@@ -100,7 +100,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
  
    /** A change that landed, was withdrawn or was superseded gives its workspace up; redelivery is a no-op. */
    protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
@@ -13,4 +13,4 @@ index ef80f26..488f847 100644
 +    const collected = event.type === "never" ? collectOnChangeEnd(tx, event, Date.now()) : undefined;
      return collected === undefined
        ? undefined
-       : { entity: { kind: "workspace", id: collected.workspaceId }, drafts: collected.drafts };
+       : {

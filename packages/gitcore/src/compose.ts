@@ -18,8 +18,8 @@ import { objectsBetween } from "./transfer.ts";
 export interface RestackMember {
   /** The commit the change was made on (its workspace's head when granted). */
   readonly base: string;
+  /** The submitted commit, whose author the restacked commit keeps. */
   readonly head: string;
-  readonly author: Signature;
   readonly message: string;
   readonly trailers: ReadonlyArray<readonly [string, string]>;
 }
@@ -72,9 +72,10 @@ export class FallbackReader implements ObjectReader {
 /**
  * Folds each member onto `base` in order, merging its change against its own
  * base (`mergeTrees(tree(m.base), acc, tree(m.head))`), and commits each step
- * by `committer` on top of the one before. Throws `MemberRefused` at the first
- * member GitCore will not merge, and `MissingObject` for an object no reader
- * holds.
+ * on top of the one before, by `committer` and with the submitted head's own
+ * author (name, email, date and offset), as `git rebase` keeps it. Throws
+ * `MemberRefused` at the first member GitCore will not merge, and
+ * `MissingObject` for an object no reader holds.
  */
 export async function restack(
   reader: ObjectReader,
@@ -101,7 +102,7 @@ export async function restack(
     const body = encodeCommit({
       tree: merged.tree,
       parents: [parent],
-      author: m.author,
+      author: to.author,
       committer,
       message: m.message,
       trailers: m.trailers,

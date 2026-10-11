@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/artifacts-objects.test.ts -t objects.author
+# kills: objects.author
+# why: The binding's reader hands gitcore the committer as the author, so a rebased commit's restack takes the wrong identity
+diff --git a/apps/keel/src/adapters/driven/artifacts/objects.ts b/apps/keel/src/adapters/driven/artifacts/objects.ts
+index ca82c70..4b22247 100644
+--- a/apps/keel/src/adapters/driven/artifacts/objects.ts
++++ b/apps/keel/src/adapters/driven/artifacts/objects.ts
+@@ -20,7 +20,7 @@ export const objectsOf = (handle: ArtifactsRepo): ObjectReader => ({
+     return {
+       tree: commit.treeHash,
+       parents: commit.parents,
+-      author: { name: commit.author.name, email: commit.author.email, time: commit.authoredAt },
++      author: { name: commit.committer.name, email: commit.committer.email, time: commit.committedAt },
+     };
+   },
+ });
