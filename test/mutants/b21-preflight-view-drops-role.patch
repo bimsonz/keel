@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/relying.test.ts
+# kills: b21.preflight-view
+# why: the agent can't tell whether a contradiction's other side is a premise or an effect
+diff --git a/apps/keel/src/adapters/driving/http/work-loop.ts b/apps/keel/src/adapters/driving/http/work-loop.ts
+index 7116c54..035ed91 100644
+--- a/apps/keel/src/adapters/driving/http/work-loop.ts
++++ b/apps/keel/src/adapters/driving/http/work-loop.ts
+@@ -240,7 +240,6 @@ function preflightView(preflight: Preflight) {
+       premise: propositionView(c.premise),
+       with: propositionView(c.with),
+       holder: c.holder,
+-      ...(c.withRole === undefined ? {} : { withRole: c.withRole }),
+     })),
+     precedents: preflight.precedents.map((p) => ({
+       decisionId: p.decisionId,

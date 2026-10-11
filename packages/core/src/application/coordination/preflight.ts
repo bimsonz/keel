@@ -3,6 +3,7 @@ import {
   type Intent,
   type LiveChange,
   type Preflight,
+  preflight,
 } from "../../domain/coordination/index.ts";
 import type { ChangeId } from "../../domain/kernel/index.ts";
 
@@ -15,10 +16,10 @@ export interface PreflightFinding {
 
 /**
  * The preflight of `intent` for change `self` against its project's live
- * changes: the domain's `exposure` gives the neighbours and contradictions.
- * Until the domain's own preflight lands, the move is `refine` when there is
- * a contradiction and `proceed` otherwise, and precedents are empty.
- * Advisory: fallout on the Subject DO is what judges.
+ * changes: the domain's `exposure` gives the neighbours and contradictions,
+ * and the domain's `preflight` the move and what it rests on. No precedent is
+ * in scope until decisions are kept. Advisory: fallout on the Subject DO is
+ * what judges.
  */
 export function preflightFor(
   self: ChangeId,
@@ -27,12 +28,7 @@ export function preflightFor(
 ): PreflightFinding {
   const found = exposure(self, intent, live);
   return {
-    preflight: {
-      neighbours: found.neighbours,
-      contradictions: found.contradictions,
-      precedents: [],
-      suggestedMove: found.contradictions.length > 0 ? "refine" : "proceed",
-    },
+    preflight: preflight(self, intent, found, []),
     unreadable: found.unreadable.length,
   };
 }

@@ -83,23 +83,33 @@ describe("[b21.contradiction] A's premise and B's declared effect on one subject
       expect(first.preflight).toMatchObject({ contradictions: [], suggestedMove: "proceed" });
       const second = yield* declared(object(), B, { declaredEffects: [cachedPerSession] });
       expect(second.preflight.contradictions.map((found) => found.holder)).toEqual([A]);
-      expect(second.preflight.suggestedMove).toBe("refine");
+      // B's effect would break A's must premise: B refines, citing that contradiction.
+      expect(second.preflight).toMatchObject({
+        suggestedMove: "refine",
+        basis: { _tag: "contradiction", index: 0 },
+      });
       expect(second.change.state).toBe("working");
     }),
   );
 
-  it.effect("[b21.contradiction] A's declare finds B's declared effect when B came first", () =>
-    Effect.gen(function* () {
-      const { object, declared } = project();
-      yield* declared(object(), B, { declaredEffects: [cachedPerSession] });
-      const second = yield* declared(object(), A, { premises: [freshPerRequest] });
-      // `holder` names the premise's holder, A itself; B is the neighbour whose effect it meets.
-      expect(second.preflight.contradictions).toEqual([
-        { premise: freshPerRequest, with: cachedPerSession, holder: A, withRole: "effect" },
-      ]);
-      expect(second.preflight.neighbours.map((found) => found.changeId)).toEqual([B]);
-      expect(second.preflight.suggestedMove).toBe("refine");
-    }),
+  it.effect(
+    "[b21.contradiction] A's declare finds B's declared effect when B came first, and suggests sequencing",
+    () =>
+      Effect.gen(function* () {
+        const { object, declared } = project();
+        yield* declared(object(), B, { declaredEffects: [cachedPerSession] });
+        const second = yield* declared(object(), A, { premises: [freshPerRequest] });
+        // `holder` names the premise's holder, A itself; B is the neighbour whose effect it meets.
+        expect(second.preflight.contradictions).toEqual([
+          { premise: freshPerRequest, with: cachedPerSession, holder: A, withRole: "effect" },
+        ]);
+        expect(second.preflight.neighbours.map((found) => found.changeId)).toEqual([B]);
+        // What A relies on is about to change under B's effect: A sequences after B.
+        expect(second.preflight).toMatchObject({
+          suggestedMove: "sequence",
+          basis: { _tag: "contradiction", index: 0 },
+        });
+      }),
   );
 });
 
@@ -121,7 +131,10 @@ describe("[b21.revise-preflight] a revision's preflight reads the intent it leav
         idempotencyKey: "revise-b",
       }).pipe(Effect.provide(layerB));
       expect(revised.preflight.contradictions.map((found) => found.holder)).toEqual([A]);
-      expect(revised.preflight.suggestedMove).toBe("refine");
+      expect(revised.preflight).toMatchObject({
+        suggestedMove: "refine",
+        basis: { _tag: "contradiction", index: 0 },
+      });
     }),
   );
 });
@@ -151,7 +164,7 @@ describe("[b21.canonical] an ordering written from either event is compared and 
         const layerB = object();
         const second = yield* declared(layerB, B, { premises: [migrateBeforeDeploy] });
         expect(second.preflight.contradictions.map((found) => found.holder)).toEqual([B]);
-        expect(second.preflight.suggestedMove).toBe("refine");
+        expect(second.preflight.suggestedMove).toBe("sequence");
         const hearing = yield* Effect.map(EventOutbox, (outbox) =>
           outbox
             .subscribers("IntentRevised", { entity: { kind: "change", id: B }, affected: [] })
@@ -177,6 +190,7 @@ describe("[b21.canonical] an ordering written from either event is compared and 
           idempotencyKey: "rely-b",
         }).pipe(Effect.provide(layerB));
         expect(relied.preflight.contradictions.map((found) => found.holder)).toEqual([B]);
+        expect(relied.preflight.suggestedMove).toBe("sequence");
         expect(relied.change.intent.premises.map((premise) => premise.subject)).toEqual(["deploy"]);
       }),
   );

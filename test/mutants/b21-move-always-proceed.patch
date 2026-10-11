@@ -1,16 +1,16 @@
-# expect-red: pnpm exec vitest run --project unit --project pool:keel apps/keel/test/unit/preflight.test.ts apps/keel/test/pool/preflight.test.ts
+# expect-red: pnpm exec vitest run --project unit --project pool:keel apps/keel/test/unit/preflight.test.ts apps/keel/test/pool/preflight.test.ts apps/keel/test/pool/relying.test.ts
 # kills: b21.contradiction
-# why: preflight suggests proceeding even when it found a contradiction
+# why: the domain's move is overridden: preflight suggests proceeding even when it found a contradiction
 diff --git a/packages/core/src/application/coordination/preflight.ts b/packages/core/src/application/coordination/preflight.ts
-index 806faea..d81592e 100644
+index d625753..f5caa9c 100644
 --- a/packages/core/src/application/coordination/preflight.ts
 +++ b/packages/core/src/application/coordination/preflight.ts
-@@ -31,7 +31,7 @@ export function preflightFor(
-       neighbours: found.neighbours,
-       contradictions: found.contradictions,
-       precedents: [],
--      suggestedMove: found.contradictions.length > 0 ? "refine" : "proceed",
-+      suggestedMove: "proceed",
-     },
+@@ -28,7 +28,7 @@ export function preflightFor(
+ ): PreflightFinding {
+   const found = exposure(self, intent, live);
+   return {
+-    preflight: preflight(self, intent, found, []),
++    preflight: { ...preflight(self, intent, found, []), suggestedMove: "proceed" },
      unreadable: found.unreadable.length,
    };
+ }

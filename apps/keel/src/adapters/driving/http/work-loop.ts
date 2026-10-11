@@ -243,6 +243,7 @@ function preflightView(preflight: Preflight) {
       premise: propositionView(c.premise),
       with: propositionView(c.with),
       holder: c.holder,
+      ...(c.withRole === undefined ? {} : { withRole: c.withRole }),
     })),
     precedents: preflight.precedents.map((p) => ({
       decisionId: p.decisionId,
@@ -251,6 +252,7 @@ function preflightView(preflight: Preflight) {
       ...(p.scope === undefined ? {} : { scope: p.scope }),
     })),
     suggestedMove: preflight.suggestedMove,
+    ...(preflight.basis === undefined ? {} : { basis: preflight.basis }),
   };
 }
 

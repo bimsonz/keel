@@ -76,12 +76,36 @@ model Neighbour {
   overlap: "subject" | "footprint";
 }
 
-/** A premise of this change that contradicts another change's premise, or a tenet. */
+/** A premise and the proposition contradicting it: one change's premise (or a tenet) against another change's premise or effect. */
 model Contradiction {
   premise: MFP.Proposition;
   with: MFP.Proposition;
-  /** The change or tenet holding the other proposition. */
+
+  /** The change or tenet holding the premise. */
   holder: string;
+
+  /** Whether `with` is a premise or an effect. Always set by Keel; absent (an answer replayed from an older event) reads as an effect. */
+  withRole?: "premise" | "effect";
+}
+
+/** A move resting on one of the preflight's contradictions, by its index in that list. */
+model ContradictionBasis {
+  _tag: "contradiction";
+
+  @minValue(0)
+  index: integer;
+}
+
+/** A move resting on a precedent in scope. */
+model PrecedentBasis {
+  _tag: "precedent";
+  decisionId: DecisionId;
+}
+
+/** What a suggested move rests on. */
+union MoveBasis {
+  contradiction: ContradictionBasis,
+  precedent: PrecedentBasis,
 }
 
 model PrecedentRef {
@@ -97,6 +121,9 @@ model Preflight {
   contradictions: Contradiction[];
   precedents: PrecedentRef[];
   suggestedMove: Move;
+
+  /** What the move rests on: a contradiction above, by index, or a precedent. Absent when the move is `proceed`. */
+  basis?: MoveBasis;
 }
 
 union ConflictKind {

@@ -7975,13 +7975,44 @@
           },
           "holder": {
             "type": "string",
-            "description": "The change or tenet holding the other proposition."
+            "description": "The change or tenet holding the premise."
+          },
+          "withRole": {
+            "type": "string",
+            "enum": [
+              "premise",
+              "effect"
+            ],
+            "description": "Whether `with` is a premise or an effect. Always set by Keel; absent (an answer replayed from an older event) reads as an effect."
           }
         },
         "additionalProperties": {
           "not": {}
         },
-        "description": "A premise of this change that contradicts another change's premise, or a tenet."
+        "description": "A premise and the proposition contradicting it: one change's premise (or a tenet) against another change's premise or effect."
+      },
+      "ContradictionBasis": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "index"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "contradiction"
+            ]
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A move resting on one of the preflight's contradictions, by its index in that list."
       },
       "CreateProjectRequest": {
         "type": "object",
@@ -12047,6 +12078,17 @@
         ],
         "description": "A coordination action Keel suggests or an agent takes."
       },
+      "MoveBasis": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ContradictionBasis"
+          },
+          {
+            "$ref": "#/components/schemas/PrecedentBasis"
+          }
+        ],
+        "description": "What a suggested move rests on."
+      },
       "Nearby": {
         "type": "object",
         "required": [
@@ -12368,6 +12410,28 @@
           "not": {}
         }
       },
+      "PrecedentBasis": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "decisionId"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "precedent"
+            ]
+          },
+          "decisionId": {
+            "$ref": "#/components/schemas/DecisionId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A move resting on a precedent in scope."
+      },
       "PrecedentDistinguished": {
         "type": "object",
         "required": [
@@ -12540,6 +12604,14 @@
           },
           "suggestedMove": {
             "$ref": "#/components/schemas/Move"
+          },
+          "basis": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MoveBasis"
+              }
+            ],
+            "description": "What the move rests on: a contradiction above, by index, or a precedent. Absent when the move is `proceed`."
           }
         },
         "additionalProperties": {

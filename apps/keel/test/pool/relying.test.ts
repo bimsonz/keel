@@ -170,7 +170,8 @@ describe("[b21.rely] relying on a premise through the doorways", () => {
     expect(body.result.change).toMatchObject({ id: a.changeId, revision: 2 });
     expect(body.result.change.premises).toHaveLength(1);
     expect(body.result.preflight.contradictions.map((found) => found.holder)).toEqual([a.changeId]);
-    expect(body.result.preflight.suggestedMove).toBe("refine");
+    // A's new premise meets B's effect: what A relies on is about to change, so A sequences.
+    expect(body.result.preflight.suggestedMove).toBe("sequence");
     expect(replayed).toMatchObject({ ok: true, result: { change: { revision: 2 } } });
     expect((await a.current()).intent.revision).toBe(2);
 
@@ -218,14 +219,49 @@ describe("[b21.nearby] what is near a change, read-only", () => {
       result: {
         preflight: {
           neighbours: [{ changeId: b.changeId }],
-          contradictions: [{ holder: a.changeId }],
-          suggestedMove: "refine",
+          contradictions: [{ holder: a.changeId, withRole: "effect" }],
+          suggestedMove: "sequence",
+          basis: { _tag: "contradiction", index: 0 },
         },
       },
     });
-    expect(viaTool).toMatchObject({ ok: true, result: { preflight: { suggestedMove: "refine" } } });
+    expect(viaTool).toMatchObject({
+      ok: true,
+      result: { preflight: { suggestedMove: "sequence" } },
+    });
     expect(foreign.status).toBe(403);
     expect((await a.log()).length).toBe(before);
+  });
+
+  it("[b21.nearby] [b21.preflight-view] B's nearby names A, whose premise B's effect breaks, and suggests refine citing it, over REST and MCP", async () => {
+    const { token, change } = await project();
+    const a = await change();
+    ok(await a.declare("declare-a", { premises: [freshPerRequest] }));
+    await drainOutbox(a.stub);
+    const b = await change();
+    ok(await b.declare("declare-b", { declaredEffects: [cachedPerSession] }));
+    await drainOutbox(b.stub);
+
+    const response = await nearbyRest(b, token);
+    const viaTool = await tool(token, "nearby", { changeId: b.changeId });
+
+    const preflight = {
+      neighbours: [{ changeId: a.changeId, overlap: "subject" }],
+      contradictions: [
+        {
+          premise: Schema.encodeSync(Proposition)(freshPerRequest),
+          with: Schema.encodeSync(Proposition)(cachedPerSession),
+          holder: a.changeId,
+          withRole: "effect",
+        },
+      ],
+      precedents: [],
+      suggestedMove: "refine",
+      basis: { _tag: "contradiction", index: 0 },
+    };
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, result: { preflight } });
+    expect(viaTool).toMatchObject({ ok: true, result: { preflight } });
   });
 });
 

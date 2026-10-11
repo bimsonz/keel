@@ -44,11 +44,14 @@ describe("[b21.contradiction] preflight through the Project DO's index", () => {
     expect(second.preflight.contradictions).toEqual([
       { premise: freshPerRequest, with: cachedPerSession, holder: a.changeId, withRole: "effect" },
     ]);
-    expect(second.preflight.suggestedMove).toBe("refine");
+    expect(second.preflight).toMatchObject({
+      suggestedMove: "refine",
+      basis: { _tag: "contradiction", index: 0 },
+    });
     expect(second.change.state).toBe("working");
   });
 
-  it("[b21.contradiction] A's premise meets B's declared effect when B declared first", async () => {
+  it("[b21.contradiction] A's premise meets B's declared effect when B declared first, and A sequences", async () => {
     const { change } = liveProject();
     const b = await change();
     ok(await b.declare("declare-b", { declaredEffects: [cachedPerSession] }));
@@ -61,6 +64,9 @@ describe("[b21.contradiction] preflight through the Project DO's index", () => {
       { premise: freshPerRequest, with: cachedPerSession, holder: a.changeId, withRole: "effect" },
     ]);
     expect(second.preflight.neighbours.map((found) => found.changeId)).toEqual([b.changeId]);
-    expect(second.preflight.suggestedMove).toBe("refine");
+    expect(second.preflight).toMatchObject({
+      suggestedMove: "sequence",
+      basis: { _tag: "contradiction", index: 0 },
+    });
   });
 });
