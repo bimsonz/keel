@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel -t "ProbeLedger contract" packages/testing/test/ports.test.ts apps/keel/test/pool/adapters.test.ts
+# kills: b21.probe-cells
+# why: a probe cell is decided without the conflict as its fact, so the machine cannot see the conflict probing and refuses every cell
+diff --git a/packages/core/src/application/coordination/probe-ledger.ts b/packages/core/src/application/coordination/probe-ledger.ts
+index 62d5896..5493591 100644
+--- a/packages/core/src/application/coordination/probe-ledger.ts
++++ b/packages/core/src/application/coordination/probe-ledger.ts
+@@ -105,7 +105,11 @@ function ledgerStep(
+           conflictId,
+           ...(probe === undefined ? {} : { probe }),
+         })
+-      : decideProbe(probe, step.command, { now: tx.at, probeId: step.probeId, conflict });
++      : decideProbe(probe, step.command, {
++          now: tx.at,
++          probeId: step.probeId,
++          ...(step.command._tag === "Record" ? {} : { conflict }),
++        });
+   if (Result.isFailure(decided)) return Result.fail(decided.failure);
+   const drafts: EventDraft[] = [];
+   for (const payload of decided.success) {

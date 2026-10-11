@@ -1,0 +1,33 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel -t "ProbeLedger contract" packages/testing/test/ports.test.ts apps/keel/test/pool/adapters.test.ts
+# kills: b21.draft-failed
+# why: ProbeDrafted is committed without decideProbe, so a draft lands on a conflict whose drafting already failed
+diff --git a/packages/core/src/application/coordination/probe-ledger.ts b/packages/core/src/application/coordination/probe-ledger.ts
+index 62d5896..0d81fdf 100644
+--- a/packages/core/src/application/coordination/probe-ledger.ts
++++ b/packages/core/src/application/coordination/probe-ledger.ts
+@@ -17,6 +17,7 @@ import {
+   evolveProbe,
+   Probe,
+   type ProbeCommand,
++  ProbeDrafted,
+   ProbeEvent,
+ } from "../../domain/verification/index.ts";
+ import { commit, type Transaction } from "../ports/commit.ts";
+@@ -105,7 +106,16 @@ function ledgerStep(
+           conflictId,
+           ...(probe === undefined ? {} : { probe }),
+         })
+-      : decideProbe(probe, step.command, { now: tx.at, probeId: step.probeId, conflict });
++      : step.command._tag === "Draft"
++        ? Result.succeed([
++            ProbeDrafted.make({
++              probeId: step.probeId,
++              conflictId,
++              attempts: step.command.attempts,
++              bundleHash: step.command.bundleHash,
++            }),
++          ])
++        : decideProbe(probe, step.command, { now: tx.at, probeId: step.probeId, conflict });
+   if (Result.isFailure(decided)) return Result.fail(decided.failure);
+   const drafts: EventDraft[] = [];
+   for (const payload of decided.success) {

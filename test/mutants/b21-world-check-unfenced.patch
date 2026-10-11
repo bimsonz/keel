@@ -1,0 +1,34 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel -t "ProbeLedger contract" packages/testing/test/ports.test.ts apps/keel/test/pool/adapters.test.ts
+# kills: b21.world-check
+# why: WorldCheckRan is committed without decideConflict, so a suite check lands on a conflict that is not probing
+diff --git a/packages/core/src/application/coordination/probe-ledger.ts b/packages/core/src/application/coordination/probe-ledger.ts
+index 62d5896..b01249d 100644
+--- a/packages/core/src/application/coordination/probe-ledger.ts
++++ b/packages/core/src/application/coordination/probe-ledger.ts
+@@ -18,6 +18,7 @@ import {
+   Probe,
+   type ProbeCommand,
+   ProbeEvent,
++  WorldCheckRan,
+ } from "../../domain/verification/index.ts";
+ import { commit, type Transaction } from "../ports/commit.ts";
+ import type { EventDraft } from "../ports/event-outbox.ts";
+@@ -99,7 +100,17 @@ function ledgerStep(
+     readonly (typeof ConflictEvent.Type | typeof ProbeEvent.Type)[],
+     LedgerRefusal
+   > =
+-    step._tag === "Conflict"
++    step._tag === "Conflict" && step.command._tag === "RecordCheck"
++      ? Result.succeed([
++          WorldCheckRan.make({
++            conflictId,
++            world: step.command.world,
++            check: step.command.check,
++            run: step.command.run,
++            outcome: step.command.outcome,
++          }),
++        ])
++      : step._tag === "Conflict"
+       ? decideConflict(conflict, step.command, {
+           now: tx.at,
+           conflictId,

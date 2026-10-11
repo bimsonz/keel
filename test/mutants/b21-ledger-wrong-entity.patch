@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel -t "ProbeLedger contract" packages/testing/test/ports.test.ts apps/keel/test/pool/adapters.test.ts
+# kills: b21.probe-cells
+# why: a probe's cells are committed on the conflict's entity, so the probe's own log misses its runs and its guard
+diff --git a/packages/core/src/application/coordination/probe-ledger.ts b/packages/core/src/application/coordination/probe-ledger.ts
+index 62d5896..2085d38 100644
+--- a/packages/core/src/application/coordination/probe-ledger.ts
++++ b/packages/core/src/application/coordination/probe-ledger.ts
+@@ -227,7 +227,7 @@ export const probeCellRan = Effect.fn("coordination/probeCellRan")(function* (
+   yield* ledgerCommit(
+     projectId,
+     cell.conflictId,
+-    probeRef(cell.probeId),
++    conflictRef(cell.conflictId),
+     `probe-cell:${cell.probeId}:${cell.world}:${cell.run}:${cell.outcome}`,
+     cell.resultRef,
+     {

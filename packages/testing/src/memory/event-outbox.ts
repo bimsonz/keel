@@ -4,7 +4,7 @@ import {
   Clock,
   DeliveryFailed,
   type DueDeliveries,
-  EntityStore,
+  type EntityStore,
   envelopesFor,
   type EventAbout,
   EVERY_TYPE,
@@ -247,14 +247,18 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
   });
 }
 
-/** An in-memory outbox and the in-memory store it lives in, so one transaction covers both. */
+/**
+ * An in-memory outbox and the in-memory store it lives in, so one transaction
+ * covers both. The outbox is built once, so every program it is provided to
+ * mints event ids from one sequence.
+ */
 export function makeEventOutboxMemory() {
   const store = makeEntityStoreMemory();
+  const service = outboxOver(store.service);
   return {
     store,
-    layer: Layer.effect(EventOutbox, Effect.map(EntityStore, outboxOver)).pipe(
-      Layer.provideMerge(store.layer),
-    ),
+    service,
+    layer: Layer.succeed(EventOutbox, service).pipe(Layer.provideMerge(store.layer)),
   };
 }
 

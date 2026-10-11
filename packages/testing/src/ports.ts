@@ -16,7 +16,9 @@ import { describeEnrolmentsContract, type EnrolmentsHarness } from "./contracts/
 import { describeSessionsContract, type SessionsHarness } from "./contracts/sessions.ts";
 import { describeStandingsContract, type StandingsHarness } from "./contracts/standings.ts";
 import { describeLiveChangesContract, type LiveChangesHarness } from "./contracts/live-changes.ts";
+import { describeProbeLedgerContract, type ProbeLedgerHarness } from "./contracts/probe-ledger.ts";
 import { makeLiveChangesMemory } from "./memory/live-changes.ts";
+import { makeProbeLedgerMemory } from "./memory/probe-ledger.ts";
 import { makeSessionsMemory } from "./memory/sessions.ts";
 import { makeStandingsMemory } from "./memory/standings.ts";
 import { describeEventFeedContract, type EventFeedHarness } from "./contracts/event-feed.ts";
@@ -76,6 +78,7 @@ import type {
   ProbeStore,
   Inbox,
   LiveChanges,
+  ProbeLedger,
   Notifier,
   Projects,
   ProjectViews,
@@ -251,6 +254,12 @@ function memoryEnrolmentsHarness(): EnrolmentsHarness {
   };
 }
 
+/** The in-memory ledger runs the Subject DO's own use-cases, one object per subject. */
+function memoryProbeLedgerHarness(): ProbeLedgerHarness {
+  const memory = makeProbeLedgerMemory();
+  return { layer: memory.layer, suspect: memory.suspect, log: memory.log };
+}
+
 /** The in-memory index folds what the suite feeds it with the Project DO's own `hearLiveChange`. */
 function memoryLiveChangesHarness(): LiveChangesHarness {
   const memory = makeLiveChangesMemory();
@@ -331,6 +340,10 @@ export const PORTS = {
   LiveChanges: harnessed<LiveChanges, LiveChangesHarness>(
     memoryLiveChangesHarness,
     describeLiveChangesContract,
+  ),
+  ProbeLedger: harnessed<ProbeLedger, ProbeLedgerHarness>(
+    memoryProbeLedgerHarness,
+    describeProbeLedgerContract,
   ),
   Sessions: harnessed<Sessions | Enrolments | AgentDirectory, SessionsHarness>(
     memorySessionsHarness,

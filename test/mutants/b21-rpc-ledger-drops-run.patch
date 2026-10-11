@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel -t "ProbeLedger contract" apps/keel/test/pool/adapters.test.ts
+# kills: b21.probe-cells
+# why: the RPC adapter sends every probe cell as run 1, so runs 2 and 3 are answered as repeats and the probe never admits
+diff --git a/apps/keel/src/adapters/driven/do-rpc/probe-ledger.ts b/apps/keel/src/adapters/driven/do-rpc/probe-ledger.ts
+index ee6cbb9..1000865 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/probe-ledger.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/probe-ledger.ts
+@@ -39,7 +39,7 @@ export function ProbeLedgerRpc(
+         ),
+       probeCellRan: (ref, cell) =>
+         callObject(SubjectCodecs.probeCellRan, () =>
+-          at(ref).probeCellRan(Schema.encodeSync(ProbeCellRanCommand)(cell)),
++          at(ref).probeCellRan(Schema.encodeSync(ProbeCellRanCommand)({ ...cell, run: 1 })),
+         ),
+       worldCheckRan: (ref, cell) =>
+         callObject(SubjectCodecs.worldCheckRan, () =>

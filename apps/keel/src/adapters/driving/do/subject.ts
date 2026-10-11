@@ -1,9 +1,26 @@
-import { hearSubject } from "@keeltown/core/application/coordination";
+import {
+  conflictView,
+  hearSubject,
+  probeCellRan,
+  probeDrafted,
+  probeDraftFailed,
+  worldCheckRan,
+} from "@keeltown/core/application/coordination";
 import { SubjectKey } from "@keeltown/core/domain/coordination";
-import { type EventEnvelope, ProjectId } from "@keeltown/core/kernel";
+import { ConflictId, type EventEnvelope, ProjectId } from "@keeltown/core/kernel";
 import type { Transaction } from "@keeltown/core/ports";
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
+import {
+  ProbeCellRanCommand,
+  ProbeDraftedCommand,
+  ProbeDraftFailedCommand,
+  SubjectCodecs,
+  WorldCheckRanCommand,
+} from "../../../rpc/index.ts";
 import { KeelObject, type Reaction } from "./keel-object.ts";
+
+const decoded = <S extends Schema.Top>(schema: S, input: unknown) =>
+  Effect.orDie(Schema.decodeUnknownEffect(schema)(input));
 
 const NAME = /^subj:(?<project>[^:]+):(?<key>[^:]+)$/;
 
@@ -24,12 +41,61 @@ export function subjectOf(name: string | undefined): {
  * fallout and semantic conflicts. A change's declare, revise and rely
  * subscribe the subject of each premise and effect, and its ancestors, scoped
  * to the change; the subject keeps what each change holds at or under its key,
- * mints itself once and records each premise relied at its key. It extends
- * KeelObject, which builds its runtime and the event backbone.
+ * mints itself once and records each premise relied at its key. It hosts the
+ * subject's conflicts and their probes, and takes the Probe Workflow's facts
+ * through the domain's machines. It extends KeelObject, which builds its
+ * runtime and the event backbone.
  */
 export class SubjectDO extends KeelObject {
   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
     const { projectId, key } = subjectOf(this.ctx.id.name);
     return hearSubject(tx.store, projectId, key, event);
+  }
+
+  async conflict(conflictId: string) {
+    return this.answer(
+      SubjectCodecs.conflict,
+      decoded(ConflictId, conflictId).pipe(Effect.flatMap(conflictView)),
+    );
+  }
+
+  async probeDrafted(command: typeof ProbeDraftedCommand.Encoded) {
+    const { projectId } = subjectOf(this.ctx.id.name);
+    return this.answer(
+      SubjectCodecs.probeDrafted,
+      decoded(ProbeDraftedCommand, command).pipe(
+        Effect.flatMap((drafted) => probeDrafted(projectId, drafted)),
+      ),
+    );
+  }
+
+  async probeDraftFailed(command: typeof ProbeDraftFailedCommand.Encoded) {
+    const { projectId } = subjectOf(this.ctx.id.name);
+    return this.answer(
+      SubjectCodecs.probeDraftFailed,
+      decoded(ProbeDraftFailedCommand, command).pipe(
+        Effect.flatMap((failed) => probeDraftFailed(projectId, failed)),
+      ),
+    );
+  }
+
+  async probeCellRan(command: typeof ProbeCellRanCommand.Encoded) {
+    const { projectId } = subjectOf(this.ctx.id.name);
+    return this.answer(
+      SubjectCodecs.probeCellRan,
+      decoded(ProbeCellRanCommand, command).pipe(
+        Effect.flatMap((cell) => probeCellRan(projectId, cell)),
+      ),
+    );
+  }
+
+  async worldCheckRan(command: typeof WorldCheckRanCommand.Encoded) {
+    const { projectId } = subjectOf(this.ctx.id.name);
+    return this.answer(
+      SubjectCodecs.worldCheckRan,
+      decoded(WorldCheckRanCommand, command).pipe(
+        Effect.flatMap((cell) => worldCheckRan(projectId, cell)),
+      ),
+    );
   }
 }

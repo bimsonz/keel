@@ -1,7 +1,15 @@
+import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { EventEnvelope, makeId } from "@keeltown/core/kernel";
 import type { AgentId, ProjectId } from "@keeltown/core/kernel";
-import { type AgentNotice, Enrolments, Sessions, Standings } from "@keeltown/core/ports";
+import {
+  type AgentNotice,
+  Enrolments,
+  EventOutbox,
+  Sessions,
+  Standings,
+} from "@keeltown/core/ports";
+import { subjectAddress, suspectConflict } from "@keeltown/core/application/coordination";
 import {
   describeAgentDirectoryContract,
   describeNotifierContract,
@@ -14,6 +22,8 @@ import { ulid } from "ulid";
 import { AgentDirectoryD1 } from "../../src/adapters/driven/d1/agent-directory.ts";
 import { EnrolmentsRpc } from "../../src/adapters/driven/do-rpc/enrolments.ts";
 import { LiveChangesRpc } from "../../src/adapters/driven/do-rpc/live-changes.ts";
+import { ProbeLedgerRpc } from "../../src/adapters/driven/do-rpc/probe-ledger.ts";
+import type { SubjectDO } from "../../src/adapters/driving/do/subject.ts";
 import { SessionsRpc } from "../../src/adapters/driven/do-rpc/sessions.ts";
 import { StandingsRpc } from "../../src/adapters/driven/do-rpc/standings.ts";
 import { InboxRpc } from "../../src/adapters/driven/do-rpc/inbox.ts";
@@ -73,6 +83,31 @@ PORTS.LiveChanges.contract("Project DO over RPC", () => ({
     Effect.promise(async () => {
       await projectObject(projectId).receive([Schema.encodeSync(EventEnvelope)(event)]);
     }),
+}));
+
+/** A subject's Subject DO, drained after each case. */
+const subjectObject = (address: string) =>
+  drainAfter(env.SUBJECT.get(env.SUBJECT.idFromName(address)));
+
+/** The Subject DO runs the ledger: the suite opens its conflict inside the object, as its fallout does. */
+PORTS.ProbeLedger.contract("Subject DO over RPC", () => ({
+  layer: ProbeLedgerRpc(subjectObject),
+  suspect: (at, conflictId, suspect) =>
+    Effect.promise(() =>
+      runInDurableObject(
+        subjectObject(subjectAddress(at.projectId, at.key)),
+        (instance: SubjectDO) =>
+          instance["runtime"].runPromise(suspectConflict(at.projectId, conflictId, suspect)),
+      ),
+    ),
+  log: (at, entity) =>
+    Effect.promise(() =>
+      runInDurableObject(
+        subjectObject(subjectAddress(at.projectId, at.key)),
+        (instance: SubjectDO) =>
+          instance["runtime"].runPromise(Effect.map(EventOutbox, (outbox) => outbox.log(entity))),
+      ),
+    ),
 }));
 
 /**

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit --project pool:keel -t "ProbeLedger contract" packages/testing/test/ports.test.ts apps/keel/test/pool/adapters.test.ts
+# kills: b21.probe-draft
+# why: each draft call gets its own cause, so a replayed Workflow step is not answered from the first and the machine refuses it
+diff --git a/packages/core/src/application/coordination/probe-ledger.ts b/packages/core/src/application/coordination/probe-ledger.ts
+index 62d5896..331da33 100644
+--- a/packages/core/src/application/coordination/probe-ledger.ts
++++ b/packages/core/src/application/coordination/probe-ledger.ts
+@@ -173,7 +173,7 @@ export const probeDrafted = Effect.fn("coordination/probeDrafted")(function* (
+     projectId,
+     drafted.conflictId,
+     probeRef(probeId),
+-    `probe-drafted:${drafted.conflictId}`,
++    `probe-drafted:${drafted.conflictId}:${crypto.randomUUID()}`,
+     `${drafted.bundleHash}/${drafted.attempts}`,
+     {
+       _tag: "Probe",
