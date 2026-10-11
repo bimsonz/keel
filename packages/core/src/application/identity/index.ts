@@ -61,6 +61,8 @@ export interface TokenRequest {
 
 export interface GrantedToken extends IssuedToken {
   readonly scopes: readonly Scope[];
+  /** The token's lifetime as issued: its `exp` is its `iat` plus this. */
+  readonly expiresInSeconds: number;
 }
 
 /** How long a bearer token lives. Short: an agent exchanges its credential again, cheaply. */
@@ -96,7 +98,7 @@ export const exchangeToken: (
     },
     TOKEN_TTL_SECONDS,
   );
-  return { ...token, scopes };
+  return { ...token, scopes, expiresInSeconds: TOKEN_TTL_SECONDS };
 });
 
 /**

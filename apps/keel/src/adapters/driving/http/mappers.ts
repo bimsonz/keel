@@ -94,13 +94,14 @@ export function whoamiError(caller: Caller, error: AgentNotKnown | AgentNotAdmit
   }
 }
 
-export function tokenOk(granted: GrantedToken, now: number): Auth_exchangeTokenResult {
+/** `expires_in` is the lifetime the token was issued with, never re-derived from a later clock read. */
+export function tokenOk(granted: GrantedToken): Auth_exchangeTokenResult {
   return {
     status: 200,
     body: {
       access_token: granted.token,
       token_type: "Bearer",
-      expires_in: Math.max(0, Math.ceil((granted.expiresAt - now) / 1000)),
+      expires_in: granted.expiresInSeconds,
       scope: granted.scopes.join(" "),
     },
   };

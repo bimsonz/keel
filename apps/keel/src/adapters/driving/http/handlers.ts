@@ -7,7 +7,6 @@ import {
 } from "@keeltown/core/application/coordination";
 import { enrolAgent, exchangeToken, whoami } from "@keeltown/core/application/identity";
 import { isBootstrap, Scope } from "@keeltown/core/domain/identity";
-import { Clock } from "@keeltown/core/ports";
 import { Effect, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
 import type { Caller, Principal } from "./caller.ts";
@@ -110,12 +109,7 @@ export function makeHandlers(run: Runner) {
           clientSecret: input.client_secret,
           ...(requested === undefined ? {} : { scopes: requested.value }),
         }).pipe(
-          Effect.flatMap((granted) =>
-            Effect.map(
-              Clock.use((clock) => clock.now),
-              (now) => tokenOk(granted, now),
-            ),
-          ),
+          Effect.map(tokenOk),
           Effect.catch((error) => Effect.succeed(tokenError(error))),
         ),
       );
