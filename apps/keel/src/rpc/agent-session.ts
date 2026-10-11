@@ -6,6 +6,7 @@ import {
   IdempotencyConflict,
   InboxPage,
   Scope,
+  Sponsor,
 } from "@keeltown/core/domain/identity";
 import { AgentId, ChangeId, InstantSchema, ProjectId, SessionId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
@@ -26,6 +27,8 @@ export type SessionSnapshot = typeof SessionSnapshot.Type;
 export const OpenSession = Schema.Struct({
   harness: Schema.optional(Schema.String),
   model: Schema.optional(Schema.String),
+  /** The human the agent acts for in this session. */
+  onBehalfOf: Schema.optional(Sponsor),
 });
 
 /** Reserve a change id for a declare's Idempotency-Key. `fingerprint` hashes the request body. */
@@ -53,6 +56,8 @@ export const EnrolCommand = Schema.Struct({
   name: Schema.NonEmptyString,
   kind: AgentKind,
   scopes: Schema.Array(Scope),
+  /** The agent's sponsor, when the operator named one. */
+  onBehalfOf: Schema.optional(Sponsor),
   clientId: Schema.NonEmptyString,
   /** `sha256:` and the hex digest of the client secret. */
   secretHash: Schema.String,

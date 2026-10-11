@@ -11,7 +11,7 @@ import {
 import type { ToolDeps } from "../../../generated/mcp/mcp-runtime.gen.ts";
 import { registerTools } from "../../../generated/mcp/mcp.gen.ts";
 import { AgentId, ProjectId } from "@keeltown/core/kernel";
-import { Scope } from "@keeltown/core/domain/identity";
+import { Scope, Sponsor } from "@keeltown/core/domain/identity";
 import { Option, Schema } from "effect";
 import {
   admitsAnonymous,
@@ -25,6 +25,7 @@ import type { Handlers } from "../http/handlers.ts";
 const decodeAgentId = Schema.decodeUnknownOption(AgentId);
 const decodeProjectId = Schema.decodeUnknownOption(ProjectId);
 const decodeScopes = Schema.decodeUnknownOption(Schema.Array(Scope));
+const decodeSponsor = Schema.decodeUnknownOption(Sponsor);
 
 /** The principal travels from the bearer gate to the tool handlers inside AuthInfo, and is decoded back out. */
 function principalOf(auth: AuthInfo | undefined): Principal | null {
@@ -32,6 +33,7 @@ function principalOf(auth: AuthInfo | undefined): Principal | null {
   const projectId = decodeProjectId(auth?.extra?.["projectId"]);
   const scopes = decodeScopes(auth?.scopes ?? []);
   const epoch = auth?.extra?.["revocationEpoch"];
+  const sponsor = decodeSponsor(auth?.extra?.["onBehalfOf"]);
   if (
     Option.isNone(agentId) ||
     Option.isNone(projectId) ||
@@ -44,6 +46,7 @@ function principalOf(auth: AuthInfo | undefined): Principal | null {
     projectId: projectId.value,
     scopes: scopes.value,
     revocationEpoch: epoch,
+    ...(Option.isSome(sponsor) ? { onBehalfOf: sponsor.value } : {}),
   };
 }
 
@@ -96,6 +99,7 @@ export function makeMcpEndpoint(
             agentId: principal.agentId,
             projectId: principal.projectId,
             revocationEpoch: principal.revocationEpoch,
+            ...(principal.onBehalfOf === undefined ? {} : { onBehalfOf: principal.onBehalfOf }),
           },
         };
       },

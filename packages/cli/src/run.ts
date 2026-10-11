@@ -27,7 +27,7 @@ const USAGE = `keeltown <command> [options]
   inbox [--cursor <cursor>] [--wait <0-30>]
   events [--cursor <cursor>] [--wait <0-30>] [--limit <1-500>]
   project create --name <name> --source <repo> [--key <idempotency-key>]
-  agent enrol --name <name> --scope <scope>... [--kind interactive|hosted|human] [--project <prj_…>] [--key <idempotency-key>]
+  agent enrol --name <name> --scope <scope>... [--kind interactive|hosted|human] [--project <prj_…>] [--on-behalf-of <scheme:value>] [--key <idempotency-key>]
 
 Credentials: KEEL_URL, KEEL_CLIENT_ID and KEEL_CLIENT_SECRET.
 Every command prints Keel's answer; --json prints it as JSON.`;
@@ -49,6 +49,7 @@ const OPTIONS = {
   scope: { type: "string", multiple: true },
   kind: { type: "string" },
   project: { type: "string" },
+  "on-behalf-of": { type: "string" },
 } as const;
 
 class UsageError extends Error {}
@@ -136,6 +137,7 @@ async function dispatch(
           kind,
           scopes,
           ...(values.project === undefined ? {} : { projectId: values.project }),
+          ...(values["on-behalf-of"] === undefined ? {} : { onBehalfOf: values["on-behalf-of"] }),
         },
         idempotent,
       );

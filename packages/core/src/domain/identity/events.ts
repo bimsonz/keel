@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { AgentId, ProjectId } from "../kernel/index.ts";
-import { AgentKind, Scope } from "./agent.ts";
+import { AgentKind, Scope, Sponsor } from "./agent.ts";
 
 export const AgentEnrolled = Schema.TaggedStruct("AgentEnrolled", {
   agentId: AgentId,
@@ -8,6 +8,8 @@ export const AgentEnrolled = Schema.TaggedStruct("AgentEnrolled", {
   name: Schema.NonEmptyString,
   kind: AgentKind,
   scopes: Schema.Array(Scope),
+  /** The human the agent acts on behalf of, when the operator named one. */
+  onBehalfOf: Schema.optional(Sponsor),
 });
 export const AgentSuspended = Schema.TaggedStruct("AgentSuspended", {
   agentId: AgentId,

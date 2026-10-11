@@ -10,6 +10,17 @@ export type Scope = typeof Scope.Type;
 export const AgentState = Schema.Literals(["active", "suspended", "revoked"]);
 export type AgentState = typeof AgentState.Type;
 
+/**
+ * The human an agent acts on behalf of: accountable for its changes, and the
+ * first person an escalation goes to. A `scheme:value` address
+ * (`github:octocat`, `mailto:a@example.com`), so a notifier can route by scheme.
+ */
+export const Sponsor = Schema.String.check(
+  Schema.isPattern(/^[a-z][a-z0-9+.-]*:\S.*$/),
+  Schema.isMaxLength(256),
+);
+export type Sponsor = typeof Sponsor.Type;
+
 /** An agent as Keel knows it. Its source of truth is the AgentSession DO; D1 holds a projection. */
 export const Agent = Schema.Struct({
   id: AgentId,
@@ -18,6 +29,8 @@ export const Agent = Schema.Struct({
   name: Schema.NonEmptyString,
   kind: AgentKind,
   scopes: Schema.Array(Scope),
+  /** The agent's sponsor, named at enrolment. */
+  onBehalfOf: Schema.optional(Sponsor),
   state: AgentState,
   /** Bumped on revocation: a token minted under an earlier epoch is refused. */
   revocationEpoch: Schema.Int,
@@ -32,6 +45,8 @@ export interface Principal {
   readonly projectId: ProjectId;
   readonly scopes: readonly Scope[];
   readonly revocationEpoch: number;
+  /** The human this token acts for, carried in its `obo` claim. */
+  readonly onBehalfOf?: Sponsor;
 }
 
 export interface SessionRef {
@@ -42,6 +57,8 @@ export interface SessionRef {
 export interface Identity {
   readonly agent: Agent;
   readonly session: SessionRef | null;
+  /** The sponsor the caller's token acts for. */
+  readonly onBehalfOf?: Sponsor;
 }
 
 /** A principal may act only while its agent is active and its epoch is current. */

@@ -7,6 +7,7 @@ import {
   evolveAgent,
   IdempotencyConflict,
   type Scope,
+  type Sponsor,
 } from "../../domain/identity/index.ts";
 import type { AgentId, ProjectId } from "../../domain/kernel/index.ts";
 import {
@@ -28,6 +29,8 @@ export interface EnrolAgent {
   readonly name: string;
   readonly kind: AgentKind;
   readonly scopes: readonly Scope[];
+  /** The agent's sponsor, when the operator named one. */
+  readonly onBehalfOf?: Sponsor | undefined;
   readonly clientId: string;
   /** `sha256:` and the hex digest of the client secret. */
   readonly secretHash: string;
@@ -71,6 +74,7 @@ export const enrol: (
             name: command.name,
             kind: command.kind,
             scopes: command.scopes,
+            ...(command.onBehalfOf === undefined ? {} : { onBehalfOf: command.onBehalfOf }),
           },
           { now: tx.at, agentId },
         );

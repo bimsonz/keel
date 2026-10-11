@@ -167,4 +167,52 @@ describe("Enrolments over Durable Object RPC", () => {
       }).pipe(Effect.provide(layer));
     },
   );
+
+  it.effect(
+    "[a11s.enrol] sends the sponsor, fingerprinted, and no sponsor key when none is named",
+    () => {
+      const sent: Array<typeof EnrolCommand.Encoded> = [];
+      const layer = EnrolmentsRpc((agentId) => ({
+        enrol: async (command) => {
+          sent.push(command);
+          return encodeExit(
+            AgentSessionCodecs.enrol,
+            Exit.succeed(
+              Schema.decodeUnknownSync(Agent)({
+                id: agentId,
+                projectId: command.projectId,
+                name: command.name,
+                kind: command.kind,
+                scopes: command.scopes,
+                ...(command.onBehalfOf === undefined ? {} : { onBehalfOf: command.onBehalfOf }),
+                state: "active",
+                revocationEpoch: 0,
+                createdAt: 1_000,
+              }),
+            ),
+          );
+        },
+      }));
+      const input = {
+        name: "worker",
+        kind: "interactive" as const,
+        scopes: ["agent:work" as const],
+        idempotencyKey: "key-0002",
+      };
+      return Effect.gen(function* () {
+        const enrolments = yield* Enrolments;
+        const sponsored = yield* enrolments.enrol(alice, {
+          ...input,
+          onBehalfOf: "github:bimsonz",
+        });
+        yield* enrolments.enrol(alice, input);
+        const [withSponsor, without] = sent;
+        expect(withSponsor?.onBehalfOf).toBe("github:bimsonz");
+        expect(sponsored.agent.onBehalfOf).toBe("github:bimsonz");
+        expect(without !== undefined && "onBehalfOf" in without).toBe(false);
+        // Another sponsor under the same key is another command, so the DO answers IdempotencyConflict.
+        expect(withSponsor?.fingerprint).not.toBe(without?.fingerprint);
+      }).pipe(Effect.provide(layer));
+    },
+  );
 });

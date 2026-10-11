@@ -5,6 +5,7 @@ import type {
   IdempotencyConflict,
   Principal,
   Scope,
+  Sponsor,
 } from "../../domain/identity/index.ts";
 import type { ProjectId } from "../../domain/kernel/index.ts";
 
@@ -14,6 +15,8 @@ export interface EnrolInput {
   readonly scopes: readonly Scope[];
   /** The project the agent works in; the operator's own when absent. */
   readonly projectId?: ProjectId;
+  /** The human the agent acts on behalf of: its sponsor. */
+  readonly onBehalfOf?: Sponsor;
   readonly idempotencyKey: string;
 }
 

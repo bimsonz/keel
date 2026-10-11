@@ -137,6 +137,24 @@ export function describeAgentDirectoryContract(
         );
       }).pipe(Effect.provide(make())),
     );
+    it.effect(
+      "[a11s.directory-sponsor] returns an agent's sponsor exactly, and no sponsor for an agent without one",
+      () =>
+        Effect.gen(function* () {
+          const directory = yield* AgentDirectory;
+          const sponsored = { ...sampleAgent, id: freshAgentId(), onBehalfOf: "github:octocat" };
+          const unsponsored = { ...sampleAgent, id: freshAgentId() };
+          for (const agent of [sponsored, unsponsored])
+            yield* directory.upsert(agent, {
+              clientId: `client-${agent.id}`,
+              agentId: agent.id,
+              secretHash: `sha256:${"a".repeat(64)}`,
+            });
+          expect(yield* directory.findAgent(sponsored.id)).toEqual(Option.some(sponsored));
+          const found = yield* directory.findAgent(unsponsored.id);
+          expect(Option.map(found, (agent) => "onBehalfOf" in agent)).toEqual(Option.some(false));
+        }).pipe(Effect.provide(make())),
+    );
     it.effect("replaces an agent on a second upsert, so a revocation epoch bump is visible", () =>
       Effect.gen(function* () {
         const directory = yield* AgentDirectory;
@@ -174,6 +192,18 @@ export function describeTokenIssuerContract(adapter: string, make: LayerFactory<
         const { token } = yield* issuer.issue(principal, 60);
         expect(yield* issuer.verify(token)).toEqual(principal);
       }).pipe(Effect.provide(make())),
+    );
+    it.effect(
+      "[a11s.token-sponsor] verifies the sponsor it issued, and none for a principal without one",
+      () =>
+        Effect.gen(function* () {
+          const issuer = yield* TokenIssuer;
+          const sponsored = { ...principal, onBehalfOf: "mailto:octocat@example.com" };
+          const { token } = yield* issuer.issue(sponsored, 60);
+          expect(yield* issuer.verify(token)).toEqual(sponsored);
+          const bare = yield* issuer.verify((yield* issuer.issue(principal, 60)).token);
+          expect("onBehalfOf" in bare).toBe(false);
+        }).pipe(Effect.provide(make())),
     );
     it.effect("rejects a token after it expires", () =>
       Effect.gen(function* () {

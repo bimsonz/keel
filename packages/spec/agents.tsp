@@ -23,6 +23,9 @@ model AgentProfile {
   kind: AgentKind;
   scopes: Scope[];
 
+  /** The agent's sponsor, named at enrolment. */
+  onBehalfOf?: Sponsor;
+
   /** Bumped on revocation; tokens minted under an earlier epoch are refused. */
   revocationEpoch: int32;
 
@@ -38,6 +41,9 @@ model WhoAmI {
 
   /** The agent's open session, if it has one. */
   session: SessionRef | null;
+
+  /** The sponsor the presented token acts for. */
+  onBehalfOf?: Sponsor;
 }
 
 model WhoAmIEnvelope is AgentEnvelope<WhoAmI>;

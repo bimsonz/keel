@@ -4641,6 +4641,14 @@
               "$ref": "#/components/schemas/Scope"
             }
           },
+          "onBehalfOf": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Sponsor"
+              }
+            ],
+            "description": "The agent's sponsor, named at enrolment."
+          },
           "revocationEpoch": {
             "type": "integer",
             "format": "int32",
@@ -5143,6 +5151,14 @@
               }
             ],
             "description": "The one project the agent works in. Defaults to the operator's own project."
+          },
+          "onBehalfOf": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Sponsor"
+              }
+            ],
+            "description": "The human the agent acts on behalf of: its sponsor."
           }
         },
         "additionalProperties": {
@@ -7269,6 +7285,14 @@
           "model": {
             "type": "string",
             "description": "The model, pinned to a revision where the provider allows."
+          },
+          "onBehalfOf": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Sponsor"
+              }
+            ],
+            "description": "The human the agent acts for in this session."
           }
         },
         "additionalProperties": {
@@ -7821,6 +7845,14 @@
           "agentId": {
             "$ref": "#/components/schemas/AgentId"
           },
+          "onBehalfOf": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Sponsor"
+              }
+            ],
+            "description": "The human the agent acts for in this session, when it named one."
+          },
           "openedAt": {
             "type": "string",
             "format": "date-time"
@@ -7937,6 +7969,12 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "Sponsor": {
+        "type": "string",
+        "maxLength": 256,
+        "pattern": "^[a-z][a-z0-9+.-]*:\\S.*$",
+        "description": "A sponsor: the human an agent acts on behalf of, accountable for its changes\nand the first person an escalation goes to. A `scheme:value` address, e.g.\n`github:octocat` or `mailto:a@example.com`."
       },
       "SubjectId": {
         "type": "string",
@@ -8215,6 +8253,14 @@
             ],
             "nullable": true,
             "description": "The agent's open session, if it has one."
+          },
+          "onBehalfOf": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Sponsor"
+              }
+            ],
+            "description": "The sponsor the presented token acts for."
           }
         },
         "additionalProperties": {

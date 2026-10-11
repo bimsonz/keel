@@ -98,7 +98,13 @@ export function makeEnrolmentsMemory() {
             Effect.suspend((): Effect.Effect<Enrolment, IdempotencyConflict> => {
               const key = keyOf(principal, input.idempotencyKey);
               const projectId: ProjectId = input.projectId ?? principal.projectId;
-              const fingerprint = JSON.stringify([input.name, input.kind, input.scopes, projectId]);
+              const fingerprint = JSON.stringify([
+                input.name,
+                input.kind,
+                input.scopes,
+                projectId,
+                ...(input.onBehalfOf === undefined ? [] : [input.onBehalfOf]),
+              ]);
               const known = byKey.get(key);
               if (known !== undefined) {
                 return known.fingerprint === fingerprint
@@ -113,6 +119,7 @@ export function makeEnrolmentsMemory() {
                 name: input.name,
                 kind: input.kind,
                 scopes: [...input.scopes],
+                ...(input.onBehalfOf === undefined ? {} : { onBehalfOf: input.onBehalfOf }),
                 state: "active",
                 revocationEpoch: 0,
                 createdAt: Instant(Date.now()),

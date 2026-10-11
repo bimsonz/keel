@@ -27,6 +27,7 @@ export function enrolInput(input: Input<"Operator_enrolAgent">): Result.Result<E
     name: input.name,
     kind: input.kind,
     scopes: [...input.scopes],
+    ...(input.onBehalfOf === undefined ? {} : { onBehalfOf: input.onBehalfOf }),
     idempotencyKey: input["idempotency-key"],
   };
   if (input.projectId === undefined) return Result.succeed(base);

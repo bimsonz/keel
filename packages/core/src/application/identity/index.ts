@@ -10,6 +10,7 @@ import {
   type Principal,
   type Scope,
   ScopeNotGranted,
+  type Sponsor,
 } from "../../domain/identity/index.ts";
 import type { Session } from "../../domain/memory/index.ts";
 import { stub } from "../not-implemented.ts";
@@ -49,7 +50,9 @@ export const whoami: (
   const reason = refusal(agent.value, principal);
   if (reason !== null) return yield* new AgentNotAdmitted({ agentId: principal.agentId, reason });
   // Sessions are the AgentSession DO's; until they are opened, an agent has none.
-  return { agent: agent.value, session: null };
+  return principal.onBehalfOf === undefined
+    ? { agent: agent.value, session: null }
+    : { agent: agent.value, session: null, onBehalfOf: principal.onBehalfOf };
 });
 
 export interface TokenRequest {
@@ -95,6 +98,7 @@ export const exchangeToken: (
       projectId: agent.value.projectId,
       scopes,
       revocationEpoch: agent.value.revocationEpoch,
+      ...(agent.value.onBehalfOf === undefined ? {} : { onBehalfOf: agent.value.onBehalfOf }),
     },
     TOKEN_TTL_SECONDS,
   );
@@ -114,7 +118,7 @@ export const enrolAgent: (
 
 export const openSession: (
   principal: Principal,
-  details: { readonly harness?: string; readonly model?: string },
+  details: { readonly harness?: string; readonly model?: string; readonly onBehalfOf?: Sponsor },
 ) => Effect.Effect<Session, AgentNotKnown, Ids | Clock> = stub("identity/openSession");
 
 export * from "./enrol.ts";

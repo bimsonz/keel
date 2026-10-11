@@ -54,6 +54,15 @@ scalar EventId extends string;
 @pattern("^prj_[0-9A-HJKMNP-TV-Z]{26}$")
 scalar ProjectId extends string;
 
+/**
+ * A sponsor: the human an agent acts on behalf of, accountable for its changes
+ * and the first person an escalation goes to. A `scheme:value` address, e.g.
+ * `github:octocat` or `mailto:a@example.com`.
+ */
+@pattern("^[a-z][a-z0-9+.-]*:\\S.*$")
+@maxLength(256)
+scalar Sponsor extends string;
+
 /** A git object id: 40 hexadecimal characters (SHA-1) or 64 (SHA-256). */
 @pattern("^([0-9a-f]{40}|[0-9a-f]{64})$")
 scalar CommitSha extends string;

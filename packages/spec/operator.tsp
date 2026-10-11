@@ -43,6 +43,9 @@ model EnrolAgentRequest {
 
   /** The one project the agent works in. Defaults to the operator's own project. */
   projectId?: ProjectId;
+
+  /** The human the agent acts on behalf of: its sponsor. */
+  onBehalfOf?: Sponsor;
 }
 
 model EnrolledAgent {

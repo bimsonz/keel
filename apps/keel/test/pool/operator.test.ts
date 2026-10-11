@@ -34,6 +34,7 @@ interface Body {
   readonly detail: string;
   readonly nextActions: readonly { readonly operationId?: string; readonly title: string }[];
   readonly result: { readonly agent: { readonly id: string; readonly projectId: string } };
+  readonly issues?: readonly { readonly path: readonly (string | number)[] }[];
 }
 
 async function call(
@@ -244,6 +245,42 @@ describe("project bootstrap", () => {
     expect(missing.body.nextActions).toEqual([
       expect.objectContaining({ operationId: "Operator_createProject" }),
     ]);
+  });
+
+  it("[a11s.enrol-rest] enrols an agent with a sponsor its token carries, and refuses a sponsor with no scheme", async () => {
+    const { via } = operatorApp();
+    const operator = await operatorToken(via);
+    const request = { name: "sponsored", kind: "interactive", scopes: ["agent:read"] };
+    const enrolled = await call(
+      via,
+      operator,
+      "POST",
+      "/agents",
+      { ...request, onBehalfOf: "github:bimsonz" },
+      key("agt"),
+    );
+    expect(enrolled.status).toBe(201);
+    expect(enrolled.body.agent).toMatchObject({ onBehalfOf: "github:bimsonz" });
+    const me = await call(
+      via,
+      await tokenOf(enrolled.body.clientId, enrolled.body.clientSecret),
+      "GET",
+      "/agents/me",
+    );
+    expect(me.body.result).toMatchObject({
+      onBehalfOf: "github:bimsonz",
+      agent: { onBehalfOf: "github:bimsonz" },
+    });
+    const refused = await call(
+      via,
+      operator,
+      "POST",
+      "/agents",
+      { ...request, onBehalfOf: "bimsonz" },
+      key("agt"),
+    );
+    expect(refused.status).toBe(400);
+    expect(refused.body.issues?.map((issue) => issue.path.join("."))).toContain("onBehalfOf");
   });
 
   it("[a11b.scope] refuses an agent's token both operator operations", async () => {

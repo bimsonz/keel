@@ -11,11 +11,18 @@ model OpenSessionRequest {
 
   /** The model, pinned to a revision where the provider allows. */
   `model`?: string;
+
+  /** The human the agent acts for in this session. */
+  onBehalfOf?: Sponsor;
 }
 
 model Session {
   id: SessionId;
   agentId: AgentId;
+
+  /** The human the agent acts for in this session, when it named one. */
+  onBehalfOf?: Sponsor;
+
   openedAt: utcDateTime;
 }
 

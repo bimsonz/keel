@@ -10,6 +10,7 @@ const AgentRow = Schema.Struct({
   name: Schema.String,
   kind: Schema.String,
   scopes: Schema.String,
+  on_behalf_of: Schema.NullOr(Schema.String),
   state: Schema.String,
   revocation_epoch: Schema.Number,
   created_at: Schema.Number,
@@ -26,6 +27,7 @@ function toAgent(row: unknown): Agent {
     name: r.name,
     kind: r.kind,
     scopes: JSON.parse(r.scopes),
+    ...(r.on_behalf_of === null ? {} : { onBehalfOf: r.on_behalf_of }),
     state: r.state,
     revocationEpoch: r.revocation_epoch,
     createdAt: r.created_at,
@@ -97,9 +99,9 @@ export function AgentDirectoryD1(db: D1Database) {
           db.batch([
             db
               .prepare(
-                `INSERT INTO agents (id, project_id, name, kind, scopes, state, revocation_epoch, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                `INSERT INTO agents (id, project_id, name, kind, scopes, on_behalf_of, state, revocation_epoch, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON CONFLICT (id) DO UPDATE SET project_id = excluded.project_id, name = excluded.name, kind = excluded.kind, scopes = excluded.scopes,
-                   state = excluded.state, revocation_epoch = excluded.revocation_epoch`,
+                   on_behalf_of = excluded.on_behalf_of, state = excluded.state, revocation_epoch = excluded.revocation_epoch`,
               )
               .bind(
                 agent.id,
@@ -107,6 +109,7 @@ export function AgentDirectoryD1(db: D1Database) {
                 agent.name,
                 agent.kind,
                 JSON.stringify(agent.scopes),
+                agent.onBehalfOf ?? null,
                 agent.state,
                 agent.revocationEpoch,
                 agent.createdAt,

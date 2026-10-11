@@ -76,6 +76,36 @@ describe("keeltown", () => {
     expect(keel.out).toEqual(["Declared chg_2."]);
   });
 
+  it("[cli.enrol] enrols an agent on behalf of its sponsor, in the project given", async () => {
+    const keel = fakeKeel(() => Response.json({ agent: {}, clientId: "c", clientSecret: "s" }));
+    const code = await run(
+      [
+        "agent",
+        "enrol",
+        "--name",
+        "worker",
+        "--scope",
+        "agent:work",
+        "--project",
+        "prj_1",
+        "--on-behalf-of",
+        "github:bimsonz",
+        "--key",
+        "key-0004",
+      ],
+      keel.io,
+    );
+    expect(code).toBe(0);
+    const body = keel.requests[0]?.init.body;
+    expect(JSON.parse(typeof body === "string" ? body : "null")).toEqual({
+      name: "worker",
+      kind: "interactive",
+      scopes: ["agent:work"],
+      projectId: "prj_1",
+      onBehalfOf: "github:bimsonz",
+    });
+  });
+
   it("[cli.problem] prints a refusal's code and next actions and exits 1", async () => {
     const keel = fakeKeel(
       () =>

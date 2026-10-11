@@ -65,6 +65,28 @@ describe("whoami", () => {
     expect(tool["structuredContent"]).toEqual(rest);
   });
 
+  it("[a11s.whoami] echoes the token's sponsor and the agent's, the MCP tool equal to REST", async () => {
+    const seeded = await seedAgent({ onBehalfOf: "github:bimsonz" });
+    const token = await tokenFor(seeded);
+    const rest = await (
+      await exports.default.fetch(`${BASE}/v1/agents/me`, {
+        headers: { authorization: `Bearer ${token}` },
+      })
+    ).json<{ result: { onBehalfOf?: string; agent: { onBehalfOf?: string } } }>();
+    expect(rest.result.onBehalfOf).toBe("github:bimsonz");
+    expect(rest.result.agent.onBehalfOf).toBe("github:bimsonz");
+    const tool = await mcpResult(
+      await mcp(token, "tools/call", { name: "whoami", arguments: {} }, "whoami"),
+    );
+    expect(tool["structuredContent"]).toEqual(rest);
+    const bare = await (
+      await exports.default.fetch(`${BASE}/v1/agents/me`, {
+        headers: { authorization: `Bearer ${await tokenFor(await seedAgent())}` },
+      })
+    ).json<{ result: Record<string, unknown> }>();
+    expect("onBehalfOf" in bare.result).toBe(false);
+  });
+
   it("refuses a token minted before the agent's revocation epoch moved, as auth.revoked", async () => {
     const seeded = await seedAgent();
     const token = await tokenFor(seeded);

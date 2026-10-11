@@ -1,4 +1,4 @@
-import { type Principal, Scope, TokenRejected } from "@keeltown/core/domain/identity";
+import { type Principal, Scope, Sponsor, TokenRejected } from "@keeltown/core/domain/identity";
 import { AgentId, Instant, ProjectId } from "@keeltown/core/kernel";
 import { Clock, TokenIssuer } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
@@ -16,6 +16,8 @@ const Claims = Schema.Struct({
   prj: ProjectId,
   scope: Schema.String,
   epoch: Schema.Int,
+  /** The sponsor: the human the agent acts on behalf of. */
+  obo: Schema.optional(Sponsor),
 });
 
 const AUDIENCE = "keel";
@@ -50,6 +52,7 @@ export function TokenIssuerJose(options: TokenIssuerOptions) {
                 prj: principal.projectId,
                 scope: principal.scopes.join(" "),
                 epoch: principal.revocationEpoch,
+                ...(principal.onBehalfOf === undefined ? {} : { obo: principal.onBehalfOf }),
               })
                 .setProtectedHeader({ alg: "EdDSA", kid, typ: "JWT" })
                 .setSubject(principal.agentId)
@@ -95,6 +98,7 @@ export function TokenIssuerJose(options: TokenIssuerOptions) {
               projectId: claims.prj,
               scopes,
               revocationEpoch: claims.epoch,
+              ...(claims.obo === undefined ? {} : { onBehalfOf: claims.obo }),
             };
           }),
       });

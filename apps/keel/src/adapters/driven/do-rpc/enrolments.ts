@@ -37,12 +37,15 @@ export function EnrolmentsRpc(
             yield* Effect.promise(() => derivedUlid(principal.agentId, input.idempotencyKey)),
           );
           const projectId: ProjectId = input.projectId ?? principal.projectId;
+          // The sponsor joins the fingerprint only when named, so a key enrolled without one replays unchanged.
+          const sponsor = input.onBehalfOf === undefined ? {} : { onBehalfOf: input.onBehalfOf };
           const fingerprint = yield* Effect.promise(() =>
             fingerprintOf({
               name: input.name,
               kind: input.kind,
               scopes: input.scopes,
               projectId,
+              ...sponsor,
             }),
           );
           const clientId = `client-${agentId.toLowerCase()}`;
@@ -55,6 +58,7 @@ export function EnrolmentsRpc(
                 name: input.name,
                 kind: input.kind,
                 scopes: input.scopes,
+                ...sponsor,
                 clientId,
                 secretHash,
                 idempotencyKey: input.idempotencyKey,

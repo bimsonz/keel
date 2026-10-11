@@ -6,7 +6,7 @@ import {
   type Instant,
   type ProjectId,
 } from "../kernel/index.ts";
-import type { Agent, AgentKind, Scope } from "./agent.ts";
+import type { Agent, AgentKind, Scope, Sponsor } from "./agent.ts";
 import { AgentNotKnown, AgentStateRefused } from "./errors.ts";
 import {
   AgentEnrolled,
@@ -28,6 +28,7 @@ export type AgentCommand =
       readonly name: string;
       readonly kind: AgentKind;
       readonly scopes: readonly Scope[];
+      readonly onBehalfOf?: Sponsor;
     }
   | { readonly _tag: "Suspend"; readonly reason: string; readonly by: string }
   | { readonly _tag: "Reinstate"; readonly by: string }
@@ -62,6 +63,7 @@ export const decideAgent = (
             name: command.name,
             kind: command.kind,
             scopes: command.scopes,
+            ...(command.onBehalfOf === undefined ? {} : { onBehalfOf: command.onBehalfOf }),
           }),
         ])
       : Result.fail(new AgentNotKnown({ agentId: facts.agentId }));
@@ -118,6 +120,7 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
           name: event.name,
           kind: event.kind,
           scopes: event.scopes,
+          ...(event.onBehalfOf === undefined ? {} : { onBehalfOf: event.onBehalfOf }),
           state: "active",
           revocationEpoch: 0,
           createdAt: committed.at,

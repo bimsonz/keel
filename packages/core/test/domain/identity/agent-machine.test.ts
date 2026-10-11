@@ -9,6 +9,7 @@ import {
   evolveAgent,
   type Principal,
   replayAgent,
+  Sponsor,
 } from "../../../src/domain/identity/index.ts";
 import {
   canonicalJson,
@@ -252,6 +253,51 @@ describe("the Agent machine", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(revocations).toBeGreaterThan(0);
     const suspended = drive([build("Enroll"), build("Suspend")]).state;
     expect(suspended !== undefined && admits(suspended, principal(0))).toBe(false);
+  });
+
+  it("[agent.sponsor] Enroll's sponsor is carried into AgentEnrolled and the Agent, through the wire; none named, none appears", () => {
+    const sponsorArb = fc.option(
+      fc
+        .tuple(
+          fc.stringMatching(/^[a-z][a-z0-9+.-]{0,9}$/),
+          fc.stringMatching(/^[!-~][ -~]{0,30}$/),
+        )
+        .map(([scheme, value]) => `${scheme}:${value}`),
+      { nil: undefined },
+    );
+    let named = 0;
+    fc.assert(
+      fc.property(sponsorArb, (sponsor) => {
+        if (sponsor !== undefined) named++;
+        const enrol: AgentCommand = {
+          ...build("Enroll"),
+          ...(sponsor === undefined ? {} : { onBehalfOf: sponsor }),
+        };
+        const decided = decideAgent(undefined, enrol, { now: T0, agentId: AGENT });
+        const [event] = eventsOf(decided);
+        if (event?._tag !== "AgentEnrolled") return false;
+        const log = [{ at: T0, payload: event }];
+        const agent = replayAgent(throughTheWire(log));
+        return (
+          event.onBehalfOf === sponsor &&
+          agent?.onBehalfOf === sponsor &&
+          "onBehalfOf" in event === (sponsor !== undefined) &&
+          "onBehalfOf" in (agent ?? {}) === (sponsor !== undefined)
+        );
+      }),
+    );
+    expect(named).toBeGreaterThan(0);
+  });
+
+  it("[agent.sponsor-address] a sponsor is a scheme:value address of at most 256 characters", () => {
+    const valid = Schema.is(Sponsor);
+    expect(["github:bimsonz", "mailto:a@b.c", "slack+team:U123 x"].every(valid)).toBe(true);
+    expect(
+      ["bimsonz", ":bimsonz", "github:", "github: x", "GitHub:x", `x:${"y".repeat(255)}`].some(
+        valid,
+      ),
+    ).toBe(false);
+    expect(valid(`x:${"y".repeat(254)}`)).toBe(true);
   });
 });
 
