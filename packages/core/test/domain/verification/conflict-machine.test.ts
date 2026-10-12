@@ -1,11 +1,12 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import { compare } from "../../../src/domain/coordination/index.ts";
+import { compare, SubjectKey } from "../../../src/domain/coordination/index.ts";
 import { Instant } from "../../../src/domain/kernel/index.ts";
 import {
   admit,
   type ConflictCommand,
   ConflictEvent,
+  type ConflictKind,
   decideConflict,
   type ProbeCommand,
   replayConflict,
@@ -424,6 +425,83 @@ describe("the Conflict chart", { timeout: PROPERTY_TIMEOUT }, () => {
 });
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+
+describe("a suspicion's subject key", () => {
+  it("[conflict.subject-key] a subject key given on a subject-owned suspicion reaches ConflictSuspected and the Conflict unchanged, through the wire; none given, none appears; on any other kind it is refused", () => {
+    const keys = ["authz.permission-evaluation", "authz", "repo-view.owner"].map((k) =>
+      SubjectKey.make(k),
+    );
+    const { premise: _p, effect: _e, subjectId: _s, predicate: _q, ...bare } = suspectSemantic;
+    const commandOf = (
+      kind: ConflictKind,
+      subjectKey: SubjectKey | undefined,
+    ): ConflictCommand => ({
+      ...bare,
+      kind,
+      parties: [CHANGE_A, CHANGE_B],
+      ...(kind === "semantic" || kind === "precedent" ? { subjectId: SUBJECT } : {}),
+      ...(kind === "semantic" ? { predicate: "freshness" as const } : {}),
+      ...(subjectKey === undefined ? {} : { subjectKey }),
+    });
+    fc.assert(
+      fc.property(
+        fc.constantFrom<ConflictKind>("semantic", "precedent", "textual", "interaction"),
+        fc.option(fc.constantFrom(...keys), { nil: undefined }),
+        (kind, subjectKey) => {
+          const owned = kind === "semantic" || kind === "precedent";
+          const decided = decideConflict(undefined, commandOf(kind, subjectKey), {
+            now: T0,
+            conflictId: CONFLICT,
+          });
+          if (!owned && subjectKey !== undefined)
+            return (
+              Result.isFailure(decided) &&
+              "reason" in decided.failure &&
+              decided.failure.reason === "subject-mismatch"
+            );
+          if (Result.isFailure(decided)) return false;
+          const [suspected] = decided.success;
+          const conflict = replayConflict(
+            throughTheWire(
+              ConflictEvent,
+              decided.success.map((payload) => ({ at: T0, payload })),
+            ),
+          );
+          return (
+            suspected?._tag === "ConflictSuspected" &&
+            suspected.subjectKey === subjectKey &&
+            "subjectKey" in suspected === (subjectKey !== undefined) &&
+            conflict !== undefined &&
+            conflict.subjectKey === subjectKey &&
+            "subjectKey" in conflict === (subjectKey !== undefined)
+          );
+        },
+      ),
+    );
+    const key = SubjectKey.make("authz.permission-evaluation");
+    const decided = decideConflict(undefined, commandOf("semantic", key), {
+      now: T0,
+      conflictId: CONFLICT,
+    });
+    const events = Result.isSuccess(decided) ? decided.success : [];
+    expect(events).toMatchObject([{ _tag: "ConflictSuspected", subjectKey: key }]);
+    expect(
+      replayConflict(
+        throughTheWire(
+          ConflictEvent,
+          events.map((payload) => ({ at: T0, payload })),
+        ),
+      ),
+    ).toMatchObject({ subjectId: SUBJECT, subjectKey: key });
+    const refused = decideConflict(undefined, commandOf("textual", key), {
+      now: T0,
+      conflictId: CONFLICT,
+    });
+    expect(Result.isFailure(refused) && refused.failure).toMatchObject({
+      reason: "subject-mismatch",
+    });
+  });
+});
 
 describe("a suspicion's propositions", () => {
   it("[conflict.suspect-propositions] Suspect's premise and effect reach ConflictSuspected and the Conflict, through the wire; none given, none appears", () => {

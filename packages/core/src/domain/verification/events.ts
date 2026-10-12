@@ -15,7 +15,7 @@ import {
   SubjectId,
   VerdictId,
 } from "../kernel/index.ts";
-import { Move, Predicate } from "../coordination/index.ts";
+import { Move, Predicate, SubjectKey } from "../coordination/index.ts";
 import {
   ConflictKind,
   ConflictOrigin,
@@ -32,6 +32,8 @@ export const ConflictSuspected = Schema.TaggedStruct("ConflictSuspected", {
   kind: ConflictKind,
   parties: Schema.Array(Party),
   subjectId: Schema.optional(SubjectId),
+  /** The subject's key, which addresses its Subject DO. Only with `subjectId`; absent on older events. */
+  subjectKey: Schema.optional(SubjectKey),
   predicate: Schema.optional(Predicate),
   /** Absent means `fallout`; `opinion` is a decision model's suspicion, which only a probe or a person settles. */
   origin: Schema.optional(ConflictOrigin),
@@ -81,15 +83,24 @@ export const WorldCheckRan = Schema.TaggedStruct("WorldCheckRan", {
   ),
 );
 /**
- * Why every draft of a probe failed (the drafting): the model's reply did
- * not fit the slots' schema, it was cut at the token limit, the model
- * abstained, or the repairs ran out.
+ * Why no draft of a probe was admitted to calibrate: the
+ * model abstained, the repairs ran out, a run of the matrix never completed,
+ * the conflict names no premise and effect to draft against, a party submitted
+ * no commit to build a world from, a party is gone, or the worlds could not be
+ * built. `schema` and `truncated` are a reply that did not fit the slots'
+ * schema and one cut at the token limit: both are repaired now, so nothing
+ * emits them, and they stay so older events decode.
  */
 export const DraftFailure = Schema.Literals([
   "schema",
   "truncated",
   "abstained",
   "repairs-exhausted",
+  "incomplete",
+  "no-propositions",
+  "no-submission",
+  "party-gone",
+  "worlds-unbuildable",
 ]);
 export type DraftFailure = typeof DraftFailure.Type;
 

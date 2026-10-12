@@ -11,7 +11,13 @@ import {
   type NextAction,
   type SubjectId,
 } from "../kernel/index.ts";
-import { compare, type Move, type Predicate, type Proposition } from "../coordination/index.ts";
+import {
+  compare,
+  type Move,
+  type Predicate,
+  type Proposition,
+  type SubjectKey,
+} from "../coordination/index.ts";
 import type {
   Conflict,
   ConflictKind,
@@ -63,6 +69,8 @@ export type ConflictCommand =
       readonly kind: ConflictKind;
       readonly parties: readonly Party[];
       readonly subjectId?: SubjectId;
+      /** The subject's key (the Subject DO's own), only on a conflict a subject owns. */
+      readonly subjectKey?: SubjectKey;
       readonly predicate?: Predicate;
       readonly origin?: ConflictOrigin;
       /** The premise at stake and the effect against it; a probe is drafted only when both are given. */
@@ -149,6 +157,7 @@ const suspicionFault = (
   if (new Set(command.parties).size !== command.parties.length) return "party-twice";
   const subjectOwned = command.kind === "semantic" || command.kind === "precedent";
   if (subjectOwned !== (command.subjectId !== undefined)) return "subject-mismatch";
+  if (command.subjectKey !== undefined && !subjectOwned) return "subject-mismatch";
   if (command.kind === "semantic" && command.predicate === undefined) return "no-predicate";
   // A decision model only ever suspects a semantic disagreement.
   if (command.origin === "opinion" && command.kind !== "semantic") return "opinion-not-semantic";
@@ -178,6 +187,7 @@ export const decideConflict = (
             kind: command.kind,
             parties: command.parties,
             ...(command.subjectId === undefined ? {} : { subjectId: command.subjectId }),
+            ...(command.subjectKey === undefined ? {} : { subjectKey: command.subjectKey }),
             ...(command.predicate === undefined ? {} : { predicate: command.predicate }),
             ...(command.origin === undefined ? {} : { origin: command.origin }),
             ...(command.premise === undefined ? {} : { premise: command.premise }),
@@ -337,6 +347,7 @@ export const evolveConflict = (
           state: "suspected",
           parties: event.parties,
           ...(event.subjectId === undefined ? {} : { subjectId: event.subjectId }),
+          ...(event.subjectKey === undefined ? {} : { subjectKey: event.subjectKey }),
           ...(event.predicate === undefined ? {} : { predicate: event.predicate }),
           ...(event.origin === undefined ? {} : { origin: event.origin }),
           ...(event.premise === undefined ? {} : { premise: event.premise }),

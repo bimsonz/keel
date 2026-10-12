@@ -8149,6 +8149,14 @@
           "subjectId": {
             "$ref": "#/components/schemas/SubjectId"
           },
+          "subjectKey": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EventSubjectKey"
+              }
+            ],
+            "description": "The subject's key, which addresses its Subject DO. Only with `subjectId`; absent on older events."
+          },
           "predicate": {
             "$ref": "#/components/schemas/MFP.Predicate"
           },
@@ -13344,9 +13352,14 @@
               "schema",
               "truncated",
               "abstained",
-              "repairs-exhausted"
+              "repairs-exhausted",
+              "incomplete",
+              "no-propositions",
+              "no-submission",
+              "party-gone",
+              "worlds-unbuildable"
             ],
-            "description": "Why every draft failed, with `draft-failed` only: the reply did not fit the\nslots' schema, it was cut at the token limit, the model abstained, or the\nrepairs ran out."
+            "description": "Why no draft was admitted to calibrate, with `draft-failed` only: the model\nabstained, the repairs ran out, a run of the matrix never completed, the\nconflict names no premise and effect to draft against, a party submitted no\ncommit to build a world from, a party is gone, or the worlds could not be\nbuilt. `schema` and `truncated` (a reply that did not fit the slots' schema,\nor was cut at the token limit) are repaired now: nothing emits them, and\nthey stay so older events decode."
           }
         },
         "additionalProperties": {

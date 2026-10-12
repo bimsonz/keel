@@ -9,7 +9,7 @@ import {
   SubjectId,
   TenetId,
 } from "../kernel/index.ts";
-import { Move, Predicate, Proposition } from "../coordination/index.ts";
+import { Move, Predicate, Proposition, SubjectKey } from "../coordination/index.ts";
 
 /** Footprint overlap is not a kind: proximity is exposure and never opens a conflict. */
 /**
@@ -70,6 +70,8 @@ export const Conflict = Schema.Struct({
   parties: Schema.Array(Party),
   /** Present for semantic and precedent conflicts, which the Subject DO owns. */
   subjectId: Schema.optional(SubjectId),
+  /** That subject's key, when the suspicion gave it: what addresses its Subject DO. */
+  subjectKey: Schema.optional(SubjectKey),
   predicate: Schema.optional(Predicate),
   openedAt: InstantSchema,
   /** Absent means `fallout`. */

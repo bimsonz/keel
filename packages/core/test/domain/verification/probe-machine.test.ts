@@ -33,6 +33,7 @@ import {
   ledgerTour,
   planArb,
   PREMISE,
+  PROBE,
   probeLog,
   probeOracle,
   type Record_,
@@ -272,13 +273,20 @@ describe("the Probe → Guard chart", { timeout: PROPERTY_TIMEOUT }, () => {
   });
 });
 
+/** Every reason a draft can fail for, written out: the list in the source must be exactly this. */
 const DRAFT_FAILURES: readonly DraftFailure[] = [
   "schema",
   "truncated",
   "abstained",
   "repairs-exhausted",
+  "incomplete",
+  "no-propositions",
+  "no-submission",
+  "party-gone",
+  "worlds-unbuildable",
 ];
 const decodeDiscarded = Schema.decodeUnknownResult(ProbeDiscarded);
+const asJson = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
 
 describe("a probe whose drafts failed", () => {
   it("[events.discard-detail] DraftFailed's detail reaches ProbeDiscarded, and a detail rides only with draft-failed", () => {
@@ -321,6 +329,57 @@ describe("a probe whose drafts failed", () => {
     expect(results[1] === undefined ? [] : eventsIn(results[1])).toMatchObject([
       { _tag: "ProbeDiscarded", reason: "draft-failed", detail: "truncated" },
     ]);
+  });
+});
+
+describe("the reasons a draft fails for", () => {
+  it("[probe.draft-failure-reasons] every reason reaches ProbeDiscarded from DraftFailed and survives the wire, and no other word decodes", () => {
+    const carried = DRAFT_FAILURES.map((detail) => {
+      const wire = { _tag: "ProbeDiscarded", reason: "draft-failed", conflictId: CONFLICT, detail };
+      // The wire form first: a reason the list lacks never decodes, whatever decide does with it.
+      const read = decodeDiscarded({ ...wire, probeId: PROBE });
+      if (Result.isFailure(read)) return `${detail}: does not decode`;
+      const { results } = drive([
+        suspect,
+        P({ _tag: "DraftFailed", conflictId: CONFLICT, detail }),
+      ]);
+      const [discarded] = results[1] === undefined ? [] : eventsIn(results[1]);
+      if (discarded?._tag !== "ProbeDiscarded") return `${detail}: no ProbeDiscarded`;
+      const back = decodeDiscarded(asJson(Schema.encodeSync(ProbeDiscarded)(discarded)));
+      return Result.isSuccess(back) &&
+        back.success.detail === detail &&
+        back.success.reason === "draft-failed" &&
+        back.success.conflictId === CONFLICT
+        ? "carried"
+        : `${detail}: lost on the way`;
+    });
+    expect(carried).toEqual(DRAFT_FAILURES.map(() => "carried"));
+    expect(new Set(DRAFT_FAILURES).size).toBe(9);
+
+    fc.assert(
+      fc.property(fc.string(), (word) => {
+        const known = DRAFT_FAILURES.some((reason) => reason === word);
+        const read = decodeDiscarded({
+          _tag: "ProbeDiscarded",
+          probeId: PROBE,
+          reason: "draft-failed",
+          conflictId: CONFLICT,
+          detail: word,
+        });
+        return Result.isSuccess(read) === known;
+      }),
+    );
+    expect(
+      Result.isSuccess(
+        decodeDiscarded({
+          _tag: "ProbeDiscarded",
+          probeId: PROBE,
+          reason: "draft-failed",
+          conflictId: CONFLICT,
+          detail: "timeout",
+        }),
+      ),
+    ).toBe(false);
   });
 });
 

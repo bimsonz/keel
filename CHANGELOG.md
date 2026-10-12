@@ -8,6 +8,7 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 
 ### Added
 
+- The draft-failure reasons and a conflict's subject key (for the Probe Workflow and fallout; additive, in core and events.tsp; no new event). `DraftFailure`, which types the Probe machine's `DraftFailed.detail?` and `ProbeDiscarded.detail?`, gains `incomplete`, `no-propositions`, `no-submission`, `party-gone` and `worlds-unbuildable`; `schema` and `truncated` stay legal so older events decode, and nothing emits them. The Conflict machine's `Suspect` gains `subjectKey?: SubjectKey` (the subject's key, which addresses its Subject DO), carried onto `ConflictSuspected.subjectKey?` and `Conflict.subjectKey?`; it is given only on a conflict a subject owns (semantic or precedent), and on any other kind the suspicion is refused `subject-mismatch`. The domain does not check that `subjectId` is that key's id: the Subject DO does. The application port's own three-word `DraftFailure` and `ProbeDraftFailedCommand.reason` move onto the domain's list separately.
 - Ports `ProbeSources` and `NoopWorlds` (new, unwired), the Probe Workflow's reads:
   - `ProbeSources.source(repo, commit) → SourceFile[]`: every UTF-8 file under `src/`, whole, in path order;
   - `ProbeSources.hunks(repo, base, head) → string`: the change as `git diff` writes it, byte for byte. `diff` 9.0.0 (jsdiff) formats it in apps/keel;
