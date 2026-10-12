@@ -844,7 +844,7 @@ model ProbeRan {
   resultRef: string;
 }
 
-/** A project suite's cell in a conflict's world matrix: a fact of the conflict, which stays Probing. An n/a cell says why. */
+/** A project suite's cell in a conflict's world matrix: a fact of a conflict whose probe was drafted, which stays in the state it is in. An n/a cell says why. */
 model WorldCheckRan {
   _tag: "WorldCheckRan";
   conflictId: ConflictId;

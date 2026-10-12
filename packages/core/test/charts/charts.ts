@@ -263,6 +263,11 @@ const unsettled = {
   ConflictEscalated: f("escalated"),
 };
 
+/** A suite's cell that completes after the probe has decided: a fact of a conflict whose probe was drafted, which stays where it is. */
+const lateCheck = (state: string) => ({
+  WorldCheckRan: [{ target: f(state), guard: "probe-drafted" }],
+});
+
 export const conflictChart: Chart = {
   id: "conflict",
   initial: "suspected",
@@ -270,10 +275,17 @@ export const conflictChart: Chart = {
   states: {
     suspected: { on: { ProbeDrafted: f("probing"), ...unsettled } },
     probing: { on: { ProbeRan: f("probing"), WorldCheckRan: f("probing"), ...unsettled } },
-    proven: { on: { ConflictResolved: f("resolved"), ConflictEscalated: f("escalated") } },
-    escalated: { on: { ConflictResolved: f("resolved") } },
-    resolved: { type: "final" },
-    dismissed: { type: "final" },
+    proven: {
+      on: {
+        ConflictResolved: f("resolved"),
+        ConflictEscalated: f("escalated"),
+        ...lateCheck("proven"),
+      },
+    },
+    escalated: { on: { ConflictResolved: f("resolved"), ...lateCheck("escalated") } },
+    // Terminal, though a late suite cell is still recorded: an xstate final state takes no event.
+    resolved: { tags: ["terminal"], on: lateCheck("resolved") },
+    dismissed: { tags: ["terminal"], on: lateCheck("dismissed") },
   },
 };
 

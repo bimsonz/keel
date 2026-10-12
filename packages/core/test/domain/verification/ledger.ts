@@ -405,10 +405,11 @@ const progress = (state: Ledger | undefined): readonly Kind[] => {
         : ["Settle"];
     case "probing":
       return probe === "calibrating" ? ["Record"] : ["Settle"];
+    // The suites' cells arrive after the probe has decided, so a decided conflict still takes them.
     case "proven":
-      return ["Resolve", "Escalate", "Retire"];
+      return ["Resolve", "Escalate", "Retire", "RecordCheck"];
     case "escalated":
-      return ["Resolve"];
+      return ["Resolve", "RecordCheck"];
     default:
       return KINDS;
   }
@@ -465,6 +466,22 @@ export const conflictOracle = (
   if (conflict === undefined)
     return command._tag === "Suspect" && validSuspicion(command) ? "suspected" : "refused";
   const ours = probe !== undefined && probe.conflictId === conflict.id;
+  // A suite's cell is a fact of a conflict whose probe was drafted, in whatever state: it never moves it.
+  if (command._tag === "RecordCheck") {
+    const malformed =
+      command.run < 1 ||
+      command.run > 3 ||
+      !command.check.startsWith("suite:chg_") ||
+      (command.outcome === "n/a" && command.reason === undefined);
+    const known = conflict.checks?.find(
+      (c) => c.world === command.world && c.check === command.check && c.run === command.run,
+    );
+    return conflict.probeId === undefined ||
+      malformed ||
+      (known !== undefined && known.outcome !== command.outcome)
+      ? "refused"
+      : conflict.state;
+  }
   switch (conflict.state) {
     case "suspected":
       if (command._tag === "Prove")
@@ -487,19 +504,6 @@ export const conflictOracle = (
           : "refused";
       return "refused";
     case "probing":
-      if (command._tag === "RecordCheck") {
-        const malformed =
-          command.run < 1 ||
-          command.run > 3 ||
-          !command.check.startsWith("suite:chg_") ||
-          (command.outcome === "n/a" && command.reason === undefined);
-        const known = conflict.checks?.find(
-          (c) => c.world === command.world && c.check === command.check && c.run === command.run,
-        );
-        return malformed || (known !== undefined && known.outcome !== command.outcome)
-          ? "refused"
-          : "probing";
-      }
       if (command._tag !== "Settle" || !ours || probe.id !== conflict.probeId) return "refused";
       if (probe.state === "admitted") return "proven";
       if (probe.state === "discarded" && probe.discarded === "non-discriminating")

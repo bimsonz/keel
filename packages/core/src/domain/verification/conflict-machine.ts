@@ -89,7 +89,12 @@ export type ConflictCommand =
   /** The conflict is human-class: permission semantics, a destructive migration, an ambiguous requirement. */
   | { readonly _tag: "Escalate"; readonly escalationId: EscalationId }
   | { readonly _tag: "Resolve"; readonly move: Move; readonly decisionId?: DecisionId }
-  /** A project suite's cell in the world matrix, recorded while the conflict's probe runs. */
+  /**
+   * A project suite's cell in the world matrix. The suites finish after the
+   * probe's deciding cell, so a cell is taken once a probe was drafted,
+   * whatever the conflict has become since; it is evidence for people and
+   * never moves the conflict.
+   */
   | {
       readonly _tag: "RecordCheck";
       readonly world: World;
@@ -302,7 +307,7 @@ export const decideConflict = (
         : refuse();
     }
     case "RecordCheck": {
-      if (conflict.state !== "probing") return refuse(undefined, awaitProbe);
+      if (conflict.probeId === undefined) return refuse("no-probe-drafted", awaitProbe);
       const cell = {
         conflictId: conflict.id,
         world: command.world,
@@ -370,7 +375,7 @@ export const evolveConflict = (
         ? { ...conflict }
         : illegal(conflict, event);
     case "WorldCheckRan":
-      return conflict.state === "probing" && sameCell(conflict, event) === undefined
+      return conflict.probeId !== undefined && sameCell(conflict, event) === undefined
         ? {
             ...conflict,
             checks: [

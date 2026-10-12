@@ -66,8 +66,8 @@ export const WorldCheck = Schema.String.check(
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 /**
  * One cell of a conflict's world matrix filled by a project's suite rather
- * than its probe: a fact of the conflict, which stays Probing. An `n/a` cell
- * says why the suite did not apply.
+ * than its probe: a fact of a conflict whose probe was drafted, which stays
+ * in the state it is in. An `n/a` cell says why the suite did not apply.
  */
 export const WorldCheckRan = Schema.TaggedStruct("WorldCheckRan", {
   conflictId: ConflictId,

@@ -219,7 +219,11 @@ stateDiagram-v2
   Probing --> Escalated: ConflictEscalated
   Proven --> Resolved: ConflictResolved
   Proven --> Escalated: ConflictEscalated
+  Proven --> Proven: WorldCheckRan [probe-drafted]
   Escalated --> Resolved: ConflictResolved
+  Escalated --> Escalated: WorldCheckRan [probe-drafted]
+  Resolved --> Resolved: WorldCheckRan [probe-drafted]
+  Dismissed --> Dismissed: WorldCheckRan [probe-drafted]
   Resolved --> [*]
   Dismissed --> [*]
 ```
@@ -233,7 +237,7 @@ stateDiagram-v2
 | Suspected | Probing | A probe compiles and runs | — | `ProbeDrafted` |
 | Suspected | Escalated | Every draft fails (four at most), or the conflict names no premise and effect to probe: it is unprovable | The settle names the escalation it opened; without one it is refused (`escalation-required`). A settle that proves or dismisses needs none | `ProbeDiscarded {draft-failed}`, then `ConflictEscalated {reason: unprovable}` |
 | Probing | Probing | One world-matrix cell completes | — | `ProbeRan` |
-| Probing | Probing | A project suite's cell of the matrix (`suite:<changeId>`, any world, run 1–3) completes | The same cell again commits nothing; a different answer for it is refused; an n/a cell says why | `WorldCheckRan` |
+| Probing, or any state after it | The same state | A project suite's cell of the matrix (`suite:trunk` or `suite:<changeId>`, any world, run 1–3) completes. The suites are Tier 2 runs that finish minutes after the probe's deciding cell, so the cell is taken whatever the conflict has become since: Proven, Dismissed, Escalated or Resolved | The conflict's probe was drafted: before any draft, and on a conflict decided without a probe (a refused merge, a failing guard, a lattice ruling, drafts that all failed), it is refused (`no-probe-drafted`). The same cell again commits nothing; a different answer for it is refused; an n/a cell says why. It is evidence for people, never admission evidence: admission does not wait for it, and it never moves the conflict | `WorldCheckRan` |
 | Probing | Proven | The probe discriminates | It passes on trunk (or does not apply), passes in the premise-holder's world, fails in the combined world and fails in A-noop, three runs in a row | `GuardAdmitted`, then `ConflictProven` |
 | Probing | Dismissed | The probe gives the same answer in every world | — | `ProbeDiscarded {non-discriminating}`, then `ConflictDismissed` |
 | Probing | Escalated | The probe is unstable across runs | The settle names the escalation it opened, as above | `ProbeDiscarded {unstable}`, then `ConflictEscalated {reason: unprovable}` |
@@ -241,7 +245,7 @@ stateDiagram-v2
 | Proven | Resolved | A Move is applied (bounce, sequence, yield, merge, distinguish…) | — | `ConflictResolved` |
 | Escalated | Resolved | Caused by `RulingGiven` | A Decision: an escalated conflict resolves only on a ruling | `ConflictResolved` (with `decisionId`) |
 
-**Terminal:** Resolved, Dismissed.
+**Terminal:** Resolved, Dismissed. A terminal conflict whose probe was drafted still records a late suite cell: a fact that leaves it where it ended.
 
 **Invariants**
 - Only proof or a ruling moves a conflict to Proven or Dismissed. An unprovable conflict is opinion, and it escalates rather than blocking.

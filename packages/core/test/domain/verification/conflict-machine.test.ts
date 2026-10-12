@@ -110,6 +110,35 @@ const cells = (
     ),
   );
 const settle = C({ _tag: "Settle", escalationId: ESCALATION });
+/** One cell of A's suite in the combined world, run 1. */
+const check = (outcome: "pass" | "fail" | "n/a", reason?: string): LedgerCommand =>
+  C({
+    _tag: "RecordCheck",
+    world: "AB",
+    check: `suite:${CHANGE_A}`,
+    run: 1,
+    outcome,
+    ...(reason === undefined ? {} : { reason }),
+  });
+/** How many events each decision committed, or why it was refused. */
+const tally = (results: ReturnType<typeof drive>["results"]) =>
+  results.map((x) => (Result.isSuccess(x) ? x.success.length : failureReason(x)));
+/** A probe drafted and decided by `decided`, then one cell recorded, repeated, contradicted and left unexplained. */
+const lateCells = (decided: readonly LedgerCommand[]) => {
+  const played = drive([
+    C(suspectSemantic),
+    draft,
+    ...decided,
+    check("fail"),
+    check("fail"),
+    check("pass"),
+    check("n/a"),
+  ]);
+  return { conflict: played.state?.conflict, last: tally(played.results).slice(-4) };
+};
+/** What a late cell does on a decided conflict: recorded once, never changed, never malformed. */
+const LATE = [1, 0, "cell-recorded", "malformed-check"];
+const CELL = { world: "AB", run: 1, outcome: "fail" };
 
 /** Proven or dismissed only on proof or a ruling: what each such event rests on must be in the state it was decided from. */
 const justified = (
@@ -181,17 +210,23 @@ describe("the Conflict machine", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(probing.state?.conflict?.state).toBe("probing");
   });
 
-  it("[conflict.one-terminal] a resolved or dismissed conflict takes no command, and a conflict ends at most once", () => {
+  it("[conflict.one-terminal] a resolved or dismissed conflict takes no command but a late suite cell, which leaves it where it ended, and a conflict ends at most once", () => {
     fc.assert(
       fc.property(planArb, (plan) =>
         run(plan).every((r) => {
-          const ended =
-            r.before?.conflict?.state === "resolved" || r.before?.conflict?.state === "dismissed";
+          const state = r.before?.conflict?.state;
+          const ended = state === "resolved" || state === "dismissed";
           const endings = conflictLog(r.log).filter(
             (c) => c.payload._tag === "ConflictResolved" || c.payload._tag === "ConflictDismissed",
           ).length;
           return (
-            endings <= 1 && (!ended || conflictTries(r).every((p) => Result.isFailure(p.result)))
+            endings <= 1 &&
+            (!ended ||
+              conflictTries(r).every((p) =>
+                p.command._tag === "RecordCheck"
+                  ? p.after?.conflict?.state === state
+                  : Result.isFailure(p.result),
+              ))
           );
         }),
       ),
@@ -204,6 +239,16 @@ describe("the Conflict machine", { timeout: PROPERTY_TIMEOUT }, () => {
     ]);
     expect(resolved.state?.conflict?.state).toBe("resolved");
     expect(Result.isFailure(resolved.results[3] ?? Result.succeed([]))).toBe(true);
+    // A suite's cell that arrives after the end is recorded, and the conflict stays ended.
+    const ended = lateCells([...cells(3), settle, C({ _tag: "Resolve", move: "sequence" })]);
+    expect(ended.last[0]).toBe(1);
+    expect(ended.conflict?.state).toBe("resolved");
+    const dismissed = lateCells([
+      ...cells(1, { run: 1, world: "A-noop", outcome: "pass" }),
+      settle,
+    ]);
+    expect(dismissed.last[0]).toBe(1);
+    expect(dismissed.conflict?.state).toBe("dismissed");
   });
 
   it("[conflict.replay] at every step, the conflict's events so far, through the wire, replay to the same conflict", () => {
@@ -345,18 +390,21 @@ describe("the Conflict machine", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(dismiss(0).state?.conflict?.state).toBe("dismissed");
     expect(dismiss(3).state?.conflict?.state).toBe("dismissed");
   });
-  it("[conflict.world-checks] a suite's cell is recorded only while the conflict is Probing, leaves its state, and a cell never changes its answer", () => {
-    let recorded = 0;
+  it("[conflict.world-checks] a suite's cell is recorded exactly on a conflict whose probe was drafted, in whatever state it has reached since and never before; it leaves the state, and a cell never changes its answer", () => {
+    let probing = 0;
+    let late = 0;
     fc.assert(
       fc.property(planArb, (plan) =>
         run(plan).every((r) =>
           conflictTries(r).every((p) => {
             if (p.command._tag !== "RecordCheck") return true;
             const events = Result.isSuccess(p.result) ? p.result.success : [];
-            if (events.length > 0) recorded++;
             const before = r.before?.conflict;
+            if (events.length > 0 && before?.state === "probing") probing++;
+            if (events.length > 0 && before?.state !== "probing") late++;
             return (
-              (before?.state === "probing" || Result.isFailure(p.result)) &&
+              (before?.probeId !== undefined || Result.isFailure(p.result)) &&
+              Result.isSuccess(p.result) === (conflictOracle(r.before, p.command) !== "refused") &&
               events.every((e) => e._tag === "WorldCheckRan") &&
               (p.after?.conflict?.state ?? "none") === (before?.state ?? "none")
             );
@@ -364,18 +412,35 @@ describe("the Conflict machine", { timeout: PROPERTY_TIMEOUT }, () => {
         ),
       ),
     );
-    expect(recorded).toBeGreaterThan(0);
-    const check = (outcome: "pass" | "fail" | "n/a", reason?: string): LedgerCommand =>
-      C({
-        _tag: "RecordCheck",
-        world: "AB",
-        check: `suite:${CHANGE_A}`,
-        run: 1,
-        outcome,
-        ...(reason === undefined ? {} : { reason }),
-      });
+    expect(probing).toBeGreaterThan(0);
+    expect(late).toBeGreaterThan(0);
+    // Before any draft there is no matrix to fill, and a conflict decided without a probe never has one.
     const early = drive([C(suspectSemantic), check("pass")]);
-    expect(early.results.at(-1)?._tag).toBe("Failure");
+    expect(failureReason(early.results.at(-1))).toBe("no-probe-drafted");
+    const undrafted = drive([
+      C(suspectSemantic),
+      P({ _tag: "DraftFailed", conflictId: CONFLICT }),
+      check("pass"),
+      settle,
+      check("pass"),
+    ]);
+    expect(undrafted.state?.conflict?.state).toBe("escalated");
+    expect(tally(undrafted.results)).toEqual([1, 1, "no-probe-drafted", 1, "no-probe-drafted"]);
+    const refusedMerge = drive([
+      C({ _tag: "Suspect", kind: "textual", parties: [CHANGE_A, CHANGE_B] }),
+      C({ _tag: "Prove", evidence: { _tag: "merge-refused", batchId: BATCH } }),
+      check("pass"),
+    ]);
+    expect(refusedMerge.state?.conflict?.state).toBe("proven");
+    expect(failureReason(refusedMerge.results.at(-1))).toBe("no-probe-drafted");
+    const ruledOut = drive([
+      C(suspectSemantic),
+      C({ _tag: "Dismiss", premise: PREMISE, effect: EFFECTS[0] ?? PREMISE }),
+      check("pass"),
+    ]);
+    expect(ruledOut.state?.conflict?.state).toBe("dismissed");
+    expect(failureReason(ruledOut.results.at(-1))).toBe("no-probe-drafted");
+    // While the probe runs.
     const played = drive([
       C(suspectSemantic),
       draft,
@@ -384,13 +449,39 @@ describe("the Conflict machine", { timeout: PROPERTY_TIMEOUT }, () => {
       check("pass"),
       check("n/a"),
     ]);
-    expect(
-      played.results.map((x) => (Result.isSuccess(x) ? x.success.length : failureReason(x))),
-    ).toEqual([1, 1, 1, 0, "cell-recorded", "malformed-check"]);
-    expect(played.state?.conflict).toMatchObject({
-      state: "probing",
-      checks: [{ world: "AB", run: 1, outcome: "fail" }],
-    });
+    expect(tally(played.results)).toEqual([1, 1, ...LATE]);
+    expect(played.state?.conflict).toMatchObject({ state: "probing", checks: [CELL] });
+    // The suites finish minutes after the probe's deciding cell: proven by it, dismissed by it, escalated when it is unstable, and resolved since.
+    const proven = lateCells([...cells(3), settle]);
+    expect(proven.last).toEqual(LATE);
+    expect(proven.conflict).toMatchObject({ state: "proven", checks: [CELL] });
+    const dismissed = lateCells([
+      ...cells(1, { run: 1, world: "A-noop", outcome: "pass" }),
+      settle,
+    ]);
+    expect(dismissed.last).toEqual(LATE);
+    expect(dismissed.conflict).toMatchObject({ state: "dismissed", checks: [CELL] });
+    const escalated = lateCells([
+      ...cells(2, { run: 2, world: "A-noop", outcome: "pass" }),
+      settle,
+    ]);
+    expect(escalated.last).toEqual(LATE);
+    expect(escalated.conflict).toMatchObject({ state: "escalated", checks: [CELL] });
+    const resolved = lateCells([...cells(3), settle, C({ _tag: "Resolve", move: "sequence" })]);
+    expect(resolved.last).toEqual(LATE);
+    expect(resolved.conflict).toMatchObject({ state: "resolved", checks: [CELL] });
+    // A cell recorded while probing is the same cell after the decision.
+    const across = drive([
+      C(suspectSemantic),
+      draft,
+      check("fail"),
+      ...cells(3),
+      settle,
+      check("fail"),
+      check("pass"),
+    ]);
+    expect(tally(across.results).slice(-2)).toEqual([0, "cell-recorded"]);
+    expect(across.state?.conflict).toMatchObject({ state: "proven", checks: [CELL] });
   });
 });
 
