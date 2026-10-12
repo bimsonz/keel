@@ -433,6 +433,48 @@ function containerBuildEnv(scratch: string): Record<string, string> {
   return { PATH: [bin, ...path].join(delimiter), DOCKER_CONFIG: config, DOCKER_HOST: host };
 }
 
+/**
+ * The routes and MCP tools are generated from the spec into gitignored files
+ * that only `pnpm gen` writes, so a clone whose last gen predates a spec change
+ * would deploy the old routes beside the new handlers (12 Oct: getChange still
+ * demanded a token after 11adb24 let anyone read it). Every run generates them
+ * from this tree first.
+ */
+function generate(): void {
+  execFileSync("pnpm", ["gen"], { cwd: root, stdio: "inherit" });
+}
+
+/**
+ * Only a committed tree deploys, so the SHA a deploy names is what runs. Checked
+ * after generating, which would show a committed contract left behind its spec.
+ */
+function requireCommittedTree(): void {
+  const changed = execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
+  if (changed !== "")
+    throw new Error(`refusing to deploy uncommitted changes to tracked files:\n${changed}`);
+}
+
+/** The version a Worker serves to all its traffic, or undefined if Cloudflare names none. */
+function liveVersion(name: string, cwd: string): string | undefined {
+  try {
+    const status: unknown = JSON.parse(
+      wrangler(["deployments", "status", "--name", name, "--json"], { cwd, quiet: true }),
+    );
+    const versions: unknown = Reflect.get(Object(status), "versions");
+    if (!Array.isArray(versions)) return undefined;
+    const whole: unknown = versions.find((v) => Reflect.get(Object(v), "percentage") === 100);
+    const id: unknown = Reflect.get(Object(whole), "version_id");
+    return typeof id === "string" ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+generate();
+if (!checkOnly) requireCommittedTree();
 const outputs = terraformOutputs();
 
 // Render and check every config before deploying any, so a bad one stops the whole deploy.
@@ -477,12 +519,31 @@ try {
     console.log(
       `\n== ${app.name}: deploying${containers ? " (building its container image)" : ""}`,
     );
-    wrangler(Object.keys(secrets).length > 0 ? [...args, "--secrets-file", "/dev/stdin"] : args, {
-      cwd,
-      stream: true,
-      ...(Object.keys(secrets).length > 0 ? { input: JSON.stringify(secrets) } : {}),
-      ...(containers ? { env: containerBuildEnv(mkdtempSync(join(scratch, `${app.dir}-`))) } : {}),
-    });
+    const before = liveVersion(app.name, cwd);
+    try {
+      wrangler(Object.keys(secrets).length > 0 ? [...args, "--secrets-file", "/dev/stdin"] : args, {
+        cwd,
+        stream: true,
+        ...(Object.keys(secrets).length > 0 ? { input: JSON.stringify(secrets) } : {}),
+        ...(containers
+          ? { env: containerBuildEnv(mkdtempSync(join(scratch, `${app.dir}-`))) }
+          : {}),
+      });
+    } catch (error) {
+      // Cloudflare's API sometimes answers a page of HTML, which wrangler reports as a
+      // malformed response, before or after the deployment it asked for went through.
+      // Cloudflare's own record of what serves says which, so the exit code can.
+      const after = liveVersion(app.name, cwd);
+      if (after === undefined || after === before) {
+        console.error(
+          `\n${app.name}: wrangler failed and Cloudflare still serves ${before ?? "no version"}: not deployed`,
+        );
+        throw error;
+      }
+      console.error(
+        `\n${app.name}: wrangler failed, but Cloudflare now serves ${after} (was ${before ?? "no version"}): deployed`,
+      );
+    }
   }
 } finally {
   rmSync(scratch, { recursive: true, force: true });
