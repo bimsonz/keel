@@ -101,6 +101,15 @@ model ConflictSide {
   role: "premise" | "effect";
 
   proposition: EventProposition;
+
+  /**
+   * On the effect's side: how the effect is known, as fallout judged it. The
+   * agent's own declared claim, or what Keel derived and by which method.
+   * Absent on the premise's side, and on a conflict suspected before Keel
+   * recorded it.
+   */
+  evidence?: SuspectEvidence;
+
   told?: ConflictTold;
 }
 

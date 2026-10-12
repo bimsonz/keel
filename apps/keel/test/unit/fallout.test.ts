@@ -425,12 +425,19 @@ describe("[b21.fallout-proximity] fallout opens a conflict only where the domain
     const effect = proposition({ subject: leaf, relation: "is", value: "per-session" });
     const premiseFirst = subjects();
     premiseFirst.declare(declaredEnvelope(0, [premise], []));
-    const one = opened(premiseFirst.declare(declaredEnvelope(1, [], [effect])));
+    const heard = premiseFirst.declare(declaredEnvelope(1, [], [effect]));
+    const one = opened(heard);
     const effectFirst = subjects();
     effectFirst.declare(declaredEnvelope(1, [], [effect]));
     const other = opened(effectFirst.declare(declaredEnvelope(0, [premise], [])));
     expect(one).toHaveLength(1);
     expect(other).toEqual(one);
+    // The suspicion says how its effect is known: here the agent's own declared claim.
+    expect(
+      heard
+        .filter(({ draft }) => draft.payload._tag === "ConflictSuspected")
+        .map(({ draft }) => Reflect.get(Object(Reflect.get(draft.payload, "effect")), "evidence")),
+    ).toEqual([{ declared: true, evidenceClass: "testimony" }]);
     for (const s of [premiseFirst, effectFirst])
       expect(s.objectAt(leaf).service.subscribers("ConflictSuspected")).toContain(PROBE_WORKFLOW);
   });
@@ -601,7 +608,12 @@ describe("[b21.fallout-derived] a derived effect is judged like a declared one",
             subjectKey: session,
             origin: "fallout",
             premise: { holder: changeOf(0) },
-            effect: { changeId: changeOf(1), proposition: { anchors: stale.anchors } },
+            effect: {
+              changeId: changeOf(1),
+              proposition: { anchors: stale.anchors },
+              // Derived by the extractor, and the change's declared effects did not speak for it.
+              evidence: { declared: false, method: "extractor", evidenceClass: "ruling" },
+            },
           },
         },
       },

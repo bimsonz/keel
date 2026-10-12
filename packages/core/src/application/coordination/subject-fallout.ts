@@ -20,6 +20,7 @@ import {
   type ProjectId,
   type SubjectId,
 } from "../../domain/kernel/index.ts";
+import { suspectEvidence } from "../../domain/verification/index.ts";
 import type { EventDraft, Transaction } from "../ports/index.ts";
 import { hashedIdBody } from "./hashed-id.ts";
 import { suspectDrafts } from "./probe-ledger.ts";
@@ -192,7 +193,7 @@ export function judgeFallout(
           predicate: pair.premise.proposition.predicate,
           origin: pair.judged.evidenceClass === "opinion" ? "opinion" : "fallout",
           premise: pair.premise,
-          effect: pair.effect,
+          effect: { ...pair.effect, evidence: suspectEvidence(pair.judged) },
         });
         if (Result.isFailure(opened)) {
           problems.push(`fallout could not open ${conflictId}: ${opened.failure._tag}`);

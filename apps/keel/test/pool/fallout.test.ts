@@ -104,7 +104,10 @@ describe("[b21.fallout-race] a premise and an effect that breaks it, in either o
         parties: [a.changeId, b.changeId],
         origin: "fallout",
         premise: { holder: a.changeId },
-        effect: { changeId: b.changeId },
+        effect: {
+          changeId: b.changeId,
+          evidence: { declared: true, evidenceClass: "testimony" },
+        },
       });
       expect(opened?.notified).toEqual(
         expect.arrayContaining([PROBE_WORKFLOW, `change:${a.changeId}`, `change:${b.changeId}`]),

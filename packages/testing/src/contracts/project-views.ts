@@ -89,7 +89,12 @@ export function projectEvents(project: string = id("prj")) {
     of: (entity: { kind: string; id: string }, payload: { _tag: string }) =>
       envelope(entity, payload),
     /** A semantic conflict suspected between `holder`'s premise and `other`'s effect on one subject. */
-    suspected: (conflictId: string, holder: string, other: string) =>
+    suspected: (
+      conflictId: string,
+      holder: string,
+      other: string,
+      evidence?: { declared: boolean; method?: string; evidenceClass: string },
+    ) =>
       envelope({ kind: "conflict", id: conflictId }, {
         _tag: "ConflictSuspected",
         conflictId,
@@ -116,6 +121,7 @@ export function projectEvents(project: string = id("prj")) {
             relation: "is",
             value: "per-session",
           },
+          ...(evidence === undefined ? {} : { evidence }),
         },
       } as { _tag: string }),
     probeDrafted: (conflictId: string, probeId: string, bundleHash: string = BUNDLE) =>

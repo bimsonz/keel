@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.conflict-sides
+# why: the effect's side leaves out how the effect is known, though the conflict's suspicion recorded it
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index f0f12c6..4d3f822 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -476,7 +476,6 @@ export const sidesOf = (
+       changeId: effect.changeId,
+       role: "effect",
+       proposition: effect.proposition,
+-      ...(effect.evidence === undefined ? {} : { evidence: effect.evidence }),
+       ...toldTo(effect.changeId),
+     },
+   };

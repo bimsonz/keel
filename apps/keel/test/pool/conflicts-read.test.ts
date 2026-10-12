@@ -230,6 +230,8 @@ describe("[b23.conflicts-read] a project's conflicts over REST, from the Project
           changeId: b.changeId,
           role: "effect",
           proposition: { relation: "is", value: "per-session" },
+          // B declared the effect itself, and fallout said so when it opened the conflict.
+          evidence: { declared: true, evidenceClass: "testimony" },
         },
       },
       probe: { id: probeId, label: "P-1", state: "admitted", attempts: 1, bundleHash: hash("7") },

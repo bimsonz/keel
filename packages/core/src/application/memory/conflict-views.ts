@@ -25,6 +25,7 @@ import {
   ProbeDrafted,
   ProbeNotFound,
   ProbeRan,
+  type SuspectEvidence,
   type World,
   WorldCheckRan,
 } from "../../domain/verification/index.ts";
@@ -445,6 +446,8 @@ export interface ConflictSide {
   readonly changeId: ChangeId;
   readonly role: "premise" | "effect";
   readonly proposition: NonNullable<ConflictRecord["conflict"]["premise"]>["proposition"];
+  /** On the effect's side: how the effect is known, as fallout judged it. Absent when the suspicion did not say. */
+  readonly evidence?: SuspectEvidence;
   readonly told?: ToldView;
 }
 
@@ -473,6 +476,7 @@ export const sidesOf = (
       changeId: effect.changeId,
       role: "effect",
       proposition: effect.proposition,
+      ...(effect.evidence === undefined ? {} : { evidence: effect.evidence }),
       ...toldTo(effect.changeId),
     },
   };

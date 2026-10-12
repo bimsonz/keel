@@ -474,6 +474,27 @@ describe("[b23.conflict-sides] the two sides of a conflict, as Keel knows them",
       },
     });
     expect(sidesOf(record(views, events.project, bare))).toBeUndefined();
+
+    // How the effect is known rides the effect's side only, and is served as it was judged.
+    const [declared, derived] = [nextId("cfl"), nextId("cfl")];
+    const testimony = { declared: true, evidenceClass: "testimony" };
+    const ruling = { declared: false, method: "extractor", evidenceClass: "ruling" };
+    Effect.runSync(views.arrive(events.suspected(declared, holder, other, testimony)));
+    Effect.runSync(views.arrive(events.suspected(derived, holder, other, ruling)));
+    const folded = (conflictId: string) => sidesOf(record(views, events.project, conflictId));
+    const served = (conflictId: string) =>
+      conflictOk(record(views, events.project, conflictId)).body;
+    expect([folded(declared)?.holder.evidence, folded(declared)?.other.evidence]).toEqual([
+      undefined,
+      testimony,
+    ]);
+    expect(folded(derived)?.other.evidence).toEqual(ruling);
+    expect(folded(named)?.other.evidence).toBeUndefined();
+    expect(served(declared)).toHaveProperty("sides.other.evidence", testimony);
+    expect(served(derived)).toHaveProperty("sides.other.evidence", ruling);
+    for (const conflictId of [declared, derived])
+      expect(served(conflictId)).not.toHaveProperty("sides.holder.evidence");
+    expect(served(named)).not.toHaveProperty("sides.other.evidence");
   });
 });
 

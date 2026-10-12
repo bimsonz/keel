@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fallout.test.ts
+# kills: b21.fallout-derived
+# why: every suspect effect is recorded as its agent's declared testimony, so an effect Keel derived from the code reads as a claim the agent made
+diff --git a/packages/core/src/application/coordination/subject-fallout.ts b/packages/core/src/application/coordination/subject-fallout.ts
+index 0f4a986..0adf267 100644
+--- a/packages/core/src/application/coordination/subject-fallout.ts
++++ b/packages/core/src/application/coordination/subject-fallout.ts
+@@ -193,7 +193,7 @@ export function judgeFallout(
+           predicate: pair.premise.proposition.predicate,
+           origin: pair.judged.evidenceClass === "opinion" ? "opinion" : "fallout",
+           premise: pair.premise,
+-          effect: { ...pair.effect, evidence: suspectEvidence(pair.judged) },
++          effect: { ...pair.effect, evidence: { declared: true, evidenceClass: "testimony" } },
+         });
+         if (Result.isFailure(opened)) {
+           problems.push(`fallout could not open ${conflictId}: ${opened.failure._tag}`);

@@ -214,6 +214,15 @@ const sideBody = (side: ConflictSide) => ({
   changeId: side.changeId,
   role: side.role,
   proposition: eventProposition(side.proposition),
+  ...(side.evidence === undefined
+    ? {}
+    : {
+        evidence: {
+          declared: side.evidence.declared,
+          ...(side.evidence.method === undefined ? {} : { method: side.evidence.method }),
+          evidenceClass: side.evidence.evidenceClass,
+        },
+      }),
   ...(side.told === undefined
     ? {}
     : {

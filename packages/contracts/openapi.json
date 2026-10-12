@@ -9126,6 +9126,14 @@
           "proposition": {
             "$ref": "#/components/schemas/EventProposition"
           },
+          "evidence": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SuspectEvidence"
+              }
+            ],
+            "description": "On the effect's side: how the effect is known, as fallout judged it. The\nagent's own declared claim, or what Keel derived and by which method.\nAbsent on the premise's side, and on a conflict suspected before Keel\nrecorded it."
+          },
           "told": {
             "$ref": "#/components/schemas/ConflictTold"
           }
