@@ -13,7 +13,12 @@ export interface DeployPlan {
   readonly world: string;
 }
 
-/** Every deployment target behind one lifecycle. Each step returns evidence (ADR 0008). */
+/**
+ * Every deploy target behind one lifecycle. Each step returns evidence (ADR
+ * 0008). `plan` takes the project's target as `resolveDeployTarget` gives it:
+ * the whole record, so the plan keeps the account and the credential reference
+ * it was made with.
+ */
 export class Deployer extends Context.Service<
   Deployer,
   {

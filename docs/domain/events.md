@@ -29,7 +29,7 @@ Every event has the same envelope:
 
 **Entity kinds:** `agent`, `session`, `change`, `subject`, `sketch`, `workspace`, `conflict`, `probe`, `guard`, `verdict`, `batch`, `candidate`, `project`, `trunk`, `decision`, `tenet`, `escalation`, `deployment`.
 
-**ID prefixes.** From the API contract: `agt_ ses_ chg_ wsp_ sk_ sub_ cnd_ vrd_ cfl_ dec_ prb_`. Added here for entities the API does not yet expose: `evt_` (event), `bat_` (batch), `grd_` (guard), `tnt_` (tenet), `lse_` (lease), `esc_` (escalation), `dpl_` (deployment).
+**ID prefixes.** From the API contract: `agt_ ses_ chg_ wsp_ sk_ sub_ cnd_ vrd_ cfl_ dec_ prb_`. Added here for entities the API does not yet expose: `evt_` (event), `bat_` (batch), `grd_` (guard), `tnt_` (tenet), `lse_` (lease), `esc_` (escalation), `dpl_` (deployment), `crd_` (a credential in an org's store: a reference, never the secret).
 
 ---
 
@@ -187,9 +187,11 @@ A **Batch** is a set of Changes verified together; its **Candidate** is the comp
 
 | Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
 |---|---|---|---|---|---|
-| `PreviewDeployed` | Change DO or Lane DO | `deploymentId, world, adapter, url` | — | the agent(s), Projector | A preview is a World, so probes can target it live |
+| `DeployTargetSet` | Project DO (`project:<id>`) | `projectId, target: {name, provider, accountId, credential}, by: UserId` | — | Projector | An owner set a deploy target, new or in place of the one of that name. `credential` is a `crd_` id, a reference into the org's credential store, never the secret. Members only |
+| `DeployTargetCleared` | Project DO (`project:<id>`) | `projectId, name, by: UserId` | — | Projector | An owner removed a deploy target. Members only |
+| `PreviewDeployed` | Change DO or Lane DO | `deploymentId, world, target, provider, url` | — | the agent(s), Projector | A preview is a World, so probes can target it live. `target` is the name of the project's deploy target |
 | `PreviewTornDown` | Change DO or Lane DO | `deploymentId` | — | Projector | On land or withdrawal |
-| `DeploymentPromoted` | Trunk DO | `deploymentId, trunkSha, adapter, stage` | — | Projector | e.g. 10% then 100% |
+| `DeploymentPromoted` | Trunk DO | `deploymentId, trunkSha, target, provider, stage` | — | Projector | e.g. 10% then 100% |
 | `DeploymentRolledBack` | Trunk DO | `deploymentId, to, reason` | — | the escalation inbox, Projector | — |
 
 ---

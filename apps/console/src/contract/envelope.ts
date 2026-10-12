@@ -117,6 +117,8 @@ export const EVENT_TYPES = [
   "MessagesCaptured",
   "SessionRedacted",
   // delivery
+  "DeployTargetSet",
+  "DeployTargetCleared",
   "PreviewDeployed",
   "PreviewTornDown",
   "DeploymentPromoted",

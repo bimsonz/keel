@@ -123,7 +123,10 @@ export const NON_SPEC_ACTIONS = {
   /** Make or unmake an owner. */
   ManageOwners: rule("Org", "own"),
   DeleteOrg: rule("Org", "own"),
+  /** Set, clear or list a project's deploy targets. */
   ManageDeployTargets: rule("Project", "own"),
+  /** Store, replace or delete a credential in the org's store; none is ever read back. */
+  ManageCredentials: rule("Org", "own"),
   DeleteProject: rule("Project", "own"),
   CloneRepo: rule("Project", "read"),
   /** Granted when the caller reads the source and is a member of the target org. */

@@ -1441,22 +1441,52 @@ model SessionRedacted {
 
 // ─── Delivery ───────────────────────────────────────────────────────────────
 
-union DeployTarget {
-  isolatePreview: "isolate-preview",
-  workersPreviews: "workers-previews",
-  versions: "versions",
-  workersForPlatforms: "workers-for-platforms",
-  r2: "r2",
-  containerImage: "container-image",
-  iac: "iac",
-  external: "external",
+/** Who hosts a deploy target. */
+union DeployProvider {
+  cloudflare: "cloudflare",
+}
+
+/** A deploy target's name, unique in its project: what a repo's `.keel/deploy` gives. */
+@pattern("^[a-z0-9](?:-?[a-z0-9]){0,38}$")
+scalar DeployTargetName extends string;
+
+/** A Cloudflare account's id. */
+@pattern("^[0-9a-f]{32}$")
+scalar CloudflareAccountId extends string;
+
+/**
+ * A place a project deploys to: a provider, the account there and a reference
+ * to the credential that reaches it. It names the credential and never holds it.
+ */
+model DeployTarget {
+  name: DeployTargetName;
+  provider: DeployProvider;
+  accountId: CloudflareAccountId;
+  credential: CredentialId;
+}
+
+/** An owner set one of the project's deploy targets, new or in place of the one of that name. */
+model DeployTargetSet {
+  _tag: "DeployTargetSet";
+  projectId: ProjectId;
+  target: DeployTarget;
+  by: UserId;
+}
+
+/** An owner removed one of the project's deploy targets. */
+model DeployTargetCleared {
+  _tag: "DeployTargetCleared";
+  projectId: ProjectId;
+  name: DeployTargetName;
+  by: UserId;
 }
 
 model PreviewDeployed {
   _tag: "PreviewDeployed";
   deploymentId: DeploymentId;
   world: string;
-  adapter: DeployTarget;
+  target: DeployTargetName;
+  provider: DeployProvider;
   url: string;
 }
 
@@ -1469,7 +1499,8 @@ model DeploymentPromoted {
   _tag: "DeploymentPromoted";
   deploymentId: DeploymentId;
   trunkSha: CommitSha;
-  adapter: DeployTarget;
+  target: DeployTargetName;
+  provider: DeployProvider;
   stage: string;
 }
 
@@ -1595,6 +1626,8 @@ union KeelEvent {
   SessionRedacted,
 
   // Delivery
+  DeployTargetSet,
+  DeployTargetCleared,
   PreviewDeployed,
   PreviewTornDown,
   DeploymentPromoted,

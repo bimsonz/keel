@@ -7898,6 +7898,11 @@
           "not": {}
         }
       },
+      "CloudflareAccountId": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{32}$",
+        "description": "A Cloudflare account's id."
+      },
       "CommitSha": {
         "type": "string",
         "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
@@ -8382,6 +8387,11 @@
           "not": {}
         }
       },
+      "CredentialId": {
+        "type": "string",
+        "pattern": "^crd_[0-9A-HJKMNP-TV-Z]{26}$",
+        "description": "A credential in an org's store, named and never held: the id is minted when the secret is stored."
+      },
       "DecisionId": {
         "type": "string",
         "pattern": "^dec_[0-9A-HJKMNP-TV-Z]{26}$"
@@ -8687,18 +8697,104 @@
         },
         "description": "Every work-loop response: the result, plus what the agent should know and do next."
       },
-      "DeployTarget": {
+      "DeployProvider": {
         "type": "string",
         "enum": [
-          "isolate-preview",
-          "workers-previews",
-          "versions",
-          "workers-for-platforms",
-          "r2",
-          "container-image",
-          "iac",
-          "external"
-        ]
+          "cloudflare"
+        ],
+        "description": "Who hosts a deploy target."
+      },
+      "DeployTarget": {
+        "type": "object",
+        "required": [
+          "name",
+          "provider",
+          "accountId",
+          "credential"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/DeployTargetName"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/DeployProvider"
+          },
+          "accountId": {
+            "$ref": "#/components/schemas/CloudflareAccountId"
+          },
+          "credential": {
+            "$ref": "#/components/schemas/CredentialId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A place a project deploys to: a provider, the account there and a reference\nto the credential that reaches it. It names the credential and never holds it."
+      },
+      "DeployTargetCleared": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "name",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "DeployTargetCleared"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "name": {
+            "$ref": "#/components/schemas/DeployTargetName"
+          },
+          "by": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An owner removed one of the project's deploy targets."
+      },
+      "DeployTargetName": {
+        "type": "string",
+        "pattern": "^[a-z0-9](?:-?[a-z0-9]){0,38}$",
+        "description": "A deploy target's name, unique in its project: what a repo's `.keel/deploy` gives."
+      },
+      "DeployTargetSet": {
+        "type": "object",
+        "required": [
+          "_tag",
+          "projectId",
+          "target",
+          "by"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "DeployTargetSet"
+            ]
+          },
+          "projectId": {
+            "$ref": "#/components/schemas/ProjectId"
+          },
+          "target": {
+            "$ref": "#/components/schemas/DeployTarget"
+          },
+          "by": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An owner set one of the project's deploy targets, new or in place of the one of that name."
       },
       "DeploymentId": {
         "type": "string",
@@ -8710,7 +8806,8 @@
           "_tag",
           "deploymentId",
           "trunkSha",
-          "adapter",
+          "target",
+          "provider",
           "stage"
         ],
         "properties": {
@@ -8726,8 +8823,11 @@
           "trunkSha": {
             "$ref": "#/components/schemas/CommitSha"
           },
-          "adapter": {
-            "$ref": "#/components/schemas/DeployTarget"
+          "target": {
+            "$ref": "#/components/schemas/DeployTargetName"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/DeployProvider"
           },
           "stage": {
             "type": "string"
@@ -10640,6 +10740,12 @@
           },
           {
             "$ref": "#/components/schemas/SessionRedacted"
+          },
+          {
+            "$ref": "#/components/schemas/DeployTargetSet"
+          },
+          {
+            "$ref": "#/components/schemas/DeployTargetCleared"
           },
           {
             "$ref": "#/components/schemas/PreviewDeployed"
@@ -13354,7 +13460,8 @@
           "_tag",
           "deploymentId",
           "world",
-          "adapter",
+          "target",
+          "provider",
           "url"
         ],
         "properties": {
@@ -13370,8 +13477,11 @@
           "world": {
             "type": "string"
           },
-          "adapter": {
-            "$ref": "#/components/schemas/DeployTarget"
+          "target": {
+            "$ref": "#/components/schemas/DeployTargetName"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/DeployProvider"
           },
           "url": {
             "type": "string"

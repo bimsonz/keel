@@ -53,6 +53,8 @@ describe("[b12.event-audience] who an event on a public project's feed is for", 
         "OrgReinstated",
         "OrgDeleted",
         "ProjectDeleted",
+        "DeployTargetSet",
+        "DeployTargetCleared",
       ].toSorted(),
     );
     // That a conflict waits on a ruling is the conflict's state; what was asked stays with members.

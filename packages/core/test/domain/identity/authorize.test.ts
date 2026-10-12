@@ -231,6 +231,11 @@ const sponsorOf = (a: AgentPrincipal): UserPrincipal =>
   });
 const into = (org: OrgId): OrgResource => ({ _tag: "Org", org, suspended: false });
 
+/** Whether the principal is a user who is an owner of that org. An agent never is. */
+const ownsOrg = (principal: Principal, org: OrgId): boolean =>
+  principal._tag === "User" &&
+  principal.memberships.some((m) => m.org === org && m.role === "owner");
+
 describe("authorize", () => {
   it("[authz.org-isolation] no principal reads a private project of an org it is not in", () => {
     fc.assert(
@@ -428,6 +433,30 @@ describe("authorize", () => {
     const maintainer = user({ memberships: [{ org: ORG_1, role: "maintainer" }] });
     expect(outcome(authorize(maintainer, "ManageMembers", into(ORG_1)))).toBe("ok:");
     expect(outcome(authorize(maintainer, "ManageOwners", into(ORG_1)))).toBe("403:role");
+  });
+
+  it("[authz.deploy-owner-only] only an owner of the org sets a project's deploy targets or touches the org's credentials", () => {
+    fc.assert(
+      fc.property(principalArb, projectArb, orgResArb, (principal, proj, org) => {
+        const targets = outcome(decide(principal, "ManageDeployTargets", proj)).startsWith("ok:");
+        const credentials = outcome(decide(principal, "ManageCredentials", org)).startsWith("ok:");
+        return (
+          (!targets || (proj._tag === "Project" && ownsOrg(principal, proj.org))) &&
+          (!credentials || ownsOrg(principal, org.org))
+        );
+      }),
+    );
+    const owner = user({ memberships: [{ org: ORG_1, role: "owner" }] });
+    const maintainer = user({ memberships: [{ org: ORG_1, role: "maintainer" }] });
+    const admin = user({ instanceAdmin: true });
+    const mine = project(PRJ_1, "private");
+    expect(outcome(authorize(owner, "ManageDeployTargets", mine))).toBe("ok:");
+    expect(outcome(authorize(owner, "ManageCredentials", into(ORG_1)))).toBe("ok:");
+    expect(outcome(authorize(maintainer, "ManageDeployTargets", mine))).toBe("403:role");
+    expect(outcome(authorize(maintainer, "ManageCredentials", into(ORG_1)))).toBe("403:role");
+    expect(outcome(authorize(owner, "ManageCredentials", into(ORG_2)))).not.toBe("ok:");
+    expect(outcome(authorize(admin, "ManageCredentials", into(ORG_1)))).not.toBe("ok:");
+    expect(outcome(authorize(admin, "ManageDeployTargets", mine))).not.toBe("ok:");
   });
 
   it("[authz.handle-first] a user without a handle may only choose one", () => {

@@ -555,3 +555,12 @@ Owner: the DO that created it. The machine is fixed when the `Deployer` adapters
 
 - preview: Previewing → Live → TornDown (`PreviewDeployed`, `PreviewTornDown`);
 - promotion: Promoting, through the target's stages (e.g. 10% → 100%) → Promoted | RolledBack (`DeploymentPromoted`, `DeploymentRolledBack`).
+
+### Deploy targets
+
+Owner: the Project DO. A project holds up to 16 deploy targets, one a name, and each is a record: the name a repo's `.keel/deploy` gives, the provider, the account there and the id of a credential in the org's store. It has no states, only what is set: two decisions and a fold, in `domain/delivery/deploy-target.ts`.
+
+- **Set** commits `DeployTargetSet` with the whole record, new or in place of the one of that name. It is refused when the credential is not in the project's own org (the caller reads that from the org's credential store and passes it as a fact), so no project deploys with another org's secret, and when the name would be a seventeenth. Setting a target to exactly what it is commits nothing.
+- **Clear** commits `DeployTargetCleared`; a name that is not set is refused.
+- The fold keeps one record a name, in name order. Resolving a name gives the whole record as it stands, which is what the Deployer's plan step takes: a plan keeps the account and the credential reference it was made with, whatever is set afterwards.
+- The record names a credential and never holds one: the credential's id is minted when a secret is stored, so nothing a person types fits the field. Only an owner of the project's org sets or clears a target, and only an owner of an org touches its credentials.

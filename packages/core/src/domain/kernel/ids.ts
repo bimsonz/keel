@@ -27,6 +27,7 @@ export const ID_PREFIXES = {
   project: "prj",
   user: "usr",
   org: "org",
+  credential: "crd",
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;
@@ -86,6 +87,12 @@ export type UserId = typeof UserId.Type;
 /** An org: a tenant owning projects, agents and members. */
 export const OrgId = prefixed("org").pipe(Schema.brand("OrgId"));
 export type OrgId = typeof OrgId.Type;
+/**
+ * A credential in an org's store, named and never held: the id is minted when
+ * the secret is stored, so a record that carries one carries no secret.
+ */
+export const CredentialId = prefixed("crd").pipe(Schema.brand("CredentialId"));
+export type CredentialId = typeof CredentialId.Type;
 
 /** The branded id type for each prefix, so `Ids.next("chg")` returns a `ChangeId`. */
 export interface IdOf {
@@ -110,6 +117,7 @@ export interface IdOf {
   prj: ProjectId;
   usr: UserId;
   org: OrgId;
+  crd: CredentialId;
 }
 
 /** A point in time, as milliseconds since the Unix epoch. Time reaches the domain only as a value. */

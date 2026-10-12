@@ -222,6 +222,8 @@ const RULES: Record<EventType, Rule[]> = {
   MessagesCaptured: [{ kind: "session", idField: "sessionId", from: ["open"] }],
   SessionRedacted: [{ kind: "session", idField: "sessionId", from: ["open"] }],
 
+  DeployTargetSet: [{ kind: "project", idField: "projectId", from: ["created"] }],
+  DeployTargetCleared: [{ kind: "project", idField: "projectId", from: ["created"] }],
   PreviewDeployed: [{ kind: "deployment", idField: "deploymentId", from: null, to: "live" }],
   PreviewTornDown: [
     { kind: "deployment", idField: "deploymentId", from: ["live"], to: "torn-down" },
