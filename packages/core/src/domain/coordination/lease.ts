@@ -22,7 +22,7 @@ export const isLapsed = (lease: Lease, now: Instant): boolean =>
 const readChange = (changeId: string): NextAction => ({
   kind: "read",
   title: "Read the change for its current lease and state",
-  operationId: "Changes_getChange",
+  operationId: "change",
   args: { changeId },
 });
 

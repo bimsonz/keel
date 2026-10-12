@@ -248,7 +248,7 @@ export function makeHandlers(run: Runner) {
           ),
         );
       },
-      Changes_getChange: (caller: Caller, input: Input<"Changes_getChange">) => {
+      change: (caller: Caller, input: Input<"change">) => {
         const decoded = changeIdInput(input.changeId);
         if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
         return run(

@@ -55,7 +55,7 @@ const waysForward = (changeId: ChangeId, other: ChangeId): readonly NextAction[]
   {
     kind: "read",
     title: "Read the other change: its intent, its state and its evidence",
-    operationId: "Changes_getChange",
+    operationId: "change",
     args: { changeId: other },
   },
   {

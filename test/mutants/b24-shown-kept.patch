@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/alternatives.test.ts
+# kills: b24.awareness
+# why: two changes that diverge and converge again are never told again
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index a0d9ef2..9a0456d 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -87,8 +87,7 @@ function aware(
+   for (const { id } of store.list(ALT_SHOWN)) {
+     const [a, b] = id.split("/");
+     const other = a === self.id ? b : b === self.id ? a : undefined;
+-    if (other !== undefined && !alternatives.some((alt) => alt === other))
+-      store.remove(ALT_SHOWN, id);
++    if (other !== undefined && other === "") store.remove(ALT_SHOWN, id);
+   }
+   const drafts: EventDraft[] = [];
+   const tell = (target: ChangeId, about: ChangeId) => {

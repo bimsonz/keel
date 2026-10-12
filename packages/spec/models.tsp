@@ -131,6 +131,12 @@ model Preflight {
 
   /** What the move rests on: a contradiction above, by index, or a precedent. Absent when the move is `proceed`. */
   basis?: MoveBasis;
+
+  /**
+   * The live changes with the same intent (their declared effects make the same claims), in the
+   * order the live index gave them, never ranked. Absent when there are none; the move never reads them.
+   */
+  alternatives?: ChangeId[];
 }
 
 union ConflictKind {

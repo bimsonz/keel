@@ -2,16 +2,14 @@
 # kills: b21.live-index
 # why: the index keeps an ended change, so preflight keeps reporting a change that can no longer land
 diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
-index d6dca6b..a6a614e 100644
+index a0d9ef2..ac70a1c 100644
 --- a/packages/core/src/application/coordination/live-index.ts
 +++ b/packages/core/src/application/coordination/live-index.ts
-@@ -75,8 +75,7 @@ export function hearLiveChange(store: Store, event: EventEnvelope): void {
-       return;
+@@ -191,7 +191,6 @@ export function hearLiveChange(
+               ),
+             )
+           : [];
+-      forget(tx, changeId);
+       return told;
      }
-     default:
--      if ((CHANGE_ENDS as readonly string[]).includes(event.type))
--        store.remove(LIVE_CHANGE, changeId);
-+      return;
    }
- }
- 

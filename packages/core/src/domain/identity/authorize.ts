@@ -65,7 +65,7 @@ export const SPEC_ACTIONS = {
   Operator_createProject: rule("Org", "member"),
 
   Changes_listChanges: rule("Project", "read"),
-  Changes_getChange: rule("Project", "read"),
+  change: rule("Project", "read"),
   status: rule("Project", "read"),
   nearby: rule("Project", "read"),
   why: rule("Project", "read"),

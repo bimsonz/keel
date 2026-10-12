@@ -2,15 +2,15 @@
 # kills: b1.owed-stays-owed
 # why: unsubscribing also deletes the deliveries already owed, so an event committed while subscribed is lost
 diff --git a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
-index 866e30a..69bb3f3 100644
+index 47f2b67..057e96e 100644
 --- a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
 +++ b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
 @@ -172,6 +172,8 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
          }
        },
-       unsubscribe: (subscriber, types) => {
+       unsubscribe: (subscriber, types, scope) => {
 +        if (types === undefined || types === EVERY_TYPE)
 +          sql.exec("DELETE FROM keel_deliveries WHERE subscriber = ?", subscriber);
-         for (const table of ["keel_subscriptions", "keel_subscription_scopes"]) {
-           if (types === undefined || types === EVERY_TYPE) {
-             sql.exec(`DELETE FROM ${table} WHERE subscriber = ?`, subscriber);
+         if (scope !== undefined) {
+           for (const type of types === undefined || types === EVERY_TYPE ? [undefined] : types)
+             if (type === undefined)

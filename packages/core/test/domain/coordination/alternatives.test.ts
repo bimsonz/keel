@@ -277,7 +277,7 @@ describe("alternatives: changes with the same intent, which Keel shows to each o
             named === otherId &&
             JSON.stringify(event.nextActions.map((n) => [n.kind, n.operationId, n.args])) ===
               JSON.stringify([
-                ["read", "Changes_getChange", { changeId: otherId }],
+                ["read", "change", { changeId: otherId }],
                 ["read", "nearby", { changeId }],
                 ["call", "rebase", { changeId }],
                 ["call", "abandon", { changeId }],
@@ -296,7 +296,7 @@ describe("alternatives: changes with the same intent, which Keel shows to each o
       alternativeId: theirs,
     });
     expect(alternativeLanded(project, mine, theirs).nextActions.map((n) => n.operationId)).toEqual([
-      "Changes_getChange",
+      "change",
       "nearby",
       "rebase",
       "abandon",

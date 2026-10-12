@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/alternatives.test.ts -t b24.change-tool
+# kills: b24.change-tool
+# why: getChange is not an MCP tool, so an MCP agent cannot read the alternative it is told to compare with
+# regen
+diff --git a/packages/spec/changes.tsp b/packages/spec/changes.tsp
+index c498366..96095f5 100644
+--- a/packages/spec/changes.tsp
++++ b/packages/spec/changes.tsp
+@@ -171,7 +171,6 @@ interface Changes {
+    * an alternative by reading both.
+    */
+   @summary("Get a change")
+-  @tag("mcp")
+   @operationId("change")
+   @useAuth(NoAuth | AgentRead | Observer)
+   @route("/{changeId}")

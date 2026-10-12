@@ -68,6 +68,9 @@ const log = (entity: EntityRef) => Effect.map(EventOutbox, (outbox) => outbox.lo
 const flush = (h: OutboxHarness) => h.run(flushOutbox(h.fanOut.fanOut));
 const ids = (events: readonly EventEnvelope[]) => events.map((event) => event.eventId);
 
+/** An event about `entity` alone, as a scoped subscriber is matched against it. */
+const aboutOnly = (entity: EntityRef) => ({ entity, affected: [] });
+
 export function describeEventOutboxContract(adapter: string, harness: () => OutboxHarness) {
   describe(`EventOutbox contract: ${adapter}`, () => {
     it.effect(
@@ -450,6 +453,41 @@ export function describeEventOutboxContract(adapter: string, harness: () => Outb
           expect(ids(h.fanOut.deliveredTo(member))).toEqual(
             ids([ours, own].filter((e) => e !== undefined)),
           );
+        }),
+    );
+
+    it.effect(
+      "[outbox.unsubscribe-scope] a scoped unsubscribe drops only that scope: the subscriber's other scopes and unscoped types stay",
+      () =>
+        Effect.gen(function* () {
+          const h = harness();
+          const [mine, other] = [change(), change()];
+          const agent = "agent:a";
+          const outcome = yield* h.run(
+            Effect.gen(function* () {
+              const outbox = yield* EventOutbox;
+              outbox.subscribe(agent, ["ConflictNoted"], mine);
+              outbox.subscribe(agent, ["ConflictNoted"], other);
+              outbox.subscribe(agent, ["ChangeLanded"]);
+              outbox.unsubscribe(agent, ["ConflictNoted"], mine);
+              const typed = {
+                mine: outbox.subscribers("ConflictNoted", aboutOnly(mine)),
+                other: outbox.subscribers("ConflictNoted", aboutOnly(other)),
+                unscoped: outbox.subscribers("ChangeLanded"),
+              };
+              outbox.unsubscribe(agent, undefined, other);
+              return {
+                typed,
+                other: outbox.subscribers("ConflictNoted", aboutOnly(other)),
+                unscoped: outbox.subscribers("ChangeLanded"),
+              };
+            }),
+          );
+          expect(outcome.typed.mine).not.toContain(agent);
+          expect(outcome.typed.other).toContain(agent);
+          expect(outcome.typed.unscoped).toContain(agent);
+          expect(outcome.other).not.toContain(agent);
+          expect(outcome.unscoped).toContain(agent);
         }),
     );
 

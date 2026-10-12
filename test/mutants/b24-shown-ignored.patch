@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/alternatives.test.ts
+# kills: b24.awareness
+# why: an agent is told again about an alternative it has already been shown
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index d5a5b93..9c03302 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -92,7 +92,6 @@ function aware(
+   }
+   const drafts: EventDraft[] = [];
+   const tell = (target: ChangeId, about: ChangeId) => {
+-    if (store.get(ALT_SHOWN, shownId(target, about)) !== undefined) return;
+     store.put(ALT_SHOWN, shownId(target, about), true);
+     drafts.push(
+       noticeFor(target, payloadOf(encodeDeclared(alternativeDeclared(projectId, target, about)))),

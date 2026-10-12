@@ -858,7 +858,7 @@
       "get": {
         "operationId": "Changes_listChanges",
         "summary": "List changes",
-        "description": "A project's changes, newest `#n` first, from the Projector's read model; `cursor` is a page's\n`nextCursor`. An agent reads its own project or a public one (another `project` is 403); an\nobserver or operator reads any, its token's project when `project` is absent. Without a token,\n`project` names a public project (otherwise 404, as for one that does not exist); without either, 401.",
+        "description": "A project's changes, newest `#n` first, from the Projector's read model; `cursor` is a page's\n`nextCursor`. An agent reads its own project or a public one (another `project` is 403); an\nobserver reads any, its token's project when `project` is absent. Without a token,\n`project` names a public project (otherwise 404, as for one that does not exist); without either, 401.",
         "parameters": [
           {
             "name": "state",
@@ -1146,9 +1146,9 @@
     },
     "/changes/{changeId}": {
       "get": {
-        "operationId": "Changes_getChange",
+        "operationId": "change",
         "summary": "Get a change",
-        "description": "Read a change, as its own Durable Object holds it. An observer or operator reads any change, an\nagent its own project's, and anyone (without a token too) a public project's. Any other change\nanswers 404, as one that does not exist does, so a private change's existence does not leak.",
+        "description": "Read a change, as its own Durable Object holds it. An observer reads any change, an agent its own\nproject's, and anyone (without a token too) a public project's. Any other change answers 404, as\none that does not exist does, so a private change's existence does not leak. Compare a change with\nan alternative by reading both.",
         "parameters": [
           {
             "$ref": "#/components/parameters/ChangePath"
@@ -1255,7 +1255,8 @@
           }
         },
         "tags": [
-          "Changes"
+          "Changes",
+          "mcp"
         ],
         "security": [
           {},
@@ -3235,7 +3236,7 @@
       "get": {
         "operationId": "Inbox_listEvents",
         "summary": "Read events",
-        "description": "The operation log, oldest first from `cursor`. `?wait` long-polls for the next event, up to the\nsame bound with a token or without. `project` keeps one project's events: an agent reads its own\n(the default) or a public one; an observer or operator reads any, and the whole log without it.\nWithout a token, `project` names a public project (otherwise 404, as for one that does not exist)\nand only its public events are served: escalations, rulings, sessions, settings and operator\nmoves stay with the project's members. Without a token and without `project`, 401.",
+        "description": "The operation log, oldest first from `cursor`. `?wait` long-polls for the next event, up to the\nsame bound with a token or without. `project` keeps one project's events: an agent reads its own\n(the default) or a public one; an observer reads any, and the whole log without it.\nWithout a token, `project` names a public project (otherwise 404, as for one that does not exist)\nand only its public events are served: escalations, rulings, sessions, settings and operator\nmoves stay with the project's members. Without a token and without `project`, 401.",
         "parameters": [
           {
             "name": "cursor",
@@ -12611,6 +12612,13 @@
           "ref": {
             "type": "string"
           },
+          "nextActions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NextAction"
+            },
+            "description": "What the agent can do about it, as the event that caused the notice named them. Absent when it named none."
+          },
           "cursor": {
             "type": "string",
             "description": "The notice's inbox position: reading the inbox from here returns only what\nis newer. A notice rides at most one tool result; the inbox keeps them all."
@@ -13081,6 +13089,13 @@
               }
             ],
             "description": "What the move rests on: a contradiction above, by index, or a precedent. Absent when the move is `proceed`."
+          },
+          "alternatives": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeId"
+            },
+            "description": "The live changes with the same intent (their declared effects make the same claims), in the\norder the live index gave them, never ranked. Absent when there are none; the move never reads them."
           }
         },
         "additionalProperties": {

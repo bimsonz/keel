@@ -13,6 +13,16 @@ export function noticeView(notice: AgentNotice) {
     title: notice.title,
     ...(notice.detail === undefined ? {} : { detail: notice.detail }),
     ...(notice.ref === undefined ? {} : { ref: notice.ref }),
+    ...(notice.nextActions === undefined
+      ? {}
+      : {
+          nextActions: notice.nextActions.map((action) => ({
+            kind: action.kind,
+            title: action.title,
+            ...(action.operationId === undefined ? {} : { operationId: action.operationId }),
+            ...(action.args === undefined ? {} : { args: { ...action.args } }),
+          })),
+        }),
     ...(notice.cursor === undefined ? {} : { cursor: notice.cursor }),
   };
 }

@@ -141,7 +141,7 @@ interface Changes {
   /**
    * A project's changes, newest `#n` first, from the Projector's read model; `cursor` is a page's
    * `nextCursor`. An agent reads its own project or a public one (another `project` is 403); an
-   * observer or operator reads any, its token's project when `project` is absent. Without a token,
+   * observer reads any, its token's project when `project` is absent. Without a token,
    * `project` names a public project (otherwise 404, as for one that does not exist); without either, 401.
    */
   @summary("List changes")
@@ -165,11 +165,14 @@ interface Changes {
   } | NotFound | Conflict | StandardErrors;
 
   /**
-   * Read a change, as its own Durable Object holds it. An observer or operator reads any change, an
-   * agent its own project's, and anyone (without a token too) a public project's. Any other change
-   * answers 404, as one that does not exist does, so a private change's existence does not leak.
+   * Read a change, as its own Durable Object holds it. An observer reads any change, an agent its own
+   * project's, and anyone (without a token too) a public project's. Any other change answers 404, as
+   * one that does not exist does, so a private change's existence does not leak. Compare a change with
+   * an alternative by reading both.
    */
   @summary("Get a change")
+  @tag("mcp")
+  @operationId("change")
   @useAuth(NoAuth | AgentRead | Observer)
   @route("/{changeId}")
   @get

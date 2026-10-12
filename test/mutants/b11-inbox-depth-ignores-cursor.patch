@@ -2,15 +2,15 @@
 # kills: b11.snapshot
 # why: the inbox depth counts every notice ever delivered, read or carried ones included
 diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
-index 8539acc..eaa3252 100644
+index ee422de..612d30a 100644
 --- a/packages/core/src/application/identity/inbox.ts
 +++ b/packages/core/src/application/identity/inbox.ts
-@@ -47,7 +47,7 @@ const piggybackedOf = (store: Store): string => {
+@@ -50,7 +50,7 @@ const piggybackedOf = (store: Store): string => {
   * How many notices wait unread: those after the `piggybacked` cursor.
   * Positions are dense from 1 to the head, and reads clamp the cursor to it.
   */
 -export const inboxDepth = (store: Store): number => headOf(store) - Number(piggybackedOf(store));
 +export const inboxDepth = (store: Store): number => headOf(store);
  
- /** Records a delivered event as the inbox's next entry. Synchronous: it runs inside the reaction's transaction. */
- export function recordDelivery(store: Store, event: EventEnvelope): void {
+ /** The next actions an event's payload names, when it names any. */
+ const decodeActionable = Schema.decodeUnknownOption(

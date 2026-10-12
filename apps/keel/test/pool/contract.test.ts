@@ -67,7 +67,7 @@ describe("the published contract, through the Worker's fetch handler", () => {
     const all = await mcpResult(await mcp(await tokenFor(worker), "tools/list"));
     const readOnly = await mcpResult(await mcp(await tokenFor(reader), "tools/list"));
     expect(toolNames(all)).toEqual(tagged.toSorted());
-    expect(toolNames(readOnly)).toEqual(["inbox", "nearby", "status", "whoami", "why"]);
+    expect(toolNames(readOnly)).toEqual(["change", "inbox", "nearby", "status", "whoami", "why"]);
   });
 
   it("[a11d.why-observer] lets an observer ask why, over REST and as an MCP tool", async () => {

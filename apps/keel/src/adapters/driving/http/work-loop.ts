@@ -45,7 +45,7 @@ import { Result, Schema, SchemaIssue } from "effect";
 import type {
   AbandonResult,
   AdoptResult,
-  Changes_getChangeResult,
+  ChangeResult,
   DeclareResult,
   InboxResult,
   NearbyResult,
@@ -258,6 +258,7 @@ function preflightView(preflight: Preflight) {
     })),
     suggestedMove: preflight.suggestedMove,
     ...(preflight.basis === undefined ? {} : { basis: preflight.basis }),
+    ...(preflight.alternatives === undefined ? {} : { alternatives: [...preflight.alternatives] }),
   };
 }
 
@@ -502,7 +503,7 @@ export function rebaseError(
             {
               kind: "read",
               title: "Read the change to see who holds its lease now",
-              operationId: "Changes_getChange",
+              operationId: "change",
               args: { changeId: error.changeId },
             },
           ],
@@ -648,7 +649,7 @@ function leaseStale(caller: Caller, error: LeaseStale) {
         {
           kind: "read",
           title: "Read the change to see who holds its lease now",
-          operationId: "Changes_getChange",
+          operationId: "change",
           args: { changeId: error.changeId },
         },
       ],
@@ -750,11 +751,11 @@ export function relyError(
 }
 
 /** A change read by id: the change itself, bare, as the spec's `Change`. */
-export function changeOk(change: Change): Changes_getChangeResult {
+export function changeOk(change: Change): ChangeResult {
   return { status: 200, body: changeView(change) };
 }
 
-export function changeReadError(caller: Caller, error: ChangeNotFound): Changes_getChangeResult {
+export function changeReadError(caller: Caller, error: ChangeNotFound): ChangeResult {
   return changeNotFound(caller, error);
 }
 

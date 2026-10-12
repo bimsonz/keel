@@ -309,6 +309,9 @@ model Notice {
   detail?: string;
   ref?: string;
 
+  /** What the agent can do about it, as the event that caused the notice named them. Absent when it named none. */
+  nextActions?: NextAction[];
+
   /**
    * The notice's inbox position: reading the inbox from here returns only what
    * is newer. A notice rides at most one tool result; the inbox keeps them all.

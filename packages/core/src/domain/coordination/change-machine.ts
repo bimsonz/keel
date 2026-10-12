@@ -261,7 +261,7 @@ type Decision = Result.Result<readonly ChangeEvent[], ChangeRejection>;
 const readChange = (changeId: ChangeId): NextAction => ({
   kind: "read",
   title: "Read the change for its current state, revision and lease",
-  operationId: "Changes_getChange",
+  operationId: "change",
   args: { changeId },
 });
 

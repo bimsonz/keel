@@ -126,10 +126,15 @@ export class EventOutbox extends Context.Service<
       types: readonly string[] | typeof EVERY_TYPE,
       scope?: EntityRef,
     ) => void;
-    /** Stops owing `subscriber` these types, scoped or not; every type when omitted. Deliveries already owed stay owed. */
+    /**
+     * Stops owing `subscriber` these types, scoped or not; every type when omitted.
+     * With a `scope`, only that scope goes: the subscriber's other scopes and its
+     * unscoped types stay. Deliveries already owed stay owed.
+     */
     readonly unsubscribe: (
       subscriber: Subscriber,
       types?: readonly string[] | typeof EVERY_TYPE,
+      scope?: EntityRef,
     ) => void;
     /**
      * The subscribers an event of this type would be delivered to now: every

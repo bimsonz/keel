@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/alternatives.test.ts
+# kills: b24.notice-next-actions
+# why: the wire notice drops the next actions the inbox kept
+diff --git a/apps/keel/src/adapters/driving/notices.ts b/apps/keel/src/adapters/driving/notices.ts
+index 65fedd0..3305c74 100644
+--- a/apps/keel/src/adapters/driving/notices.ts
++++ b/apps/keel/src/adapters/driving/notices.ts
+@@ -13,7 +13,7 @@ export function noticeView(notice: AgentNotice) {
+     title: notice.title,
+     ...(notice.detail === undefined ? {} : { detail: notice.detail }),
+     ...(notice.ref === undefined ? {} : { ref: notice.ref }),
+-    ...(notice.nextActions === undefined
++    ...(notice.nextActions !== null
+       ? {}
+       : {
+           nextActions: notice.nextActions.map((action) => ({

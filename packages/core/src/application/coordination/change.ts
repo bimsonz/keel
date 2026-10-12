@@ -143,11 +143,18 @@ export const PRECHECK = "workflow:Precheck";
 /** The events after which the change's pool collects its workspace. */
 export const CHANGE_ENDS = ["ChangeLanded", "ChangeWithdrawn", "ChangeSuperseded"] as const;
 
-/** The events its project's live-change index hears of each change, subscribed at declare. */
+/**
+ * The events its project's live-change index hears of each change, subscribed
+ * at declare: the intent and its effects, each preflight (who has been shown
+ * which alternative), an adoption (whose agent hears the change's notices) and
+ * the end.
+ */
 export const LIVE_INDEX_HEARS = [
   "IntentDeclared",
   "IntentRevised",
   "EffectsDerived",
+  "PreflightIssued",
+  "ChangeAdopted",
   ...CHANGE_ENDS,
 ] as const;
 
@@ -374,7 +381,7 @@ function subscribeSubjects(
 const readChange = (changeId: ChangeId): NextAction => ({
   kind: "read",
   title: "Read the change for its current state, revision and lease",
-  operationId: "Changes_getChange",
+  operationId: "change",
   args: { changeId },
 });
 

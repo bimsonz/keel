@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/alternatives.test.ts
+# kills: b24.awareness
+# why: a change declared earlier is never told that a later one attempts the same thing
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index d5a5b93..dde5949 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -99,7 +99,6 @@ function aware(
+     );
+   };
+   for (const other of alternatives) {
+-    tell(other, self.id);
+     tell(self.id, other);
+   }
+   return drafts;

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/alternatives.test.ts
+# kills: b24.alternative-landed
+# why: a change's alternatives never hear that it landed
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index a0d9ef2..9b6be5a 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -183,7 +183,7 @@ export function hearLiveChange(
+     default: {
+       if (!(CHANGE_ENDS as readonly string[]).includes(event.type)) return [];
+       const told =
+-        event.type === "ChangeLanded" && live !== undefined
++        event.type === "" && live !== undefined
+           ? alternativesOf(changeId, live.intent, liveChanges(store)).map((other) =>
+               noticeFor(
+                 other,

@@ -171,7 +171,24 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
             );
         }
       },
-      unsubscribe: (subscriber, types) => {
+      unsubscribe: (subscriber, types, scope) => {
+        if (scope !== undefined) {
+          for (const type of types === undefined || types === EVERY_TYPE ? [undefined] : types)
+            if (type === undefined)
+              sql.exec(
+                "DELETE FROM keel_subscription_scopes WHERE subscriber = ? AND scope = ?",
+                subscriber,
+                scopeOf(scope),
+              );
+            else
+              sql.exec(
+                "DELETE FROM keel_subscription_scopes WHERE subscriber = ? AND type = ? AND scope = ?",
+                subscriber,
+                type,
+                scopeOf(scope),
+              );
+          return;
+        }
         for (const table of ["keel_subscriptions", "keel_subscription_scopes"]) {
           if (types === undefined || types === EVERY_TYPE) {
             sql.exec(`DELETE FROM ${table} WHERE subscriber = ?`, subscriber);

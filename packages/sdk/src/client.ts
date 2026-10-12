@@ -475,8 +475,8 @@ export class KeelClient {
     );
   }
 
-  change(changeId: string, options?: CallOptions): Promise<WireOutputs["Changes_getChange"]> {
-    return this.call("Changes_getChange", { changeId }, options);
+  change(changeId: string, options?: CallOptions): Promise<WireOutputs["change"]> {
+    return this.call("change", { changeId }, options);
   }
 
   trunk(projectId: string, options?: CallOptions): Promise<WireOutputs["Views_getTrunk"]> {

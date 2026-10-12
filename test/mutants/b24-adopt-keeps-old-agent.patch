@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/alternatives.test.ts
+# kills: b24.adopted
+# why: after an adopt the agent that let the lease lapse still hears the change's alternatives, and the adopter never does
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index a0d9ef2..cb107fb 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -174,7 +174,7 @@ export function hearLiveChange(
+       const previous = agentOf(store, changeId);
+       if (live === undefined || previous === undefined) return [];
+       const adopted = Schema.decodeUnknownSync(ChangeAdopted)(event.payload);
+-      if (adopted.agentId === previous) return [];
++      if (adopted.agentId !== "") return [];
+       tx.outbox.unsubscribe(`agent:${previous}`, ALTERNATIVE_NOTICES, changeRef(changeId));
+       tx.outbox.subscribe(`agent:${adopted.agentId}`, ALTERNATIVE_NOTICES, changeRef(changeId));
+       store.put(LIVE_AGENT, changeId, adopted.agentId);

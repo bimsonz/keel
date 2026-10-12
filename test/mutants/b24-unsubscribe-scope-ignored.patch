@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t unsubscribe-scope
+# kills: outbox.unsubscribe-scope
+# why: a scoped unsubscribe drops every scope the subscriber has, so ending one change silences its agent's others
+diff --git a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
+index 47f2b67..9d088fe 100644
+--- a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
++++ b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
+@@ -182,10 +182,9 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
+               );
+             else
+               sql.exec(
+-                "DELETE FROM keel_subscription_scopes WHERE subscriber = ? AND type = ? AND scope = ?",
++                "DELETE FROM keel_subscription_scopes WHERE subscriber = ? AND type = ?",
+                 subscriber,
+                 type,
+-                scopeOf(scope),
+               );
+           return;
+         }

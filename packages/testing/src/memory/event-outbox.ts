@@ -189,10 +189,11 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
         );
       }
     },
-    unsubscribe: (subscriber, types) => {
+    unsubscribe: (subscriber, types, scope) => {
       for (const row of store.list(SUBSCRIPTION)) {
         const subscription = Schema.decodeUnknownSync(StoredSubscription)(row.value);
         if (subscription.subscriber !== subscriber) continue;
+        if (scope !== undefined && subscription.scope !== scopeOf(scope)) continue;
         if (types === undefined || types === EVERY_TYPE || types.includes(subscription.type))
           store.remove(SUBSCRIPTION, row.id);
       }

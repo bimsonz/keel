@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/alternatives.test.ts
+# kills: b24.awareness
+# why: a declarer whose preflight read the index before its alternative reached it never learns of it
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index a0d9ef2..045b220 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -98,7 +98,6 @@ function aware(
+   };
+   for (const other of alternatives) {
+     tell(other, self.id);
+-    tell(self.id, other);
+   }
+   return drafts;
+ }

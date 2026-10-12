@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import {
   type AgentNotice,
   type InboxEntry,
@@ -6,7 +6,7 @@ import {
   type InboxPage,
   noticeOf,
 } from "../../domain/identity/index.ts";
-import type { EventEnvelope } from "../../domain/kernel/index.ts";
+import { type EventEnvelope, NextAction } from "../../domain/kernel/index.ts";
 import { EntityStore, type Stored } from "../ports/index.ts";
 
 /**
@@ -52,15 +52,61 @@ const piggybackedOf = (store: Store): string => {
  */
 export const inboxDepth = (store: Store): number => headOf(store) - Number(piggybackedOf(store));
 
-/** Records a delivered event as the inbox's next entry. Synchronous: it runs inside the reaction's transaction. */
+/** The next actions an event's payload names, when it names any. */
+const decodeActionable = Schema.decodeUnknownOption(
+  Schema.Struct({ nextActions: Schema.optional(Schema.Array(NextAction)) }),
+);
+const decodeNoted = Schema.decodeUnknownOption(
+  Schema.Struct({ evidenceRef: Schema.optional(Schema.String) }),
+);
+const decodeSameIntent = Schema.decodeUnknownOption(
+  Schema.Struct({ changeId: Schema.String, alternativeId: Schema.String }),
+);
+const decodeLandedSameIntent = Schema.decodeUnknownOption(
+  Schema.Struct({ changeId: Schema.String, landedChangeId: Schema.String }),
+);
+
+/** More than the notice's title says, chosen for the event when it is delivered. */
+export function detailOf(event: EventEnvelope): string | undefined {
+  switch (event.type) {
+    case "ConflictNoted":
+      return Option.getOrUndefined(decodeNoted(event.payload))?.evidenceRef;
+    case "AlternativeDeclared":
+      return Option.match(decodeSameIntent(event.payload), {
+        onNone: () => undefined,
+        onSome: (p) =>
+          `${p.alternativeId} was declared with the same intent as your change ${p.changeId}`,
+      });
+    case "AlternativeLanded":
+      return Option.match(decodeLandedSameIntent(event.payload), {
+        onNone: () => undefined,
+        onSome: (p) =>
+          `${p.landedChangeId}, with the same intent as your change ${p.changeId}, landed`,
+      });
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Records a delivered event as the inbox's next entry, with its detail and
+ * the next actions its payload names. Synchronous: it runs inside the
+ * reaction's transaction.
+ */
 export function recordDelivery(store: Store, event: EventEnvelope): void {
   const next = headOf(store) + 1;
+  const detail = detailOf(event);
+  const nextActions = Option.getOrUndefined(decodeActionable(event.payload))?.nextActions;
   const entry: typeof InboxEntrySchema.Encoded = {
     eventId: event.eventId,
     type: event.type,
     entity: event.entity,
     seq: event.seq,
     at: event.at,
+    ...(detail === undefined ? {} : { detail }),
+    ...(nextActions === undefined
+      ? {}
+      : { nextActions: nextActions.map((action) => Schema.encodeSync(NextAction)(action)) }),
   };
   store.put(INBOX.kind, position(next), asStored(entry));
   store.put(INBOX.head.kind, INBOX.head.id, next);

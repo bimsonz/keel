@@ -48,11 +48,15 @@ export class ProjectDO
 
   /**
    * The live-change index: each change of the project subscribes it, scoped,
-   * at declare, and every event folds in the transaction that receives it.
+   * at declare, and every event folds in the transaction that receives it. The
+   * notices it gives (a change's alternatives) go on the project.
    */
   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
-    hearLiveChange(tx.store, event);
-    return { drafts: [] };
+    const projectId = projectIdOf(this.ctx.id.name);
+    const drafts = hearLiveChange(tx, projectId, event);
+    return drafts.length === 0
+      ? { drafts: [] }
+      : { entity: { kind: "project", id: projectId }, drafts, project: projectId };
   }
 
   /** The project's live changes, read once by each preflight. */

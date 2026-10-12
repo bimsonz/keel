@@ -1,0 +1,28 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/alternatives.test.ts
+# kills: b24.never-acts
+# why: Keel acts on an alternative's landing: the other change is withdrawn instead of told
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index f0a9795..869a32a 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1372,6 +1372,8 @@ const commandFor = (
+           }
+         : undefined;
+     }
++    case "AlternativeLanded":
++      return { command: { _tag: "Withdraw", authority: { _tag: "Operator", by: "keel" } } };
+     case "ConflictProven":
+       hearConflict(store, event);
+       return provenAgainst(store, change, event);
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index a0d9ef2..be96691 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -147,6 +147,7 @@ export function hearLiveChange(
+       store.put(LIVE_CHANGE, changeId, encodeRow({ id: declared.changeId, intent, derived: [] }));
+       store.put(LIVE_AGENT, changeId, declared.agentId);
+       tx.outbox.subscribe(`agent:${declared.agentId}`, ALTERNATIVE_NOTICES, changeRef(changeId));
++      tx.outbox.subscribe(`change:${changeId}`, ["AlternativeLanded"], changeRef(changeId));
+       return [];
+     }
+     case "IntentRevised": {

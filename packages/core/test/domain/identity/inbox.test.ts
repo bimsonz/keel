@@ -49,7 +49,7 @@ const nextActionArb: fc.Arbitrary<NextAction> = fc
   .record({
     kind: fc.constantFrom("call" as const, "wait" as const, "read" as const, "escalate" as const),
     title: fc.constantFrom("Read the other change", "Rebase your change", "Withdraw your change"),
-    operationId: fc.option(fc.constantFrom("Changes_getChange", "rebase", "abandon"), {
+    operationId: fc.option(fc.constantFrom("change", "rebase", "abandon"), {
       nil: undefined,
     }),
     args: fc.option(fc.constant({ changeId: CHANGE }), { nil: undefined }),
@@ -94,7 +94,7 @@ describe("the inbox", () => {
       }),
     );
     const actions: NextAction[] = [
-      { kind: "read", title: "Read the other change", operationId: "Changes_getChange" },
+      { kind: "read", title: "Read the other change", operationId: "change" },
       {
         kind: "call",
         title: "Rebase your change",

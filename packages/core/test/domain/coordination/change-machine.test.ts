@@ -1187,7 +1187,7 @@ describe("rebasing a change", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(brief(drive([...working, [rebase(REBASED, BASE), 1]]).results[2])).toEqual({
       tag: "ChangeStateRefused",
       reason: undefined,
-      next: ["Changes_getChange"],
+      next: ["change"],
     });
     expect(failureTag(drive([...working, [rebase(BASE, BASE), 1]]).results[2])).toBe(
       "ChangeStateRefused",
@@ -1260,7 +1260,7 @@ describe("the Lease", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(brief(adopted.results[4])).toEqual({
       tag: "LeaseStale",
       reason: "stale",
-      next: ["Changes_getChange"],
+      next: ["change"],
     });
     expect(succeeded(adopted.results[5])).toBe(true);
   });

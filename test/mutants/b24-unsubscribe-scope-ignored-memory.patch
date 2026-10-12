@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t unsubscribe-scope
+# kills: outbox.unsubscribe-scope
+# why: the memory outbox drops every scope on a scoped unsubscribe
+diff --git a/packages/testing/src/memory/event-outbox.ts b/packages/testing/src/memory/event-outbox.ts
+index 3979ab8..f0ae1c7 100644
+--- a/packages/testing/src/memory/event-outbox.ts
++++ b/packages/testing/src/memory/event-outbox.ts
+@@ -193,7 +193,6 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
+       for (const row of store.list(SUBSCRIPTION)) {
+         const subscription = Schema.decodeUnknownSync(StoredSubscription)(row.value);
+         if (subscription.subscriber !== subscriber) continue;
+-        if (scope !== undefined && subscription.scope !== scopeOf(scope)) continue;
+         if (types === undefined || types === EVERY_TYPE || types.includes(subscription.type))
+           store.remove(SUBSCRIPTION, row.id);
+       }

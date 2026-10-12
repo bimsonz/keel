@@ -1,34 +1,39 @@
 import { hearLiveChange, liveChanges } from "@keeltown/core/application/coordination";
 import type { EventEnvelope, ProjectId } from "@keeltown/core/kernel";
-import { type EntityStore, LiveChanges } from "@keeltown/core/ports";
+import { type EventDraft, LiveChanges } from "@keeltown/core/ports";
 import { Effect, Layer } from "effect";
-import { makeEntityStoreMemory } from "./storage.ts";
-
-type Store = (typeof EntityStore)["Service"];
+import { makeEventOutboxMemory } from "./event-outbox.ts";
 
 /**
  * LiveChanges in memory: one index per project, folded by the same
- * `hearLiveChange` the Project DO runs. `hear` feeds it an event of one of
- * the project's changes, as the fan-out would.
+ * `hearLiveChange` the Project DO runs, over an in-memory outbox of its own.
+ * `hear` feeds it an event of one of the project's changes, as the fan-out
+ * would, and answers the notices the Project DO would commit.
  */
 export function makeLiveChangesMemory() {
-  const indexes = new Map<ProjectId, Store>();
-  const indexOf = (projectId: ProjectId): Store => {
-    let store = indexes.get(projectId);
-    if (store === undefined) {
-      store = makeEntityStoreMemory().service;
-      indexes.set(projectId, store);
+  const indexes = new Map<ProjectId, ReturnType<typeof makeEventOutboxMemory>>();
+  const indexOf = (projectId: ProjectId) => {
+    let index = indexes.get(projectId);
+    if (index === undefined) {
+      index = makeEventOutboxMemory();
+      indexes.set(projectId, index);
     }
-    return store;
+    return index;
   };
   return {
-    hear: (projectId: ProjectId, event: EventEnvelope): void => {
-      const store = indexOf(projectId);
-      store.transaction(() => hearLiveChange(store, event));
+    hear: (projectId: ProjectId, event: EventEnvelope): readonly EventDraft[] => {
+      const { store, service: outbox } = indexOf(projectId);
+      return store.service.transaction(() =>
+        hearLiveChange({ store: store.service, outbox }, projectId, event),
+      );
     },
+    /** The project's index outbox: who it would tell, as the Project DO's own subscriptions. */
+    outboxOf: (projectId: ProjectId) => indexOf(projectId).service,
     layer: Layer.succeed(
       LiveChanges,
-      LiveChanges.of({ of: (projectId) => Effect.sync(() => liveChanges(indexOf(projectId))) }),
+      LiveChanges.of({
+        of: (projectId) => Effect.sync(() => liveChanges(indexOf(projectId).store.service)),
+      }),
     ),
   };
 }

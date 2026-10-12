@@ -2,13 +2,13 @@
 # kills: b12.get-change
 # why: getChange still answers the declared 503 service.not_implemented
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
-index 1fd73a4..74e888a 100644
+index 318e58d..0dea818 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
 @@ -249,6 +249,7 @@ export function makeHandlers(run: Runner) {
          );
        },
-       Changes_getChange: (caller: Caller, input: Input<"Changes_getChange">) => {
+       change: (caller: Caller, input: Input<"change">) => {
 +        if (caller.requestId !== "") return notYet(caller);
          const decoded = changeIdInput(input.changeId);
          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
