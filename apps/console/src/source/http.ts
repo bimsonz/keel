@@ -1,16 +1,19 @@
-// Keel, as the page reaches it: through the console's own Worker, which holds
-// the credentials the page never sees. Events are read from `/api/v1/events`
-// by cursor, long-polling at the tail. A ruling goes to `/rule/<capability>`,
-// where the capability names one question and is either the one this page was
-// opened with (a phone that scanned a QR code) or one the Worker gives the
-// presenter's console.
+// Keel, as the page reaches it: on the page's own origin, under /v1, as
+// whoever is signed in. The session is a cookie Keel set, which the browser
+// sends with every request to its own origin and no script can read; the page
+// puts no credential of its own on anything. A reader with no session is a
+// visitor, and Keel reads a visitor what is public.
+//
+// A project is found by its org and its name (`GET /v1/orgs/{org}/projects/
+// {name}`), and everything after is read by the id Keel answered: its log by
+// cursor, long-polling at the tail, its repository, a verdict's evidence. A
+// ruling is Keel's own operation, and Keel decides whether this reader may
+// give it.
 //
 // What the API does not offer yet is absent here too, honestly: there are no
 // observations, and diffs and probe sources are refused (QUESTIONS.md, B and
-// D). The console's views show their empty states for those. A verdict's
-// evidence is read from Keel's own view of the verdict.
+// D). The console's views show their empty states for those.
 
-import { readClaim } from "../capability.ts";
 import { EVENT_TYPES } from "../contract/envelope.ts";
 import type { AnyEvent } from "../contract/events.ts";
 import type {
@@ -18,6 +21,9 @@ import type {
   EventRecord,
   Inbox_listEventsInput,
   LatticeSet,
+  Operator_giveRulingInput,
+  ProjectPage,
+  ProjectView,
   RepoBlob,
   RepoCommitDiff,
   RepoCommitPage,
@@ -25,56 +31,33 @@ import type {
   Repo_getBlobInput,
   Repo_getTreeInput,
   Repo_listCommitsInput,
-  RulingRequest,
   VerdictView,
 } from "../contract/keel/index.ts";
 import { type KeelRepository, RepoRefused } from "./repository.ts";
-import type {
-  ChangeDiff,
-  KeelCommands,
-  KeelEventSource,
-  KeelResources,
-  Page,
-  ProbeSource,
-  ReadRequest,
-  RulingCommand,
-  SourceDescriptor,
-  VerdictReasons,
+import {
+  type ChangeDiff,
+  type KeelCommands,
+  type KeelDirectory,
+  type KeelEventSource,
+  KeelRefused,
+  type KeelResources,
+  type Page,
+  type ProbeSource,
+  type ReadRequest,
+  type RulingCommand,
+  type SourceDescriptor,
+  type VerdictReasons,
 } from "./types.ts";
 
-export interface HttpSourceOptions {
-  /** Where the console's Worker is. The page's own origin, so nothing, unless a test says otherwise. */
+export interface HttpOptions {
+  /** Where Keel is. The page's own origin, so nothing, unless a test says otherwise. */
   origin?: string;
-  /** The presenter's key. With it this console may ask for a capability; without it, it only reads. */
-  presenterKey?: string;
-  /** A capability this page was opened with. */
-  capability?: string;
   fetch?: typeof fetch;
 }
-
-/** Keel would not read its log to this reader: a visitor, where the log is an observer's to read. */
-class LogClosed extends Error {}
-
-/** The Worker would not have the key this console was opened with. */
-export class KeyRefused extends Error {
-  constructor() {
-    super("That is not the presenter's key");
-  }
-}
-
-/** A capability is asked for again once it has less than this long left, in seconds. */
-const FRESH_FOR = 120;
 
 export type HttpSource = KeelEventSource & KeelResources & KeelRepository & KeelCommands;
 
 const KNOWN: ReadonlySet<string> = new Set(EVENT_TYPES);
-
-/** What the console's Worker answers besides Keel's own bodies. */
-interface Answer {
-  capability?: unknown;
-  expires?: unknown;
-  reason?: unknown;
-}
 
 /** An entry of the log, as the console reads one. An event its catalogue does not know yet is left out, not guessed at. */
 function toEvent(record: EventRecord): AnyEvent | null {
@@ -95,49 +78,92 @@ const queryOf = (input: Record<string, string | number | undefined>): string => 
   return query === "" ? "" : `?${query}`;
 };
 
-export async function createHttpSource(options: HttpSourceOptions): Promise<HttpSource> {
+/** What the console reads of Keel's problem answer: its words, its code, and the next actions it always carries. */
+interface Problem {
+  title?: unknown;
+  detail?: unknown;
+  code?: unknown;
+  nextActions?: unknown;
+}
+
+/** Keel's refusal, as it words one: its detail or its title, its code, and the ways forward it gave. */
+async function refusalOf(response: Response): Promise<KeelRefused> {
+  const problem: Problem = await response.json().catch(() => ({}));
+  const said = [problem.detail, problem.title].find(
+    (words): words is string => typeof words === "string" && words !== "",
+  );
+  const next = Array.isArray(problem.nextActions) ? problem.nextActions : [];
+  return new KeelRefused(
+    said ?? `Keel answered ${response.status}`,
+    typeof problem.code === "string" ? problem.code : "",
+    response.status,
+    next.flatMap((action: unknown) =>
+      typeof action === "object" &&
+      action !== null &&
+      "title" in action &&
+      typeof action.title === "string"
+        ? [action.title]
+        : [],
+    ),
+  );
+}
+
+/** Keel's answer to a read, as the JSON it is. Whatever answers under /v1 with anything else is not Keel. */
+async function answered<Body>(response: Response): Promise<Body> {
+  try {
+    const body: Body = await response.json();
+    return body;
+  } catch {
+    throw new Error("What answered at /v1 was not Keel");
+  }
+}
+
+/** A read of Keel, with nothing added to it: what the browser sends to its own origin is all Keel is shown. */
+function reader(options: HttpOptions): (path: string, signal?: AbortSignal) => Promise<Response> {
   const request = options.fetch ?? fetch;
   const origin = options.origin ?? "";
-  const linked =
-    options.capability === undefined
-      ? null
-      : { capability: options.capability, claim: readClaim(options.capability) };
-  const minted = new Map<string, { capability: string; expires: number }>();
-  /**
-   * A read of Keel, through the Worker. The presenter's key rides on every one: it is what makes the Worker
-   * read as an observer. Without it the Worker asks Keel with no token, as for any visitor.
-   */
-  const read = (path: string, signal?: AbortSignal): Promise<Response> =>
-    request(`${origin}/api${path}`, {
-      ...(options.presenterKey === undefined
-        ? {}
-        : { headers: { authorization: `Bearer ${options.presenterKey}` } }),
-      ...(signal === undefined ? {} : { signal }),
-    });
+  return (path, signal) => request(`${origin}${path}`, signal === undefined ? {} : { signal });
+}
 
-  /** A capability for one question: the one this page was opened with, or one asked of the Worker. */
-  const capabilityFor = async (escalationId: string): Promise<string | null> => {
-    if (linked?.claim?.escalationId === escalationId) return linked.capability;
-    if (options.presenterKey === undefined) return null;
-    const held = minted.get(escalationId);
-    if (held !== undefined && held.expires - Date.now() / 1000 > FRESH_FOR) return held.capability;
-    const response = await request(`${origin}/present/capability`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${options.presenterKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ escalationId }),
-    });
-    if (!response.ok) return null;
-    const answer: Answer = await response.json();
-    if (typeof answer.capability !== "string" || typeof answer.expires !== "number") return null;
-    minted.set(escalationId, { capability: answer.capability, expires: answer.expires });
-    return answer.capability;
+export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
+  const read = reader(options);
+  return {
+    async findProject(org, name, signal) {
+      const response = await read(
+        `/v1/orgs/${encodeURIComponent(org)}/projects/${encodeURIComponent(name)}`,
+        signal,
+      );
+      // Keel answers a project it does not show this reader as it answers one that is not there.
+      if (response.status === 404) return null;
+      if (!response.ok) throw await refusalOf(response);
+      return answered<ProjectView>(response);
+    },
+    async listProjects(signal) {
+      const listed: ProjectView[] = [];
+      let cursor: string | undefined;
+      do {
+        // oxlint-disable-next-line no-await-in-loop -- a page names the next one
+        const response = await read(`/v1/projects${queryOf({ cursor, limit: 100 })}`, signal);
+        // oxlint-disable-next-line no-await-in-loop -- as above
+        if (!response.ok) throw await refusalOf(response);
+        // oxlint-disable-next-line no-await-in-loop -- as above
+        const page = await answered<Partial<ProjectPage>>(response);
+        listed.push(...(page.items ?? []));
+        cursor = page.nextCursor;
+      } while (cursor !== undefined && cursor !== "");
+      return listed;
+    },
   };
+}
+
+/** One project's log, repository and questions, read from Keel as whoever is signed in. */
+export function createHttpSource(project: ProjectView, options: HttpOptions = {}): HttpSource {
+  const request = options.fetch ?? fetch;
+  const origin = options.origin ?? "";
+  const read = reader(options);
 
   /**
-   * One of Keel's reads of a project's repository. Keel says why it refuses one by its own code: no such
+   * One of Keel's reads of the project's repository. Keel says why it refuses one by its own code: no such
    * project for this reader, no such ref, no such path.
    */
   const repo = async <Body>(
@@ -158,23 +184,15 @@ export async function createHttpSource(options: HttpSourceOptions): Promise<Http
   };
 
   const events = async (asked: ReadRequest): Promise<Page<AnyEvent>> => {
-    // The operation's own input, by Keel's names for it.
+    // The operation's own input, by Keel's names for it. The log asked for is this project's and no other's.
     const input: Inbox_listEventsInput = {
+      project: project.id,
       limit: Math.min(asked.limit ?? 500, 500),
       ...(asked.cursor === undefined || asked.cursor === "" ? {} : { cursor: asked.cursor }),
       ...((asked.waitSec ?? 0) > 0 ? { wait: Math.min(asked.waitSec ?? 0, 30) } : {}),
     };
-    const query = new URLSearchParams(
-      Object.entries(input).map(([name, value]) => [name, String(value)]),
-    );
-    const response = await read(`/v1/events?${query.toString()}`, asked.signal);
-    // Keel reads its log to an observer. A 401 or a 403 is its answer to anyone else: to a visitor, that the
-    // log is not theirs to read; to a console opened with a key, that the key is not the presenter's.
-    if (response.status === 401 || response.status === 403) {
-      if (options.presenterKey === undefined) throw new LogClosed();
-      throw new KeyRefused();
-    }
-    if (!response.ok) throw new Error(`reading events failed: ${response.status}`);
+    const response = await read(`/v1/events${queryOf({ ...input })}`, asked.signal);
+    if (!response.ok) throw await refusalOf(response);
     const page: Partial<EventPage> = await response.json();
     // Keel's page always says where to read next. A reader that carried on without that would start again from
     // the beginning, for ever, so a page that does not is refused.
@@ -186,31 +204,11 @@ export async function createHttpSource(options: HttpSourceOptions): Promise<Http
     };
   };
 
-  // Simulated time is measured from the log's first event, so read one page to learn when that was. This is
-  // also where a visitor learns the log is not theirs: the console stands all the same, with what Keel does
-  // read to anyone.
-  const first = await events({}).catch((error: unknown) => {
-    if (error instanceof LogClosed) return null;
-    throw error;
-  });
-  let firstPage: Page<AnyEvent> | null = first;
-  const descriptor: SourceDescriptor = {
-    mode: "live",
-    log: first === null ? "closed" : "open",
-    epoch: first?.items[0]?.at ?? new Date().toISOString(),
-  };
+  const descriptor: SourceDescriptor = { mode: "live", project };
 
   return {
     descriptor,
-    readEvents(asked = {}) {
-      if (first === null) return Promise.resolve({ items: [], nextCursor: asked.cursor ?? "" });
-      if (firstPage !== null && asked.cursor === undefined) {
-        const page = firstPage;
-        firstPage = null;
-        return Promise.resolve(page);
-      }
-      return events(asked);
-    },
+    readEvents: (asked = {}) => events(asked),
     readObservations: (asked = {}) =>
       Promise.resolve({ items: [], nextCursor: asked.cursor ?? "" }),
     getTree: (projectId, at, signal) =>
@@ -249,25 +247,31 @@ export async function createHttpSource(options: HttpSourceOptions): Promise<Http
       const view: VerdictView = await response.json();
       return view;
     },
-    canRule: (escalationId: string): boolean =>
-      options.presenterKey !== undefined || linked?.claim?.escalationId === escalationId,
-    capabilityFor,
+    // Keel decides who may answer. The buttons are offered to a member of the project's org, and for the finer
+    // cases Keel's own refusal says no.
+    canRule: (): boolean => project.viewer !== undefined,
     async giveRuling(command: RulingCommand): Promise<void> {
-      const capability = await capabilityFor(command.escalationId);
-      if (capability === null) throw new Error("This console is read-only.");
-      const response = await request(`${origin}/rule/${capability}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          option: command.option,
-          ...(command.rationale === undefined ? {} : { rationale: command.rationale }),
-        } satisfies RulingRequest),
-      });
-      if (response.ok) return;
-      const refused: Answer = await response.json().catch(() => ({}));
-      throw new Error(
-        typeof refused.reason === "string" ? refused.reason : "The ruling was not taken.",
+      // The operation's whole input, as Keel's contract has it: the question in the path, the key in the
+      // header, and the ruling as the body.
+      const {
+        escalationId,
+        "idempotency-key": key,
+        ...ruling
+      }: Operator_giveRulingInput = {
+        escalationId: command.escalationId,
+        "idempotency-key": command.idempotencyKey,
+        option: command.option,
+        ...(command.rationale === undefined ? {} : { rationale: command.rationale }),
+      };
+      const response = await request(
+        `${origin}/v1/escalations/${encodeURIComponent(escalationId)}/ruling`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", "idempotency-key": key },
+          body: JSON.stringify(ruling),
+        },
       );
+      if (!response.ok) throw await refusalOf(response);
     },
   };
 }

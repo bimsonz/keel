@@ -293,6 +293,7 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 ### Removed
 
 - The scope checks the policy replaced (the cutover): `satisfies` and the generated routes' scope test, the MCP tool filter, `confineBootstrap`/`BOOTSTRAP_MAY_CALL`, read-scope's `readsInstanceWide`/`projectScope`/`readScope`/`viewScope` with `TokenRequired`/`ForeignProject`/`ReadRefused`, `repoAccess`, `withdrawAuthority`'s scope test, and the inbox streams' own checks.
+- `scripts/deploy.ts` (tooling, no contract change): the console's block is gone. The console's Worker holds no credential, so the deploy no longer sets the observer's and operator's client credentials on it, nor generates `CONSOLE_CAPABILITY_KEY` and `CONSOLE_PRESENTER_KEY`, and `--rotate` is removed with them. The `console` entry of `.keel/<env>.json` is no longer read or written. `apps/console/wrangler.jsonc` loses its six `secrets.required` and its service binding to `keel`.
 - `L1_SUITE_PLAN` in `@keeltown/core/application/verification`: nothing runs a static plan; tests compile theirs (`suitePlan`, `workerAppPlan`, `guardedPlan` and `TEST_GUARD` in `@keeltown/testing`).
 - `SubjectRpc.rely` and its codec: a change relies on a subject through its own Change DO only (`ChangeRpc.rely`), which subscribes the subject.
 - `LaneRpc.enqueue` and `LaneCodecs.enqueue`, which nothing called: a change joins its lane by its ChangeQueued only (no callers).

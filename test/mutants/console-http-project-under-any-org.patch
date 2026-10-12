@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.org
+# why: a project is looked for by its name alone, so an address under another org opens it
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 77b9794..a3c7d7f 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -130,7 +130,7 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
+   return {
+     async findProject(org, name, signal) {
+       const response = await read(
+-        `/v1/orgs/${encodeURIComponent(org)}/projects/${encodeURIComponent(name)}`,
++        `/v1/orgs/acme/projects/${encodeURIComponent(name)}`,
+         signal,
+       );
+       // Keel answers a project it does not show this reader as it answers one that is not there.

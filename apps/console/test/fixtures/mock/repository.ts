@@ -14,7 +14,7 @@ import type {
   RepoFileChange,
   RepoTree,
 } from "../../../src/contract/keel/index.ts";
-import type { RepoNote, RepoNotes, RepoProject } from "../../../src/contract/provisional.ts";
+import type { RepoNote, RepoNotes } from "../../../src/contract/provisional.ts";
 import {
   type KeelRepository,
   NO_SUCH_PROJECT,
@@ -33,7 +33,8 @@ interface Snapshot {
 }
 
 interface Derived {
-  project: RepoProject;
+  /** Keel's id for the project the log creates. */
+  projectId: string;
   /** Oldest first. */
   snapshots: Snapshot[];
 }
@@ -78,16 +79,10 @@ function derive(log: GeneratedLog): Derived | null {
   const files = new Map<string, string>();
   let anchors = [...scripted.anchors];
   const snapshots: Snapshot[] = [];
-  let project: RepoProject | undefined;
+  let projectId: string | undefined;
   log.events.forEach((event, index) => {
     if (event.type === "ProjectCreated") {
-      project = {
-        id: event.payload.projectId,
-        name: event.payload.name,
-        visibility: "public",
-        cloneUrl: `https://keel.town/${event.payload.name}.git`,
-        head: "",
-      };
+      projectId = event.payload.projectId;
     } else if (event.type === "IntentDeclared") {
       labels.set(event.payload.changeId, {
         label: event.label ?? event.payload.changeId.slice(-4),
@@ -141,9 +136,7 @@ function derive(log: GeneratedLog): Derived | null {
       });
     }
   });
-  const head = snapshots.at(-1)?.commit.sha;
-  if (project === undefined || head === undefined) return null;
-  return { project: { ...project, head }, snapshots };
+  return projectId === undefined || snapshots.length === 0 ? null : { projectId, snapshots };
 }
 
 /** What the log says, up to `until`, about the subject with this key. */
@@ -239,10 +232,9 @@ export function createMockRepository(log: () => GeneratedLog): KeelRepository {
   };
   /** A read names its project by Keel's id. Any other is no project, as a private one is. */
   const inProject = (projectId: string): void => {
-    if (projectId !== current().project.id) throw new RepoRefused(NO_SUCH_PROJECT, 404);
+    if (projectId !== current().projectId) throw new RepoRefused(NO_SUCH_PROJECT, 404);
   };
   return {
-    getProject: () => answer((): RepoProject => current().project),
     getTree: (projectId: string, at: RepoAt) =>
       answer((): RepoTree => {
         inProject(projectId);

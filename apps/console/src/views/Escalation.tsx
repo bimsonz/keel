@@ -173,10 +173,11 @@ export function Escalation({
                     label="QR code: answer this question from a phone"
                   />
                   <p className="text-base leading-snug text-kumo-default">
-                    <b className="font-semibold text-kumo-strong">Answer from a phone.</b> Scan
-                    this. The link is good for this question only, once, for ten minutes.{" "}
-                    <a className="a-link" href={phoneUrl} target="_blank" rel="noreferrer">
-                      Open the phone view
+                    <b className="font-semibold text-kumo-strong">Answer from a phone.</b> Scan this
+                    to open the question there. It is this page's own address and nothing more:
+                    whoever opens it signs in, and Keel decides whether they may answer.{" "}
+                    <a className="a-link break-all" href={phoneUrl}>
+                      {phoneUrl}
                     </a>
                   </p>
                 </div>

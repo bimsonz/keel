@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { type Org, createAccount, nameOf } from "./account/account.ts";
 import { openCounts } from "./engine/lists.ts";
 import { Player } from "./engine/player.ts";
 import { ConsoleProvider, usePlayer, useSelected, useWorldVersion } from "./engine/react.tsx";
@@ -13,12 +14,14 @@ import { HomePage } from "./pages/Home.tsx";
 import { InsightsPage } from "./pages/Insights.tsx";
 import { Missing } from "./pages/Missing.tsx";
 import { MissionControlPage } from "./pages/MissionControl.tsx";
-import { type Route, TRUNK, href, parse } from "./route.ts";
-import { WhereProvider, carriedParams, onMove, useAddress } from "./router.tsx";
-import { KeyRefused, createHttpSource } from "./source/http.ts";
+import { type Route, TRUNK, href } from "./route.ts";
+import { hrefOf } from "./places.ts";
+import { WhereProvider, carriedParams, useAddress } from "./router.tsx";
+import { createHttpDirectory, createHttpSource } from "./source/http.ts";
+import type { ProjectView } from "./contract/keel/index.ts";
+import type { KeelDirectory } from "./source/types.ts";
 import { type Mode, applyMode } from "./theme/mode.ts";
-import { Frame, Notice } from "./views/Frame.tsx";
-import { Phone } from "./views/Phone.tsx";
+import { Frame, Notice, type ReaderMark } from "./views/Frame.tsx";
 import { NamesProvider } from "./views/links.tsx";
 // oxlint-disable-next-line import/no-unassigned-import -- a stylesheet
 import "./views/tokens.css";
@@ -32,55 +35,105 @@ function parseTime(value: string | null): number {
   return (Number(minutes) * 60 + Number(seconds)) * 1000 || 0;
 }
 
-const PRESENTER_KEY = "keel.presenter";
-
-/**
- * The presenter's key, if this console was opened with one. It arrives once, in the address's fragment
- * (`#presenter=…`), which is never sent to a server; it is kept for the session and taken out of the address.
- */
-function presenterKey(): { presenterKey?: string } {
-  const given = new URLSearchParams(window.location.hash.slice(1)).get("presenter");
-  if (given !== null && given !== "") {
-    window.sessionStorage.setItem(PRESENTER_KEY, given);
-    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
-  }
-  const kept = window.sessionStorage.getItem(PRESENTER_KEY);
-  return kept === null ? {} : { presenterKey: kept };
-}
-
-/** The project the address names, if it names one. */
-const projectAsked = (): string | null => parse(window.location.pathname, "").project;
-
-/** A capability this page was opened with: what a QR code carries to a phone. */
-function linkedCapability(params: URLSearchParams): { capability?: string } {
-  const given = params.get("rule");
-  return given === null || given === "" ? {} : { capability: given };
+/** Keel as this page reads it: Keel itself, or in development a scripted fixture standing in for it. */
+interface Reading {
+  mode: "live" | "fixture";
+  /** The projects Keel names to this reader. */
+  directory: KeelDirectory;
+  /** A playhead on one of those projects, its log not read yet. */
+  open(project: ProjectView): Player;
 }
 
 /** A scripted fixture, loaded only when asked for. The import is what keeps it out of the built console. */
-async function fixtureSource(scenario: string, params: URLSearchParams, seed: number) {
-  const { createMockSource, isScenario } = await import("../test/fixtures/mock/MockSource.ts");
+async function fixtureReading(
+  scenario: string,
+  params: URLSearchParams,
+  seed: number,
+): Promise<Reading> {
+  const { createMockSource, fixtureDirectory, isScenario } =
+    await import("../test/fixtures/mock/MockSource.ts");
   const ruling = params.get("ruling");
   const [agents, seconds] = [Number(params.get("agents")), Number(params.get("seconds"))];
-  return createMockSource({
+  const source = createMockSource({
     scenario: isScenario(scenario) ? scenario : "s1",
     seed,
     ...(ruling === null ? {} : { ruling }),
     ...(agents > 0 ? { agents } : {}),
     ...(seconds > 0 ? { seconds } : {}),
   });
+  return {
+    mode: "fixture",
+    directory: await fixtureDirectory(source),
+    // A fixture's one log holds every project it has, so its playhead is told which to fold.
+    open(project) {
+      const player = new Player(source);
+      player.scopeTo(project.name);
+      return player;
+    },
+  };
 }
 
-/** True on a screen as narrow as a phone's. */
-function useNarrow(): boolean {
-  const query = useMemo(() => window.matchMedia("(max-width: 720px)"), []);
-  return useSyncExternalStore(
-    (notify) => {
-      query.addEventListener("change", notify);
-      return () => query.removeEventListener("change", notify);
-    },
-    () => query.matches,
-  );
+/**
+ * The console reads Keel. A scripted fixture can stand in for it in development, for tests and for working on
+ * a view; it is not in the built console, so that branch is gone from the build.
+ */
+async function readingOf(params: URLSearchParams, seed: number): Promise<Reading> {
+  const fixture = import.meta.env.DEV ? params.get("scenario") : null;
+  if (fixture !== null) return fixtureReading(fixture, params, seed);
+  return {
+    mode: "live",
+    directory: createHttpDirectory(),
+    open: (project) => new Player(createHttpSource(project)),
+  };
+}
+
+/** Who is reading, and their orgs. */
+interface Reader {
+  mark: ReaderMark;
+  orgs: readonly Org[];
+}
+
+/**
+ * Who is reading, for the frame's way in and its way to the reader's own orgs. Keel says, by the session the
+ * browser holds. Undefined until it has, on a Keel that serves no accounts, and on a test fixture.
+ */
+function useReader(live: boolean): Reader | undefined {
+  const [reader, setReader] = useState<Reader>();
+  useEffect(() => {
+    if (!live) return undefined;
+    let here = true;
+    const account = createAccount({ origin: window.location.origin });
+    const read = async (): Promise<void> => {
+      const who = await account.who();
+      if (!here) return;
+      if (who === null) {
+        setReader({ mark: {}, orgs: [] });
+        return;
+      }
+      setReader({ mark: { name: nameOf(who) }, orgs: [] });
+      // Keel lists a user's orgs once they have a handle; one who has none yet has no org.
+      if (who.handle === undefined) return;
+      const orgs = await account.orgs();
+      if (!here) return;
+      setReader({
+        mark: {
+          name: nameOf(who),
+          orgs: orgs.map((org) => ({
+            name: org.handle,
+            href: hrefOf({ at: "org", org: org.handle, tab: "home" }),
+            ...(org.name === org.handle ? {} : { note: org.name }),
+          })),
+        },
+        orgs,
+      });
+    };
+    // A Keel that serves no accounts has nobody to name: the frame then offers no way in.
+    read().catch(() => undefined);
+    return () => {
+      here = false;
+    };
+  }, [live]);
+  return reader;
 }
 
 function Page({ route, mode }: { route: Route; mode: Mode }) {
@@ -133,78 +186,148 @@ function pageOf(route: Route, address: string): string {
   return address;
 }
 
-/** The places read from the project's code, which Keel reads to anyone where the project is public. */
+/** The places read from the project's code, which need nothing of its log. */
 const CODE: ReadonlySet<Route["at"]> = new Set(["code", "commits", "commit"]);
 
-function Console({ mode, seed }: { mode: Mode; seed: number }) {
+/** A project's pages, in its frame. */
+function Console({
+  found,
+  siblings,
+  reader,
+  route,
+  mode,
+  seed,
+}: {
+  found: ProjectView;
+  /** The other projects of the org that Keel names to this reader. */
+  siblings: readonly ProjectView[];
+  reader: ReaderMark | undefined;
+  route: Route;
+  mode: Mode;
+  seed: number;
+}) {
   const player = usePlayer();
   useWorldVersion();
-  const narrow = useNarrow();
-  const { project: asked, route } = useAddress();
-  const named = player.world.project?.name;
-  // Who may read the project: as Keel's own answer about the project has it, or else as its log has it.
-  const visibility =
-    player.repository.project?.visibility ??
-    (asked === null ? undefined : player.projects.named(asked)?.visibility);
+  // Who may read the project: as its log says it now is, or else as Keel said when the project was found.
+  const visibility = player.projects.named(found.name)?.visibility ?? found.visibility;
   const counts = useSelected(openCounts);
-  /** Keel reads its log to an observer, and this reader is a visitor: the console has what Keel reads to anyone. */
-  const closed = player.source.descriptor.log === "closed";
-  const source = { mode: player.source.descriptor.mode, seed, unread: player.unread, closed };
-  // The other projects Keel has named to this reader, for the frame's switcher. A visitor is named none.
-  const projects = player.projects.list.map((project) => ({
+  const source = { mode: player.source.descriptor.mode, seed, unread: player.unread };
+  const projects = siblings.map((project) => ({
     name: project.name,
-    href: href(project.name, HOME, carriedParams()),
+    href: href(project.org, project.name, HOME, carriedParams()),
     note: project.visibility,
   }));
+  // A page read from the log has nothing to draw until the log has been read. The code waits for none of it.
+  const waiting = !player.loaded && !CODE.has(route.at) && route.at !== "missing";
+  return (
+    <WhereProvider org={found.org} project={found.name} route={route}>
+      <NamesProvider>
+        <Frame
+          source={source}
+          projects={projects}
+          visibility={visibility}
+          {...(reader === undefined ? {} : { reader })}
+          {...(player.loaded ? { counts } : {})}
+        >
+          {waiting ? null : (
+            <Page
+              key={pageOf(route, href(found.org, found.name, route))}
+              route={route}
+              mode={mode}
+            />
+          )}
+        </Frame>
+      </NamesProvider>
+    </WhereProvider>
+  );
+}
 
-  // The page a QR code opens is for answering one question, on whatever screen it is opened. It keeps the address it
-  // was given, which holds its capability.
-  const linked = new URLSearchParams(window.location.search).has("rule");
-  // A narrow screen that can read the log is a phone too. One that cannot is a visitor's, and gets what a visitor gets.
-  const answering = asked !== null && (linked || (narrow && !closed));
-  // What the project is, and who may read it, is Keel's to say, and is asked once.
+type Opened =
+  | { is: "reading" }
+  | { is: "missing" }
+  | { is: "failed"; said: string }
+  | { is: "open"; found: ProjectView; player: Player };
+
+/** One project, found by its org and its name, and read from there. */
+function Project({
+  reading,
+  reader,
+  org,
+  name,
+  route,
+  mode,
+  seed,
+  params,
+}: {
+  reading: Reading;
+  reader: ReaderMark | undefined;
+  org: string;
+  name: string;
+  route: Route;
+  mode: Mode;
+  seed: number;
+  params: URLSearchParams;
+}) {
+  const [opened, setOpened] = useState<Opened>({ is: "reading" });
+  const [siblings, setSiblings] = useState<readonly ProjectView[]>([]);
+
   useEffect(() => {
-    if (asked !== null) player.repository.wantProject();
-  }, [player, asked]);
+    let here = true;
+    const stop = new AbortController();
+    const start = async (): Promise<void> => {
+      const found = await reading.directory.findProject(org, name, stop.signal);
+      if (!here) return;
+      if (found === null) {
+        setOpened({ is: "missing" });
+        return;
+      }
+      const player = reading.open(found);
+      if (player.live) {
+        // Keel's log is followed as it is written, and the code needs none of it: the pages stand at once, and
+        // the log is read behind them.
+        setOpened({ is: "open", found, player });
+        await player.load();
+        if (!here) return;
+        player.seek(player.end);
+        player.play();
+        void player.follow(stop.signal);
+        return;
+      }
+      // Where in a fixture's log to stand, and how fast to go, are the address's to say, before anything is drawn.
+      await player.load();
+      if (!here) return;
+      player.setRate(Number(params.get("speed")) || (params.get("scenario") === "swarm" ? 1 : 4));
+      player.seek(parseTime(params.get("t")));
+      if (params.get("play") !== "0") player.play();
+      setOpened({ is: "open", found, player });
+    };
+    start().catch((error: unknown) => {
+      if (here)
+        setOpened({
+          is: "failed",
+          said: error instanceof Error ? error.message : "Keel could not be read",
+        });
+    });
+    // The org's other projects, for the frame's switcher. The page does not wait for them.
+    const others = async (): Promise<void> => {
+      const listed = await reading.directory.listProjects(stop.signal).catch(() => []);
+      if (here) setSiblings(listed.filter((project) => project.org === org));
+    };
+    void others();
+    return () => {
+      here = false;
+      stop.abort();
+    };
+  }, [reading, org, name, params]);
 
-  // A phone is for one thing: answering the question a QR code brought it to.
-  if (answering && closed) {
+  if (opened.is === "reading") return null;
+  if (opened.is === "failed") return <Unreachable said={opened.said} />;
+  if (opened.is === "missing") {
+    // A project Keel does not show this reader and one that is not there are the same answer, and the same page.
     return (
-      <Notice title="This phone cannot show the question yet">
-        Keel reads a question only to an observer today, and what a QR code carries is a way to
-        answer one question, not a key to read with. Answer it on the console it was asked on.
-      </Notice>
-    );
-  }
-  if (answering) {
-    return (
-      <Phone
-        world={player.world}
-        canRule={(escalationId) => player.canRule(escalationId)}
-        readOnly={
-          player.live
-            ? "This console is read-only: it was not opened with the presenter's key."
-            : "This fixture's own operator answers this one, a few seconds after it is asked."
-        }
-        onRule={(escalationId, option) => player.rule(escalationId, option)}
-      />
-    );
-  }
-
-  // The bare address is the instance's own: one Keel is one organisation's, and this lists its projects.
-  if (asked === null) {
-    return (
-      <WhereProvider project="" route={route.at === "missing" ? route : HOME}>
-        <Frame source={source}>{route.at === "missing" ? <Missing /> : <HomePage />}</Frame>
-      </WhereProvider>
-    );
-  }
-  // An observer's log names every project there is, so a name it does not have is no project's.
-  if (!closed && named === undefined) {
-    return (
-      <WhereProvider project="" route={{ at: "missing" }}>
-        <Frame source={source}>
-          <Notice title={`There is no project called ${asked} here`}>
+      <WhereProvider org="" project="" route={{ at: "missing" }}>
+        <Frame source={{ mode: reading.mode, seed }} {...(reader === undefined ? {} : { reader })}>
+          <Notice title={`There is no project ${org}/${name} here`}>
             <a href="/" className="a-link">
               See the projects Keel has
             </a>
@@ -215,25 +338,27 @@ function Console({ mode, seed }: { mode: Mode; seed: number }) {
     );
   }
   return (
-    <WhereProvider project={asked} route={route}>
-      <NamesProvider>
-        <Frame
-          source={source}
-          counts={counts}
-          projects={projects}
-          {...(visibility === undefined ? {} : { visibility })}
-        >
-          {closed && !CODE.has(route.at) && route.at !== "missing" ? (
-            <Notice title="This page is not shown to visitors yet">
-              It is read from Keel's log, and Keel reads its log only to an observer. The console
-              reads it for whoever opens it with the presenter's key.
-            </Notice>
-          ) : (
-            <Page key={pageOf(route, href(asked, route))} route={route} mode={mode} />
-          )}
-        </Frame>
-      </NamesProvider>
-    </WhereProvider>
+    <ConsoleProvider player={opened.player}>
+      <Console
+        found={opened.found}
+        siblings={siblings}
+        reader={reader}
+        route={route}
+        mode={mode}
+        seed={seed}
+      />
+    </ConsoleProvider>
+  );
+}
+
+function Unreachable({ said }: { said: string }) {
+  return (
+    <Notice title="The console could not reach Keel">
+      {said}. Check that Keel is up.
+      {import.meta.env.DEV
+        ? " In development there is no Keel behind this page; the test fixtures are at ?scenario=s1, s2, s3, s4, s5 or swarm."
+        : ""}
+    </Notice>
   );
 }
 
@@ -241,82 +366,62 @@ export function App() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const mode: Mode = params.get("theme") === "light" ? "light" : "dark";
   const seed = Number(params.get("seed") ?? "42") || 42;
-  const [player, setPlayer] = useState<Player | null>(null);
-  const [failure, setFailure] = useState<{ message: string; refused: boolean } | null>(null);
+  const [reading, setReading] = useState<Reading | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const { org, project, route } = useAddress();
+  const reader = useReader(reading?.mode === "live");
 
   useEffect(() => {
     applyMode(mode);
   }, [mode]);
 
   useEffect(() => {
-    let live = true;
-    const stop = new AbortController();
-    const start = async (): Promise<void> => {
-      // The console reads Keel. A scripted fixture can stand in for it in development, for tests and for
-      // working on a view; it is not in the built console, so this branch is gone from the build.
-      const fixture = import.meta.env.DEV ? params.get("scenario") : null;
-      const created = new Player(
-        fixture === null
-          ? await createHttpSource({ ...presenterKey(), ...linkedCapability(params) })
-          : await fixtureSource(fixture, params, seed),
-      );
-      // Keel's log holds every project. What is folded is the project the address names, and it is kept in
-      // step with the address before any view reads either.
-      created.scopeTo(projectAsked());
-      const unhear = onMove(() => created.scopeTo(projectAsked()));
-      stop.signal.addEventListener("abort", unhear, { once: true });
-      await created.load();
-      if (!live) return;
-      if (created.live) {
-        // Keel's log is followed as it is written. Where in it to stand, and how fast to go, are a fixture's questions.
-        created.seek(created.end);
-        created.play();
-        void created.follow(stop.signal);
-      } else {
-        created.setRate(Number(params.get("speed")) || (fixture === "swarm" ? 1 : 4));
-        created.seek(parseTime(params.get("t")));
-        if (params.get("play") !== "0") created.play();
+    let here = true;
+    const begin = async (): Promise<void> => {
+      try {
+        const made = await readingOf(params, seed);
+        if (here) setReading(made);
+      } catch (error) {
+        if (here) setFailure(error instanceof Error ? error.message : "Keel could not be read");
       }
-      setPlayer(created);
     };
-    start().catch((error: unknown) => {
-      // A key the Worker would not have is forgotten, so that the next load reads as a visitor does.
-      const refused = error instanceof KeyRefused;
-      if (refused) window.sessionStorage.removeItem(PRESENTER_KEY);
-      if (live)
-        setFailure({
-          message: error instanceof Error ? error.message : "Keel's log could not be read",
-          refused,
-        });
-    });
+    void begin();
     return () => {
-      live = false;
-      stop.abort();
+      here = false;
     };
   }, [params, seed]);
 
-  if (failure?.refused === true) {
+  if (failure !== null) return <Unreachable said={failure} />;
+  if (reading === null) return null;
+  if (org !== null && project !== null) {
+    // Another project is another log and another playhead: nothing of the last one is carried over.
     return (
-      <Notice title="That is not the presenter's key">
-        This console was opened with a key its Worker does not have. The key has been forgotten:
-        load the page again to read as a visitor does.
-      </Notice>
+      <Project
+        key={`${org}/${project}`}
+        reading={reading}
+        reader={reader?.mark}
+        org={org}
+        name={project}
+        route={route}
+        mode={mode}
+        seed={seed}
+        params={params}
+      />
     );
   }
-  if (failure !== null) {
-    return (
-      <Notice title="The console could not reach Keel">
-        {failure.message}. Check that Keel is up and that this console's Worker can reach it.
-        {import.meta.env.DEV
-          ? " In development there is no Keel behind this page; the test fixtures are at ?scenario=s1, s2, s3, s4, s5 or swarm."
-          : ""}
-      </Notice>
-    );
-  }
-  if (player === null) return null;
+  // The bare address is the home: the projects Keel names to this reader, by org.
   return (
-    <ConsoleProvider player={player}>
-      <Console mode={mode} seed={seed} />
-    </ConsoleProvider>
+    <WhereProvider org="" project="" route={route.at === "missing" ? route : HOME}>
+      <Frame
+        source={{ mode: reading.mode, seed }}
+        {...(reader === undefined ? {} : { reader: reader.mark })}
+      >
+        {route.at === "missing" || org !== null ? (
+          <Missing />
+        ) : (
+          <HomePage directory={reading.directory} orgs={reader?.orgs ?? []} />
+        )}
+      </Frame>
+    </WhereProvider>
   );
 }

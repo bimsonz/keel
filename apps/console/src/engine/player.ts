@@ -51,8 +51,14 @@ export class Player {
   version = 0;
   /** Events of the project being shown that could not be folded. They are left out of what is shown, and said. */
   unread = 0;
+  /**
+   * True once the log has been read to its end for the first time. Until then the world is short of what Keel
+   * has said, and a page that is read from the log has nothing to show yet; the code needs none of it.
+   */
+  loaded = false;
 
-  #epochMs: number;
+  /** The log's first instant, in ms since 1970. Unknown until the source says, or the log's first entry does. */
+  #epochAt: number | undefined;
   #events: AnyEvent[] = [];
   #eventTimes: number[] = [];
   #observations: Observation[] = [];
@@ -73,18 +79,22 @@ export class Player {
   constructor(source: ConsoleSource, now: () => number = Date.now) {
     this.source = source;
     this.#now = now;
-    this.#epochMs = Date.parse(source.descriptor.epoch);
-    // The repository is read for the project the address names. Its id is the one the log gave it; a reader
-    // the log is closed to has only the name.
+    const { epoch, project } = source.descriptor;
+    if (epoch !== undefined) this.#epochAt = Date.parse(epoch);
+    // A source that reads one project says which, in Keel's own words for it: that is the project shown.
+    if (project !== undefined) {
+      this.projects.know(project);
+      this.#scope = project.name;
+    }
+    // The repository is read for the project being shown, by the id Keel gave it.
     this.repository = new RepositoryReader(
       source,
       () => this.#changed(),
       () => {
         if (this.#scope === null) return undefined;
         const known = this.projects.named(this.#scope);
-        return known === undefined
-          ? { name: this.#scope }
-          : { id: known.id, name: known.name, visibility: known.visibility };
+        if (known === undefined) return { name: this.#scope };
+        return { id: known.id, name: known.name, visibility: known.visibility };
       },
     );
   }
@@ -99,6 +109,11 @@ export class Player {
     this.#timeListeners.add(listener);
     return () => this.#timeListeners.delete(listener);
   };
+
+  /** The log's first instant. A log with nothing in it yet begins now. */
+  get #epochMs(): number {
+    return this.#epochAt ?? this.#now();
+  }
 
   #changed(): void {
     this.version += 1;
@@ -125,13 +140,12 @@ export class Player {
   /** Read everything the source has, page by page. */
   async load(): Promise<void> {
     // The lattices are the same for the whole run. Without them a conflict's page draws no line; nothing else waits on them.
-    // Keel reads them to whoever it reads its log to, so a reader with a closed log is shown no conflict and asks for none.
-    if (this.source.descriptor.log === "open")
-      void this.#fetch(async () => {
-        for (const lattice of (await this.source.getLattices()).items)
-          this.lattices.set(lattice.predicate, lattice);
-      });
+    void this.#fetch(async () => {
+      for (const lattice of (await this.source.getLattices()).items)
+        this.lattices.set(lattice.predicate, lattice);
+    });
     await this.#drain();
+    this.loaded = true;
     this.#changed();
   }
 
@@ -175,6 +189,8 @@ export class Player {
   }
 
   #append(events: readonly AnyEvent[]): void {
+    const [first] = events;
+    if (first !== undefined) this.#epochAt ??= Date.parse(first.at);
     for (const event of events) {
       this.projects.note(event);
       // The log's own order is the truth; `at` only says how far along it we are.
@@ -194,8 +210,6 @@ export class Player {
    * shows everything that has arrived; paused or scrubbed back, it shows history.
    */
   async follow(signal: AbortSignal): Promise<void> {
-    // A log Keel will not read to this reader has no tail to follow, and asking again changes nothing.
-    if (this.source.descriptor.log === "closed") return;
     while (!signal.aborted) {
       const asked = Date.now();
       try {

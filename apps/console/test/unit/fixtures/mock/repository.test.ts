@@ -55,7 +55,6 @@ describe("the repository a fixture's story is about", () => {
     expect(items.slice(0, 2).map((commit) => commit.committer.at)).toEqual(
       advances.map((event) => event.at).toReversed(),
     );
-    expect((await repo.getProject?.())?.head).toBe(items[0]?.sha);
   });
 
   it("serves the tree as it stood at each commit, and refuses by Keel's own codes", async () => {
@@ -201,7 +200,6 @@ describe("the repository a fixture's story is about", () => {
 
   it("is not there for a story that has no repository", async () => {
     const repo = createMockRepository(() => generateSwarm(42, { agents: 12, seconds: 40 }));
-    await expect(repo.getProject?.()).rejects.toThrow("this fixture has no repository");
     await expect(repo.getTree("prj_ANY", { path: "" })).rejects.toThrow(
       "this fixture has no repository",
     );

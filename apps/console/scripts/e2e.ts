@@ -1,19 +1,21 @@
 // Drives the real page in a real browser.
 //
 // Two servers are under test. The dev server (`pnpm dev`, port 5311) serves the
-// scripted fixtures, and the pages are checked against those. The built console
-// is then built and served here (port 5312) and checked the way it is deployed:
-// reading Keel through the console's Worker. The Worker's own code runs in this
-// process and answers the page's requests; behind it stands a stand-in for Keel.
+// scripted fixtures, and the pages are checked against those. The console is
+// then built and served here (port 5312) and checked the way it is deployed:
+// one page that reads Keel under /v1 on its own origin, as whoever is signed
+// in. What answers /v1 here is test code: the real Better Auth for Keel's
+// identity, and a stand-in for the rest of Keel.
 //
 //   node scripts/e2e.ts
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type BrowserContext, type Page, chromium } from "playwright";
+import { encode } from "uqr";
 import { build, preview } from "vite";
+import { createAccount } from "../src/account/account.ts";
 import { type Identity, createIdentity } from "../test/fixtures/identity/standIn.ts";
-import { createFakeKeel } from "../test/fixtures/mock/fakeKeel.ts";
-import { type Env, createConsole } from "../src/worker/handler.ts";
+import { type FakeKeel, type Reader, createFakeKeel } from "../test/fixtures/mock/fakeKeel.ts";
 
 const dev = process.argv[2] ?? "http://localhost:5311";
 const BUILT_PORT = 5312;
@@ -64,7 +66,7 @@ const stat = (label: string): Promise<string> => statOn(page, label);
 const stage = (index: number): Promise<string> => stageOn(page, index);
 const tabs = tabsOf(page);
 const at = (place: string, fixture: string): string =>
-  `${dev}/demo${place}${place.includes("?") ? "&" : "?"}${fixture}`;
+  `${dev}/acme/demo${place}${place.includes("?") ? "&" : "?"}${fixture}`;
 const QUESTION = /May permission checks be cached within a session\?/;
 
 // Scenario 1 is held at the question: nothing has landed, and one person has been asked.
@@ -95,7 +97,12 @@ expectEqual(
   String(await page.getByText("parked on this: #1 and #2").count()),
   "1",
 );
-expectEqual("a fixture offers no phone link", String(await qrOn(page).count()), "0");
+// An open question has a QR code beside it, of its own address: the way to it from a phone.
+expectEqual(
+  "an open question offers its address as a QR code",
+  String(await qrOn(page).count()),
+  "1",
+);
 
 // The project is the frame. Each of its places is a tab, each tab is a link with an address of its own, and what is still open is counted on it.
 expectEqual(
@@ -107,7 +114,7 @@ expectEqual(
       ),
     )
   ).join(" "),
-  "/demo /demo/changes /demo/conflicts /demo/escalations /demo/mission-control /demo/insights",
+  "/acme/demo /acme/demo/changes /acme/demo/conflicts /acme/demo/escalations /acme/demo/mission-control /acme/demo/insights",
 );
 expectEqual(
   "frame: what is open, counted on the tabs",
@@ -157,7 +164,7 @@ expectEqual("advances, still held after waiting", await stat("Advances"), "0");
 // From there to the list of what is waiting for a person, to the question, and back the way one came.
 await page.getByRole("link", { name: "Holding: a person is being asked" }).click();
 await page.getByRole("list", { name: "Escalations, newest first" }).waitFor();
-expectEqual("escalations: listed at their own address", pathOf(page), "/demo/escalations");
+expectEqual("escalations: listed at their own address", pathOf(page), "/acme/demo/escalations");
 expectEqual(
   "escalations: one row, open, with what waits on it",
   String(
@@ -170,13 +177,17 @@ expectEqual(
 );
 await page.locator(".a-list-title a", { hasText: QUESTION }).click();
 await page.getByRole("heading", { level: 1, name: QUESTION }).waitFor();
-expectEqual("escalation: named in its address", pathOf(page), "/demo/escalations/E-1");
+expectEqual("escalation: named in its address", pathOf(page), "/acme/demo/escalations/E-1");
 await page.goBack();
 await page.getByRole("list", { name: "Escalations, newest first" }).waitFor();
-expectEqual("Back returns to the list it was opened from", pathOf(page), "/demo/escalations");
+expectEqual("Back returns to the list it was opened from", pathOf(page), "/acme/demo/escalations");
 await page.goBack();
 await page.getByText("Holding: a person is being asked").waitFor();
-expectEqual("Back again returns to the page before that", pathOf(page), "/demo/mission-control");
+expectEqual(
+  "Back again returns to the page before that",
+  pathOf(page),
+  "/acme/demo/mission-control",
+);
 await page.goForward();
 await page.goForward();
 await page.getByRole("heading", { level: 1, name: QUESTION }).waitFor();
@@ -231,11 +242,11 @@ await page
 expectEqual(
   "conflicts: a filter is part of the address",
   `${pathOf(page)}?state=${new URL(page.url()).searchParams.get("state") ?? ""}`,
-  "/demo/conflicts?state=settled",
+  "/acme/demo/conflicts?state=settled",
 );
 await page.locator(".a-list-title a").first().click();
 await page.getByRole("heading", { name: "World matrix" }).waitFor();
-expectEqual("conflict: named in its address", pathOf(page), "/demo/conflicts/C-1");
+expectEqual("conflict: named in its address", pathOf(page), "/acme/demo/conflicts/C-1");
 expectEqual(
   "conflict: called by what the two sides hold, and by Keel's label",
   squash(await page.getByRole("heading", { level: 1 }).innerText()),
@@ -297,9 +308,9 @@ expectEqual(
         links.map((link) => (link instanceof HTMLAnchorElement ? new URL(link.href).pathname : "")),
       )
   )
-    .filter((path) => path.startsWith("/demo/changes/"))
+    .filter((path) => path.startsWith("/acme/demo/changes/"))
     .join(" "),
-  "/demo/changes/2 /demo/changes/1",
+  "/acme/demo/changes/2 /acme/demo/changes/1",
 );
 
 // Once the agent has said what its change does, its page shows the claim beside what Keel derived.
@@ -329,7 +340,7 @@ expectEqual(
 );
 await parts.filter({ hasText: "Files changed" }).click();
 await page.locator("section.a-panel[aria-label]").first().waitFor();
-expectEqual("change: its files have an address", pathOf(page), "/demo/changes/1/files");
+expectEqual("change: its files have an address", pathOf(page), "/acme/demo/changes/1/files");
 // A part's address opens that part, from nowhere.
 await page.goto(at("/changes/1/files", "scenario=s1&t=700&play=0"), { waitUntil: "networkidle" });
 await page.locator("section.a-panel[aria-label]").first().waitFor();
@@ -414,7 +425,7 @@ expectEqual(
       .first()
       .innerText(),
   )}`,
-  "/demo/conflicts/C-1 proven",
+  "/acme/demo/conflicts/C-1 proven",
 );
 await page.goto(at("/changes?state=bounced", "scenario=s4&t=460&play=0"), {
   waitUntil: "networkidle",
@@ -438,7 +449,11 @@ expectEqual(
   "Landed on trunk | Noted C-1 advise on freshness Proven against this change, which went on: its plan does not block on that predicate. Keel told its agent, and held nothing.",
 );
 await follow(noted.getByRole("link", { name: "C-1" }), ".a-timeline");
-expectEqual("change: what is noted links to the conflict", pathOf(page), "/demo/conflicts/C-1");
+expectEqual(
+  "change: what is noted links to the conflict",
+  pathOf(page),
+  "/acme/demo/conflicts/C-1",
+);
 await page.goto(at("/conflicts/C-1", "scenario=s3&t=495&play=0"), { waitUntil: "networkidle" });
 await page.locator(".a-timeline").waitFor();
 expectEqual(
@@ -519,7 +534,7 @@ const rowsOf = async (): Promise<string> =>
 expectEqual(
   "alternatives: this change and the others side by side, by state, verdict and conflicts, never ranked",
   `${pathOf(page)} | ${await rowsOf()}`,
-  "/demo/changes/2/alternatives | #2 this change “Add a rate limit to collaborator routes” hosted-112 HOSTED withdrawn none yet 0 09:30:24, revision 1 | #1 “Rate-limit the collaborators API” hosted-041 HOSTED landed Land, on 1 piece of evidence 0 09:30:10, revision 1 | #3 “Throttle the collaborators endpoints” hosted-207 HOSTED working none yet 0 09:30:41, revision 1",
+  "/acme/demo/changes/2/alternatives | #2 this change “Add a rate limit to collaborator routes” hosted-112 HOSTED withdrawn none yet 0 09:30:24, revision 1 | #1 “Rate-limit the collaborators API” hosted-041 HOSTED landed Land, on 1 piece of evidence 0 09:30:10, revision 1 | #3 “Throttle the collaborators endpoints” hosted-207 HOSTED working none yet 0 09:30:41, revision 1",
 );
 expectEqual(
   "alternatives: the claim they share is given whole, with its unit and its scope",
@@ -546,7 +561,11 @@ expectEqual(
   "#1 has the same intent, and landed. Read the other change: its intent, its state and its evidence Read what is near your change, the other change included Rebase your change onto trunk as it is now Withdraw your change | #3 was declared with the same intent. Read the other change: its intent, its state and its evidence Read what is near your change, the other change included Rebase your change onto trunk as it is now Withdraw your change",
 );
 await follow(compared.getByRole("link", { name: "#1" }), 'section[aria-label="Verdict"]');
-expectEqual("alternatives: each one is a link to that change", pathOf(page), "/demo/changes/1");
+expectEqual(
+  "alternatives: each one is a link to that change",
+  pathOf(page),
+  "/acme/demo/changes/1",
+);
 await page.goto(at("/changes/1/alternatives", "scenario=s5&t=160&play=0"), {
   waitUntil: "networkidle",
 });
@@ -597,17 +616,14 @@ await page.getByRole("list", { name: "Changes, newest first" }).waitFor();
 expectEqual(
   "changes: Back from a change returns to the list, under the filter it had",
   `${pathOf(page)}?state=${new URL(page.url()).searchParams.get("state") ?? ""}`,
-  "/demo/changes?state=landed",
+  "/acme/demo/changes?state=landed",
 );
 
 // The code: the project's files with its README beneath, a file with the reasons beside its lines, and trunk's history.
 await page.goto(at("", "scenario=s1&t=700&play=0"), { waitUntil: "networkidle" });
 await page.locator(".a-prose h2").first().waitFor();
-expectEqual(
-  "code: the clone command",
-  squash(await page.locator(".a-clone code").innerText()),
-  "git clone https://keel.town/demo.git",
-);
+// Keel serves no clone address yet, and the console makes none up.
+expectEqual("code: no clone address", String(await page.getByText("git clone").count()), "0");
 expectEqual(
   "code: the root, directories first",
   (await page.locator(".a-tree li").allInnerTexts()).map(squash).join(" | "),
@@ -628,7 +644,7 @@ await page.locator("[data-why]").waitFor();
 expectEqual(
   "code: a file's address can be shared",
   pathOf(page),
-  "/demo/blob/trunk/src/authz/cache.ts",
+  "/acme/demo/blob/trunk/src/authz/cache.ts",
 );
 expectEqual(
   "code: why a line is as it is",
@@ -652,7 +668,7 @@ await tree.getByRole("link", { name: "revoke.ts" }).waitFor();
 expectEqual(
   "code: a directory opens beside the file, and the file stays",
   pathOf(page),
-  "/demo/blob/trunk/src/authz/cache.ts",
+  "/acme/demo/blob/trunk/src/authz/cache.ts",
 );
 // Another file is one click away, and the list is as the reader left it.
 await tree.getByRole("link", { name: "check.ts" }).click();
@@ -664,7 +680,7 @@ await page.waitForFunction(
 expectEqual(
   "code: a file opened from the list beside",
   pathOf(page),
-  "/demo/blob/trunk/src/authz/check.ts",
+  "/acme/demo/blob/trunk/src/authz/check.ts",
 );
 expectEqual(
   "code: what the reader opened in the list is still open",
@@ -688,14 +704,14 @@ expectEqual(
 // Each place in the code is a page of its own: Back returns to the last.
 await page.goBack();
 await page.locator(".a-tree a", { hasText: "cache.ts" }).waitFor();
-expectEqual("code: Back returns to the directory", pathOf(page), "/demo/tree/trunk/src/authz");
+expectEqual("code: Back returns to the directory", pathOf(page), "/acme/demo/tree/trunk/src/authz");
 await page.goForward();
 await page.locator("[data-why] a", { hasText: "#2" }).click();
 await page.getByRole("heading", { level: 1, name: /Owners can revoke collaborators/ }).waitFor();
 expectEqual(
   "code: the change that holds a premise opens its page",
   pathOf(page),
-  "/demo/changes/2",
+  "/acme/demo/changes/2",
 );
 // A file's address opens the file from nowhere, dots and all. And an address that calls a file a directory is put right.
 await page.goto(at("/blob/trunk/src/authz/cache.ts", "scenario=s1&t=700&play=0"), {
@@ -710,7 +726,7 @@ await page.locator("[data-why]").waitFor();
 expectEqual(
   "code: a file addressed as a directory is addressed as a file",
   pathOf(page),
-  "/demo/blob/trunk/src/authz/cache.ts",
+  "/acme/demo/blob/trunk/src/authz/cache.ts",
 );
 
 await page.goto(at("/commits", "scenario=s1&t=700&play=0"), { waitUntil: "networkidle" });
@@ -726,7 +742,7 @@ await page.locator(".a-history a", { hasText: "Owners can revoke collaborators" 
 await page.getByText("Browse the files at this commit").waitFor();
 expectEqual(
   "code: a commit has an address",
-  String(/^\/demo\/commit\/[0-9a-f]+$/.test(pathOf(page))),
+  String(/^\/acme\/demo\/commit\/[0-9a-f]+$/.test(pathOf(page))),
   "true",
 );
 expectEqual(
@@ -773,36 +789,43 @@ await page.getByRole("heading", { name: "There is nothing at this address" }).wa
 expectEqual("missing: the frame is still there", String(await tabs.count()), "6");
 await page.getByRole("link", { name: "Go to the project's code" }).click();
 await page.locator(".a-prose h2").first().waitFor();
-expectEqual("missing: the way back is the project's code", pathOf(page), "/demo");
-// The bare address is the instance's own: it lists the projects Keel's log has named, each a link to its own address.
+expectEqual("missing: the way back is the project's code", pathOf(page), "/acme/demo");
+// The bare address is the home: the projects Keel names to this reader, each under its org, each a link to its own address.
 await page.goto(`${dev}/?scenario=s1&t=700&play=0`, { waitUntil: "networkidle" });
-await page.getByRole("heading", { level: 1, name: "Projects" }).waitFor();
+await page.getByRole("heading", { name: "Projects" }).waitFor();
 const listed = page.getByRole("list", { name: "Projects" }).getByRole("link");
 expectEqual(
-  "the bare address lists the projects",
+  "the bare address lists the projects, each under its org",
   (await listed.allInnerTexts()).join(" "),
-  "demo",
+  "acme demo",
 );
 expectEqual("the bare address has no project's tabs", String(await tabs.count()), "0");
-await listed.filter({ hasText: "demo" }).click();
+await listed.filter({ hasText: /^demo$/ }).click();
 await page.locator(".a-prose h2").first().waitFor();
 expectEqual(
   "a project in the list opens at its own address, still on the fixture",
   `${pathOf(page)} ${new URL(page.url()).searchParams.get("scenario")}`,
-  "/demo s1",
+  "/acme/demo s1",
 );
 // And Back returns to the list, which has folded nothing of the project's since.
 await page.goBack();
-await page.getByRole("heading", { level: 1, name: "Projects" }).waitFor();
+await page.getByRole("heading", { name: "Projects" }).waitFor();
 expectEqual("Back from a project is the list of them", pathOf(page), "/");
 
 // With nothing asked for, the page reads Keel, even in development. There is none behind the dev server, and it says so.
-await page.goto(`${dev}/`, { waitUntil: "networkidle" });
+await page.goto(`${dev}/acme/demo`, { waitUntil: "networkidle" });
 await page.getByRole("heading", { name: "The console could not reach Keel" }).waitFor();
 expectEqual(
   "dev, with no fixture asked for: none is shown",
   String(await page.locator(".a-root").count()),
   "0",
+);
+await page.goto(`${dev}/`, { waitUntil: "networkidle" });
+await page.getByRole("heading", { name: "Keel did not list its projects" }).waitFor();
+expectEqual(
+  "dev, with no fixture asked for: the home says what answered was not Keel, and lists nothing",
+  `${squash(await page.getByRole("main").innerText())} | ${await page.getByRole("list", { name: "Projects" }).count()}`,
+  "Keel did not list its projects What answered at /v1 was not Keel. | 0",
 );
 
 // Mission Control on the swarm, with six conflicts open at once. There is one lane to a subject and one column to
@@ -964,7 +987,7 @@ await page.goto(graph, { waitUntil: "networkidle" });
 await page.locator('.a-fn[data-kind="subject"]', { hasText: "storage.gc.safety" }).click();
 const panel = page.getByRole("complementary", { name: "Subject storage.gc.safety" });
 await panel.waitFor();
-expectEqual("subject: named in the address", pathOf(page), "/demo/subjects/storage.gc.safety");
+expectEqual("subject: named in the address", pathOf(page), "/acme/demo/subjects/storage.gc.safety");
 expectEqual(
   "subject: premises, by what they say",
   (await panel.locator("section").first().locator("li").allInnerTexts()).map(squash).join(" | "),
@@ -996,14 +1019,14 @@ await page.getByRole("heading", { name: "World matrix" }).waitFor();
 expectEqual(
   "subject: its conflict opens on the conflict's page",
   pathOf(page),
-  "/demo/conflicts/C-7",
+  "/acme/demo/conflicts/C-7",
 );
 await page.goBack();
 await panel.waitFor();
 expectEqual(
   "subject: Back returns to it, open as it was",
   pathOf(page),
-  "/demo/subjects/storage.gc.safety",
+  "/acme/demo/subjects/storage.gc.safety",
 );
 // A subject's address opens it from nowhere, dots and all.
 await page.goto(at("/subjects/storage.gc.safety", "scenario=swarm&t=100&play=0"), {
@@ -1139,8 +1162,8 @@ await reference
   .first()
   .click({ timeout: 5000 })
   .catch(() => {});
-await page.waitForURL("**/demo/changes/1**", { timeout: 5000 }).catch(() => {});
-expectEqual("graph: a reference opens the change's own page", pathOf(page), "/demo/changes/1");
+await page.waitForURL("**/acme/demo/changes/1**", { timeout: 5000 }).catch(() => {});
+expectEqual("graph: a reference opens the change's own page", pathOf(page), "/acme/demo/changes/1");
 
 // The graph's size is measured from the room there is, even where the page opened with nothing to draw.
 await page.setViewportSize({ width: 1400, height: 900 });
@@ -1158,11 +1181,11 @@ await page.goto(graph, { waitUntil: "networkidle" });
 // A change is named by Keel's own number for it.
 await page.locator('.a-fn[data-kind="change"]', { hasText: "#496" }).click();
 await page.getByRole("navigation", { name: "Change" }).waitFor();
-expectEqual("graph: a change opens its page", pathOf(page), "/demo/changes/496");
+expectEqual("graph: a change opens its page", pathOf(page), "/acme/demo/changes/496");
 await page.goto(graph, { waitUntil: "networkidle" });
 await page.locator('.a-fn[data-kind="conflict"]', { hasText: "C-13" }).click();
 await page.getByRole("heading", { name: "World matrix" }).waitFor();
-expectEqual("graph: a conflict opens its page", pathOf(page), "/demo/conflicts/C-13");
+expectEqual("graph: a conflict opens its page", pathOf(page), "/acme/demo/conflicts/C-13");
 
 // At scale a list shows a page at a time, and says how to see more.
 await page.goto(at("/changes", "scenario=swarm&t=100&play=0"), { waitUntil: "networkidle" });
@@ -1202,7 +1225,7 @@ await page
 
 // The review funnel on the swarm: what each stage settled, read off the page.
 await page.getByRole("heading", { name: "Review funnel" }).waitFor();
-expectEqual("funnel: at its own address", pathOf(page), "/demo/insights/funnel");
+expectEqual("funnel: at its own address", pathOf(page), "/acme/demo/insights/funnel");
 expectEqual(
   "stages in the funnel",
   String(await page.locator("table.a-funnel tbody tr").count()),
@@ -1282,300 +1305,285 @@ expectEqual(
   "M-13Planted api.rate-limit.bound synthetic-575 relies on freshness at most per-call. synthetic-590 makes it per-request. missed Nothing was raised. Clef derived freshness is per-call (p = 0.59), and no extractor applied. Both changes landed. The change",
 );
 
-// On a phone the console is the question and nothing else, whatever address it was opened at.
+// A phone gets the same pages as a desk: the frame, every tab, and a question whose options can be tapped. Nothing
+// runs off the side of the screen, where a thumb would have to go looking for it.
 const pocket = await browser.newContext({
   viewport: { width: 390, height: 844 },
   isMobile: true,
   hasTouch: true,
 });
 const narrow = watch(await pocket.newPage(), "fixture, narrow");
-await narrow.goto(at("/mission-control", "scenario=s1&t=472&ruling=live"), {
+/** How far the page runs past the right edge of the screen, in pixels. */
+const overflowOf = (shown: Page): Promise<number> =>
+  shown.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+await narrow.goto(at("/escalations/E-1", "scenario=s1&t=472&ruling=live"), {
   waitUntil: "networkidle",
 });
 await narrow
   .getByRole("heading", { name: "May permission checks be cached within a session?" })
   .waitFor();
-expectEqual("narrow: no console chrome", String(await tabsOf(narrow).count()), "0");
+expectEqual("narrow: the same frame, with every tab", String(await tabsOf(narrow).count()), "6");
+expectEqual(
+  "narrow: a question's page stays within the screen",
+  String(await overflowOf(narrow)),
+  "0",
+);
 expectEqual(
   "narrow: options to tap",
   String(await narrow.locator(".a-option:enabled").count()),
   "3",
 );
+// The tabs are wider than a phone. They scroll where they are, by a thumb, and at the far end the last is whole.
+expectEqual(
+  "narrow: the tabs scroll where they are, to the last of them",
+  await narrow.getByRole("navigation", { name: "Project" }).evaluate((row) => {
+    const scrolls = ["auto", "scroll"].includes(window.getComputedStyle(row).overflowX);
+    row.scrollLeft = row.scrollWidth;
+    const last = row.lastElementChild?.getBoundingClientRect();
+    return `${scrolls ? "they scroll" : "they do not scroll"}, the last ${last !== undefined && last.left >= 0 && last.right <= window.innerWidth ? "whole" : "cut off"}`;
+  }),
+  "they scroll, the last whole",
+);
+// The top row wraps: what the page is reading stays on the screen, under where the reader is.
+expectEqual(
+  "narrow: the frame's top row is all on the screen",
+  await narrow
+    .locator("header")
+    .first()
+    .getByText("Test fixture")
+    .evaluate((mark) => {
+      const box = mark.getBoundingClientRect();
+      return box.left >= 0 && box.right <= window.innerWidth ? "on the screen" : "cut off";
+    }),
+  "on the screen",
+);
+for (const place of ["", "/changes", "/conflicts/C-1", "/mission-control"]) {
+  await narrow.goto(at(place, "scenario=s1&t=700&play=0"), { waitUntil: "networkidle" });
+  expectEqual(
+    `narrow: ${place === "" ? "the code" : place} stays within the screen`,
+    String(await overflowOf(narrow)),
+    "0",
+  );
+}
 await pocket.close();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// The built console, as it is deployed: reading Keel through its Worker
+// The built console, as it is deployed: one page, reading Keel on its own origin
 // ─────────────────────────────────────────────────────────────────────────────
+// As deployed, the console's Worker serves the page and nothing else, and Keel answers /v1 on the same origin.
+// So here the build is served, and what the page asks of /v1 is answered by stand-ins (test code only): the real
+// Better Auth for /v1/auth, and a stand-in Keel for the rest, which knows a reader by their session, as Keel does.
 await build({ logLevel: "silent" });
 const served = await preview({
   preview: { port: BUILT_PORT, strictPort: true },
   logLevel: "silent",
 });
 
-const PRESENTER = "the presenter's key, for this run only";
-const keel = createFakeKeel({
-  clients: [
-    { id: "console-observer", secret: "observer-secret", scopes: ["observer"] },
-    { id: "console-operator", secret: "operator-secret", scopes: ["operator"] },
-  ],
-});
-const mission = createConsole();
-const env: Env = {
-  KEEL: keel,
-  KEEL_API_HOST: "keel.example",
-  ASSETS: {
-    fetch: () =>
-      Promise.resolve(
-        new Response("not used: the preview server serves the page", { status: 404 }),
-      ),
-  },
-  KEEL_OBSERVER_CLIENT_ID: "console-observer",
-  KEEL_OBSERVER_CLIENT_SECRET: "observer-secret",
-  KEEL_OPERATOR_CLIENT_ID: "console-operator",
-  KEEL_OPERATOR_CLIENT_SECRET: "operator-secret",
-  CONSOLE_CAPABILITY_KEY: "a signing key, for this run only",
-  CONSOLE_PRESENTER_KEY: PRESENTER,
+const identity = createIdentity(built);
+/** The org the stand-in's project is in: Ada's own, once she has signed up below. */
+const ORG = "ada";
+
+/** Who a request is from, as Keel's gate reads it: asked of its identity by the session the browser sent. */
+const readerOf = async (request: Request): Promise<Reader> => {
+  const cookie = request.headers.get("cookie");
+  if (cookie === null) return null;
+  const asThem = createAccount({
+    origin: built,
+    fetch: (input, init) => {
+      const asked = new Request(input, init);
+      const headers = new Headers(asked.headers);
+      headers.set("cookie", cookie);
+      headers.set("origin", built);
+      return identity.handle(new Request(asked, { headers }));
+    },
+  });
+  const who = await asThem.who().catch(() => null);
+  if (who === null) return null;
+  const org = await asThem.org(ORG, who).catch(() => null);
+  return org === null ? {} : { role: org.role };
 };
 
-/**
- * Everything the deployed Worker would answer is answered by the Worker's own code, here. `shown` gathers the
- * `authorization` each of the page's reads carried: nothing for a visitor, the presenter's key for the presenter.
- */
-async function behindTheWorker(context: BrowserContext, shown: string[] = []): Promise<void> {
+// Two Keels, alike but for who may read the project: on one its org has made it public, on the other it has not.
+const open = createFakeKeel({ org: ORG, visibility: "public", readerOf });
+const shut = createFakeKeel({ org: ORG, visibility: "private", readerOf });
+
+/** What the page sent to /v1, as the browser sent it. */
+interface Sent {
+  path: string;
+  authorization: string | undefined;
+  /** The claim code, where a request carried one. */
+  claim: string | undefined;
+}
+
+interface Deployed {
+  keel: Pick<FakeKeel, "fetch">;
+  /** Keel's identity. The one every person here signs up on, unless another is named. */
+  identity?: Pick<Identity, "handle">;
+  sent?: Sent[];
+  /** Holds Keel's answer to a request back for as long as it takes to settle. */
+  hold?: (path: string) => Promise<void>;
+}
+
+async function asDeployed(context: BrowserContext, deployed: Deployed): Promise<void> {
+  const { keel, sent = [], hold } = deployed;
+  const auth = deployed.identity ?? identity;
   // As deployed, an address that is not one of the build's files gets the page: the Worker's assets are set to answer
   // so. The preview server does that only where the address has no dot in it, so the same is done for it here.
   await context.route(
-    (url) =>
-      url.origin === built &&
-      url.pathname !== "/" &&
-      !/^\/(api|present|rule|assets)\//.test(url.pathname),
+    (url) => url.origin === built && url.pathname !== "/" && !/^\/(v1|assets)\//.test(url.pathname),
     async (route) => {
       if (!route.request().isNavigationRequest()) return route.fallback();
       const index = await route.fetch({ url: `${built}/index.html` });
       return route.fulfill({ response: index });
     },
   );
-  await context.route(new RegExp(`^${built}/(api|present|rule)/`), async (route) => {
+  await context.route(new RegExp(`^${built}/v1/`), async (route) => {
     const request = route.request();
-    const headers = Object.fromEntries(
-      Object.entries(request.headers()).filter(
-        ([name]) => name !== "content-length" && name !== "host",
-      ),
-    );
+    const headers = await request.allHeaders();
+    delete headers["content-length"];
+    delete headers["host"];
+    const { pathname } = new URL(request.url());
+    sent.push({
+      path: pathname,
+      authorization: headers["authorization"],
+      claim: headers["keel-claim"],
+    });
     const posted = request.postData();
-    if (new URL(request.url()).pathname.startsWith("/api/"))
-      shown.push(headers["authorization"] ?? "");
-    const response = await mission.fetch(
-      new Request(request.url(), {
-        method: request.method(),
-        headers,
-        ...(posted === null ? {} : { body: posted }),
-      }),
-      env,
-    );
+    const asked = new Request(request.url(), {
+      method: request.method(),
+      headers,
+      ...(posted === null ? {} : { body: posted }),
+    });
+    await hold?.(pathname);
+    const response = await (pathname.startsWith("/v1/auth/")
+      ? auth.handle(asked)
+      : keel.fetch(asked));
+    const answered = Object.fromEntries(response.headers);
+    const cookies = response.headers.getSetCookie();
+    if (cookies.length > 0) answered["set-cookie"] = cookies.join("\n");
     // A page that has gone away no longer wants its answer.
     await route
-      .fulfill({
-        status: response.status,
-        headers: Object.fromEntries(response.headers),
-        body: await response.text(),
-      })
+      .fulfill({ status: response.status, headers: answered, body: await response.text() })
       .catch(() => undefined);
   });
 }
 
-const NOT_SHOWN = "This page is not shown to visitors yet";
-const NO_CODE_FOR_VISITORS = "This project's code is not shown to visitors yet";
 const OPEN_ON_TABS =
   "Code | Changes 2 open | Conflicts 1 open | Escalations 1 waiting for a person | Mission Control | Insights";
+const QUESTION_ASKED = /May permission checks be cached within a session\?/;
+const filesOn = async (shown: Page): Promise<string> =>
+  (await shown.locator(".a-tree li").allInnerTexts()).map(squash).join(" | ");
+/** Waits until the log has been read and counted on the tabs, or for ten seconds: the check after it says which. */
+const counted = (shown: Page): Promise<void> =>
+  shown
+    .getByRole("navigation", { name: "Project" })
+    .getByText("waiting for a person")
+    .waitFor({ timeout: 10_000 })
+    .catch(() => undefined);
+/** What a page says where Keel shows this reader no such project, with the project's own name left out. */
+const toldAt = async (shown: Page, org: string, name: string): Promise<string> => {
+  await shown.goto(`${built}/${org}/${name}`, { waitUntil: "domcontentloaded" });
+  await shown.getByRole("heading").first().waitFor();
+  await shown.waitForTimeout(400);
+  // A page that could not read Keel at all has no frame. What it says is still read, so that a check can say so.
+  const said =
+    (await shown.getByRole("main").count()) > 0 ? shown.getByRole("main") : shown.locator("body");
+  return `${squash(await said.innerText()).replaceAll(`${org}/${name}`, "<org>/<name>")} | ${await tabsOf(shown).count()} tabs`;
+};
+const NO_PROJECT = "There is no project <org>/<name> here";
 
-// ── A visitor: opened by anyone, with no key ──
-// Keel reads its log to an observer, and the Worker asks Keel for a visitor with no token. So a visitor has the
-// project's frame and what Keel reads to anyone, and every page that is read from the log says that it is.
+// ── A visitor, on a project its org has made public ──
+// Public is live: anyone reads its code, its log and what is folded from it. Nothing can be answered.
 const street = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
-const visitorShowed: string[] = [];
-await behindTheWorker(street, visitorShowed);
+const visitorSent: Sent[] = [];
+// Keel's answer about the log is held back until the code has been looked for on the page.
+let answerTheLog = (): void => {};
+const logHeld = new Promise<void>((resolve) => {
+  answerTheLog = resolve;
+});
+await asDeployed(street, {
+  keel: open,
+  sent: visitorSent,
+  hold: (path) => (path === "/v1/events" ? logHeld : Promise.resolve()),
+});
 const visitor = watch(await street.newPage(), "built, a visitor");
 await visitor.goto(`${built}/`, { waitUntil: "domcontentloaded" });
-await visitor
-  .getByRole("heading", { name: "Keel's projects are not listed to visitors yet" })
-  .waitFor();
-// Nothing of Keel's log is on a visitor's screen, so nothing on it says it is live.
+// The home lists the projects Keel names to anyone, each under its org.
+await visitor.getByRole("list", { name: "Projects" }).getByRole("link").first().waitFor();
 expectEqual(
-  "visitor: nothing says it is live",
+  "visitor: the home lists the public projects, each under its org",
+  squash(await visitor.getByRole("list", { name: "Projects" }).innerText()),
+  "ada / demo public",
+);
+await visitor.getByRole("list", { name: "Projects" }).getByRole("link", { name: "demo" }).click();
+// The code is asked for as soon as Keel has said which project the address names, and is drawn when it comes:
+// the log is read behind it. Here Keel has not answered about the log at all yet.
+await visitor.waitForURL(`${built}/ada/demo`);
+while (!visitorSent.some((request) => request.path === "/v1/events"))
+  // oxlint-disable-next-line no-await-in-loop -- waiting on the page's own request
+  await new Promise((resolve) => setTimeout(resolve, 50));
+await visitor
+  .locator(".a-tree li")
+  .first()
+  .waitFor({ timeout: 8_000 })
+  .catch(() => undefined);
+expectEqual(
+  "visitor: the code is on the page while Keel has yet to answer about the log",
+  `${await filesOn(visitor)}; the log ${open.calls.some((call) => call.path === "/v1/events") ? "answered" : "not answered"}`,
+  "src | package.json | README.md; the log not answered",
+);
+answerTheLog();
+await counted(visitor);
+expectEqual(
+  "visitor: what is open, counted on the tabs",
+  (await tabsOf(visitor).allInnerTexts()).map(squash).join(" | "),
+  OPEN_ON_TABS,
+);
+expectEqual(
+  "visitor: live, and says so",
   String(await visitor.getByText("Live", { exact: true }).count()),
-  "0",
+  "1",
 );
 expectEqual(
   "visitor: nothing calls itself a fixture",
   String(await visitor.getByText("Test fixture").count()),
   "0",
 );
-// Keel reads a repository by the project's id, and a visitor has only the name in the address: Keel has no way
-// yet to find a project by its name. The built console says so, asks Keel nothing, and shows nothing in its place.
-await visitor.goto(`${built}/demo`, { waitUntil: "domcontentloaded" });
-await visitor.getByRole("heading", { name: NO_CODE_FOR_VISITORS }).waitFor();
+// Keel serves no clone address yet, and the console makes none up.
 expectEqual(
-  "visitor: no repository is made up",
-  String(await visitor.locator(".a-tree, .a-clone, .a-prose").count()),
+  "visitor: no clone address is made up",
+  String(await visitor.getByText("git clone").count()),
   "0",
 );
-expectEqual(
-  "visitor: the project's frame, with nothing counted on it",
-  (await tabsOf(visitor).allInnerTexts()).map(squash).join(" | "),
-  "Code | Changes | Conflicts | Escalations | Mission Control | Insights",
-);
-for (const place of ["/mission-control", "/changes", "/escalations/E-1", "/insights/funnel"]) {
-  await visitor.goto(`${built}/demo${place}`, { waitUntil: "domcontentloaded" });
-  await visitor.getByRole("heading", { name: NOT_SHOWN }).waitFor();
-  expectEqual(`visitor: ${place} says it is read from the log`, pathOf(visitor), `/demo${place}`);
-  // A visitor is not shown the code either, so the notice does not send one there.
-  expectEqual(
-    `visitor: ${place} points at no page that shows nothing either`,
-    String(await visitor.locator("main a").count()),
-    "0",
-  );
-}
-// Asking the built console for a fixture gets Keel, not the fixture. And no link in it carries the asking further.
-await visitor.goto(`${built}/demo/insights/benchmark?scenario=swarm&t=100`, {
-  waitUntil: "domcontentloaded",
-});
-await visitor.getByRole("heading", { name: NOT_SHOWN }).waitFor();
-expectEqual(
-  "visitor: ?scenario= is not a way in to a fixture",
-  String(await visitor.getByText("Test fixture").count()),
-  "0",
-);
-expectEqual(
-  "visitor: no link carries a fixture's parameters",
-  String(await visitor.locator('a[href*="scenario"], a[href*="t="]').count()),
-  "0",
-);
-// An address with a dot in it opens from nowhere, as it does where the console is deployed.
-await visitor.goto(`${built}/demo/subjects/authz.permission-evaluation`, {
-  waitUntil: "domcontentloaded",
-});
-await visitor.getByRole("heading", { name: NOT_SHOWN }).waitFor();
-await visitor.goto(`${built}/demo/nowhere`, { waitUntil: "domcontentloaded" });
-await visitor.getByRole("heading", { name: "There is nothing at this address" }).waitFor();
-expectEqual(
-  "visitor: the page showed the Worker no credential",
-  [...new Set(visitorShowed)].join(","),
-  "",
-);
-expectEqual(
-  "visitor: Keel was asked with no token, and for none",
-  [
-    ...new Set(
-      keel.calls.map(
-        (call) => `${call.path} ${call.authorization === "" ? "no token" : "a token"}`,
-      ),
-    ),
-  ]
-    .toSorted()
-    .join(" | "),
-  "/v1/events no token",
-);
-const askedForVisitor = keel.calls.length;
-
-// ── The presenter: opened with the key in the address's fragment ──
-const desk = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
-const presenterShowed: string[] = [];
-await behindTheWorker(desk, presenterShowed);
-const presenter = watch(await desk.newPage(), "built, presenter");
-const QUESTION_ASKED = /May permission checks be cached within a session\?/;
-await presenter.goto(`${built}/#presenter=${encodeURIComponent(PRESENTER)}`, {
-  waitUntil: "domcontentloaded",
-});
-// The bare address is the instance's: the projects Keel's log names, each with who may read it.
-await presenter.getByRole("heading", { level: 1, name: "Projects" }).waitFor();
-expectEqual("presenter: the key is taken out of the address", new URL(presenter.url()).hash, "");
-expectEqual(
-  "presenter: the projects, and who may read each",
-  squash(await presenter.getByRole("list", { name: "Projects" }).innerText()),
-  "demo private",
-);
-await presenter.getByRole("list", { name: "Projects" }).getByRole("link", { name: "demo" }).click();
-// The project's code, read from Keel's own repository reads: its files, with the README beneath.
-await presenter.locator(".a-prose h2").first().waitFor();
-expectEqual("presenter: a project opens at its own address", pathOf(presenter), "/demo");
-expectEqual(
-  "presenter: the project's files, read from Keel",
-  (await presenter.locator(".a-tree li").allInnerTexts()).map(squash).join(" | "),
-  "src | package.json | README.md",
-);
-// Beside the project's name, the projects Keel has named, a click away, as a code host's frame has them.
-await presenter.getByRole("button", { name: "Switch project" }).click();
-await presenter.getByRole("menuitem", { name: "All projects" }).waitFor();
-expectEqual(
-  "presenter: the frame drops down on the project, to the others and to all of them",
-  (await presenter.getByRole("menuitem").allInnerTexts()).map(squash).join(" | "),
-  "demo private | All projects",
-);
-expectEqual(
-  "presenter: each is a link to its own address",
-  (
-    await presenter
-      .getByRole("menuitem")
-      .evaluateAll((items) => items.map((item) => item.getAttribute("href")))
-  ).join(" | "),
-  "/demo | /",
-);
-if ((process.env["SHOTS"] ?? "") !== "")
-  await presenter.screenshot({ path: `${process.env["SHOTS"] ?? "."}/switcher.png` });
-await presenter.keyboard.press("Escape");
 // A file's address costs Keel one read of the file: the page does not first ask for it as a directory and wait
 // to be refused.
-const beforeTheFile = keel.calls.length;
-await presenter.goto(`${built}/demo/blob/trunk/src/authz/check.ts`, {
+const beforeTheFile = open.calls.length;
+await visitor.goto(`${built}/ada/demo/blob/trunk/src/authz/check.ts`, {
   waitUntil: "domcontentloaded",
 });
-await presenter.locator(".a-code").first().waitFor({ timeout: 10_000 });
+await visitor.locator(".a-code").first().waitFor({ timeout: 10_000 });
 expectEqual(
-  "presenter: a file's address asks Keel for the file, and never for a directory of its name",
-  keel.calls
+  "visitor: a file's address asks Keel for the file, and never for a directory of its name",
+  open.calls
     .slice(beforeTheFile)
     .filter((call) => new URLSearchParams(call.query).get("path") === "src/authz/check.ts")
     .map((call) => call.path.split("/").at(-1))
     .join(" "),
   "blob",
 );
-await presenter.goto(`${built}/demo`, { waitUntil: "domcontentloaded" });
-await presenter.locator(".a-prose h2").first().waitFor();
-// Keel has no clone address to give yet, and the console makes none up.
-expectEqual(
-  "presenter: no clone address is made up",
-  String(await presenter.locator(".a-clone").count()),
-  "0",
-);
-expectEqual(
-  "presenter: live, and says so",
-  String(await presenter.getByText("Live", { exact: true }).count()),
-  "1",
-);
-expectEqual(
-  "presenter: nothing calls itself a fixture",
-  String(await presenter.getByText("Test fixture").count()),
-  "0",
-);
-expectEqual(
-  "presenter: what is open, counted on the tabs",
-  (await tabsOf(presenter).allInnerTexts()).map(squash).join(" | "),
-  OPEN_ON_TABS,
-);
 
 // Playback is for a fixture's log. The built console has none, and no way to move about in Keel's.
-await presenter.goto(`${built}/demo/mission-control`, { waitUntil: "domcontentloaded" });
-await presenter.locator("dl.a-trunk-line").waitFor();
+await visitor.goto(`${built}/ada/demo/mission-control`, { waitUntil: "domcontentloaded" });
+await visitor.locator("dl.a-trunk-line").waitFor();
 expectEqual(
-  "presenter: people asked / landed",
-  await statOn(presenter, "People asked / changes landed"),
+  "visitor: people asked / landed",
+  await statOn(visitor, "People asked / changes landed"),
   "1/0",
 );
 // The control is loaded apart from the page, a moment after it. So it is waited for, and must not come.
 expectEqual(
   "built: no playback",
-  await presenter
+  await visitor
     .getByLabel("Position in the log")
     .waitFor({ timeout: 3_000 })
     .then(
@@ -1586,92 +1594,88 @@ expectEqual(
 );
 
 // Asking the built console for a fixture gets Keel, not the fixture. And no link in it carries the asking further.
-await presenter.goto(`${built}/demo/insights/benchmark?scenario=swarm&t=100`, {
+await visitor.goto(`${built}/ada/demo/insights/benchmark?scenario=swarm&t=100`, {
   waitUntil: "domcontentloaded",
 });
-await presenter.getByRole("heading", { name: "No sealed run here" }).waitFor();
+await visitor.getByRole("heading", { name: "No sealed run here" }).waitFor();
 expectEqual(
-  "presenter: ?scenario= is not a way in to a fixture",
-  (await tabsOf(presenter).allInnerTexts()).map(squash).join(" | "),
+  "visitor: ?scenario= is not a way in to a fixture",
+  (await tabsOf(visitor).allInnerTexts()).map(squash).join(" | "),
   OPEN_ON_TABS,
 );
+// The way in remembers the address it was on, whole; no link goes anywhere with a fixture's own parameters.
 expectEqual(
-  "presenter: no link carries a fixture's parameters",
-  String(await presenter.locator('a[href*="scenario"], a[href*="t="]').count()),
+  "visitor: no link carries a fixture's parameters",
+  String(
+    await visitor.locator("a").evaluateAll(
+      (links) =>
+        links.filter((link) => {
+          const to = new URL(link instanceof HTMLAnchorElement ? link.href : "", document.baseURI);
+          return to.searchParams.has("scenario") || to.searchParams.has("t");
+        }).length,
+    ),
+  ),
   "0",
 );
 
 // Keel sends no funnel counters yet: those stages are left empty, and probes and questions are counted from events.
-await presenter.goto(`${built}/demo/insights/funnel`, { waitUntil: "domcontentloaded" });
-await presenter.getByRole("heading", { name: "Review funnel" }).waitFor();
+await visitor.goto(`${built}/ada/demo/insights/funnel`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("heading", { name: "Review funnel" }).waitFor();
 expectEqual(
   "built: stages with no count are left empty",
-  String(await presenter.getByText("not counted yet").count()),
+  String(await visitor.getByText("not counted yet").count()),
   "4",
 );
-expectEqual("built: subject index", await stageOn(presenter, 0), "— | — not counted yet | — | —");
+expectEqual("built: subject index", await stageOn(visitor, 0), "— | — not counted yet | — | —");
 expectEqual(
   "built: probe, counted from events",
-  await stageOn(presenter, 4),
+  await stageOn(visitor, 4),
   "1 | 0 0% 1 passed on | 1 | —",
 );
 // Keel records no cost yet. Where there is none the funnel shows none: a review that cost nothing is not what it says.
 expectEqual(
   "built: no cost is shown where Keel has recorded none",
-  await statOn(presenter, "Cost of review"),
+  await statOn(visitor, "Cost of review"),
   "—",
 );
 expectEqual(
   "built: and the funnel says that Keel records none",
-  String(await presenter.getByText("Keel records no cost yet.").count()),
+  String(await visitor.getByText("Keel records no cost yet.").count()),
   "1",
 );
 expectEqual(
   "built: a person, being asked",
-  await stageOn(presenter, 5),
+  await stageOn(visitor, 5),
   "1 | 0 0% 1 waiting for a person 1 waiting for a person Open the escalations |  | a person's time",
 );
 
-// The conflict's line is drawn from the lattices the Worker read from Keel, and a verdict's evidence from Keel's view of it.
-await presenter.goto(`${built}/demo/conflicts/C-1`, { waitUntil: "domcontentloaded" });
-await presenter.getByRole("heading", { name: "World matrix" }).waitFor();
-await presenter.locator("[data-lattice-value]").first().waitFor({ timeout: 10_000 });
+// The conflict's line is drawn from the lattices the page read from Keel, and a verdict's evidence from Keel's view of it.
+await visitor.goto(`${built}/ada/demo/conflicts/C-1`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("heading", { name: "World matrix" }).waitFor();
+await visitor.locator("[data-lattice-value]").first().waitFor({ timeout: 10_000 });
 expectEqual(
   "built: the lattice's line, read from Keel",
-  (await presenter.locator("[data-lattice-value]").allInnerTexts()).join(" < "),
+  (await visitor.locator("[data-lattice-value]").allInnerTexts()).join(" < "),
   "per-call < per-request < per-session < static",
 );
-await presenter.goto(`${built}/demo/changes/1/verification`, { waitUntil: "domcontentloaded" });
-await presenter
+await visitor.goto(`${built}/ada/demo/changes/1/verification`, { waitUntil: "domcontentloaded" });
+await visitor
   .getByText("Probe P-1 fails in A+B, three runs out of three")
   .first()
   .waitFor({ timeout: 10_000 });
 expectEqual(
-  "built: a verdict's evidence, read from Keel",
-  String(
-    keel.calls.some(
-      (call) => call.path.startsWith("/v1/verdicts/") && call.authorization.endsWith("_observer"),
-    ),
-  ),
-  "true",
-);
-expectEqual(
-  "built: the lattices, read from Keel",
-  String(
-    keel.calls.some(
-      (call) => call.path === "/v1/lattices" && call.authorization.endsWith("_observer"),
-    ),
-  ),
-  "true",
+  "built: a verdict's evidence and the lattices, read from Keel",
+  `${open.calls.some((call) => call.path.startsWith("/v1/verdicts/"))} ${open.calls.some((call) => call.path === "/v1/lattices")}`,
+  "true true",
 );
 
 // Keel's contract has no way to read a change's diff either. Its page says so, and counts no files.
-await presenter.goto(`${built}/demo/changes/1/files`, { waitUntil: "domcontentloaded" });
-await presenter.getByText("Keel does not serve this change's diff").waitFor({ timeout: 10_000 });
+await visitor.goto(`${built}/ada/demo/changes/1/files`, { waitUntil: "domcontentloaded" });
+await visitor.getByText("Keel does not serve this change's diff").waitFor({ timeout: 10_000 });
 expectEqual(
   "built: a diff Keel does not serve is not counted as no files",
   squash(
-    await presenter
+    await visitor
       .getByRole("navigation", { name: "Change" })
       .getByRole("link", { name: /Files changed/ })
       .innerText(),
@@ -1680,25 +1684,50 @@ expectEqual(
 );
 
 // An address with a dot in it opens from nowhere, as it does where the console is deployed.
-await presenter.goto(`${built}/demo/subjects/authz.permission-evaluation`, {
+await visitor.goto(`${built}/ada/demo/subjects/authz.permission-evaluation`, {
   waitUntil: "domcontentloaded",
 });
-await presenter
-  .getByRole("complementary", { name: "Subject authz.permission-evaluation" })
-  .waitFor();
+await visitor.getByRole("complementary", { name: "Subject authz.permission-evaluation" }).waitFor();
 expectEqual(
   "built: a subject, opened cold",
-  pathOf(presenter),
-  "/demo/subjects/authz.permission-evaluation",
+  pathOf(visitor),
+  "/ada/demo/subjects/authz.permission-evaluation",
 );
-await presenter.goto(`${built}/demo/nowhere`, { waitUntil: "domcontentloaded" });
-await presenter.getByRole("heading", { name: "There is nothing at this address" }).waitFor();
-// An observer's log names every project, so a name it does not have is no project's, and the way on is the list.
-await presenter.goto(`${built}/keel/changes`, { waitUntil: "domcontentloaded" });
-await presenter.getByRole("heading", { name: "There is no project called keel here" }).waitFor();
+await visitor.goto(`${built}/ada/demo/nowhere`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("heading", { name: "There is nothing at this address" }).waitFor();
+
+// A question is read by anyone a public project is shown to. Answering is for a member: nothing can be tapped, and
+// the frame's way in comes back to this page.
+await visitor.goto(`${built}/ada/demo/escalations/E-1`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("heading", { level: 1, name: QUESTION_ASKED }).waitFor();
+expectEqual(
+  "visitor: a question is read, and none of its options can be tapped",
+  `${await visitor.locator(".a-option").count()} options, ${await visitor.locator(".a-option:enabled").count()} to tap`,
+  "3 options, 0 to tap",
+);
+const wayIn =
+  (await visitor.getByRole("link", { name: "Sign in" }).first().getAttribute("href")) ?? "";
+expectEqual(
+  "visitor: the frame's way in comes back to the page it was on",
+  `${new URL(wayIn, built).pathname} ${new URL(wayIn, built).searchParams.get("next")}`,
+  "/login /ada/demo/escalations/E-1",
+);
+
+// A project Keel does not have, and a project of that name under another org, are told alike, and lead to the
+// projects Keel has.
+const told = {
+  none: await toldAt(visitor, "ada", "none"),
+  elsewhere: await toldAt(visitor, "other", "demo"),
+};
+expectEqual(
+  "visitor: a project that is not there is said to be none",
+  told.none.split(" | ")[0]?.startsWith(NO_PROJECT) === true ? NO_PROJECT : told.none,
+  NO_PROJECT,
+);
+expectEqual("visitor: and one under another org is told as that is", told.elsewhere, told.none);
 expectEqual(
   "built: a project Keel does not have leads to the ones it has",
-  await presenter
+  await visitor
     .getByRole("main")
     .getByRole("link", { name: "See the projects Keel has" })
     .evaluate((link) => (link instanceof HTMLAnchorElement ? new URL(link.href).pathname : "")),
@@ -1709,223 +1738,64 @@ expectEqual(
   "built: Keel is asked only for what its contract has",
   [
     ...new Set(
-      keel.calls.map((call) =>
+      open.calls.map((call) =>
         call.path
           .replace(/\/v1\/verdicts\/.+/, "/v1/verdicts/{id}")
+          .replace(/\/v1\/orgs\/[^/]+\/projects\/[^/]+$/, "/v1/orgs/{org}/projects/{name}")
           .replace(/\/v1\/projects\/[^/]+\//, "/v1/projects/{id}/"),
       ),
     ),
   ]
     .toSorted()
     .join(" "),
-  "/v1/events /v1/lattices /v1/oauth/token /v1/projects/{id}/repo/blob /v1/projects/{id}/repo/commits /v1/projects/{id}/repo/tree /v1/verdicts/{id}",
+  "/v1/events /v1/lattices /v1/orgs/{org}/projects/{name} /v1/projects /v1/projects/{id}/repo/blob /v1/projects/{id}/repo/commits /v1/projects/{id}/repo/tree /v1/verdicts/{id}",
 );
-// The presenter's page showed its key on every read, and the Worker read Keel as the observer for each: never
-// with the key itself, and never as anything more.
+// The page put nothing of its own on anything it asked: no token, no key. A visitor's browser holds no session.
 expectEqual(
-  "presenter: every read showed the key",
-  [...new Set(presenterShowed)].join(","),
-  `Bearer ${PRESENTER}`,
-);
-expectEqual(
-  "presenter: every read went out as the observer",
-  String(
-    keel.calls
-      .slice(askedForVisitor)
-      .filter((call) => call.method === "GET")
-      .every((call) => call.authorization.endsWith("_observer")),
-  ),
-  "true",
+  "visitor: the page sent Keel no credential, and the browser had none to send",
+  `${visitorSent.filter((request) => request.authorization !== undefined).length} ${open.calls.filter((call) => call.authorization !== "").length} ${(await street.cookies()).length}`,
+  "0 0 0",
 );
 
-// The question, with the presenter's key: its options can be tapped, and a QR code is beside it.
-await presenter.goto(`${built}/demo/escalations/E-1`, { waitUntil: "domcontentloaded" });
-await presenter.getByRole("heading", { level: 1, name: QUESTION_ASKED }).waitFor();
-// What Keel says on the entry and in the payload reaches the page through the Worker: the changes' numbers, and the default.
+// ── A visitor, on a project its org has kept private ──
+// A private project is to a visitor as one that is not there: the same words, and nothing of it on the page.
+const lane = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+await asDeployed(lane, { keel: shut });
+const outsider = watch(await lane.newPage(), "built, a visitor to a private project");
+await outsider.goto(`${built}/`, { waitUntil: "domcontentloaded" });
+await outsider.getByRole("heading", { name: "Keel has no project to show you yet" }).waitFor();
+const hidden = await toldAt(outsider, "ada", "demo");
 expectEqual(
-  "built: the parked changes, by Keel's numbers",
-  String(await presenter.getByText("parked on this: #1 and #2").count()),
-  "1",
-);
-expectEqual(
-  "built: the default is said",
-  String(await presenter.getByText("Both changes wait. Nothing lands on this subject.").count()),
-  "1",
-);
-const phoneLink = presenter.getByRole("link", { name: "Open the phone view" });
-await phoneLink.waitFor();
-const phoneUrl = (await phoneLink.getAttribute("href")) ?? "";
-expectEqual(
-  "presenter: a QR code is offered with the question",
-  String(await qrOn(presenter).count()),
-  "1",
+  "visitor: a private project is told as none is",
+  hidden,
+  await toldAt(outsider, "ada", "none"),
 );
 expectEqual(
-  "presenter: the link names the project, and carries a capability and no key",
-  String(/^http:\/\/localhost:5312\/demo\?rule=[\w-]+\.[\w-]+$/.test(phoneUrl)),
-  "true",
+  "visitor: and that is what a visitor to a public Keel is told of none",
+  hidden,
+  told.none,
 );
-expectEqual(
-  "presenter: options can be tapped",
-  String(await presenter.locator(".a-option:enabled").count()),
-  "3",
-);
-
-// A phone opens what the QR code encodes. It holds a capability to answer one question, and no key to read with:
-// Keel reads a question only to an observer today, so the phone says that it cannot show the question, and
-// does not say that nothing is waiting.
-const hand = await browser.newContext({
-  viewport: { width: 390, height: 844 },
-  isMobile: true,
-  hasTouch: true,
-});
-await behindTheWorker(hand);
-const handset = watch(await hand.newPage(), "built, phone");
-await handset.goto(phoneUrl, { waitUntil: "domcontentloaded" });
-await handset.getByRole("heading", { name: "This phone cannot show the question yet" }).waitFor();
-expectEqual(
-  "phone: nothing of the console around it, and nothing to tap",
-  `${await tabsOf(handset).count()} tabs, ${await handset.locator(".a-option").count()} options`,
-  "0 tabs, 0 options",
-);
-expectEqual(
-  "phone: it does not say that nothing is waiting",
-  String(await handset.getByText("Nothing is waiting for a person").count()),
-  "0",
-);
-
-// The presenter answers on the console. Not the option a script would have chosen: what lands must be what was tapped.
-await presenter.locator(".a-option", { hasText: "Never cache permission checks" }).click();
-await presenter
-  .getByRole("heading", { name: "Ruled: Never cache permission checks" })
-  .waitFor({ timeout: 15_000 });
-expectEqual(
-  "Keel: one ruling, the presenter's",
-  keel
-    .events()
-    .flatMap((event) => (event.type === "RulingGiven" ? [event.payload.option] : []))
-    .join(","),
-  "no-cache",
-);
-const rulings = keel.calls.filter((call) => call.path.endsWith("/ruling"));
-expectEqual(
-  "Keel: ruled as an operator, with the capability's nonce as the idempotency key",
-  String(
-    rulings.length === 1 &&
-      (rulings[0]?.authorization ?? "").endsWith("_operator") &&
-      /^console:[0-9a-f]{24}$/.test(rulings[0]?.idempotencyKey ?? ""),
-  ),
-  "true",
-);
-
-// The capability a phone was given is good for that question once. The question is answered: it rules nothing more.
-const again = await handset.evaluate(async (link) => {
-  const capability = new URL(link).searchParams.get("rule") ?? "";
-  const response = await fetch(`/rule/${capability}`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: '{"option":"invalidate"}',
-  });
-  return response.status;
-}, phoneUrl);
-expectEqual("phone: a question already answered is not answered again", String(again), "409");
-
-// A capability the Worker did not sign is refused by the Worker, whoever sends it.
-const forgedCapability = "eyJlIjoiZXNjXzEiLCJ4Ijo5OTk5OTk5OTk5LCJuIjoiYSJ9.c2lnbmVkLWJ5LW5vLW9uZQ";
-const forged = await handset.evaluate(
-  async (capability) =>
-    (
-      await fetch(`/rule/${capability}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: '{"option":"invalidate"}',
-      })
-    ).status,
-  forgedCapability,
-);
-expectEqual("forged capability: refused by the Worker", String(forged), "403");
-expectEqual(
-  "Keel: still one ruling",
-  String(keel.events().filter((event) => event.type === "RulingGiven").length),
-  "1",
-);
-
-// A live console's clock is the wall clock. Keel writes nothing more from here, and the page still moves on:
-// a second after the log's last entry one change has landed in the last minute, and a minute later none has.
-const logEnded = Date.parse(keel.events().at(-1)?.at ?? "");
-const later = watch(await presenter.context().newPage(), "presenter, as time passes");
-await later.clock.install({ time: new Date(logEnded + 1_000) });
-await later.goto(`${built}/demo/mission-control#presenter=${encodeURIComponent(PRESENTER)}`, {
-  waitUntil: "domcontentloaded",
-});
-await later.locator("dl.a-trunk-line").waitFor({ timeout: 10_000 });
-const landedLately = async (): Promise<string> => statOn(later, "Landed per minute");
-/** Reads the rate until it is `wanted`, or for three seconds: a rate that never moves is a failed check, by name. */
-const settlesAt = async (wanted: string): Promise<string> => {
-  for (let tries = 0; tries < 30 && (await landedLately()) !== wanted; tries += 1)
-    // oxlint-disable-next-line no-await-in-loop -- waiting on the page's own clock
-    await later.clock.runFor(100);
-  return landedLately();
-};
-expectEqual(
-  "live: just after the log's last entry, the landing in the minute before it is counted",
-  await settlesAt("1"),
-  "1",
-);
-await later.clock.fastForward(61_000);
-expectEqual(
-  "live: a minute on with nothing new from Keel, nothing has landed in the last minute",
-  await settlesAt("0"),
-  "0",
-);
-await later.close();
+for (const place of ["/mission-control", "/changes", "/escalations/E-1", "/blob/trunk/README.md"]) {
+  await outsider.goto(`${built}/ada/demo${place}`, { waitUntil: "domcontentloaded" });
+  await outsider.getByRole("heading").first().waitFor();
+  await outsider.waitForTimeout(300);
+  expectEqual(
+    `visitor: ${place} of a private project shows nothing of it`,
+    `${squash(await outsider.getByRole("heading").first().innerText())} | ${await tabsOf(outsider).count()} tabs | ${await outsider.locator(".a-tree, .a-prose, .a-code, .a-option").count()}`,
+    "There is no project ada/demo here | 0 tabs | 0",
+  );
+}
+await lane.close();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The pages above every project: signing up and in, the user's settings, approving a terminal
 // ─────────────────────────────────────────────────────────────────────────────
-// Keel's identity is Better Auth, mounted at /v1/auth on the page's own origin. Here the real library stands in
-// for it (test code only), so what the page is checked against answers as Keel's will. The page calls it
-// directly: nothing of this goes through the console's Worker.
+// Keel's identity is Better Auth, mounted at /v1/auth on the page's own origin, and the real library stands in for
+// it here. Ada's browser and Grace's read the Keel on which the project is private.
 
-/** What the page sent to /v1, as the browser sent it. */
-interface Sent {
-  path: string;
-  authorization: string | undefined;
-}
-
-async function withIdentity(
-  context: BrowserContext,
-  identity: Pick<Identity, "handle">,
-  sent: Sent[] = [],
-): Promise<void> {
-  await behindTheWorker(context);
-  await context.route(new RegExp(`^${built}/v1/`), async (route) => {
-    const request = route.request();
-    const headers = await request.allHeaders();
-    delete headers["content-length"];
-    delete headers["host"];
-    sent.push({ path: new URL(request.url()).pathname, authorization: headers["authorization"] });
-    const posted = request.postData();
-    const response = await identity.handle(
-      new Request(request.url(), {
-        method: request.method(),
-        headers,
-        ...(posted === null ? {} : { body: posted }),
-      }),
-    );
-    const answered = Object.fromEntries(response.headers);
-    const cookies = response.headers.getSetCookie();
-    if (cookies.length > 0) answered["set-cookie"] = cookies.join("\n");
-    await route
-      .fulfill({ status: response.status, headers: answered, body: await response.text() })
-      .catch(() => undefined);
-  });
-}
-
-const identity = createIdentity(built);
 const lobby = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const sentToKeel: Sent[] = [];
-await withIdentity(lobby, identity, sentToKeel);
+await asDeployed(lobby, { keel: shut, sent: sentToKeel });
 const person = watch(await lobby.newPage(), "account");
 // A passkey needs an authenticator. Chrome plays one, which makes and keeps real keys and signs with them.
 const devtools = await lobby.newCDPSession(person);
@@ -2096,7 +1966,7 @@ expectEqual(
 
 // ─── Orgs: an org's home, making one, its members and invitations, its settings ───
 // An org's pages name the org in their address. Ada has had an org of her own since she chose her handle.
-await person.goto(`${built}/orgs/ada`, { waitUntil: "domcontentloaded" });
+await person.goto(`${built}/ada`, { waitUntil: "domcontentloaded" });
 await person.getByRole("heading", { level: 1, name: /^ada/ }).waitFor();
 expectEqual(
   "orgs: the frame names the org, and who is signed in",
@@ -2124,7 +1994,7 @@ await person.getByRole("heading", { level: 1, name: /^Lovelace/ }).waitFor();
 expectEqual(
   "orgs: made, at an address of its own, and its maker is its owner",
   `${whereOf(person)} ${squash(await person.getByRole("heading", { level: 1 }).innerText())}`,
-  "/orgs/lovelace Lovelace owner",
+  "/lovelace Lovelace owner",
 );
 
 // The dropdown is offered once Keel has said which orgs the reader is in, and not before: opened sooner, it would
@@ -2156,12 +2026,12 @@ expectEqual(
 );
 await shot(person, "org-switcher");
 await person.getByRole("menuitem", { name: /^ada/ }).click();
-await person.waitForURL(`${built}/orgs/ada`);
-expectEqual("orgs: and goes to the one chosen", whereOf(person), "/orgs/ada");
+await person.waitForURL(`${built}/ada`);
+expectEqual("orgs: and goes to the one chosen", whereOf(person), "/ada");
 
 // A second person signs up, in a browser of her own.
 const second = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-await withIdentity(second, identity, sentToKeel);
+await asDeployed(second, { keel: shut, sent: sentToKeel });
 const grace = watch(await second.newPage(), "account, a second user");
 await grace.goto(`${built}/signup`, { waitUntil: "domcontentloaded" });
 await grace.getByLabel("Email").fill("grace@example.com");
@@ -2201,7 +2071,7 @@ await shot(person, "members");
 
 // The link is the invitation's address. A visitor who opens it signs in first, and comes back to it.
 const passerBy = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-await withIdentity(passerBy, identity);
+await asDeployed(passerBy, { keel: shut });
 const stranger = watch(await passerBy.newPage(), "account, a visitor with an invitation's link");
 await stranger.goto(invitation.href, { waitUntil: "domcontentloaded" });
 await stranger.getByRole("heading", { name: "Sign in to Keel" }).waitFor();
@@ -2228,7 +2098,7 @@ await grace.getByRole("heading", { level: 1, name: /^Lovelace/ }).waitFor();
 expectEqual(
   "orgs: joined, with the role the invitation gave",
   `${whereOf(grace)} ${squash(await grace.getByRole("heading", { level: 1 }).innerText())}`,
-  "/orgs/lovelace Lovelace maintainer",
+  "/lovelace Lovelace maintainer",
 );
 /** An invitation's page where it is no longer one to answer: its heading, and what is said under it. */
 const closedOf = async (shown: Page): Promise<string> => {
@@ -2267,7 +2137,7 @@ await members.getByRole("button", { name: "Remove" }).click();
 await person.waitForFunction(
   () => document.querySelectorAll('ul[aria-label="Members of this org"] > li').length === 1,
 );
-await grace.goto(`${built}/orgs/lovelace`, { waitUntil: "domcontentloaded" });
+await grace.goto(`${built}/lovelace`, { waitUntil: "domcontentloaded" });
 await grace.getByRole("heading", { name: "There is no org of that name here" }).waitFor();
 expectEqual(
   "orgs: removed, the org is to her as one that is not there",
@@ -2321,7 +2191,6 @@ expectEqual(
   "Make another member an owner first",
 );
 await shot(person, "only-owner");
-await second.close();
 
 // Deleting an org is deliberate: its handle is typed first.
 await person.goto(`${built}/orgs/lovelace/settings`, { waitUntil: "domcontentloaded" });
@@ -2336,20 +2205,196 @@ await person.getByLabel(/^Type lovelace to delete it/).fill("lovelace");
 await shot(person, "org-settings");
 await deleting.click();
 await person.waitForURL(`${built}/settings`);
-await person.goto(`${built}/orgs/lovelace`, { waitUntil: "domcontentloaded" });
+await person.goto(`${built}/lovelace`, { waitUntil: "domcontentloaded" });
 await person.getByRole("heading", { name: "There is no org of that name here" }).waitFor();
-expectEqual("orgs: deleted, it is no longer there", whereOf(person), "/orgs/lovelace");
+expectEqual("orgs: deleted, it is no longer there", whereOf(person), "/lovelace");
 
-// Whatever the page asked of Keel, it put no credential of its own on it.
+// ─── A project, to a member of its org and to someone who is not ───
+// Ada's browser reads the Keel on which her org keeps the project private. She is a member, by the session she
+// signed in with above, so Keel shows it to her: on her org's home, at its own address, and in the frame.
+await person.goto(`${built}/ada`, { waitUntil: "domcontentloaded" });
+await person.getByRole("list", { name: "Projects" }).getByRole("link").first().waitFor();
+expectEqual(
+  "member: her org's home lists its projects, the private ones too",
+  squash(await person.getByRole("list", { name: "Projects" }).innerText()),
+  "demo private",
+);
+await person.getByRole("list", { name: "Projects" }).getByRole("link", { name: "demo" }).click();
+await person.locator(".a-prose h2").first().waitFor();
+await counted(person);
+expectEqual(
+  "member: a private project of her org opens, with its code and what is open",
+  `${pathOf(person)} | ${await filesOn(person)} | ${(await tabsOf(person).allInnerTexts()).map(squash).join(" | ")}`,
+  `/ada/demo | src | package.json | README.md | ${OPEN_ON_TABS}`,
+);
+expectEqual(
+  "member: the frame names the org, the project and who is reading",
+  squash(await person.locator("header").first().innerText()).split(" Code ")[0] ?? "",
+  "Keel / ada / demo private Live ada",
+);
+// Beside the project's name, the org's projects; beside the org's, the reader's orgs: a code host's frame.
+await person.getByRole("button", { name: "Switch project" }).click();
+await person.getByRole("menuitem").first().waitFor();
+expectEqual(
+  "member: the frame drops down on the project, to the org's projects and to all of them",
+  `${(await person.getByRole("menuitem").allInnerTexts()).map(squash).join(" | ")} → ${(
+    await person
+      .getByRole("menuitem")
+      .evaluateAll((items) => items.map((item) => item.getAttribute("href")))
+  ).join(" | ")}`,
+  "demo private | All projects of ada → /ada/demo | /ada",
+);
+await shot(person, "switcher");
+await person.keyboard.press("Escape");
+await person.getByRole("button", { name: "Switch org" }).click();
+await person.getByRole("menuitem", { name: "New org" }).waitFor();
+expectEqual(
+  "member: and on the org, to her orgs and to making one",
+  (await person.getByRole("menuitem").allInnerTexts()).map(squash).toSorted().join(" | "),
+  "New org | ada",
+);
+await person.keyboard.press("Escape");
+
+// The question. Keel's answer about the project named her a member, so its options can be tapped.
+await person.goto(`${built}/ada/demo/escalations/E-1`, { waitUntil: "domcontentloaded" });
+await person.getByRole("heading", { level: 1, name: QUESTION_ASKED }).waitFor();
+expectEqual(
+  "built: the parked changes, by Keel's numbers",
+  String(await person.getByText("parked on this: #1 and #2").count()),
+  "1",
+);
+expectEqual(
+  "built: the default is said",
+  String(await person.getByText("Both changes wait. Nothing lands on this subject.").count()),
+  "1",
+);
+expectEqual(
+  "member: options can be tapped",
+  String(await person.locator(".a-option:enabled").count()),
+  "3",
+);
+// The QR code beside it is for answering from a phone. What it says is this page's address, and nothing else:
+// no key and no capability. Whoever opens it signs in, and Keel decides whether they may answer.
+const answering = person.getByRole("region", { name: "Answer" });
+/** The marks a QR code of `text` is made of, as the page draws one: so what a code on the page says can be told. */
+const marksOf = (text: string): string => {
+  let marks = "";
+  encode(text, { ecc: "M", border: 2 }).data.forEach((row, y) => {
+    row.forEach((dark, x) => {
+      if (dark) marks += `M${x} ${y}h1v1h-1z`;
+    });
+  });
+  return marks;
+};
+expectEqual(
+  "member: one QR code is offered with the question, and what it says is this page's own address",
+  String(
+    (await qrOn(person).count()) === 1 &&
+      (await qrOn(person).locator("path").getAttribute("d")) ===
+        marksOf(`${built}/ada/demo/escalations/E-1`),
+  ),
+  "true",
+);
+expectEqual(
+  "member: the address is written beside it",
+  (await answering.getByRole("link").last().getAttribute("href")) ?? "",
+  `${built}/ada/demo/escalations/E-1`,
+);
+await shot(person, "question");
+
+// Grace is signed in too, and is in no org of the project's. A private project is to her as it is to a visitor.
+expectEqual(
+  "stranger: a private project of another's org is told as none is",
+  await toldAt(grace, "ada", "demo"),
+  told.none,
+);
+// On the Keel where the project is public she reads the question, signed in, and cannot answer it.
+const visiting = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+await visiting.addCookies(await second.cookies());
+await asDeployed(visiting, { keel: open });
+const guest = watch(await visiting.newPage(), "built, a stranger");
+await guest.goto(`${built}/ada/demo/escalations/E-1`, { waitUntil: "domcontentloaded" });
+await guest.getByRole("heading", { level: 1, name: QUESTION_ASKED }).waitFor();
+await guest.waitForTimeout(600);
+expectEqual(
+  "stranger: a public project's question is read by someone signed in who is no member, and cannot be answered",
+  `${await guest.locator(".a-option").count()} options, ${await guest.locator(".a-option:enabled").count()} to tap, ${await guest.getByRole("link", { name: "Sign in" }).count()} ways in offered`,
+  "3 options, 0 to tap, 0 ways in offered",
+);
+await visiting.close();
+await second.close();
+
+// Ada answers. Not the option a script would have chosen: what lands must be what was tapped.
+await person.locator(".a-option", { hasText: "Never cache permission checks" }).click();
+await person
+  .getByRole("heading", { name: "Ruled: Never cache permission checks" })
+  .waitFor({ timeout: 15_000 });
+expectEqual(
+  "Keel: one ruling, the member's",
+  shut
+    .events()
+    .flatMap((event) => (event.type === "RulingGiven" ? [event.payload.option] : []))
+    .join(","),
+  "no-cache",
+);
+const rulings = shut.calls.filter((call) => call.path.endsWith("/ruling"));
+expectEqual(
+  "Keel: ruled by its own operation, as whoever is signed in: nothing of the page's on it but a key to make a retry the same answer",
+  String(
+    rulings.length === 1 &&
+      /^\/v1\/escalations\/[^/]+\/ruling$/.test(rulings[0]?.path ?? "") &&
+      rulings[0]?.authorization === "" &&
+      (rulings[0]?.idempotencyKey ?? "") !== "",
+  ),
+  "true",
+);
+expectEqual(
+  "Keel: and nobody ruled on the Keel a visitor and a stranger read",
+  String(open.events().filter((event) => event.type === "RulingGiven").length),
+  "0",
+);
+
+// A live console's clock is the wall clock. Keel writes nothing more from here, and the page still moves on:
+// a second after the log's last entry one change has landed in the last minute, and a minute later none has.
+const logEnded = Date.parse(shut.events().at(-1)?.at ?? "");
+const later = watch(await lobby.newPage(), "member, as time passes");
+await later.clock.install({ time: new Date(logEnded + 1_000) });
+await later.goto(`${built}/ada/demo/mission-control`, { waitUntil: "domcontentloaded" });
+await later.locator("dl.a-trunk-line").waitFor({ timeout: 10_000 });
+const landedLately = async (): Promise<string> => statOn(later, "Landed per minute");
+/** Reads the rate until it is `wanted`, or for three seconds: a rate that never moves is a failed check, by name. */
+const settlesAt = async (wanted: string): Promise<string> => {
+  for (let tries = 0; tries < 30 && (await landedLately()) !== wanted; tries += 1)
+    // oxlint-disable-next-line no-await-in-loop -- waiting on the page's own clock
+    await later.clock.runFor(100);
+  return landedLately();
+};
+expectEqual(
+  "live: just after the log's last entry, the landing in the minute before it is counted",
+  await settlesAt("1"),
+  "1",
+);
+await later.clock.fastForward(61_000);
+expectEqual(
+  "live: a minute on with nothing new from Keel, nothing has landed in the last minute",
+  await settlesAt("0"),
+  "0",
+);
+await later.close();
+
+// Whatever the page asked of Keel, of its identity or of anything else, it put no credential of its own on it.
 expectEqual(
   "account: the page sent Keel no Authorization",
   String(sentToKeel.filter((request) => request.authorization !== undefined).length),
   "0",
 );
 expectEqual(
-  "account: and everything it asked was of Keel's identity",
+  "account: on its identity, its projects, their code and logs, and the ruling",
   String(
-    sentToKeel.length > 10 && sentToKeel.every((request) => request.path.startsWith("/v1/auth/")),
+    sentToKeel.some((request) => request.path.startsWith("/v1/auth/")) &&
+      sentToKeel.some((request) => request.path === "/v1/projects") &&
+      sentToKeel.some((request) => request.path === "/v1/events") &&
+      sentToKeel.some((request) => request.path.endsWith("/ruling")),
   ),
   "true",
 );
@@ -2360,7 +2405,7 @@ await lobby.close();
 const passkeysAlone = createIdentity(built, { emailCodes: false });
 const door = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const sentAtTheDoor: Sent[] = [];
-await withIdentity(door, passkeysAlone, sentAtTheDoor);
+await asDeployed(door, { keel: open, identity: passkeysAlone, sent: sentAtTheDoor });
 const newcomer = watch(await door.newPage(), "account, on a Keel with passkeys alone");
 const authenticator = await door.newCDPSession(newcomer);
 await authenticator.send("WebAuthn.enable");
@@ -2406,7 +2451,7 @@ expectEqual(
   `${squash(await newcomer.locator("header").first().innerText())} | ${squash(await newcomer.locator("main header").innerText())} | ${await newcomer.getByRole("list", { name: "Your passkeys" }).getByRole("listitem").count()} | ${String((await newcomer.content()).includes("keel.invalid"))}`,
   "Keel turing | Your account turing | 1 | false",
 );
-await newcomer.goto(`${built}/orgs/turing`, { waitUntil: "domcontentloaded" });
+await newcomer.goto(`${built}/turing`, { waitUntil: "domcontentloaded" });
 await newcomer.getByRole("heading", { level: 1, name: /^turing/ }).waitFor();
 expectEqual(
   "passkey sign-up: their own org is there, named by the handle",
@@ -2431,10 +2476,92 @@ expectEqual(
 );
 await door.close();
 
+// Whoever set a Keel up makes its first account at /signup?claim, with the code they were given. The code is typed,
+// and rides on the two passkey calls and on nothing else. Once the sign-up has ended the page holds it nowhere.
+const CLAIM = "a-claim-code-for-this-run-only";
+const founding = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const sentClaiming: Sent[] = [];
+await asDeployed(founding, { keel: open, identity: passkeysAlone, sent: sentClaiming });
+const founder = watch(await founding.newPage(), "account, the claim");
+const foundersKey = await founding.newCDPSession(founder);
+await foundersKey.send("WebAuthn.enable");
+await foundersKey.send("WebAuthn.addVirtualAuthenticator", {
+  options: {
+    protocol: "ctap2",
+    transport: "internal",
+    hasResidentKey: true,
+    hasUserVerification: true,
+    isUserVerified: true,
+    automaticPresenceSimulation: true,
+  },
+});
+const withTheCode = (): string =>
+  sentClaiming
+    .filter((request) => request.claim !== undefined)
+    .map(
+      (request) =>
+        `${request.path.replace("/v1/auth/passkey/", "")}${request.claim === CLAIM ? "" : " with another code"}`,
+    )
+    .join(" ");
+await founder.goto(`${built}/signup`, { waitUntil: "domcontentloaded" });
+await founder.getByLabel("Handle").waitFor();
+expectEqual(
+  "claim: a sign-up page nobody asked a claim of has no field for one",
+  String(await founder.getByLabel("Claim code").count()),
+  "0",
+);
+await founder.goto(`${built}/signup?claim`, { waitUntil: "domcontentloaded" });
+await founder.getByLabel("Claim code").waitFor();
+await founder.getByLabel("Handle").fill("lamarr");
+expectEqual(
+  "claim: with no code typed, there is no account to make",
+  String(
+    await founder.getByRole("button", { name: "Create your account with a passkey" }).isDisabled(),
+  ),
+  "true",
+);
+await founder.getByLabel("Claim code").fill(CLAIM);
+await shot(founder, "signup-claim");
+await founder.getByRole("button", { name: "Create your account with a passkey" }).click();
+// Signed up or not, the page ends somewhere with a heading: the checks below say which.
+await founder.waitForURL(`${built}/`, { timeout: 10_000 }).catch(() => undefined);
+expectEqual(
+  "claim: the code rode on both passkey calls, and on nothing else",
+  withTheCode(),
+  "generate-register-options verify-registration",
+);
+await founder.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
+await founder.getByRole("heading", { name: "Your account" }).waitFor();
+await founder.getByRole("list", { name: "Your passkeys" }).getByRole("listitem").first().waitFor();
+expectEqual(
+  "claim: the account is made, and once it is nothing more carries the code",
+  `${squash(await founder.locator("main header").innerText())} | ${withTheCode()}`,
+  "Your account lamarr | generate-register-options verify-registration",
+);
+expectEqual(
+  "claim: and the page keeps it in no storage and no address",
+  String(
+    await founder.evaluate(
+      (code) =>
+        JSON.stringify([
+          Object.entries(window.localStorage),
+          Object.entries(window.sessionStorage),
+          document.cookie,
+          window.location.href,
+          window.history.state,
+        ]).includes(code),
+      CLAIM,
+    ),
+  ),
+  "false",
+);
+await founding.close();
+
 // Where Keel serves no identity yet, the pages say so, and take nobody for a visitor to be signed up.
 const early = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-await withIdentity(early, {
-  handle: () => Promise.resolve(new Response("Not found", { status: 404 })),
+await asDeployed(early, {
+  keel: open,
+  identity: { handle: () => Promise.resolve(new Response("Not found", { status: 404 })) },
 });
 const earlyPage = watch(await early.newPage(), "account, before Keel has identity");
 await earlyPage.goto(`${built}/signup`, { waitUntil: "domcontentloaded" });
@@ -2450,7 +2577,7 @@ await early.close();
 // Anyone's to read, signed in or not. The text is the repository's own, built into the page: reading it asks
 // Keel nothing, and loads nothing from anywhere else.
 const readers = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-await withIdentity(readers, identity);
+await asDeployed(readers, { keel: open });
 const reading = watch(await readers.newPage(), "legal, a visitor");
 const fetched: string[] = [];
 reading.on("request", (request) => fetched.push(request.url()));
@@ -2515,7 +2642,7 @@ expectEqual(
   "0",
 );
 // A project's page goes on listening to Keel, so the network there is never idle.
-await reading.goto(`${built}/demo`, { waitUntil: "domcontentloaded" });
+await reading.goto(`${built}/ada/demo`, { waitUntil: "domcontentloaded" });
 await reading
   .locator("footer a")
   .first()

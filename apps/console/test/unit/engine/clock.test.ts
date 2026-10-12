@@ -21,7 +21,7 @@ async function live(clock: { sinceTheLogBegan: number }, cut = false): Promise<P
       Promise.resolve({ items: request.cursor === undefined ? events : [], nextCursor: "end" }),
     readObservations: () => Promise.resolve({ items: [], nextCursor: "end" }),
   };
-  const epoch = Date.parse(source.descriptor.epoch);
+  const epoch = Date.parse(source.descriptor.epoch ?? "");
   const player = new Player(source, () => epoch + clock.sinceTheLogBegan);
   player.scopeTo("demo");
   await player.load();

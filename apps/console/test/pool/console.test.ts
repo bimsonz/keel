@@ -1,29 +1,12 @@
 import { SELF } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-// The console's Worker as it is deployed: its own wrangler config, the built
-// page as its assets, and Keel behind the config's own service binding. The
-// `keel` it reaches is a stand-in (keel.worker.ts) that keeps what reached it.
+// The console's Worker as it is deployed: its own wrangler config, and the
+// built page as its assets. Nothing is added to the config for the test, so
+// what the Worker is bound to here is what it is bound to in production.
 
 const CONSOLE = "https://keel-console.localhost";
-
-interface Seen {
-  method: string;
-  path: string;
-  host: string;
-  authorization: string | null;
-}
-
-/** What has reached Keel since the test began. */
-async function reachedKeel(): Promise<Seen[]> {
-  const response = await env.KEEL.fetch("https://keel.localhost/test/seen");
-  return response.json();
-}
-
-beforeEach(async () => {
-  await env.KEEL.fetch("https://keel.localhost/test/forget");
-});
 
 describe("the console's Worker", () => {
   it("answers /healthz itself", async () => {
@@ -40,74 +23,29 @@ describe("the console's Worker", () => {
   });
 
   it.each([
-    "/forge-lite/mission-control",
-    "/keel/blob/trunk/src/index.ts",
-    "/keel/subjects/authz.permission-evaluation",
-  ])("serves the page at %s, and asks Keel nothing to do it", async (path) => {
+    "/keel/forge-lite/mission-control",
+    "/keel/keel/blob/trunk/src/index.ts",
+    "/keel/keel/subjects/authz.permission-evaluation",
+    "/keel",
+    "/signup",
+  ])("[console.spa] serves the page at %s", async (path) => {
     const response = await SELF.fetch(`${CONSOLE}${path}`);
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
     expect(await response.text()).toContain('<div id="root"');
-    expect(await reachedKeel()).toEqual([]);
   });
 
-  it("[console.anonymous] sends a visitor's read to Keel with no Authorization and no token asked for, and answers as Keel did", async () => {
-    const response = await SELF.fetch(`${CONSOLE}/api/v1/events?limit=5`);
-    expect(await reachedKeel()).toEqual([
-      { method: "GET", path: "/v1/events?limit=5", host: "keel.localhost", authorization: null },
-    ]);
-    expect(response.status).toBe(401);
+  it("[console.no-credential] is bound to its own files and nothing else, and holds no secret", () => {
+    // The test pool binds a few things of its own to run the tests through. They are not the Worker's.
+    const own = Object.keys(env).filter((name) => !name.startsWith("__VITEST_POOL_WORKERS_"));
+    expect(own.toSorted()).toEqual(["ASSETS", "KEEL_HOST"]);
   });
 
-  it("[console.repo] reads a project's code for a visitor with no Authorization, and a private one is Keel's own 404", async () => {
-    const open = await SELF.fetch(
-      `${CONSOLE}/api/v1/projects/prj_PUBLIC/repo/tree?path=src&as=observer`,
-    );
-    expect(open.status).toBe(200);
-    expect(await open.json()).toMatchObject({ path: "src", entries: [] });
-    const shut = await SELF.fetch(`${CONSOLE}/api/v1/projects/prj_PRIVATE/repo/tree?path=`);
-    expect(shut.status).toBe(404);
-    expect(await shut.json()).toMatchObject({ code: "resource.not_found" });
-    expect(await reachedKeel()).toEqual([
-      {
-        method: "GET",
-        path: "/v1/projects/prj_PUBLIC/repo/tree?path=src",
-        host: "keel.localhost",
-        authorization: null,
-      },
-      {
-        method: "GET",
-        path: "/v1/projects/prj_PRIVATE/repo/tree?path=",
-        host: "keel.localhost",
-        authorization: null,
-      },
-    ]);
-  });
-
-  it("[console.presenter] reads as the observer for the presenter", async () => {
+  it("[console.no-proxy] reads nothing of Keel for anyone: where its proxy was is the page, whatever key is shown", async () => {
     const response = await SELF.fetch(`${CONSOLE}/api/v1/events?limit=5`, {
       headers: { authorization: "Bearer test-presenter-key" },
     });
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ items: [], nextCursor: "0" });
-    // The observer's token, and not the key that earned it. A token is exchanged at most once before it.
-    const reached = await reachedKeel();
-    expect(reached.at(-1)).toEqual({
-      method: "GET",
-      path: "/v1/events?limit=5",
-      host: "keel.localhost",
-      authorization: "Bearer tok_observer",
-    });
-    expect(reached.slice(0, -1).map((call) => call.path)).toEqual(
-      reached.length === 1 ? [] : ["/v1/oauth/token"],
-    );
-  });
-
-  it("[console.wrong-key] refuses a key that is not the presenter's without asking Keel anything", async () => {
-    const response = await SELF.fetch(`${CONSOLE}/api/v1/events`, {
-      headers: { authorization: "Bearer not-the-key" },
-    });
-    expect(response.status).toBe(401);
-    expect(await reachedKeel()).toEqual([]);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(await response.text()).toContain('<div id="root"');
   });
 });

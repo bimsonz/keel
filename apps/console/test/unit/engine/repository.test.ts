@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import { createHttpSource } from "../../../src/source/http.ts";
 import { createMockSource } from "../../fixtures/mock/MockSource.ts";
 import type { Player } from "../../../src/engine/player.ts";
 import {
@@ -55,10 +54,6 @@ function gate(): { held: Promise<void>; release: () => void } {
   return out;
 }
 
-/** A Keel with an empty log, and nothing else. */
-const emptyLog = (): Promise<Response> =>
-  Promise.resolve(Response.json({ items: [], nextCursor: "0" }));
-
 /** The list of files beside the code, a line to an entry: indented by depth, a directory with whether it is open, and the entry being read marked. */
 const drawn = (browser: BrowserEntry[] | undefined): string[] =>
   (browser ?? []).map(
@@ -95,11 +90,7 @@ describe("the repository view", () => {
   it("opens on the project: its name, where to clone it, trunk's head, and the root with its README beneath", async () => {
     const player = await playerAt("s1", 700);
     const state = ready(await shown(player, { view: "code", path: "" }));
-    expect(state.project).toEqual({
-      name: "demo",
-      visibility: "public",
-      cloneUrl: "https://keel.town/demo.git",
-    });
+    expect(state.project).toEqual({ name: "demo", visibility: "private" });
     expect(state.ref).toEqual({ sha: player.world.trunk.head, head: true });
     expect(state.crumbs).toEqual([{ name: "demo", path: "" }]);
     // Directories first, then files, each by name.
@@ -379,23 +370,15 @@ describe("the repository view", () => {
     });
   });
 
-  it("[repository.unknown] says what it cannot show: a project it cannot look up, and one there is no code for", async () => {
+  it("[repository.refused] says what it cannot show: a project there is no code for, and one whose id nobody has given", async () => {
     // A story with no repository: every read of it fails, and nothing is drawn in its place.
     const swarm = await playerAt("swarm", 30);
     expect(await shown(swarm, { view: "code", path: "" })).toEqual({ status: "refused" });
-    // A reader Keel's log has named no project to has only the name in the address, and Keel reads a
-    // repository by the project's id: nothing is asked, and the page says which of the two it is.
-    const asked: string[] = [];
-    const live = showing(
-      await createHttpSource({
-        fetch: (input) => {
-          asked.push(typeof input === "string" ? input : "");
-          return emptyLog();
-        },
-      }),
-    );
-    await live.load();
-    expect(await shown(live, { view: "code", path: "" })).toEqual({ status: "unknown" });
-    expect(asked.filter((url) => url.includes("/repo/"))).toEqual([]);
+    // Keel reads a repository by the project's id. A playhead that has been given no project of that name asks
+    // Keel nothing, and has no code to show.
+    const nameless = showing(createMockSource({ scenario: "s1", seed: 42 }), "no-such-project");
+    await nameless.load();
+    expect(await shown(nameless, { view: "code", path: "" })).toEqual({ status: "refused" });
+    expect(nameless.repository.trees.size).toBe(0);
   });
 });

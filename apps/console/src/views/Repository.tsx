@@ -6,16 +6,14 @@ import {
   CaretDownIcon,
   CaretRightIcon,
   CheckCircleIcon,
-  CheckIcon,
   ClockCounterClockwiseIcon,
-  CopyIcon,
   FileIcon,
   FolderOpenIcon,
   FolderSimpleIcon,
   GitCommitIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 import { CodeDiff, CodeFile, type LineNote } from "../code/CodeDiff.tsx";
 import type {
   BrowserEntry,
@@ -42,30 +40,6 @@ function bytes(size: number): string {
   return size < 1_000_000
     ? `${(size / 1000).toFixed(1)} kB`
     : `${(size / 1_000_000).toFixed(1)} MB`;
-}
-
-/** The address to clone from, and a button that copies the command. */
-function CloneBox({ url }: { url: string }) {
-  const [copied, setCopied] = useState(false);
-  const command = `git clone ${url}`;
-  const copy = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(command);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1_600);
-    } catch {
-      // No clipboard here: the command is on the page to be selected.
-    }
-  };
-  return (
-    <div className="a-clone">
-      <code className="a-mono">{command}</code>
-      <button type="button" onClick={() => void copy()} aria-label="Copy the clone command">
-        {copied ? <CheckIcon size={15} /> : <CopyIcon size={15} />}
-        {copied ? "Copied" : "Copy"}
-      </button>
-    </div>
-  );
 }
 
 const KIND_WORD: Record<RepoNote["kind"], string> = {
@@ -501,15 +475,6 @@ export function Repository({
   /** Opens or closes a directory in the list of files beside the code. */
   onToggle: (directory: string, open: boolean) => void;
 }) {
-  if (state.status === "unknown") {
-    return (
-      <Notice title="This project's code is not shown to visitors yet">
-        Keel reads a public project's code to anyone, by Keel's own id for the project, and has no
-        way yet to find a project by the name in an address. The console knows a project's id from
-        Keel's log, which it reads for whoever opens it with the presenter's key.
-      </Notice>
-    );
-  }
   if (state.status === "refused") {
     return (
       <Notice title="Keel has no code to show here">
@@ -567,13 +532,6 @@ export function Repository({
               Browse the files
             </Link>
           )}
-          {address.view === "code" &&
-            address.path === "" &&
-            state.project.cloneUrl !== undefined && (
-              <div className="ml-auto">
-                <CloneBox url={state.project.cloneUrl} />
-              </div>
-            )}
         </header>
       )}
 

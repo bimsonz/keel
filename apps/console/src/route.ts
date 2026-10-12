@@ -1,15 +1,16 @@
-// Where in the console an address is. A project is the first segment of the
-// path, as a repository is on a code host, and everything the console shows
-// has an address under it:
+// Where in the console an address is. An org's handle is the first segment of
+// the path and a project's name the second, as an owner and a repository are
+// on a code host. `/` is the home, `/O` an org's own, and everything a project
+// has is under `/O/P`, written P below:
 //
-//   /P                              the code at trunk's head
-//   /P/tree/<ref>/<path>            a directory        /P/blob/<ref>/<path>   a file
-//   /P/commits[/<ref>]              history            /P/commit/<sha>        one commit
-//   /P/changes                      the changes        /P/changes/<n>[/verification|/files|/alternatives]
-//   /P/conflicts                    the conflicts      /P/conflicts/<C-n>[/probe|/evidence]
-//   /P/escalations                  the questions      /P/escalations/<E-n>
-//   /P/mission-control              the live graph     /P/subjects/<key>      with that subject open
-//   /P/insights[/funnel|/benchmark]
+//   P                              the code at trunk's head
+//   P/tree/<ref>/<path>            a directory        P/blob/<ref>/<path>   a file
+//   P/commits[/<ref>]              history            P/commit/<sha>        one commit
+//   P/changes                      the changes        P/changes/<n>[/verification|/files|/alternatives]
+//   P/conflicts                    the conflicts      P/conflicts/<C-n>[/probe|/evidence]
+//   P/escalations                  the questions      P/escalations/<E-n>
+//   P/mission-control              the live graph     P/subjects/<key>      with that subject open
+//   P/insights[/funnel|/benchmark]
 //
 // `ref` is a commit, or `trunk` for wherever trunk's head is. Nothing here
 // touches the browser: `parse` reads an address and `href` writes one.
@@ -47,10 +48,9 @@ export type Route =
 export const TRUNK = "trunk";
 
 /**
- * First segments that are never a project, nor an org's handle: Keel answers them (`v1`, `mcp`), the console's
- * Worker does, they are the build's own files, or they are a page above every project (places.ts). Keel refuses
- * each as a handle, so the list is kept the same there. `rule` and `present` go when sessions replace the
- * presenter's key.
+ * First segments that are never an org's handle: Keel answers them (`v1`, `mcp`), the console's Worker does,
+ * they are the build's own files, or they are a page above every org (places.ts). Keel refuses each as a
+ * handle, so the list is kept the same there.
  */
 export const RESERVED = [
   "api",
@@ -75,8 +75,6 @@ export const RESERVED = [
   ".well-known",
   "robots.txt",
   "favicon.ico",
-  "rule",
-  "present",
 ] as const;
 
 const HOME: Route = { at: "code", kind: "tree", ref: TRUNK, path: "" };
@@ -178,8 +176,16 @@ function routeOf(place: string | undefined, rest: string[], query: URLSearchPara
   }
 }
 
-/** Reads an address. `project` is null where the address does not name one: the bare `/`, or a path that is not a project's. */
-export function parse(pathname: string, search: string): { project: string | null; route: Route } {
+/** An address, read: the org and the project it names, and the place in that project. */
+export interface Address {
+  /** Null at the bare `/`, and at a reserved first segment, which is no org's. */
+  org: string | null;
+  /** Null where the address names no project: the home, or an org's own. */
+  project: string | null;
+  route: Route;
+}
+
+export function parse(pathname: string, search: string): Address {
   let segments: string[];
   try {
     segments = pathname
@@ -188,15 +194,14 @@ export function parse(pathname: string, search: string): { project: string | nul
       .map((segment) => decodeURIComponent(segment));
   } catch {
     // Not an address anyone was given: a percent sign that encodes nothing.
-    return {
-      project: pathname.split("/").find((segment) => segment !== "") ?? null,
-      route: MISSING,
-    };
+    const [org = null, project = null] = pathname.split("/").filter((segment) => segment !== "");
+    return { org, project, route: MISSING };
   }
-  const [project, place, ...rest] = segments;
-  if (project === undefined) return { project: null, route: HOME };
-  if (among(RESERVED, project) !== undefined) return { project: null, route: MISSING };
-  return { project, route: routeOf(place, rest, new URLSearchParams(search)) };
+  const [org, project, place, ...rest] = segments;
+  if (org === undefined) return { org: null, project: null, route: HOME };
+  if (among(RESERVED, org) !== undefined) return { org: null, project: null, route: MISSING };
+  if (project === undefined) return { org, project: null, route: HOME };
+  return { org, project, route: routeOf(place, rest, new URLSearchParams(search)) };
 }
 
 function pathOf(route: Route): string[] {
@@ -241,9 +246,11 @@ function queryOf(route: Route): string {
   return query.toString();
 }
 
-/** Writes the address of a place in a project. `carried` is what every link takes with it: see `carriedOf`. */
-export function href(project: string, route: Route, carried = ""): string {
-  const path = [project, ...pathOf(route)].map((segment) => encodeURIComponent(segment)).join("/");
+/** Writes the address of a place in an org's project. `carried` is what every link takes with it: see `carriedOf`. */
+export function href(org: string, project: string, route: Route, carried = ""): string {
+  const path = [org, project, ...pathOf(route)]
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
   const query = [queryOf(route), carried].filter((part) => part !== "").join("&");
   return `/${path}${query === "" ? "" : `?${query}`}`;
 }

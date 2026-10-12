@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/worker/handler.test.ts
+# kills: handler.no-proxy
+# why: the Worker reads Keel for whoever asks it to: a proxy is back
+diff --git a/apps/console/src/worker/handler.ts b/apps/console/src/worker/handler.ts
+index e03b3a9..edbf1fc 100644
+--- a/apps/console/src/worker/handler.ts
++++ b/apps/console/src/worker/handler.ts
+@@ -28,6 +28,9 @@ export function createConsole(): Console {
+     async fetch(request, env) {
+       if (new URL(request.url).pathname === "/healthz")
+         return Response.json({ ok: true, service: "keel-console" });
++      const { pathname, search } = new URL(request.url);
++      if (pathname.startsWith("/api/v1/"))
++        return fetch(`https://keel.town${pathname.slice("/api".length)}${search}`, request);
+       return env.ASSETS.fetch(request);
+     },
+   };

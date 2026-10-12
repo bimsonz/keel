@@ -3,6 +3,11 @@
 // be in what is deployed, and neither must the controls that play one back.
 // This reads the build and fails if any of them is.
 //
+// The console also holds no credential and has no way to Keel of its own: its
+// page reads /v1 on its own origin, as whoever is signed in. So this fails,
+// too, if the build, the Worker's code or its config names a credential the
+// console once held, or a path it once read or ruled through.
+//
 //   node scripts/guard-build.ts [dist]
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -21,6 +26,22 @@ const MARKS: [string, string][] = [
   ["Position in the log", "the playback controls"],
 ];
 
+/**
+ * What the console held and served before Keel knew its readers: the secrets its Worker was given, the key its
+ * page kept, and the paths that went through the Worker. None of them is anywhere in the console now. A name
+ * here is found only where one has been put back.
+ */
+const GONE: [string, string][] = [
+  ["KEEL_OBSERVER_CLIENT", "the observer's credential"],
+  ["KEEL_OPERATOR_CLIENT", "the operator's credential"],
+  ["CONSOLE_CAPABILITY_KEY", "the key capabilities were signed with"],
+  ["CONSOLE_PRESENTER_KEY", "the presenter's key"],
+  ["keel.presenter", "the presenter's key, as the page kept it"],
+  ["/api/v1", "the Worker's proxy to Keel"],
+  ["/present/", "the path a capability was asked for at"],
+  ["/rule/", "the path a capability ruled through"],
+];
+
 /** The console's own folder, wherever this is run from. */
 const CONSOLE = join(import.meta.dirname, "..");
 
@@ -37,6 +58,17 @@ const read = files(root).filter((path) => /\.(js|mjs|html|css|json|map)$/.test(p
 const found = read.flatMap((path) => {
   const text = readFileSync(path, "utf8");
   return MARKS.filter(([mark]) => text.includes(mark)).map(([, what]) => `${path}: ${what}`);
+});
+
+// The Worker's own code and its config are deployed beside the build, so they are read for the same names.
+const deployed = [
+  ...read,
+  join(CONSOLE, "wrangler.jsonc"),
+  ...files(join(CONSOLE, "src", "worker")).filter((path) => path.endsWith(".ts")),
+];
+const held = deployed.flatMap((path) => {
+  const text = readFileSync(path, "utf8");
+  return GONE.filter(([name]) => text.includes(name)).map(([, what]) => `${path}: ${what}`);
 });
 
 // A mark that is in no fixture any more would catch nothing. Each must still be in the source it stands for.
@@ -62,4 +94,12 @@ if (found.length > 0) {
   );
   process.exit(1);
 }
-console.log(`guard-build: ${read.length} built files read, no test fixture in any of them.`);
+if (held.length > 0) {
+  console.error(
+    `guard-build: the console holds no credential and has no way to Keel of its own, and something of one is back.\n  ${held.join("\n  ")}`,
+  );
+  process.exit(1);
+}
+console.log(
+  `guard-build: ${read.length} built files read, with the Worker's code and config: no test fixture in any, and no credential or proxy named.`,
+);

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.by-project
+# why: the log is asked for with no project named, so the page asks Keel for every project's events
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 77b9794..a0d41ca 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -186,7 +186,6 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+   const events = async (asked: ReadRequest): Promise<Page<AnyEvent>> => {
+     // The operation's own input, by Keel's names for it. The log asked for is this project's and no other's.
+     const input: Inbox_listEventsInput = {
+-      project: project.id,
+       limit: Math.min(asked.limit ?? 500, 500),
+       ...(asked.cursor === undefined || asked.cursor === "" ? {} : { cursor: asked.cursor }),
+       ...((asked.waitSec ?? 0) > 0 ? { wait: Math.min(asked.waitSec ?? 0, 30) } : {}),

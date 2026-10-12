@@ -5,7 +5,7 @@
 
 import type { DiffFile } from "../domain/state.ts";
 import type { RepoBlob, RepoCommit, RepoCommitDiff, RepoTree } from "../contract/keel/index.ts";
-import type { RepoNote, RepoProject } from "../contract/provisional.ts";
+import type { RepoNote } from "../contract/provisional.ts";
 import { type KeelRepository, NO_SUCH_PROJECT, RepoRefused } from "../source/repository.ts";
 import type { Visibility } from "./projects.ts";
 import type { World } from "./world.ts";
@@ -38,8 +38,6 @@ export interface ReadProject {
 
 /** Reads the repository once for each thing asked, and keeps what Keel answered. */
 export class RepositoryReader {
-  /** What a fixture says the project is, where one does. Keel has no such read yet. */
-  project: RepoProject | undefined;
   /** The projects Keel has answered this reader that there are none such: private ones, or none at all. */
   readonly #refused = new Set<string>();
   readonly trees = new Map<string, RepoTree>();
@@ -73,22 +71,20 @@ export class RepositoryReader {
     return this.#refused.has(this.#project()?.id ?? "");
   }
 
-  /** What an address reads at: the ref it names, else trunk's head as the log has it, else wherever Keel says trunk is. */
+  /**
+   * What an address reads at: the ref it names, else trunk's head as the log has it, else the project's `main`,
+   * which is what Keel reads where no ref is named. So the code is read before the log has said where trunk is.
+   * What was read at `main` stands for as long as trunk is still at the commit Keel read it at: the log saying
+   * where trunk is does not send the page to read the same commit again.
+   */
   refOf(address: RepoAddress, head: string): string {
-    return address.ref ?? (head === "" ? HEAD : head);
+    if (address.ref !== undefined) return address.ref;
+    return head === "" || this.resolved.get(this.keyOf(HEAD, "")) === head ? HEAD : head;
   }
 
   /** What is kept is kept by project, so that one project's files are never shown as another's. */
   keyOf(ref: string, path: string): string {
     return `${this.#project()?.id ?? ""} ${ref}:${path}`;
-  }
-
-  /** Ask what the project is beyond its name. Only a fixture can say: Keel has no such read yet. */
-  wantProject(): void {
-    if (this.#source.getProject === undefined) return;
-    this.#once("project", async () => {
-      this.project = await this.#source.getProject?.();
-    });
   }
 
   /**
@@ -97,7 +93,6 @@ export class RepositoryReader {
    * whichever directories a reader has `opened`.
    */
   want(address: RepoAddress, head: string, opened: Iterable<string> = []): void {
-    this.wantProject();
     const id = this.#project()?.id;
     if (id === undefined) return;
     const ref = this.refOf(address, head);
@@ -278,15 +273,12 @@ export type RepositoryView =
   | { kind: "commit"; commit: CommitRow; files: DiffFile[]; additions: number; deletions: number };
 
 export type RepositoryState =
-  /** The console cannot tell which project the address names: Keel has no way to look one up by its name yet. */
-  | { status: "unknown" }
   /** Keel would not read the project's files to this reader: it is private or not there, or its trunk has nothing on it. */
   | { status: "refused" }
   | { status: "loading" }
   | {
       status: "ready";
-      /** `cloneUrl` only where something has said where to clone it from. */
-      project: { name: string; visibility?: Visibility; cloneUrl?: string };
+      project: { name: string; visibility?: Visibility };
       /** The commit being read, and whether it is trunk's head. */
       ref: { sha: string; head: boolean };
       /** From the root to where the address is. The root's name is the project's. */
@@ -469,8 +461,7 @@ export function repositoryOf(
   browsing: Browsing = AS_IT_COMES,
 ): RepositoryState {
   const reading = reader.reading;
-  if (reading?.id === undefined) return { status: "unknown" };
-  if (reader.refused) return { status: "refused" };
+  if (reading?.id === undefined || reader.refused) return { status: "refused" };
   const ref = reader.refOf(address, world.trunk.head);
   // The commit being read: the one Keel resolved the ref to, once it has answered anything read at it.
   const sha = reader.resolved.get(reader.keyOf(ref, "")) ?? (ref === HEAD ? undefined : ref);
@@ -486,13 +477,11 @@ export function repositoryOf(
     address.view === "code" && address.path !== ""
       ? browserOf(reader, ref, address.path, browsing)
       : undefined;
-  const visibility = reader.project?.visibility ?? reading.visibility;
   return {
     status: "ready",
     project: {
       name: reading.name,
-      ...(visibility === undefined ? {} : { visibility }),
-      ...(reader.project === undefined ? {} : { cloneUrl: reader.project.cloneUrl }),
+      ...(reading.visibility === undefined ? {} : { visibility: reading.visibility }),
     },
     // Where no commit was named, what is read is trunk's head, wherever that is.
     ref: { sha, head: address.ref === undefined },

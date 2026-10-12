@@ -1,10 +1,13 @@
-// A stand-in for Keel's API, for tests. It serves scenario 1's log the way the
-// spec says Keel does: client-credentials tokens with scopes, events by cursor
-// with the cursor always given, a verdict's evidence by its id, and a ruling an
-// operator may give once. Its answers are typed by Keel's own generated wire
-// types. The one place it is ahead of them is an event's payload, which it
-// serves as Keel's design settles it (contract/events.ts, `Ahead`).
-// Nothing in the built console imports this.
+// A stand-in for Keel's API, for tests. It serves scenario 1's one project the
+// way Keel does: a reader is whoever the session cookie says, or a visitor;
+// a project is found by its org and name; its events are read by cursor with
+// the cursor always given, a verdict's evidence by its id, and a member of the
+// project's org may answer its question, once. What a reader may not see is
+// answered as what is not there. Its answers are typed by Keel's own generated
+// wire types, but for the project, whose shape is the console's read of it
+// the read (source/types.ts). An event's payload it serves as
+// Keel's design settles it (contract/events.ts, `Ahead`). Nothing in the
+// built console imports this.
 
 import type { AnyEvent } from "../../../src/contract/events.ts";
 import type {
@@ -13,11 +16,11 @@ import type {
   EventRecord,
   LatticeSet,
   NextAction,
+  ProjectView,
   RepoBlob,
   RepoCommitDiff,
   RepoCommitPage,
   RepoTree,
-  TokenResponse,
   VerdictView,
 } from "../../../src/contract/keel/index.ts";
 import { RepoRefused } from "../../../src/source/repository.ts";
@@ -39,11 +42,16 @@ function unpriced(payload: AnyEvent["payload"]): AnyEvent["payload"] {
   return (Object.keys(rest).length === 0 ? own : { ...own, x: rest }) as AnyEvent["payload"];
 }
 
-export interface Client {
-  id: string;
-  secret: string;
-  scopes: string[];
-}
+export type Role = NonNullable<ProjectView["viewer"]>["role"];
+
+/**
+ * Who a request is from, as Keel's gate reads it: a user, by their session, with the role they have in the
+ * project's org where they are a member of it; or null, a visitor.
+ */
+export type Reader = { role?: Role } | null;
+
+/** The cookie Keel keeps a session in. */
+export const SESSION_COOKIE = "__Secure-keel.session_token";
 
 export interface Call {
   method: string;
@@ -51,6 +59,7 @@ export interface Call {
   host: string;
   path: string;
   query: string;
+  /** What the request carried as a credential of the sender's own making. The console's page sends none. */
   authorization: string;
   idempotencyKey: string;
   body: string;
@@ -62,10 +71,8 @@ export interface FakeKeel {
   calls: Call[];
   /** The log as it stands. */
   events(): readonly AnyEvent[];
-  /** Makes every token issued so far stale, as an early expiry would. */
-  revokeTokens(): void;
-  /** Answers every authenticated request with 401 from now on, whatever the token. */
-  refuseEveryone(): void;
+  /** The project it holds, as it names it to a reader who is not a member of its org. */
+  project: ProjectView;
 }
 
 const RULINGS: ReadonlySet<string> = new Set(S1_CHOICES.map((option) => option.id));
@@ -108,13 +115,20 @@ function problem(status: number, code: string, nextActions: NextAction[] = []): 
   return Response.json(body, { status, headers: { "content-type": "application/problem+json" } });
 }
 
-export function createFakeKeel(options: {
-  clients: Client[];
-  seed?: number;
-  pageSize?: number;
-  /** Who may read the project's repository with no token. Keel creates a project private. */
-  visibility?: "public" | "private";
-}): FakeKeel {
+export function createFakeKeel(
+  options: {
+    seed?: number;
+    pageSize?: number;
+    /** The handle of the org the project is in. */
+    org?: string;
+    /** Who may read the project with no session. Keel creates a project private. */
+    visibility?: "public" | "private";
+    /** Sessions, by the value of their cookie: the role each one's user has in the project's org, or none. */
+    sessions?: Record<string, Role | "stranger">;
+    /** Says who a request is from, in place of `sessions`: for a test that has real sessions to ask about. */
+    readerOf?: (request: Request) => Reader | Promise<Reader>;
+  } = {},
+): FakeKeel {
   const seed = options.seed ?? 42;
   const pageSize = options.pageSize ?? 500;
   let log = generateS1(seed);
@@ -123,25 +137,34 @@ export function createFakeKeel(options: {
   const escalationId = log.gates[0]?.escalationId ?? "";
   let ruled: { option: string; key: string } | undefined;
   let waiters: (() => void)[] = [];
-  let refusing = false;
-  const tokens = new Map<string, string[]>();
   const calls: Call[] = [];
-  let issued = 0;
+  const created = log.events.find((event) => event.type === "ProjectCreated");
+  if (created === undefined) throw new Error("scenario 1 creates no project");
+  const project: ProjectView = {
+    id: created.payload.projectId,
+    org: options.org ?? "acme",
+    name: created.payload.name,
+    visibility,
+    createdAt: created.at,
+  };
 
   /** The question as the log raised it: Keel's view of an escalation is that event's own fields. */
   const raised = () => log.events.find((event) => event.type === "EscalationRaised");
-  const scopesOf = (request: Request): string[] | undefined =>
-    refusing
-      ? undefined
-      : tokens.get(/^Bearer (.+)$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "");
+  const readerOf =
+    options.readerOf ??
+    ((request: Request): Reader => {
+      const held = new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`).exec(
+        request.headers.get("cookie") ?? "",
+      )?.[1];
+      const role = held === undefined ? undefined : options.sessions?.[held];
+      if (role === undefined) return null;
+      return role === "stranger" ? {} : { role };
+    });
 
   return {
     calls,
     events: () => log.events,
-    revokeTokens: () => tokens.clear(),
-    refuseEveryone: () => {
-      refusing = true;
-    },
+    project,
     async fetch(request) {
       const url = new URL(request.url);
       const sent = request.method === "GET" ? "" : await request.text();
@@ -155,42 +178,31 @@ export function createFakeKeel(options: {
         body: sent,
       });
 
-      if (url.pathname === "/v1/oauth/token" && request.method === "POST") {
-        const form = new URLSearchParams(sent);
-        const client = options.clients.find(
-          (candidate) =>
-            candidate.id === form.get("client_id") &&
-            candidate.secret === form.get("client_secret"),
-        );
-        if (client === undefined)
-          return Response.json({ error: "invalid_client" }, { status: 401 });
-        const asked = (form.get("scope") ?? client.scopes.join(" ")).split(" ");
-        if (asked.some((scope) => !client.scopes.includes(scope)))
-          return Response.json({ error: "invalid_scope" }, { status: 400 });
-        issued += 1;
-        const token = `tok_${issued}_${asked.join("+")}`;
-        tokens.set(token, asked);
-        return Response.json({
-          access_token: token,
-          token_type: "Bearer",
-          expires_in: 3600,
-          scope: asked.join(" "),
-        } satisfies TokenResponse);
-      }
+      const reader = await readerOf(request);
+      const member = reader?.role !== undefined;
+      /** The project is shown to its org's members, and to anyone where it is public. To the rest it is not there. */
+      const visible = member || visibility === "public";
+      const gone = (): Response => problem(404, "resource.not_found");
 
-      // A project's repository is read by anyone where the project is public, and by an observer or an agent
-      // where it is not. To a reader with no token a private project is the same answer as no project at all.
+      const named = /^\/v1\/orgs\/([^/]+)\/projects\/([^/]+)$/.exec(url.pathname);
+      if (named !== null && request.method === "GET") {
+        const [, org = "", name = ""] = named.map((part) => decodeURIComponent(part));
+        if (!visible || org !== project.org || name !== project.name) return gone();
+        return Response.json({
+          ...project,
+          ...(reader?.role === undefined ? {} : { viewer: { role: reader.role } }),
+        } satisfies ProjectView);
+      }
+      if (url.pathname === "/v1/projects" && request.method === "GET")
+        return Response.json({ items: visible ? [project] : [] });
+
+      // A project's repository is read by whoever the project is shown to.
       const repoRead = /^\/v1\/projects\/([^/]+)\/repo\/(tree|blob|commits)(?:\/([^/]+))?$/.exec(
         url.pathname,
       );
       if (repoRead !== null && request.method === "GET") {
         const [, projectId = "", what, sha] = repoRead;
-        const anonymous = !request.headers.has("authorization");
-        const reader = anonymous ? [] : scopesOf(request);
-        if (reader === undefined) return problem(401, "auth.invalid_token");
-        if (anonymous && visibility !== "public") return problem(404, "resource.not_found");
-        if (!anonymous && !reader.includes("observer") && !reader.includes("agent:read"))
-          return problem(403, "auth.insufficient_scope");
+        if (!visible) return gone();
         const asked = (name: string): { [key: string]: string } => {
           const value = url.searchParams.get(name);
           return value === null ? {} : { [name]: value };
@@ -228,12 +240,13 @@ export function createFakeKeel(options: {
         }
       }
 
-      const scopes = scopesOf(request);
-      if (scopes === undefined) return problem(401, "auth.invalid_token");
-
       if (url.pathname === "/v1/events" && request.method === "GET") {
-        if (!scopes.includes("observer") && !scopes.includes("agent:read"))
-          return problem(403, "auth.insufficient_scope");
+        const asked = url.searchParams.get("project");
+        // A log is one project's. Asked for none, a user is read the projects of their orgs, and a visitor is
+        // told to name one.
+        if (asked === null && reader === null) return problem(400, "request.invalid");
+        if (asked !== null && (asked !== project.id || !visible)) return gone();
+        if (asked === null && !member) return Response.json({ items: [], nextCursor: "0" });
         const start = Number(url.searchParams.get("cursor") ?? "0") || 0;
         const limit = Math.min(Number(url.searchParams.get("limit") ?? "500") || 500, pageSize);
         const wait = Number(url.searchParams.get("wait") ?? "0") || 0;
@@ -260,7 +273,7 @@ export function createFakeKeel(options: {
               payload,
               label,
               actor,
-              project,
+              project: stamped,
             }): Omit<EventRecord, "payload"> & { payload: AnyEvent["payload"] } => ({
               eventId,
               type,
@@ -270,7 +283,7 @@ export function createFakeKeel(options: {
               payload: unpriced(payload),
               ...(label === undefined ? {} : { label }),
               ...(actor === undefined ? {} : { actor }),
-              ...(project === undefined ? {} : { project }),
+              ...(stamped === undefined ? {} : { project: stamped }),
             }),
           );
         // The cursor is always the position just after the last item, so a reader at the tail has something to wait on.
@@ -280,16 +293,12 @@ export function createFakeKeel(options: {
         > & { items: unknown[] });
       }
 
-      if (url.pathname === "/v1/lattices" && request.method === "GET") {
-        if (!scopes.includes("observer") && !scopes.includes("agent:read"))
-          return problem(403, "auth.insufficient_scope");
+      if (url.pathname === "/v1/lattices" && request.method === "GET")
         return Response.json(LATTICES satisfies LatticeSet);
-      }
 
       const verdict = /^\/v1\/verdicts\/([^/]+)$/.exec(url.pathname);
       if (verdict !== null && request.method === "GET") {
-        if (!scopes.includes("observer") && !scopes.includes("agent:read"))
-          return problem(403, "auth.insufficient_scope");
+        if (!visible) return gone();
         const view = log.verdicts.get(decodeURIComponent(verdict[1] ?? ""));
         return view === undefined
           ? problem(404, "resource.not_found")
@@ -298,7 +307,16 @@ export function createFakeKeel(options: {
 
       const ruling = /^\/v1\/escalations\/([^/]+)\/ruling$/.exec(url.pathname);
       if (ruling !== null && request.method === "POST") {
-        if (!scopes.includes("operator")) return problem(403, "auth.insufficient_scope");
+        // A question is answered by a person: one who is signed in, on a page of Keel's own site, and a member
+        // of the project's org. Whoever the project is not shown to is told there is no such question.
+        if (!visible) return gone();
+        if (reader === null) return problem(401, "auth.required");
+        // A page of another site, and a call that names no site, are refused alike.
+        if (request.headers.get("origin") !== url.origin) return problem(403, "auth.cross_site");
+        if (!member)
+          return problem(403, "auth.forbidden", [
+            { kind: "escalate", title: `Ask an owner of ${project.org} to make you a member` },
+          ]);
         if (decodeURIComponent(ruling[1] ?? "") !== escalationId)
           return problem(404, "resource.not_found");
         const key = request.headers.get("idempotency-key") ?? "";

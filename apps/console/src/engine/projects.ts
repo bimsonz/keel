@@ -55,6 +55,20 @@ export class Projects {
     return false;
   }
 
+  /**
+   * What Keel itself said of a project, when it was asked for by name. A project's own log need not hold the
+   * entry that created it, so this is how the project being read is known; the log still says what changes.
+   */
+  know(project: { id: string; name: string; visibility: Visibility }): void {
+    const held = this.#byId.get(project.id);
+    this.#byId.set(project.id, {
+      id: project.id,
+      name: project.name,
+      visibility: project.visibility,
+      unverified: held?.unverified ?? false,
+    });
+  }
+
   get list(): readonly ProjectEntry[] {
     return [...this.#byId.values()];
   }

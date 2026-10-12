@@ -15,29 +15,13 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    // Only these reach the Worker's code. Everything else is a file or the page.
-    "run_worker_first": ["/api/*", "/rule/*", "/present/*", "/healthz"],
+    // Only this reaches the Worker's code. Everything else is a file or the page.
+    "run_worker_first": ["/healthz"],
   },
-  // Keel is reached Worker to Worker: no public hop, no CORS, and no token in a browser.
-  "services": [{ "binding": "KEEL", "service": "keel" }],
+  // No binding to Keel and no secret: the page reads Keel itself, on this host under /v1, as whoever is
+  // signed in. scripts/guard-build.ts fails the build if this file names a credential again.
   "vars": {
     // The public host this Worker answers on. scripts/deploy.ts overrides it per environment.
     "KEEL_HOST": "keel-console.localhost",
-    // Keel's public host: requests over the KEEL binding are addressed to it. Set per environment too.
-    "KEEL_API_HOST": "keel.localhost",
-  },
-  "secrets": {
-    // The console reads Keel as the seeded observer and acts (rulings, settings) as the seeded operator:
-    // scripts/deploy.ts takes both credentials from .keel/<env>.json, which scripts/seed.ts writes.
-    // CONSOLE_CAPABILITY_KEY signs the console's capability links; CONSOLE_PRESENTER_KEY unlocks the
-    // presenter's controls. deploy.ts generates each only when the Worker has none, so links survive deploys.
-    "required": [
-      "KEEL_OBSERVER_CLIENT_ID",
-      "KEEL_OBSERVER_CLIENT_SECRET",
-      "KEEL_OPERATOR_CLIENT_ID",
-      "KEEL_OPERATOR_CLIENT_SECRET",
-      "CONSOLE_CAPABILITY_KEY",
-      "CONSOLE_PRESENTER_KEY",
-    ],
   },
 }

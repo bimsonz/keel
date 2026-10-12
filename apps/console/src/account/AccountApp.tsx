@@ -4,6 +4,7 @@
 import { Button, Input } from "@cloudflare/kumo";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { type Place, hrefOf, nextOf, sentFrom } from "../places.ts";
+import { createHttpDirectory } from "../source/http.ts";
 import { applyMode } from "../theme/mode.ts";
 import { Switch } from "../views/Switch.tsx";
 import {
@@ -18,7 +19,7 @@ import {
 } from "./account.ts";
 import { LEGAL } from "../legal/legal.ts";
 import { Footer } from "../views/Footer.tsx";
-import { Invite, NewOrg, OrgPages } from "./OrgPages.tsx";
+import { Invite, NewOrg, OrgPages, OrgPublic } from "./OrgPages.tsx";
 import { Card, HANDLE, Refusal, type Said, go, saidOf, useAsking } from "./parts.tsx";
 // oxlint-disable-next-line import/no-unassigned-import -- a stylesheet
 import "../views/tokens.css";
@@ -64,6 +65,10 @@ function handleError(handle: string, taken: boolean): { error: string } | Record
 function PasskeySignUp({ account, next }: { account: Account; next: string }) {
   const [handle, setHandle] = useState("");
   const [taken, setTaken] = useState(false);
+  // `/signup?claim` is where whoever set this Keel up makes its first account. The code is typed, never in an
+  // address, and is kept only in this field until it is sent.
+  const claiming = new URLSearchParams(window.location.search).has("claim");
+  const [claim, setClaim] = useState("");
   const { busy, refused, ask } = useAsking();
   const create = (event: FormEvent) => {
     event.preventDefault();
@@ -72,7 +77,11 @@ function PasskeySignUp({ account, next }: { account: Account; next: string }) {
         setTaken(true);
         return;
       }
-      await account.signUpWithPasskey(handle);
+      try {
+        await account.signUpWithPasskey(handle, claiming ? claim : undefined);
+      } finally {
+        setClaim("");
+      }
       go(next);
     });
   };
@@ -93,11 +102,24 @@ function PasskeySignUp({ account, next }: { account: Account; next: string }) {
           setHandle(event.target.value.toLowerCase());
         }}
       />
+      {claiming && (
+        <Input
+          label="Claim code"
+          name="claim"
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          required
+          value={claim}
+          description="The code this Keel gave whoever set it up. It is used once, with the account made here."
+          onChange={(event) => setClaim(event.target.value)}
+        />
+      )}
       <Button
         className="w-full justify-center"
         type="submit"
         variant="primary"
-        disabled={busy || !HANDLE.test(handle)}
+        disabled={busy || !HANDLE.test(handle) || (claiming && claim === "")}
       >
         Create your account with a passkey
       </Button>
@@ -618,7 +640,7 @@ function Shell({
               </svg>
               <span className="text-base text-kumo-default">Keel</span>
             </a>
-            {org !== undefined && reader.is === "user" && (
+            {org !== undefined && (reader.is === "user" || reader.is === "visitor") && (
               <>
                 <span className="text-kumo-inactive">/</span>
                 <a
@@ -650,6 +672,15 @@ function Shell({
               {nameOf(reader.who)}
             </a>
           )}
+          {/* A visitor at an org's home is offered the way in, and comes back to where they were. */}
+          {reader.is === "visitor" && org !== undefined && (
+            <a
+              href={hrefOf({ at: "login" }, `${window.location.pathname}${window.location.search}`)}
+              className="text-sm text-kumo-default hover:underline"
+            >
+              Sign in
+            </a>
+          )}
         </div>
       </header>
       <main className="flex-1">{children}</main>
@@ -660,6 +691,8 @@ function Shell({
 
 export function AccountApp({ place }: { place: Place }) {
   const account = useMemo(() => createAccount({ origin: window.location.origin }), []);
+  // An org's projects are Keel's own to list, to whoever is reading: the same read the home makes.
+  const directory = useMemo(() => createHttpDirectory(), []);
   const reader = useReader(account);
   useEffect(() => {
     applyMode(
@@ -704,7 +737,17 @@ export function AccountApp({ place }: { place: Place }) {
     page = <Device account={account} who={reader.who} userCode={place.userCode} />;
   else if (reader.is === "user" && place.at === "new-org") page = <NewOrg account={account} />;
   else if (reader.is === "user" && place.at === "org")
-    page = <OrgPages account={account} who={reader.who} handle={place.org} tab={place.tab} />;
+    page = (
+      <OrgPages
+        account={account}
+        directory={directory}
+        who={reader.who}
+        handle={place.org}
+        tab={place.tab}
+      />
+    );
+  else if (reader.is === "visitor" && place.at === "org" && place.tab === "home")
+    page = <OrgPublic directory={directory} handle={place.org} signedIn={false} />;
   else if (reader.is === "user" && place.at === "invite")
     page = <Invite account={account} who={reader.who} id={place.id} />;
   return (

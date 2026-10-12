@@ -872,58 +872,7 @@
   outline-offset: 2px;
 }
 
-/* ── An escalation on a phone ── */
-:root .a-phone {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-height: 100%;
-  padding: 16px 16px 32px;
-  overflow-y: auto;
-  background: var(--color-kumo-canvas);
-  color: var(--text-color-kumo-default);
-  font-size: 16px;
-}
-
-/* A thumb needs more room than a pointer. */
-:root .a-phone .a-option {
-  min-height: 64px;
-  padding: 16px;
-}
-
 /* ── The repository ─────────────────────────────────────────────────────── */
-
-:root .a-clone {
-  display: flex;
-  align-items: center;
-  height: 32px;
-  border: 1px solid var(--color-kumo-line);
-  border-radius: 8px;
-  background: var(--color-kumo-control);
-  font-size: 13px;
-}
-
-:root .a-clone code {
-  padding: 0 10px;
-  color: var(--text-color-kumo-strong);
-  user-select: all;
-  white-space: nowrap;
-}
-
-:root .a-clone button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 100%;
-  padding: 0 10px;
-  border-left: 1px solid var(--color-kumo-line);
-  color: var(--text-color-kumo-default);
-  font-weight: 500;
-}
-
-:root .a-clone button:hover {
-  color: var(--text-color-kumo-strong);
-}
 
 :root .a-tabs {
   display: flex;
@@ -950,6 +899,25 @@
 :root .a-tabs a[aria-current] {
   border-bottom-color: var(--color-kumo-brand);
   color: var(--text-color-kumo-strong);
+}
+
+/* Where a row of tabs is wider than the screen, as on a phone, it scrolls where it is: no tab is squeezed, and
+   none is cut off. The row holds what is inside it, so that nothing a tab hides for a screen reader can widen
+   the page. */
+:root .a-tabs {
+  position: relative;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+:root .a-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+:root .a-tabs a {
+  flex: none;
+  white-space: nowrap;
 }
 
 :root .a-tree,
@@ -981,8 +949,7 @@
 }
 
 :root .a-tree a:focus-visible,
-:root .a-tabs a:focus-visible,
-:root .a-clone button:focus-visible {
+:root .a-tabs a:focus-visible {
   outline: 2px solid var(--color-kumo-brand);
   outline-offset: -2px;
 }
@@ -1293,13 +1260,15 @@
 /* ── Trunk's numbers ────────────────────────────────────────────────────── */
 
 /* It is never cut short: where the row is too narrow for it and what follows, what follows goes beneath. */
+/* One line where there is room for it. On a narrow screen the numbers wrap under each other, and none is cut off. */
 :root .a-trunk-line {
   display: flex;
   flex-shrink: 0;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 28px;
-  height: 44px;
-  padding: 0 24px;
+  gap: 6px 28px;
+  min-height: 44px;
+  padding: 6px 24px;
   white-space: nowrap;
   font-size: 13px;
 }

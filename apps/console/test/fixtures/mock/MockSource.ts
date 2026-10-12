@@ -4,10 +4,13 @@
 // continuation to the log.
 
 import type { AnyEvent } from "../../../src/contract/events.ts";
+import type { ProjectView } from "../../../src/contract/keel/index.ts";
 import type { Observation } from "../../../src/contract/observations.ts";
+import { Projects } from "../../../src/engine/projects.ts";
 import type {
   ChangeDiff,
   KeelCommands,
+  KeelDirectory,
   KeelEventSource,
   KeelResources,
   Page,
@@ -54,6 +57,45 @@ export interface MockSource extends KeelEventSource, KeelResources, KeelReposito
   openGate(): Gate | undefined;
 }
 
+/** The org every fixture's projects are in: the first segment of a fixture's addresses. */
+export const FIXTURE_ORG = "acme";
+
+/**
+ * A fixture's projects, named as Keel names its own: by org and name. They are the ones the fixture's log
+ * creates, all in one org, and the fixture's reader is a member of it.
+ */
+export async function fixtureDirectory(source: MockSource): Promise<KeelDirectory> {
+  const named = new Projects();
+  const createdAt = new Map<string, string>();
+  let cursor: string | undefined;
+  for (;;) {
+    // oxlint-disable-next-line no-await-in-loop -- a page names the next one
+    const read = await source.readEvents(cursor === undefined ? {} : { cursor });
+    for (const event of read.items) {
+      named.note(event);
+      if (event.type === "ProjectCreated") createdAt.set(event.payload.projectId, event.at);
+    }
+    if (read.items.length === 0) break;
+    cursor = read.nextCursor;
+  }
+  const listed = (): ProjectView[] =>
+    named.list.map((project) => ({
+      id: project.id,
+      org: FIXTURE_ORG,
+      name: project.name,
+      visibility: project.visibility,
+      createdAt: createdAt.get(project.id) ?? "",
+      viewer: { role: "owner" },
+    }));
+  return {
+    findProject: (org, name) =>
+      Promise.resolve(
+        org === FIXTURE_ORG ? (listed().find((project) => project.name === name) ?? null) : null,
+      ),
+    listProjects: () => Promise.resolve(listed()),
+  };
+}
+
 const S1_RULINGS: ReadonlySet<string> = new Set(["no-cache", "invalidate", "allow-stale"]);
 
 function isS1Ruling(value: string): value is S1Ruling {
@@ -92,7 +134,6 @@ export function createMockSource(options: MockOptions): MockSource {
 
   const descriptor: SourceDescriptor = {
     mode: "fixture",
-    log: "open",
     scenario: options.scenario,
     seed: options.seed,
     epoch: log.epoch,

@@ -4,6 +4,9 @@
 import { Button, Input } from "@cloudflare/kumo";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
 import { type OrgTab, hrefOf } from "../places.ts";
+import { TRUNK, href } from "../route.ts";
+import type { ProjectView } from "../contract/keel/index.ts";
+import type { KeelDirectory } from "../source/types.ts";
 import {
   type Account,
   type Closed,
@@ -129,14 +132,63 @@ function OrgFrame({ page, tab, children }: { page: OrgPage; tab: OrgTab; childre
   );
 }
 
-function Home({ page }: { page: OrgPage }) {
+/** The projects of an org that Keel names to this reader: undefined until it has answered. */
+function useProjects(directory: KeelDirectory, org: string): readonly ProjectView[] | undefined {
+  const [projects, setProjects] = useState<readonly ProjectView[]>();
+  useEffect(() => {
+    let here = true;
+    const stop = new AbortController();
+    const read = async (): Promise<void> => {
+      // A list Keel would not give is no list: the page says there is nothing to show.
+      const listed = await directory.listProjects(stop.signal).catch(() => []);
+      if (here) setProjects(listed.filter((project) => project.org === org));
+    };
+    void read();
+    return () => {
+      here = false;
+      stop.abort();
+    };
+  }, [directory, org]);
+  return projects;
+}
+
+function ProjectList({ projects }: { projects: readonly ProjectView[] }) {
+  return (
+    <ul className="flex flex-col gap-1.5" aria-label="Projects of this org">
+      {projects.map((project) => (
+        <li key={project.id} className="flex items-center justify-between gap-3 text-sm">
+          <a
+            className="font-semibold text-kumo-strong hover:underline"
+            href={href(project.org, project.name, {
+              at: "code",
+              kind: "tree",
+              ref: TRUNK,
+              path: "",
+            })}
+          >
+            {project.name}
+          </a>
+          <span className="a-chip" data-tone="quiet">
+            {project.visibility}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Home({ page, directory }: { page: OrgPage; directory: KeelDirectory }) {
+  const projects = useProjects(directory, page.org.handle);
   return (
     <>
       <section className="a-panel flex flex-col gap-2 p-4" aria-label="Projects">
         <h2 className="a-h">Projects</h2>
-        <p className="text-sm text-kumo-subtle">
-          Keel does not say which org a project is in yet, so none is listed here.
-        </p>
+        {projects !== undefined &&
+          (projects.length === 0 ? (
+            <p className="text-sm text-kumo-subtle">This org has no project yet.</p>
+          ) : (
+            <ProjectList projects={projects} />
+          ))}
       </section>
       <section className="a-panel flex flex-col gap-3 p-4" aria-label="Members">
         <h2 className="a-h">Members</h2>
@@ -466,20 +518,70 @@ function OrgSettings({
   );
 }
 
-/** An org's pages, by the handle in the address. One that is not this reader's to see is told as one that is not there. */
+/**
+ * An org as anyone may see it: its handle, and the projects of it that Keel names to this reader. For a visitor
+ * those are its public ones. An org with none to show is, to this reader, an org that is not there.
+ */
+export function OrgPublic({
+  directory,
+  handle,
+  signedIn,
+}: {
+  directory: KeelDirectory;
+  handle: string;
+  signedIn: boolean;
+}) {
+  const projects = useProjects(directory, handle);
+  if (projects === undefined) return null;
+  if (projects.length === 0)
+    return (
+      <Card
+        title="There is no org of that name here"
+        lede={
+          signedIn
+            ? `Either there is no org called ${handle} on this Keel, or you are not a member of it and it has no public project.`
+            : `Either there is no org called ${handle} on this Keel, or it has no public project. Its members sign in to see the rest.`
+        }
+      >
+        <a className="a-link" href={signedIn ? hrefOf({ at: "new-org" }) : hrefOf({ at: "login" })}>
+          {signedIn ? "Make an org" : "Sign in"}
+        </a>
+      </Card>
+    );
+  return (
+    <div className="mx-auto flex w-full max-w-[880px] flex-col gap-5 px-6 py-8">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-[22px] font-semibold text-kumo-strong">{handle}</h1>
+      </header>
+      <section className="a-panel flex flex-col gap-2 p-4" aria-label="Projects">
+        <h2 className="a-h">Projects</h2>
+        <ProjectList projects={projects} />
+      </section>
+    </div>
+  );
+}
+
+/**
+ * An org's pages, by the handle in the address. To a reader who is not a member, its home is what anyone may
+ * see of it, and its members' pages are told as an org that is not there.
+ */
 export function OrgPages({
   account,
+  directory,
   who,
   handle,
   tab,
 }: {
   account: Account;
+  directory: KeelDirectory;
   who: Who;
   handle: string;
   tab: OrgTab;
 }) {
   const { held, read } = useOrg(account, handle, who);
   if (held === undefined) return null;
+  if (held === null && tab === "home")
+    return <OrgPublic directory={directory} handle={handle} signedIn />;
   if (held === null)
     return (
       <Card
@@ -493,7 +595,7 @@ export function OrgPages({
     );
   return (
     <OrgFrame page={held} tab={tab}>
-      {tab === "home" && <Home page={held} />}
+      {tab === "home" && <Home page={held} directory={directory} />}
       {tab === "members" && <Members account={account} page={held} who={who} read={read} />}
       {tab === "settings" && (
         // The name typed starts from the org's own, whichever org the address goes on to name.

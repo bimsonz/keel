@@ -91,20 +91,6 @@ export interface ProvisionalFields {
   };
 }
 
-/**
- * QUESTIONS R6: the project behind an address, as Keel will give it by name.
- * Keel's contract does not have it yet. The console takes the clone address from it, and nothing else.
- */
-export interface RepoProject {
-  id: string;
-  name: string;
-  visibility: "public" | "private";
-  /** Where `git clone` is pointed. */
-  cloneUrl: string;
-  /** Trunk's head, as a commit. */
-  head: string;
-}
-
 /** QUESTIONS R5: why a line is as it is. It waits on `why`, which Keel does not serve yet. */
 export interface RepoNote {
   /** The lines it is about, first and last, counted from 1. */

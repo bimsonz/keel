@@ -13,7 +13,7 @@ import {
   useMemo,
   useSyncExternalStore,
 } from "react";
-import { type Route, carriedOf, href, parse } from "./route.ts";
+import { type Address, type Route, carriedOf, href, parse } from "./route.ts";
 
 const listeners = new Set<() => void>();
 
@@ -61,7 +61,7 @@ export function carriedParams(): string {
 }
 
 /** The address the browser is at, read as a place. It changes as the reader moves, and on Back. */
-export function useAddress(): { project: string | null; route: Route } {
+export function useAddress(): Address {
   const at = useSyncExternalStore(subscribe, address);
   return useMemo(() => {
     const mark = at.indexOf("?");
@@ -70,6 +70,8 @@ export function useAddress(): { project: string | null; route: Route } {
 }
 
 export interface Where {
+  /** The org the project is in. */
+  org: string;
   project: string;
   route: Route;
   /** The address of a place in this project. */
@@ -79,17 +81,24 @@ export interface Where {
 const WhereContext = createContext<Where | null>(null);
 
 export function WhereProvider({
+  org,
   project,
   route,
   children,
 }: {
+  org: string;
   project: string;
   route: Route;
   children: ReactNode;
 }) {
   const where = useMemo(
-    (): Where => ({ project, route, to: (next) => href(project, next, carriedParams()) }),
-    [project, route],
+    (): Where => ({
+      org,
+      project,
+      route,
+      to: (next) => href(org, project, next, carriedParams()),
+    }),
+    [org, project, route],
   );
   return <WhereContext.Provider value={where}>{children}</WhereContext.Provider>;
 }

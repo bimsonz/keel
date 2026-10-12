@@ -3,8 +3,6 @@
 //   node scripts/deploy.ts staging --check    render and check only
 //   node scripts/deploy.ts staging --only console
 //                                             render and check every config, deploy one app
-//   node scripts/deploy.ts staging --rotate CONSOLE_PRESENTER_KEY
-//                                             replace a console key, kept in .keel/<env>.json
 // Account-specific ids come only from Terraform's outputs. A missing output, or
 // a sentinel left in a rendered config, stops the deploy before wrangler runs,
 // and wrangler's automatic provisioning is switched off, so nothing is ever
@@ -12,13 +10,11 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
-  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
-  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -29,8 +25,7 @@ import { applyEdits, modify, parse, type ParseError, printParseErrorCode } from 
 import { pinProblems } from "../packages/tooling/src/guards/model-pins.ts";
 import { accountId, cloudflare, root, wrangler } from "./env.ts";
 
-const USAGE =
-  "usage: node scripts/deploy.ts <env> [--check] [--only <app>] [--rotate <console key>]";
+const USAGE = "usage: node scripts/deploy.ts <env> [--check] [--only <app>]";
 
 function usage(reason: string): never {
   console.error(`${reason}\n${USAGE}`);
@@ -45,10 +40,8 @@ function parseArguments(argv: readonly string[]): {
   environment: string;
   checkOnly: boolean;
   only: string | undefined;
-  rotate: string | undefined;
 } {
-  if (argv.length === 0)
-    return { environment: "staging", checkOnly: false, only: undefined, rotate: undefined };
+  if (argv.length === 0) return { environment: "staging", checkOnly: false, only: undefined };
   const [environment = "", ...rest] = argv;
   if (!/^[a-z][a-z0-9-]*$/.test(environment))
     usage(`the first argument names the environment, not ${JSON.stringify(environment)}`);
@@ -56,16 +49,15 @@ function parseArguments(argv: readonly string[]): {
     environment,
     checkOnly: false,
     only: undefined as string | undefined,
-    rotate: undefined as string | undefined,
   };
   for (let i = 0; i < rest.length; i += 1) {
     const arg = rest[i];
     if (arg === "--check") {
       parsed.checkOnly = true;
-    } else if (arg === "--only" || arg === "--rotate") {
+    } else if (arg === "--only") {
       const value = rest[i + 1];
       if (value === undefined || value.startsWith("--")) usage(`${arg} needs a value`);
-      parsed[arg === "--only" ? "only" : "rotate"] = value;
+      parsed.only = value;
       i += 1;
     } else {
       usage(`unknown argument ${JSON.stringify(arg)}`);
@@ -73,28 +65,11 @@ function parseArguments(argv: readonly string[]): {
   }
   return parsed;
 }
-const { environment, checkOnly, only, rotate } = parseArguments(process.argv.slice(2));
+const { environment, checkOnly, only } = parseArguments(process.argv.slice(2));
 
 /** keel binds keel-verify's SANDBOX class and VERIFIER entrypoint, so keel-verify goes first. */
 const APPS = ["keel-verify", "keel", "console"] as const;
 
-/**
- * The console's generated keys, by the field `.keel/<env>.json` keeps each
- * under `console`. A Worker's secret cannot be read back, so the file is the
- * only place anyone can learn one.
- */
-const CONSOLE_KEYS = {
-  CONSOLE_CAPABILITY_KEY: "capabilityKey",
-  CONSOLE_PRESENTER_KEY: "presenterKey",
-} as const;
-type ConsoleKey = keyof typeof CONSOLE_KEYS;
-const isConsoleKey = (name: string): name is ConsoleKey => Object.hasOwn(CONSOLE_KEYS, name);
-
-if (rotate !== undefined && !isConsoleKey(rotate)) {
-  usage(
-    `--rotate takes ${Object.keys(CONSOLE_KEYS).join(" or ")}, not ${rotate}. KEEL_SIGNING_KEY is never rotated here: a new one voids every token already issued.`,
-  );
-}
 if (only !== undefined && !APPS.some((app) => app === only))
   usage(`--only takes one of ${APPS.join(", ")}, not ${only}`);
 
@@ -241,108 +216,6 @@ async function workerExists(name: string): Promise<boolean> {
   }
 }
 
-/** 32 random bytes, base64url: a key the console signs or unlocks with. */
-function randomKey(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return Buffer.from(bytes).toString("base64url");
-}
-
-/** The console's credentials, from the seed (scripts/seed.ts) of this environment. */
-function seededCredential(
-  role: "observer" | "operator",
-  part: "clientId" | "clientSecret",
-): string {
-  const path = join(root, ".keel", `${environment}.json`);
-  if (!existsSync(path)) {
-    throw new Error(
-      `The console needs the ${role}'s credential from ${path}, which does not exist: run \`node scripts/seed.ts ${environment}\` (Keel is deployed by now), then deploy again.`,
-    );
-  }
-  const value: unknown = Reflect.get(
-    Object(Reflect.get(Object(JSON.parse(readFileSync(path, "utf8"))), role)),
-    part,
-  );
-  if (typeof value !== "string" || value === "")
-    throw new Error(`${path} holds no ${role} ${part}`);
-  return value;
-}
-
-const SEEDED: Readonly<
-  Record<string, readonly ["observer" | "operator", "clientId" | "clientSecret"]>
-> = {
-  KEEL_OBSERVER_CLIENT_ID: ["observer", "clientId"],
-  KEEL_OBSERVER_CLIENT_SECRET: ["observer", "clientSecret"],
-  KEEL_OPERATOR_CLIENT_ID: ["operator", "clientId"],
-  KEEL_OPERATOR_CLIENT_SECRET: ["operator", "clientSecret"],
-};
-
-const seedFile = join(root, ".keel", `${environment}.json`);
-
-/** `.keel/<env>.json` as an object; scripts/seed.ts writes everything in it but `console`. */
-function seedFileContents(): Json {
-  if (!existsSync(seedFile)) return {};
-  const contents: unknown = JSON.parse(readFileSync(seedFile, "utf8"));
-  return isObject(contents) ? contents : {};
-}
-
-/** The console key `.keel/<env>.json` holds, if it holds one. */
-function knownConsoleKey(secret: ConsoleKey): string | undefined {
-  const keys = seedFileContents()["console"];
-  const value = isObject(keys) ? keys[CONSOLE_KEYS[secret]] : undefined;
-  return typeof value === "string" && value !== "" ? value : undefined;
-}
-
-/**
- * Keeps a new console key in `.keel/<env>.json` (gitignored, 0600) before
- * wrangler sets it: replaced whole through a rename, so a crash never leaves
- * the seeded credentials half written.
- */
-function recordConsoleKey(secret: ConsoleKey, value: string): void {
-  const contents = seedFileContents();
-  const keys = isObject(contents["console"]) ? contents["console"] : {};
-  const next = { ...contents, console: { ...keys, [CONSOLE_KEYS[secret]]: value } };
-  mkdirSync(join(root, ".keel"), { recursive: true, mode: 0o700 });
-  const staged = `${seedFile}.${process.pid}`;
-  writeFileSync(staged, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
-  chmodSync(staged, 0o600);
-  renameSync(staged, seedFile);
-}
-
-/** A short digest that matches a deploy's log to the file without printing the key. */
-const digest = (value: string): string =>
-  `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 12)}`;
-
-/**
- * A console key's value for this deploy, or undefined to leave the Worker's
- * own. A new key voids every link or session made with the old one, so one is
- * made only when `--rotate` names it or nobody has one; a key the file holds
- * is set from it, which also heals a deploy that died after writing it.
- */
-function consoleKeyFor(name: string, secret: ConsoleKey, onWorker: boolean): string | undefined {
-  const known = knownConsoleKey(secret);
-  let value: string;
-  let source: string;
-  if (rotate === secret) {
-    value = randomKey();
-    recordConsoleKey(secret, value);
-    source = "rotated (--rotate)";
-  } else if (known !== undefined) {
-    value = known;
-    source = `from .keel/${environment}.json`;
-  } else if (onWorker) {
-    console.log(
-      `${name}: ${secret} kept (not in .keel/${environment}.json: --rotate ${secret} to know it)`,
-    );
-    return undefined;
-  } else {
-    value = randomKey();
-    recordConsoleKey(secret, value);
-    source = "generated (the Worker had none)";
-  }
-  console.log(`${name}: ${secret} ${source}, ${digest(value)}`);
-  return value;
-}
-
 async function signingKey(): Promise<string> {
   const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
   if (!("privateKey" in pair)) throw new Error("Ed25519 did not generate a key pair");
@@ -374,9 +247,8 @@ function requiredSecrets(config: Json): string[] {
  * KEEL_BOOTSTRAP_SECRET, BETTER_AUTH_SECRET and KEEL_CLAIM_DIGEST (Terraform's
  * outputs, so replacing one there rotates it here; the claim code as its digest)
  * are set on every deploy; KEEL_SIGNING_KEY only when the Worker lacks
- * one, because a new key invalidates every token already issued. The
- * console's observer and operator credentials come from the seed on every
- * deploy; its capability and presenter keys as `consoleKeyFor` decides.
+ * one, because a new key invalidates every token already issued. The console
+ * requires none: it holds no credential.
  */
 async function secretsFor(
   name: string,
@@ -408,12 +280,6 @@ async function secretsFor(
         values[secret] = await signingKey();
         console.log(`${name}: KEEL_SIGNING_KEY generated (the Worker had none)`);
       }
-    } else if (SEEDED[secret] !== undefined) {
-      const [role, part] = SEEDED[secret];
-      values[secret] = seededCredential(role, part);
-    } else if (isConsoleKey(secret)) {
-      const value = consoleKeyFor(name, secret, existing.has(secret));
-      if (value !== undefined) values[secret] = value;
     } else {
       throw new Error(
         `${name} requires secret ${secret}, and scripts/deploy.ts has no source for it`,
@@ -503,8 +369,6 @@ for (const app of rendered) {
       requireOutput(outputs, FROM_TERRAFORM[secret], secret);
 }
 const deploying = rendered.filter((app) => only === undefined || app.dir === only);
-if (rotate !== undefined && !deploying.some((app) => requiredSecrets(app.config).includes(rotate)))
-  throw new Error(`--rotate ${rotate}: no app this deploy reaches requires it`);
 if (checkOnly) {
   console.log(
     `${environment}: every config rendered with no sentinel left, every bound store exists, and Terraform outputs every secret it owns`,

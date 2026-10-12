@@ -4,7 +4,7 @@ import { AccountApp } from "./account/AccountApp.tsx";
 import { App } from "./App.tsx";
 import { legalOf } from "./legal/legal.ts";
 import { LegalPage } from "./legal/LegalPage.tsx";
-import { placeOf } from "./places.ts";
+import { hrefOf, placeOf } from "./places.ts";
 // oxlint-disable-next-line import/no-unassigned-import -- a stylesheet
 import "./styles.css";
 
@@ -15,6 +15,9 @@ if (root === null) throw new Error("missing #root");
 // the user's own, and reads nothing of Keel's log; everything else is the console.
 const legal = legalOf(window.location.pathname);
 const place = placeOf(window.location.pathname, window.location.search);
+// An org's home was once at `/orgs/<org>`. It is at `/<org>`, and an address of the old kind is corrected.
+if (place?.at === "org" && place.tab === "home" && window.location.pathname !== hrefOf(place))
+  window.history.replaceState(null, "", `${hrefOf(place)}${window.location.search}`);
 
 createRoot(root).render(
   <StrictMode>

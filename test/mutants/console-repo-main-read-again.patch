@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: http.code-first
+# why: once the log says where trunk is, the code already read at main is read from Keel again, and the page is empty in between
+diff --git a/apps/console/src/engine/repository.ts b/apps/console/src/engine/repository.ts
+index f8cad6a..8813fde 100644
+--- a/apps/console/src/engine/repository.ts
++++ b/apps/console/src/engine/repository.ts
+@@ -79,7 +79,7 @@ export class RepositoryReader {
+    */
+   refOf(address: RepoAddress, head: string): string {
+     if (address.ref !== undefined) return address.ref;
+-    return head === "" || this.resolved.get(this.keyOf(HEAD, "")) === head ? HEAD : head;
++    return head === "" ? HEAD : head;
+   }
+ 
+   /** What is kept is kept by project, so that one project's files are never shown as another's. */

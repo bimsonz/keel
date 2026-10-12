@@ -1,29 +1,43 @@
 import { describe, expect, it } from "vitest";
+import type { ProjectView } from "../../../src/contract/keel/index.ts";
+import { Player } from "../../../src/engine/player.ts";
 import { type RepoAddress, repositoryOf } from "../../../src/engine/repository.ts";
 import { changePageOf, conflictPageOf } from "../../../src/engine/select.ts";
-import { createHttpSource } from "../../../src/source/http.ts";
-import { createConsole } from "../../../src/worker/handler.ts";
-import { createFakeKeel } from "../../fixtures/mock/fakeKeel.ts";
+import { createHttpDirectory, createHttpSource } from "../../../src/source/http.ts";
+import { KeelRefused } from "../../../src/source/types.ts";
+import { type Role, SESSION_COOKIE, createFakeKeel } from "../../fixtures/mock/fakeKeel.ts";
 import { generateS1 } from "../../fixtures/mock/s1.ts";
-import { showing } from "../showing.ts";
 
-/** A stand-in for Keel's API: serves a log by numeric cursor, and always says where to read next, as Keel's contract has it. */
-function fakeKeel(pageSize: number) {
+const ORIGIN = "https://keel.example";
+
+const addressOf = (input: RequestInfo | URL): URL =>
+  new URL(
+    typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+    ORIGIN,
+  );
+
+/** A stand-in for Keel's log: served by numeric cursor, always saying where to read next, as Keel's contract has it. */
+function fakeLog(pageSize: number) {
   const log = generateS1(42, "invalidate");
-  const calls: { url: string; init: RequestInit | undefined }[] = [];
-  const serve = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const url = new URL(
-      typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
-      "https://keel.test",
-    );
-    calls.push({ url: `${url.pathname}${url.search}`, init });
-    if (url.pathname === "/api/v1/events") {
+  const created = log.events.find((event) => event.type === "ProjectCreated");
+  const project: ProjectView = {
+    id: created?.payload.projectId ?? "",
+    org: "acme",
+    name: "demo",
+    visibility: "private",
+    createdAt: created?.at ?? "",
+  };
+  const calls: URL[] = [];
+  const serve = (input: RequestInfo | URL): Promise<Response> => {
+    const url = addressOf(input);
+    calls.push(url);
+    if (url.pathname === "/v1/events") {
       const start = Number(url.searchParams.get("cursor") ?? "0");
       const limit = Math.min(Number(url.searchParams.get("limit") ?? "500"), pageSize);
       // Published records carry less than the internal envelope.
       const items = log.events
         .slice(start, start + limit)
-        .map(({ eventId, type, entity, seq, at, payload, label, project }) => ({
+        .map(({ eventId, type, entity, seq, at, payload, label, project: stamped }) => ({
           eventId,
           type,
           entity,
@@ -31,7 +45,7 @@ function fakeKeel(pageSize: number) {
           at,
           payload,
           ...(label === undefined ? {} : { label }),
-          ...(project === undefined ? {} : { project }),
+          ...(stamped === undefined ? {} : { project: stamped }),
         }));
       return Promise.resolve(
         Response.json({
@@ -40,20 +54,19 @@ function fakeKeel(pageSize: number) {
         }),
       );
     }
-    if (url.pathname.endsWith("/ruling")) return Promise.resolve(Response.json({ state: "ruled" }));
     return Promise.resolve(new Response("not found", { status: 404 }));
   };
-  return { log, calls, serve };
+  return { log, project, calls, serve };
 }
 
 describe("the HTTP source", () => {
-  it("reads the whole log page by page and folds to the same world as the replay", async () => {
-    const keel = fakeKeel(7);
-    const source = await createHttpSource({ fetch: keel.serve });
-    const player = showing(source);
+  it("[http.by-project] reads the project's own log page by page and folds to the same world as the replay", async () => {
+    const keel = fakeLog(7);
+    const source = createHttpSource(keel.project, { fetch: keel.serve });
+    expect(source.descriptor).toEqual({ mode: "live", project: keel.project });
+    const player = new Player(source);
     await player.load();
     player.seek(9_999_000);
-    expect(source.descriptor).toMatchObject({ mode: "live", epoch: keel.log.events[0]?.at });
     expect(player.world.trunk).toMatchObject({
       advances: 2,
       changesLanded: 2,
@@ -63,32 +76,35 @@ describe("the HTTP source", () => {
     expect(
       [...player.world.conflicts.values()].map((conflict) => [conflict.label, conflict.state]),
     ).toEqual([["C-1", "resolved"]]);
-    // Every page was asked for by the cursor the last one returned.
-    const cursors = keel.calls
-      .filter((call) => call.url.startsWith("/api/v1/events"))
-      .map((call) => new URL(call.url, "https://keel.test").searchParams.get("cursor"));
-    expect(cursors.slice(0, 4)).toEqual([null, "7", "14", "21"]);
+    // Every page was asked for by the cursor the last one returned, and each by the project's id: the log
+    // read is that project's and no other's.
+    const reads = keel.calls.filter((call) => call.pathname === "/v1/events");
+    expect(reads.slice(0, 4).map((call) => call.searchParams.get("cursor"))).toEqual([
+      null,
+      "7",
+      "14",
+      "21",
+    ]);
+    expect(new Set(reads.map((call) => call.searchParams.get("project")))).toEqual(
+      new Set([keel.project.id]),
+    );
   });
 
   it("drops records that are not catalogue events instead of guessing at them", async () => {
-    const keel = fakeKeel(500);
-    const source = await createHttpSource({ fetch: keel.serve });
-    const page = await source.readEvents();
+    const keel = fakeLog(500);
+    const page = await createHttpSource(keel.project, { fetch: keel.serve }).readEvents();
     expect(page.items).toHaveLength(keel.log.events.length);
     expect(page.items.map((event): string => event.type)).not.toContain("NotInTheCatalogue");
   });
 
   it("follows the tail: what arrives later is folded without re-reading what came before", async () => {
-    const keel = fakeKeel(500);
+    const keel = fakeLog(500);
     const all = keel.log.events;
     let published = 60;
     let served = 0;
     const serve = (input: RequestInfo | URL): Promise<Response> => {
-      const url = new URL(
-        typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
-        "https://keel.test",
-      );
-      if (url.pathname !== "/api/v1/events")
+      const url = addressOf(input);
+      if (url.pathname !== "/v1/events")
         return Promise.resolve(new Response("not found", { status: 404 }));
       const cursor = Number(url.searchParams.get("cursor") ?? "0");
       const items = all.slice(cursor, published);
@@ -96,8 +112,10 @@ describe("the HTTP source", () => {
       // At the tail the page is empty and its cursor is where the reader already is.
       return Promise.resolve(Response.json({ items, nextCursor: String(cursor + items.length) }));
     };
-    const player = showing(await createHttpSource({ fetch: serve }));
+    const player = new Player(createHttpSource(keel.project, { fetch: serve }));
+    expect(player.loaded).toBe(false);
     await player.load();
+    expect(player.loaded).toBe(true);
     player.seek(player.end);
     player.play();
     const seenAtFirst = player.world.version;
@@ -117,49 +135,40 @@ describe("the HTTP source", () => {
   });
 
   it("refuses a page that does not say where to read next, rather than starting again from the beginning", async () => {
-    await expect(
-      createHttpSource({ fetch: () => Promise.resolve(Response.json({ items: [] })) }),
-    ).rejects.toThrow("the page has no cursor");
+    const source = createHttpSource(fakeLog(1).project, {
+      fetch: () => Promise.resolve(Response.json({ items: [] })),
+    });
+    await expect(source.readEvents()).rejects.toThrow("the page has no cursor");
   });
 
   it("says plainly what the API cannot give yet", async () => {
-    const source = await createHttpSource({ fetch: fakeKeel(500).serve });
+    const keel = fakeLog(500);
+    const source = createHttpSource(keel.project, { fetch: keel.serve });
     await expect(source.getDiff("chg_01")).rejects.toThrow("no diff endpoint yet");
     await expect(source.readObservations()).resolves.toEqual({ items: [], nextCursor: "" });
   });
 });
 
-/** The page's source, talking to the real Worker, which talks to a stand-in Keel. */
-function behindTheWorker(visibility: "public" | "private" = "private") {
+type Who = Role | "stranger" | "visitor";
+
+/**
+ * The page reading the stand-in Keel as `who`. The browser's part is played here: it sends the session's cookie
+ * to its own origin, and says which page a request that changes something came from. What the page's own code
+ * put on a request is kept apart, in `fromThePage`.
+ */
+function reading(who: Who, visibility: "public" | "private" = "private") {
   const keel = createFakeKeel({
     visibility,
-    clients: [
-      { id: "observer", secret: "s1", scopes: ["observer"] },
-      { id: "operator", secret: "s2", scopes: ["operator"] },
-    ],
+    sessions: { owner: "owner", maintainer: "maintainer", member: "member", stranger: "stranger" },
   });
-  const mission = createConsole();
-  const requests: Request[] = [];
-  const serve = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const request = new Request(
-      new URL(
-        typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
-        "https://console.test",
-      ),
-      init,
-    );
-    requests.push(request.clone());
-    return mission.fetch(request, {
-      KEEL: keel,
-      KEEL_API_HOST: "keel.example",
-      ASSETS: { fetch: () => Promise.resolve(new Response("page")) },
-      KEEL_OBSERVER_CLIENT_ID: "observer",
-      KEEL_OBSERVER_CLIENT_SECRET: "s1",
-      KEEL_OPERATOR_CLIENT_ID: "operator",
-      KEEL_OPERATOR_CLIENT_SECRET: "s2",
-      CONSOLE_CAPABILITY_KEY: "signing key",
-      CONSOLE_PRESENTER_KEY: "presenter key",
-    });
+  const fromThePage: Request[] = [];
+  const serve: typeof fetch = (input, init) => {
+    const asked = new Request(addressOf(input), init);
+    fromThePage.push(asked.clone());
+    const headers = new Headers(asked.headers);
+    if (who !== "visitor") headers.set("cookie", `${SESSION_COOKIE}=${who}`);
+    if (asked.method !== "GET") headers.set("origin", ORIGIN);
+    return keel.fetch(new Request(asked, { headers }));
   };
   const question =
     keel
@@ -167,74 +176,88 @@ function behindTheWorker(visibility: "public" | "private" = "private") {
       .flatMap((event) =>
         event.type === "EscalationRaised" ? [event.payload.escalationId] : [],
       )[0] ?? "";
-  return { keel, serve, requests, question };
+  return { keel, serve, fromThePage, question, directory: createHttpDirectory({ fetch: serve }) };
+}
+
+/** The project as `who` is shown it, with a playhead on it. */
+async function opened(who: Who, visibility: "public" | "private" = "private") {
+  const r = reading(who, visibility);
+  const found = await r.directory.findProject("acme", "demo");
+  if (found === null) throw new Error("Keel showed this reader no such project");
+  const source = createHttpSource(found, { fetch: r.serve });
+  return { ...r, found, source, player: new Player(source) };
 }
 
 const settled = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 30));
 
 describe("who the page reads as", () => {
-  it("[http.visitor] stands with a closed log for a visitor: no events, no asking again, and no credential sent", async () => {
-    const { serve, requests, keel } = behindTheWorker();
-    const source = await createHttpSource({ fetch: serve });
-    expect(source.descriptor).toMatchObject({ mode: "live", log: "closed" });
-    const player = showing(source);
-    await player.load();
-    expect(player.end).toBe(0);
-    expect(player.projects.list).toEqual([]);
-    // Following a closed log returns at once, where following an open one waits on its tail.
-    await player.follow(new AbortController().signal);
-    // The log is asked for once. Nothing else Keel reads only to an observer is asked for at all.
-    expect(requests.map((request) => new URL(request.url).pathname)).toEqual(["/api/v1/events"]);
-    expect(requests.filter((request) => request.headers.has("authorization"))).toEqual([]);
-    // Keel was asked with no token, and was never asked for one.
-    expect(keel.calls.map((call) => `${call.path} ${call.authorization}`)).toEqual(["/v1/events "]);
-  });
+  it("[http.visitor] is shown a public project and its log as a visitor, and a private one is to a visitor as none", async () => {
+    const shut = reading("visitor");
+    expect(await shut.directory.findProject("acme", "demo")).toBeNull();
+    expect(await shut.directory.listProjects()).toEqual([]);
+    // No such project, and a project in another org of the same name, are the same answer.
+    expect(await shut.directory.findProject("acme", "no-such")).toBeNull();
 
-  it("[http.presenter-reads] shows the presenter's key on every read, and the Worker then reads as the observer", async () => {
-    const { serve, requests, keel } = behindTheWorker();
-    const source = await createHttpSource({ fetch: serve, presenterKey: "presenter key" });
-    expect(source.descriptor.log).toBe("open");
-    const player = showing(source);
-    await player.load();
+    const open = await opened("visitor", "public");
+    expect(open.found).toMatchObject({ org: "acme", name: "demo", visibility: "public" });
+    expect(open.found.viewer).toBeUndefined();
+    expect(await open.directory.listProjects()).toMatchObject([{ org: "acme", name: "demo" }]);
+    await open.player.load();
     await settled();
-    expect(player.projects.list.map((project) => project.name)).toEqual(["demo"]);
-    // Every entry of the log is folded, as Keel publishes it: with no cost on any of them.
-    player.seek(player.end);
-    expect(player.world.conflicts.size).toBe(1);
-    expect(player.unread).toBe(0);
-    const reads = requests.filter((request) => new URL(request.url).pathname.startsWith("/api/"));
-    expect(reads.length).toBeGreaterThan(2);
-    expect(reads.map((request) => request.headers.get("authorization"))).toEqual(
-      reads.map(() => "Bearer presenter key"),
-    );
-    expect(
-      keel.calls
-        .filter((call) => call.path !== "/v1/oauth/token")
-        .every((call) => /^Bearer tok_\d+_observer$/.test(call.authorization)),
-    ).toBe(true);
+    open.player.seek(open.player.end);
+    expect(open.player.world.conflicts.size).toBe(1);
+    expect(open.player.unread).toBe(0);
+    expect(open.source.canRule?.(open.question)).toBe(false);
   });
 
-  it("[http.key-refused] says the key was refused when it is not the presenter's, and asks Keel nothing", async () => {
-    const { serve, keel } = behindTheWorker();
-    await expect(createHttpSource({ fetch: serve, presenterKey: "a guess" })).rejects.toThrow(
-      "That is not the presenter's key",
-    );
-    expect(keel.calls).toEqual([]);
+  it("[http.org] finds a project under its own org and under no other", async () => {
+    const r = reading("owner");
+    expect(await r.directory.findProject("acme", "demo")).toMatchObject({ name: "demo" });
+    expect(await r.directory.findProject("other", "demo")).toBeNull();
+  });
+
+  it("[http.member] reads a private project as a member of its org, with the role Keel says they have", async () => {
+    const { found, player, source, question, directory } = await opened("maintainer");
+    expect(found).toMatchObject({ visibility: "private", viewer: { role: "maintainer" } });
+    expect(await directory.listProjects()).toHaveLength(1);
+    await player.load();
+    player.seek(player.end);
+    expect(player.projects.list.map((project) => project.name)).toEqual(["demo"]);
+    expect(player.world.conflicts.size).toBe(1);
+    expect(source.canRule?.(question)).toBe(true);
+    // Someone signed in who is in no org of the project's is shown nothing of it.
+    expect(await reading("stranger").directory.findProject("acme", "demo")).toBeNull();
+  });
+
+  it("[http.page-sends-nothing] puts no credential of its own on anything it asks, whoever is reading", async () => {
+    for (const who of ["visitor", "owner"] as const) {
+      // oxlint-disable-next-line no-await-in-loop -- two readers, one after the other
+      const { player, source, question, fromThePage, keel } = await opened(who, "public");
+      // oxlint-disable-next-line no-await-in-loop -- as above
+      await player.load();
+      // oxlint-disable-next-line no-await-in-loop -- as above
+      await source.getTree(keel.project.id, { path: "" });
+      // oxlint-disable-next-line no-await-in-loop -- as above
+      await source
+        .giveRuling({ escalationId: question, option: "invalidate", idempotencyKey: "k" })
+        .catch(() => undefined);
+      expect(fromThePage.length).toBeGreaterThan(4);
+      expect(
+        fromThePage.filter(
+          (request) => request.headers.has("authorization") || request.headers.has("cookie"),
+        ),
+      ).toEqual([]);
+      expect(keel.calls.every((call) => call.authorization === "")).toBe(true);
+      // Everything asked is Keel's own, under /v1 on the page's origin.
+      expect(fromThePage.every((request) => request.url.startsWith(`${ORIGIN}/v1/`))).toBe(true);
+    }
   });
 });
 
-/** Keel's id for the stand-in's one project. */
-const projectOf = (keel: ReturnType<typeof behindTheWorker>["keel"]): string =>
-  keel
-    .events()
-    .flatMap((event) => (event.type === "ProjectCreated" ? [event.payload.projectId] : []))[0] ??
-  "";
-
 describe("a project's code, from the page", () => {
   it("[http.repo-visitor] reads a public project's code for a visitor, and is told there is none where it is private", async () => {
-    const open = behindTheWorker("public");
-    const visitor = await createHttpSource({ fetch: open.serve });
-    const id = projectOf(open.keel);
+    const { source: visitor, keel } = await opened("visitor", "public");
+    const { id } = keel.project;
     const root = await visitor.getTree(id, { path: "" });
     expect(root.entries.map((entry) => entry.name).toSorted()).toEqual([
       "README.md",
@@ -251,22 +274,18 @@ describe("a project's code, from the page", () => {
     await expect(visitor.getTree(id, { path: "README.md" })).rejects.toMatchObject({
       code: "repo.path_not_found",
     });
-    expect(open.requests.filter((request) => request.headers.has("authorization"))).toEqual([]);
-    expect(open.keel.calls.every((call) => call.authorization === "")).toBe(true);
 
-    const shut = behindTheWorker();
-    const outsider = await createHttpSource({ fetch: shut.serve });
-    await expect(outsider.getTree(projectOf(shut.keel), { path: "" })).rejects.toMatchObject({
+    // Someone who has a private project's id all the same is told what Keel tells anyone it does not show it to.
+    const shut = reading("visitor");
+    const outsider = createHttpSource(shut.keel.project, { fetch: shut.serve });
+    await expect(outsider.getTree(shut.keel.project.id, { path: "" })).rejects.toMatchObject({
       code: "resource.not_found",
       status: 404,
     });
   });
 
-  it("[http.repo-presenter] shows the presenter a private project's code: the tree, a file, history joined to the log", async () => {
-    const { serve } = behindTheWorker();
-    const player = showing(await createHttpSource({ fetch: serve, presenterKey: "presenter key" }));
-    await player.load();
-    player.seek(player.end);
+  it("[http.code-first] shows a member a private project's code before any of its log is read, at the project's main", async () => {
+    const { player, fromThePage } = await opened("member");
     const look = async (address: RepoAddress) => {
       for (let turn = 0; turn < 6; turn += 1) {
         player.repository.want(address, player.world.trunk.head);
@@ -279,11 +298,32 @@ describe("a project's code, from the page", () => {
     expect(code).toMatchObject({
       status: "ready",
       project: { name: "demo", visibility: "private" },
-      ref: { sha: player.world.trunk.head, head: true },
+      ref: { head: true },
       view: { kind: "tree" },
     });
-    // Keel has no clone address to give yet, and the console makes none up.
-    expect(code.status === "ready" && "cloneUrl" in code.project).toBe(false);
+    expect(player.loaded).toBe(false);
+    const asked = fromThePage.map((request) => new URL(request.url));
+    expect(asked.map((url) => url.pathname)).not.toContain("/v1/events");
+    // Nothing has said where trunk is yet, so no read names a ref, and Keel reads the project's `main`.
+    const reads = asked.filter((url) => url.pathname.includes("/repo/"));
+    expect(reads.length).toBeGreaterThan(0);
+    expect(reads.filter((url) => url.searchParams.has("ref"))).toEqual([]);
+    const atMain = code.status === "ready" ? code.ref.sha : "";
+
+    // Once the log is read, trunk's head is the log's, and what was read at `main` is that commit.
+    await player.load();
+    player.seek(player.end);
+    expect(player.world.trunk.head).toBe(atMain);
+    // Trunk is where Keel read `main`, so what was read stands: the log's word for it costs Keel no second read.
+    const readSoFar = fromThePage.length;
+    expect(await look({ view: "code", path: "" })).toMatchObject({
+      status: "ready",
+      ref: { sha: atMain, head: true },
+      view: { kind: "tree" },
+    });
+    expect(fromThePage.slice(readSoFar).map((request) => new URL(request.url).pathname)).toEqual(
+      [],
+    );
     const file = await look({ view: "code", path: "src/authz/check.ts" });
     expect(file).toMatchObject({ status: "ready", view: { kind: "file", notes: [] } });
     const history = await look({ view: "history", path: "" });
@@ -294,9 +334,8 @@ describe("a project's code, from the page", () => {
 });
 
 describe("Keel's read models, from the page", () => {
-  it("reads Keel's lattices through the Worker, and draws the conflict's line from them", async () => {
-    const { serve } = behindTheWorker();
-    const player = showing(await createHttpSource({ fetch: serve, presenterKey: "presenter key" }));
+  it("reads Keel's lattices, and draws the conflict's line from them", async () => {
+    const { player } = await opened("member");
     await player.load();
     await settled();
     expect([...player.lattices.keys()]).toHaveLength(11);
@@ -310,8 +349,7 @@ describe("Keel's read models, from the page", () => {
   });
 
   it("reads a verdict's evidence from Keel's view of the verdict: the event carries only references", async () => {
-    const { serve, keel } = behindTheWorker();
-    const player = showing(await createHttpSource({ fetch: serve, presenterKey: "presenter key" }));
+    const { player, keel } = await opened("member");
     await player.load();
     player.seek(player.end);
     const issued = keel.events().find((event) => event.type === "VerdictIssued");
@@ -333,60 +371,61 @@ describe("Keel's read models, from the page", () => {
   });
 });
 
+const ruled = (keel: ReturnType<typeof reading>["keel"]): boolean =>
+  keel.events().some((event) => event.type === "RulingGiven");
+
 describe("ruling, from the page", () => {
-  it("only reads when it holds neither the presenter's key nor a capability", async () => {
-    const { keel, serve, requests, question } = behindTheWorker();
-    const source = await createHttpSource({ fetch: serve });
+  const answer = { option: "invalidate", idempotencyKey: "k" };
+
+  it("[http.ruling-visitor] offers a visitor no way to answer, and Keel's refusal is what a visitor who tries is told", async () => {
+    const { source, question, keel } = await opened("visitor", "public");
     expect(source.canRule?.(question)).toBe(false);
-    expect(await source.capabilityFor?.(question)).toBeNull();
-    await expect(
-      source.giveRuling({ escalationId: question, option: "invalidate", idempotencyKey: "k" }),
-    ).rejects.toThrow("This console is read-only.");
-    expect(keel.events().some((event) => event.type === "RulingGiven")).toBe(false);
-    // And it never sends a credential of its own: the Worker holds those.
-    expect(requests.filter((request) => request.headers.has("authorization"))).toEqual([]);
+    const refused: unknown = await source
+      .giveRuling({ escalationId: question, ...answer })
+      .catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(KeelRefused);
+    expect(refused).toMatchObject({ status: 401, code: "auth.required" });
+    expect(ruled(keel)).toBe(false);
   });
 
-  it("with the presenter's key, asks the Worker for a capability and rules through it", async () => {
-    const { keel, serve, requests, question } = behindTheWorker();
-    const source = await createHttpSource({ fetch: serve, presenterKey: "presenter key" });
+  it("[http.ruling-refused] gives someone Keel refuses its own words, with the way forward it names", async () => {
+    const { source, question, keel } = await opened("stranger", "public");
+    expect(source.canRule?.(question)).toBe(false);
+    const refused: unknown = await source
+      .giveRuling({ escalationId: question, ...answer })
+      .catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(KeelRefused);
+    expect(refused).toMatchObject({
+      status: 403,
+      code: "auth.forbidden",
+      next: ["Ask an owner of acme to make you a member"],
+    });
+    expect(ruled(keel)).toBe(false);
+  });
+
+  it("[http.ruling] answers as the member signed in, by Keel's own operation: the question in the path, the key in the header, the ruling as the body", async () => {
+    const { source, question, keel } = await opened("member");
     expect(source.canRule?.(question)).toBe(true);
-    await source.giveRuling({ escalationId: question, option: "allow-stale", idempotencyKey: "k" });
+    await source.giveRuling({
+      escalationId: question,
+      option: "allow-stale",
+      rationale: "It is read rarely",
+      idempotencyKey: "console:k",
+    });
     expect(keel.events().find((event) => event.type === "RulingGiven")?.payload).toMatchObject({
       option: "allow-stale",
     });
-    expect(
-      requests.map(
-        (request) =>
-          `${request.method} ${new URL(request.url).pathname.replace(/\/rule\/.+/, "/rule/…")}`,
-      ),
-    ).toEqual(["GET /api/v1/events", "POST /present/capability", "POST /rule/…"]);
-    // The same capability is handed to a phone as long as it is fresh: the Worker is asked once.
-    await source.capabilityFor?.(question);
-    await source.capabilityFor?.(question);
-    expect(
-      requests.filter((request) => new URL(request.url).pathname === "/present/capability"),
-    ).toHaveLength(1);
-  });
-
-  it("opened with a capability, rules on that question and no other, once", async () => {
-    const { keel, serve, question } = behindTheWorker();
-    const presenter = await createHttpSource({ fetch: serve, presenterKey: "presenter key" });
-    const capability = (await presenter.capabilityFor?.(question)) ?? "";
-    const phone = await createHttpSource({ fetch: serve, capability });
-    expect(phone.canRule?.(question)).toBe(true);
-    expect(phone.canRule?.("esc_another")).toBe(false);
-    await expect(
-      phone.giveRuling({ escalationId: "esc_another", option: "invalidate", idempotencyKey: "k" }),
-    ).rejects.toThrow("This console is read-only.");
-    await phone.giveRuling({ escalationId: question, option: "no-cache", idempotencyKey: "k" });
-    expect(keel.events().find((event) => event.type === "RulingGiven")?.payload).toMatchObject({
-      option: "no-cache",
+    expect(keel.calls.at(-1)).toMatchObject({
+      method: "POST",
+      path: `/v1/escalations/${question}/ruling`,
+      idempotencyKey: "console:k",
+      authorization: "",
+      body: JSON.stringify({ option: "allow-stale", rationale: "It is read rarely" }),
     });
-    // The presenter's own tap, after the phone's, finds the question closed. Keel says so, not the page.
-    const late = await createHttpSource({ fetch: serve, presenterKey: "presenter key" });
-    await expect(
-      late.giveRuling({ escalationId: question, option: "invalidate", idempotencyKey: "k" }),
-    ).rejects.toThrow("This question has already been answered.");
+    // Another answer, later, finds the question closed. Keel says so, and not the page.
+    const late: unknown = await source
+      .giveRuling({ escalationId: question, option: "invalidate", idempotencyKey: "another" })
+      .catch((error: unknown) => error);
+    expect(late).toMatchObject({ status: 409, code: "escalation.state_refused" });
   });
 });

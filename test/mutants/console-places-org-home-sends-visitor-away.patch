@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/places.test.ts
+# kills: places.org-home
+# why: a visitor who opens an org's home is sent to sign in, so nobody reads an org's public projects without an account
+diff --git a/apps/console/src/places.ts b/apps/console/src/places.ts
+index 5093c32..58e60ef 100644
+--- a/apps/console/src/places.ts
++++ b/apps/console/src/places.ts
+@@ -117,7 +117,7 @@ export function sentFrom(
+   const asked = `${here.pathname}${here.search}`;
+   // An org's home is anyone's to open: Keel shows a visitor the org's public projects, and nothing else of it.
+   const open =
+-    place.at === "login" || place.at === "signup" || (place.at === "org" && place.tab === "home");
++    place.at === "login" || place.at === "signup";
+   if (reader.is === "visitor") return open ? null : hrefOf({ at: "login" }, asked);
+   if (place.at === "login") return nextOf(here.search);
+   if (place.at === "signup") return reader.handle === undefined ? null : nextOf(here.search);

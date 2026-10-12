@@ -21,7 +21,7 @@ describe("the pages above every project", () => {
     expect(hrefOf({ at: "login" }, "/")).toBe("/login");
   });
 
-  it("[places.reserved] has every page at a reserved first segment, so none is a project's address or an org's", () => {
+  it("[places.reserved] has every page but an org's home at a reserved first segment, so none is a project's address or an org's", () => {
     for (const address of [
       "/login",
       "/signup",
@@ -34,13 +34,13 @@ describe("the pages above every project", () => {
     ]) {
       const segment = address.split("/").find((part) => part !== "") ?? "";
       expect(RESERVED).toContain(segment);
-      expect(parse(address, "").project).toBeNull();
+      expect(parse(address, "")).toMatchObject({ org: null, project: null });
     }
-    // And nothing else is one of them: a project's own pages, and a path under a page.
+    // And nothing else is one of them: the home, a project's own pages, and a path under a page.
     for (const address of [
       "/",
-      "/demo",
-      "/demo/login",
+      "/acme/demo",
+      "/acme/login",
       "/login/extra",
       "/new",
       "/orgs",
@@ -51,6 +51,22 @@ describe("the pages above every project", () => {
       "/orgs/%E0%A4%A",
     ])
       expect(placeOf(address)).toBeNull();
+  });
+
+  it("[places.org-home] has an org's home at its handle, where a code host has an owner's, and no reserved word is one", () => {
+    expect(placeOf("/lovelace")).toEqual({ at: "org", org: "lovelace", tab: "home" });
+    expect(placeOf("/lovelace/")).toEqual({ at: "org", org: "lovelace", tab: "home" });
+    expect(hrefOf({ at: "org", org: "lovelace", tab: "home" })).toBe("/lovelace");
+    // The address it had before still reads as the same place, and is written the new way.
+    expect(hrefOf(placeOf("/orgs/lovelace") ?? { at: "login" })).toBe("/lovelace");
+    // The route table agrees: one segment names an org and no project.
+    expect(parse("/lovelace", "")).toMatchObject({ org: "lovelace", project: null });
+    for (const word of RESERVED) expect(placeOf(`/${word}`)?.at).not.toBe("org");
+    // Anyone may open it: Keel shows a visitor an org's public projects. Its members' pages are a member's.
+    const visitor = { is: "visitor" } as const;
+    expect(
+      sentFrom({ at: "org", org: "lovelace", tab: "home" }, visitor, at("/lovelace")),
+    ).toBeNull();
   });
 
   it("[places.orgs] gives an org's pages, making one and an invitation each an address of its own", () => {
@@ -67,7 +83,7 @@ describe("the pages above every project", () => {
       tab: "settings",
     });
     expect(placeOf("/invite/inv_1")).toEqual({ at: "invite", id: "inv_1" });
-    for (const address of ["/new/org", "/orgs/lovelace", "/orgs/lovelace/members", "/invite/inv_1"])
+    for (const address of ["/new/org", "/lovelace", "/orgs/lovelace/members", "/invite/inv_1"])
       expect(hrefOf(placeOf(address) ?? { at: "login" })).toBe(address);
   });
 
