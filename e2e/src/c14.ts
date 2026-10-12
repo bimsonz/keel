@@ -1,7 +1,11 @@
-// C1.4's live proof against a deployed Keel: node e2e/src/c14.ts <run> [env]
+// The live proof of a rebase against a deployed Keel:
+//   KEEL_URL=<keel> KEEL_SESSION=<token> KEEL_ORG=<org> node e2e/src/c14.ts <run>
 //
-// In a project of its own (c14-rebase, forked from the seeded fixture repo, so
-// S-0's projects are untouched), two agents rewrite the same line:
+// KEEL_SESSION is a user's bearer session, read and never printed. That user
+// creates the project in KEEL_ORG (an org it may create projects in: its own
+// is named by its handle), sets it up, and sponsors its two agents. In a
+// project of its own (c14-rebase, forked from the fixture repo, so S-0's
+// projects are untouched), two agents rewrite the same line:
 //   (a) the first lands (rebased onto trunk first, when its slot was forked
 //       before trunk last moved);
 //   (b) the second bounces textually, with `rebase` as its first next action;
@@ -14,29 +18,36 @@
 //   (f) before merging, the rebased change's old commit, which doesn't descend
 //       from its new base, is refused with `rebase` (Precheck);
 //   (g) two more changes insert lines in different parts of package.json
-//       and both land with no rebase, each merged by hunk onto trunk.
-// The operator credential comes from `.keel/<env>.json` under KEEL_SEEDED_ROOT
-// (the repo root by default). No remote URL or credential is printed.
-import { execFileSync } from "node:child_process";
+//       and both land with no rebase, each merged by hunk onto trunk;
+//   (h) the pool keeps its ready workspaces on trunk: both agents' workspaces
+//       were granted on trunk's head (after an earlier run's landings, that is
+//       the pool's refresh), and no push of Keel's own shows as a
+//       WorkspacePushed anywhere in the run.
+// It ends with each promotion's wall time by trunk's own clock. No remote URL
+// or credential is printed.
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { KeelClient, KeelProblem } from "@keeltown/sdk";
 import { cloneWorkspace, commitAndPush, git } from "./lib/git.ts";
-import { readSeeded, userClient } from "./lib/seeded.ts";
 
-const [run, environment = "staging"] = process.argv.slice(2);
+const run = process.argv[2];
 if (run === undefined || !/^[a-z0-9-]+$/.test(run))
-  throw new Error("usage: c14.ts <run> [env], the run a lower-case slug");
-const root =
-  process.env["KEEL_SEEDED_ROOT"] ??
-  execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
+  throw new Error("usage: c14.ts <run>, the run a lower-case slug");
+const needed = (name: string): string => {
+  const value = process.env[name];
+  if (value === undefined)
+    throw new Error(
+      `${name} is not set: c14 needs KEEL_URL, KEEL_SESSION (a user's session) and KEEL_ORG (the project's org)`,
+    );
+  return value;
+};
+const keelUrl = needed("KEEL_URL");
+const session = needed("KEEL_SESSION");
+const ORG = needed("KEEL_ORG");
 const FIXTURE = "fixture-forge-lite";
 const PROJECT = "c14-rebase";
 const SETTLE_MS = 15 * 60_000;
-const key = (what: string) => `c14:${environment}:${what}`;
-
-const seeded = readSeeded(root, environment);
-const keelUrl = process.env["KEEL_URL"] ?? seeded.keelUrl;
+const key = (what: string) => `c14:${what}`;
 
 let failures = 0;
 const check = (ok: boolean, what: string) => {
@@ -90,6 +101,31 @@ function line(e: EventRecord): string {
   return `${e.at}  ${e.payload._tag.padEnd(22)} ${parts.join(" ")}`;
 }
 
+/**
+ * Each promotion's wall time by trunk's own clock, one line per group: from
+ * PromotionStarted to PromotionComposed, and on to the TrunkAdvanced or
+ * PromotionDeclined that ended it. The push pass between the last two weighs
+ * the group's pack, admits it against its org's repo bytes, pushes it and
+ * reads trunk back.
+ */
+function promotionTimes(events: readonly EventRecord[]): string[] {
+  const lines: string[] = [];
+  let started: EventRecord | undefined;
+  let composed: EventRecord | undefined;
+  const ms = (from: EventRecord, to: EventRecord) => Date.parse(to.at) - Date.parse(from.at);
+  for (const e of events) {
+    const tag = e.payload._tag;
+    if (tag === "PromotionStarted") [started, composed] = [e, undefined];
+    if (tag === "PromotionComposed") composed = e;
+    if ((tag === "TrunkAdvanced" || tag === "PromotionDeclined") && started !== undefined) {
+      const push = composed === undefined ? "" : `, composed to end ${ms(composed, e)} ms`;
+      lines.push(`${tag} ${ms(started, e)} ms after PromotionStarted${push}`);
+      started = undefined;
+    }
+  }
+  return lines;
+}
+
 /** The repo name at the end of a workspace's remote; the host, which carries the account id, is dropped. */
 const repoName = (remote: string) => (remote.split("/").pop() ?? "").replace(/\.git$/, "");
 
@@ -139,9 +175,9 @@ async function enrolled(operator: KeelClient, name: string, projectId: string) {
 
 const dirs: string[] = [];
 try {
-  const operator = userClient(keelUrl, seeded.seedUser);
+  const operator = new KeelClient({ baseUrl: keelUrl, session });
   const project = await operator.createProject(
-    { org: seeded.seedUser.handle, name: PROJECT, source: FIXTURE },
+    { org: ORG, name: PROJECT, source: FIXTURE },
     { idempotencyKey: key("project") },
   );
   await operator.putSettings(project.id, {
@@ -149,7 +185,7 @@ try {
     maxBatchSize: 1,
     verification: "required",
   });
-  console.log(`     project ${PROJECT}: ${project.id}`);
+  console.log(`     project ${ORG}/${PROJECT}: ${project.id}`);
   const first = await enrolled(operator, "c14-first", project.id);
   const second = await enrolled(operator, "c14-second", project.id);
   // The snapshot's cursor is the head of the log: an agent's page of events is one window of
@@ -182,6 +218,10 @@ try {
     console.log(
       `     ${who}'s base ${git(dir, ["rev-parse", "HEAD"]).slice(0, 12)}, trunk's head ${trunkAtStart.slice(0, 12)}`,
     );
+  check(
+    [dirA, dirB].every((dir) => git(dir, ["rev-parse", "HEAD"]) === trunkAtStart),
+    "(h) both workspaces were granted on trunk's head",
+  );
   if (git(dirA, ["rev-parse", "HEAD"]) !== trunkAtStart) {
     const { result: moved } = await first.rebase(a.change.id, {
       lease: a.lease.id,
@@ -349,11 +389,13 @@ try {
     { client: second, who: "second", after: "{\n", line: `  "author": "c14-${run}-e",\n` },
   ];
   const declaredHunks: Declared[] = [];
+  const hunkShas: string[] = [];
   for (const [i, h] of hunks.entries()) {
     const d = await declareWhenPooled(h.client, `C1.5 ${run}: ${i}`, `c14:${run}:hunk${i}`);
     if (d.workspace.token === undefined) throw new Error("declare answered no workspace token");
     const dir = cloneWorkspace(d.workspace.remote, d.workspace.token);
     dirs.push(dir);
+    console.log(`     hunk change ${i}'s base ${git(dir, ["rev-parse", "HEAD"]).slice(0, 12)}`);
     const path = join(dir, "package.json");
     const before = readFileSync(path, "utf8");
     if (!before.includes(h.after))
@@ -366,6 +408,7 @@ try {
     );
     console.log(`     hunk change ${i}: ${d.change.id} submitted at ${sha.slice(0, 12)}`);
     declaredHunks.push(d);
+    hunkShas.push(sha);
   }
   events = await projectEvents(first, cursor, project.id, (seen) =>
     declaredHunks.every(
@@ -397,8 +440,17 @@ try {
     "(g) trunk's package.json holds both inserted lines and the earlier resolution",
   );
 
+  const agentPushes = new Set([shaA, shaB, shaMerge, ...hunkShas]);
+  const notAgents = tagged(events, "WorkspacePushed").filter(
+    (e) => !agentPushes.has(String(Reflect.get(e.payload, "sha"))),
+  );
+  for (const e of notAgents) console.log(`     not an agent's: ${line(e)}`);
+  check(notAgents.length === 0, "(h) every WorkspacePushed in the run is an agent's push");
+
   console.log("\n     chain:");
   for (const e of events) console.log(`     ${line(e)}`);
+  console.log("\n     promotions:");
+  for (const timed of promotionTimes(events)) console.log(`     ${timed}`);
 } catch (error) {
   if (error instanceof KeelProblem) {
     console.log(`FAIL ${error.message}`);
@@ -408,5 +460,5 @@ try {
 } finally {
   for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
 }
-console.log(failures === 0 ? "\nall C1.4 staging checks hold" : `\n${failures} check(s) failed`);
+console.log(failures === 0 ? "\nall C1.4 checks hold" : `\n${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);
