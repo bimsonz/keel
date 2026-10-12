@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.subject-key
+# why: a subject key is accepted on a textual or interaction conflict, which no subject owns
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index af2cf2d..8971d9a 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -157,7 +157,6 @@ const suspicionFault = (
+   if (new Set(command.parties).size !== command.parties.length) return "party-twice";
+   const subjectOwned = command.kind === "semantic" || command.kind === "precedent";
+   if (subjectOwned !== (command.subjectId !== undefined)) return "subject-mismatch";
+-  if (command.subjectKey !== undefined && !subjectOwned) return "subject-mismatch";
+   if (command.kind === "semantic" && command.predicate === undefined) return "no-predicate";
+   // A decision model only ever suspects a semantic disagreement.
+   if (command.origin === "opinion" && command.kind !== "semantic") return "opinion-not-semantic";

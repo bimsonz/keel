@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.draft-failure-reasons
+# why: worlds-unbuildable is left out of the draft-failure reasons, so the Probe Workflow cannot say the worlds could not be built
+diff --git a/packages/core/src/domain/verification/events.ts b/packages/core/src/domain/verification/events.ts
+index f007009..c17aa35 100644
+--- a/packages/core/src/domain/verification/events.ts
++++ b/packages/core/src/domain/verification/events.ts
+@@ -100,7 +100,6 @@ export const DraftFailure = Schema.Literals([
+   "no-propositions",
+   "no-submission",
+   "party-gone",
+-  "worlds-unbuildable",
+ ]);
+ export type DraftFailure = typeof DraftFailure.Type;
+ 

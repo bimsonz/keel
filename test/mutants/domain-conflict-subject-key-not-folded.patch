@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.subject-key
+# why: evolve forgets the subject key, so a conflict read back from its events no longer names its subject's key
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index af2cf2d..55b2e21 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -347,7 +347,6 @@ export const evolveConflict = (
+           state: "suspected",
+           parties: event.parties,
+           ...(event.subjectId === undefined ? {} : { subjectId: event.subjectId }),
+-          ...(event.subjectKey === undefined ? {} : { subjectKey: event.subjectKey }),
+           ...(event.predicate === undefined ? {} : { predicate: event.predicate }),
+           ...(event.origin === undefined ? {} : { origin: event.origin }),
+           ...(event.premise === undefined ? {} : { premise: event.premise }),

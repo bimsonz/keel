@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.subject-key
+# why: Suspect's subject key never reaches ConflictSuspected, so the fan-out cannot address the subject's Probe instance
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index af2cf2d..9fe6ff7 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -187,7 +187,6 @@ export const decideConflict = (
+             kind: command.kind,
+             parties: command.parties,
+             ...(command.subjectId === undefined ? {} : { subjectId: command.subjectId }),
+-            ...(command.subjectKey === undefined ? {} : { subjectKey: command.subjectKey }),
+             ...(command.predicate === undefined ? {} : { predicate: command.predicate }),
+             ...(command.origin === undefined ? {} : { origin: command.origin }),
+             ...(command.premise === undefined ? {} : { premise: command.premise }),
