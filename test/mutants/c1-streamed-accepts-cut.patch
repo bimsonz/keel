@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/fetch.test.ts -t "relay.pack-bytes-refuses"
+# kills: relay.pack-bytes-refuses
+# why: An answer cut off inside a packet is weighed as what arrived, so a dropped connection undercounts a repo
+diff --git a/packages/gitcore/src/fetch.ts b/packages/gitcore/src/fetch.ts
+index d14b992..e7812a6 100644
+--- a/packages/gitcore/src/fetch.ts
++++ b/packages/gitcore/src/fetch.ts
+@@ -192,7 +192,6 @@ export async function uploadPackBytes(
+       break;
+     }
+   }
+-  if (left > 0) throw new Error("truncated pkt-line in the upload-pack answer");
+   if (dec.decode(Uint8Array.from(magic)) !== "PACK")
+     throw new Error("upload-pack answered without a pack");
+   return bytes;

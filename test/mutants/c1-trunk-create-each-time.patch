@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.create-counted"
+# kills: trunk.create-counted
+# why: Every initialize counts the history under a key of its own, so a retried create is charged twice
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index cf9cea3..d1e85ca 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -203,7 +203,7 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
+   const org = yield* orgOf(projectId);
+   if (org !== undefined) {
+     const bytes = yield* (yield* TrunkWriter).historyBytes(head);
+-    yield* (yield* OrgUsage).record(org, REPO_BYTES, bytes, `create:${projectId}`);
++    yield* (yield* OrgUsage).record(org, REPO_BYTES, bytes, `create:${projectId}:${Math.random()}`);
+   }
+   return trunk;
+ });

@@ -2,7 +2,7 @@
 # kills: harness.one-door
 # why: a test spawns git itself again, past the harness and its timeout
 diff --git a/packages/gitcore/test/fetch.test.ts b/packages/gitcore/test/fetch.test.ts
-index 7620c6a..b7cb4f6 100644
+index 6002ca0..8fccd19 100644
 --- a/packages/gitcore/test/fetch.test.ts
 +++ b/packages/gitcore/test/fetch.test.ts
 @@ -2,6 +2,7 @@
@@ -11,9 +11,9 @@ index 7620c6a..b7cb4f6 100644
  
 +import { spawnSync } from "node:child_process";
  import { afterAll, describe, expect, it } from "vitest";
- import { dec } from "../src/bytes.ts";
- import { PackTooLarge, type RelayMove, relay, relayPack, uploadPack } from "../src/fetch.ts";
-@@ -41,7 +42,7 @@ function commitFile(dir: string, path: string, content: string, parent?: string)
+ import { concat, dec, enc } from "../src/bytes.ts";
+ import {
+@@ -48,7 +49,7 @@ function commitFile(dir: string, path: string, content: string, parent?: string)
  }
  
  const headOf = (dir: string): string | null => {

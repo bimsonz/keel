@@ -44,6 +44,13 @@ export class TrunkWriter extends Context.Service<
      */
     readonly packBytes: (from: CommitSha, to: CommitSha) => Effect.Effect<number, PackTooLarge>;
     /**
+     * The length in bytes of the pack that carries everything `at` reaches
+     * in trunk: what the repo held when it was created at `at`, and what a
+     * fork of it takes in. Counted as it streams, so a history of any size
+     * is weighed without being held. It reads trunk and writes nothing.
+     */
+    readonly historyBytes: (at: CommitSha) => Effect.Effect<number>;
+    /**
      * Copies trunk's head into each target's main (staging, the mirror),
      * relaying trunk's own pack so commit ids survive. Idempotent: a target
      * already at the head is left alone, and one that moves meanwhile is read

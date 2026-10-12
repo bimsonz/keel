@@ -2,15 +2,15 @@
 # kills: trunk.too-large-moved
 # why: A pack over the cap is refused without reading trunk's head, so a trunk that moved is told it is still on the old one
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index 7b3bf3d..ef17b73 100644
+index cf9cea3..8ce2e86 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -384,7 +384,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
-   const pushed = yield* Effect.result(writer.push(trunk.wal.old, target));
-   if (Result.isFailure(pushed)) {
-     const failure = pushed.failure;
--    if (failure._tag === "PackTooLarge" && (yield* writer.head) === trunk.wal.old) {
-+    if (failure._tag === "PackTooLarge") {
-       // Nothing landed and no retry can help: the domain declines the group, so its change bounces and trunk stays free.
-       yield* promote(
-         projectId,
+@@ -473,7 +473,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+       // Stale or an unexpected head: the read-back tells a lost acknowledgement from a moved trunk.
+     }
+   }
+-  if (refused !== undefined && (yield* writer.head) === trunk.wal.old) {
++  if (refused !== undefined) {
+     // Nothing landed and no retry can help. What the group was admitted is given back before it is declined: a crash between the two then leaves the group open, and the next pass ends it.
+     if (org !== undefined && admitted !== undefined)
+       yield* usage.record(org, REPO_BYTES, -admitted, `giveback:${target}`);

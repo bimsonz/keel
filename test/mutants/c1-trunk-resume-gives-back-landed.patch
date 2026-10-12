@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.gives-back-frozen"
+# kills: trunk.gives-back-frozen
+# why: A resume gives the group's bytes back even when trunk stands on the group's own commit, so a pack that landed goes uncounted
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index cf9cea3..99b3ce2 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -514,7 +514,7 @@ export const resumeTrunk = Effect.fn("integration/resumeTrunk")(function* (
+   const now = yield* (yield* Clock).now;
+   const stopped = trunkOf(yield* EntityStore, projectId);
+   const composed = stopped?.phase === "frozen" ? stopped.wal?.composed : undefined;
+-  if (stopped?.wal !== undefined && composed !== undefined && composed !== head)
++  if (stopped?.wal !== undefined && composed !== undefined)
+     yield* giveBack(projectId, stopped.wal.old, composed);
+   yield* promote(projectId, { _tag: "Resume", by, head }, `resume:${by}@${now}`).pipe(
+     Effect.catchTag("PromotionStateRefused", () => Effect.void),

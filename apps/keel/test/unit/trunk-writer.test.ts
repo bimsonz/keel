@@ -203,6 +203,32 @@ describe("TrunkWriter.push", () => {
         expect(over.server.requests.map((r) => r.service)).toEqual(["upload-pack"]);
       }),
   );
+
+  it.effect(
+    "[trunkwriter.history-bytes] weighs trunk's whole history at a commit: a want with no have, asked of trunk, and the pack's own length",
+    () =>
+      Effect.gen(function* () {
+        const pack = new Uint8Array(150_000);
+        pack.set(PACK);
+        const { server, minted, layer, seeded } = pushing([], pack);
+        yield* seeded;
+        const bytes = yield* Effect.flatMap(TrunkWriter, (w) => w.historyBytes(TO)).pipe(
+          Effect.provide(layer),
+        );
+        expect(
+          server.requests.map(({ auth, ...r }) => ({ ...r, auth: auth?.replace(/_\d+$/, "") })),
+        ).toEqual([
+          {
+            service: "upload-pack",
+            repo: "memory/prj.git",
+            auth: "Bearer memrepo_read_memory/prj",
+            lines: [expect.stringMatching(new RegExp(`^want ${TO} `)), "done"],
+          },
+        ]);
+        expect(minted).toEqual(["prj read 60s"]);
+        expect(bytes).toBe(150_000);
+      }),
+  );
 });
 
 describe("StagingWriter.fastForward", () => {

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.gives-back-frozen"
+# kills: trunk.gives-back-frozen
+# why: A give-back returns the whole pack where the admission counted it less 32 bytes, so each one credits 32 bytes too many
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index cf9cea3..36da6b2 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -133,7 +133,7 @@ const giveBack = Effect.fn("integration/giveBack")(function* (
+   if (org === undefined) return;
+   const weighed = yield* Effect.result((yield* TrunkWriter).packBytes(old, sha));
+   if (Result.isFailure(weighed)) return;
+-  const bytes = weighed.success - PACK_OVERHEAD_BYTES;
++  const bytes = weighed.success;
+   const usage = yield* OrgUsage;
+   const admitted = yield* Effect.result(usage.admit(org, REPO_BYTES, bytes, `promotion:${sha}`));
+   if (Result.isFailure(admitted)) return;

@@ -169,19 +169,44 @@ it("[trunkwriter.live-pack-bytes] weighs a promotion's pack as exactly the bytes
       const first = yield* commit(staging, MAIN, { "README.md": `${prose.join("\n")}\n` });
       const second = yield* commit(staging, MAIN, { "README.md": "second\n" });
       sent.length = 0;
+      const historyAtBase = yield* writer.historyBytes(base);
+      const weighing = Date.now();
       const firstBytes = yield* writer.packBytes(base, first);
+      const weighMs = Date.now() - weighing;
       const again = yield* writer.packBytes(base, first);
       const unsent = [...sent];
+      const pushing = Date.now();
       yield* writer.push(base, first);
+      const pushMs = Date.now() - pushing;
       const secondBytes = yield* writer.packBytes(first, second);
       yield* writer.push(first, second);
       const whole = yield* writer.packBytes(base, second);
       const landed = yield* codeHost.head(trunk, MAIN);
-      return { second, firstBytes, again, unsent, secondBytes, whole, landed };
+      const history = yield* writer.historyBytes(second);
+      return {
+        second,
+        firstBytes,
+        again,
+        unsent,
+        secondBytes,
+        whole,
+        landed,
+        historyAtBase,
+        history,
+        weighMs,
+        pushMs,
+      };
     }),
   );
   console.log(
     `LIVE packBytes: base → first weighed ${report.firstBytes} bytes (asked again: ${report.again}) and its push sent ${sent[0]}; first → second weighed ${report.secondBytes} and its push sent ${sent[1]}; base → second in one pack would weigh ${report.whole}, the two less one pack's 32 bytes = ${report.firstBytes + report.secondBytes - 32}`,
+  );
+  console.log(
+    `LIVE historyBytes: trunk at its base ${report.historyAtBase} bytes; after the two landings ${report.history}, and the meter's sum is ${report.historyAtBase} + (${report.firstBytes} - 32) + (${report.secondBytes} - 32) = ${report.historyAtBase + report.firstBytes - 32 + report.secondBytes - 32}. Weighing the first pack took ${report.weighMs} ms and pushing it ${report.pushMs} ms, from this machine`,
+  );
+  // The meter: the history at create plus each landed pack less 32 bytes is the repo's history now.
+  expect(report.history).toBe(
+    report.historyAtBase + report.firstBytes - 32 + report.secondBytes - 32,
   );
   expect(report.unsent).toEqual([]);
   expect(report.again).toBe(report.firstBytes);

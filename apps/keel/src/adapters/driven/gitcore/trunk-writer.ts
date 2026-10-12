@@ -14,6 +14,7 @@ import {
   type RelayMove,
   relay,
   relayPack,
+  uploadPackBytes,
 } from "@keeltown/gitcore";
 import { Effect, Layer } from "effect";
 
@@ -115,6 +116,11 @@ export const TrunkWriterGitCore = ({ trunk, staging }: { trunk: RepoRef; staging
               catch: (cause) => cause,
             }).pipe(Effect.catch(tooLarge(trunk)));
             return pack.length;
+          }).pipe(Effect.catchTag("RepoNotFound", Effect.die)),
+        historyBytes: (at) =>
+          Effect.gen(function* () {
+            const source = yield* remoteOf(trunk, "read");
+            return yield* Effect.promise(() => uploadPackBytes(source, [at], []));
           }).pipe(Effect.catchTag("RepoNotFound", Effect.die)),
         sync: (targets) =>
           Effect.gen(function* () {

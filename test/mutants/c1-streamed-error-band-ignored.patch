@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/fetch.test.ts -t "relay.pack-bytes-refuses"
+# kills: relay.pack-bytes-refuses
+# why: The streamed count does not raise the server's error band as the buffered fetch does, so a failed fetch is not reported as what it was
+diff --git a/packages/gitcore/src/fetch.ts b/packages/gitcore/src/fetch.ts
+index d14b992..bd7e287 100644
+--- a/packages/gitcore/src/fetch.ts
++++ b/packages/gitcore/src/fetch.ts
+@@ -140,8 +140,7 @@ export async function uploadPackBytes(
+   let bytes = 0;
+ 
+   const endLine = () => {
+-    if (band === 3) throw new Error(`upload-pack error: ${dec.decode(concat(text).subarray(1))}`);
+-    if (band !== 1 && band !== 2) {
++    if (band !== 1 && band !== 2 && band !== 3) {
+       const line = dec.decode(concat(text));
+       if (!line.startsWith("NAK") && !line.startsWith("ACK"))
+         throw new Error(`unexpected upload-pack line ${JSON.stringify(line.slice(0, 80))}`);

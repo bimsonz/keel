@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.admits-once|trunk.meter-sums"
+# kills: trunk.admits-once, trunk.meter-sums
+# why: A landing is counted as its whole pack, header and trailer too, so every landing charges 32 bytes the repo never stored
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index cf9cea3..7393344 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -455,7 +455,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+     const weighed = yield* Effect.result(writer.packBytes(trunk.wal.old, target));
+     if (Result.isFailure(weighed)) refused = "pack-too-large";
+     else {
+-      const bytes = weighed.success - PACK_OVERHEAD_BYTES;
++      const bytes = weighed.success;
+       const answer = yield* Effect.result(
+         usage.admit(org, REPO_BYTES, bytes, `promotion:${target}`),
+       );

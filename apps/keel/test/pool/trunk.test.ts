@@ -6,13 +6,22 @@ import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it, vi } from "vitest";
 import { projectRepos } from "@keeltown/core/application/integration";
-import { CommitSha, EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
-import { Changes, CodeHost, EventOutbox, Trunks } from "@keeltown/core/ports";
+import {
+  CommitSha,
+  EventEnvelope,
+  makeId,
+  type OrgId,
+  type ProjectId,
+} from "@keeltown/core/kernel";
+import { Changes, CodeHost, EventOutbox, OrgUsage, Trunks } from "@keeltown/core/ports";
 import {
   makeBatchVerificationMemory,
   makeCandidateBundlesMemory,
   makeCandidateComposerMemory,
+  freshOrg,
   makeCodeHostMemory,
+  makeOrgUsageMemory,
+  makeProjectOrgsMemory,
   makeProjectsMemory,
   makeStagingWriterMemory,
   makeTrunkWriterMemory,
@@ -79,8 +88,12 @@ describe("the Trunk DO", () => {
   });
 });
 
-/** A Trunk DO for a fresh project, initialized at staging's one commit, promoting through memory adapters. */
-async function promoting() {
+/**
+ * A Trunk DO for a fresh project, initialized at staging's one commit,
+ * promoting through memory adapters. With `placed`, the project is in that
+ * org before its trunk is initialized, and its history weighs `history`.
+ */
+async function promoting(placed?: { readonly org: OrgId; readonly history: number }) {
   const projectId: ProjectId = makeId("prj", ulid());
   const stub = trunkStub(projectId);
   const staging = projectRepos(projectId).staging;
@@ -95,11 +108,25 @@ async function promoting() {
     }),
   );
   writer.interfere(base);
+  const places = makeProjectOrgsMemory();
+  const usage = makeOrgUsageMemory();
+  if (placed !== undefined) {
+    places.places.set(projectId, { projectId, org: placed.org, name: "keel" });
+    writer.holds(base, placed.history);
+  }
   await runInDurableObject(stub, (instance: TrunkDO, state) => {
     Reflect.set(
       instance,
       "runtime",
-      ManagedRuntime.make(Layer.mergeAll(backbone(state.storage), code.layer, writer.layer)),
+      ManagedRuntime.make(
+        Layer.mergeAll(
+          backbone(state.storage),
+          code.layer,
+          writer.layer,
+          places.layer,
+          usage.layer,
+        ),
+      ),
     );
   });
   // The lane hears every advance and decline; it follows trunk in the same memory staging.
@@ -189,7 +216,7 @@ async function promoting() {
       await runDurableObjectAlarm(stub);
       await settled();
     }, WAIT);
-  return { projectId, stub, code, writer, base, composed, verified, status, log, until };
+  return { projectId, stub, code, writer, usage, base, composed, verified, status, log, until };
 }
 
 // Per-project ids, so the isolate's shared memory never mixes two tests' batches.
@@ -305,6 +332,42 @@ describe("the Trunk DO's promotion", () => {
       reason: "pack-too-large",
     });
     expect(t.writer.head()).toBe(tip);
+  });
+
+  it("[trunk.do.refused-quota] through the real object a project's history and each landing are counted into its org, and a batch over what is left is declined while a smaller one behind it lands", async () => {
+    const org = freshOrg();
+    const t = await promoting({ org, history: 1_000 });
+    const counting = <A, E>(
+      program: (usage: (typeof OrgUsage)["Service"]) => Effect.Effect<A, E>,
+    ) => Effect.runPromise(Effect.flatMap(OrgUsage, program).pipe(Effect.provide(t.usage.layer)));
+    // The history counted at create leaves room for 500 bytes more.
+    await counting((usage) =>
+      usage.configure(org, { overrides: { "repo-bytes": 1_500 }, halted: false }),
+    );
+    const big = await t.composed(1, t.base);
+    const tip = await t.composed(2, t.base);
+    t.writer.weigh(big, 533);
+    t.writer.weigh(tip, 332);
+    await t.stub.receive([t.verified(1, t.base)]);
+    await t.until(async () =>
+      expect((await t.log()).map((e) => e.type)).toContain("PromotionDeclined"),
+    );
+    expect(await t.status()).toMatchObject(Exit.succeed({ head: t.base }));
+    expect(t.writer.pushes()).toEqual([]);
+    await t.stub.receive([t.verified(2, t.base)]);
+    await t.until(async () =>
+      expect(await t.status()).toEqual(Exit.succeed({ head: tip, promotion: "idle", redCount: 0 })),
+    );
+    const log = await t.log();
+    expect(log.map((e) => e.type)).not.toContain("PromotionFrozen");
+    expect(log.find((e) => e.type === "PromotionDeclined")?.payload).toMatchObject({
+      reason: "repo-bytes-quota",
+    });
+    // The create's 1,000 and the landing's 300: 200 are left of 1,500.
+    expect(await counting((usage) => usage.admit(org, "repo-bytes", 0, "probe"))).toEqual({
+      limit: 1_500,
+      remaining: 200,
+    });
   });
 
   it("[destroy.resumes] a destroyed trunk deletes its project's four repos, trying a failed deletion again until none is left, and promotes nothing meanwhile", async () => {

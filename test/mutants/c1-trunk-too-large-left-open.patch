@@ -2,15 +2,16 @@
 # kills: trunk.refused-too-large
 # why: A pack over the cap is pushed again and again instead of refused, so its group stays open and every batch behind it waits
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index 7b3bf3d..e1ebdb0 100644
+index cf9cea3..cf79396 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -384,7 +384,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
-   const pushed = yield* Effect.result(writer.push(trunk.wal.old, target));
-   if (Result.isFailure(pushed)) {
-     const failure = pushed.failure;
--    if (failure._tag === "PackTooLarge" && (yield* writer.head) === trunk.wal.old) {
-+    if (failure._tag === "PackTooLarge" && trunk.wal.old === undefined) {
-       // Nothing landed and no retry can help: the domain declines the group, so its change bounces and trunk stays free.
-       yield* promote(
-         projectId,
+@@ -467,8 +467,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+     const pushed = yield* Effect.result(writer.push(trunk.wal.old, target));
+     if (Result.isFailure(pushed)) {
+       const failure = pushed.failure;
+-      if (failure._tag === "PackTooLarge") refused = "pack-too-large";
+-      else if (failure._tag === "PushRejected" && failure.reason === "busy")
++      if (failure._tag === "PushRejected" && failure.reason === "busy")
+         return "retry" satisfies PushOutcome;
+       // Stale or an unexpected head: the read-back tells a lost acknowledgement from a moved trunk.
+     }

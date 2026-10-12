@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts -t "trunkwriter.history-bytes"
+# kills: trunkwriter.history-bytes
+# why: A new repo is weighed by staging's history, not trunk's, so every candidate ever staged is charged at create
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index 6185d13..2d78dd1 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -119,7 +119,7 @@ export const TrunkWriterGitCore = ({ trunk, staging }: { trunk: RepoRef; staging
+           }).pipe(Effect.catchTag("RepoNotFound", Effect.die)),
+         historyBytes: (at) =>
+           Effect.gen(function* () {
+-            const source = yield* remoteOf(trunk, "read");
++            const source = yield* remoteOf(staging, "read");
+             return yield* Effect.promise(() => uploadPackBytes(source, [at], []));
+           }).pipe(Effect.catchTag("RepoNotFound", Effect.die)),
+         sync: (targets) =>

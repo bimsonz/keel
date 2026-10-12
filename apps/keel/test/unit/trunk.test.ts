@@ -26,23 +26,58 @@ import {
   EventEnvelope,
   Instant,
   makeId,
+  type OrgId,
   type ProjectId,
 } from "@keeltown/core/kernel";
-import { CodeHost, EntityStore, EventOutbox } from "@keeltown/core/ports";
+import { DEFAULT_QUOTAS } from "@keeltown/core/domain/identity";
+import { CodeHost, EntityStore, EventOutbox, OrgUsage, TrunkWriter } from "@keeltown/core/ports";
 import {
   makeClockMemory,
   makeCodeHostMemory,
   makeEventOutboxMemory,
   makeManualClock,
+  makeOrgUsageMemory,
+  makeProjectOrgsMemory,
   makeTrunkWriterMemory,
 } from "@keeltown/testing";
 import { Effect, Layer, Schema } from "effect";
+import * as fc from "fast-check";
 import { ulid } from "ulid";
 
+// prove:red pins the seed with FC_SEED; a plain run explores a fresh one.
+const seed = process.env["FC_SEED"];
+fc.configureGlobal({ numRuns: 50, ...(seed === undefined ? {} : { seed: Number(seed) }) });
+
 const PROJECT: ProjectId = makeId("prj", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
+const ORG: OrgId = makeId("org", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
 
-const ports = () => Layer.mergeAll(makeEventOutboxMemory().layer, makeClockMemory().layer);
+/** The outbox and a clock, a trunk writer at `a`, and a project that has no place until a test gives it one. */
+const ports = () => {
+  const places = makeProjectOrgsMemory();
+  const writer = makeTrunkWriterMemory(sha("a"));
+  return {
+    places,
+    writer,
+    layer: Layer.mergeAll(
+      makeEventOutboxMemory().layer,
+      makeClockMemory().layer,
+      places.layer,
+      makeOrgUsageMemory().layer,
+      writer.layer,
+    ),
+  };
+};
+
+/** Puts the project in ORG: from here its trunk is weighed, and counted into ORG's repo bytes. */
+const place = (places: ReturnType<typeof makeProjectOrgsMemory>) =>
+  places.places.set(PROJECT, { projectId: PROJECT, org: ORG, name: "keel" });
+
+/** ORG's repo bytes as counted now: what an admission of nothing finds used. */
+const counted = Effect.map(
+  Effect.flatMap(OrgUsage, (usage) => usage.admit(ORG, "repo-bytes", 0, `probe-${ulid()}`)),
+  (answer) => answer.limit - answer.remaining,
+);
 
 const logOf = (projectId: ProjectId) =>
   Effect.map(EventOutbox, (outbox) =>
@@ -60,7 +95,7 @@ describe("the Trunk's Initialize", () => {
         const again = yield* initializeTrunk(PROJECT, sha("a"), "seed");
         expect(again).toEqual(first);
         expect(yield* logOf(PROJECT)).toEqual(["TrunkInitialized"]);
-      }).pipe(Effect.provide(ports())),
+      }).pipe(Effect.provide(ports().layer)),
   );
 
   it.effect("[trunk.project] TrunkInitialized carries the trunk's project", () =>
@@ -68,7 +103,7 @@ describe("the Trunk's Initialize", () => {
       yield* initializeTrunk(PROJECT, sha("a"), "seed");
       const log = (yield* EventOutbox).log({ kind: "trunk", id: PROJECT });
       expect(log.map((e) => [e.type, e.project])).toEqual([["TrunkInitialized", PROJECT]]);
-    }).pipe(Effect.provide(ports())),
+    }).pipe(Effect.provide(ports().layer)),
   );
 
   it.effect(
@@ -80,7 +115,27 @@ describe("the Trunk's Initialize", () => {
         expect(refused).toMatchObject({ _tag: "PromotionStateRefused", command: "Initialize" });
         expect(trunkOf(yield* EntityStore, PROJECT)?.head).toBe(sha("a"));
         expect(yield* logOf(PROJECT)).toEqual(["TrunkInitialized"]);
-      }).pipe(Effect.provide(ports())),
+      }).pipe(Effect.provide(ports().layer)),
+  );
+});
+
+describe("the Trunk's count at create", () => {
+  it.effect(
+    "[trunk.create-counted] a placed project's whole history at its first head is counted into its org once, however often it is initialized; an unplaced project counts nothing",
+    () => {
+      const w = ports();
+      w.writer.holds(sha("a"), 4_000);
+      return Effect.gen(function* () {
+        yield* initializeTrunk(makeId("prj", "01J9YYYYYYYYYYYYYYYYYYYYYY"), sha("a"), "seed");
+        expect(yield* counted).toBe(0);
+        place(w.places);
+        yield* initializeTrunk(PROJECT, sha("a"), "seed");
+        expect(yield* counted).toBe(4_000);
+        yield* initializeTrunk(PROJECT, sha("a"), "seed");
+        yield* Effect.flip(initializeTrunk(PROJECT, sha("b"), "operator"));
+        expect(yield* counted).toBe(4_000);
+      }).pipe(Effect.provide(w.layer));
+    },
   );
 });
 
@@ -140,7 +195,11 @@ function promotion() {
   const outbox = makeEventOutboxMemory();
   const clock = makeManualClock();
   const writer = makeTrunkWriterMemory(sha("0"));
-  const layer = Layer.mergeAll(code.layer, outbox.layer, clock.layer, writer.layer);
+  const places = makeProjectOrgsMemory();
+  const usage = makeOrgUsageMemory();
+  /** Everything but the trunk's writer, for a test that wraps the writer. */
+  const rest = Layer.mergeAll(code.layer, outbox.layer, clock.layer, places.layer, usage.layer);
+  const layer = Layer.merge(rest, writer.layer);
   const stagingRefs = () => code.repos.get(`${STAGING.namespace}/${STAGING.name}`)?.refs;
   /** Staging and trunk at one base commit, trunk initialized there. */
   const seeded = Effect.gen(function* () {
@@ -161,7 +220,7 @@ function promotion() {
         [`src/change-${n}.ts`]: `export const n = ${n};\n`,
       });
     });
-  return { code, clock, writer, layer, seeded, composed };
+  return { code, clock, writer, places, rest, layer, seeded, composed };
 }
 
 let delivered = 0;
@@ -424,6 +483,221 @@ describe("the Trunk's promotion", () => {
   );
 
   it.effect(
+    "[trunk.no-org] a project with no place is promoted as before: its pack is neither weighed nor counted",
+    () => {
+      const w = promotion();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        const tip = yield* w.composed(1, base);
+        w.writer.weigh(tip, 1_032);
+        yield* deliver(verified(1, base));
+        yield* flushTrunk(PROJECT);
+        expect(yield* pushPromotion(PROJECT)).toBe("advanced");
+        expect(w.writer.head()).toBe(tip);
+        expect(w.writer.weighed()).toEqual([]);
+        expect(yield* counted).toBe(0);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[trunk.admits-once] a landing is counted into its org as its pack less a pack's 32 bytes, once, however many times the group is pushed",
+    () => {
+      const w = promotion();
+      place(w.places);
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        // What the create counted: the history at the base.
+        const held = yield* counted;
+        const tip = yield* w.composed(1, base);
+        w.writer.weigh(tip, 1_032);
+        yield* deliver(verified(1, base));
+        yield* flushTrunk(PROJECT);
+        w.writer.drop(1);
+        expect(yield* pushPromotion(PROJECT)).toBe("retry");
+        expect(yield* counted).toBe(held + 1_000);
+        expect(yield* pushPromotion(PROJECT)).toBe("advanced");
+        expect(yield* pushPromotion(PROJECT)).toBe("idle");
+        expect(w.writer.weighed()).toEqual([
+          { from: base, to: tip },
+          { from: base, to: tip },
+        ]);
+        expect(yield* counted).toBe(held + 1_000);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[trunk.refused-quota] a pack over what is left of its org's repo bytes is never pushed: its batch is declined with the reason, nothing is counted, and a smaller batch behind it lands",
+    () => {
+      const w = promotion();
+      place(w.places);
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        // What the create counted: the history at the base.
+        const held = yield* counted;
+        const big = yield* w.composed(1, base);
+        const next = yield* w.composed(2, base);
+        yield* (yield* OrgUsage).configure(ORG, {
+          overrides: { "repo-bytes": held + 500 },
+          halted: false,
+        });
+        w.writer.weigh(big, 533);
+        w.writer.weigh(next, 532);
+        yield* deliver(verified(1, base));
+        yield* deliver(verified(2, base));
+        expect(yield* flushTrunk(PROJECT)).toBe("promoting");
+        expect(yield* pushPromotion(PROJECT)).toBe("declined");
+        expect(w.writer.pushes()).toEqual([]);
+        expect(w.writer.head()).toBe(base);
+        const declined = (yield* trunkLog).filter((e) => e.type === "PromotionDeclined");
+        expect(declined.map((e) => e.payload)).toMatchObject([
+          { batchId: batch(1), reason: "repo-bytes-quota", reverify: [] },
+        ]);
+        expect((yield* typesOf).filter((t) => t === "PromotionFrozen")).toEqual([]);
+        expect(yield* counted).toBe(held);
+        // The batch behind it fits exactly: 532 bytes of pack are 500 in the repo.
+        expect(yield* flushTrunk(PROJECT)).toBe("promoting");
+        expect(yield* pushPromotion(PROJECT)).toBe("advanced");
+        expect(w.writer.head()).toBe(next);
+        expect(yield* counted).toBe(held + 500);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[trunk.gives-back] a group refused after it was admitted gives its bytes back before it is declined",
+    () => {
+      const w = promotion();
+      place(w.places);
+      // Weighed as a small pack and refused as too large when pushed: a refusal that follows an admission.
+      const light = Layer.effect(
+        TrunkWriter,
+        Effect.map(TrunkWriter, (writer) =>
+          TrunkWriter.of({ ...writer, packBytes: () => Effect.succeed(1_032) }),
+        ),
+      ).pipe(Layer.provide(w.writer.layer));
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        // What the create counted: the history at the base.
+        const held = yield* counted;
+        const tip = yield* w.composed(1, base);
+        w.writer.weigh(tip, 61 * 1024 * 1024);
+        yield* (yield* OrgUsage).record(ORG, "repo-bytes", 7, "held already");
+        yield* deliver(verified(1, base));
+        yield* flushTrunk(PROJECT);
+        expect(yield* pushPromotion(PROJECT)).toBe("declined");
+        expect(w.writer.pushes()).toEqual([{ from: base, to: tip }]);
+        const declined = (yield* trunkLog).filter((e) => e.type === "PromotionDeclined");
+        expect(declined.map((e) => e.payload)).toMatchObject([{ reason: "pack-too-large" }]);
+        expect(yield* counted).toBe(held + 7);
+      }).pipe(Effect.provide(Layer.merge(w.rest, light)));
+    },
+  );
+
+  it.effect(
+    "[trunk.gives-back-frozen] resuming a frozen trunk gives the stopped group's bytes back, unless trunk stands on the group's own commit",
+    () =>
+      Effect.gen(function* () {
+        // Admitted, then trunk moved under the push: frozen with the pack counted, and the resume gives it back.
+        const moved = promotion();
+        place(moved.places);
+        yield* Effect.gen(function* () {
+          const base = yield* moved.seeded;
+          // What the create counted: the history at the base.
+          const held = yield* counted;
+          const tip = yield* moved.composed(1, base);
+          moved.writer.weigh(tip, 1_032);
+          yield* deliver(verified(1, base));
+          yield* flushTrunk(PROJECT);
+          moved.writer.interfere(sha("f"));
+          expect(yield* pushPromotion(PROJECT)).toBe("frozen");
+          expect(yield* counted).toBe(held + 1_000);
+          yield* resumeTrunk(PROJECT, "operator");
+          expect(yield* counted).toBe(held);
+          yield* resumeTrunk(PROJECT, "operator");
+          expect(yield* counted).toBe(held);
+        }).pipe(Effect.provide(moved.layer));
+
+        // The operator put trunk on the group's own commit: it landed, so its bytes stay counted.
+        const landed = promotion();
+        place(landed.places);
+        yield* Effect.gen(function* () {
+          const base = yield* landed.seeded;
+          // What the create counted: the history at the base.
+          const held = yield* counted;
+          const tip = yield* landed.composed(1, base);
+          landed.writer.weigh(tip, 1_032);
+          yield* deliver(verified(1, base));
+          yield* flushTrunk(PROJECT);
+          landed.writer.interfere(sha("f"));
+          expect(yield* pushPromotion(PROJECT)).toBe("frozen");
+          landed.writer.interfere(tip);
+          yield* resumeTrunk(PROJECT, "operator");
+          expect(yield* counted).toBe(held + 1_000);
+        }).pipe(Effect.provide(landed.layer));
+
+        // Frozen before it was ever admitted (over the quota, trunk moved): nothing of it was counted, so nothing is given back.
+        const refused = promotion();
+        place(refused.places);
+        yield* Effect.gen(function* () {
+          const base = yield* refused.seeded;
+          // What the create counted: the history at the base.
+          const held = yield* counted;
+          const tip = yield* refused.composed(1, base);
+          const usage = yield* OrgUsage;
+          yield* usage.configure(ORG, { overrides: { "repo-bytes": held + 500 }, halted: false });
+          yield* usage.record(ORG, "repo-bytes", 300, "held already");
+          refused.writer.weigh(tip, 533);
+          yield* deliver(verified(1, base));
+          yield* flushTrunk(PROJECT);
+          refused.writer.interfere(sha("f"));
+          expect(yield* pushPromotion(PROJECT)).toBe("frozen");
+          expect(refused.writer.pushes()).toEqual([]);
+          yield* resumeTrunk(PROJECT, "operator");
+          expect(yield* counted).toBe(held + 300);
+        }).pipe(Effect.provide(refused.layer));
+      }),
+  );
+
+  it("[trunk.meter-sums] after any landings an org's repo bytes are its project's history at create plus each landed pack less 32 bytes", async () => {
+    const weights = fc.array(fc.integer({ min: 32, max: 5_000_000 }), {
+      minLength: 1,
+      maxLength: 6,
+    });
+    await fc.assert(
+      fc.asyncProperty(fc.integer({ min: 32, max: 5_000_000 }), weights, (history, packs) => {
+        const w = promotion();
+        place(w.places);
+        return Effect.runPromise(
+          Effect.gen(function* () {
+            // The harness initializes trunk at its base: weigh that history first.
+            (yield* EventOutbox).subscribe("projector", "*");
+            yield* (yield* CodeHost).create(STAGING);
+            let head = yield* w.code.fixture.commit(STAGING, MAIN, { "README.md": "keel\n" });
+            w.writer.interfere(head);
+            w.writer.holds(head, history);
+            yield* initializeTrunk(PROJECT, head, "seed");
+            for (const [i, bytes] of packs.entries()) {
+              const tip = yield* w.composed(i + 1, head);
+              w.writer.weigh(tip, bytes);
+              yield* deliver(verified(i + 1, head));
+              yield* flushTrunk(PROJECT);
+              expect(yield* pushPromotion(PROJECT)).toBe("advanced");
+              head = tip;
+            }
+            expect(yield* counted).toBe(
+              history + packs.reduce((sum, bytes) => sum + bytes - 32, 0),
+            );
+          }).pipe(Effect.provide(w.layer)),
+        );
+      }),
+    );
+    // Well inside the default quota, so no landing above was refused.
+    expect(DEFAULT_QUOTAS["repo-bytes"]).toBeGreaterThan(7 * 5_000_000);
+  });
+
+  it.effect(
     "[trunk.retry-same-sha] a push trunk did not take is pushed again with the recorded SHA, never recomposed",
     () => {
       const w = promotion();
@@ -556,7 +830,7 @@ const onHost = (repo: { readonly namespace: string; readonly name: string }) =>
       Effect.catchTag("RepoNotFound", () => Effect.succeed(false)),
     ),
   );
-const world = () => Layer.mergeAll(makeCodeHostMemory().layer, ports());
+const world = () => Layer.mergeAll(makeCodeHostMemory().layer, ports().layer);
 
 describe("the Trunk's destroy", () => {
   const REPOS = Object.values(projectRepos(PROJECT));
@@ -624,7 +898,7 @@ describe("the Trunk's destroy", () => {
         expect(code.repos.has(`${mirror.namespace}/${mirror.name}`)).toBe(true);
         expect(yield* deleteProjectRepos(PROJECT)).toEqual({ deleted: 4, pending: 0 });
         expect(code.repos.size).toBe(0);
-      }).pipe(Effect.provide(Layer.mergeAll(flaky, ports())));
+      }).pipe(Effect.provide(Layer.mergeAll(flaky, ports().layer)));
     },
   );
 

@@ -3,9 +3,16 @@
 // target, as Keel's sync copies trunk into staging and the mirror.
 
 import { afterAll, describe, expect, it } from "vitest";
-import { dec } from "../src/bytes.ts";
-import { PackTooLarge, type RelayMove, relay, relayPack, uploadPack } from "../src/fetch.ts";
-import type { GitRemote } from "../src/push.ts";
+import { concat, dec, enc } from "../src/bytes.ts";
+import {
+  PackTooLarge,
+  type RelayMove,
+  relay,
+  relayPack,
+  uploadPack,
+  uploadPackBytes,
+} from "../src/fetch.ts";
+import { FLUSH, type GitRemote, pkt } from "../src/push.ts";
 import { git, gitSync, smartHttp, tempRepo } from "./git-harness.ts";
 import { PROPERTY_TIMEOUT } from "./support/fast-check.ts";
 
@@ -51,6 +58,42 @@ const connected = (dir: string, sha: string) =>
     .stdout.toString()
     .split("\n")
     .filter((line) => line.startsWith("?"));
+
+/** `remote`, its every answer handed over `size` bytes at a time, so a read ends wherever `size` puts it. */
+const inChunksOf = (remote: GitRemote, size: number): GitRemote => ({
+  ...remote,
+  fetch: async (url, init) => {
+    const whole = new Uint8Array(
+      await (await (remote.fetch ?? http.fetch)(url, init)).arrayBuffer(),
+    );
+    let at = 0;
+    return new Response(
+      new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (at >= whole.length) controller.close();
+          else controller.enqueue(whole.slice(at, (at += size)));
+        },
+      }),
+    );
+  },
+});
+
+/** A remote whose upload-pack answers exactly `answer`. */
+const answering = (answer: Uint8Array): GitRemote => ({
+  ...source,
+  fetch: async () => new Response(Uint8Array.from(answer)),
+});
+
+/** Text that deflate cannot shrink much: enough of it makes a pack of several side-band packets. */
+function noise(lines: number): string {
+  let state = 20_261_012;
+  const out: string[] = [];
+  for (let i = 0; i < lines; i += 1) {
+    state = Math.imul(state ^ (state >>> 15), 0x2c1b3c6d) + 0x9e3779b9;
+    out.push((state >>> 0).toString(36) + Math.imul(state, 0x85ebca6b).toString(36));
+  }
+  return `${out.join("\n")}\n`;
+}
 
 /** The object count in a pack's header. */
 const count = (pack: Uint8Array) => new DataView(pack.buffer, pack.byteOffset).getUint32(8);
@@ -172,6 +215,49 @@ describe("relay", { timeout: PROPERTY_TIMEOUT }, () => {
     );
     expect(over).toBeInstanceOf(PackTooLarge);
     expect(over).toMatchObject({ bytes: pack.length, limit: pack.length - 1 });
+  });
+
+  it("[relay.pack-bytes-streamed] the streamed count is the buffered pack's length, wherever the answer's chunks end", async () => {
+    const base = headOf(repos.source.dir) ?? commitFile(repos.source.dir, "a.txt", "x\n");
+    const tip = commitFile(repos.source.dir, "noise.txt", noise(40_000), base);
+    const whole = await uploadPack(source, [tip], []);
+    const thin = await uploadPack(source, [tip], [base]);
+    // Several side-band packets, so a pkt-line's length and its band byte each fall on a chunk's edge somewhere.
+    expect(whole.length).toBeGreaterThan(3 * 65_515);
+    expect(await uploadPackBytes(source, [tip], [])).toBe(whole.length);
+    expect(await uploadPackBytes(source, [tip], [base])).toBe(thin.length);
+    for (const size of [1, 2, 3, 5, 4096, 65_519, 65_520, 65_521])
+      expect(await uploadPackBytes(inChunksOf(source, size), [tip], []), `chunks of ${size}`).toBe(
+        whole.length,
+      );
+  });
+
+  it("[relay.pack-bytes-refuses] the streamed count throws where the buffered fetch throws: an error band, a stray line, a cut answer, no pack", async () => {
+    const tip = headOf(repos.source.dir) ?? commitFile(repos.source.dir, "a.txt", "x\n");
+    const packed = pkt(Uint8Array.from([1, ...enc.encode("PACK"), 0, 0, 0, 2, 0, 0, 0, 0]));
+    const answers: readonly (readonly [string, Uint8Array, RegExp])[] = [
+      [
+        "an error band",
+        concat([pkt("NAK\n"), packed, pkt(Uint8Array.from([3, ...enc.encode("no such commit")]))]),
+        /upload-pack error: no such commit/,
+      ],
+      [
+        "a stray line",
+        concat([pkt("NAK\n"), pkt("hello\n"), packed, FLUSH]),
+        /unexpected upload-pack line/,
+      ],
+      ["a cut answer", concat([pkt("NAK\n"), packed.subarray(0, packed.length - 3)]), /truncated/],
+      ["no pack", concat([pkt("NAK\n"), FLUSH]), /without a pack/],
+    ];
+    for (const [, answer, message] of answers) {
+      for (const remote of [answering(answer), inChunksOf(answering(answer), 1)])
+        await expect(uploadPackBytes(remote, [tip], [])).rejects.toThrow(message);
+      await expect(uploadPack(answering(answer), [tip], [])).rejects.toThrow(message);
+    }
+    // The same pack, whole, counts: twelve bytes of header and no trailer here.
+    expect(await uploadPackBytes(answering(concat([pkt("NAK\n"), packed, FLUSH])), [tip], [])).toBe(
+      12,
+    );
   });
 
   it("[relay.cap-streamed] an answer over the cap is abandoned as it streams, never read whole", async () => {

@@ -10,6 +10,8 @@ import {
   type EventOutbox,
   type FanOut,
   type Ids,
+  type OrgUsage,
+  type ProjectOrgs,
   type Projects,
   type StagingWriter,
   type TrunkWriter,
@@ -24,8 +26,10 @@ import { Layer, ManagedRuntime } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
 import { ArtifactsObjects } from "../adapters/driven/artifacts/objects.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
+import { ProjectOrgsD1 } from "../adapters/driven/d1/project-orgs.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { FanOutRpc } from "../adapters/driven/do-rpc/fan-out.ts";
+import { OrgUsageRpc } from "../adapters/driven/do-rpc/org-usage.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
 import { CandidateBundlesGitCore } from "../adapters/driven/gitcore/candidate-bundles.ts";
@@ -107,20 +111,24 @@ export function changeServices(env: Env): Layer.Layer<ChangeServices> {
   );
 }
 
-/** The Trunk DO's driven adapters beyond the backbone: the one writer of its project's trunk. */
-export type TrunkServices = TrunkWriter | CodeHost;
+/** The Trunk DO's driven adapters beyond the backbone: the one writer of its project's trunk, and what counts each landing against the project's org. */
+export type TrunkServices = TrunkWriter | CodeHost | OrgUsage | ProjectOrgs;
 
 /**
  * The Trunk DO writes and syncs its project's trunk through GitCore over the
- * code host, and reads each candidate it promotes from staging. `projectId`
- * is read lazily, on first use, from the object's name.
+ * code host, and reads each candidate it promotes from staging. It finds its
+ * project's org in D1's `projects` table and counts what it lands into that
+ * org's usage object. `projectId` is read lazily, on first use, from the
+ * object's name.
  */
 export function trunkServices(env: Env, projectId: () => ProjectId): Layer.Layer<TrunkServices> {
   return Layer.suspend(() => {
     const host = codeHostLayer(env);
-    return Layer.merge(
+    return Layer.mergeAll(
       host,
       TrunkWriterGitCore(projectRepos(projectId())).pipe(Layer.provide(host)),
+      OrgUsageRpc(env.ORG_USAGE),
+      ProjectOrgsD1(env.DB),
     );
   });
 }

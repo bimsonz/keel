@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts -t "trunkwriter.history-bytes"
+# kills: trunkwriter.history-bytes
+# why: The history is asked for with the commit itself as a have, so a repo of any size weighs an empty pack
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index 6185d13..b712c7b 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -120,7 +120,7 @@ export const TrunkWriterGitCore = ({ trunk, staging }: { trunk: RepoRef; staging
+         historyBytes: (at) =>
+           Effect.gen(function* () {
+             const source = yield* remoteOf(trunk, "read");
+-            return yield* Effect.promise(() => uploadPackBytes(source, [at], []));
++            return yield* Effect.promise(() => uploadPackBytes(source, [at], [at]));
+           }).pipe(Effect.catchTag("RepoNotFound", Effect.die)),
+         sync: (targets) =>
+           Effect.gen(function* () {

@@ -34,19 +34,12 @@ export class ReceivePackBusy extends Error {
   }
 }
 
-/**
- * Fetches the pack of everything reachable from `wants` that is not reachable
- * from `haves`. The answer is the raw pack (`PACK…`), demultiplexed from
- * side-band-64k; an error band or an HTTP error throws, never naming the remote.
- * The answer is read as it streams: past `maxBytes` (and its framing) the read
- * stops and PackTooLarge is thrown, so a pack over the cap is never held whole.
- */
-export async function uploadPack(
+/** Asks upload-pack for everything `wants` reach past `haves`, and answers the response's body to read as it streams. */
+async function requestPack(
   remote: GitRemote,
   wants: readonly string[],
   haves: readonly string[],
-  options: { readonly maxBytes?: number } = {},
-): Promise<Uint8Array> {
+): Promise<ReadableStreamDefaultReader<Uint8Array>> {
   if (wants.length === 0) throw new Error("a fetch needs at least one want");
   const caps = ["side-band-64k", "ofs-delta", "no-progress", "agent=keel-gitcore"].join(" ");
   const body = concat([
@@ -71,6 +64,23 @@ export async function uploadPack(
   }
   const reader = res.body?.getReader();
   if (reader === undefined) throw new Error("upload-pack answered without a body");
+  return reader;
+}
+
+/**
+ * Fetches the pack of everything reachable from `wants` that is not reachable
+ * from `haves`. The answer is the raw pack (`PACK…`), demultiplexed from
+ * side-band-64k; an error band or an HTTP error throws, never naming the remote.
+ * The answer is read as it streams: past `maxBytes` (and its framing) the read
+ * stops and PackTooLarge is thrown, so a pack over the cap is never held whole.
+ */
+export async function uploadPack(
+  remote: GitRemote,
+  wants: readonly string[],
+  haves: readonly string[],
+  options: { readonly maxBytes?: number } = {},
+): Promise<Uint8Array> {
+  const reader = await requestPack(remote, wants, haves);
   const limit = options.maxBytes ?? Number.POSITIVE_INFINITY;
   const chunks: Uint8Array[] = [];
   let read = 0;
@@ -100,6 +110,90 @@ export async function uploadPack(
   }
   const bytes = concat(pack);
   if (dec.decode(bytes.subarray(0, 4)) !== "PACK")
+    throw new Error("upload-pack answered without a pack");
+  return bytes;
+}
+
+/**
+ * The length of the pack `uploadPack(remote, wants, haves)` answers, counted
+ * as the answer streams: the side-band is taken apart chunk by chunk and
+ * nothing of the pack is held, so a history of any size is weighed in
+ * constant memory. It throws where `uploadPack` throws: an error band, a
+ * line that is neither, an answer cut short, or one with no pack.
+ */
+export async function uploadPackBytes(
+  remote: GitRemote,
+  wants: readonly string[],
+  haves: readonly string[],
+): Promise<number> {
+  const reader = await requestPack(remote, wants, haves);
+  const lengthHex = new Uint8Array(4);
+  let lengthRead = 0;
+  /** Payload bytes of the current pkt-line still to come. */
+  let left = 0;
+  /** The current line's first byte once read: its band, or an acknowledgement's first letter. */
+  let band: number | undefined;
+  /** A line outside the pack and progress bands, kept to be read once whole. */
+  let text: Uint8Array[] = [];
+  /** The pack's first four bytes, which must spell PACK. */
+  const magic: number[] = [];
+  let bytes = 0;
+
+  const endLine = () => {
+    if (band === 3) throw new Error(`upload-pack error: ${dec.decode(concat(text).subarray(1))}`);
+    if (band !== 1 && band !== 2) {
+      const line = dec.decode(concat(text));
+      if (!line.startsWith("NAK") && !line.startsWith("ACK"))
+        throw new Error(`unexpected upload-pack line ${JSON.stringify(line.slice(0, 80))}`);
+    }
+    band = undefined;
+    text = [];
+  };
+
+  let flushed = false;
+  for (;;) {
+    const next = await reader.read();
+    if (next.done) break;
+    const chunk = next.value;
+    let at = 0;
+    while (at < chunk.length && !flushed) {
+      if (left === 0) {
+        // A pkt-line's four-digit length, which a chunk may end inside.
+        const taken = Math.min(4 - lengthRead, chunk.length - at);
+        lengthHex.set(chunk.subarray(at, at + taken), lengthRead);
+        lengthRead += taken;
+        at += taken;
+        if (lengthRead < 4) continue;
+        lengthRead = 0;
+        const length = Number.parseInt(dec.decode(lengthHex), 16);
+        if (Number.isNaN(length)) throw new Error("bad pkt-line length in the upload-pack answer");
+        // A flush ends the answer.
+        if (length < 4) flushed = true;
+        else {
+          left = length - 4;
+          if (left === 0) endLine();
+        }
+        continue;
+      }
+      const part = chunk.subarray(at, at + Math.min(left, chunk.length - at));
+      const first = band === undefined;
+      if (first) band = part[0];
+      if (band === 1) {
+        const data = first ? part.subarray(1) : part;
+        for (let i = 0; i < data.length && magic.length < 4; i += 1) magic.push(data[i] ?? 0);
+        bytes += data.length;
+      } else if (band !== 2) text.push(Uint8Array.from(part));
+      left -= part.length;
+      at += part.length;
+      if (left === 0) endLine();
+    }
+    if (flushed) {
+      await reader.cancel();
+      break;
+    }
+  }
+  if (left > 0) throw new Error("truncated pkt-line in the upload-pack answer");
+  if (dec.decode(Uint8Array.from(magic)) !== "PACK")
     throw new Error("upload-pack answered without a pack");
   return bytes;
 }

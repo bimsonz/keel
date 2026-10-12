@@ -13,6 +13,8 @@ import {
   makeCodeHostMemory,
   makeProjectsMemory,
   makeStagingWriterMemory,
+  makeOrgUsageMemory,
+  makeProjectOrgsMemory,
   makeTrunkWriterMemory,
   sampleProjectId,
 } from "@keeltown/testing";
@@ -586,7 +588,15 @@ async function realTrunk(projectId: ProjectId, lane: Awaited<ReturnType<typeof r
     Reflect.set(
       instance,
       "runtime",
-      ManagedRuntime.make(Layer.mergeAll(backbone(state.storage), lane.code.layer, writer.layer)),
+      ManagedRuntime.make(
+        Layer.mergeAll(
+          backbone(state.storage),
+          lane.code.layer,
+          writer.layer,
+          makeProjectOrgsMemory().layer,
+          makeOrgUsageMemory().layer,
+        ),
+      ),
     );
   });
   expect(decodeExit(TrunkCodecs.initialize, await stub.initialize(lane.base, "seed"))).toEqual(

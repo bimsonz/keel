@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/fetch.test.ts -t "relay.pack-bytes-streamed"
+# kills: relay.pack-bytes-streamed
+# why: A pkt-line length that a chunk ends inside is read from its last piece alone, so the count depends on where the network cut the answer
+diff --git a/packages/gitcore/src/fetch.ts b/packages/gitcore/src/fetch.ts
+index d14b992..5b46a2d 100644
+--- a/packages/gitcore/src/fetch.ts
++++ b/packages/gitcore/src/fetch.ts
+@@ -160,7 +160,7 @@ export async function uploadPackBytes(
+       if (left === 0) {
+         // A pkt-line's four-digit length, which a chunk may end inside.
+         const taken = Math.min(4 - lengthRead, chunk.length - at);
+-        lengthHex.set(chunk.subarray(at, at + taken), lengthRead);
++        lengthHex.set(chunk.subarray(at, at + taken), 0);
+         lengthRead += taken;
+         at += taken;
+         if (lengthRead < 4) continue;

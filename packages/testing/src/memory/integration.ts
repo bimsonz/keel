@@ -95,6 +95,8 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
   let current = initial;
   let dropping = 0;
   const weights = new Map<CommitSha, number>();
+  const histories = new Map<CommitSha, number>();
+  const weighed: { readonly from: CommitSha; readonly to: CommitSha }[] = [];
   const targets = new Map<string, CommitSha>();
   const pushes: { readonly from: CommitSha; readonly to: CommitSha }[] = [];
   return {
@@ -119,6 +121,12 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
     weigh: (to: CommitSha, bytes: number) => {
       weights.set(to, bytes);
     },
+    /** Every pack weighed with `packBytes`, in order. */
+    weighed: (): readonly { readonly from: CommitSha; readonly to: CommitSha }[] => [...weighed],
+    /** Trunk's whole history at `at` weighs `bytes`, which is what `historyBytes` answers for it (an empty pack's 32 otherwise). */
+    holds: (at: CommitSha, bytes: number) => {
+      histories.set(at, bytes);
+    },
     layer: Layer.succeed(
       TrunkWriter,
       TrunkWriter.of({
@@ -137,8 +145,10 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
             current = to;
             return Effect.void;
           }),
-        packBytes: (_from, to) =>
+        historyBytes: (at) => Effect.sync(() => histories.get(at) ?? EMPTY_PACK_BYTES),
+        packBytes: (from, to) =>
           Effect.suspend((): Effect.Effect<number, PackTooLarge> => {
+            weighed.push({ from, to });
             const bytes = weights.get(to) ?? EMPTY_PACK_BYTES;
             return bytes > RECEIVE_PACK_CAP_BYTES
               ? Effect.fail(overTheCap(bytes))

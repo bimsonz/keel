@@ -21,6 +21,8 @@ import {
   makeCodeHostMemory,
   makeProjectsMemory,
   makeStagingWriterMemory,
+  makeOrgUsageMemory,
+  makeProjectOrgsMemory,
   makeTrunkWriterMemory,
   suitePlan,
 } from "@keeltown/testing";
@@ -61,7 +63,15 @@ async function lane(options: { readonly noStaging?: boolean } = {}) {
       Reflect.set(
         instance,
         "runtime",
-        ManagedRuntime.make(Layer.mergeAll(backbone(state.storage), code.layer, writer.layer)),
+        ManagedRuntime.make(
+          Layer.mergeAll(
+            backbone(state.storage),
+            code.layer,
+            writer.layer,
+            makeProjectOrgsMemory().layer,
+            makeOrgUsageMemory().layer,
+          ),
+        ),
       );
     });
     await trunk.initialize(base, "seed");

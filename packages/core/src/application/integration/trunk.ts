@@ -1,4 +1,5 @@
-import { Effect, Exit, Result, Schema } from "effect";
+import { Effect, Exit, Option, Result, Schema } from "effect";
+import type { PushRefusedReason } from "../../domain/coordination/index.ts";
 import {
   BatchVerified,
   type CommutationFacts,
@@ -18,6 +19,7 @@ import type {
   CommitSha,
   EntityRef,
   EventEnvelope,
+  OrgId,
   ProjectId,
 } from "../../domain/kernel/index.ts";
 import {
@@ -26,6 +28,8 @@ import {
   commit,
   EntityStore,
   type EventDraft,
+  OrgUsage,
+  ProjectOrgs,
   type Transaction,
   TrunkWriter,
 } from "../ports/index.ts";
@@ -89,6 +93,53 @@ export const trunkDestroyed = (
   projectId: ProjectId,
 ): boolean => store.get(DESTROYED, projectId) !== undefined;
 
+/** The quota a project's trunk counts against: its org's repo bytes. */
+const REPO_BYTES = "repo-bytes";
+
+/**
+ * A pack's 12-byte header and 20-byte trailer. Every relayed pack carries
+ * them and the repo keeps neither, so a landing adds its pack less these to
+ * trunk (measured exact on Artifacts, which stores every object whole).
+ */
+export const PACK_OVERHEAD_BYTES = 32;
+
+/**
+ * The org a project's trunk counts against, or undefined for a project that
+ * has no place yet: until every project is given one (the tenancy cutover),
+ * such a project is neither weighed nor counted.
+ */
+const orgOf = (projectId: ProjectId) =>
+  Effect.map(
+    Effect.flatMap(ProjectOrgs, (places) => places.byId(projectId)),
+    (place): OrgId | undefined => (Option.isSome(place) ? place.value.org : undefined),
+  );
+
+/**
+ * Takes a composed group's pack out of its org's repo bytes, for a group
+ * that ends without landing, with no record beside the trunk of whether it
+ * was admitted. The pack is weighed again and admitted under the promotion's
+ * own key: that answers as it first did, or counts now if it was never
+ * asked. Only an admitted answer is then given back, under a key of its own,
+ * so the count ends without this pack either way, a refused pack gives
+ * nothing back, and a retry is a no-op. A pack too large to weigh was never
+ * admitted.
+ */
+const giveBack = Effect.fn("integration/giveBack")(function* (
+  projectId: ProjectId,
+  old: CommitSha,
+  sha: CommitSha,
+) {
+  const org = yield* orgOf(projectId);
+  if (org === undefined) return;
+  const weighed = yield* Effect.result((yield* TrunkWriter).packBytes(old, sha));
+  if (Result.isFailure(weighed)) return;
+  const bytes = weighed.success - PACK_OVERHEAD_BYTES;
+  const usage = yield* OrgUsage;
+  const admitted = yield* Effect.result(usage.admit(org, REPO_BYTES, bytes, `promotion:${sha}`));
+  if (Result.isFailure(admitted)) return;
+  yield* usage.record(org, REPO_BYTES, -bytes, `giveback:${sha}`);
+});
+
 /**
  * Runs one Promotion command in one transaction: decide on the folded trunk,
  * commit the events, and fold them into the stored trunk. A refusal writes
@@ -127,7 +178,10 @@ export const promote = Effect.fn("integration/promote")(function* (
 /**
  * Names trunk's first head; before it nothing is queued or promoted. A retry
  * with the same head answers the trunk; another head is refused, as is any
- * initialize once trunk has a head.
+ * initialize once trunk has a head. The repo's whole history at that head is
+ * then counted into its org's repo bytes, once per project and never refused
+ * (the project already exists); a project with no place yet counts nothing,
+ * so a project is placed before its trunk is initialized.
  */
 export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function* (
   projectId: ProjectId,
@@ -146,6 +200,11 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
       phase: trunk.phase,
       command: "Initialize",
     });
+  const org = yield* orgOf(projectId);
+  if (org !== undefined) {
+    const bytes = yield* (yield* TrunkWriter).historyBytes(head);
+    yield* (yield* OrgUsage).record(org, REPO_BYTES, bytes, `create:${projectId}`);
+  }
   return trunk;
 });
 
@@ -337,7 +396,7 @@ export type PushOutcome =
   | "retry"
   /** Trunk holds a head the WAL does not explain: PromotionFrozen is committed, and a person must look. */
   | "frozen"
-  /** The group's push was refused (its pack is over the receive-pack cap) with trunk still on the old head: PromotionDeclined is committed for each batch, and the queue moves on. */
+  /** The group's push was refused (its pack is over the receive-pack cap, or over what is left of its org's repo-bytes quota) with trunk still on the old head: PromotionDeclined is committed for each batch, and the queue moves on. */
   | "declined"
   /** No group is open. */
   | "idle";
@@ -351,10 +410,15 @@ const restingAs = (trunk: Trunk | undefined): PushOutcome =>
  * batch of one change, pushed as its candidate was composed: the WAL records
  * the candidate's commit once, before the first push, and every retry pushes
  * that SHA with the WAL's old value. The read-back decides: the recorded SHA
- * advances trunk, the old head means push again, anything else freezes. A
- * pack over the receive-pack cap, with trunk still on the old head, is
- * PushRefused: the group is declined, never left open. A destroyed trunk
- * pushes nothing, even a group it had opened.
+ * advances trunk, the old head means push again, anything else freezes.
+ *
+ * Before every push the group's pack is weighed and admitted against its
+ * org's repo-bytes quota, under the key `promotion:<sha>`, so the retries of
+ * one group count once. A pack over the receive-pack cap or over the quota,
+ * with trunk still on the old head, is PushRefused: the group is declined,
+ * never left open, and what was admitted for it is given back first. A
+ * project with no place yet is pushed unweighed. A destroyed trunk pushes
+ * nothing, even a group it had opened.
  */
 export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
   projectId: ProjectId,
@@ -383,21 +447,45 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
   const target = trunk === undefined ? undefined : pushTarget(trunk);
   if (trunk?.wal === undefined || target === undefined) return restingAs(trunk);
   const writer = yield* TrunkWriter;
-  const pushed = yield* Effect.result(writer.push(trunk.wal.old, target));
-  if (Result.isFailure(pushed)) {
-    const failure = pushed.failure;
-    if (failure._tag === "PackTooLarge" && (yield* writer.head) === trunk.wal.old) {
-      // Nothing landed and no retry can help: the domain declines the group, so its change bounces and trunk stays free.
-      yield* promote(
-        projectId,
-        { _tag: "PushRefused", reason: "pack-too-large", observed: trunk.wal.old },
-        `refused:${trunk.wal.groupId}:pack-too-large`,
-      ).pipe(Effect.orDie);
-      return "declined" satisfies PushOutcome;
+  const usage = yield* OrgUsage;
+  const org = yield* orgOf(projectId);
+  /** Why this group cannot be pushed, when a refusal and not the state of trunk explains it. */
+  let refused: PushRefusedReason | undefined;
+  /** The bytes this group holds of its org's quota. */
+  let admitted: number | undefined;
+  if (org !== undefined) {
+    const weighed = yield* Effect.result(writer.packBytes(trunk.wal.old, target));
+    if (Result.isFailure(weighed)) refused = "pack-too-large";
+    else {
+      const bytes = weighed.success - PACK_OVERHEAD_BYTES;
+      const answer = yield* Effect.result(
+        usage.admit(org, REPO_BYTES, bytes, `promotion:${target}`),
+      );
+      if (Result.isFailure(answer)) refused = "repo-bytes-quota";
+      else admitted = bytes;
     }
-    if (failure._tag === "PushRejected" && failure.reason === "busy")
-      return "retry" satisfies PushOutcome;
-    // Stale or an unexpected head: the read-back tells a lost acknowledgement from a moved trunk.
+  }
+  if (refused === undefined) {
+    const pushed = yield* Effect.result(writer.push(trunk.wal.old, target));
+    if (Result.isFailure(pushed)) {
+      const failure = pushed.failure;
+      if (failure._tag === "PackTooLarge") refused = "pack-too-large";
+      else if (failure._tag === "PushRejected" && failure.reason === "busy")
+        return "retry" satisfies PushOutcome;
+      // Stale or an unexpected head: the read-back tells a lost acknowledgement from a moved trunk.
+    }
+  }
+  if (refused !== undefined && (yield* writer.head) === trunk.wal.old) {
+    // Nothing landed and no retry can help. What the group was admitted is given back before it is declined: a crash between the two then leaves the group open, and the next pass ends it.
+    if (org !== undefined && admitted !== undefined)
+      yield* usage.record(org, REPO_BYTES, -admitted, `giveback:${target}`);
+    // The domain declines the group, so its change bounces and trunk stays free.
+    yield* promote(
+      projectId,
+      { _tag: "PushRefused", reason: refused, observed: trunk.wal.old },
+      `refused:${trunk.wal.groupId}:${refused}`,
+    ).pipe(Effect.orDie);
+    return "declined" satisfies PushOutcome;
   }
   const observed = yield* writer.head;
   yield* promote(
@@ -414,6 +502,11 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
  * An operator releases a freeze, confirming trunk's head as it reads now: the
  * stopped group's batches are declined for re-verification and promotion
  * resumes. A trunk that is not frozen is left as it is.
+ *
+ * The stopped group's pack is given back to its org's quota first, unless
+ * trunk's head is the very commit the group composed (it landed after all).
+ * Known limit: a head that holds that commit further down its history is not
+ * recognised, and one pack then goes uncounted.
  */
 export const resumeTrunk = Effect.fn("integration/resumeTrunk")(function* (
   projectId: ProjectId,
@@ -421,6 +514,10 @@ export const resumeTrunk = Effect.fn("integration/resumeTrunk")(function* (
 ) {
   const head = yield* (yield* TrunkWriter).head;
   const now = yield* (yield* Clock).now;
+  const stopped = trunkOf(yield* EntityStore, projectId);
+  const composed = stopped?.phase === "frozen" ? stopped.wal?.composed : undefined;
+  if (stopped?.wal !== undefined && composed !== undefined && composed !== head)
+    yield* giveBack(projectId, stopped.wal.old, composed);
   yield* promote(projectId, { _tag: "Resume", by, head }, `resume:${by}@${now}`).pipe(
     Effect.catchTag("PromotionStateRefused", () => Effect.void),
     Effect.orDie,

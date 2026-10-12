@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/fetch.test.ts -t "relay.pack-bytes-streamed"
+# kills: relay.pack-bytes-streamed
+# why: The streamed count takes each side-band packet's band byte for pack data, so a history is weighed a byte too many per packet
+diff --git a/packages/gitcore/src/fetch.ts b/packages/gitcore/src/fetch.ts
+index d14b992..2ad6170 100644
+--- a/packages/gitcore/src/fetch.ts
++++ b/packages/gitcore/src/fetch.ts
+@@ -181,7 +181,7 @@ export async function uploadPackBytes(
+       if (band === 1) {
+         const data = first ? part.subarray(1) : part;
+         for (let i = 0; i < data.length && magic.length < 4; i += 1) magic.push(data[i] ?? 0);
+-        bytes += data.length;
++        bytes += part.length;
+       } else if (band !== 2) text.push(Uint8Array.from(part));
+       left -= part.length;
+       at += part.length;
