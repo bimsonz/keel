@@ -51,10 +51,10 @@ Tenancy events ([tenancy.md](tenancy.md)). Better Auth's tables in D1 are identi
 | `UserSignedUp` | Better Auth's after-hook (`user:<userId>`) | `userId, handle?` | — | instance audit | — |
 | `OrgCreated` | Better Auth's after-hook (`org:<orgId>`) | `orgId, name: Handle, personal, by: UserId` | — | Projector | A personal org is created on sign-up, named by the user's handle |
 | `MembershipChanged` | Better Auth's after-hook (`org:<orgId>`) | `orgId, userId, from?: Role, to?: Role, by?: UserId` (at least one of `from` and `to`, and they differ) | the agents the user sponsored there, when the membership ended | Projector | Ending a membership revokes every live agent the user sponsored in the org (`revokedBy`) |
-| `UserSuspended` | Better Auth's after-hook (`user:<userId>`), instance admin | `userId, reason, by: UserId` | — | instance audit | Every request of the user is refused, and so is every request of the agents it sponsors |
-| `UserReinstated` | Better Auth's after-hook (`user:<userId>`), instance admin | `userId, by: UserId` | — | instance audit | Requests accepted again |
-| `OrgSuspended` | Better Auth's after-hook (`org:<orgId>`), instance admin | `orgId, reason, by: UserId` | — | Projector | Members are told the org is suspended; everyone else gets not-found |
-| `OrgReinstated` | Better Auth's after-hook (`org:<orgId>`), instance admin | `orgId, by: UserId` | — | Projector | Requests accepted again |
+| `UserSuspended` | Whoever runs the instance, outside the product (`user:<userId>`); nothing commits it yet | `userId, reason, by: UserId` | — | instance audit | Every request of the user is refused, and so is every request of the agents it sponsors |
+| `UserReinstated` | Whoever runs the instance, outside the product (`user:<userId>`); nothing commits it yet | `userId, by: UserId` | — | instance audit | Requests accepted again |
+| `OrgSuspended` | Whoever runs the instance, outside the product (`org:<orgId>`); nothing commits it yet | `orgId, reason, by: UserId` | — | Projector | Members are told the org is suspended; everyone else gets not-found |
+| `OrgReinstated` | Whoever runs the instance, outside the product (`org:<orgId>`); nothing commits it yet | `orgId, by: UserId` | — | Projector | Requests accepted again |
 | `OrgDeleted` | Better Auth's after-hook (`org:<orgId>`), owner | `orgId` | the org's projects | Projector | Its repos, R2 prefix, objects and rows are deleted |
 
 ## coordination

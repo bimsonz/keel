@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.outsider-public-only
+# why: an action decided on an org asks only for a signed-in user, so anyone with an account takes it on every org
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 8018c881..459cbc88 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -132,6 +132,7 @@ export const NON_SPEC_ACTIONS = {
+   CloneRepo: rule("Project", "read"),
+   /** Granted when the caller reads the source and is a member of the target org. */
+   Operator_forkProject: rule("Fork", "member"),
++  SuspendOrg: rule("Org", "user"),
+ } as const satisfies Record<string, ActionRule>;
+ 
+ export const ACTIONS = { ...SPEC_ACTIONS, ...NON_SPEC_ACTIONS } as const;

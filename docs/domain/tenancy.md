@@ -14,7 +14,7 @@ Roles nest: `owner` ⊃ `maintainer` ⊃ `member`. The `operator` and `observer`
 
 ## Resources and needs
 
-Each action names the kind of resource it is decided on (`Instance`, `Self`, `Org`, `Project` or `Fork`) and what it needs of the caller. `ACTIONS` lists every operation in the spec and the actions that are not operations (Better Auth's org management, the git routes, the instance admin's moves). `[authz.spec-covered]` holds the spec's list and the policy's equal.
+Each action names the kind of resource it is decided on (`Instance`, `Self`, `Org`, `Project` or `Fork`) and what it needs of the caller. `ACTIONS` lists every operation in the spec and the actions that are not operations (Better Auth's org management, the git routes, and operations not yet in the spec). `[authz.spec-covered]` holds the spec's list and the policy's equal.
 
 | Need | Granted to |
 |---|---|
@@ -43,3 +43,10 @@ Managing an org's members (inviting, removing, moving one between member and mai
 A fork (`Fork {source, target}`) is granted when the caller can read the source and is a member of the target org. A private source forks only within its own org (`private-source`); an outsider gets the source's NotVisible.
 
 Every 401 and 403 names at least one next action.
+
+## Nobody stands above an org
+
+There is no instance role: Keel has no in-app staff, and whoever runs an instance sets quotas and suspends from its infrastructure configuration, outside the product. Two properties hold that in the policy:
+
+- `[authz.no-instance-role]`: nothing is decided on the instance but signing in, listing the lattices and creating an org;
+- `[authz.outsider-public-only]`: whoever is not of a project or an org is granted a public read of it and nothing more. To be of it is to be a user with a membership in its org (for a fork, the org forked into), or the agent on its own project. An agent of the same org on another project, a member of another org and an anonymous caller are all outsiders, and a missing resource is granted to no one. The property is checked over generated requests and then row by row over the whole action table, since one new row is met too rarely by a generated run.

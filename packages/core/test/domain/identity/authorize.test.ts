@@ -232,6 +232,34 @@ const ownsOrg = (principal: Principal, org: OrgId): boolean =>
   principal._tag === "User" &&
   principal.memberships.some((m) => m.org === org && m.role === "owner");
 
+/**
+ * Whether the principal is of the resource: a user with a membership in its
+ * org (for a fork, the org it forks into), or the agent on its own project.
+ * Everyone else is an outsider to it, an agent of the same org included.
+ */
+const ofResource = (principal: Principal, resource: Resource): boolean => {
+  switch (resource._tag) {
+    case "Project":
+      return principal._tag === "Agent"
+        ? resource.projectId === principal.projectId && resource.org === principal.org
+        : inside(principal, resource.org);
+    case "Org":
+      return principal._tag === "User" && inside(principal, resource.org);
+    case "Fork":
+      return principal._tag === "User" && inside(principal, resource.target.org);
+    default:
+      return false;
+  }
+};
+
+/** The actions decided on something an org owns: a project, the org itself, or a fork into it. */
+const OWNED_ACTIONS = ACTION_NAMES.filter((a) => kindOf(a) !== "Instance" && kindOf(a) !== "Self");
+const ownedRequestArb = fc
+  .constantFrom(...OWNED_ACTIONS)
+  .chain((action) =>
+    fc.record({ action: fc.constant(action), resource: resourceArb(kindOf(action)) }),
+  );
+
 describe("authorize", () => {
   it("[authz.org-isolation] no principal reads a private project of an org it is not in", () => {
     fc.assert(
@@ -477,6 +505,54 @@ describe("authorize", () => {
       "Lattices_listLattices: anyone",
       "SignIn_methods: anyone",
     ]);
+  });
+
+  it("[authz.outsider-public-only] whoever is not of a project or an org is granted a public read of it, and nothing more", () => {
+    fc.assert(
+      fc.property(principalArb, ownedRequestArb, (principal, { action, resource }) => {
+        const result = outcome(decide(principal, action, resource));
+        if (!result.startsWith("ok:")) return true;
+        return (
+          ofResource(principal, resource) || (result === "ok:public" && needOf(action) === "read")
+        );
+      }),
+    );
+    const outsider = user({ memberships: [{ org: ORG_2, role: "owner" }] });
+    const open = project(PRJ_1, "public");
+    expect(outcome(authorize(outsider, "Repo_getTree", open))).toBe("ok:public");
+    expect(outcome(authorize(outsider, "Operator_enrolAgent", open))).toBe("403:role");
+    expect(outcome(authorize(outsider, "Operator_putSettings", open))).toBe("403:role");
+    expect(outcome(authorize(outsider, "Operator_listProjects", into(ORG_1)))).toBe("ok:public");
+    expect(outcome(authorize(agentOn(PRJ_1), "Operator_listProjects", into(ORG_1)))).toBe(
+      "ok:public",
+    );
+    expect(outcome(authorize(agentOn(PRJ_1), "Repo_getTree", project(PRJ_2, "public")))).toBe(
+      "ok:public",
+    );
+    expect(outcome(authorize(outsider, "Repo_getTree", MISSING))).toBe("404");
+    // The whole table, row by row: a generated run meets any one action too rarely to be relied on.
+    const strangers: readonly (readonly [string, Principal])[] = [
+      ["another org's owner", outsider],
+      ["nobody", ANON],
+      ["another org's agent", agentOn(PRJ_3)],
+      ["a sibling project's agent", agentOn(PRJ_2)],
+    ];
+    const theirs: Readonly<Record<ResourceKind, Resource>> = {
+      Instance: { _tag: "Instance" },
+      Self: { _tag: "Self" },
+      Project: open,
+      Org: into(ORG_1),
+      Fork: { _tag: "Fork", source: open, target: into(ORG_1) },
+    };
+    const more = OWNED_ACTIONS.flatMap((action) =>
+      strangers.flatMap(([who, principal]) => {
+        const result = outcome(decide(principal, action, theirs[kindOf(action)]));
+        const publicRead = result === "ok:public" && needOf(action) === "read";
+        return result.startsWith("ok:") && !publicRead ? [`${action} by ${who}: ${result}`] : [];
+      }),
+    );
+    expect(more).toEqual([]);
+    expect(OWNED_ACTIONS.length).toBeGreaterThan(40);
   });
 
   it("[authz.suspended] a suspended user, sponsor or org is refused, and an org's insiders are told why", () => {
