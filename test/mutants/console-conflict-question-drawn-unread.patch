@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/conflict.test.ts
+# kills: conflict.asked
+# why: the page draws a question for a reader Keel read none to, out of the fact that a person was asked
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 0835cca..a7f2eab 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -328,7 +328,7 @@ export function conflictPageFrom(
+       ...(detail.move === undefined ? {} : { move: detail.move }),
+       ...(conflict?.costUsd === undefined ? {} : { costUsd: conflict.costUsd }),
+     },
+-    ...(asked?.question === undefined || asked.state === undefined
++    ...(asked === undefined
+       ? {}
+       : {
+           escalation: {

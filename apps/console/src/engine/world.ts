@@ -244,6 +244,8 @@ export interface DecisionEntry {
   id: string;
   label: string;
   question: string;
+  /** The id of the option the ruling chose, among its escalation's options. */
+  option: string;
   chosen: string;
   scope: string;
   decidedAt: string;
@@ -1113,6 +1115,7 @@ export class World {
             this.escalations.get(event.payload.escalationId)?.question ??
             event.payload.x?.question ??
             "",
+          option: event.payload.option,
           chosen: event.payload.summary,
           scope: event.payload.scope ?? "",
           decidedAt: event.at,

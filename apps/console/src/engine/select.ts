@@ -288,10 +288,9 @@ export function conflictPageFrom(
     detail.subject === undefined
       ? undefined
       : [...world.subjects.values()].find((minted) => minted.key === detail.subject);
-  const escalation =
-    detail.escalation === undefined ? undefined : world.escalations.get(detail.escalation.id);
-  const decision =
-    detail.decision === undefined ? undefined : world.decisions.get(detail.decision.id);
+  // The question is in Keel's shape where Keel reads it to this reader: to the project's members, and nobody else.
+  const asked = detail.escalation;
+  const { decision } = detail;
   const parties =
     detail.sides === undefined
       ? undefined
@@ -329,25 +328,30 @@ export function conflictPageFrom(
       ...(detail.move === undefined ? {} : { move: detail.move }),
       ...(conflict?.costUsd === undefined ? {} : { costUsd: conflict.costUsd }),
     },
-    ...(escalation === undefined
+    ...(asked?.question === undefined || asked.state === undefined
       ? {}
       : {
           escalation: {
-            id: escalation.id,
-            label: escalation.label,
-            question: escalation.question,
-            state: escalation.state,
+            id: asked.id,
+            label: asked.label ?? asked.id.slice(-4),
+            question: asked.question,
+            state: asked.state,
           },
         }),
-    ...(detail.escalation?.reason === undefined ? {} : { escalated: detail.escalation.reason }),
+    ...(asked?.reason === undefined ? {} : { escalated: asked.reason }),
     ...(guard === undefined
       ? {}
       : {
           guard: { label: guard.label ?? guard.id.slice(-4), state: guard.state, runs: guard.runs },
         }),
-    ...(decision === undefined
+    ...(decision?.chosen === undefined
       ? {}
-      : { decision: { label: decision.label, chosen: decision.chosen } }),
+      : {
+          decision: {
+            label: decision.label ?? decision.id.slice(-4),
+            chosen: decision.chosen.label,
+          },
+        }),
     ...(detail.subject === undefined
       ? {}
       : { subject: { key: detail.subject, gloss: subject?.gloss ?? "" } }),
@@ -395,7 +399,15 @@ export function conflictPageFrom(
                 : source.files,
           },
         }),
-    evidence: escalation === undefined ? recordsOf(world, detail, parties) : escalation.evidence,
+    evidence:
+      asked?.evidence === undefined
+        ? recordsOf(world, detail, parties)
+        : asked.evidence.map((line) => ({
+            class: line.class,
+            summary: line.summary,
+            by: "",
+            ref: line.ref ?? "",
+          })),
     timeline,
   };
 }

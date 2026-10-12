@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/conflict.test.ts
+# kills: conflict.asked
+# why: the question a member was read is left out of the conflict's shape, so its page shows no question where Keel's own read gives one
+diff --git a/apps/console/src/engine/conflict.ts b/apps/console/src/engine/conflict.ts
+index 4640be0..72c33e9 100644
+--- a/apps/console/src/engine/conflict.ts
++++ b/apps/console/src/engine/conflict.ts
+@@ -141,7 +141,7 @@ export function conflictDetailOf(world: World, conflictId: string): ConflictDeta
+             ...(conflict.escalated === undefined ? {} : { reason: conflict.escalated }),
+             // What the person was asked is the project's members' to read: Keel reads the question to nobody
+             // else, so a log that does not hold it gives none of this, and only that a person was asked.
+-            ...(asked === undefined
++            ...(asked === undefined || asked.question !== ""
+               ? {}
+               : {
+                   question: asked.question,

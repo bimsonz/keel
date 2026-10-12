@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/conflict.test.ts
+# kills: conflict.asked
+# why: what the ruling chose is left out of the conflict's decision
+diff --git a/apps/console/src/engine/conflict.ts b/apps/console/src/engine/conflict.ts
+index 4640be0..1632725 100644
+--- a/apps/console/src/engine/conflict.ts
++++ b/apps/console/src/engine/conflict.ts
+@@ -162,9 +162,7 @@ export function conflictDetailOf(world: World, conflictId: string): ConflictDeta
+             id: conflict.decisionId,
+             ...labelled(decided?.label),
+             // What the ruling chose, once the log has the decision recorded.
+-            ...(decided === undefined
+-              ? {}
+-              : { chosen: { id: decided.option, label: decided.chosen } }),
++
+           },
+         }),
+     ...(conflict.move === undefined ? {} : { move: conflict.move }),

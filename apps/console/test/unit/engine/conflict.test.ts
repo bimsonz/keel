@@ -4,6 +4,9 @@ import type { Resources } from "../../../src/engine/select.ts";
 import { conflictPageOf } from "../../../src/engine/select.ts";
 import { contradictionsOf, sidesOf } from "../../../src/engine/sides.ts";
 import type { ScriptBuilder } from "../../fixtures/mock/builder.ts";
+import { World } from "../../../src/engine/world.ts";
+import { createMockSource } from "../../fixtures/mock/MockSource.ts";
+import { showing } from "../showing.ts";
 import { declareChange, foldedLog, openingOf, premiseOn } from "./script.ts";
 
 const NOTHING_READ: Resources = {
@@ -224,6 +227,57 @@ describe("a conflict, as Keel names it", () => {
       "pending",
       "pending",
     ]);
+  });
+
+  it("[conflict.asked] carries the question a person was asked where the log holds it, and what the ruling chose, as Keel's read of the conflict does", async () => {
+    // A member's log holds the question. Folded to its end, with the ruling given, the conflict's shape has
+    // what was asked, how it stands, its options and evidence, and the option the decision chose.
+    const source = createMockSource({ scenario: "s1", seed: 42, ruling: "invalidate" });
+    const member = showing(source);
+    await member.load();
+    member.seek(9_999_000);
+    const [id = ""] = member.world.conflicts.keys();
+    const detail = conflictDetailOf(member.world, id);
+    expect(detail?.escalation).toMatchObject({
+      label: "E-1",
+      open: false,
+      question: "May permission checks be cached within a session?",
+      state: "ruled",
+    });
+    expect(detail?.escalation?.options?.map((option) => option.id)).toContain("invalidate");
+    expect(detail?.escalation?.evidence?.length).toBeGreaterThan(0);
+    expect(detail?.decision).toEqual({
+      id: member.world.conflicts.get(id)?.decisionId,
+      label: "D-1",
+      chosen: { id: "invalidate", label: member.world.decisions.values().next().value?.chosen },
+    });
+    // The page is drawn from that shape alone: the question, the question's own evidence, the decision.
+    const page = conflictPageOf(member.world, id, NOTHING_READ);
+    expect(page?.escalation).toMatchObject({ label: "E-1", state: "ruled" });
+    expect(page?.decision).toMatchObject({ label: "D-1" });
+    expect(page?.evidence.map((line) => line.summary)).toEqual(
+      detail?.escalation?.evidence?.map((line) => line.summary),
+    );
+
+    // Anyone else is read the public part of the log, which holds no question: that a person was asked, and
+    // why, is all the shape then has, and the page lists Keel's records in the question's place.
+    const world = new World();
+    const log = await source.readEvents();
+    log.items
+      .filter((event) => event.type !== "EscalationRaised" && event.type !== "DecisionRecorded")
+      .forEach((event, index) => world.apply(event, index));
+    const told = conflictDetailOf(world, id);
+    expect(told?.escalation).toEqual({
+      id: told?.escalation?.id,
+      open: false,
+      reason: "human-class",
+    });
+    expect(told?.decision).toEqual({ id: told?.decision?.id });
+    const shown = conflictPageOf(world, id, NOTHING_READ);
+    expect(shown).not.toHaveProperty("escalation");
+    expect(shown).not.toHaveProperty("decision");
+    expect(shown?.escalated).toBe("human-class");
+    expect(shown?.evidence.every((line) => line.by !== "")).toBe(true);
   });
 
   it("[probe.discarded] says why Keel discarded a probe none of whose drafts it kept, which was never drafted in the log", () => {

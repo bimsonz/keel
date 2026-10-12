@@ -95,6 +95,10 @@ export function conflictDetailOf(world: World, conflictId: string): ConflictDeta
   const probe = conflict.probeId === undefined ? undefined : world.probes.get(conflict.probeId);
   const guard = conflict.guardId === undefined ? undefined : world.guards.get(conflict.guardId);
   const sides = sidesOf(world, conflict);
+  const asked =
+    conflict.escalationId === undefined ? undefined : world.escalations.get(conflict.escalationId);
+  const decided =
+    conflict.decisionId === undefined ? undefined : world.decisions.get(conflict.decisionId);
   return {
     ...headOf(conflict),
     ...(conflict.origin === undefined ? {} : { origin: conflict.origin }),
@@ -132,10 +136,23 @@ export function conflictDetailOf(world: World, conflictId: string): ConflictDeta
       : {
           escalation: {
             id: conflict.escalationId,
-            // The question itself is its project's members' to read; its name is not there for anyone else.
-            ...labelled(world.escalations.get(conflict.escalationId)?.label),
+            ...labelled(asked?.label),
             open: isOpenConflict(conflict.state),
             ...(conflict.escalated === undefined ? {} : { reason: conflict.escalated }),
+            // What the person was asked is the project's members' to read: Keel reads the question to nobody
+            // else, so a log that does not hold it gives none of this, and only that a person was asked.
+            ...(asked === undefined
+              ? {}
+              : {
+                  question: asked.question,
+                  state: asked.state,
+                  options: asked.options.map((option) => ({ ...option })),
+                  evidence: asked.evidence.map((line) => ({
+                    class: line.class,
+                    summary: line.summary,
+                    ...(line.ref === "" ? {} : { ref: line.ref }),
+                  })),
+                }),
           },
         }),
     ...(conflict.decisionId === undefined
@@ -143,7 +160,11 @@ export function conflictDetailOf(world: World, conflictId: string): ConflictDeta
       : {
           decision: {
             id: conflict.decisionId,
-            ...labelled(world.decisions.get(conflict.decisionId)?.label),
+            ...labelled(decided?.label),
+            // What the ruling chose, once the log has the decision recorded.
+            ...(decided === undefined
+              ? {}
+              : { chosen: { id: decided.option, label: decided.chosen } }),
           },
         }),
     ...(conflict.move === undefined ? {} : { move: conflict.move }),
