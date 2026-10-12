@@ -9,9 +9,8 @@ import {
   evolveAgent,
   IdempotencyConflict,
   type Scope,
-  type Sponsor,
 } from "../../domain/identity/index.ts";
-import type { AgentId, ProjectId } from "../../domain/kernel/index.ts";
+import type { AgentId, OrgId, ProjectId, UserId } from "../../domain/kernel/index.ts";
 import {
   AgentDirectory,
   type Clock,
@@ -25,14 +24,16 @@ import {
 /** Where the AgentSession DO keeps its agent, the source of truth the directory projects. */
 export const AGENT = "agent";
 
-/** An operator's enrolment, as the isolate sends it: the client secret travels only as its hash. */
+/** An enrolment, as the isolate sends it: the client secret travels only as its hash. */
 export interface EnrolAgent {
   readonly projectId: ProjectId;
   readonly name: string;
   readonly kind: AgentKind;
   readonly scopes: readonly Scope[];
-  /** The agent's sponsor, when the operator named one. */
-  readonly onBehalfOf?: Sponsor | undefined;
+  /** The agent's org, when the enrolment names one. */
+  readonly org?: OrgId | undefined;
+  /** The user minting the credential, when the enrolment names one. */
+  readonly sponsor?: UserId | undefined;
   readonly clientId: string;
   /** `sha256:` and the hex digest of the client secret. */
   readonly secretHash: string;
@@ -85,7 +86,8 @@ export const enrol: (
             name: command.name,
             kind: command.kind,
             scopes: command.scopes,
-            ...(command.onBehalfOf === undefined ? {} : { onBehalfOf: command.onBehalfOf }),
+            ...(command.org === undefined ? {} : { org: command.org }),
+            ...(command.sponsor === undefined ? {} : { sponsor: command.sponsor }),
           },
           { now: tx.at, agentId },
         );

@@ -20,7 +20,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type KeelClient, KeelProblem } from "@keeltown/sdk";
 import { cloneWorkspace, commitAndPush } from "./lib/git.ts";
-import { clientFor, readSeeded } from "./lib/seeded.ts";
+import { clientFor, readSeeded, userClient } from "./lib/seeded.ts";
 
 const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 const environment = process.argv.slice(2).find((arg) => !arg.startsWith("--")) ?? "staging";
@@ -31,7 +31,7 @@ const SETTLE_MS = Number(process.env["S0_SETTLE_MS"] ?? 15 * 60_000);
 const TERMINAL = new Set(["landed", "bounced", "withdrawn", "superseded", "parked"]);
 
 const seeded = readSeeded(root, environment);
-const observer = clientFor(seeded.keelUrl, seeded.observer);
+const reader = userClient(seeded.keelUrl, seeded.seedUser);
 
 const record: { run: string; environment: string; control: boolean; checks: unknown[] } = {
   run,
@@ -106,7 +106,7 @@ type EventRecord = Awaited<ReturnType<KeelClient["events"]>>["items"][number];
  * window of the whole log, so an empty page is not its end.
  */
 async function feedHead(projectId: string): Promise<string> {
-  return (await observer.snapshot({ project: projectId })).cursor;
+  return (await reader.snapshot({ project: projectId })).cursor;
 }
 
 /** Every event after `cursor`, read until a page no longer moves the cursor. */
@@ -114,7 +114,7 @@ async function feedSince(cursor: string): Promise<EventRecord[]> {
   const events: EventRecord[] = [];
   let at = cursor;
   for (;;) {
-    const page = await observer.events({ cursor: at, limit: 500 });
+    const page = await reader.events({ cursor: at, limit: 500 });
     events.push(...page.items);
     if (page.items.length === 0 && page.nextCursor === at) return events;
     at = page.nextCursor;

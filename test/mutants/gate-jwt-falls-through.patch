@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/gate.test.ts -t gate.principal
+# kills: gate.principal
+# why: a token that does not verify is served as an anonymous caller instead of refused, so a forged JWT reads whatever the public reads and nobody notices the bad credential
+diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
+--- a/apps/keel/src/adapters/driving/http/gate.ts
++++ b/apps/keel/src/adapters/driving/http/gate.ts
+@@ -121,7 +121,12 @@
+     if (userId !== null) credential = { _tag: "Session", userId };
+   }
+   const answer = await deps.admit(credential);
+-  if (!("admitted" in answer)) return refusal(answer, requestId);
++  if (!("admitted" in answer)) {
++    const anonymous = await deps.admit({ _tag: "None" });
++    return "admitted" in anonymous
++      ? { admitted: anonymous.admitted, timing: "" }
++      : refusal(answer, requestId);
++  }
+   return {
+     admitted: answer.admitted,
+     timing: `gate;dur=${Date.now() - started}, session;dur=${sessionMs}`,

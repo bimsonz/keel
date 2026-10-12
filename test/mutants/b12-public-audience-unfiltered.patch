@@ -1,16 +1,15 @@
-# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/public-reads.test.ts
-# kills: b12.public-feed
+# expect-red: pnpm exec vitest run --project pool:keel --project unit apps/keel/test/pool/public-reads.test.ts apps/keel/test/unit/read-feed.test.ts
+# kills: b12.public-feed, feed.project
 # why: a reader outside the project also gets its members-only events: settings, escalations, rulings, sessions
 diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
-index 9f3620f..1bdb840 100644
 --- a/packages/core/src/application/coordination/gateway.ts
 +++ b/packages/core/src/application/coordination/gateway.ts
-@@ -173,7 +173,7 @@ export const readEvents: (
-               events: page.events.filter(
-                 (e) =>
-                   e.project === scope.project &&
--                  (scope.audience === "members" || audienceOf(e.type) === "public"),
-+                  true,
-               ),
-             },
-       ),
+@@ -215,7 +215,7 @@
+ ): Effect.Effect<readonly EventFeedEntry[]> => {
+   if (scope._tag === "Project")
+     return Effect.succeed(
+-      events.filter((e) => e.project === scope.project && readable(e, scope.audience)),
++      events.filter((e) => e.project === scope.project && readable(e, "members")),
+     );
+   const projects = [
+     ...new Set(events.flatMap((e) => (e.project === undefined ? [] : [e.project]))),

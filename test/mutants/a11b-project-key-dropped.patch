@@ -1,16 +1,15 @@
-# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/operator-rpc.test.ts -t "a11b.derive"
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/project-place.test.ts -t "a11b.derive"
 # kills: a11b.derive
-# why: the project id ignores the Idempotency-Key, so every create by one operator reaches one DO
-diff --git a/apps/keel/src/adapters/driven/do-rpc/projects.ts b/apps/keel/src/adapters/driven/do-rpc/projects.ts
-index 813dac8..909b282 100644
---- a/apps/keel/src/adapters/driven/do-rpc/projects.ts
-+++ b/apps/keel/src/adapters/driven/do-rpc/projects.ts
-@@ -25,7 +25,7 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
-         Effect.gen(function* () {
-           const projectId = makeId(
-             "prj",
--            yield* Effect.promise(() => derivedUlid(principal.agentId, input.idempotencyKey)),
-+            yield* Effect.promise(() => derivedUlid(principal.agentId)),
-           );
-           const fingerprint = yield* Effect.promise(() =>
-             fingerprintOf({ name: input.name, source: input.source }),
+# why: the project id ignores the Idempotency-Key, so every create by one actor reaches one project
+diff --git a/packages/core/src/application/coordination/projects.ts b/packages/core/src/application/coordination/projects.ts
+--- a/packages/core/src/application/coordination/projects.ts
++++ b/packages/core/src/application/coordination/projects.ts
+@@ -31,7 +31,7 @@
+  * reaches the same project and two actors' keys never meet.
+  */
+ export const projectIdFor = (actor: Actor, idempotencyKey: string): ProjectId =>
+-  ProjectId.make(`prj_${hashedIdBody(`${actorId(actor)}\u0000${idempotencyKey}`)}`);
++  ProjectId.make(`prj_${hashedIdBody(actorId(actor))}`);
+ 
+ /**
+  * Creates a project in `input.org`, which the doorway authorised the actor in.

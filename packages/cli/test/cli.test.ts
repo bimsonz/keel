@@ -49,6 +49,36 @@ const only = (requests: { url: string; init: RequestInit }[]) => {
 };
 
 describe("keeltown", () => {
+  it("[cli.session] a user's session governs: project create sends its org under the session as a bearer, and enrol needs its project", async () => {
+    const keel = fakeKeel(() =>
+      Response.json(
+        { id: "prj_1", org: "keel", name: "forge", visibility: "private" },
+        { status: 201 },
+      ),
+    );
+    const session = { ...keel.io, env: { KEEL_URL: "https://keel.test", KEEL_SESSION: "sess-1" } };
+    expect(
+      await run(
+        ["project", "create", "--org", "keel", "--name", "forge", "--source", "fixture", "--json"],
+        session,
+      ),
+    ).toBe(0);
+    const sent = only(keel.requests);
+    expect([sent.url, sent.headers.get("authorization"), sent.body]).toEqual([
+      "https://keel.test/v1/projects",
+      "Bearer sess-1",
+      { org: "keel", name: "forge", source: "fixture" },
+    ]);
+    expect(await run(["agent", "enrol", "--name", "a1", "--scope", "agent:work"], session)).toBe(2);
+    expect(keel.err.join("\n")).toContain("--project");
+    expect(
+      await run(
+        ["agent", "enrol", "--project", "prj_1", "--name", "a1", "--scope", "operator"],
+        session,
+      ),
+    ).toBe(2);
+  });
+
   it("[cli.status] waits as asked and prints Keel's answer as JSON with --json", async () => {
     const keel = fakeKeel(() => Response.json(envelope));
     expect(await run(["status", "chg_1", "--wait", "20", "--json"], keel.io)).toBe(0);
@@ -89,7 +119,7 @@ describe("keeltown", () => {
     expect(keel.out).toEqual(["Declared chg_2."]);
   });
 
-  it("[cli.enrol] enrols an agent on behalf of its sponsor, in the project given", async () => {
+  it("[cli.enrol] enrols an agent in the project given", async () => {
     const keel = fakeKeel(() => Response.json({ agent: {}, clientId: "c", clientSecret: "s" }));
     const code = await run(
       [
@@ -101,8 +131,6 @@ describe("keeltown", () => {
         "agent:work",
         "--project",
         "prj_1",
-        "--on-behalf-of",
-        "github:bimsonz",
         "--key",
         "key-0004",
       ],
@@ -115,7 +143,6 @@ describe("keeltown", () => {
       kind: "interactive",
       scopes: ["agent:work"],
       projectId: "prj_1",
-      onBehalfOf: "github:bimsonz",
     });
   });
 
@@ -207,28 +234,17 @@ describe("keeltown", () => {
     value: true,
   };
 
-  it("[cli.session] opens a session for the harness, model and sponsor given, under the key", async () => {
+  it("[cli.session] opens a session for the harness and model given, under the key", async () => {
     const keel = fakeKeel(() => Response.json({ id: "ses_1" }));
     const code = await run(
-      [
-        "session",
-        "open",
-        "--harness",
-        "h",
-        "--model",
-        "m",
-        "--on-behalf-of",
-        "human:ada",
-        "--key",
-        "key-0006",
-      ],
+      ["session", "open", "--harness", "h", "--model", "m", "--key", "key-0006"],
       keel.io,
     );
     const sent = only(keel.requests);
     expect(code).toBe(0);
     expect(sent).toMatchObject({ url: "https://keel.test/v1/sessions", method: "POST" });
     expect(sent.headers.get("idempotency-key")).toBe("key-0006");
-    expect(sent.body).toEqual({ harness: "h", model: "m", onBehalfOf: "human:ada" });
+    expect(sent.body).toEqual({ harness: "h", model: "m" });
   });
 
   it("[cli.revise] revises at the revision given, under the lease, with the premises parsed", async () => {

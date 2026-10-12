@@ -154,18 +154,21 @@ export class Changes extends Context.Service<
       Revised,
       ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict
     >;
-    /** The preflight of the change's intent as it stands; commits nothing. Only for an agent of the change's project. */
+    /**
+     * The preflight of the change's intent as it stands; commits nothing. Only
+     * for a reader of the change's project: another is ChangeInOtherProject.
+     */
     readonly nearby: (
-      principal: AgentToken,
+      projectId: ProjectId,
       changeId: ChangeId,
     ) => Effect.Effect<Preflight, ChangeNotFound | ChangeInOtherProject>;
     /**
-     * Withdraws a change under its lease, or as an operator: the change ends
-     * and its workspace is released. Idempotent by Idempotency-Key per change;
-     * the same key with another body is an IdempotencyConflict.
+     * Withdraws a change under its lease, or as a maintainer of its project:
+     * the change ends and its workspace is released. A maintainer of another
+     * project is ChangeNotFound. Idempotent by Idempotency-Key per change; the
+     * same key with another body is an IdempotencyConflict.
      */
     readonly abandon: (
-      principal: AgentToken,
       input: AbandonInput,
     ) => Effect.Effect<
       Change,

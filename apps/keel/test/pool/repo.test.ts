@@ -6,7 +6,7 @@ import { makeCodeHostMemory, makeProjectsMemory } from "@keeltown/testing";
 import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
-import { BASE, type Fetch, seedAgent, tokenFor, worker } from "./helpers.ts";
+import { BASE, type Fetch, seedAgent, seedForeignAgent, tokenFor, worker } from "./helpers.ts";
 
 /**
  * The repo read API through the real doorway and auth gate: its routes admit a
@@ -55,7 +55,8 @@ describe("the repo read API's doorway", () => {
   it("[repo.http] no token reads only a public project; a presented token is read, its agent's own project opens, a bad one is refused", async () => {
     const via = await repoApp();
     const own = await tokenFor(await seedAgent({ projectId: PRIVATE }));
-    const other = await tokenFor(await seedAgent({ projectId: PUBLIC }));
+    const sibling = await tokenFor(await seedAgent({ projectId: PUBLIC }));
+    const other = await tokenFor(await seedForeignAgent());
 
     expect(await tree(via, PUBLIC)).toMatchObject({ status: 200 });
     expect(await tree(via, PRIVATE)).toMatchObject({
@@ -66,6 +67,11 @@ describe("the repo read API's doorway", () => {
     expect(await tree(via, PRIVATE, `Bearer ${other}`)).toMatchObject({
       status: 404,
       body: { code: "resource.not_found" },
+    });
+    // Another project of its own org is refused by name; another org's private project reads as missing.
+    expect(await tree(via, PRIVATE, `Bearer ${sibling}`)).toMatchObject({
+      status: 403,
+      body: { code: "auth.forbidden", detail: "Refused: foreign-project." },
     });
     expect(await tree(via, PUBLIC, `Bearer ${other}`)).toMatchObject({ status: 200 });
     for (const bad of ["Bearer not-a-token", "Basic YTpi"])

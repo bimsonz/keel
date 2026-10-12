@@ -10,10 +10,14 @@ import type {
   EventFeed,
   Ids,
   Inbox,
+  Memberships,
   Notifier,
+  Orgs,
+  ProjectOrgs,
   Projects,
   ProjectViews,
   TokenIssuer,
+  Users,
 } from "@keeltown/core/ports";
 import { Cause, type Effect, Exit, type ManagedRuntime } from "effect";
 import type { Caller } from "./caller.ts";
@@ -34,7 +38,11 @@ export type IsolateServices =
   | Enrolments
   | CodeHost
   | Sessions
-  | Standings;
+  | Standings
+  | Users
+  | Memberships
+  | Orgs
+  | ProjectOrgs;
 
 /** What a request answers with when its effect dies rather than failing with a declared error. */
 export type DefectResult =

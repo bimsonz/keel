@@ -30,7 +30,7 @@ interface Memory {
   @summary("Why is it like this?")
   @tag("mcp")
   @operationId("why")
-  @useAuth(AgentRead | Observer)
+  @useAuth(AgentRead | SessionAuth)
   @route("/why")
   @get
   why(
@@ -42,13 +42,13 @@ interface Memory {
   ): WhyEnvelope | NotFound | StandardErrors;
 
   @summary("List decisions")
-  @useAuth(AgentRead | Observer)
+  @useAuth(AgentRead | SessionAuth)
   @route("/decisions")
   @get
   listDecisions(@query subject?: SubjectKey, ...PageQuery): DecisionPage | StandardErrors;
 
   @summary("Get a decision")
-  @useAuth(AgentRead | Observer)
+  @useAuth(AgentRead | SessionAuth)
   @route("/decisions/{decisionId}")
   @get
   getDecision(@path decisionId: DecisionId): DecisionView | NotFound | StandardErrors;

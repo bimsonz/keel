@@ -33,12 +33,12 @@ model ConflictPage is Page<ConflictView>;
 interface Conflicts {
   /** Conflicts, optionally only those involving one change. */
   @summary("List conflicts")
-  @useAuth(AgentRead | Observer)
+  @useAuth(AgentRead | SessionAuth)
   @get
   listConflicts(@query changeId?: ChangeId, @query state?: ConflictState, ...PageQuery): ConflictPage | StandardErrors;
 
   @summary("Get a conflict")
-  @useAuth(AgentRead | Observer)
+  @useAuth(AgentRead | SessionAuth)
   @route("/{conflictId}")
   @get
   getConflict(...ConflictPath): ConflictView | NotFound | StandardErrors;

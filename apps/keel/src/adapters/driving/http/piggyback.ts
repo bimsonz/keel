@@ -1,4 +1,3 @@
-import { isBootstrap } from "@keeltown/core/domain/identity";
 import { Notifier } from "@keeltown/core/ports";
 import { Effect } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
@@ -83,7 +82,7 @@ export function piggyback<H extends Operations<Caller>>(run: Runner, handlers: H
       return async (caller: Caller, ...rest: readonly unknown[]) => {
         const answer: unknown = await Reflect.apply(handler, target, [caller, ...rest]);
         const { principal } = caller;
-        if (principal === null || isBootstrap(principal) || !ridable(answer)) return answer;
+        if (principal._tag !== "Agent" || !ridable(answer)) return answer;
         const taken = await run(
           caller,
           Notifier.use((notifier) => notifier.take(principal.agentId, MAX_NOTICES)).pipe(

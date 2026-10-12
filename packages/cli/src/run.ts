@@ -21,7 +21,7 @@ export type ExitCode = 0 | 1 | 2;
 const USAGE = `keeltown <command> [options]
 
   whoami
-  session open [--harness <name>] [--model <id>] [--on-behalf-of <scheme:value>] [--key <idempotency-key>]
+  session open [--harness <name>] [--model <id>] [--key <idempotency-key>]
   declare --goal <text> [--footprint <path[:edit|create|delete]>]... [--key <idempotency-key>]
   revise <chg_…> --lease <lse_…> --if-match <revision> [--goal <text>] [--footprint <path[:op]>]... [--add-premise <json>]... [--retract-premise <json>]... [--key <idempotency-key>]
   rely <chg_…> --lease <lse_…> --premise <json> [--key <idempotency-key>]
@@ -33,11 +33,12 @@ const USAGE = `keeltown <command> [options]
   abandon <chg_…> [--reason <text>] [--lease <lse_…>] [--key <idempotency-key>]
   inbox [--cursor <cursor>] [--wait <0-30>]
   events [--cursor <cursor>] [--wait <0-30>] [--limit <1-500>]
-  project create --name <name> --source <repo> [--key <idempotency-key>]
-  agent enrol --name <name> --scope <scope>... [--kind interactive|hosted|human|synthetic] [--project <prj_…>] [--on-behalf-of <scheme:value>] [--key <idempotency-key>]
+  project create --org <org> --name <name> --source <repo> [--key <idempotency-key>]
+  agent enrol --project <prj_…> --name <name> --scope <scope>... [--kind interactive|hosted|human|synthetic] [--key <idempotency-key>]
 
 A premise is a proposition as JSON: {"subject", "predicate", "relation", "value", …}.
-Credentials: KEEL_URL, KEEL_CLIENT_ID and KEEL_CLIENT_SECRET.
+Credentials: KEEL_URL, and an agent's KEEL_CLIENT_ID and KEEL_CLIENT_SECRET, or a user's KEEL_SESSION.
+Projects and agents are governed by a user (KEEL_SESSION); work is done by an agent.
 Every command prints Keel's answer; --json prints it as JSON.`;
 
 const OPTIONS = {
@@ -54,11 +55,11 @@ const OPTIONS = {
   cursor: { type: "string" },
   limit: { type: "string" },
   name: { type: "string" },
+  org: { type: "string" },
   source: { type: "string" },
   scope: { type: "string", multiple: true },
   kind: { type: "string" },
   project: { type: "string" },
-  "on-behalf-of": { type: "string" },
   harness: { type: "string" },
   model: { type: "string" },
   "if-match": { type: "string" },
@@ -126,7 +127,7 @@ function isProposition(value: unknown): value is Proposition {
 }
 
 const KINDS = ["interactive", "hosted", "human", "synthetic"] as const;
-const SCOPES = ["agent:work", "agent:read", "operator", "observer"] as const;
+const SCOPES = ["agent:work", "agent:read"] as const;
 
 /** One command against Keel, as the SDK answers it. */
 async function dispatch(
@@ -146,7 +147,6 @@ async function dispatch(
         {
           ...(values.harness === undefined ? {} : { harness: values.harness }),
           ...(values.model === undefined ? {} : { model: values.model }),
-          ...(values["on-behalf-of"] === undefined ? {} : { onBehalfOf: values["on-behalf-of"] }),
         },
         idempotent,
       );
@@ -175,7 +175,11 @@ async function dispatch(
     }
     case "project create":
       return client.createProject(
-        { name: required(values.name, "name"), source: required(values.source, "source") },
+        {
+          org: required(values.org, "org"),
+          name: required(values.name, "name"),
+          source: required(values.source, "source"),
+        },
         idempotent,
       );
     case "agent enrol": {
@@ -192,8 +196,7 @@ async function dispatch(
           name: required(values.name, "name"),
           kind,
           scopes,
-          ...(values.project === undefined ? {} : { projectId: values.project }),
-          ...(values["on-behalf-of"] === undefined ? {} : { onBehalfOf: values["on-behalf-of"] }),
+          projectId: required(values.project, "project"),
         },
         idempotent,
       );
@@ -268,16 +271,21 @@ export async function run(argv: readonly string[], io: Io): Promise<ExitCode> {
   const baseUrl = io.env["KEEL_URL"];
   const clientId = io.env["KEEL_CLIENT_ID"];
   const clientSecret = io.env["KEEL_CLIENT_SECRET"];
-  if (baseUrl === undefined || clientId === undefined || clientSecret === undefined) {
-    io.stderr("Set KEEL_URL, KEEL_CLIENT_ID and KEEL_CLIENT_SECRET.");
+  const session = io.env["KEEL_SESSION"];
+  const agent = clientId !== undefined && clientSecret !== undefined;
+  if (baseUrl === undefined || (!agent && session === undefined)) {
+    io.stderr(
+      "Set KEEL_URL, and KEEL_CLIENT_ID with KEEL_CLIENT_SECRET (an agent) or KEEL_SESSION (a user).",
+    );
     return 2;
   }
-  const client = createKeelClient({
-    baseUrl,
-    clientId,
-    clientSecret,
-    ...(io.fetch === undefined ? {} : { fetch: io.fetch }),
-  });
+  const fetch = io.fetch === undefined ? {} : { fetch: io.fetch };
+  // An agent's credentials win when both are set: work is an agent's.
+  const client = createKeelClient(
+    agent
+      ? { baseUrl, clientId, clientSecret, ...fetch }
+      : { baseUrl, session: session ?? "", ...fetch },
+  );
   try {
     const answer = await dispatch(client, positionals, values);
     io.stdout(values.json === true ? JSON.stringify(answer, null, 2) : summaryOf(answer));

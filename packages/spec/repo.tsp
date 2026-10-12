@@ -138,7 +138,7 @@ model RepoCommitPage is Page<RepoCommit>;
 @route("/projects/{projectId}/repo")
 interface Repo {
   @summary("List a directory")
-  @useAuth(NoAuth | Observer | AgentRead)
+  @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/tree")
   @get
   getTree(
@@ -148,7 +148,7 @@ interface Repo {
   ): RepoTree | NotFound | StandardErrors;
 
   @summary("Read a file")
-  @useAuth(NoAuth | Observer | AgentRead)
+  @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/blob")
   @get
   getBlob(
@@ -159,7 +159,7 @@ interface Repo {
 
   /** Newest first along the first-parent chain. The cursor names a commit, so a page holds still while trunk moves. */
   @summary("List commits")
-  @useAuth(NoAuth | Observer | AgentRead)
+  @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/commits")
   @get
   listCommits(
@@ -169,7 +169,7 @@ interface Repo {
   ): RepoCommitPage | NotFound | StandardErrors;
 
   @summary("Read a commit and the files it changed")
-  @useAuth(NoAuth | Observer | AgentRead)
+  @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/commits/{sha}")
   @get
   getCommit(@path projectId: ProjectId, @path sha: CommitSha): RepoCommitDiff | NotFound | StandardErrors;

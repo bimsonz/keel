@@ -1,16 +1,25 @@
 import { env } from "cloudflare:workers";
-import { BOOTSTRAP_CLIENT_ID, PLATFORM_PROJECT_ID } from "@keeltown/core/domain/identity";
+import { BOOTSTRAP_CLIENT_ID } from "@keeltown/core/domain/identity";
 import { makeEnrolmentsMemory, makeProjectsMemory } from "@keeltown/testing";
 import { describe, expect, it } from "vitest";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
-import { BASE, type Fetch, seedAgent, tokenFor, worker } from "./helpers.ts";
+import {
+  BASE,
+  type Fetch,
+  seedAgent,
+  seedUser,
+  tokenFor,
+  uniqueHandle,
+  worker,
+} from "./helpers.ts";
 
 /**
- * Project bootstrap through the real HTTP doorway, auth gate and handler
- * object: the bootstrap credential enrols the first operator and nothing else;
- * the operator creates projects and enrols agents. Projects and Enrolments are
- * in-memory here; enrolments project into the
- * real D1 directory, so every credential they return exchanges for a token.
+ * Project bootstrap through the real HTTP doorway, gate and handler object:
+ * the bootstrap credential creates users and nothing else; a member of an org
+ * creates projects there and enrols agents in them. Projects and Enrolments
+ * are in-memory here; projects are placed in
+ * the real D1 `projects` table, and enrolments project into the real D1
+ * directory, so every credential they return exchanges for a token.
  */
 const SOURCE = "fixture-forge-lite";
 
@@ -26,8 +35,16 @@ function operatorApp() {
 
 interface Body {
   readonly id: string;
+  readonly org: string;
   readonly name: string;
-  readonly agent: { readonly id: string; readonly projectId: string; readonly scopes: string[] };
+  readonly viewer?: { readonly role: string };
+  readonly agent: {
+    readonly id: string;
+    readonly projectId: string;
+    readonly scopes: string[];
+    readonly org?: string;
+    readonly sponsor?: string;
+  };
   readonly clientId: string;
   readonly clientSecret: string;
   readonly code: string;
@@ -35,6 +52,9 @@ interface Body {
   readonly nextActions: readonly { readonly operationId?: string; readonly title: string }[];
   readonly result: { readonly agent: { readonly id: string; readonly projectId: string } };
   readonly issues?: readonly { readonly path: readonly (string | number)[] }[];
+  readonly userId: string;
+  readonly handle: string;
+  readonly session: { readonly token: string };
 }
 
 async function call(
@@ -77,71 +97,54 @@ async function tokenOf(clientId: string, clientSecret: string): Promise<string> 
 
 const bootstrapToken = () => tokenOf(BOOTSTRAP_CLIENT_ID, env.KEEL_BOOTSTRAP_SECRET);
 const key = (what: string) => `${what}-${crypto.randomUUID()}`;
-const operatorRequest = { name: "operator", kind: "hosted", scopes: ["operator"] };
+const agentRequest = { kind: "interactive", scopes: ["agent:read", "agent:work"] };
 
-/** Enrols a real operator through the bootstrap credential and returns its token. */
-async function operatorToken(via: Fetch): Promise<string> {
-  const enrolled = await call(
-    via,
-    await bootstrapToken(),
-    "POST",
-    "/agents",
-    operatorRequest,
-    key("op"),
-  );
-  expect(enrolled.status).toBe(201);
-  return tokenOf(enrolled.body.clientId, enrolled.body.clientSecret);
-}
+/** A maintainer of org `pool`, signed in: who governs its projects and agents here. */
+const maintainer = async () =>
+  (await seedUser(uniqueHandle("maintainer"), { role: "maintainer" })).token;
+
+/** A project name no other case in the file has placed in org `pool`. */
+const projectName = (what: string) => uniqueHandle(what);
 
 describe("project bootstrap", () => {
-  it("[a11b.bootstrap] exchanges only the deployment's bootstrap secret, for an operator token", async () => {
+  it("[a11b.bootstrap] exchanges only the deployment's bootstrap secret", async () => {
     const good = await exchangeAs(BOOTSTRAP_CLIENT_ID, env.KEEL_BOOTSTRAP_SECRET);
     expect(good.status).toBe(200);
-    expect(await good.json()).toMatchObject({ scope: "operator" });
+    expect(await good.json()).toMatchObject({ token_type: "Bearer" });
     const wrong = await exchangeAs(BOOTSTRAP_CLIENT_ID, `${env.KEEL_BOOTSTRAP_SECRET}-not`);
     expect(wrong.status).toBe(401);
     expect(await wrong.json()).toMatchObject({ error: "invalid_client" });
   });
 
-  it("[a11b.enrol] enrols an operator whose credential exchanges at once, in the platform project", async () => {
+  it("[a11b.enrol] the bootstrap credential creates a user, who creates a project in its own org and enrols an agent there whose credential exchanges at once", async () => {
     const { via } = operatorApp();
-    const enrolled = await call(
-      via,
-      await bootstrapToken(),
-      "POST",
-      "/agents",
-      operatorRequest,
-      key("op"),
-    );
-    expect(enrolled.status).toBe(201);
-    expect(enrolled.body.agent).toMatchObject({
-      projectId: PLATFORM_PROJECT_ID,
-      scopes: ["operator"],
-    });
-    const operator = await tokenOf(enrolled.body.clientId, enrolled.body.clientSecret);
+    const handle = uniqueHandle("first");
+    const created = await call(via, await bootstrapToken(), "POST", "/admin/users", { handle });
+    expect(created.status).toBe(201);
+    const user = created.body.session.token;
     const project = await call(
       via,
-      operator,
+      user,
       "POST",
       "/projects",
-      { name: "forge", source: SOURCE },
+      { org: handle, name: "forge", source: SOURCE },
       key("prj"),
     );
     expect(project.status).toBe(201);
+    expect(project.body).toMatchObject({ org: handle, name: "forge", viewer: { role: "owner" } });
     const agent = await call(
       via,
-      operator,
+      user,
       "POST",
       "/agents",
-      {
-        name: "worker",
-        kind: "interactive",
-        scopes: ["agent:read", "agent:work"],
-        projectId: project.body.id,
-      },
+      { ...agentRequest, name: "worker", projectId: project.body.id },
       key("agt"),
     );
     expect(agent.status).toBe(201);
+    expect(agent.body.agent).toMatchObject({
+      projectId: project.body.id,
+      sponsor: created.body.userId,
+    });
     // The agent's token carries the project it was enrolled in (the `prj` claim).
     const me = await call(
       via,
@@ -156,44 +159,63 @@ describe("project bootstrap", () => {
     });
   });
 
-  it("[a11b.confined] refuses the bootstrap credential everything but enrolment, with a next action", async () => {
+  it("[a11b.confined] refuses the bootstrap credential everything but creating users, with a next action", async () => {
     const { via, projects } = operatorApp();
+    const bootstrap = await bootstrapToken();
     const refused = await call(
       via,
-      await bootstrapToken(),
+      bootstrap,
       "POST",
       "/projects",
-      { name: "forge", source: SOURCE },
+      { org: "pool", name: projectName("confined"), source: SOURCE },
       key("prj"),
     );
     expect(refused.status).toBe(403);
-    expect(refused.body.code).toBe("auth.insufficient_scope");
-    expect(refused.body.nextActions).toEqual([
-      expect.objectContaining({ operationId: "Operator_enrolAgent" }),
+    expect([refused.body.code, refused.body.detail]).toEqual([
+      "auth.forbidden",
+      "Refused: bootstrap-confined.",
     ]);
+    expect(refused.body.nextActions).toEqual([
+      expect.objectContaining({ operationId: "Admin_createUser" }),
+    ]);
+    const enrol = await call(
+      via,
+      bootstrap,
+      "POST",
+      "/agents",
+      { ...agentRequest, name: "worker", projectId: "prj_01JZ8PT2C4E6G8J0M2N4Q6S8V0" },
+      key("agt"),
+    );
+    expect([enrol.status, enrol.body.detail]).toEqual([403, "Refused: bootstrap-confined."]);
     expect(projects.projects()).toEqual([]);
   });
 
   it("[a11b.create] creates a project once per key: a retry answers the same project", async () => {
     const { via, projects } = operatorApp();
-    const operator = await operatorToken(via);
+    const user = await maintainer();
     const reused = key("prj");
+    const name = projectName("forge");
     const first = await call(
       via,
-      operator,
+      user,
       "POST",
       "/projects",
-      { name: "forge", source: SOURCE },
+      { org: "pool", name, source: SOURCE },
       reused,
     );
     expect(first.status).toBe(201);
-    expect(first.body).toMatchObject({ id: expect.stringMatching(/^prj_/), name: "forge" });
+    expect(first.body).toMatchObject({
+      id: expect.stringMatching(/^prj_/),
+      org: "pool",
+      name,
+      viewer: { role: "maintainer" },
+    });
     const again = await call(
       via,
-      operator,
+      user,
       "POST",
       "/projects",
-      { name: "forge", source: SOURCE },
+      { org: "pool", name, source: SOURCE },
       reused,
     );
     expect(again).toEqual(first);
@@ -202,27 +224,35 @@ describe("project bootstrap", () => {
 
   it("[a11b.conflict] answers a reused key with another body 409, for projects and enrolments", async () => {
     const { via } = operatorApp();
-    const operator = await operatorToken(via);
+    const user = await maintainer();
     const projectKey = key("prj");
-    await call(via, operator, "POST", "/projects", { name: "forge", source: SOURCE }, projectKey);
-    const project = await call(
+    const created = await call(
       via,
-      operator,
+      user,
       "POST",
       "/projects",
-      { name: "other", source: SOURCE },
+      { org: "pool", name: projectName("forge"), source: SOURCE },
+      projectKey,
+    );
+    const project = await call(
+      via,
+      user,
+      "POST",
+      "/projects",
+      { org: "pool", name: projectName("other"), source: SOURCE },
       projectKey,
     );
     expect(project.status).toBe(409);
     expect(project.body.code).toBe("request.idempotency_conflict");
     const agentKey = key("agt");
-    await call(via, operator, "POST", "/agents", operatorRequest, agentKey);
+    const enrolling = { ...agentRequest, name: "worker", projectId: created.body.id };
+    await call(via, user, "POST", "/agents", enrolling, agentKey);
     const agent = await call(
       via,
-      operator,
+      user,
       "POST",
       "/agents",
-      { ...operatorRequest, name: "other" },
+      { ...enrolling, name: "other" },
       agentKey,
     );
     expect(agent.status).toBe(409);
@@ -233,10 +263,10 @@ describe("project bootstrap", () => {
     const { via } = operatorApp();
     const missing = await call(
       via,
-      await operatorToken(via),
+      await maintainer(),
       "POST",
       "/projects",
-      { name: "forge", source: "no-such-repo" },
+      { org: "pool", name: projectName("forge"), source: "no-such-repo" },
       key("prj"),
     );
     expect(missing.status).toBe(404);
@@ -247,50 +277,28 @@ describe("project bootstrap", () => {
     ]);
   });
 
-  it("[a11s.enrol-rest] enrols an agent with a sponsor its token carries, and refuses a sponsor with no scheme", async () => {
-    const { via } = operatorApp();
-    const operator = await operatorToken(via);
-    const request = { name: "sponsored", kind: "interactive", scopes: ["agent:read"] };
-    const enrolled = await call(
-      via,
-      operator,
-      "POST",
-      "/agents",
-      { ...request, onBehalfOf: "github:bimsonz" },
-      key("agt"),
-    );
-    expect(enrolled.status).toBe(201);
-    expect(enrolled.body.agent).toMatchObject({ onBehalfOf: "github:bimsonz" });
-    const me = await call(
-      via,
-      await tokenOf(enrolled.body.clientId, enrolled.body.clientSecret),
-      "GET",
-      "/agents/me",
-    );
-    expect(me.body.result).toMatchObject({
-      onBehalfOf: "github:bimsonz",
-      agent: { onBehalfOf: "github:bimsonz" },
-    });
-    const refused = await call(
-      via,
-      operator,
-      "POST",
-      "/agents",
-      { ...request, onBehalfOf: "bimsonz" },
-      key("agt"),
-    );
-    expect(refused.status).toBe(400);
-    expect(refused.body.issues?.map((issue) => issue.path.join("."))).toContain("onBehalfOf");
-  });
-
   it("[a11e.synthetic-rest] enrols a synthetic agent whose credential exchanges at once", async () => {
     const { via } = operatorApp();
+    const user = await maintainer();
+    const project = await call(
+      via,
+      user,
+      "POST",
+      "/projects",
+      { org: "pool", name: projectName("load"), source: SOURCE },
+      key("prj"),
+    );
     const enrolled = await call(
       via,
-      await operatorToken(via),
+      user,
       "POST",
       "/agents",
-      { name: "load-1", kind: "synthetic", scopes: ["agent:read", "agent:work"] },
+      {
+        name: "load-1",
+        kind: "synthetic",
+        scopes: ["agent:read", "agent:work"],
+        projectId: project.body.id,
+      },
       key("agt"),
     );
     expect(enrolled.status).toBe(201);
@@ -304,19 +312,27 @@ describe("project bootstrap", () => {
     expect(me.body.result.agent).toMatchObject({ id: enrolled.body.agent.id, kind: "synthetic" });
   });
 
-  it("[a11b.scope] refuses an agent's token both operator operations", async () => {
+  it("[a11b.scope] refuses an agent's token both governing operations: governance is users' only", async () => {
     const { via } = operatorApp();
-    const agent = await tokenFor(await seedAgent());
+    const seeded = await seedAgent();
+    const agent = await tokenFor(seeded);
     const project = await call(
       via,
       agent,
       "POST",
       "/projects",
-      { name: "forge", source: SOURCE },
+      { org: "pool", name: projectName("forge"), source: SOURCE },
       key("prj"),
     );
-    expect(project.status).toBe(403);
-    const enrol = await call(via, agent, "POST", "/agents", operatorRequest, key("agt"));
-    expect(enrol.status).toBe(403);
+    expect([project.status, project.body.detail]).toEqual([403, "Refused: users-only."]);
+    const enrol = await call(
+      via,
+      agent,
+      "POST",
+      "/agents",
+      { ...agentRequest, name: "worker", projectId: seeded.agent.projectId },
+      key("agt"),
+    );
+    expect([enrol.status, enrol.body.detail]).toEqual([403, "Refused: users-only."]);
   });
 });

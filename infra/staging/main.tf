@@ -96,3 +96,13 @@ resource "random_password" "better_auth" {
   length  = 64
   special = false
 }
+
+# The instance's one-time claim code: a passkey sign-up with a held handle that
+# presents it (header Keel-Claim) makes its user the instance admin and the
+# owner of org `keel`, once. The Worker holds only its SHA-256: scripts/deploy.ts
+# sets KEEL_CLAIM_DIGEST from this output. The claimant reads it with
+# `terraform output -raw claim_code`.
+resource "random_password" "claim_code" {
+  length  = 32
+  special = false
+}

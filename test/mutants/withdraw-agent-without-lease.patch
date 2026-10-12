@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/abandon.test.ts -t "a11.abandon-authority"
+# kills: a11.abandon-authority
+# why: an agent that sent no lease withdraws as though it maintained the project, so any agent ends any change of its project
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -155,7 +155,7 @@
+   switch (by._tag) {
+     case "Agent":
+       return lease === undefined
+-        ? undefined
++        ? { _tag: "Maintainer", by: by.token.agentId, projectId: by.token.projectId }
+         : { _tag: "Lease", leaseId: lease, agentId: by.token.agentId };
+     case "Maintainer":
+       return { _tag: "Maintainer", by: by.userId, projectId: by.projectId };

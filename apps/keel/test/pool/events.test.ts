@@ -3,7 +3,8 @@ import { EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it } from "vitest";
-import { BASE, seedAgent, tokenFor, worker } from "./helpers.ts";
+import { BASE, seedAgent, seedUser, tokenFor, uniqueHandle, worker } from "./helpers.ts";
+import { project as heldProject } from "./project-harness.ts";
 
 /** The one Projector every object's outbox delivers to. */
 const projector = () => env.PROJECTOR.get(env.PROJECTOR.idFromName("projector"));
@@ -71,16 +72,20 @@ async function head(token: string) {
   return page.body.nextCursor;
 }
 
-const projectA = makeId("prj", ulid());
-const projectB = makeId("prj", ulid());
+/** Two private projects of org `pool`, each held by its real Project DO, and a member of the org who reads both. */
+async function tenancy() {
+  const [a, b] = [await heldProject(), await heldProject()];
+  const member = (await seedUser(uniqueHandle("member"))).token;
+  return { projectA: a.projectId, projectB: b.projectId, member };
+}
 
 describe("GET /v1/events", () => {
   it("[a11.events] serves the feed as EventRecords, with a cursor on every page", async () => {
-    const observer = await tokenFor(await seedAgent({ projectId: projectA }, ["observer"]));
-    const from = await head(observer);
+    const { projectA, member } = await tenancy();
+    const from = await head(member);
     const declared = await arrive(projectA, "IntentDeclared");
     const started = await arrive(projectA);
-    const page = await events(observer, `?cursor=${from}`);
+    const page = await events(member, `?cursor=${from}`);
     expect(page.status).toBe(200);
     expect(page.body.items.map((e) => e.eventId)).toEqual([declared.eventId, started.eventId]);
     expect(page.body.items[0]).toMatchObject({
@@ -92,15 +97,15 @@ describe("GET /v1/events", () => {
     });
     expect(page.body.nextCursor > from).toBe(true);
     // D8: the last page still answers its cursor, the one it was read from.
-    const after = await events(observer, `?cursor=${page.body.nextCursor}`);
+    const after = await events(member, `?cursor=${page.body.nextCursor}`);
     expect(after.body).toEqual({ items: [], nextCursor: page.body.nextCursor });
   });
 
   it("[a11.events-wait] answers a waiting read as soon as an event arrives", async () => {
-    const observer = await tokenFor(await seedAgent({ projectId: projectA }, ["observer"]));
-    const from = await head(observer);
+    const { projectA, member } = await tenancy();
+    const from = await head(member);
     const started = Date.now();
-    const waiting = events(observer, `?cursor=${from}&wait=20`);
+    const waiting = events(member, `?cursor=${from}&wait=20`);
     await new Promise((resolve) => setTimeout(resolve, 300));
     const arrived = await arrive(projectA);
     const page = await waiting;
@@ -108,27 +113,38 @@ describe("GET /v1/events", () => {
     expect(Date.now() - started).toBeLessThan(10_000);
   });
 
-  it("[a11.events-scope] shows an agent its own project only, and an observer every project", async () => {
+  it("[a11.events-scope] shows an agent its own project only, and a member of the org every project it may read", async () => {
+    const { projectA, projectB, member } = await tenancy();
     const agent = await tokenFor(await seedAgent({ projectId: projectA }, ["agent:read"]));
-    const observer = await tokenFor(await seedAgent({ projectId: projectA }, ["observer"]));
     const agentFrom = await head(agent);
-    const observerFrom = await head(observer);
+    const memberFrom = await head(member);
     const mine = await arrive(projectA);
     const theirs = await arrive(projectB);
     const seenByAgent = await events(agent, `?cursor=${agentFrom}`);
     expect(seenByAgent.body.items.map((e) => e.eventId)).toEqual([mine.eventId]);
     // The agent's cursor still moves past the event it may not see.
     expect(seenByAgent.body.nextCursor).toBe(
-      (await events(observer, `?cursor=${observerFrom}`)).body.nextCursor,
+      (await events(member, `?cursor=${memberFrom}`)).body.nextCursor,
     );
-    const seenByObserver = await events(observer, `?cursor=${observerFrom}`);
-    expect(seenByObserver.body.items.map((e) => e.eventId)).toEqual([mine.eventId, theirs.eventId]);
+    const seenByMember = await events(member, `?cursor=${memberFrom}`);
+    expect(seenByMember.body.items.map((e) => e.eventId)).toEqual([mine.eventId, theirs.eventId]);
+    // A project with no place in any org is no one's to read: its events reach no reader.
+    const unplaced = await arrive(makeId("prj", ulid()));
+    const after = await events(member, `?cursor=${seenByMember.body.nextCursor}`);
+    expect(after.body.items.map((e) => e.eventId)).not.toContain(unplaced.eventId);
   });
 
   it("[a11.events-cursor] refuses a cursor that is not a feed position, naming it", async () => {
-    const observer = await tokenFor(await seedAgent({ projectId: projectA }, ["observer"]));
-    const page = await events(observer, "?cursor=not-a-cursor");
+    const { member } = await tenancy();
+    const page = await events(member, "?cursor=not-a-cursor");
     expect(page.status).toBe(400);
     expect(JSON.stringify(page.body)).toMatch(/cursor/);
+  });
+
+  it("[a11.events-anonymous] answers a caller without a token that names no project 400: only a signed-in user reads across projects", async () => {
+    const response = await worker(`${BASE}/v1/events`);
+    const body = await response.json<{ code: string; issues: { path: string[] }[] }>();
+    expect([response.status, body.code]).toEqual([400, "request.invalid"]);
+    expect(body.issues.map((issue) => issue.path)).toEqual([["project"]]);
   });
 });

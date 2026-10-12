@@ -1,4 +1,5 @@
-import type { AgentId, ProjectId } from "@keeltown/core/kernel";
+import { actorId } from "@keeltown/core/domain/identity";
+import type { AgentId } from "@keeltown/core/kernel";
 import { makeId } from "@keeltown/core/kernel";
 import { Enrolments } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
@@ -19,7 +20,7 @@ function freshSecret(): string {
 
 /**
  * `Enrolments` over the new agent's AgentSession DO, the agents' source of
- * truth. The agent id is derived from the operator and the Idempotency-Key, so
+ * truth. The agent id is derived from the actor and the Idempotency-Key, so
  * a retry reaches the same DO. The secret is minted here and only its hash
  * crosses; the DO writes the D1 projection before answering, and a retry
  * replaces the hash, so the secret this call returns is the one that works.
@@ -30,22 +31,21 @@ export function EnrolmentsRpc(
   return Layer.succeed(
     Enrolments,
     Enrolments.of({
-      enrol: (principal, input) =>
+      enrol: (actor, input) =>
         Effect.gen(function* () {
           const agentId = makeId(
             "agt",
-            yield* Effect.promise(() => derivedUlid(principal.agentId, input.idempotencyKey)),
+            yield* Effect.promise(() => derivedUlid(actorId(actor), input.idempotencyKey)),
           );
-          const projectId: ProjectId = input.projectId ?? principal.projectId;
-          // The sponsor joins the fingerprint only when named, so a key enrolled without one replays unchanged.
-          const sponsor = input.onBehalfOf === undefined ? {} : { onBehalfOf: input.onBehalfOf };
+          const { projectId, org, sponsor } = input;
           const fingerprint = yield* Effect.promise(() =>
             fingerprintOf({
               name: input.name,
               kind: input.kind,
               scopes: input.scopes,
               projectId,
-              ...sponsor,
+              org,
+              sponsor,
             }),
           );
           const clientId = `client-${agentId.toLowerCase()}`;
@@ -58,7 +58,8 @@ export function EnrolmentsRpc(
                 name: input.name,
                 kind: input.kind,
                 scopes: input.scopes,
-                ...sponsor,
+                org,
+                sponsor,
                 clientId,
                 secretHash,
                 idempotencyKey: input.idempotencyKey,

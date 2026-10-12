@@ -121,9 +121,9 @@ const drainedEnrolments = Layer.effect(
   Effect.gen(function* () {
     const enrolments = yield* Enrolments;
     return Enrolments.of({
-      enrol: (principal, input) =>
+      enrol: (actor, input) =>
         enrolments
-          .enrol(principal, input)
+          .enrol(actor, input)
           .pipe(
             Effect.tap((enrolled) =>
               Effect.promise(() => drainOutbox(agentSession(enrolled.agent.id))),
@@ -154,15 +154,15 @@ const drainedSessions = Layer.effect(
   }),
 ).pipe(Layer.provide(SessionsRpc(agentSession)));
 
-/** An operator's move commits on the agent's AgentSession DO; each waits for its outbox to go quiet. */
+/** A move on an agent's standing commits on its AgentSession DO; each waits for its outbox to go quiet. */
 const drainedStandings = Layer.effect(
   Standings,
   Effect.gen(function* () {
     const standings = yield* Standings;
     const drained =
       (move: "suspend" | "reinstate" | "revoke"): (typeof standings)["suspend"] =>
-      (principal, input) =>
-        standings[move](principal, input).pipe(
+      (actor, input) =>
+        standings[move](actor, input).pipe(
           Effect.ensuring(Effect.promise(() => drainOutbox(agentSession(input.agentId)))),
         );
     return Standings.of({
@@ -177,19 +177,14 @@ PORTS.Standings.contract("AgentSession DO over RPC", () => ({
   layer: Layer.mergeAll(drainedStandings, drainedEnrolments, AgentDirectoryD1(env.DB)),
 }));
 
-const suiteOperator = {
-  agentId: makeId("agt", ulid()),
-  projectId: makeId("prj", ulid()),
-  scopes: ["operator" as const],
-  revocationEpoch: 0,
-};
+const suiteMaintainer = { _tag: "User" as const, userId: makeId("usr", ulid()) };
 
 PORTS.Sessions.contract("AgentSession DO over RPC", () => ({
   layer: Layer.mergeAll(drainedSessions, drainedEnrolments, AgentDirectoryD1(env.DB)),
-  // The operator's own suspend, on the agent's AgentSession DO.
+  // A maintainer's own suspend, on the agent's AgentSession DO.
   suspend: (agentId) =>
     Standings.use((standings) =>
-      standings.suspend(suiteOperator, {
+      standings.suspend(suiteMaintainer, {
         agentId,
         reason: "suspended by the Sessions suite",
         idempotencyKey: `suspend-${agentId}`,

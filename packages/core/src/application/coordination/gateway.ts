@@ -1,36 +1,40 @@
 import { Effect, Schema } from "effect";
-import {
-  type Change,
-  type ChangeInOtherProject,
+import type {
+  Change,
+  ChangeInOtherProject,
   ChangeNotFound,
-  type ChangeStateRefused,
-  type CommitNotInWorkspace,
-  type LeaseNotLapsed,
-  type LeaseStale,
-  type PoolExhausted,
-  type Preflight,
-  type RevisionMismatch,
-  type SketchNotFound,
-  type WithdrawAuthority,
+  ChangeStateRefused,
+  CommitNotInWorkspace,
+  LeaseNotLapsed,
+  LeaseStale,
+  PoolExhausted,
+  Preflight,
+  RevisionMismatch,
+  SketchNotFound,
 } from "../../domain/coordination/index.ts";
-import type { IdempotencyConflict, InboxPage, AgentToken } from "../../domain/identity/index.ts";
-import { ChangeId, type LeaseId, type ProjectId } from "../../domain/kernel/index.ts";
+import type {
+  Audience,
+  IdempotencyConflict,
+  InboxPage,
+  AgentToken,
+} from "../../domain/identity/index.ts";
+import { ChangeId, type LeaseId, type ProjectId, type UserId } from "../../domain/kernel/index.ts";
 import {
   type ChangeListPage,
   type ChangeListRead,
   type ChangeRead,
   Changes,
   EventFeed,
+  type EventFeedEntry,
   type EventFeedPage,
   Inbox,
-  type Projects,
   ProjectViews,
   type SubmissionStatus,
   type ViewSnapshot,
 } from "../ports/index.ts";
 import type { PushRejected } from "../../domain/integration/index.ts";
 import type { PackTooLarge } from "../ports/index.ts";
-import type { RebasedChange } from "./change.ts";
+import type { RebasedChange, Withdrawal } from "./change.ts";
 import type {
   AbandonCall,
   Adopted,
@@ -43,12 +47,12 @@ import type {
   Revised,
   SubmitInput,
 } from "./index.ts";
-import { audienceOf, projectScope, type ReadRefused, readScope, viewScope } from "./read-scope.ts";
+import { audienceOf, type FeedScope, type ProjectScope } from "./read-scope.ts";
 
 /**
- * The isolate's side of the work loop. The doorways have already checked the
- * caller's scope; each use-case hands the call to the Change or AgentSession DO
- * that decides it. Leases are authorised there and only there.
+ * The isolate's side of the work loop. The doorways have already authorised
+ * the call on its project; each use-case hands it to the Change or AgentSession
+ * DO that decides it. Leases are authorised there and only there.
  */
 
 /** The longest a read may wait, in seconds (the spec's `?wait`). */
@@ -119,52 +123,63 @@ export const relyOn: (
   Changes
 > = (principal, input) => Changes.use((changes) => changes.rely(principal, input));
 
-/** What is near a change now, for an agent of its project. */
+/** What is near a change now, for a reader of `projectId`: a change of another project is ChangeInOtherProject. */
 export const nearbyOf: (
-  principal: AgentToken,
+  projectId: ProjectId,
   changeId: ChangeId,
 ) => Effect.Effect<Preflight, ChangeNotFound | ChangeInOtherProject, Changes> = (
-  principal,
+  projectId,
   changeId,
-) => Changes.use((changes) => changes.nearby(principal, changeId));
+) => Changes.use((changes) => changes.nearby(projectId, changeId));
 
-/**
- * An abandon with no lease from a caller without the operator scope: only the
- * holder of the change's lease, or an operator, may withdraw it.
- */
+/** An abandon by an agent that sent no lease: only the holder of the change's lease, or a maintainer, may withdraw it. */
 export class LeaseRequired extends Schema.TaggedError<LeaseRequired>()("LeaseRequired", {
   changeId: ChangeId,
 }) {}
 
 /**
- * Who withdraws: the lease when the caller sent one, else an operator when its
- * token carries the scope. Decided from the scope alone, never from who holds
- * the change; whether the lease is the change's is the Change DO's to say.
+ * Who withdraws a change, as the doorway authorised them on its project: an
+ * agent, which must hold the change's lease, or a maintainer of the project,
+ * who needs none.
  */
-const withdrawAuthority = (
-  principal: AgentToken,
-  lease: LeaseId | undefined,
-): WithdrawAuthority | undefined => {
-  if (lease !== undefined) return { _tag: "Lease", leaseId: lease };
-  return principal.scopes.includes("operator")
-    ? { _tag: "Operator", by: principal.agentId }
-    : undefined;
+export type Withdrawer =
+  | { readonly _tag: "Agent"; readonly token: AgentToken }
+  | { readonly _tag: "Maintainer"; readonly userId: UserId; readonly projectId: ProjectId };
+
+/**
+ * What the Change DO is told: an agent's lease, when it sent one, or the
+ * maintainer and the project they maintain. Whether the lease is the change's,
+ * and the project the change's, is the Change DO's to say.
+ */
+const withdrawal = (by: Withdrawer, lease: LeaseId | undefined): Withdrawal | undefined => {
+  switch (by._tag) {
+    case "Agent":
+      return lease === undefined
+        ? undefined
+        : { _tag: "Lease", leaseId: lease, agentId: by.token.agentId };
+    case "Maintainer":
+      return { _tag: "Maintainer", by: by.userId, projectId: by.projectId };
+    default: {
+      const unreachable: never = by;
+      return unreachable;
+    }
+  }
 };
 
-/** Withdraws a change under its lease, or as an operator. The Change DO checks the lease and the state. */
+/** Withdraws a change under its lease, or as a maintainer. The Change DO checks the lease and the state. */
 export const abandonChange: (
-  principal: AgentToken,
+  by: Withdrawer,
   call: AbandonCall,
 ) => Effect.Effect<
   Change,
   ChangeNotFound | LeaseStale | ChangeStateRefused | IdempotencyConflict | LeaseRequired,
   Changes
-> = (principal, call) => {
+> = (by, call) => {
   const { lease, ...rest } = call;
-  const authority = withdrawAuthority(principal, lease);
+  const authority = withdrawal(by, lease);
   return authority === undefined
     ? Effect.fail(new LeaseRequired({ changeId: call.changeId }))
-    : Changes.use((changes) => changes.abandon(principal, { ...rest, authority }));
+    : Changes.use((changes) => changes.abandon({ ...rest, authority }));
 };
 
 /** Where a change's submission stands, waiting up to `waitSeconds` (0–30) for it to move. */
@@ -183,77 +198,84 @@ export const readInbox: (
   Inbox.use((inbox) => inbox.read(principal.agentId, cursor, clampWait(waitSeconds)));
 
 /**
- * The event feed after `cursor`, waiting up to `waitSeconds` (0–30, with a
- * token or without) for an event, as far as `readScope` lets the caller read.
- * A one-project page keeps only that project's events, and only the public
- * ones for a reader outside it, so it may hold fewer than `limit`, or none,
- * while its cursor still moves past the rest. A refusal answers at once,
- * before any wait.
+ * Whether a reader who sees the event's project as `audience` reads it: all of
+ * it as a member, its public events as the public, and none of it where
+ * `audience` is undefined.
+ */
+const readable = (event: EventFeedEntry, audience: Audience | undefined): boolean =>
+  audience !== undefined && (audience === "members" || audienceOf(event.type) === "public");
+
+/**
+ * The events of a page the scope reads: one project's, or each one whose
+ * project is readable, asked once per project; of those, what `readable` keeps.
+ */
+const kept = (
+  scope: FeedScope,
+  events: readonly EventFeedEntry[],
+): Effect.Effect<readonly EventFeedEntry[]> => {
+  if (scope._tag === "Project")
+    return Effect.succeed(
+      events.filter((e) => e.project === scope.project && readable(e, scope.audience)),
+    );
+  const projects = [
+    ...new Set(events.flatMap((e) => (e.project === undefined ? [] : [e.project]))),
+  ];
+  return Effect.forEach(
+    projects,
+    (project) => Effect.map(scope.audienceOf(project), (audience) => [project, audience] as const),
+    { concurrency: 8 },
+  ).pipe(
+    Effect.map((audiences) => {
+      const audience = new Map(audiences);
+      return events.filter((e) => e.project !== undefined && readable(e, audience.get(e.project)));
+    }),
+  );
+};
+
+/**
+ * The event feed after `cursor`, waiting up to `waitSeconds` (0–30) for an
+ * event, as far as `scope` reads it. A page keeps only the events the scope
+ * reads, so it may hold fewer than `limit`, or none, while its cursor still
+ * moves past the rest.
  */
 export const readEvents: (
-  principal: AgentToken | null,
+  scope: FeedScope,
   input: {
     readonly cursor?: string;
     readonly limit?: number;
     readonly waitSeconds?: number;
-    readonly project?: ProjectId;
   },
-) => Effect.Effect<EventFeedPage, ReadRefused, EventFeed | Projects> = (principal, input) =>
-  Effect.flatMap(readScope(principal, input.project), (scope) =>
-    EventFeed.use((feed) =>
-      feed.read({
-        ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-        ...(input.limit === undefined ? {} : { limit: input.limit }),
-        waitSeconds: clampWait(input.waitSeconds),
-      }),
-    ).pipe(
-      Effect.map((page) =>
-        scope._tag === "instance"
-          ? page
-          : {
-              ...page,
-              events: page.events.filter(
-                (e) =>
-                  e.project === scope.project &&
-                  (scope.audience === "members" || audienceOf(e.type) === "public"),
-              ),
-            },
-      ),
+) => Effect.Effect<EventFeedPage, never, EventFeed> = (scope, input) =>
+  EventFeed.use((feed) =>
+    feed.read({
+      ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+      ...(input.limit === undefined ? {} : { limit: input.limit }),
+      waitSeconds: clampWait(input.waitSeconds),
+    }),
+  ).pipe(
+    Effect.flatMap((page) =>
+      Effect.map(kept(scope, page.events), (events) => ({ ...page, events })),
     ),
   );
 
-/** A project's changes from the Projector's read model, newest `#n` first, as far as `viewScope` lets the caller read. */
+/** A project's changes from the Projector's read model, newest `#n` first. */
 export const readChangeList: (
-  principal: AgentToken | null,
-  read: Omit<ChangeListRead, "project"> & { readonly project?: ProjectId },
-) => Effect.Effect<ChangeListPage, ReadRefused, ProjectViews | Projects> = (principal, read) =>
-  Effect.flatMap(viewScope(principal, read.project), ({ project }) =>
-    ProjectViews.use((views) => views.changes({ ...read, project })),
-  );
+  scope: ProjectScope,
+  read: Omit<ChangeListRead, "project">,
+) => Effect.Effect<ChangeListPage, never, ProjectViews> = (scope, read) =>
+  ProjectViews.use((views) => views.changes({ ...read, project: scope.project }));
 
 /**
- * A change by id, from its own DO, if `projectScope` lets the caller read its
- * project. A change the caller may not read answers ChangeNotFound, as an
- * unknown one does: the caller names the change, so any other refusal would
- * tell it that the change exists.
+ * A change by id, from its own DO, with its project: the doorway reads it, and
+ * decides on that project, before it answers.
  */
 export const readChange: (
-  principal: AgentToken | null,
   changeId: ChangeId,
-) => Effect.Effect<ChangeRead, ChangeNotFound, Changes | Projects> = (principal, changeId) =>
-  Changes.use((changes) => changes.get(changeId)).pipe(
-    Effect.tap(({ projectId }) =>
-      projectScope(principal, projectId).pipe(
-        Effect.mapError(() => new ChangeNotFound({ changeId })),
-      ),
-    ),
-  );
+) => Effect.Effect<ChangeRead, ChangeNotFound, Changes> = (changeId) =>
+  Changes.use((changes) => changes.get(changeId));
 
 /** A project's changes and trunk at the feed's head, with the cursor to fold forward from. */
 export const readSnapshot: (
-  principal: AgentToken | null,
-  project: ProjectId | undefined,
-) => Effect.Effect<ViewSnapshot, ReadRefused, ProjectViews | Projects> = (principal, asked) =>
-  Effect.flatMap(viewScope(principal, asked), ({ project }) =>
-    ProjectViews.use((views) => views.snapshot(project)),
-  );
+  scope: ProjectScope,
+) => Effect.Effect<ViewSnapshot, never, ProjectViews> = (scope) =>
+  ProjectViews.use((views) => views.snapshot(scope.project));

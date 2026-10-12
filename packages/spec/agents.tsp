@@ -31,10 +31,13 @@ model AgentProfile {
 
   name: string;
   kind: AgentKind;
-  scopes: Scope[];
+  scopes: RecordedScope[];
 
-  /** The agent's sponsor, named at enrolment. */
-  onBehalfOf?: Sponsor;
+  /** The agent's org. Absent only for agents enrolled before tenancy. */
+  org?: OrgId;
+
+  /** The user who minted the agent's credential: its sponsor, accountable for it. */
+  sponsor?: UserId;
 
   /** Bumped on revocation; tokens minted under an earlier epoch are refused. */
   revocationEpoch: int32;
@@ -54,9 +57,6 @@ model WhoAmI {
 
   /** The agent's open session, if it has one. */
   session: SessionRef | null;
-
-  /** The sponsor the presented token acts for. */
-  onBehalfOf?: Sponsor;
 }
 
 model WhoAmIEnvelope is AgentEnvelope<WhoAmI>;

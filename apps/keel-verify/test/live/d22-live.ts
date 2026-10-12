@@ -1,10 +1,10 @@
 // The live S-1 probe: two changes that merge cleanly and disagree about
 // one premise, through the deployed Keel.
 //
-//   KEEL_OPERATOR=<file> node apps/keel-verify/test/live/d22-live.ts <run>
+//   KEEL_SESSION=<token> [KEEL_ORG=<org>] node apps/keel-verify/test/live/d22-live.ts <run>
 //
-// KEEL_OPERATOR names a JSON file holding an operator's {clientId,
-// clientSecret}; it is read, never printed. In a project of its own
+// KEEL_SESSION is the maintainer's bearer session (a maintainer of KEEL_ORG,
+// `keel` by default); it is read, never printed. In a project of its own
 // (d22-live-<run>, forked from the seeded fixture repo):
 //   A relies on permission evaluation being fresh at most per-request, and adds
 //     the revoke route (scenarios/s1/a.patch);
@@ -56,8 +56,9 @@ const SETTLE_MS = 10 * 60_000;
 const run = process.argv[2];
 if (run === undefined || !/^[a-z0-9-]+$/.test(run))
   throw new Error("usage: d22-live.ts <run>, the run a lower-case slug");
-const operatorFile = process.env["KEEL_OPERATOR"];
-if (operatorFile === undefined) throw new Error("set KEEL_OPERATOR to the operator's JSON file");
+const session = process.env["KEEL_SESSION"];
+if (session === undefined) throw new Error("set KEEL_SESSION to the maintainer's session");
+const ORG = process.env["KEEL_ORG"] ?? "keel";
 const PROJECT = `d22-live-${run}`;
 
 const wranglerEnv = {
@@ -74,13 +75,9 @@ const wrangler = (...args: string[]) =>
     stdio: ["ignore", "pipe", "pipe"],
   });
 
+/** The maintainer: it creates the project, puts its settings and enrols its agents, which it sponsors. */
 function operatorClient(): KeelClient {
-  const json: unknown = JSON.parse(readFileSync(operatorFile ?? "", "utf8"));
-  const clientId: unknown = Reflect.get(Object(json), "clientId");
-  const clientSecret: unknown = Reflect.get(Object(json), "clientSecret");
-  if (typeof clientId !== "string" || typeof clientSecret !== "string")
-    throw new Error("KEEL_OPERATOR's file holds no {clientId, clientSecret}");
-  return new KeelClient({ baseUrl: KEEL_URL, clientId, clientSecret });
+  return new KeelClient({ baseUrl: KEEL_URL, session: session ?? "" });
 }
 
 type EventRecord = Awaited<ReturnType<KeelClient["events"]>>["items"][number];
@@ -273,7 +270,7 @@ try {
   operator = operatorClient();
   const admin = operator;
   const project = await admin.createProject(
-    { name: PROJECT, source: FIXTURE },
+    { org: ORG, name: PROJECT, source: FIXTURE },
     { idempotencyKey: `live:${PROJECT}:project` },
   );
   console.log(`     project ${PROJECT}: ${project.id}`);

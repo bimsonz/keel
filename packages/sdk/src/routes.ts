@@ -116,6 +116,9 @@ export const ROUTES = {
     query: ["cursor", "limit"],
   },
   Operator_listProjects: { method: "GET", path: "/projects", query: ["cursor", "limit"] },
+  Orgs_getProject: { method: "GET", path: "/orgs/{org}/projects/{name}" },
+  Users_me: { method: "GET", path: "/users/me" },
+  Admin_createUser: { method: "POST", path: "/admin/users" },
   Operator_suspendAgent: {
     method: "POST",
     path: "/agents/{agentId}/suspend",

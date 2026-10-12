@@ -1,16 +1,19 @@
-# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/public-reads.test.ts
-# kills: b12.public-feed
+# expect-red: pnpm exec vitest run --project pool:keel --project unit apps/keel/test/pool/public-reads.test.ts apps/keel/test/unit/read-feed.test.ts
+# kills: b12.public-feed, feed.project
 # why: a public read is not kept to the project it names, so other projects' events leak to it
 diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
-index 9f3620f..c5c39db 100644
 --- a/packages/core/src/application/coordination/gateway.ts
 +++ b/packages/core/src/application/coordination/gateway.ts
-@@ -172,7 +172,7 @@ export const readEvents: (
-               ...page,
-               events: page.events.filter(
-                 (e) =>
--                  e.project === scope.project &&
-+                  (scope.audience === "public" || e.project === scope.project) &&
-                   (scope.audience === "members" || audienceOf(e.type) === "public"),
-               ),
-             },
+@@ -215,7 +215,11 @@
+ ): Effect.Effect<readonly EventFeedEntry[]> => {
+   if (scope._tag === "Project")
+     return Effect.succeed(
+-      events.filter((e) => e.project === scope.project && readable(e, scope.audience)),
++      events.filter(
++        (e) =>
++          (scope.audience === "public" || e.project === scope.project) &&
++          readable(e, scope.audience),
++      ),
+     );
+   const projects = [
+     ...new Set(events.flatMap((e) => (e.project === undefined ? [] : [e.project]))),

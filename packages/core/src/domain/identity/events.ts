@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { AgentId, OrgId, ProjectId, UserId } from "../kernel/index.ts";
-import { AgentKind, Scope, Sponsor } from "./agent.ts";
+import { AgentKind, Scope } from "./agent.ts";
 import { Handle, Role } from "./tenancy.ts";
 
 export const AgentEnrolled = Schema.TaggedStruct("AgentEnrolled", {
@@ -9,8 +9,6 @@ export const AgentEnrolled = Schema.TaggedStruct("AgentEnrolled", {
   name: Schema.NonEmptyString,
   kind: AgentKind,
   scopes: Schema.Array(Scope),
-  /** The human the agent acts on behalf of, when the operator named one. */
-  onBehalfOf: Schema.optional(Sponsor),
   /** The agent's org. Optional only so agents enrolled before tenancy still decode. */
   org: Schema.optional(OrgId),
   /** The user who minted the agent's credential: its sponsor, accountable for it. */

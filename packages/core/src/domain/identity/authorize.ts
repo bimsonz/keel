@@ -61,9 +61,12 @@ export const SPEC_ACTIONS = {
   SignIn_methods: rule("Instance", "anyone"),
   whoami: rule("Self", "self"),
   inbox: rule("Self", "self"),
+  Users_me: rule("Self", "user"),
+  Admin_createUser: rule("Instance", "admin"),
 
   Operator_listProjects: rule("Org", "read"),
   Operator_createProject: rule("Org", "member"),
+  Orgs_getProject: rule("Project", "read"),
 
   Changes_listChanges: rule("Project", "read"),
   change: rule("Project", "read"),
@@ -137,7 +140,6 @@ export const NON_SPEC_ACTIONS = {
   ReinstateOrg: rule("Instance", "admin"),
   SetQuotas: rule("Instance", "admin"),
   HaltSpend: rule("Instance", "admin"),
-  Admin_createUser: rule("Instance", "admin"),
 } as const satisfies Record<string, ActionRule>;
 
 export const ACTIONS = { ...SPEC_ACTIONS, ...NON_SPEC_ACTIONS } as const;
@@ -155,13 +157,12 @@ interface ResourceOfKind {
 export type ResourceFor<A extends Action> = ResourceOfKind[(typeof ACTIONS)[A]["resource"]];
 
 /**
- * What the bootstrap credential may call: exchange its secret, create the first
- * user, and (until P4) enrol an agent. Everything else is `bootstrap-confined`.
+ * What the bootstrap credential may call: exchange its secret and create users.
+ * Everything else is `bootstrap-confined`.
  */
 export const BOOTSTRAP_ACTIONS: ReadonlySet<Action> = new Set<Action>([
   "Auth_exchangeToken",
   "Admin_createUser",
-  "Operator_enrolAgent",
 ]);
 
 /** Who may see what a grant lets the caller read: everything members see, or only what is public. */
@@ -258,7 +259,7 @@ export const rightsOf = (principal: Principal, resource: Resource): ReadonlySet<
   }
 };
 
-type Decision = Result.Result<Grant, AuthorizationRefusal>;
+export type Decision = Result.Result<Grant, AuthorizationRefusal>;
 
 const granted = (audience?: Audience): Decision =>
   Result.succeed(audience === undefined ? {} : { audience });

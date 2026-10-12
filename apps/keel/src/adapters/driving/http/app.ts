@@ -10,15 +10,15 @@ import {
   UndeclaredStatusError,
 } from "../../../generated/http/runtime.gen.ts";
 import { type AuthMount, registerAuth } from "./auth-mount.ts";
-import type { TokenVerifier } from "./caller.ts";
 import type { Handlers } from "./handlers.ts";
 import { type InboxStreams, registerInboxStreams } from "./inbox-streams.ts";
 import { problemResponse } from "./problems.ts";
-import { routeDeps } from "./route-deps.ts";
+import { type BoundGate, routeDeps } from "./route-deps.ts";
 
 export interface AppOptions {
   readonly handlers: Handlers;
-  readonly verify: TokenVerifier;
+  /** Who is calling: every /v1 operation passes it, and `authorizeHandlers` decides on what it admits. */
+  readonly gate: BoundGate;
   readonly mcp: (request: Request) => Promise<Response>;
   /** Users, sessions, orgs and the device grant (Better Auth), at `/v1/auth/*`. */
   readonly auth: AuthMount;
@@ -51,7 +51,7 @@ export function makeApp(options: AppOptions) {
   app.get("/healthz", (c) => c.json({ ok: true, service: "keel" }));
   app.get(DOCUMENT_PATH, (c) => c.json(openApiDocument));
   app.all("/mcp", (c) => options.mcp(c.req.raw));
-  const deps = routeDeps(options.verify);
+  const deps = routeDeps(options.gate);
   registerInboxStreams(app, deps, options.streams);
 
   app.notFound((c) => problemResponse(404, "resource.not_found", c.get("requestId")));

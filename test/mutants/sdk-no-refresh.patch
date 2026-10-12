@@ -2,13 +2,13 @@
 # kills: sdk.token
 # why: a 401 is thrown instead of exchanging the credentials once more
 diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
-index 0d48a78..b752b45 100644
+index c1a4384..cacd1e1 100644
 --- a/packages/sdk/src/client.ts
 +++ b/packages/sdk/src/client.ts
-@@ -124,8 +124,7 @@ export class KeelClient {
-       });
+@@ -146,8 +146,7 @@ export class KeelClient {
      const credentialed = "clientId" in this.#options;
-     let response = await send(credentialed ? await this.token() : undefined);
+     const session = "session" in this.#options ? this.#options.session : undefined;
+     let response = await send(credentialed ? await this.token() : session);
 -    if (credentialed && response.status === 401)
 -      response = await send(await this.token({ fresh: true }));
 +

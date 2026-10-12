@@ -6,8 +6,6 @@ import {
   AgentNotKnown,
   IdempotencyConflict,
   notifies,
-  SessionSponsorRefused,
-  type Sponsor,
 } from "../../domain/identity/index.ts";
 import {
   type AgentId,
@@ -54,10 +52,6 @@ const decodeAgent = Schema.decodeUnknownSync(Agent);
 export interface OpenSessionCommand {
   readonly harness?: string | undefined;
   readonly model?: string | undefined;
-  /** The sponsor the request names. It must be the one the session takes. */
-  readonly onBehalfOf?: Sponsor | undefined;
-  /** The sponsor the caller's token acts for: its `obo` claim. */
-  readonly tokenObo?: Sponsor | undefined;
   readonly idempotencyKey: string;
   /** A hash of the request body, so a reused key with another body is told apart from a retry. */
   readonly fingerprint: string;
@@ -68,10 +62,9 @@ export interface OpenSessionCommand {
  * SessionOpened on the session's own entity and makes it the agent's current
  * session, replacing any other.
  *
- * The session acts for the token's sponsor, else the enrolment's. A request
- * naming any other sponsor is refused, one naming none takes that sponsor:
- * an agent never names its own. An unknown agent is AgentNotKnown; a
- * suspended or revoked one is AgentNotAdmitted.
+ * The session's sponsor is the agent's, from its enrolment record: never a
+ * value the request or its token carries. An unknown agent is AgentNotKnown;
+ * a suspended or revoked one is AgentNotAdmitted.
  *
  * The same Idempotency-Key and body answers the session it opened, without
  * committing again; another body is an IdempotencyConflict. The key's row
@@ -83,16 +76,13 @@ export const openSession: (
   command: OpenSessionCommand,
 ) => Effect.Effect<
   Session,
-  AgentNotKnown | AgentNotAdmitted | IdempotencyConflict | SessionSponsorRefused,
+  AgentNotKnown | AgentNotAdmitted | IdempotencyConflict,
   Clock | Ids | EntityStore | EventOutbox
 > = Effect.fn("identity/openSession")(function* (agentId: AgentId, command: OpenSessionCommand) {
   const enrolled = (yield* EntityStore).get(AGENT, agentId);
   if (enrolled === undefined) return yield* new AgentNotKnown({ agentId });
   const sessionId: SessionId = yield* (yield* Ids).next("ses");
-  const committed = yield* commit<
-    Session,
-    AgentNotAdmitted | IdempotencyConflict | SessionSponsorRefused
-  >(
+  const committed = yield* commit<Session, AgentNotAdmitted | IdempotencyConflict>(
     {
       entity: { kind: "session", id: sessionId },
       cause: `session:${command.idempotencyKey}`,
@@ -111,19 +101,10 @@ export const openSession: (
       const agent = decodeAgent(tx.store.get(AGENT, agentId));
       if (agent.state !== "active")
         return Result.fail(new AgentNotAdmitted({ agentId, reason: agent.state }));
-      const sponsor = command.tokenObo ?? agent.onBehalfOf;
-      if (command.onBehalfOf !== undefined && command.onBehalfOf !== sponsor)
-        return Result.fail(
-          new SessionSponsorRefused({
-            agentId,
-            requested: command.onBehalfOf,
-            ...(sponsor === undefined ? {} : { sponsor }),
-          }),
-        );
       const details = {
         ...(command.harness === undefined ? {} : { harness: command.harness }),
         ...(command.model === undefined ? {} : { model: command.model }),
-        ...(sponsor === undefined ? {} : { onBehalfOf: sponsor }),
+        ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
       };
       const session: Session = { id: sessionId, agentId, ...details, openedAt: tx.at };
       tx.store.put(

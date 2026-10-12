@@ -1,15 +1,15 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/operator.test.ts -t "a11b.confined"
 # kills: a11b.confined
 # why: the bootstrap credential may also create projects, so least privilege is gone
-diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
-index fc50962..8c6a1f4 100644
---- a/apps/keel/src/adapters/driving/http/handlers.ts
-+++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -53,6 +53,7 @@ const decodeScopes = Schema.decodeUnknownOption(Schema.Array(Scope));
- export const BOOTSTRAP_MAY_CALL: ReadonlySet<string> = new Set([
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 7b9bc8d..7d673f8 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -160,6 +160,7 @@ export type ResourceFor<A extends Action> = ResourceOfKind[(typeof ACTIONS)[A]["
+ export const BOOTSTRAP_ACTIONS: ReadonlySet<Action> = new Set<Action>([
    "Auth_exchangeToken",
-   "Operator_enrolAgent",
+   "Admin_createUser",
 +  "Operator_createProject",
  ]);
  
- /**
+ /** Who may see what a grant lets the caller read: everything members see, or only what is public. */

@@ -18,19 +18,15 @@ export type AgentKind = typeof AgentKind.Type;
 export const Scope = Schema.Literals(["agent:work", "agent:read", "operator", "observer"]);
 export type Scope = typeof Scope.Type;
 
+/**
+ * The scopes a token may be asked for and an agent enrolled with. `operator` and
+ * `observer` confer nothing since tenancy: only the records of agents enrolled
+ * before it hold them.
+ */
+export const GrantableScope = Schema.Literals(["agent:work", "agent:read"]);
+
 export const AgentState = Schema.Literals(["active", "suspended", "revoked"]);
 export type AgentState = typeof AgentState.Type;
-
-/**
- * The human an agent acts on behalf of: accountable for its changes, and the
- * first person an escalation goes to. A `scheme:value` address
- * (`github:octocat`, `mailto:a@example.com`), so a notifier can route by scheme.
- */
-export const Sponsor = Schema.String.check(
-  Schema.isPattern(/^[a-z][a-z0-9+.-]*:\S.*$/),
-  Schema.isMaxLength(256),
-);
-export type Sponsor = typeof Sponsor.Type;
 
 /** An agent as Keel knows it. Its source of truth is the AgentSession DO; D1 holds a projection. */
 export const Agent = Schema.Struct({
@@ -40,8 +36,6 @@ export const Agent = Schema.Struct({
   name: Schema.NonEmptyString,
   kind: AgentKind,
   scopes: Schema.Array(Scope),
-  /** The agent's sponsor, named at enrolment. */
-  onBehalfOf: Schema.optional(Sponsor),
   /** The agent's org. Optional only for agents enrolled before tenancy. */
   org: Schema.optional(OrgId),
   /** The user who minted its credential: an agent never exceeds this user's rights. */
@@ -60,8 +54,10 @@ export interface AgentToken {
   readonly projectId: ProjectId;
   readonly scopes: readonly Scope[];
   readonly revocationEpoch: number;
-  /** The human this token acts for, carried in its `obo` claim. */
-  readonly onBehalfOf?: Sponsor;
+  /** The agent's org, carried in the token's `org` claim. */
+  readonly org?: OrgId;
+  /** The user who minted the agent's credential: its sponsor, carried in the token's `obo` claim. */
+  readonly sponsor?: UserId;
 }
 
 export interface SessionRef {
@@ -72,8 +68,6 @@ export interface SessionRef {
 export interface Identity {
   readonly agent: Agent;
   readonly session: SessionRef | null;
-  /** The sponsor the caller's token acts for. */
-  readonly onBehalfOf?: Sponsor;
 }
 
 /** A principal may act only while its agent is active and its epoch is current. */

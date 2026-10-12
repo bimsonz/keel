@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-org.test.ts -t ba.org-roles
+# kills: ba.org-roles
+# why: owner changes are left to Better Auth's own creator-role check, which answers in its own codes, a maintainer removing an owner as if the owner were leaving, instead of Keel's ManageOwners refusal
+diff --git a/apps/keel/src/adapters/driven/better-auth/org.ts b/apps/keel/src/adapters/driven/better-auth/org.ts
+--- a/apps/keel/src/adapters/driven/better-auth/org.ts
++++ b/apps/keel/src/adapters/driven/better-auth/org.ts
+@@ -198,11 +198,7 @@
+   return async (ctx: HookContext) => {
+     switch (ctx.path) {
+       case "/organization/invite-member":
+-        await ownerChange(ctx, db);
+         return inviteTarget(ctx, db);
+-      case "/organization/update-member-role":
+-      case "/organization/remove-member":
+-        return ownerChange(ctx, db);
+       case "/organization/get-invitation":
+         return answerable(ctx, ctx.query?.["id"]);
+       case "/organization/accept-invitation":

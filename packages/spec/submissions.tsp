@@ -46,7 +46,7 @@ interface Submissions {
   @summary("Get a change's submission status")
   @tag("mcp")
   @operationId("status")
-  @useAuth(AgentRead | Observer)
+  @useAuth(AgentRead | SessionAuth)
   @route("/changes/{changeId}/submission")
   @get
   getSubmission(@path changeId: ChangeId, ...WaitQuery): SubmissionEnvelope | NotFound | StandardErrors;

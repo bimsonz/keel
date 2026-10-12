@@ -394,7 +394,15 @@ export function submitOk(change: Change, commitSha: CommitSha): SubmitResult {
   };
 }
 
-function changeNotFound(caller: Caller, error: ChangeNotFound) {
+/**
+ * A change that is not there, with the way forward. The policy answers a
+ * change the caller may not see with this too (`refusalResult`), so the two
+ * read alike.
+ */
+export function changeNotFound(
+  caller: Pick<Caller, "requestId">,
+  error: { readonly changeId: string },
+) {
   return {
     status: 404 as const,
     body: problem(404, "change.not_found", caller.requestId, {
@@ -780,8 +788,8 @@ export function nearbyError(
     case "ChangeInOtherProject":
       return {
         status: 403,
-        body: problem(403, "auth.insufficient_scope", caller.requestId, {
-          detail: `${error.changeId} is in another project; your token is bound to your own.`,
+        body: problem(403, "auth.forbidden", caller.requestId, {
+          detail: `Refused: foreign-project. ${error.changeId} is in another project; your token is bound to your own.`,
         }),
       };
     default: {
@@ -848,8 +856,8 @@ export function adoptError(
     case "ChangeInOtherProject":
       return {
         status: 403,
-        body: problem(403, "auth.insufficient_scope", caller.requestId, {
-          detail: `${error.changeId} is in another project; your token is bound to your own.`,
+        body: problem(403, "auth.forbidden", caller.requestId, {
+          detail: `Refused: foreign-project. ${error.changeId} is in another project; your token is bound to your own.`,
         }),
       };
     case "IdempotencyConflict":

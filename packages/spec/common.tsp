@@ -76,15 +76,6 @@ scalar OrgId extends string;
 @pattern("^crd_[0-9A-HJKMNP-TV-Z]{26}$")
 scalar CredentialId extends string;
 
-/**
- * A sponsor: the human an agent acts on behalf of, accountable for its changes
- * and the first person an escalation goes to. A `scheme:value` address, e.g.
- * `github:octocat` or `mailto:a@example.com`.
- */
-@pattern("^[a-z][a-z0-9+.-]*:\\S.*$")
-@maxLength(256)
-scalar Sponsor extends string;
-
 /** A git object id: 40 hexadecimal characters (SHA-1) or 64 (SHA-256). */
 @pattern("^([0-9a-f]{40}|[0-9a-f]{64})$")
 scalar CommitSha extends string;
@@ -119,18 +110,39 @@ alias AgentWork = OAuth2Auth<[KeelClientCredentials], ["agent:work"]>;
 /** Read what an agent needs to work: its identity, inbox, conflicts, memory. */
 alias AgentRead = OAuth2Auth<[KeelClientCredentials], ["agent:read"]>;
 
-/** Administer projects, agents and rulings. */
-alias OperatorScope = OAuth2Auth<[KeelClientCredentials], ["operator"]>;
+/**
+ * A user's session: the console's cookie (`__Secure-keel.session_token`, set by `/v1/auth`), or the bearer
+ * `keeltown login` or `POST /v1/admin/users` hands out. Every operation decides who may call it by one policy
+ * on the caller's memberships, whichever way it signed in.
+ */
+alias SessionAuth = BearerAuth;
 
-/** Read-only views of the whole system, e.g. for Mission Control. */
-alias Observer = OAuth2Auth<[KeelClientCredentials], ["observer"]>;
+/** The bootstrap credential, exchanged like an agent's: it may create users and nothing else. */
+alias BootstrapAuth = OAuth2Auth<[KeelClientCredentials], []>;
 
-/** The scopes a token can carry. */
+/** The scopes an agent's token can carry. */
 union Scope {
+  agentWork: "agent:work",
+  agentRead: "agent:read",
+}
+
+/**
+ * A scope as an agent's record and its events hold it: an agent's scopes, plus `operator` and `observer`,
+ * which agents enrolled before tenancy held and which confer nothing.
+ */
+union RecordedScope {
   agentWork: "agent:work",
   agentRead: "agent:read",
   operator: "operator",
   observer: "observer",
+}
+
+/** A role in an org: owners manage members and the org, maintainers its projects and agents. */
+alias OrgRole = "owner" | "maintainer" | "member";
+
+/** The reader's place in a project's org, present only for a member of it. */
+model Viewer {
+  role: OrgRole;
 }
 
 // ─── Problems ───────────────────────────────────────────────────────────────
@@ -138,7 +150,10 @@ union Scope {
 /** Machine-readable reason for a problem. Dotted; lanes add codes as they build. */
 union ProblemCode {
   authInvalidToken: "auth.invalid_token",
-  authInsufficientScope: "auth.insufficient_scope",
+  authRequired: "auth.required",
+  authForbidden: "auth.forbidden",
+  authCrossSite: "auth.cross_site",
+  authAgentUnplaced: "auth.agent_unplaced",
   authRevoked: "auth.revoked",
   requestInvalid: "request.invalid",
   requestIdempotencyConflict: "request.idempotency_conflict",
@@ -160,8 +175,9 @@ union ProblemCode {
   sketchNotFound: "sketch.not_found",
   repoRefNotFound: "repo.ref_not_found",
   repoPathNotFound: "repo.path_not_found",
-  sessionSponsorRefused: "session.sponsor_refused",
   agentStateRefused: "agent.state_refused",
+  projectNameTaken: "project.name_taken",
+  userHandleRefused: "user.handle_refused",
 }
 
 /** What an agent can do next. Each one can be fed straight into the matching tool. */

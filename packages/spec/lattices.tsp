@@ -53,7 +53,7 @@ model LatticeSet {
 interface Lattices {
   /** Each predicate's lattice, as data: what a premise or an effect can say, and how values order. */
   @summary("List the lattices")
-  @useAuth(Observer | AgentRead)
+  @useAuth(NoAuth | AgentRead | SessionAuth)
   @get
   listLattices(): LatticeSet | StandardErrors;
 }

@@ -2,15 +2,15 @@
 # kills: b11.session-admit
 # why: only a revoked agent is refused, so a suspended agent still opens sessions
 diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
-index b22f33b..f71ff8b 100644
+index 64304bf..94fb685 100644
 --- a/packages/core/src/application/identity/session.ts
 +++ b/packages/core/src/application/identity/session.ts
-@@ -109,7 +109,7 @@ export const openSession: (
+@@ -99,7 +99,7 @@ export const openSession: (
            : Result.fail(new IdempotencyConflict({ idempotencyKey: command.idempotencyKey }));
        }
        const agent = decodeAgent(tx.store.get(AGENT, agentId));
 -      if (agent.state !== "active")
 +      if (agent.state === "revoked")
          return Result.fail(new AgentNotAdmitted({ agentId, reason: agent.state }));
-       const sponsor = command.tokenObo ?? agent.onBehalfOf;
-       if (command.onBehalfOf !== undefined && command.onBehalfOf !== sponsor)
+       const details = {
+         ...(command.harness === undefined ? {} : { harness: command.harness }),

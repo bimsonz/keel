@@ -238,8 +238,9 @@ function makeWaiters<K>() {
  * with an active lease and a workspace, idempotent by (agent, Idempotency-Key).
  * `submit` checks the lease and the state, as the Change DO does, and accepts
  * only a commit `push`ed to the change's workspace. `abandon` withdraws it
- * under its lease or as an operator, refused once it has ended or while it
- * is integrating, as the Change machine refuses it. `awaitSubmission` waits
+ * under its lease or as a maintainer of its project (another project's is
+ * ChangeNotFound), refused once it has ended or while it is integrating, as
+ * the Change machine refuses it. `awaitSubmission` waits
  * for `settle` (or a submit) to move the change, up to its deadline.
  * `capacity` bounds the workspaces it will grant.
  */
@@ -493,17 +494,19 @@ export function makeChangesMemory(
             waiters.wake(changeId);
             return { change: unparked, ...regrant() };
           }),
-        abandon: (principal, input) =>
+        abandon: (input) =>
           Effect.gen(function* () {
             const now = Instant(yield* EffectClock.currentTimeMillis);
             const { changeId, authority, reason, idempotencyKey } = input;
-            const body = JSON.stringify({ agentId: principal.agentId, authority, reason });
+            const body = JSON.stringify({ authority, reason });
             const replayed = withdrawals.get(`${changeId} ${idempotencyKey}`);
             if (replayed !== undefined && replayed !== body)
               return yield* new IdempotencyConflict({ idempotencyKey });
             const change = changes.get(changeId);
             if (change === undefined) return yield* new ChangeNotFound({ changeId });
             if (replayed !== undefined) return change;
+            if (authority._tag === "Maintainer" && projects.get(changeId) !== authority.projectId)
+              return yield* new ChangeNotFound({ changeId });
             const refused = new ChangeStateRefused({
               changeId,
               state: change.state,
@@ -619,10 +622,10 @@ export function makeChangesMemory(
                 premisesRetracted: [],
               }),
           ),
-        nearby: (principal, changeId) =>
+        nearby: (projectId, changeId) =>
           Effect.gen(function* () {
             if (!changes.has(changeId)) return yield* new ChangeNotFound({ changeId });
-            if (projects.get(changeId) !== principal.projectId)
+            if (projects.get(changeId) !== projectId)
               return yield* new ChangeInOtherProject({ changeId });
             return NOTHING_NEAR;
           }),

@@ -24,5 +24,10 @@ export class ProjectOrgs extends Context.Service<
     readonly byName: (org: OrgId, name: string) => Effect.Effect<Option.Option<ProjectPlace>>;
     /** The org's projects, by name. */
     readonly inOrg: (org: OrgId) => Effect.Effect<readonly ProjectPlace[]>;
+    /** Every project on the instance, by id, up to `limit` after `after`: a page of the list anyone reads, filtered by the policy. */
+    readonly all: (
+      after: ProjectId | undefined,
+      limit: number,
+    ) => Effect.Effect<readonly ProjectPlace[]>;
   }
 >()("keel/ProjectOrgs") {}

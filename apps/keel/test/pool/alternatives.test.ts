@@ -9,7 +9,16 @@ import { Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it } from "vitest";
 import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
-import { BASE, drainAfter, drainOutbox, mcp, mcpResult, seedAgent, tokenFor } from "./helpers.ts";
+import {
+  BASE,
+  drainAfter,
+  drainOutbox,
+  mcp,
+  mcpResult,
+  seedAgent,
+  seedForeignAgent,
+  tokenFor,
+} from "./helpers.ts";
 
 const claim = (subject: string) =>
   Schema.decodeUnknownSync(Proposition)({
@@ -125,7 +134,7 @@ describe("[b24.preflight-alternatives] two attempts at the same thing see each o
 });
 
 describe("[b24.change-tool] comparing over MCP: the change tool reads the other change", () => {
-  it("[b24.change-tool] an agent of the project reads B as REST does; an agent of another project gets the 404 of an unknown change", async () => {
+  it("[b24.change-tool] an agent of the project reads B as REST does; an agent of another org's project gets the 404 of an unknown change", async () => {
     const { projectId, change } = await project();
     const a = await change();
     ok(await a.declare("declare-a", { declaredEffects: effects }));
@@ -138,7 +147,7 @@ describe("[b24.change-tool] comparing over MCP: the change tool reads the other 
     expect(viaTool).toEqual(await viaRest.json());
     expect(viaTool).toMatchObject({ id: a.changeId, state: "working" });
 
-    const outsider = await tokenFor(await seedAgent());
+    const outsider = await tokenFor(await seedForeignAgent());
     const unknown = makeId("chg", ulid());
     const hidden = await tool(outsider, "change", { changeId: a.changeId });
     const missing = await tool(outsider, "change", { changeId: unknown });

@@ -21,6 +21,11 @@ output "better_auth_secret" {
   sensitive = true
 }
 
+output "claim_code" {
+  value     = random_password.claim_code.result
+  sensitive = true
+}
+
 # The host every Worker names as Keel's own (KEEL_HOST, and the console's KEEL_API_HOST).
 output "keel_host" {
   value = var.host

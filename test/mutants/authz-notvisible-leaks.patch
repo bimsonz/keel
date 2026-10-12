@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/authz.test.ts -t authz.public-private-missing
+# kills: authz.public-private-missing
+# why: what the caller may not see answers 403 rather than the operation's own 404, so a private project's existence leaks to anyone who asks
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -259,7 +259,7 @@
+     case "NotVisible":
+       return CHANGE_KEYED.has(action)
+         ? changeNotFound({ requestId }, { changeId: String(Object(input).changeId) })
+-        : { status: 404, body: problem(404, "resource.not_found", requestId) };
++        : { status: 403, body: problem(403, "auth.forbidden", requestId) };
+     default: {
+       const unmapped: never = refusal;
+       return unmapped;

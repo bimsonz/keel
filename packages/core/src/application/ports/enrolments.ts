@@ -1,22 +1,23 @@
 import { Context, type Effect } from "effect";
 import type {
+  Actor,
   Agent,
   AgentKind,
   IdempotencyConflict,
-  AgentToken,
   Scope,
-  Sponsor,
 } from "../../domain/identity/index.ts";
-import type { ProjectId } from "../../domain/kernel/index.ts";
+import type { OrgId, ProjectId, UserId } from "../../domain/kernel/index.ts";
 
 export interface EnrolInput {
   readonly name: string;
   readonly kind: AgentKind;
   readonly scopes: readonly Scope[];
-  /** The project the agent works in; the operator's own when absent. */
-  readonly projectId?: ProjectId;
-  /** The human the agent acts on behalf of: its sponsor. */
-  readonly onBehalfOf?: Sponsor;
+  /** The project the agent works in. */
+  readonly projectId: ProjectId;
+  /** The agent's org: its project's. */
+  readonly org: OrgId;
+  /** The user minting the agent's credential, who becomes its sponsor. */
+  readonly sponsor: UserId;
   readonly idempotencyKey: string;
 }
 
@@ -32,14 +33,14 @@ export interface Enrolment {
  * the agents' source of truth. The DO writes the AgentDirectory projection
  * before it answers, so the credential exchanges for a token at once.
  * `enrol` is idempotent by Idempotency-Key (the agent id is derived from the
- * operator and the key); a retry re-issues the secret, because the first answer
+ * actor and the key); a retry re-issues the secret, because the first answer
  * was the only place it was shown.
  */
 export class Enrolments extends Context.Service<
   Enrolments,
   {
     readonly enrol: (
-      principal: AgentToken,
+      actor: Actor,
       input: EnrolInput,
     ) => Effect.Effect<Enrolment, IdempotencyConflict>;
   }

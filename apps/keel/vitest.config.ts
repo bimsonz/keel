@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
@@ -10,6 +11,10 @@ async function testSigningKey(): Promise<string> {
   const jwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
   return JSON.stringify(Object.assign(jwk, { kid: "test" }));
 }
+
+/** The pool's claim code, and its digest as deploy.ts derives KEEL_CLAIM_DIGEST from Terraform's. */
+const claimCode = `test-claim-${crypto.randomUUID()}`;
+const claimDigest = createHash("sha256").update(claimCode).digest("hex");
 
 /** The fake Artifacts namespace, typechecked as TypeScript and served as plain JavaScript. */
 const fakeArtifacts = stripTypeScriptTypes(
@@ -27,6 +32,9 @@ export default defineProject({
           KEEL_SIGNING_KEY: await testSigningKey(),
           KEEL_BOOTSTRAP_SECRET: `test-bootstrap-${crypto.randomUUID()}`,
           BETTER_AUTH_SECRET: `test-auth-${crypto.randomUUID()}`,
+          KEEL_CLAIM_DIGEST: claimDigest,
+          // Test-only: the claim code itself, which no deployed Worker holds.
+          TEST_CLAIM_CODE: claimCode,
           TEST_MIGRATIONS: await readD1Migrations(`${import.meta.dirname}/migrations`),
           // prove:red pins fast-check's seed; workerd sees it only as a binding.
           ...(process.env["FC_SEED"] === undefined ? {} : { FC_SEED: process.env["FC_SEED"] }),

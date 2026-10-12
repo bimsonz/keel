@@ -1,6 +1,5 @@
 import { env, exports } from "cloudflare:workers";
-import type { Sponsor } from "@keeltown/core/domain/identity";
-import { type AgentId, makeId } from "@keeltown/core/kernel";
+import { type AgentId, makeId, type UserId } from "@keeltown/core/kernel";
 import { Sessions } from "@keeltown/core/ports";
 import { hashSecret, sampleProjectId } from "@keeltown/testing";
 import { Effect, Exit, Layer } from "effect";
@@ -9,13 +8,34 @@ import { describe, expect, it } from "vitest";
 import { SessionsRpc } from "../../src/adapters/driven/do-rpc/sessions.ts";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
 import { AgentSessionCodecs, decodeExit } from "../../src/rpc/index.ts";
-import { BASE, drainAfter, type Fetch, type SeededAgent, tokenFor } from "./helpers.ts";
+import {
+  BASE,
+  drainAfter,
+  establishProject,
+  type Fetch,
+  placeProject,
+  POOL_ORG,
+  type SeededAgent,
+  seedUser,
+  tokenFor,
+  uniqueHandle,
+} from "./helpers.ts";
 
 const agentSession = (agentId: string) =>
   drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)));
 
-/** Enrols a fresh agent in its own AgentSession DO, as the operator's enrolment does; sponsored when `sponsor` is given. */
-async function enrolled(sponsor?: Sponsor): Promise<SeededAgent> {
+/** A member of org `pool`, who sponsors an agent there. */
+const member = async (): Promise<UserId> => (await seedUser(uniqueHandle("sponsor"))).userId;
+
+/**
+ * Enrols a fresh agent in its own AgentSession DO, as a member's enrolment
+ * does: in org `pool`, sponsored by `sponsor` (a new member when none is
+ * given), its project placed there and held.
+ */
+async function enrolled(sponsor?: UserId): Promise<SeededAgent> {
+  const by = sponsor ?? (await member());
+  await placeProject(sampleProjectId);
+  await establishProject(sampleProjectId);
   const agentId: AgentId = makeId("agt", ulid());
   const clientId = `client-${agentId.toLowerCase()}`;
   const clientSecret = `secret-${crypto.randomUUID()}`;
@@ -26,7 +46,8 @@ async function enrolled(sponsor?: Sponsor): Promise<SeededAgent> {
       name: "session-agent",
       kind: "interactive",
       scopes: ["agent:read", "agent:work"],
-      ...(sponsor === undefined ? {} : { onBehalfOf: sponsor }),
+      org: POOL_ORG,
+      sponsor: by,
       clientId,
       secretHash: await hashSecret(clientSecret),
       idempotencyKey: "enrol-1",
@@ -40,7 +61,7 @@ async function enrolled(sponsor?: Sponsor): Promise<SeededAgent> {
 interface Answer {
   readonly id: string;
   readonly agentId: string;
-  readonly onBehalfOf?: string;
+  readonly sponsor?: string;
   readonly openedAt: string;
   readonly code: string;
   readonly nextActions: readonly { readonly operationId?: string; readonly args?: object }[];
@@ -70,7 +91,8 @@ const worker: Fetch = (url, init) => exports.default.fetch(url, init);
 
 describe("POST /v1/sessions", () => {
   it("[b11.session-open] opens the agent's current session, which whoami then names; a retry answers it", async () => {
-    const seeded = await enrolled("github:sponsor");
+    const sponsor = await member();
+    const seeded = await enrolled(sponsor);
     const token = await tokenFor(seeded);
     const before = await call(worker, token, "GET", "/agents/me");
     expect(before.body.result.session).toBeNull();
@@ -81,7 +103,7 @@ describe("POST /v1/sessions", () => {
     expect(opened.body).toEqual({
       id: expect.stringMatching(/^ses_/),
       agentId: seeded.agent.id,
-      onBehalfOf: "github:sponsor",
+      sponsor,
       openedAt: expect.any(String),
     });
     const me = await call(worker, token, "GET", "/agents/me");
@@ -113,34 +135,16 @@ describe("POST /v1/sessions", () => {
     expect(reused.body.nextActions[0]?.operationId).toBe("Sessions_openSession");
   });
 
-  it("[b11.session-obo] refuses a sponsor the agent does not act for, 403 session.sponsor_refused naming its own", async () => {
-    const token = await tokenFor(await enrolled("github:sponsor"));
-    const refused = await call(
-      worker,
-      token,
-      "POST",
-      "/sessions",
-      { onBehalfOf: "github:someone-else" },
-      "session-key-1",
-    );
-    expect(refused.status).toBe(403);
-    expect(refused.body.code).toBe("session.sponsor_refused");
-    expect(refused.body.nextActions).toEqual([
-      expect.objectContaining({
-        operationId: "Sessions_openSession",
-        args: { onBehalfOf: "github:sponsor" },
-      }),
-    ]);
-    const named = await call(
-      worker,
-      token,
-      "POST",
-      "/sessions",
-      { onBehalfOf: "github:sponsor" },
-      "session-key-2",
-    );
-    expect(named.status).toBe(201);
-    expect(named.body.onBehalfOf).toBe("github:sponsor");
+  it("[b11.session-sponsor] takes the sponsor from the agent's enrolment, and refuses a body that names one", async () => {
+    const sponsor = await member();
+    const token = await tokenFor(await enrolled(sponsor));
+    const named = { sponsor: makeId("usr", ulid()) };
+    const refused = await call(worker, token, "POST", "/sessions", named, "session-key-1");
+    expect(refused.status).toBe(400);
+    expect(refused.body.code).toBe("request.invalid");
+    const opened = await call(worker, token, "POST", "/sessions", {}, "session-key-1");
+    expect(opened.status).toBe(201);
+    expect(opened.body.sponsor).toBe(sponsor);
   });
 });
 

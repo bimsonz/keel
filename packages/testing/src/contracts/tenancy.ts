@@ -360,5 +360,32 @@ export function describeProjectOrgsContract(adapter: string, make: () => Layer.L
         );
       }).pipe(Effect.provide(make())),
     );
+
+    it.effect(
+      "[ports.project-orgs-all] pages every org's projects by id, after a cursor and up to a limit",
+      () =>
+        Effect.gen(function* () {
+          const projects = yield* ProjectOrgs;
+          const stem = fresh("all");
+          const places = [orgId(), orgId(), orgId()].map((org, i) => ({
+            projectId: projectId(),
+            org,
+            name: `${stem}-${i}`,
+          }));
+          for (const place of places) yield* projects.assign(place);
+          const ours = (list: readonly { readonly projectId: string }[]) =>
+            list.filter((place) => places.some((p) => p.projectId === place.projectId));
+          const ids = places.map((place) => place.projectId).toSorted();
+          const first = yield* projects.all(undefined, 10_000);
+          expect(ours(first).map((place) => place.projectId)).toEqual(ids);
+          const [one, two] = ids;
+          expect(ours(yield* projects.all(one, 10_000)).map((p) => p.projectId)).toEqual(
+            ids.slice(1),
+          );
+          const page = yield* projects.all(undefined, 1);
+          expect(page).toHaveLength(1);
+          expect(two).toBeDefined();
+        }).pipe(Effect.provide(make())),
+    );
   });
 }

@@ -3,19 +3,51 @@ import {
   AgentNotKnown,
   CredentialRejected,
   IdempotencyConflict,
+  type Principal,
   ScopeNotGranted,
 } from "@keeltown/core/domain/identity";
 import type { Change } from "@keeltown/core/domain/coordination";
 import { AgentId, CommitSha, Instant, makeId } from "@keeltown/core/kernel";
+import {
+  makeAgentDirectoryMemory,
+  makeBetterAuthMemory,
+  makeChangesMemory,
+  makeClockMemory,
+  makeCodeHostMemory,
+  makeEnrolmentsMemory,
+  makeEventFeedMemory,
+  makeIdsMemory,
+  makeInboxMemory,
+  makeMembershipsMemory,
+  makeOrgsMemory,
+  makeProjectOrgsMemory,
+  makeProjectsMemory,
+  makeProjectViewsMemory,
+  makeSessionsMemory,
+  makeStandingsMemory,
+  makeTokenIssuerMemory,
+  makeUsersMemory,
+  sampleOrgId,
+  sampleProjectId,
+  sampleSponsorId,
+} from "@keeltown/testing";
 import { ulid } from "ulid";
-import { Schema } from "effect";
-import { describe, expect, it } from "vitest";
+import { Layer, ManagedRuntime, Schema } from "effect";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import type { Caller } from "../../src/adapters/driving/http/caller.ts";
 import { tokenError, whoamiError } from "../../src/adapters/driving/http/mappers.ts";
 import { statusOk, submitError } from "../../src/adapters/driving/http/work-loop.ts";
 import { makeHandlers } from "../../src/adapters/driving/http/handlers.ts";
+import { makeRunner } from "../../src/adapters/driving/http/run.ts";
 
 const agentId = Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
-const caller = { requestId: "req-1", principal: null, signal: new AbortController().signal };
+const callerAs = (principal: Principal, token?: Caller["token"]): Caller => ({
+  requestId: "req-1",
+  principal,
+  ...(token === undefined ? {} : { token }),
+  signal: new AbortController().signal,
+});
+const caller = callerAs({ _tag: "Anonymous" });
 
 describe("mappers", () => {
   it("maps every whoami error to a declared 401 problem with a way forward", () => {
@@ -50,7 +82,10 @@ describe("mappers", () => {
   });
 });
 
-/** The operations still answering 503 service.not_implemented. Shrinks, visibly, as lanes land each one. */
+/**
+ * The operations still answering 503 service.not_implemented to a caller the
+ * policy grants them. Shrinks, visibly, as lanes land each one.
+ */
 const STUBBED = [
   "sketch",
   "Workspaces_refreshWorkspaceToken",
@@ -65,39 +100,148 @@ const STUBBED = [
   "Views_getCandidate",
   "Views_listLanes",
   "Views_getTrunk",
-  "Operator_listProjects",
   "Operator_listEscalations",
-  "Operator_giveRuling",
 ];
 
+/**
+ * A project placed in its org with settings, so the policy sees it, and the
+ * two callers it grants between them every operation it lets anyone reach:
+ * the project's own agent (work and reads) and an owner of its org who is also
+ * the instance admin (governance).
+ */
+function grantedSurface() {
+  const directory = makeAgentDirectoryMemory().layer;
+  const clock = makeClockMemory().layer;
+  const inbox = makeInboxMemory();
+  const projects = makeProjectsMemory();
+  projects.setSettings(sampleProjectId, {
+    protectedPaths: [],
+    maxBatchSize: 1,
+    verification: "required",
+    visibility: "private",
+  });
+  const places = makeProjectOrgsMemory();
+  places.places.set(sampleProjectId, {
+    projectId: sampleProjectId,
+    org: sampleOrgId,
+    name: "stubs",
+  });
+  const rows = makeBetterAuthMemory({ orgs: [{ id: sampleOrgId, slug: "stubs" }] });
+  const runtime = ManagedRuntime.make(
+    Layer.mergeAll(
+      directory,
+      projects.layer,
+      makeEnrolmentsMemory().layer.pipe(Layer.provide(directory)),
+      makeSessionsMemory().layer.pipe(Layer.provide(directory)),
+      makeStandingsMemory().layer.pipe(Layer.provide(directory)),
+      makeTokenIssuerMemory().layer.pipe(Layer.provide(clock)),
+      clock,
+      makeIdsMemory().layer,
+      makeChangesMemory().layer,
+      inbox.layer,
+      inbox.notifier,
+      makeEventFeedMemory().layer,
+      makeProjectViewsMemory().layer,
+      makeCodeHostMemory().layer,
+      makeUsersMemory(rows).layer,
+      makeMembershipsMemory(rows).layer,
+      makeOrgsMemory(rows).layer,
+      places.layer,
+    ),
+  );
+  const agent = callerAs(
+    {
+      _tag: "Agent",
+      agentId,
+      org: sampleOrgId,
+      projectId: sampleProjectId,
+      scopes: ["agent:read", "agent:work"],
+      sponsor: { userId: sampleSponsorId, role: "member", suspended: false },
+    },
+    {
+      agentId,
+      projectId: sampleProjectId,
+      scopes: ["agent:read", "agent:work"],
+      revocationEpoch: 0,
+      org: sampleOrgId,
+      sponsor: sampleSponsorId,
+    },
+  );
+  const owner = callerAs({
+    _tag: "User",
+    userId: sampleSponsorId,
+    handle: "stubs-owner",
+    instanceAdmin: true,
+    suspended: false,
+    memberships: [{ org: sampleOrgId, role: "owner" }],
+  });
+  const handlers = makeHandlers(
+    makeRunner(runtime),
+    { emailCode: false, github: false },
+    async () => {
+      throw new Error("no users are made here");
+    },
+  );
+  return { runtime, handlers, callers: [agent, owner] };
+}
+
 describe("stubbed operations", () => {
-  it("answer exactly the declared 503 service.not_implemented, and only the listed ones do", async () => {
-    const handlers = makeHandlers(
-      async () => {
-        throw new Error("a stub must not reach the runtime");
-      },
-      { emailCode: false, github: false },
-    );
-    const answers = await Promise.all(
-      Object.entries(handlers).map(async ([operation, handler]) => {
-        // `{}` is not valid input; an implemented handler may throw on it, which counts as not a stub.
+  const { runtime, handlers, callers } = grantedSurface();
+  // `{}` is no operation's valid input: the defects it raises past the routes' validation are logged, and expected.
+  beforeAll(() => vi.spyOn(console, "error").mockImplementation(() => undefined));
+  afterAll(async () => {
+    vi.restoreAllMocks();
+    await runtime.dispose();
+  });
+
+  /** What each caller is answered: `{}` names the project the agent works in, and nothing else. */
+  const answersTo = (operation: string) =>
+    Promise.all(
+      callers.map(async (who) => {
+        const handler: unknown = Reflect.get(handlers, operation);
+        // Not valid input; an implemented handler may throw on it, which counts as not a stub.
         const result: unknown = await Promise.resolve()
-          .then(() => Reflect.apply(handler, undefined, [caller, {}]))
+          .then(() =>
+            typeof handler === "function"
+              ? Reflect.apply(handler, handlers, [who, { projectId: sampleProjectId }])
+              : null,
+          )
           .catch(() => null);
         return {
-          operation,
           status: result === null ? null : Reflect.get(Object(result), "status"),
           body: result === null ? null : Reflect.get(Object(result), "body"),
         };
       }),
     );
-    const stubbed = answers.filter((answer) => answer.status === 503);
+
+  it("answer exactly the declared 503 service.not_implemented, and only the listed ones do", async () => {
+    const answers = await Promise.all(
+      Object.keys(handlers).map(async (operation) => ({
+        operation,
+        answers: (await answersTo(operation)).filter((answer) => answer.status === 503),
+      })),
+    );
+    const stubbed = answers.filter((answer) => answer.answers.length > 0);
     expect(stubbed.map((answer) => answer.operation).toSorted()).toEqual(STUBBED.toSorted());
-    expect(stubbed.map((answer) => answer.body)).toEqual(
-      stubbed.map(() =>
-        expect.objectContaining({ code: "service.not_implemented", requestId: "req-1" }),
+    expect(stubbed.flatMap((answer) => answer.answers.map((a) => a.body))).toEqual(
+      stubbed.flatMap((answer) =>
+        answer.answers.map(() =>
+          expect.objectContaining({ code: "service.not_implemented", requestId: "req-1" }),
+        ),
       ),
     );
+  });
+
+  it("Operator_giveRuling is a stub no caller reaches yet: its escalation resolves to the agent's own project, which only a user may rule on", async () => {
+    const [agent, owner] = await answersTo("Operator_giveRuling");
+    expect(agent).toEqual({
+      status: 403,
+      body: expect.objectContaining({ code: "auth.forbidden", detail: "Refused: users-only." }),
+    });
+    expect(owner).toEqual({
+      status: 404,
+      body: expect.objectContaining({ code: "resource.not_found" }),
+    });
   });
 });
 

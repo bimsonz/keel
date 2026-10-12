@@ -21,7 +21,7 @@ import {
   type Preflight,
   TERMINAL,
 } from "@keeltown/core/domain/coordination";
-import { Agent, type Sponsor } from "@keeltown/core/domain/identity";
+import { Agent } from "@keeltown/core/domain/identity";
 import {
   type AgentId,
   agentActor,
@@ -31,6 +31,7 @@ import {
   EventEnvelope,
   Instant,
   makeId,
+  type UserId,
 } from "@keeltown/core/kernel";
 import { EntityStore, EventOutbox } from "@keeltown/core/ports";
 import {
@@ -51,6 +52,7 @@ fc.configureGlobal({ numRuns: 200, ...(seed === undefined ? {} : { seed: Number(
 
 const agentId = makeId("agt", ulidOf(1));
 const other = makeId("agt", ulidOf(2));
+const sponsor = makeId("usr", ulidOf(3));
 
 /** One AgentSession DO's state, in memory: its outbox and store, ids and a clock. */
 const layer = () =>
@@ -61,14 +63,14 @@ const layer = () =>
     makeAgentDirectoryMemory().layer,
   );
 
-/** Enrols the agent as the operator would, sponsored when `sponsor` is given. */
-const enrolled = (sponsor?: Sponsor) =>
+/** Enrols the agent as the operator would, sponsored by the user `by` names when given. */
+const enrolled = (by?: UserId) =>
   enrol(agentId, {
     projectId: sampleProjectId,
     name: "session-agent",
     kind: "interactive",
     scopes: ["agent:read", "agent:work"],
-    ...(sponsor === undefined ? {} : { onBehalfOf: sponsor }),
+    ...(by === undefined ? {} : { sponsor: by }),
     clientId: "client-session-agent",
     secretHash: "sha256:aa",
     idempotencyKey: "enrol-1",
@@ -92,7 +94,7 @@ describe("openSession", () => {
     "[b11.session-open] commits SessionOpened on the session's own entity as the agent's current session; a retry answers it without committing",
     () =>
       Effect.gen(function* () {
-        yield* enrolled("github:enrolled");
+        yield* enrolled(sponsor);
         const store = yield* EntityStore;
         const outbox = yield* EventOutbox;
         const first = yield* openSession(agentId, opening("key-1", "body-1"));
@@ -100,7 +102,7 @@ describe("openSession", () => {
           agentId,
           harness: "claude-code",
           model: "a-model-2026-10",
-          onBehalfOf: "github:enrolled",
+          sponsor,
         });
         const [opened, ...more] = outbox.log({ kind: "session", id: first.id });
         expect(more).toEqual([]);
@@ -114,7 +116,7 @@ describe("openSession", () => {
             agentId,
             harness: "claude-code",
             model: "a-model-2026-10",
-            onBehalfOf: "github:enrolled",
+            sponsor,
           },
         });
         expect(currentSession(store)).toEqual(first);
@@ -143,73 +145,22 @@ describe("openSession", () => {
     }).pipe(Effect.provide(layer())),
   );
 
-  describe("the session's sponsor: the token's, else the enrolment's, and never another", () => {
-    it.effect.each<{
-      name: string;
-      enrolledBy?: Sponsor;
-      tokenObo?: Sponsor;
-      asked?: Sponsor;
-      acts?: Sponsor;
-      refused?: { sponsor?: Sponsor };
-    }>([
-      {
-        name: "the token's sponsor",
-        enrolledBy: "github:e",
-        tokenObo: "github:t",
-        acts: "github:t",
-      },
-      {
-        name: "the token's, named",
-        enrolledBy: "github:e",
-        tokenObo: "github:t",
-        asked: "github:t",
-        acts: "github:t",
-      },
-      { name: "the enrolment's", enrolledBy: "github:e", acts: "github:e" },
-      {
-        name: "the enrolment's, named",
-        enrolledBy: "github:e",
-        asked: "github:e",
-        acts: "github:e",
-      },
-      { name: "none" },
-      {
-        name: "refuses the enrolment's under a token's",
-        enrolledBy: "github:e",
-        tokenObo: "github:t",
-        asked: "github:e",
-        refused: { sponsor: "github:t" },
-      },
-      {
-        name: "refuses another",
-        enrolledBy: "github:e",
-        asked: "github:x",
-        refused: { sponsor: "github:e" },
-      },
-      { name: "refuses one named with no sponsor", asked: "github:itself", refused: {} },
-    ])("[b11.session-obo] $name", ({ enrolledBy, tokenObo, asked, acts, refused }) =>
-      Effect.gen(function* () {
-        yield* enrolled(enrolledBy);
-        const command = opening("key-1", "body-1", {
-          ...(tokenObo === undefined ? {} : { tokenObo }),
-          ...(asked === undefined ? {} : { onBehalfOf: asked }),
-        });
-        if (refused === undefined) {
-          const session = yield* openSession(agentId, command);
-          expect(session.onBehalfOf).toBe(acts);
-          expect("onBehalfOf" in session).toBe(acts !== undefined);
-          return;
-        }
-        const error = yield* Effect.flip(openSession(agentId, command));
-        expect(error).toEqual(
-          expect.objectContaining({ _tag: "SessionSponsorRefused", agentId, requested: asked }),
-        );
-        expect(error).toMatchObject(refused);
-        expect("sponsor" in error).toBe(refused.sponsor !== undefined);
-        expect(currentSession(yield* EntityStore)).toBeNull();
-      }).pipe(Effect.provide(layer())),
-    );
-  });
+  it.effect.each([
+    { name: "the enrolment's sponsor", by: sponsor },
+    { name: "none, for an agent enrolled without one", by: undefined },
+  ])("[b11.session-sponsor] the session and SessionOpened carry $name", ({ by }) =>
+    Effect.gen(function* () {
+      yield* enrolled(by);
+      const session = yield* openSession(agentId, opening("key-1", "body-1"));
+      const [opened] = (yield* EventOutbox).log({ kind: "session", id: session.id });
+      const payload: object = Object(opened?.payload);
+      expect([session.sponsor, Reflect.get(payload, "sponsor")]).toEqual([by, by]);
+      expect(["sponsor" in session, "sponsor" in payload]).toEqual([
+        by !== undefined,
+        by !== undefined,
+      ]);
+    }).pipe(Effect.provide(layer())),
+  );
 
   describe("an agent this object never enrolled, or one that may not act", () => {
     it.effect("[b11.session-admit] is AgentNotKnown before enrolment", () =>

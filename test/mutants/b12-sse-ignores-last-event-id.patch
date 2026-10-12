@@ -2,13 +2,13 @@
 # kills: b12.sse
 # why: the SSE route reads only `?cursor`, so a reconnecting client is sent every notice again from the start
 diff --git a/apps/keel/src/adapters/driving/http/inbox-streams.ts b/apps/keel/src/adapters/driving/http/inbox-streams.ts
-index 63f7133..c523634 100644
+index ffcd296..6838cd5 100644
 --- a/apps/keel/src/adapters/driving/http/inbox-streams.ts
 +++ b/apps/keel/src/adapters/driving/http/inbox-streams.ts
-@@ -53,7 +53,7 @@ export function registerInboxStreams(
+@@ -52,7 +52,7 @@ export function registerInboxStreams(
+     if (refused !== undefined) return refused;
      const { principal } = caller;
-     if (principal === null) return deps.noContext(c);
-     if (isBootstrap(principal)) return confined(caller);
+     if (principal._tag !== "Agent") return deps.noContext(c);
 -    const resumeFrom = c.req.header("last-event-id") ?? c.req.query("cursor");
 +    const resumeFrom = c.req.query("cursor");
      if (resumeFrom !== undefined && !isInboxCursor(resumeFrom)) return badCursor(caller);

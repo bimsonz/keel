@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/read-feed.test.ts -t "feed.readable"
+# kills: feed.readable
+# why: a read naming no project keeps the events of a project its reader may not read, as though it were a member there
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -227,7 +227,7 @@
+   ).pipe(
+     Effect.map((audiences) => {
+       const audience = new Map(audiences);
+-      return events.filter((e) => e.project !== undefined && readable(e, audience.get(e.project)));
++      return events.filter((e) => e.project !== undefined && readable(e, audience.get(e.project) ?? "members"));
+     }),
+   );
+ };

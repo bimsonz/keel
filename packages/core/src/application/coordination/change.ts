@@ -29,7 +29,6 @@ import {
   type RevisionMismatch,
   type SubjectKey,
   subjectAncestors,
-  type WithdrawAuthority,
 } from "../../domain/coordination/index.ts";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import {
@@ -56,6 +55,7 @@ import {
   NextAction,
   ProjectId,
   type SketchId,
+  type UserId,
   type VerdictId,
   WorkspaceId,
 } from "../../domain/kernel/index.ts";
@@ -264,9 +264,18 @@ export interface SubmitChange {
   readonly idempotencyKey: string;
 }
 
+/**
+ * Who withdraws, as the Change DO is told: the agent holding the change's
+ * lease, or a maintainer of its project. The doorway authorised either on the
+ * change's project; the DO checks the lease, and that a maintainer's project
+ * is the change's.
+ */
+export type Withdrawal =
+  | { readonly _tag: "Lease"; readonly leaseId: LeaseId; readonly agentId: AgentId }
+  | { readonly _tag: "Maintainer"; readonly by: UserId; readonly projectId: ProjectId };
+
 export interface AbandonChange {
-  readonly agentId: AgentId;
-  readonly authority: WithdrawAuthority;
+  readonly authority: Withdrawal;
   readonly reason?: string | undefined;
   readonly idempotencyKey: string;
 }
@@ -976,13 +985,15 @@ export const submit: (
   return yield* settled(changeId, command.idempotencyKey, committed);
 });
 
-/** Who withdraws: the agent under its lease, or an operator by name. */
-const withdrawnBy = (command: AbandonChange): Actor =>
-  command.authority._tag === "Operator"
-    ? `operator:${command.authority.by}`
-    : agentActor(command.agentId);
+/** Who withdraws: the agent under its lease, or a maintainer by user id. */
+const withdrawnBy = ({ authority }: AbandonChange): Actor =>
+  authority._tag === "Maintainer" ? `operator:${authority.by}` : agentActor(authority.agentId);
 
-/** Withdraws the change, under its lease or as an operator. The pool collects its workspace by event. */
+/**
+ * Withdraws the change, under its lease or as a maintainer of its project. A
+ * maintainer of another project is answered ChangeNotFound, as for a change
+ * that does not exist. The pool collects its workspace by event.
+ */
 export const abandon: (
   changeId: ChangeId,
   command: AbandonChange,
@@ -999,8 +1010,14 @@ export const abandon: (
       actor: withdrawnBy(command),
       ...inProject(yield* EntityStore, changeId),
     },
-    (tx) =>
-      Result.map(
+    (tx): Result.Result<Transition<Change>, ChangeNotFound | LeaseStale | ChangeStateRefused> => {
+      const { authority } = command;
+      if (
+        authority._tag === "Maintainer" &&
+        heldWorkspace(tx.store, changeId)?.projectId !== authority.projectId
+      )
+        return Result.fail(new ChangeNotFound({ changeId }));
+      return Result.map(
         transition(
           tx,
           changeId,
@@ -1008,13 +1025,14 @@ export const abandon: (
           [
             {
               _tag: "Withdraw",
-              authority: command.authority,
+              authority,
               ...(command.reason === undefined ? {} : { reason: command.reason }),
             },
           ],
         ),
         asTransition,
-      ),
+      );
+    },
   );
   return yield* settled(changeId, command.idempotencyKey, committed);
 });

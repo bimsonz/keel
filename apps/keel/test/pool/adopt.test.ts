@@ -89,10 +89,11 @@ describe("adopting a change through the doorways", () => {
     c.clock.advance(LEASE_TTL_MS);
 
     const response = await adoptRest(c, foreign, "adopt-key-0004");
-    const problem = await response.json<{ code: string }>();
+    const problem = await response.json<{ code: string; detail: string }>();
 
     expect(response.status).toBe(403);
-    expect(problem.code).toBe("auth.insufficient_scope");
+    expect(problem.code).toBe("auth.forbidden");
+    expect(problem.detail).toMatch(/^Refused: foreign-project\. /);
     expect((await c.current()).lease.id).toBe(declared.change.lease.id);
   });
 

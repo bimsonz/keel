@@ -10,7 +10,6 @@ const AgentRow = Schema.Struct({
   name: Schema.String,
   kind: Schema.String,
   scopes: Schema.String,
-  on_behalf_of: Schema.NullOr(Schema.String),
   org_id: Schema.NullOr(Schema.String),
   sponsor_user: Schema.NullOr(Schema.String),
   state: Schema.String,
@@ -29,7 +28,6 @@ function toAgent(row: unknown): Agent {
     name: r.name,
     kind: r.kind,
     scopes: JSON.parse(r.scopes),
-    ...(r.on_behalf_of === null ? {} : { onBehalfOf: r.on_behalf_of }),
     ...(r.org_id === null ? {} : { org: r.org_id }),
     ...(r.sponsor_user === null ? {} : { sponsor: r.sponsor_user }),
     state: r.state,
@@ -108,14 +106,16 @@ export function AgentDirectoryD1(db: D1Database) {
             .bind(standing.state, standing.revocationEpoch ?? null, seq, agentId, seq)
             .run(),
         ).pipe(Effect.asVoid),
+      // An agent's org and sponsor, once placed (at enrolment or by the cutover's move), are never
+      // cleared by a later write of a record that lacks them, such as an enrolment replayed by its key.
       upsert: (agent, credential) =>
         Effect.promise(() =>
           db.batch([
             db
               .prepare(
-                `INSERT INTO agents (id, project_id, name, kind, scopes, on_behalf_of, org_id, sponsor_user, state, revocation_epoch, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `INSERT INTO agents (id, project_id, name, kind, scopes, org_id, sponsor_user, state, revocation_epoch, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON CONFLICT (id) DO UPDATE SET project_id = excluded.project_id, name = excluded.name, kind = excluded.kind, scopes = excluded.scopes,
-                   on_behalf_of = excluded.on_behalf_of, org_id = excluded.org_id, sponsor_user = excluded.sponsor_user, state = excluded.state,
+                   org_id = COALESCE(excluded.org_id, agents.org_id), sponsor_user = COALESCE(excluded.sponsor_user, agents.sponsor_user), state = excluded.state,
                    revocation_epoch = excluded.revocation_epoch`,
               )
               .bind(
@@ -124,7 +124,6 @@ export function AgentDirectoryD1(db: D1Database) {
                 agent.name,
                 agent.kind,
                 JSON.stringify(agent.scopes),
-                agent.onBehalfOf ?? null,
                 agent.org ?? null,
                 agent.sponsor ?? null,
                 agent.state,

@@ -1,54 +1,23 @@
-import type { AgentToken } from "@keeltown/core/domain/identity";
+import type { AgentToken, Audience, Principal, Resource } from "@keeltown/core/domain/identity";
 
 export type { AgentToken };
 
 /**
- * Who is calling, as the doorways establish it. The HTTP and MCP surfaces
- * build the same `Caller`, so one handler object serves both.
+ * Who is calling, as the gate establishes it. The HTTP and MCP surfaces build
+ * the same `Caller`, so one handler object serves both.
  */
 export interface Caller {
   readonly requestId: string;
-  /** Null only on operations the spec publishes as anonymous (the token exchange). */
-  readonly principal: AgentToken | null;
+  /** Who is asking: a user, an agent, the bootstrap credential, or anonymous. */
+  readonly principal: Principal;
+  /** The token an agent (or the bootstrap credential) presented: what the work use-cases take. */
+  readonly token?: AgentToken;
+  /** Who a granted read sees as: set by `authorizeHandlers` on reads. */
+  readonly audience?: Audience;
+  /** What the call was decided on, as `authorizeHandlers` resolved it: its handler reads the project from here. */
+  readonly resource?: Resource;
   /** Aborted when the client goes away; the use-case's fiber is interrupted with it. */
   readonly signal: AbortSignal;
-}
-
-/** The outcome of verifying a bearer token. */
-export type Verification =
-  | { readonly principal: AgentToken }
-  | { readonly refused: "invalid" | "revoked" };
-
-/** Verifies a bearer token: its signature and expiry, then that its agent may still act at that epoch. */
-export type TokenVerifier = (token: string) => Promise<Verification>;
-
-/** Whether `principal` satisfies one of the OpenAPI security requirements. */
-export function satisfies(
-  requirements: readonly Readonly<Record<string, readonly string[]>>[],
-  principal: AgentToken,
-): boolean {
-  return requirements.some((requirement) =>
-    Object.values(requirement).every((scopes) =>
-      scopes.every((scope) => principal.scopes.some((held) => held === scope)),
-    ),
-  );
-}
-
-/** An operation the document publishes with an anonymous alternative (`{}`) needs no token. */
-export function admitsAnonymous(
-  requirements: readonly Readonly<Record<string, readonly string[]>>[],
-): boolean {
-  return (
-    requirements.length === 0 ||
-    requirements.some((requirement) => Object.keys(requirement).length === 0)
-  );
-}
-
-/** Whether any requirement asks for a scheme: false for an operation published as anonymous only. */
-export function namesScheme(
-  requirements: readonly Readonly<Record<string, readonly string[]>>[],
-): boolean {
-  return requirements.some((requirement) => Object.keys(requirement).length > 0);
 }
 
 export function bearerToken(header: string | undefined): string | null {

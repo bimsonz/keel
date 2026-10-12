@@ -39,7 +39,7 @@ The AgentSession DO (`agent:<id>`) is the source of truth for an agent. D1's `Ag
 
 | Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
 |---|---|---|---|---|---|
-| `AgentEnrolled` | AgentSession DO (operator command) | `agentId, projectId, name, kind: interactive\|hosted\|human\|synthetic, scopes[], onBehalfOf?` (the sponsor, a `scheme:value` address), `org?`, `sponsor?: UserId` (the user who minted the credential; optional only for agents enrolled before tenancy) | — | Projector | Catalog row created |
+| `AgentEnrolled` | AgentSession DO (operator command) | `agentId, projectId, name, kind: interactive\|hosted\|human\|synthetic, scopes[], org?`, `sponsor?: UserId` (the user who minted the credential; optional only for agents enrolled before tenancy) | — | Projector | Catalog row created |
 | `AgentSuspended` | AgentSession DO (operator command) | `agentId, reason, by` | the agent's open changes | the agent's AgentSession DO, Projector | Token exchange and every call refused until reinstated; its leases stop renewing |
 | `AgentReinstated` | AgentSession DO (operator command) | `agentId, by` | — | the agent's AgentSession DO, Projector | Calls accepted again |
 | `AgentRevoked` | AgentSession DO (operator command) | `agentId, revocationEpoch, by` | the agent's open changes, its leases | the agent's AgentSession DO, Projector | Revocation epoch bumped, so every token minted before it is rejected; its changes park for adoption |
@@ -179,7 +179,7 @@ A **Batch** is a set of Changes verified together; its **Candidate** is the comp
 | `TenetReaffirmed` | Subject DO | `tenetId, conflictId` | — | relying changes' agents | The contest was dismissed or resolved in the tenet's favour |
 | `TenetRetracted` | Subject DO | `tenetId, changeId, conflictId, decisionId?` | — | relying changes' agents | A change landed against the tenet: on a ruling (`decisionId`), or on its proven conflict where the predicate's policy let it land |
 | `TenetSuperseded` | Subject DO | `tenetId, by: tenetId` | — | relying changes' agents | — |
-| `SessionOpened` | AgentSession DO | `sessionId, agentId, harness?, model?, onBehalfOf?` | — | Projector | Session messages are captured against this ID |
+| `SessionOpened` | AgentSession DO | `sessionId, agentId, harness?, model?, sponsor?: UserId` (the agent's sponsor, from its enrolment) | — | Projector | Session messages are captured against this ID |
 | `MessagesCaptured` | AgentSession DO | `sessionId, fromSeq, toSeq, bundleRef` | — | Projector | Messages are immutable and addressed by number |
 | `SessionRedacted` | AgentSession DO | `sessionId, ranges[], reason` | — | Projector | Citations into redacted ranges resolve to a redaction marker |
 

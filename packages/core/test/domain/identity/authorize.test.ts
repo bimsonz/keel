@@ -571,7 +571,7 @@ describe("authorize", () => {
     ).toBe(1);
   });
 
-  it("[authz.bootstrap-confined] the bootstrap credential may call exactly its three actions", () => {
+  it("[authz.bootstrap-confined] the bootstrap credential may call exactly its two actions", () => {
     fc.assert(
       fc.property(requestArb, ({ action, resource }) => {
         const result = outcome(decide({ _tag: "Bootstrap" }, action, resource));
@@ -580,11 +580,7 @@ describe("authorize", () => {
           : result === "403:bootstrap-confined";
       }),
     );
-    expect([...BOOTSTRAP_ACTIONS].toSorted()).toEqual([
-      "Admin_createUser",
-      "Auth_exchangeToken",
-      "Operator_enrolAgent",
-    ]);
+    expect([...BOOTSTRAP_ACTIONS].toSorted()).toEqual(["Admin_createUser", "Auth_exchangeToken"]);
     expect(
       outcome(authorize({ _tag: "Bootstrap" }, "Operator_putSettings", project(PRJ_1, "private"))),
     ).toBe("403:bootstrap-confined");

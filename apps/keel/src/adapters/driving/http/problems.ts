@@ -11,7 +11,10 @@ export type NextAction = ProblemBody["nextActions"][number];
 
 const TITLES: Record<ProblemCode, string> = {
   "auth.invalid_token": "The bearer token is missing, malformed, expired or unknown",
-  "auth.insufficient_scope": "The token does not carry the scope this operation requires",
+  "auth.required": "This needs a signed-in user or an agent's token",
+  "auth.forbidden": "The policy refuses this caller this action",
+  "auth.cross_site": "A request signed in by the session cookie came from another origin",
+  "auth.agent_unplaced": "The agent has no org or sponsor",
   "auth.revoked": "The agent's credentials have been revoked",
   "request.invalid": "The request does not match the API contract",
   "request.idempotency_conflict": "This idempotency key was already used for a different request",
@@ -33,8 +36,9 @@ const TITLES: Record<ProblemCode, string> = {
   "sketch.not_found": "No such sketch",
   "repo.ref_not_found": "The project's trunk has no such branch or commit",
   "repo.path_not_found": "Nothing of that kind at this path",
-  "session.sponsor_refused": "The session names a sponsor the agent does not act for",
   "agent.state_refused": "The agent's standing does not allow this",
+  "project.name_taken": "The org already has a project by that name",
+  "user.handle_refused": "That handle cannot be given to a new user",
 };
 
 export interface ProblemExtras {

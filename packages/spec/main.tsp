@@ -17,6 +17,7 @@ import "./events.tsp";
 import "./inbox.tsp";
 import "./views.tsp";
 import "./operator.tsp";
+import "./tenancy.tsp";
 
 using Http;
 

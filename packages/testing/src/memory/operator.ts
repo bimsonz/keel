@@ -1,5 +1,10 @@
 import { DEFAULT_SETTINGS } from "@keeltown/core/application/integration";
-import { type Agent, IdempotencyConflict, type AgentToken } from "@keeltown/core/domain/identity";
+import {
+  type Actor,
+  actorId,
+  type Agent,
+  IdempotencyConflict,
+} from "@keeltown/core/domain/identity";
 import { ProjectNotFound } from "@keeltown/core/domain/integration";
 import { type AgentId, Instant, makeId, type ProjectId } from "@keeltown/core/kernel";
 import {
@@ -24,18 +29,17 @@ export function ulidOf(n: number): string {
   return body.padStart(26, "0");
 }
 
-/** What an idempotent operator call remembers per key: what it made, and the body that made it. */
+/** What an idempotent call remembers per key: what it made, and the body that made it. */
 interface Keyed<T> {
   readonly made: T;
   readonly fingerprint: string;
 }
 
-const keyOf = (principal: AgentToken, idempotencyKey: string) =>
-  `${principal.agentId}\u0000${idempotencyKey}`;
+const keyOf = (actor: Actor, idempotencyKey: string) => `${actorId(actor)}\u0000${idempotencyKey}`;
 
 /**
- * Projects in a map. `create` keys each project by its operator and
- * Idempotency-Key, as the real adapter derives the project id from both, and
+ * Projects in a map. `create` makes the project it is given the id of, as the
+ * Project DO named for it does, replays by that id and the Idempotency-Key, and
  * forks only from a source registered with `addSource`. A created project has
  * the default settings until `putSettings` replaces them (an absent
  * `verification` is `required`; the same request id with other settings is
@@ -55,7 +59,6 @@ export function makeProjectsMemory(
   const byKey = new Map<string, Keyed<ProjectRecord>>();
   const settings = new Map<ProjectId, ProjectSettings>();
   const requests = new Map<string, string>();
-  let count = 0;
   return {
     sources,
     live,
@@ -66,9 +69,9 @@ export function makeProjectsMemory(
     layer: Layer.succeed(
       Projects,
       Projects.of({
-        create: (principal, input) =>
+        create: (_actor, input) =>
           Effect.suspend((): Effect.Effect<ProjectRecord, IdempotencyConflict | RepoNotFound> => {
-            const key = keyOf(principal, input.idempotencyKey);
+            const key = `${input.projectId}\u0000${input.idempotencyKey}`;
             const fingerprint = JSON.stringify([input.name, input.source]);
             const known = byKey.get(key);
             if (known !== undefined) {
@@ -80,9 +83,8 @@ export function makeProjectsMemory(
               return Effect.fail(
                 new RepoNotFound({ repo: { namespace: "keel-core", name: input.source } }),
               );
-            count += 1;
             const made: ProjectRecord = {
-              id: makeId("prj", ulidOf(count)),
+              id: input.projectId,
               name: input.name,
               createdAt: Instant(Date.now()),
             };
@@ -97,7 +99,7 @@ export function makeProjectsMemory(
               ? Effect.fail(new ProjectNotFound({ projectId }))
               : Effect.succeed(found);
           }),
-        putSettings: (_principal, projectId, put, requestId) =>
+        putSettings: (_actor, projectId, put, requestId) =>
           Effect.suspend(
             (): Effect.Effect<ProjectSettings, ProjectNotFound | IdempotencyConflict> => {
               const current = settings.get(projectId);
@@ -147,16 +149,17 @@ export function makeEnrolmentsMemory() {
             return { agent, clientId, clientSecret };
           });
         return Enrolments.of({
-          enrol: (principal, input) =>
+          enrol: (actor, input) =>
             Effect.suspend((): Effect.Effect<Enrolment, IdempotencyConflict> => {
-              const key = keyOf(principal, input.idempotencyKey);
-              const projectId: ProjectId = input.projectId ?? principal.projectId;
+              const key = keyOf(actor, input.idempotencyKey);
+              const { projectId, org, sponsor } = input;
               const fingerprint = JSON.stringify([
                 input.name,
                 input.kind,
                 input.scopes,
                 projectId,
-                ...(input.onBehalfOf === undefined ? [] : [input.onBehalfOf]),
+                org,
+                sponsor,
               ]);
               const known = byKey.get(key);
               if (known !== undefined) {
@@ -172,7 +175,8 @@ export function makeEnrolmentsMemory() {
                 name: input.name,
                 kind: input.kind,
                 scopes: [...input.scopes],
-                ...(input.onBehalfOf === undefined ? {} : { onBehalfOf: input.onBehalfOf }),
+                org,
+                sponsor,
                 state: "active",
                 revocationEpoch: 0,
                 createdAt: Instant(Date.now()),

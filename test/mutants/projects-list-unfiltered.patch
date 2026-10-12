@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/authz.test.ts -t authz.public-private-missing
+# kills: authz.public-private-missing
+# why: the project list skips the policy, so a visitor's list shows every org's private projects
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -170,7 +170,7 @@
+ const readableView = (caller: Caller, projectId: ProjectId, name: string) =>
+   Effect.gen(function* () {
+     const resource = yield* projectResource(projectId);
+-    if (resource._tag !== "Project" || Result.isFailure(decideEach(caller.principal, resource)))
++    if (resource._tag !== "Project")
+       return undefined;
+     const org = yield* Orgs.use((orgs) => orgs.byId(resource.org));
+     const role = roleIn(caller.principal, resource.org);

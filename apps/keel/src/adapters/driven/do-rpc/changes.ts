@@ -64,7 +64,8 @@ const encodeAbandon = Schema.encodeSync(AbandonCommand);
  * AgentSession for the change id its Idempotency-Key reserves (minted on first
  * use, kept 24 h, refused for another body), then declares on that change's
  * own DO, which takes the workspace and decides. Every other call goes
- * straight to the change's DO, which authorises the lease.
+ * straight to the change's DO, which authorises the lease and confines a read
+ * or a maintainer's withdrawal to the project it was authorised on.
  */
 export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
   return Layer.succeed(
@@ -177,15 +178,14 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
             }),
           ),
         ),
-      nearby: (principal, changeId) =>
+      nearby: (projectId, changeId) =>
         callObject(ChangeCodecs.nearby, () =>
-          objects.change(changeId).nearby(encodeNearby({ projectId: principal.projectId })),
+          objects.change(changeId).nearby(encodeNearby({ projectId })),
         ),
-      abandon: (principal, input) =>
+      abandon: (input) =>
         callObject(ChangeCodecs.abandon, () =>
           objects.change(input.changeId).abandon(
             encodeAbandon({
-              agentId: principal.agentId,
               authority: input.authority,
               ...(input.reason === undefined ? {} : { reason: input.reason }),
               idempotencyKey: input.idempotencyKey,

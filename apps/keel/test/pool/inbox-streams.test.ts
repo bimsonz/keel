@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AgentSessionDO } from "../../src/adapters/driving/do/agent-session.ts";
 import type { SocketFrame } from "../../src/adapters/driving/notices.ts";
 import { AgentSessionCodecs, decodeExit, EventCodecs } from "../../src/rpc/index.ts";
-import { BASE, drainAfter, seedAgent, tokenFor } from "./helpers.ts";
+import { BASE, drainAfter, seedAgent, seedUser, tokenFor } from "./helpers.ts";
 
 const WAIT = { timeout: 5_000, interval: 20 };
 
@@ -51,9 +51,9 @@ async function cursorsOf(agentId: AgentId): Promise<string[]> {
   return page.value.notices.map((notice) => notice.cursor ?? "");
 }
 
-async function enrolled(scope?: string) {
+async function enrolled() {
   const seeded = await seedAgent();
-  return { agentId: seeded.agent.id, token: await tokenFor(seeded, scope) };
+  return { agentId: seeded.agent.id, token: await tokenFor(seeded) };
 }
 
 /** Reads SSE events off a stream, skipping comments; each `next()` answers the next notice event. */
@@ -181,8 +181,8 @@ describe("the agent's WebSocket", () => {
     expect(frames[1]?.notices.map((notice) => notice.id)).toEqual([delivered]);
   });
 
-  it("[b12.ws-scope] refuses the socket and the stream to a token without agent:read", async () => {
-    const { token } = await enrolled("agent:work");
+  it("[b12.ws-scope] refuses the socket and the stream to anyone but an agent: a user is pointed to its own record, a caller without a token is asked to sign in", async () => {
+    const { token } = await seedUser("inbox-user");
     const socket = await exports.default.fetch(`${BASE}/v1/inbox/socket`, {
       headers: { authorization: `Bearer ${token}`, upgrade: "websocket" },
     });
@@ -193,8 +193,18 @@ describe("the agent's WebSocket", () => {
       headers: { upgrade: "websocket" },
     });
 
-    expect(socket.status).toBe(403);
-    expect(stream.status).toBe(403);
-    expect(anonymous.status).toBe(401);
+    for (const refused of [socket, stream])
+      expect([refused.status, await refused.json()]).toEqual([
+        403,
+        expect.objectContaining({
+          code: "auth.forbidden",
+          detail: expect.stringMatching(/^Refused: agents-only\./),
+          nextActions: [expect.objectContaining({ operationId: "Users_me" })],
+        }),
+      ]);
+    expect([anonymous.status, (await anonymous.json<{ code: string }>()).code]).toEqual([
+      401,
+      "auth.required",
+    ]);
   });
 });

@@ -16,7 +16,16 @@ import type { ChangeDO } from "../../src/adapters/driving/do/change.ts";
 import type { WorkspacePoolDO } from "../../src/adapters/driving/do/workspace-pool.ts";
 import { decodeExit, WorkspacePoolCodecs } from "../../src/rpc/index.ts";
 import { changeUnderTest, ok } from "./change-harness.ts";
-import { BASE, drainAfter, mcp, mcpResult, seedAgent, tokenFor } from "./helpers.ts";
+import {
+  BASE,
+  drainAfter,
+  mcp,
+  mcpResult,
+  seedAgent,
+  seedUser,
+  tokenFor,
+  uniqueHandle,
+} from "./helpers.ts";
 
 /** How long a test waits for something an object does by itself (a fork, a delivery). */
 const WAIT = { timeout: 20_000, interval: 25 };
@@ -161,10 +170,10 @@ describe("abandoning a change through the doorways", () => {
     );
   });
 
-  it("[a11.abandon-operator] an operator withdraws with no lease: 200, ChangeWithdrawn by the operator's agent, as operator:<id>", async () => {
-    const { c, projectId } = await heldChange();
-    const operator = await seedAgent({ projectId }, ["operator"]);
-    const token = await tokenFor(operator);
+  it("[a11.abandon-operator] a maintainer of the project's org withdraws with no lease: 200, ChangeWithdrawn by the maintainer, as operator:<id>", async () => {
+    const { c } = await heldChange();
+    const maintainer = await seedUser(uniqueHandle("maintainer"), { role: "maintainer" });
+    const { token } = maintainer;
 
     const withdrawn = await abandonRest(token, c.changeId, "abandon-key-0002");
     const event = withdrawal(await c.log());
@@ -174,8 +183,8 @@ describe("abandoning a change through the doorways", () => {
     expect(withdrawn.body.result.change).toMatchObject({ id: c.changeId, state: "withdrawn" });
     expect((await c.current()).state).toBe("withdrawn");
     expect(event).toMatchObject({
-      actor: `operator:${operator.agent.id}`,
-      payload: { by: operator.agent.id },
+      actor: `operator:${maintainer.userId}`,
+      payload: { by: maintainer.userId },
     });
     expect(tools).toContain("abandon");
   });
@@ -206,7 +215,7 @@ describe("abandoning a change through the doorways", () => {
     expect(stored.lease.id).toBe(adopted.body.result.lease.id);
   });
 
-  it("[a11.abandon-no-lease] an agent without the operator scope that sends no lease is 400 request.invalid, told to send the keel-lease header", async () => {
+  it("[a11.abandon-no-lease] an agent that sends no lease is 400 request.invalid, told to send the keel-lease header", async () => {
     const { c, holder, lease } = await heldChange();
 
     const refused = await abandonRest(holder, c.changeId, "abandon-key-0005");

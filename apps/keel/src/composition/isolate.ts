@@ -1,5 +1,5 @@
-import { admit } from "@keeltown/core/application/identity";
-import type { AgentId, ChangeId, ProjectId } from "@keeltown/core/kernel";
+import { type Credential, principalOf } from "@keeltown/core/application/identity";
+import { type AgentId, type ChangeId, type ProjectId, UserId } from "@keeltown/core/kernel";
 import {
   type AgentDirectory,
   type Changes,
@@ -12,20 +12,24 @@ import {
   type Notifier,
   PROJECTOR,
   type Projects,
-  TokenIssuer,
 } from "@keeltown/core/ports";
 import { waitUntil } from "cloudflare:workers";
-import { Effect, Layer, ManagedRuntime } from "effect";
+import { Effect, Layer, ManagedRuntime, Option, Schema } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
 import {
   AUTH_BASE_PATH,
   type AuthConfig,
+  createUser,
   makeAuth,
   type OtpSender,
   signInMethods,
 } from "../adapters/driven/better-auth/auth.ts";
 import { AgentDirectoryWithBootstrap } from "../adapters/driven/bootstrap/directory.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
+import { MembershipsD1 } from "../adapters/driven/d1/memberships.ts";
+import { OrgsD1 } from "../adapters/driven/d1/orgs.ts";
+import { ProjectOrgsD1 } from "../adapters/driven/d1/project-orgs.ts";
+import { UsersD1 } from "../adapters/driven/d1/users.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { EnrolmentsRpc } from "../adapters/driven/do-rpc/enrolments.ts";
 import { SessionsRpc } from "../adapters/driven/do-rpc/sessions.ts";
@@ -38,7 +42,8 @@ import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { TokenIssuerJose } from "../adapters/driven/jose/token-issuer.ts";
 import { ClockLive, SystemLive } from "../adapters/driven/system.ts";
 import { makeApp } from "../adapters/driving/http/app.ts";
-import type { TokenVerifier, Verification } from "../adapters/driving/http/caller.ts";
+import { gate, type GateDeps } from "../adapters/driving/http/gate.ts";
+import type { BoundGate } from "../adapters/driving/http/route-deps.ts";
 import type { InboxStreams } from "../adapters/driving/http/inbox-streams.ts";
 import { makeHandlers } from "../adapters/driving/http/handlers.ts";
 import { makeRunner, type IsolateServices } from "../adapters/driving/http/run.ts";
@@ -74,6 +79,10 @@ export function isolateLayer(
     overrides.sessions ?? SessionsRpc(agentSession),
     overrides.standings ?? StandingsRpc(agentSession),
     directory,
+    UsersD1(env.DB),
+    MembershipsD1(env.DB),
+    OrgsD1(env.DB),
+    ProjectOrgsD1(env.DB),
     // The repo read API reads trunks, which live in the core namespace alone.
     overrides.codeHost ?? CodeHostArtifacts({ "keel-core": env.ARTIFACTS }),
     TokenIssuerJose({ privateJwk: env.KEEL_SIGNING_KEY, issuer: env.KEEL_HOST }).pipe(
@@ -100,26 +109,38 @@ export interface IsolateOverrides {
 
 export type IsolateRuntime = ManagedRuntime.ManagedRuntime<IsolateServices, never>;
 
+const decodeUserId = Schema.decodeUnknownOption(UserId);
+
 /**
- * A bearer token is good if it verifies and its agent may still act at the
- * token's epoch. `admit` reads only the AgentDirectory: the gate never calls
- * an AgentSession DO.
+ * The gate's dependencies: the user a Better Auth session names (Better Auth
+ * made for the call, never kept), and the principal the core gate builds for a
+ * credential, with its refusals as the doorway answers them.
  */
-function makeVerifier(runtime: IsolateRuntime): TokenVerifier {
-  return (token) =>
-    runtime.runPromise(
-      TokenIssuer.use((issuer) => issuer.verify(token)).pipe(
-        Effect.flatMap((principal) =>
-          admit(principal).pipe(
-            Effect.as<Verification>({ principal }),
-            Effect.catchTag("AgentNotAdmitted", () =>
-              Effect.succeed<Verification>({ refused: "revoked" }),
-            ),
+function gateDeps(
+  runtime: IsolateRuntime,
+  host: string,
+  auth: () => ReturnType<typeof makeAuth>,
+): GateDeps {
+  return {
+    origin: `https://${host}`,
+    sessionUser: async (headers) => {
+      const session = await auth().api.getSession({ headers });
+      return session === null ? null : Option.getOrNull(decodeUserId(session.user.id));
+    },
+    admit: (credential: Credential) =>
+      runtime.runPromise(
+        principalOf(credential).pipe(
+          Effect.map((admitted) => ({ admitted })),
+          Effect.catchTag("AgentNotAdmitted", () =>
+            Effect.succeed({ refused: "revoked" } as const),
           ),
+          Effect.catchTag("AgentUnplaced", (error) =>
+            Effect.succeed({ refused: "unplaced", agentId: error.agentId } as const),
+          ),
+          Effect.catch(() => Effect.succeed({ refused: "invalid" } as const)),
         ),
-        Effect.catch(() => Effect.succeed<Verification>({ refused: "invalid" })),
       ),
-    );
+  };
 }
 
 interface Isolate {
@@ -172,6 +193,7 @@ function identity(env: Env, overrides: AuthOverrides): AuthConfig {
         .map((name) => name.trim().toLowerCase())
         .filter((name) => name !== ""),
     ),
+    claimDigest: env.KEEL_CLAIM_DIGEST,
   };
 }
 
@@ -183,8 +205,9 @@ export function makeIsolate(
 ): Isolate {
   const runtime = ManagedRuntime.make(layer);
   const authConfig = identity(env, authOverrides);
-  const handlers = makeHandlers(makeRunner(runtime), signInMethods(authConfig));
-  const verify = makeVerifier(runtime);
+  const handlers = makeHandlers(makeRunner(runtime), signInMethods(authConfig), (handle) =>
+    createUser(authConfig, handle),
+  );
   /**
    * Better Auth starts its initialisation (D1 included) when it is made and
    * shares that promise, and its adapter's schema check, with every later
@@ -197,10 +220,12 @@ export function makeIsolate(
     authOverrides.made?.();
     return makeAuth(authConfig);
   };
+  const deps = gateDeps(runtime, env.KEEL_HOST, auth);
+  const boundGate: BoundGate = (request, requestId) => gate(request, requestId, deps);
   const app = makeApp({
     handlers,
-    verify,
-    mcp: makeMcpEndpoint(handlers, verify, [env.KEEL_HOST]),
+    gate: boundGate,
+    mcp: makeMcpEndpoint(handlers, deps, [env.KEEL_HOST]),
     auth: {
       basePath: AUTH_BASE_PATH,
       handler: (request) => auth().handler(request),

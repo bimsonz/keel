@@ -1,12 +1,13 @@
 // The repo read API through the handler object: who may read a project's
 // code, and what each read answers, over in-memory trunks.
 import { projectRepos } from "@keeltown/core/application/integration";
-import type { AgentToken } from "@keeltown/core/domain/identity";
+import type { Principal } from "@keeltown/core/domain/identity";
 import { AgentId, CommitSha, Instant, ProjectId } from "@keeltown/core/kernel";
 import { CodeHost, type ProjectSettings } from "@keeltown/core/ports";
 import {
   type FixtureFiles,
   makeAgentDirectoryMemory,
+  makeBetterAuthMemory,
   makeChangesMemory,
   makeClockMemory,
   makeCodeHostMemory,
@@ -16,9 +17,15 @@ import {
   makeEventFeedMemory,
   makeIdsMemory,
   makeInboxMemory,
+  makeMembershipsMemory,
+  makeOrgsMemory,
+  makeProjectOrgsMemory,
   makeProjectsMemory,
   makeProjectViewsMemory,
   makeTokenIssuerMemory,
+  makeUsersMemory,
+  sampleOrgId,
+  sampleSponsorId,
 } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { afterAll, describe, expect, it } from "vitest";
@@ -29,7 +36,6 @@ import { makeRunner } from "../../src/adapters/driving/http/run.ts";
 
 const project = Schema.decodeUnknownSync(ProjectId);
 const PRIVATE = project("prj_25R7GR504NN2N2MB7JTCFBPPQ8");
-const PUBLIC = project("prj_7VDSYA2DEW8R8GHT98W18TZKVN");
 const ELSEWHERE = project("prj_0SYSTEM0000000000000000000");
 const HISTORY = project("prj_3QV5XQYT97AZ542QMTCPSQYENF");
 const DIFFS = project("prj_7FTAT7FJWMEMMJZWGW3D51XX97");
@@ -40,6 +46,8 @@ const directory = makeAgentDirectoryMemory().layer;
 const inbox = makeInboxMemory();
 const codeHost = makeCodeHostMemory();
 const projects = makeProjectsMemory();
+const places = makeProjectOrgsMemory();
+const rows = makeBetterAuthMemory({ orgs: [{ id: sampleOrgId, slug: "forge" }] });
 const runtime = ManagedRuntime.make(
   Layer.mergeAll(
     directory,
@@ -56,10 +64,20 @@ const runtime = ManagedRuntime.make(
     makeEventFeedMemory().layer,
     makeProjectViewsMemory().layer,
     codeHost.layer,
+    makeUsersMemory(rows).layer,
+    makeMembershipsMemory(rows).layer,
+    makeOrgsMemory(rows).layer,
+    places.layer,
   ),
 );
 afterAll(() => runtime.dispose());
-const handlers = makeHandlers(makeRunner(runtime), { emailCode: false, github: false });
+const handlers = makeHandlers(
+  makeRunner(runtime),
+  { emailCode: false, github: false },
+  async () => {
+    throw new Error("the repo reads make no users");
+  },
+);
 
 const settings = (visibility: "private" | "public"): ProjectSettings => ({
   protectedPaths: [],
@@ -67,10 +85,14 @@ const settings = (visibility: "private" | "public"): ProjectSettings => ({
   verification: "required",
   visibility,
 });
-projects.setSettings(PRIVATE, settings("private"));
-projects.setSettings(PUBLIC, settings("public"));
-projects.setSettings(HISTORY, settings("public"));
-projects.setSettings(DIFFS, settings("private"));
+for (const [projectId, visibility] of [
+  [PRIVATE, "private"],
+  [HISTORY, "public"],
+  [DIFFS, "private"],
+] as const) {
+  projects.setSettings(projectId, settings(visibility));
+  places.places.set(projectId, { projectId, org: sampleOrgId, name: projectId.toLowerCase() });
+}
 
 /** Commits `files` as the whole tree on a project's trunk `main`, creating the trunk first. */
 async function commit(projectId: ProjectId, files: FixtureFiles): Promise<string> {
@@ -84,26 +106,32 @@ async function commit(projectId: ProjectId, files: FixtureFiles): Promise<string
   );
 }
 
-const caller = (principal: AgentToken | null): Caller => ({
+const caller = (principal: Principal): Caller => ({
   requestId: "req-repo",
   principal,
   signal: new AbortController().signal,
 });
-const principal = (projectId: ProjectId, scopes: AgentToken["scopes"]): AgentToken => ({
-  agentId: Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0"),
-  projectId,
-  scopes,
-  revocationEpoch: 0,
-});
-const anonymous = caller(null);
+const anonymous = caller({ _tag: "Anonymous" });
+/** An agent of `projectId`, placed in the project's org and sponsored by a member there. */
 const agentOf = (projectId: ProjectId) =>
-  caller(principal(projectId, ["agent:read", "agent:work"]));
-const observer = caller(principal(ELSEWHERE, ["observer"]));
-const operator = caller(principal(ELSEWHERE, ["operator"]));
+  caller({
+    _tag: "Agent",
+    agentId: Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0"),
+    org: sampleOrgId,
+    projectId,
+    scopes: ["agent:read", "agent:work"],
+    sponsor: { userId: sampleSponsorId, role: "member", suspended: false },
+  });
+/** A member of the org that holds every project here: it reads them all, the private ones too. */
+const member = caller({
+  _tag: "User",
+  userId: sampleSponsorId,
+  handle: "forge-member",
+  instanceAdmin: false,
+  suspended: false,
+  memberships: [{ org: sampleOrgId, role: "member" }],
+});
 
-const statusOf = async (
-  answer: Promise<{ readonly status: number }> | { readonly status: number },
-) => (await answer).status;
 const bodyOf = async <B>(answer: unknown): Promise<B> => {
   const result: unknown = await answer;
   return Reflect.get(Object(result), "body");
@@ -118,36 +146,7 @@ const FILES: FixtureFiles = {
   vendor: { mode: "160000", data: "1".repeat(40) },
 };
 
-const tree = (who: Caller, projectId: ProjectId) => handlers.Repo_getTree(who, { projectId });
-
 describe("the repo read API", () => {
-  it("[repo.access] an agent reads its own project, an observer or operator any, anyone a public one; every refusal is the same 404", async () => {
-    await commit(PRIVATE, FILES);
-    await commit(PUBLIC, FILES);
-    expect(await statusOf(tree(agentOf(PRIVATE), PRIVATE))).toBe(200);
-    expect(await statusOf(tree(observer, PRIVATE))).toBe(200);
-    expect(await statusOf(tree(operator, PRIVATE))).toBe(200);
-    expect(await statusOf(tree(anonymous, PUBLIC))).toBe(200);
-    expect(await statusOf(tree(agentOf(PRIVATE), PUBLIC))).toBe(200);
-
-    const refused = [
-      await tree(anonymous, PRIVATE),
-      await tree(agentOf(PUBLIC), PRIVATE),
-      await tree(caller(principal(PRIVATE, ["agent:work"])), PRIVATE),
-      await tree(anonymous, ELSEWHERE),
-    ];
-    expect(refused.map((r) => r.status)).toEqual([404, 404, 404, 404]);
-    const codes = await Promise.all(refused.map((r) => bodyOf<{ code: string }>(r)));
-    expect(codes.map((b) => b.code)).toEqual(Array.from({ length: 4 }, () => "resource.not_found"));
-    // A refused read and a project that does not exist answer alike, but for its id.
-    const [hidden, missing] = await Promise.all([
-      bodyOf<{ detail: string; nextActions: unknown[] }>(refused[0]),
-      bodyOf<{ detail: string; nextActions: unknown[] }>(refused[3]),
-    ]);
-    expect(hidden.nextActions).toEqual(missing.nextActions);
-    expect(hidden.detail.replace(PRIVATE, "")).toBe(missing.detail.replace(ELSEWHERE, ""));
-  });
-
   it("[repo.tree] a directory at a branch, a full ref or a commit, its entries typed; a file's path or an unknown ref is a 404 naming which", async () => {
     const head = await commit(PRIVATE, FILES);
     const reader = agentOf(PRIVATE);
@@ -247,7 +246,7 @@ describe("the repo read API", () => {
   });
 
   it("[repo.diff] a commit's files against its first parent with their text; a root commit adds every file", async () => {
-    const reader = observer;
+    const reader = member;
     const before = await commit(DIFFS, { "a.txt": "one\n", "gone.txt": "bye\n", "d/x": "x\n" });
     const after = await commit(DIFFS, { "a.txt": "two\n", "new.txt": "hi\n", "d/x": "x\n" });
     const rooted = await bodyOf<{ base?: string; files: unknown[] }>(
@@ -286,6 +285,20 @@ describe("the repo read API", () => {
       sha: "0".repeat(40),
     });
     expect(await bodyOf(unknown)).toMatchObject({ code: "repo.ref_not_found" });
+    // A private project's code is its org's: another project's agent is refused, a visitor sees nothing.
+    const foreign = await handlers.Repo_getCommit(agentOf(ELSEWHERE), {
+      projectId: DIFFS,
+      sha: after,
+    });
+    expect([foreign.status, await bodyOf(foreign)]).toEqual([
+      403,
+      expect.objectContaining({ code: "auth.forbidden", detail: "Refused: foreign-project." }),
+    ]);
+    const visitor = await handlers.Repo_getCommit(anonymous, { projectId: DIFFS, sha: after });
+    expect([visitor.status, await bodyOf(visitor)]).toEqual([
+      404,
+      expect.objectContaining({ code: "resource.not_found" }),
+    ]);
   });
 
   it("[repo.diff-caps] a side over 1 MiB, the files past 8 MiB in all, and every file past 300 come without text", async () => {
@@ -298,7 +311,7 @@ describe("the repo read API", () => {
     const sha = await commit(PRIVATE, files);
     const diff = await bodyOf<{
       files: { path: string; truncated: boolean; after: string | null }[];
-    }>(handlers.Repo_getCommit(observer, { projectId: PRIVATE, sha }));
+    }>(handlers.Repo_getCommit(member, { projectId: PRIVATE, sha }));
     const byPath = new Map(diff.files.map((f) => [f.path, f]));
     const served = (path: string) => byPath.get(path)?.after !== null;
     expect([...Array(8).keys()].every((i) => served(`big/${i}.txt`))).toBe(true);

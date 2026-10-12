@@ -22,7 +22,7 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { KeelClient, KeelProblem } from "@keeltown/sdk";
 import { cloneWorkspace, commitAndPush, git } from "./lib/git.ts";
-import { clientFor, readSeeded } from "./lib/seeded.ts";
+import { readSeeded, userClient } from "./lib/seeded.ts";
 
 const [run, environment = "staging"] = process.argv.slice(2);
 if (run === undefined || !/^[a-z0-9-]+$/.test(run))
@@ -139,9 +139,9 @@ async function enrolled(operator: KeelClient, name: string, projectId: string) {
 
 const dirs: string[] = [];
 try {
-  const operator = clientFor(keelUrl, seeded.operator);
+  const operator = userClient(keelUrl, seeded.seedUser);
   const project = await operator.createProject(
-    { name: PROJECT, source: FIXTURE },
+    { org: seeded.seedUser.handle, name: PROJECT, source: FIXTURE },
     { idempotencyKey: key("project") },
   );
   await operator.putSettings(project.id, {

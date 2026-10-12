@@ -1,12 +1,10 @@
 import { Effect, Option, Schema } from "effect";
-import type { AgentToken } from "../../domain/identity/index.ts";
 import { ProjectNotFound } from "../../domain/integration/index.ts";
 import { CommitSha, type ProjectId } from "../../domain/kernel/index.ts";
 import {
   CodeHost,
   type CommitInfo,
   PathNotFound,
-  Projects,
   RefNotFound,
   type RepoRef,
   type TreeChange,
@@ -15,9 +13,10 @@ import {
 import { projectRepos } from "./project-repos.ts";
 
 /**
- * A project's code, read-only, as a code host shows it. Every read is of the
- * project's trunk: never its staging repo, its mirror or a workspace, so no
- * read reaches a token, a candidate or another project's code.
+ * A project's code, read-only, as a code host shows it. The doorway has already
+ * authorised the read on the project. Every read is of the project's trunk:
+ * never its staging repo, its mirror or a workspace, so no read reaches a
+ * token, a candidate or another project's code.
  */
 
 /** The largest file served inline; a larger one answers its size and no content. */
@@ -36,31 +35,8 @@ const MODE_GITLINK = "160000";
 const isBinary = (bytes: Uint8Array) => bytes.subarray(0, BINARY_PROBE_BYTES).includes(0);
 const asSha = Schema.decodeUnknownOption(CommitSha);
 
-/**
- * Whose code a caller may read. An observer or an operator reads every
- * project, as it reads the whole event feed at L1; an agent reads its own
- * project; anyone, with a token or without, reads a project its operator made
- * public. Every refusal is ProjectNotFound, the answer for a project that does
- * not exist, so a private project's existence does not leak.
- */
-export const repoAccess = (
-  principal: AgentToken | null,
-  projectId: ProjectId,
-): Effect.Effect<RepoRef, ProjectNotFound, Projects> => {
-  const trunk = Effect.succeed(projectRepos(projectId).trunk);
-  if (
-    principal !== null &&
-    (principal.scopes.includes("observer") ||
-      principal.scopes.includes("operator") ||
-      (principal.projectId === projectId && principal.scopes.includes("agent:read")))
-  )
-    return trunk;
-  return Projects.use((projects) => projects.settings(projectId)).pipe(
-    Effect.flatMap((settings) =>
-      settings.visibility === "public" ? trunk : Effect.fail(new ProjectNotFound({ projectId })),
-    ),
-  );
-};
+/** The repo a project's code is read from: its trunk, and nothing else. */
+const trunkOf = (projectId: ProjectId): RepoRef => projectRepos(projectId).trunk;
 
 /** A trunk the code host does not hold is a project that does not exist. */
 const projectMissing = (projectId: ProjectId) => () =>
@@ -90,12 +66,11 @@ export interface RepoTreeView {
 }
 
 export const readRepoTree = (
-  principal: AgentToken | null,
   projectId: ProjectId,
   input: { readonly ref?: string; readonly path: string },
-): Effect.Effect<RepoTreeView, ProjectNotFound | RefNotFound | PathNotFound, Projects | CodeHost> =>
+): Effect.Effect<RepoTreeView, ProjectNotFound | RefNotFound | PathNotFound, CodeHost> =>
   Effect.gen(function* () {
-    const repo = yield* repoAccess(principal, projectId);
+    const repo = trunkOf(projectId);
     const host = yield* CodeHost;
     const commit = yield* resolve(repo, input.ref);
     const entries = yield* host
@@ -117,12 +92,11 @@ export interface RepoBlobView {
 }
 
 export const readRepoBlob = (
-  principal: AgentToken | null,
   projectId: ProjectId,
   input: { readonly ref?: string; readonly path: string },
-): Effect.Effect<RepoBlobView, ProjectNotFound | RefNotFound | PathNotFound, Projects | CodeHost> =>
+): Effect.Effect<RepoBlobView, ProjectNotFound | RefNotFound | PathNotFound, CodeHost> =>
   Effect.gen(function* () {
-    const repo = yield* repoAccess(principal, projectId);
+    const repo = trunkOf(projectId);
     const host = yield* CodeHost;
     const commit = yield* resolve(repo, input.ref);
     const slash = input.path.lastIndexOf("/");
@@ -164,12 +138,11 @@ export interface RepoCommitPage {
  * trunk moves.
  */
 export const listRepoCommits = (
-  principal: AgentToken | null,
   projectId: ProjectId,
   input: { readonly ref?: string; readonly from?: CommitSha; readonly limit?: number },
-): Effect.Effect<RepoCommitPage, ProjectNotFound | RefNotFound, Projects | CodeHost> =>
+): Effect.Effect<RepoCommitPage, ProjectNotFound | RefNotFound, CodeHost> =>
   Effect.gen(function* () {
-    const repo = yield* repoAccess(principal, projectId);
+    const repo = trunkOf(projectId);
     const host = yield* CodeHost;
     const limit = Math.min(MAX_COMMIT_PAGE, Math.max(1, input.limit ?? DEFAULT_COMMIT_PAGE));
     const from = input.from ?? (yield* resolve(repo, input.ref));
@@ -236,12 +209,11 @@ const withSides = (repo: RepoRef, files: readonly TreeChange[]) =>
 
 /** A commit and the files it changed against its first parent, with their text; a root commit adds every file. */
 export const readRepoCommit = (
-  principal: AgentToken | null,
   projectId: ProjectId,
   sha: CommitSha,
-): Effect.Effect<RepoCommitDiffView, ProjectNotFound | RefNotFound, Projects | CodeHost> =>
+): Effect.Effect<RepoCommitDiffView, ProjectNotFound | RefNotFound, CodeHost> =>
   Effect.gen(function* () {
-    const repo = yield* repoAccess(principal, projectId);
+    const repo = trunkOf(projectId);
     const host = yield* CodeHost;
     const commit = yield* host
       .readCommit(repo, sha)

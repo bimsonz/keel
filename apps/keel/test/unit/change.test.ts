@@ -203,8 +203,7 @@ describe("declare", () => {
         yield* abandon(
           changeId,
           Schema.decodeUnknownSync(AbandonCommand)({
-            agentId,
-            authority: { _tag: "Lease", leaseId: declared.change.lease.id },
+            authority: { _tag: "Lease", leaseId: declared.change.lease.id, agentId },
             idempotencyKey: "abandon-1",
           }),
         );
@@ -215,6 +214,37 @@ describe("declare", () => {
         expect(failureTag(afterEnd)).toContain("ChangeStateRefused");
         expect([...pool.released]).toEqual([[expect.any(String), "withdrawn"]]);
         expect(pool.released.has(declared.grant.workspaceId)).toBe(false);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[change.abandon-maintainer] a maintainer withdraws a change of their project, named as the event's by and actor; another project's is ChangeNotFound and commits nothing",
+    () => {
+      const { layer } = changeObject();
+      const maintainer = "usr_01JZ8PT2C4E6G8J0M2N4Q6S8V0";
+      const withdrawing = (projectId: string, key: string) =>
+        Schema.decodeUnknownSync(AbandonCommand)({
+          authority: { _tag: "Maintainer", by: maintainer, projectId },
+          idempotencyKey: key,
+        });
+      return Effect.gen(function* () {
+        yield* declare(declaring());
+        const before = yield* types;
+        const elsewhere = yield* Effect.exit(
+          abandon(changeId, withdrawing(makeId("prj", ulid()), "abandon-elsewhere")),
+        );
+        expect(failureTag(elsewhere)).toContain("ChangeNotFound");
+        expect(yield* types).toEqual(before);
+
+        const withdrawn = yield* abandon(changeId, withdrawing(sampleProjectId, "abandon-1"));
+        expect(withdrawn.state).toBe("withdrawn");
+        const log = (yield* EventOutbox).log({ kind: "change", id: changeId });
+        expect(log.at(-1)).toMatchObject({
+          type: "ChangeWithdrawn",
+          actor: `operator:${maintainer}`,
+          payload: { by: maintainer },
+        });
       }).pipe(Effect.provide(layer));
     },
   );

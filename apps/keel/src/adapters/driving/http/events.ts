@@ -29,16 +29,18 @@ const KeelEvent = Schema.Union([
   VerificationEvent,
 ]);
 const decodeKeelEvent = Schema.decodeUnknownResult(KeelEvent);
+const encodeKeelEvent = Schema.encodeSync(KeelEvent);
 
 type EventPageBody = Extract<Inbox_listEventsResult, { readonly status: 200 }>["body"];
 type WireEvent = EventPageBody["items"][number]["payload"];
 
 /**
- * The feed holds each event as its committer encoded it, which is the wire's
- * form: core's schemas decode it, and the spec's KeelEvent is the same
- * catalogue, held equal to core's by `[events.conform]`. They differ only in
- * `| undefined` on optional keys, which JSON cannot carry. `servedBody` parses
- * the page against the spec again before it leaves.
+ * The feed holds each event as its committer encoded it. It is served as core
+ * reads it now, decoded and encoded again: a key an older schema committed and
+ * a later one retired is dropped, since the spec's objects are sealed. The
+ * spec's KeelEvent is core's catalogue, held equal to it by `[events.conform]`;
+ * they differ only in `| undefined` on optional keys, which JSON cannot carry.
+ * `servedBody` parses the page against the spec again before it leaves.
  */
 const isWireEvent = (payload: unknown): payload is WireEvent =>
   Result.isSuccess(decodeKeelEvent(payload));
@@ -74,9 +76,13 @@ export function eventsInput(input: Input<"Inbox_listEvents">): Result.Result<Eve
  * catalogue, or one changed in place), a defect rather than a silent skip.
  */
 function eventRecord(entry: EventFeedEntry) {
-  const { payload } = entry;
-  if (!isWireEvent(payload)) {
+  const decoded = decodeKeelEvent(entry.payload);
+  if (Result.isFailure(decoded)) {
     throw new Error(`Feed event ${entry.eventId} (${entry.type}) is not in core's catalogue`);
+  }
+  const payload = JSON.parse(JSON.stringify(encodeKeelEvent(decoded.success)));
+  if (!isWireEvent(payload)) {
+    throw new Error(`Feed event ${entry.eventId} (${entry.type}) does not encode to its wire form`);
   }
   return {
     eventId: entry.eventId,

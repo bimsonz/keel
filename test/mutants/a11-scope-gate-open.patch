@@ -1,16 +1,16 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/work-loop.test.ts -t "a11.scope-gate"
 # kills: a11.scope-gate
 # why: the REST gate admits any verified token, whatever scope the operation demands
-diff --git a/apps/keel/src/adapters/driving/http/route-deps.ts b/apps/keel/src/adapters/driving/http/route-deps.ts
-index e0dc54d..f3cef83 100644
---- a/apps/keel/src/adapters/driving/http/route-deps.ts
-+++ b/apps/keel/src/adapters/driving/http/route-deps.ts
-@@ -69,7 +69,7 @@ export function routeDeps(verify: TokenVerifier): RouteDeps<AppEnv, Caller> {
-             });
-       }
-       const { principal } = verification;
--      if (!satisfies(requirements, principal)) {
-+      if (false && !satisfies(requirements, principal)) {
-         return problemResponse(403, "auth.insufficient_scope", requestId, {
-           detail: `This operation requires one of: ${requirements.map((r) => Object.values(r).flat().join(" + ")).join(", ")}.`,
-         });
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 7b9bc8d..780ac10 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -228,7 +228,7 @@ const agentRights = (agent: AgentPrincipal, resource: Resource): ReadonlySet<Rig
+       resource._tag === "Org" || (resource._tag === "Project" && resource.visibility === "public");
+     if (own || publicRead) rights.add("read");
+   }
+-  if (own && agent.scopes.includes("agent:work") && sponsor.has("member")) rights.add("work");
++  if (own && sponsor.has("member")) rights.add("work");
+   return rights;
+ };
+ 

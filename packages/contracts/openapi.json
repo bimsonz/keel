@@ -50,25 +50,31 @@
     },
     {
       "name": "Operator"
+    },
+    {
+      "name": "Orgs"
+    },
+    {
+      "name": "Users"
+    },
+    {
+      "name": "Admin"
     }
   ],
   "paths": {
-    "/agents": {
+    "/admin/users": {
       "post": {
-        "operationId": "Operator_enrolAgent",
-        "summary": "Enrol an agent",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
+        "operationId": "Admin_createUser",
+        "summary": "Create a user",
+        "description": "A user with a handle and its personal org, and a bearer session for it, shown once: how automation\ngets a user. The instance admin, or the bootstrap credential, may call it. A handle already taken or\nheld answers 409.",
+        "parameters": [],
         "responses": {
           "201": {
             "description": "The request has succeeded and a new resource has been created as a result.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnrolledAgent"
+                  "$ref": "#/components/schemas/CreatedUser"
                 }
               }
             }
@@ -163,6 +169,148 @@
           }
         },
         "tags": [
+          "Admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "OAuth2Auth": []
+          }
+        ]
+      }
+    },
+    "/agents": {
+      "post": {
+        "operationId": "Operator_enrolAgent",
+        "summary": "Enrol an agent",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The request has succeeded and a new resource has been created as a result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrolledAgent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request conflicts with the current state of the server.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
           "Operator"
         ],
         "requestBody": {
@@ -177,9 +325,7 @@
         },
         "security": [
           {
-            "OAuth2Auth": [
-              "operator"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -426,9 +572,7 @@
         ],
         "security": [
           {
-            "OAuth2Auth": [
-              "operator"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -566,9 +710,7 @@
         ],
         "security": [
           {
-            "OAuth2Auth": [
-              "operator"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -716,9 +858,7 @@
         },
         "security": [
           {
-            "OAuth2Auth": [
-              "operator"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -921,9 +1061,7 @@
             ]
           },
           {
-            "OAuth2Auth": [
-              "observer"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -1066,13 +1204,11 @@
           {},
           {
             "OAuth2Auth": [
-              "observer"
+              "agent:read"
             ]
           },
           {
-            "OAuth2Auth": [
-              "agent:read"
-            ]
+            "BearerAuth": []
           }
         ]
       },
@@ -1340,9 +1476,7 @@
             ]
           },
           {
-            "OAuth2Auth": [
-              "observer"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -1500,9 +1634,7 @@
             ]
           },
           {
-            "OAuth2Auth": [
-              "operator"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -2350,9 +2482,7 @@
             ]
           },
           {
-            "OAuth2Auth": [
-              "observer"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -2488,9 +2618,7 @@
             ]
           },
           {
-            "OAuth2Auth": [
-              "observer"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -2614,9 +2742,7 @@
             ]
           },
           {
-            "OAuth2Auth": [
-              "observer"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -2891,9 +3017,7 @@
             ]
           },
           {
-            "OAuth2Auth": [
-              "observer"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -3022,9 +3146,7 @@
             ]
           },
           {
-            "OAuth2Auth": [
-              "observer"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -3151,8 +3273,11 @@
         "security": [
           {
             "OAuth2Auth": [
-              "operator"
+              "agent:read"
             ]
+          },
+          {
+            "BearerAuth": []
           }
         ]
       }
@@ -3299,9 +3424,7 @@
         },
         "security": [
           {
-            "OAuth2Auth": [
-              "operator"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -3453,13 +3576,11 @@
           {},
           {
             "OAuth2Auth": [
-              "observer"
+              "agent:read"
             ]
           },
           {
-            "OAuth2Auth": [
-              "agent:read"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -3587,13 +3708,11 @@
           {},
           {
             "OAuth2Auth": [
-              "observer"
+              "agent:read"
             ]
           },
           {
-            "OAuth2Auth": [
-              "agent:read"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -3820,15 +3939,14 @@
           "Lattices"
         ],
         "security": [
-          {
-            "OAuth2Auth": [
-              "observer"
-            ]
-          },
+          {},
           {
             "OAuth2Auth": [
               "agent:read"
             ]
+          },
+          {
+            "BearerAuth": []
           }
         ]
       }
@@ -3937,10 +4055,150 @@
         ]
       }
     },
+    "/orgs/{org}/projects/{name}": {
+      "get": {
+        "operationId": "Orgs_getProject",
+        "summary": "Get a project by its org and name",
+        "description": "A project by its org's name and its own, as `/<org>/<project>` names them; either name in any case.\nA private project reads as missing to anyone outside its org.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Orgs"
+        ],
+        "security": [
+          {},
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/projects": {
       "get": {
         "operationId": "Operator_listProjects",
         "summary": "List projects",
+        "description": "The projects the caller may read: a visitor's are the public ones; each project is decided by its read rule.",
         "parameters": [
           {
             "$ref": "#/components/parameters/PageQuery.cursor"
@@ -4043,10 +4301,14 @@
           "Operator"
         ],
         "security": [
+          {},
           {
             "OAuth2Auth": [
-              "operator"
+              "agent:read"
             ]
+          },
+          {
+            "BearerAuth": []
           }
         ]
       },
@@ -4183,9 +4445,7 @@
         },
         "security": [
           {
-            "OAuth2Auth": [
-              "operator"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -4320,9 +4580,7 @@
             ]
           },
           {
-            "OAuth2Auth": [
-              "observer"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -4466,13 +4724,11 @@
           {},
           {
             "OAuth2Auth": [
-              "observer"
+              "agent:read"
             ]
           },
           {
-            "OAuth2Auth": [
-              "agent:read"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -4614,13 +4870,11 @@
           {},
           {
             "OAuth2Auth": [
-              "observer"
+              "agent:read"
             ]
           },
           {
-            "OAuth2Auth": [
-              "agent:read"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -4754,13 +5008,11 @@
           {},
           {
             "OAuth2Auth": [
-              "observer"
+              "agent:read"
             ]
           },
           {
-            "OAuth2Auth": [
-              "agent:read"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -4904,13 +5156,11 @@
           {},
           {
             "OAuth2Auth": [
-              "observer"
+              "agent:read"
             ]
           },
           {
-            "OAuth2Auth": [
-              "agent:read"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -5035,8 +5285,11 @@
         "security": [
           {
             "OAuth2Auth": [
-              "operator"
+              "agent:read"
             ]
+          },
+          {
+            "BearerAuth": []
           }
         ]
       },
@@ -5178,9 +5431,7 @@
         },
         "security": [
           {
-            "OAuth2Auth": [
-              "operator"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -5309,9 +5560,7 @@
             ]
           },
           {
-            "OAuth2Auth": [
-              "observer"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -5725,6 +5974,112 @@
         ]
       }
     },
+    "/users/me": {
+      "get": {
+        "operationId": "Users_me",
+        "summary": "Who am I, as a user?",
+        "description": "The signed-in user: its handle, whether it is the instance admin, and its orgs with its role in each.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserIdentity"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/verdicts/{verdictId}": {
       "get": {
         "operationId": "Views_getVerdict",
@@ -5849,9 +6204,7 @@
             ]
           },
           {
-            "OAuth2Auth": [
-              "observer"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -6004,9 +6357,7 @@
             ]
           },
           {
-            "OAuth2Auth": [
-              "observer"
-            ]
+            "BearerAuth": []
           }
         ]
       }
@@ -6532,16 +6883,8 @@
           "scopes": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Scope"
+              "$ref": "#/components/schemas/RecordedScope"
             }
-          },
-          "onBehalfOf": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Sponsor"
-              }
-            ],
-            "description": "The human the agent acts on behalf of, when the operator named one."
           },
           "org": {
             "allOf": [
@@ -6609,16 +6952,24 @@
           "scopes": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Scope"
+              "$ref": "#/components/schemas/RecordedScope"
             }
           },
-          "onBehalfOf": {
+          "org": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/Sponsor"
+                "$ref": "#/components/schemas/OrgId"
               }
             ],
-            "description": "The agent's sponsor, named at enrolment."
+            "description": "The agent's org. Absent only for agents enrolled before tenancy."
+          },
+          "sponsor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserId"
+              }
+            ],
+            "description": "The user who minted the agent's credential: its sponsor, accountable for it."
           },
           "revocationEpoch": {
             "type": "integer",
@@ -8369,18 +8720,75 @@
       "CreateProjectRequest": {
         "type": "object",
         "required": [
+          "org",
           "name",
           "source"
         ],
         "properties": {
+          "org": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The org the project is created in, by name; the caller must be a member of it."
+          },
           "name": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "The project's name in its org, unique there in any case."
           },
           "source": {
             "type": "string",
             "minLength": 1,
             "description": "The repository in Keel's core namespace that trunk is forked from. It must already hold the code."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "CreateUserRequest": {
+        "type": "object",
+        "required": [
+          "handle"
+        ],
+        "properties": {
+          "handle": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Handle"
+              }
+            ],
+            "description": "The new user's handle; its personal org takes the same name."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "CreatedUser": {
+        "type": "object",
+        "required": [
+          "userId",
+          "handle",
+          "org",
+          "session"
+        ],
+        "properties": {
+          "userId": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "handle": {
+            "$ref": "#/components/schemas/Handle"
+          },
+          "org": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrgId"
+              }
+            ],
+            "description": "The user's personal org, named by its handle."
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionGrant"
           }
         },
         "additionalProperties": {
@@ -8974,7 +9382,8 @@
         "required": [
           "name",
           "kind",
-          "scopes"
+          "scopes",
+          "projectId"
         ],
         "properties": {
           "name": {
@@ -8996,15 +9405,7 @@
                 "$ref": "#/components/schemas/ProjectId"
               }
             ],
-            "description": "The one project the agent works in. Defaults to the operator's own project."
-          },
-          "onBehalfOf": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Sponsor"
-              }
-            ],
-            "description": "The human the agent acts on behalf of: its sponsor."
+            "description": "The one project the agent works in. The caller, a member of its org, becomes the agent's sponsor."
           }
         },
         "additionalProperties": {
@@ -12845,14 +13246,6 @@
           "model": {
             "type": "string",
             "description": "The model, pinned to a revision where the provider allows."
-          },
-          "onBehalfOf": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Sponsor"
-              }
-            ],
-            "description": "The human the agent acts for in this session. Optional: the session takes\nthe token's sponsor, else the enrolment's. Naming any other is refused\n(`session.sponsor_refused`); an agent never names its own sponsor."
           }
         },
         "additionalProperties": {
@@ -13652,7 +14045,10 @@
         "type": "string",
         "enum": [
           "auth.invalid_token",
-          "auth.insufficient_scope",
+          "auth.required",
+          "auth.forbidden",
+          "auth.cross_site",
+          "auth.agent_unplaced",
           "auth.revoked",
           "request.invalid",
           "request.idempotency_conflict",
@@ -13674,8 +14070,9 @@
           "sketch.not_found",
           "repo.ref_not_found",
           "repo.path_not_found",
-          "session.sponsor_refused",
-          "agent.state_refused"
+          "agent.state_refused",
+          "project.name_taken",
+          "user.handle_refused"
         ],
         "description": "Machine-readable reason for a problem. Dotted; lanes add codes as they build."
       },
@@ -13937,24 +14334,47 @@
         "type": "object",
         "required": [
           "id",
+          "org",
           "name",
-          "createdAt"
+          "visibility"
         ],
         "properties": {
           "id": {
             "$ref": "#/components/schemas/ProjectId"
           },
+          "org": {
+            "type": "string",
+            "description": "The project's org, by name."
+          },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "The project's name in its org, lower-case."
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public"
+            ]
           },
           "createdAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "When the project was created: answered on creation."
+          },
+          "viewer": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Viewer"
+              }
+            ],
+            "description": "The reader's role in the project's org; absent for anyone who is not a member of it."
           }
         },
         "additionalProperties": {
           "not": {}
-        }
+        },
+        "description": "A project and where it lives: `/<org>/<name>`."
       },
       "PromotionComposed": {
         "type": "object",
@@ -14270,6 +14690,16 @@
           "not": {}
         },
         "description": "Every work-loop response: the result, plus what the agent should know and do next."
+      },
+      "RecordedScope": {
+        "type": "string",
+        "enum": [
+          "agent:work",
+          "agent:read",
+          "operator",
+          "observer"
+        ],
+        "description": "A scope as an agent's record and its events hold it: an agent's scopes, plus `operator` and `observer`,\nwhich agents enrolled before tenancy held and which confer nothing."
       },
       "Relied": {
         "type": "object",
@@ -14919,11 +15349,9 @@
         "type": "string",
         "enum": [
           "agent:work",
-          "agent:read",
-          "operator",
-          "observer"
+          "agent:read"
         ],
-        "description": "The scopes a token can carry."
+        "description": "The scopes an agent's token can carry."
       },
       "Session": {
         "type": "object",
@@ -14939,13 +15367,13 @@
           "agentId": {
             "$ref": "#/components/schemas/AgentId"
           },
-          "onBehalfOf": {
+          "sponsor": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/Sponsor"
+                "$ref": "#/components/schemas/UserId"
               }
             ],
-            "description": "The human the agent acts for in this session: its token's sponsor, else its enrolment's."
+            "description": "The user who sponsors the agent, from its enrolment: never named by the request."
           },
           "openedAt": {
             "type": "string",
@@ -14955,6 +15383,26 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "SessionGrant": {
+        "type": "object",
+        "required": [
+          "token",
+          "expiresAt"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A user's bearer session, shown once: present it as `Authorization: Bearer <token>`."
       },
       "SessionId": {
         "type": "string",
@@ -14986,13 +15434,13 @@
           "model": {
             "type": "string"
           },
-          "onBehalfOf": {
+          "sponsor": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/Sponsor"
+                "$ref": "#/components/schemas/UserId"
               }
             ],
-            "description": "The human the agent acts for in this session, when it has a sponsor."
+            "description": "The user who sponsors the agent, from its enrolment, when it has one."
           }
         },
         "additionalProperties": {
@@ -15274,12 +15722,6 @@
         "additionalProperties": {
           "not": {}
         }
-      },
-      "Sponsor": {
-        "type": "string",
-        "maxLength": 256,
-        "pattern": "^[a-z][a-z0-9+.-]*:\\S.*$",
-        "description": "A sponsor: the human an agent acts on behalf of, accountable for its changes\nand the first person an escalation goes to. A `scheme:value` address, e.g.\n`github:octocat` or `mailto:a@example.com`."
       },
       "SubjectId": {
         "type": "string",
@@ -15876,6 +16318,70 @@
         "type": "string",
         "pattern": "^usr_[0-9A-HJKMNP-TV-Z]{26}$"
       },
+      "UserIdentity": {
+        "type": "object",
+        "required": [
+          "userId",
+          "instanceAdmin",
+          "orgs"
+        ],
+        "properties": {
+          "userId": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "handle": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Handle"
+              }
+            ],
+            "description": "Absent until the user chooses one; its personal org takes the same name."
+          },
+          "instanceAdmin": {
+            "type": "boolean",
+            "description": "Whether the user is this instance's admin."
+          },
+          "orgs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserOrg"
+            },
+            "description": "The orgs the user belongs to, in org id order."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The signed-in user, as its session names it."
+      },
+      "UserOrg": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "role"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/OrgId"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "maintainer",
+              "member"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One of a user's orgs, with the user's role there."
+      },
       "UserReinstated": {
         "type": "object",
         "required": [
@@ -16098,6 +16604,26 @@
           "not": {}
         }
       },
+      "Viewer": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "maintainer",
+              "member"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The reader's place in a project's org, present only for a member of it."
+      },
       "WhoAmI": {
         "type": "object",
         "required": [
@@ -16117,14 +16643,6 @@
             ],
             "nullable": true,
             "description": "The agent's open session, if it has one."
-          },
-          "onBehalfOf": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Sponsor"
-              }
-            ],
-            "description": "The sponsor the presented token acts for."
           }
         },
         "additionalProperties": {
@@ -16584,12 +17102,14 @@
             "tokenUrl": "/v1/oauth/token",
             "scopes": {
               "agent:read": "",
-              "agent:work": "",
-              "observer": "",
-              "operator": ""
+              "agent:work": ""
             }
           }
         }
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "Bearer"
       }
     }
   },

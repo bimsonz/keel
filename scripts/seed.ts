@@ -4,13 +4,15 @@
 //    commit, made with a fixed author and date so the same tree is the same
 //    commit. A repo already at that commit is left alone; one at any other
 //    commit stops the seed rather than being overwritten.
-// 2. The bootstrap credential (Terraform's `bootstrap_secret`) enrols the operator.
-// 3. The operator creates forge-lite and forge-lite-control and puts each
-//    one's declared settings: verification off in the control project only
-//    (S-0's negative control); both private. The seed is staging's
+// 2. The bootstrap credential (Terraform's `bootstrap_secret`) creates the
+//    seed's automation user, `keel-seed`, with its personal org of that name,
+//    and a bearer session for it, kept while it still works.
+// 3. That user creates forge-lite and forge-lite-control in its org and puts
+//    each one's declared settings: verification off in the control project
+//    only (S-0's negative control); both private. The seed is staging's
 //    declared state, so a second run restores it rather than keeping
-//    whatever drifted. Then it enrols an observer and agents
-//    a1..aN in each project.
+//    whatever drifted. Then it enrols agents a1..aN in each project, which
+//    it sponsors.
 // 4. Everything a run needs is written to .keel/<env>.json (gitignored, 0600),
 //    keeping what scripts/deploy.ts put there (the console's keys).
 //
@@ -178,8 +180,6 @@ function previousCredentials(): Map<string, Credential> {
     const c = Object(value);
     if (typeof c.agentId === "string" && typeof c.clientSecret === "string") previous.set(role, c);
   };
-  put("operator", Reflect.get(Object(seeded), "operator"));
-  put("observer", Reflect.get(Object(seeded), "observer"));
   const projects = Object(Reflect.get(Object(seeded), "projects"));
   for (const [name, project] of Object.entries<unknown>(projects)) {
     const agents: unknown = Reflect.get(Object(project), "agents");
@@ -188,6 +188,59 @@ function previousCredentials(): Map<string, Credential> {
   return previous;
 }
 const previous = previousCredentials();
+
+/** The seed's automation user: its handle names its org too. */
+const SEED_HANDLE = "keel-seed";
+
+interface SeedUser {
+  readonly userId: string;
+  readonly handle: string;
+  readonly org: string;
+  readonly token: string;
+}
+
+const isSeedUser = (value: unknown): value is SeedUser =>
+  typeof value === "object" &&
+  value !== null &&
+  ["userId", "handle", "org", "token"].every(
+    (field) => typeof Reflect.get(value, field) === "string",
+  );
+
+/** What an earlier seed wrote, without the operator and observer credentials tenancy retired. */
+function withoutRetired(seeded: Record<string, unknown>): Record<string, unknown> {
+  const { operator: _operator, observer: _observer, ...rest } = seeded;
+  return rest;
+}
+
+/**
+ * The seed's user, created by the bootstrap credential, or the one an earlier
+ * seed wrote while its session still works. A user whose session was lost
+ * cannot be recreated under its handle: the seed stops and says so.
+ */
+async function automationUser(bootstrap: KeelClient): Promise<SeedUser> {
+  const kept: unknown = earlier["seedUser"];
+  if (isSeedUser(kept)) {
+    try {
+      await new KeelClient({ baseUrl: keelUrl, session: kept.token }).me();
+      console.log(`ok   ${SEED_HANDLE}: ${kept.userId} (session kept)`);
+      return kept;
+    } catch {
+      // The session lapsed: a new user is needed, which the handle forbids.
+    }
+  }
+  try {
+    const made = await bootstrap.createUser({ handle: SEED_HANDLE });
+    console.log(`ok   ${SEED_HANDLE}: ${made.userId} in org ${made.org}`);
+    return { userId: made.userId, handle: made.handle, org: made.org, token: made.session.token };
+  } catch (error) {
+    if (error instanceof KeelProblem && error.status === 409)
+      throw new Error(
+        `${SEED_HANDLE} exists but this file holds no working session for it: delete the user, then seed again`,
+        { cause: error },
+      );
+    throw error;
+  }
+}
 
 /** Whether a stored credential still exchanges for a token. */
 async function stillWorks(credential: Credential): Promise<boolean> {
@@ -233,22 +286,16 @@ try {
     clientId: "keel-bootstrap",
     clientSecret: bootstrapSecret(),
   });
-  const operator = await enrol(bootstrap, "operator", {
-    name: "seed-operator",
-    kind: "hosted",
-    scopes: ["operator"],
-  });
-  const asOperator = new KeelClient({ baseUrl: keelUrl, ...operator });
-
+  const seedUser = await automationUser(bootstrap);
+  const asSeed = new KeelClient({ baseUrl: keelUrl, session: seedUser.token });
   const projects: Record<string, { id: string; verification: string; agents: Credential[] }> = {};
-  let observer: Credential | undefined;
   for (const [name, declared] of Object.entries(PROJECTS)) {
-    const project = await asOperator.createProject(
-      { name, source: FIXTURE },
+    const project = await asSeed.createProject(
+      { org: SEED_HANDLE, name, source: FIXTURE },
       { idempotencyKey: key(`project:${name}`) },
     );
     console.log(`ok   project ${name}: ${project.id}`);
-    const settings = await asOperator.putSettings(project.id, {
+    const settings = await asSeed.putSettings(project.id, {
       protectedPaths: [],
       maxBatchSize: 1,
       verification: declared.verification,
@@ -257,17 +304,10 @@ try {
     console.log(
       `ok   ${name} verification: ${settings.verification}, visibility: ${settings.visibility}`,
     );
-    // An observer reads every project at L1; it is enrolled in the first.
-    observer ??= await enrol(asOperator, "observer", {
-      name: "seed-observer",
-      kind: "hosted",
-      scopes: ["observer"],
-      projectId: project.id,
-    });
     const agents: Credential[] = [];
     for (let i = 1; i <= agentCount; i += 1) {
       agents.push(
-        await enrol(asOperator, `${name}:a${i}`, {
+        await enrol(asSeed, `${name}:a${i}`, {
           name: `a${i}`,
           kind: "interactive",
           scopes: ["agent:read", "agent:work"],
@@ -281,7 +321,7 @@ try {
   mkdirSync(join(root, ".keel"), { recursive: true, mode: 0o700 });
   writeFileSync(
     out,
-    `${JSON.stringify({ ...earlier, environment, keelUrl, fixture: { repo: `${CORE}/${FIXTURE}`, sha: fixtureSha }, operator, observer, projects }, null, 2)}\n`,
+    `${JSON.stringify({ ...withoutRetired(earlier), environment, keelUrl, fixture: { repo: `${CORE}/${FIXTURE}`, sha: fixtureSha }, seedUser, projects }, null, 2)}\n`,
     { mode: 0o600 },
   );
   chmodSync(out, 0o600);

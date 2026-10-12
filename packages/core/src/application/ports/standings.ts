@@ -1,14 +1,14 @@
 import { Context, type Effect } from "effect";
 import type {
+  Actor,
   Agent,
   AgentNotKnown,
   AgentStateRefused,
   IdempotencyConflict,
-  AgentToken,
 } from "../../domain/identity/index.ts";
 import type { AgentId } from "../../domain/kernel/index.ts";
 
-/** An operator's move on an agent's standing. A suspension says why; the others take no reason. */
+/** A move on an agent's standing. A suspension says why; the others take no reason. */
 export interface StandingInput {
   readonly agentId: AgentId;
   readonly reason?: string;
@@ -16,8 +16,9 @@ export interface StandingInput {
 }
 
 /**
- * An agent's standing, which its AgentSession DO holds: an operator suspends,
- * reinstates or revokes it. Each writes the agent's directory row before it
+ * An agent's standing, which its AgentSession DO holds: an actor the doorway
+ * authorised suspends, reinstates or revokes it, recorded as
+ * `operator:<actor's id>`. Each writes the agent's directory row before it
  * answers, so the agent's next request is judged by its new standing. The
  * same Idempotency-Key and body answers the agent again; another body is an
  * IdempotencyConflict. A move the agent's state refuses (reinstating an
@@ -27,15 +28,15 @@ export class Standings extends Context.Service<
   Standings,
   {
     readonly suspend: (
-      principal: AgentToken,
+      actor: Actor,
       input: StandingInput,
     ) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict>;
     readonly reinstate: (
-      principal: AgentToken,
+      actor: Actor,
       input: StandingInput,
     ) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict>;
     readonly revoke: (
-      principal: AgentToken,
+      actor: Actor,
       input: StandingInput,
     ) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict>;
   }

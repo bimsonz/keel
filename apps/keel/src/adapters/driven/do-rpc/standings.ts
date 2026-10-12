@@ -1,6 +1,6 @@
+import { type Actor, actorId } from "@keeltown/core/domain/identity";
 import type { AgentId } from "@keeltown/core/kernel";
 import { type StandingInput, Standings } from "@keeltown/core/ports";
-import type { AgentToken } from "@keeltown/core/domain/identity";
 import { Effect, Layer, Schema } from "effect";
 import { AgentSessionCodecs, StandingCommand } from "../../../rpc/index.ts";
 import { callObject, fingerprintOf } from "./answer.ts";
@@ -15,29 +15,28 @@ export interface StandingsStub {
 const encodeStanding = Schema.encodeSync(StandingCommand);
 
 /**
- * `Standings` over each agent's AgentSession DO. The operator is the events'
- * `by`; the fingerprint hashes the move and its reason, so a retry is told
- * apart from a reused key.
+ * `Standings` over each agent's AgentSession DO. The actor, as
+ * `operator:<its id>`, is the events' `by`; the fingerprint hashes the move and
+ * its reason, so a retry is told apart from a reused key.
  */
 export function StandingsRpc(
   agentSession: (agentId: AgentId) => StandingsStub,
 ): Layer.Layer<Standings> {
-  const move =
-    (kind: "suspend" | "reinstate" | "revoke") => (principal: AgentToken, input: StandingInput) =>
-      Effect.gen(function* () {
-        const fingerprint = yield* Effect.promise(() =>
-          fingerprintOf({ move: kind, reason: input.reason ?? null }),
-        );
-        const command = encodeStanding({
-          by: `operator:${principal.agentId}`,
-          ...(input.reason === undefined ? {} : { reason: input.reason }),
-          idempotencyKey: input.idempotencyKey,
-          fingerprint,
-        });
-        return yield* callObject(AgentSessionCodecs[kind], () =>
-          agentSession(input.agentId)[kind](command),
-        );
+  const move = (kind: "suspend" | "reinstate" | "revoke") => (actor: Actor, input: StandingInput) =>
+    Effect.gen(function* () {
+      const fingerprint = yield* Effect.promise(() =>
+        fingerprintOf({ move: kind, reason: input.reason ?? null }),
+      );
+      const command = encodeStanding({
+        by: `operator:${actorId(actor)}`,
+        ...(input.reason === undefined ? {} : { reason: input.reason }),
+        idempotencyKey: input.idempotencyKey,
+        fingerprint,
       });
+      return yield* callObject(AgentSessionCodecs[kind], () =>
+        agentSession(input.agentId)[kind](command),
+      );
+    });
   return Layer.succeed(
     Standings,
     Standings.of({

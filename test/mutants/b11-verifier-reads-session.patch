@@ -1,13 +1,24 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/sessions.test.ts
 # kills: b11.gate-no-hop
 # why: the request gate runs whoami, so every authenticated request calls the agent's AgentSession DO
-diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
-index 7ea55b8..1ca6e10 100644
---- a/apps/keel/src/composition/isolate.ts
-+++ b/apps/keel/src/composition/isolate.ts
-@@ -1,4 +1,4 @@
--import { admit } from "@keeltown/core/application/identity";
-+import { whoami as admit } from "@keeltown/core/application/identity";
- import type { AgentId, ChangeId, ProjectId } from "@keeltown/core/kernel";
- import {
-   type AgentDirectory,
+diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index 3a1ef4e..cffa42e 100644
+--- a/packages/core/src/application/identity/gate.ts
++++ b/packages/core/src/application/identity/gate.ts
+@@ -10,7 +10,7 @@ import {
+   TokenRejected,
+ } from "../../domain/identity/index.ts";
+ import { AgentId, UserId } from "../../domain/kernel/index.ts";
+-import { AgentDirectory, Memberships, TokenIssuer, Users } from "../ports/index.ts";
++import { AgentDirectory, Memberships, Sessions, TokenIssuer, Users } from "../ports/index.ts";
+ 
+ /** What a request presents, as the doorway reads it: a Keel token, a user's session, or nothing. */
+ export type Credential =
+@@ -97,6 +97,7 @@ export const principalOf: (
+       case "Token": {
+         const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
+         const agent = yield* admit(token);
++        yield* Sessions.use((sessions) => sessions.current(agent.id));
+         if (isBootstrap(token)) return { principal: { _tag: "Bootstrap" }, token };
+         if (agent.org === undefined || agent.sponsor === undefined)
+           return yield* new AgentUnplaced({ agentId: agent.id });

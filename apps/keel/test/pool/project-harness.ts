@@ -1,6 +1,6 @@
 // A real Project DO for the doorway's reads: created over in-memory code, trunk
-// and pool, private as created, and made public by an operator through the
-// settings route.
+// and pool, placed in org `pool`, private as created, and made public by a
+// maintainer through the settings route.
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { makeId } from "@keeltown/core/kernel";
@@ -19,11 +19,11 @@ import type { ProjectDO } from "../../src/adapters/driving/do/project.ts";
 import { backbone } from "../../src/composition/do.ts";
 import { decodeExit, ProjectCodecs } from "../../src/rpc/index.ts";
 import { ok } from "./change-harness.ts";
-import { BASE, drainAfter, drainOutbox, seedAgent, tokenFor, worker } from "./helpers.ts";
+import { BASE, drainAfter, drainOutbox, placeProject, seedUser, worker } from "./helpers.ts";
 
 const SOURCE = { namespace: "keel-core", name: "seed-app" };
 
-/** A created project, private as created; `open()` has an operator make it public through the settings route. */
+/** A created project, placed in org `pool` and private as created; `open()` has a maintainer make it public through the settings route. */
 export async function project() {
   const projectId = makeId("prj", ulid());
   const stub = drainAfter(env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)));
@@ -62,11 +62,12 @@ export async function project() {
     ),
   );
   await drainOutbox(stub);
+  await placeProject(projectId);
   const open = async () => {
-    const operator = await tokenFor(await seedAgent({}, ["operator"]));
+    const maintainer = await seedUser(`open-${ulid().toLowerCase()}`, { role: "maintainer" });
     const put = await worker(`${BASE}/v1/projects/${projectId}/settings`, {
       method: "PUT",
-      headers: { authorization: `Bearer ${operator}`, "content-type": "application/json" },
+      headers: { authorization: `Bearer ${maintainer.token}`, "content-type": "application/json" },
       body: JSON.stringify({ protectedPaths: [], maxBatchSize: 1, visibility: "public" }),
     });
     expect(put.status).toBe(200);

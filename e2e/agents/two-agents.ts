@@ -14,7 +14,7 @@
 // the working directory, and nothing else: no general shell, no web tools.
 //
 // Afterwards both changes must have landed through verified advances, read
-// from the observer's feed. Transcripts (stream-json) go to
+// from the seed user's feed. Transcripts (stream-json) go to
 // `.keel/runs/<run>/<agent>.jsonl` with the run's record.
 import { spawn } from "node:child_process";
 import {
@@ -29,7 +29,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { clientFor, readSeeded } from "../src/lib/seeded.ts";
+import { clientFor, userClient, readSeeded } from "../src/lib/seeded.ts";
 
 const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 const environment = process.argv.slice(2).find((arg) => !arg.startsWith("--")) ?? "staging";
@@ -147,12 +147,12 @@ async function runAgent(agent: keyof typeof TASKS, index: number, dir: string): 
 
 const dir = join(root, ".keel", "runs", run);
 mkdirSync(dir, { recursive: true });
-const observer = clientFor(keelUrl, seeded.observer);
-let from = (await observer.events({ limit: 500 })).nextCursor;
+const reader = userClient(keelUrl, seeded.seedUser);
+let from = (await reader.events({ limit: 500 })).nextCursor;
 for (
-  let page = await observer.events({ cursor: from, limit: 500 });
+  let page = await reader.events({ cursor: from, limit: 500 });
   page.items.length > 0;
-  page = await observer.events({ cursor: from, limit: 500 })
+  page = await reader.events({ cursor: from, limit: 500 })
 )
   from = page.nextCursor;
 
@@ -163,9 +163,9 @@ for (const o of outcomes)
 
 const events = [];
 for (
-  let page = await observer.events({ cursor: from, limit: 500 });
+  let page = await reader.events({ cursor: from, limit: 500 });
   page.items.length > 0;
-  page = await observer.events({ cursor: page.nextCursor, limit: 500 })
+  page = await reader.events({ cursor: page.nextCursor, limit: 500 })
 ) {
   events.push(...page.items);
   if (page.items.length < 500) break;

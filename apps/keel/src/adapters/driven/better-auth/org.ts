@@ -4,8 +4,11 @@
  * address, so an invitation by handle is stored under the invitee's own address
  * beside the handle, and every answer is rewritten for the person reading it.
  */
+import { strongestRole } from "@keeltown/core/domain/identity";
 import type { NextAction } from "@keeltown/core/kernel";
 import { APIError, type createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
+import { Result } from "effect";
+import { decideAsRole } from "./roles.ts";
 
 type HookContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0];
 
@@ -133,12 +136,76 @@ async function ownInvitations(ctx: HookContext, db: D1Database) {
   return ctx.json(await shown(db, mine, await readerOf(ctx, db)));
 }
 
+/** The roles a request or a member row names: one, a list, or comma-separated, as Better Auth reads them. */
+const rolesIn = (value: unknown): string[] =>
+  (Array.isArray(value) ? value : [value])
+    .filter((role): role is string => typeof role === "string")
+    .flatMap((role) => role.split(","))
+    .map((role) => role.trim());
+
+/** The roles of the member a request is about: by id, or by its user's email for a removal. */
+async function targetRoles(db: D1Database, org: string, member: unknown): Promise<string[]> {
+  if (typeof member !== "string") return [];
+  const row = member.includes("@")
+    ? await db
+        .prepare(
+          `SELECT m.role FROM member m JOIN user u ON u.id = m.userId WHERE m.organizationId = ?1 AND lower(u.email) = lower(?2)`,
+        )
+        .bind(org, member)
+        .first<{ role: string }>()
+    : await db
+        .prepare(`SELECT role FROM member WHERE organizationId = ?1 AND id = ?2`)
+        .bind(org, member)
+        .first<{ role: string }>();
+  return rolesIn(row?.role);
+}
+
+/**
+ * Making or unmaking an owner (ManageOwners): an invitation as one, a move to
+ * or from owner, or an owner's removal. Better Auth's access control can't say
+ * which role a change sets, so Keel decides these here, by the same policy as
+ * every other action, before Better Auth sees them. A caller who isn't a
+ * member is left to Better Auth's own refusal.
+ */
+async function ownerChange(ctx: HookContext, db: D1Database): Promise<void> {
+  const session = await getSessionFromCtx(ctx);
+  if (session === null) return;
+  const body: Record<string, unknown> = ctx.body ?? {};
+  // The org Better Auth will act on: the one named, or else the session's active one.
+  const named = body["organizationId"];
+  const org =
+    typeof named === "string" && named !== "" ? named : session.session.activeOrganizationId;
+  if (typeof org !== "string" || org === "") return;
+  const touched = [
+    ...(ctx.path === "/organization/remove-member" ? [] : rolesIn(body["role"])),
+    ...(await targetRoles(db, org, body["memberId"] ?? body["memberIdOrEmail"])),
+  ];
+  if (!touched.includes("owner")) return;
+  const caller = await db
+    .prepare(`SELECT role FROM member WHERE organizationId = ?1 AND userId = ?2`)
+    .bind(org, session.user.id)
+    .first<{ role: string }>();
+  const role = strongestRole(rolesIn(caller?.role));
+  if (role === undefined) return;
+  const decided = decideAsRole(role, "ManageOwners");
+  if (Result.isSuccess(decided)) return;
+  throw new APIError("FORBIDDEN", {
+    code: "OWNERS_ONLY",
+    message: "Only an owner makes or unmakes an owner, or invites one",
+    nextActions: "nextActions" in decided.failure ? decided.failure.nextActions : [],
+  });
+}
+
 /** Runs before Better Auth's org routes. */
 export function orgBefore(db: D1Database) {
   return async (ctx: HookContext) => {
     switch (ctx.path) {
       case "/organization/invite-member":
+        await ownerChange(ctx, db);
         return inviteTarget(ctx, db);
+      case "/organization/update-member-role":
+      case "/organization/remove-member":
+        return ownerChange(ctx, db);
       case "/organization/get-invitation":
         return answerable(ctx, ctx.query?.["id"]);
       case "/organization/accept-invitation":

@@ -16,6 +16,7 @@ import {
   type LeaseId,
   type NextAction,
   type SketchId,
+  type UserId,
   type VerdictId,
   type WorkspaceId,
 } from "../kernel/index.ts";
@@ -104,10 +105,10 @@ export interface Blockers {
   readonly unresolvedHighDrift: readonly Drift[];
 }
 
-/** Who withdraws a change: the holder of its lease, or an operator (the doorway checks the scope). */
+/** Who withdraws a change: the holder of its lease, or a maintainer of its project (the doorway authorised them). */
 export type WithdrawAuthority =
   | { readonly _tag: "Lease"; readonly leaseId: LeaseId }
-  | { readonly _tag: "Operator"; readonly by: string };
+  | { readonly _tag: "Maintainer"; readonly by: UserId };
 
 /**
  * A command on a change: an agent's call (carrying its lease), a Workflow

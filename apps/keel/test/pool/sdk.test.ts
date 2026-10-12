@@ -7,7 +7,15 @@ import { ulid } from "ulid";
 import { describe, expect, it } from "vitest";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
 import { AgentSessionCodecs, decodeExit } from "../../src/rpc/index.ts";
-import { BASE, drainAfter, seedAgent } from "./helpers.ts";
+import {
+  BASE,
+  drainAfter,
+  establishProject,
+  placeProject,
+  POOL_ORG,
+  seedAgent,
+  seedUser,
+} from "./helpers.ts";
 
 /**
  * The SDK against the real HTTP doorway, auth gate and handler object (over
@@ -89,10 +97,13 @@ describe("the SDK over the real doorway", () => {
   });
 
   it("[a11.sdk-session] opens a session through the deployed doorway; a retry under the key answers it, as REST does", async () => {
-    // Enrolled in its own AgentSession DO, as the operator's enrolment does, since only a known agent opens a session.
+    // Enrolled in its own AgentSession DO, as a member's enrolment does, since only a known agent opens a session.
     const agentId = makeId("agt", ulid());
     const clientId = `client-${agentId.toLowerCase()}`;
     const clientSecret = `secret-${crypto.randomUUID()}`;
+    const sponsor = (await seedUser("sdk-sponsor")).userId;
+    await placeProject(sampleProjectId);
+    await establishProject(sampleProjectId);
     const enrolled = decodeExit(
       AgentSessionCodecs.enrol,
       await drainAfter(
@@ -102,7 +113,8 @@ describe("the SDK over the real doorway", () => {
         name: "sdk-session-agent",
         kind: "interactive",
         scopes: ["agent:read", "agent:work"],
-        onBehalfOf: "github:sponsor",
+        org: POOL_ORG,
+        sponsor,
         clientId,
         secretHash: await hashSecret(clientSecret),
         idempotencyKey: "enrol-1",
@@ -126,7 +138,7 @@ describe("the SDK over the real doorway", () => {
       body: JSON.stringify({ harness: "a-harness", model: "a-model" }),
     });
 
-    expect(opened).toMatchObject({ agentId, onBehalfOf: "github:sponsor" });
+    expect(opened).toMatchObject({ agentId, sponsor });
     expect(rest.status).toBe(201);
     expect(await rest.json()).toEqual(opened);
     expect((await client.whoami()).result.session).toEqual({ id: opened.id });

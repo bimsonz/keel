@@ -5,7 +5,7 @@
 // adapter, the DO's RPC and codecs, and its decisions.
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import type { AgentToken } from "@keeltown/core/domain/identity";
+import type { Actor } from "@keeltown/core/domain/identity";
 import { EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
 import { CodeHost, Projects } from "@keeltown/core/ports";
 import {
@@ -76,13 +76,9 @@ PORTS.Projects.contract("Project DO over RPC", () => {
     withSettings: (settings) =>
       Effect.gen(function* () {
         const projects = yield* Projects;
-        const by: AgentToken = {
-          agentId: makeId("agt", ulid()),
-          projectId: makeId("prj", ulid()),
-          scopes: ["operator"],
-          revocationEpoch: 0,
-        };
+        const by: Actor = { _tag: "User", userId: makeId("usr", ulid()) };
         const created = yield* projects.create(by, {
+          projectId: makeId("prj", ulid()),
           name: "forge",
           source,
           idempotencyKey: `key-${crypto.randomUUID()}`,

@@ -144,24 +144,6 @@ export function describeAgentDirectoryContract(
       }).pipe(Effect.provide(make())),
     );
     it.effect(
-      "[a11s.directory-sponsor] returns an agent's sponsor exactly, and no sponsor for an agent without one",
-      () =>
-        Effect.gen(function* () {
-          const directory = yield* AgentDirectory;
-          const sponsored = { ...sampleAgent, id: freshAgentId(), onBehalfOf: "github:octocat" };
-          const unsponsored = { ...sampleAgent, id: freshAgentId() };
-          for (const agent of [sponsored, unsponsored])
-            yield* directory.upsert(agent, {
-              clientId: `client-${agent.id}`,
-              agentId: agent.id,
-              secretHash: `sha256:${"a".repeat(64)}`,
-            });
-          expect(yield* directory.findAgent(sponsored.id)).toEqual(Option.some(sponsored));
-          const found = yield* directory.findAgent(unsponsored.id);
-          expect(Option.map(found, (agent) => "onBehalfOf" in agent)).toEqual(Option.some(false));
-        }).pipe(Effect.provide(make())),
-    );
-    it.effect(
       "[tenancy.directory-org] returns an agent's org and sponsoring user exactly, and neither for an agent without them",
       () =>
         Effect.gen(function* () {
@@ -266,15 +248,18 @@ export function describeTokenIssuerContract(adapter: string, make: LayerFactory<
       }).pipe(Effect.provide(make())),
     );
     it.effect(
-      "[a11s.token-sponsor] verifies the sponsor it issued, and none for a principal without one",
+      "[tenancy.token-org] verifies the org and the sponsoring user it issued, each on its own, and neither for a principal without them",
       () =>
         Effect.gen(function* () {
           const issuer = yield* TokenIssuer;
-          const sponsored = { ...principal, onBehalfOf: "mailto:octocat@example.com" };
-          const { token } = yield* issuer.issue(sponsored, 60);
-          expect(yield* issuer.verify(token)).toEqual(sponsored);
+          for (const tenant of [
+            { ...principal, org: sampleOrgId, sponsor: sampleSponsorId },
+            { ...principal, org: sampleOrgId },
+            { ...principal, sponsor: sampleSponsorId },
+          ])
+            expect(yield* issuer.verify((yield* issuer.issue(tenant, 60)).token)).toEqual(tenant);
           const bare = yield* issuer.verify((yield* issuer.issue(principal, 60)).token);
-          expect("onBehalfOf" in bare).toBe(false);
+          expect(["org" in bare, "sponsor" in bare]).toEqual([false, false]);
         }).pipe(Effect.provide(make())),
     );
     it.effect("rejects a token after it expires", () =>

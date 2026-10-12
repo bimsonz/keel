@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { createProject, projectRepos } from "@keeltown/core/application/integration";
-import { AgentId, ProjectId } from "@keeltown/core/kernel";
+import { ProjectId, UserId } from "@keeltown/core/kernel";
 import { CodeHost, EventOutbox } from "@keeltown/core/ports";
 import {
   CodeHostFixture,
@@ -13,7 +13,7 @@ import {
 import { Effect, Exit, Layer, Schema } from "effect";
 
 const projectId = Schema.decodeUnknownSync(ProjectId)("prj_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
-const operator = Schema.decodeUnknownSync(AgentId)("agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const creator = Schema.decodeUnknownSync(UserId)("usr_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 const SOURCE = { namespace: "keel-core", name: "seed-app" };
 const POOL_TARGET = 2;
 
@@ -37,7 +37,7 @@ const creating = (idempotencyKey = "create-1", fingerprint = "body-1", source = 
   projectId,
   name: "Seed app",
   source,
-  by: operator,
+  by: creator,
   idempotencyKey,
   fingerprint,
 });
@@ -81,6 +81,8 @@ describe("createProject", () => {
           target: POOL_TARGET,
         });
         expect(yield* projectEvents).toEqual(["ProjectCreated"]);
+        const [created] = (yield* EventOutbox).log({ kind: "project", id: projectId });
+        expect(created).toMatchObject({ actor: `operator:${creator}`, payload: { by: creator } });
       }).pipe(Effect.provide(layer));
     },
   );

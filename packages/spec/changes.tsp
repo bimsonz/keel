@@ -145,7 +145,7 @@ interface Changes {
    * `project` names a public project (otherwise 404, as for one that does not exist); without either, 401.
    */
   @summary("List changes")
-  @useAuth(NoAuth | Observer | AgentRead)
+  @useAuth(NoAuth | AgentRead | SessionAuth)
   @get
   listChanges(
     @query state?: ChangeState,
@@ -173,7 +173,7 @@ interface Changes {
   @summary("Get a change")
   @tag("mcp")
   @operationId("change")
-  @useAuth(NoAuth | AgentRead | Observer)
+  @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/{changeId}")
   @get
   getChange(...ChangePath): Change | NotFound | StandardErrors;
@@ -224,7 +224,7 @@ interface Changes {
   @summary("Abandon a change")
   @tag("mcp")
   @operationId("abandon")
-  @useAuth(AgentWork | OperatorScope)
+  @useAuth(AgentWork | SessionAuth)
   @route("/{changeId}/abandon")
   @post
   abandon(

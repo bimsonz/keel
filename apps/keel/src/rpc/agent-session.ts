@@ -8,11 +8,9 @@ import {
   IdempotencyConflict,
   InboxPage,
   Scope,
-  SessionSponsorRefused,
-  Sponsor,
 } from "@keeltown/core/domain/identity";
 import { Session } from "@keeltown/core/domain/memory";
-import { AgentId, ChangeId, ProjectId } from "@keeltown/core/kernel";
+import { AgentId, ChangeId, OrgId, ProjectId, UserId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
@@ -32,18 +30,13 @@ export const SessionSnapshot = Schema.Struct({
 export type SessionSnapshot = typeof SessionSnapshot.Type;
 
 /**
- * Open a session for the agent this DO is named for. The session acts for
- * `tokenObo`, the caller's token's sponsor, else the enrolment's; a request
- * `onBehalfOf` naming another is refused. `fingerprint` hashes the request
+ * Open a session for the agent this DO is named for. Its sponsor is the
+ * agent's, from the enrolment the DO holds. `fingerprint` hashes the request
  * body: the same key with another body is an IdempotencyConflict.
  */
 export const OpenSession = Schema.Struct({
   harness: Schema.optional(Schema.String),
   model: Schema.optional(Schema.String),
-  /** The sponsor the request names. */
-  onBehalfOf: Schema.optional(Sponsor),
-  /** The `obo` claim of the caller's token. */
-  tokenObo: Schema.optional(Sponsor),
   idempotencyKey: Schema.String,
   fingerprint: Schema.String,
 });
@@ -76,8 +69,10 @@ export const EnrolCommand = Schema.Struct({
   name: Schema.NonEmptyString,
   kind: AgentKind,
   scopes: Schema.Array(Scope),
-  /** The agent's sponsor, when the operator named one. */
-  onBehalfOf: Schema.optional(Sponsor),
+  /** The agent's org. */
+  org: Schema.optional(OrgId),
+  /** The user minting the credential, who becomes the agent's sponsor. */
+  sponsor: Schema.optional(UserId),
   clientId: Schema.NonEmptyString,
   /** `sha256:` and the hex digest of the client secret. */
   secretHash: Schema.String,
@@ -103,7 +98,7 @@ export const AgentSessionCodecs = {
   describe: exitCodec(SessionSnapshot, AgentNotKnown),
   openSession: exitCodec(
     Session,
-    Schema.Union([AgentNotKnown, AgentNotAdmitted, IdempotencyConflict, SessionSponsorRefused]),
+    Schema.Union([AgentNotKnown, AgentNotAdmitted, IdempotencyConflict]),
   ),
   reserveChange: exitCodec(ChangeId, IdempotencyConflict),
   inbox: exitCodec(InboxPage, AgentNotKnown),

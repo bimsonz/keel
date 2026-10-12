@@ -2,15 +2,15 @@
 # kills: sdk.public
 # why: a client with no credentials asks for a token before every call
 diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
-index 0d48a78..382169f 100644
+index c1a4384..48288fd 100644
 --- a/packages/sdk/src/client.ts
 +++ b/packages/sdk/src/client.ts
-@@ -122,7 +122,7 @@ export class KeelClient {
+@@ -143,7 +143,7 @@ export class KeelClient {
          ...(request.body === undefined ? {} : { body: request.body }),
          ...(options.signal === undefined ? {} : { signal: options.signal }),
        });
 -    const credentialed = "clientId" in this.#options;
 +    const credentialed = true;
-     let response = await send(credentialed ? await this.token() : undefined);
+     const session = "session" in this.#options ? this.#options.session : undefined;
+     let response = await send(credentialed ? await this.token() : session);
      if (credentialed && response.status === 401)
-       response = await send(await this.token({ fresh: true }));

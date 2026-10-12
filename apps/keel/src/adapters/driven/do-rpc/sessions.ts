@@ -9,10 +9,9 @@ const encodeOpen = Schema.encodeSync(OpenSession);
 
 /**
  * `Sessions` over each agent's AgentSession DO. The fingerprint hashes the
- * request body, so a retry is told apart from a reused key; the token's
- * sponsor travels beside it, for the DO to hold the request to. `current`
- * reads the DO's snapshot, and an agent the DO has never enrolled has no
- * session.
+ * request body, so a retry is told apart from a reused key; the DO takes the
+ * session's sponsor from the agent's record. `current` reads the DO's
+ * snapshot, and an agent the DO has never enrolled has no session.
  */
 export function SessionsRpc(
   agentSession: (agentId: AgentId) => Pick<AgentSessionStub, "openSession" | "describe">,
@@ -25,14 +24,12 @@ export function SessionsRpc(
           const body = {
             ...(input.harness === undefined ? {} : { harness: input.harness }),
             ...(input.model === undefined ? {} : { model: input.model }),
-            ...(input.onBehalfOf === undefined ? {} : { onBehalfOf: input.onBehalfOf }),
           };
           const fingerprint = yield* Effect.promise(() => fingerprintOf(body));
           return yield* callObject(AgentSessionCodecs.openSession, () =>
             agentSession(principal.agentId).openSession(
               encodeOpen({
                 ...body,
-                ...(principal.onBehalfOf === undefined ? {} : { tokenObo: principal.onBehalfOf }),
                 idempotencyKey: input.idempotencyKey,
                 fingerprint,
               }),

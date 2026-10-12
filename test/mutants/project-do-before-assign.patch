@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/project-place.test.ts -t "project.create-heals"
+# kills: project.create-heals
+# why: the Project DO is made before the project's place is taken, so trunk is initialized with no place and a taken name is found only once a second project exists
+diff --git a/packages/core/src/application/coordination/projects.ts b/packages/core/src/application/coordination/projects.ts
+--- a/packages/core/src/application/coordination/projects.ts
++++ b/packages/core/src/application/coordination/projects.ts
+@@ -59,8 +59,9 @@
+   const placed = yield* places.byId(projectId);
+   if (Option.isSome(placed) && (placed.value.org !== org || placed.value.name !== name))
+     return yield* new IdempotencyConflict({ idempotencyKey });
++  const project = yield* (yield* Projects).create(actor, { projectId, name, source, idempotencyKey });
+   yield* places.assign({ projectId, org, name });
+-  return yield* (yield* Projects).create(actor, { projectId, name, source, idempotencyKey });
++  return project;
+ });
+ 
+ /** The project's settings, as its Project DO holds them. */

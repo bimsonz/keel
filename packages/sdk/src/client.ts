@@ -40,6 +40,17 @@ export interface PublicClientOptions {
   readonly fetch?: (input: string, init: RequestInit) => Promise<Response>;
 }
 
+/**
+ * A signed-in user's client: a Better Auth session, sent as a bearer. It is
+ * what `keeltown login` and `POST /v1/admin/users` hand out; the caller acts
+ * as that user, through its memberships.
+ */
+export interface SessionClientOptions {
+  readonly baseUrl: string;
+  readonly session: string;
+  readonly fetch?: (input: string, init: RequestInit) => Promise<Response>;
+}
+
 export interface CallOptions {
   readonly signal?: AbortSignal;
 }
@@ -59,11 +70,11 @@ const EXPIRY_MARGIN_MS = 30_000;
  * Idempotency-Key. A refusal throws `KeelProblem`, carrying the next actions.
  */
 export class KeelClient {
-  readonly #options: KeelClientOptions | PublicClientOptions;
+  readonly #options: KeelClientOptions | PublicClientOptions | SessionClientOptions;
   readonly #fetch: (input: string, init: RequestInit) => Promise<Response>;
   #token: { readonly value: string; readonly expiresAt: number } | undefined;
 
-  constructor(options: KeelClientOptions | PublicClientOptions) {
+  constructor(options: KeelClientOptions | PublicClientOptions | SessionClientOptions) {
     this.#options = options;
     this.#fetch = options.fetch ?? ((input, init) => fetch(input, init));
   }
@@ -133,7 +144,8 @@ export class KeelClient {
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       });
     const credentialed = "clientId" in this.#options;
-    let response = await send(credentialed ? await this.token() : undefined);
+    const session = "session" in this.#options ? this.#options.session : undefined;
+    let response = await send(credentialed ? await this.token() : session);
     if (credentialed && response.status === 401)
       response = await send(await this.token({ fresh: true }));
     if (!response.ok) throw await KeelProblem.from(response);
@@ -500,7 +512,32 @@ export class KeelClient {
     );
   }
 
-  /** Operator: the instance's projects; pass a page's `nextCursor` for the next. */
+  /** A project by its org's name and its own, as `/<org>/<project>` names them, with the reader's role there. */
+  project(
+    org: string,
+    name: string,
+    options?: CallOptions,
+  ): Promise<WireOutputs["Orgs_getProject"]> {
+    return this.call("Orgs_getProject", { org, name }, options);
+  }
+
+  /** The signed-in user: its handle, whether it is the instance admin, and its orgs with its role in each. */
+  me(options?: CallOptions): Promise<WireOutputs["Users_me"]> {
+    return this.call("Users_me", {}, options);
+  }
+
+  /**
+   * Instance admin (or the bootstrap credential): a user with a handle and its
+   * personal org, and a bearer session for it, shown once.
+   */
+  createUser(
+    user: { readonly handle: string },
+    options?: CallOptions,
+  ): Promise<WireOutputs["Admin_createUser"]> {
+    return this.call("Admin_createUser", { handle: user.handle }, options);
+  }
+
+  /** The projects the caller may read, each with its org and the reader's role there; pass a page's `nextCursor` for the next. */
   projects(
     options: CallOptions & { readonly cursor?: string; readonly limit?: number } = {},
   ): Promise<WireOutputs["Operator_listProjects"]> {
@@ -666,6 +703,8 @@ function isTokenResponse(body: unknown): body is TokenResponse {
 
 const keyOf = (options: Idempotent) => options.idempotencyKey ?? crypto.randomUUID();
 
-export function createKeelClient(options: KeelClientOptions | PublicClientOptions): KeelClient {
+export function createKeelClient(
+  options: KeelClientOptions | PublicClientOptions | SessionClientOptions,
+): KeelClient {
   return new KeelClient(options);
 }

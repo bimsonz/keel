@@ -1,0 +1,332 @@
+import {
+  type AuthenticationRequired,
+  type AuthorizationRefusal,
+  authorize,
+  type Decision,
+  type MissingResource,
+  type Principal,
+  type ProjectResource,
+  type Resource,
+  type ResourceFor,
+  SPEC_ACTIONS,
+  type SpecAction,
+} from "@keeltown/core/domain/identity";
+import { AgentId, ChangeId, ProjectId, type UserId } from "@keeltown/core/kernel";
+import { AgentDirectory, Changes, Orgs, ProjectOrgs, Projects } from "@keeltown/core/ports";
+import { Effect, Option, Result, Schema } from "effect";
+import type { Operations } from "../../../generated/http/app.gen.ts";
+import type { Caller } from "./caller.ts";
+import { problem, type ProblemBody } from "./problems.ts";
+import type { Runner } from "./run.ts";
+import { changeNotFound } from "./work-loop.ts";
+
+/** The operations the spec publishes: each is an action the policy decides. */
+type Operation = SpecAction & keyof Operations<Caller>;
+type InputOf<A extends Operation> = Parameters<Operations<Caller>[A]>[1];
+
+/**
+ * An operation over many resources, each of which the policy decides on its
+ * own (a list of projects, a feed across them): its handler calls `decideEach`
+ * per item. The operation as a whole is anyone's to call.
+ */
+export interface PerItem {
+  readonly _tag: "PerItem";
+}
+const PER_ITEM: PerItem = { _tag: "PerItem" };
+
+type ResolverServices = ProjectOrgs | Orgs | Projects | Changes | AgentDirectory;
+
+/** How an operation finds the resource it is decided on, from its input and its caller. */
+export type Resolver<A extends Operation> = (
+  input: InputOf<A>,
+  caller: Caller,
+) => Effect.Effect<ResourceFor<A> | PerItem, never, ResolverServices>;
+
+/** One resolver per operation in the spec: a missing one does not compile. */
+export type Resolvers = { readonly [A in Operation]: Resolver<A> };
+
+const MISSING: MissingResource = { _tag: "Missing" };
+const instance = () => Effect.succeed({ _tag: "Instance" } as const);
+const self = () => Effect.succeed({ _tag: "Self" } as const);
+const perItem = () => Effect.succeed(PER_ITEM);
+
+/**
+ * A project as the policy needs it: its org (from its place), whether that org
+ * is suspended, and its visibility (from its settings). A project with no place
+ * or no settings is missing.
+ */
+export const projectResource = (
+  projectId: ProjectId,
+  sponsor?: UserId,
+): Effect.Effect<ProjectResource | MissingResource, never, ProjectOrgs | Orgs | Projects> =>
+  Effect.gen(function* () {
+    const place = yield* ProjectOrgs.use((places) => places.byId(projectId));
+    if (Option.isNone(place)) return MISSING;
+    const org = yield* Orgs.use((orgs) => orgs.byId(place.value.org));
+    const settings = yield* Projects.use((projects) => projects.settings(projectId)).pipe(
+      Effect.option,
+    );
+    if (Option.isNone(settings)) return MISSING;
+    return {
+      _tag: "Project",
+      org: place.value.org,
+      projectId,
+      visibility: settings.value.visibility,
+      orgSuspended: Option.match(org, {
+        onNone: () => false,
+        onSome: (record) => record.suspended,
+      }),
+      ...(sponsor === undefined ? {} : { sponsor }),
+    } satisfies ProjectResource;
+  });
+
+const decodeProjectId = Schema.decodeUnknownOption(ProjectId);
+const decodeChangeId = Schema.decodeUnknownOption(ChangeId);
+const decodeAgentId = Schema.decodeUnknownOption(AgentId);
+
+/** The project an id names, or missing when it names none. */
+const projectNamed = (id: unknown) =>
+  Option.match(decodeProjectId(id), {
+    onNone: () => Effect.succeed(MISSING),
+    onSome: (projectId) => projectResource(projectId),
+  });
+
+/** The agent's own project: the one work is ever done in. Anyone else asks about nothing. */
+const ownProject = (_input: unknown, caller: Caller) =>
+  caller.principal._tag === "Agent"
+    ? projectResource(caller.principal.projectId)
+    : Effect.succeed(MISSING);
+
+/** The project named, or for an agent naming none, its own. */
+const projectOrOwn = (id: unknown, caller: Caller) =>
+  id === undefined ? ownProject(undefined, caller) : projectNamed(id);
+
+/** The project a change belongs to, read from the change itself. */
+const changeProject = (id: unknown) =>
+  Option.match(decodeChangeId(id), {
+    onNone: () => Effect.succeed(MISSING),
+    onSome: (changeId) =>
+      Changes.use((changes) => changes.get(changeId)).pipe(
+        Effect.flatMap((read) => projectResource(read.projectId)),
+        Effect.catchTag("ChangeNotFound", () => Effect.succeed(MISSING)),
+      ),
+  });
+
+/** The project an agent is enrolled in, with its sponsor: what a move on the agent is decided on. */
+const agentProject = (id: unknown) =>
+  Option.match(decodeAgentId(id), {
+    onNone: () => Effect.succeed(MISSING),
+    onSome: (agentId) =>
+      AgentDirectory.use((directory) => directory.findAgent(agentId)).pipe(
+        Effect.flatMap(
+          Option.match({
+            onNone: () => Effect.succeed(MISSING),
+            onSome: (agent) => projectResource(agent.projectId, agent.sponsor),
+          }),
+        ),
+      ),
+  });
+
+/** An org by its name, in any case. */
+const orgNamed = (name: string) =>
+  Orgs.use((orgs) => orgs.byName(name)).pipe(
+    Effect.map(
+      Option.match({
+        onNone: () => MISSING,
+        onSome: (org) => ({ _tag: "Org", org: org.org, suspended: org.suspended }) as const,
+      }),
+    ),
+  );
+
+/** A project by its org's name and its own, as `/<org>/<project>` names it. */
+const projectByName = (orgName: string, name: string) =>
+  Orgs.use((orgs) => orgs.byName(orgName)).pipe(
+    Effect.flatMap(
+      Option.match({
+        onNone: () => Effect.succeed(Option.none()),
+        onSome: (org) => ProjectOrgs.use((places) => places.byName(org.org, name)),
+      }),
+    ),
+    Effect.flatMap(
+      Option.match({
+        onNone: () => Effect.succeed(MISSING),
+        onSome: (place) => projectResource(place.projectId),
+      }),
+    ),
+  );
+
+/**
+ * What each operation is decided on. Work is only ever in the agent's own
+ * project; reads of a change are decided on the change's project; a move on an
+ * agent on the agent's project and sponsor. Operations not implemented yet that
+ * name a resource by an id of their own resolve to the caller's own project
+ * until their lane resolves the id.
+ */
+export const RESOLVERS: Resolvers = {
+  Auth_exchangeToken: instance,
+  SignIn_methods: instance,
+  Lattices_listLattices: instance,
+  Admin_createUser: instance,
+  whoami: self,
+  inbox: self,
+  Users_me: self,
+
+  Operator_listProjects: perItem,
+  Operator_createProject: (input) => orgNamed(input.org),
+  Orgs_getProject: (input) => projectByName(input.org, input.name),
+
+  Changes_listChanges: (input, caller) => projectOrOwn(input.project, caller),
+  change: (input) => changeProject(input.changeId),
+  status: (input) => changeProject(input.changeId),
+  nearby: (input) => changeProject(input.changeId),
+  abandon: (input) => changeProject(input.changeId),
+  Inbox_listEvents: (input, caller) =>
+    input.project !== undefined || caller.principal._tag === "Agent"
+      ? projectOrOwn(input.project, caller)
+      : perItem(),
+  Inbox_getSnapshot: (input, caller) => projectOrOwn(input.project, caller),
+  Repo_getTree: (input) => projectNamed(input.projectId),
+  Repo_getBlob: (input) => projectNamed(input.projectId),
+  Repo_listCommits: (input) => projectNamed(input.projectId),
+  Repo_getCommit: (input) => projectNamed(input.projectId),
+  Views_getTrunk: (input) => projectNamed(input.projectId),
+  Views_listLanes: ownProject,
+  Views_getCandidate: ownProject,
+  Views_getVerdict: ownProject,
+  Conflicts_listConflicts: ownProject,
+  Conflicts_getConflict: ownProject,
+  Memory_listDecisions: ownProject,
+  Memory_getDecision: ownProject,
+  why: ownProject,
+
+  Operator_getSettings: (input) => projectNamed(input.projectId),
+  Operator_putSettings: (input) => projectNamed(input.projectId),
+  Operator_listEscalations: ownProject,
+  Operator_giveRuling: ownProject,
+  Operator_enrolAgent: (input) => projectNamed(input.projectId),
+  Operator_suspendAgent: (input) => agentProject(input.agentId),
+  Operator_reinstateAgent: (input) => agentProject(input.agentId),
+  Operator_revokeAgent: (input) => agentProject(input.agentId),
+
+  declare: ownProject,
+  adopt: ownProject,
+  rely: ownProject,
+  rebase: ownProject,
+  revise: ownProject,
+  submit: ownProject,
+  sketch: ownProject,
+  resolve: ownProject,
+  Sessions_openSession: ownProject,
+  Workspaces_releaseWorkspace: ownProject,
+  Workspaces_refreshWorkspaceToken: ownProject,
+};
+
+/** The policy's next actions as a problem carries them: absent fields left out rather than undefined. */
+const actions = (next: AuthenticationRequired["nextActions"]) =>
+  next.map((action) => ({
+    kind: action.kind,
+    title: action.title,
+    ...(action.operationId === undefined ? {} : { operationId: action.operationId }),
+    ...(action.args === undefined ? {} : { args: action.args }),
+  }));
+
+/** The operations keyed by a change: what the caller cannot see reads as that change not found. */
+const CHANGE_KEYED: ReadonlySet<string> = new Set(["change", "status", "nearby", "abandon"]);
+
+/** A refusal as the operation answers it. NotVisible reads exactly as the operation's own not-found. */
+export function refusalResult(
+  action: string,
+  input: unknown,
+  requestId: string,
+  refusal: AuthorizationRefusal,
+): { readonly status: 401 | 403 | 404; readonly body: ProblemBody } {
+  switch (refusal._tag) {
+    case "AuthenticationRequired":
+      return {
+        status: 401,
+        body: problem(401, "auth.required", requestId, {
+          nextActions: actions(refusal.nextActions),
+        }),
+      };
+    case "AccessRefused":
+      return {
+        status: 403,
+        body: problem(403, "auth.forbidden", requestId, {
+          detail: `Refused: ${refusal.reason}.`,
+          nextActions: actions(refusal.nextActions),
+        }),
+      };
+    case "NotVisible":
+      return CHANGE_KEYED.has(action)
+        ? changeNotFound({ requestId }, { changeId: String(Object(input).changeId) })
+        : { status: 404, body: problem(404, "resource.not_found", requestId) };
+    default: {
+      const unmapped: never = refusal;
+      return unmapped;
+    }
+  }
+}
+
+/**
+ * An operation about an agent's own record (its identity, its inbox) asked by a
+ * user: the policy grants it to anyone on their own record, and a user has none
+ * of an agent's. It points to the user's own.
+ */
+export function agentsOnly(requestId: string): {
+  readonly status: 403;
+  readonly body: ProblemBody;
+} {
+  return {
+    status: 403,
+    body: problem(403, "auth.forbidden", requestId, {
+      detail: "Refused: agents-only. This reads an agent's own record.",
+      nextActions: [{ kind: "call", title: "Read who you are as a user", operationId: "Users_me" }],
+    }),
+  };
+}
+
+/** The policy's decision for one item of a per-item operation, under that item's own read rule. */
+export const decideEach = (
+  principal: Principal,
+  resource: ProjectResource | MissingResource,
+): Decision => authorize(principal, "Orgs_getProject", resource);
+
+/**
+ * The one authorization policy, in front of every operation: each operation's
+ * identity; R11): each operation's resource is resolved, `authorize` decides,
+ * and only a granted call reaches its handler, with the audience a read was
+ * granted. No handler holds a check of its own. REST and MCP dispatch into the
+ * same wrapped object.
+ */
+/* oxlint-disable typescript/no-unsafe-type-assertion -- the wrapper dispatches by operation name over
+   tables whose entries are typed where they are declared (Operations, Resolvers): here each is one
+   function of the same shape, and ResourceFor<action> is what that action's resolver answers. */
+export function authorizeHandlers<H extends Operations<Caller>>(
+  handlers: H,
+  resolvers: Resolvers,
+  run: Runner,
+): H {
+  const wrapped: Record<string, unknown> = { ...(handlers as unknown as Record<string, unknown>) };
+  for (const action of Object.keys(SPEC_ACTIONS) as Operation[]) {
+    const handler = handlers[action] as (caller: Caller, input: unknown) => unknown;
+    const resolve = resolvers[action] as (
+      input: unknown,
+      caller: Caller,
+    ) => Effect.Effect<Resource | PerItem, never, ResolverServices>;
+    wrapped[action] = async (caller: Caller, input: unknown) => {
+      const resolved = await run(caller, resolve(input, caller));
+      if ("status" in resolved) return resolved;
+      if (resolved._tag === "PerItem") return handler(caller, input);
+      const decided = authorize(caller.principal, action, resolved as ResourceFor<typeof action>);
+      if (Result.isFailure(decided))
+        return refusalResult(action, input, caller.requestId, decided.failure);
+      const { audience } = decided.success;
+      return handler(
+        { ...caller, resource: resolved, ...(audience === undefined ? {} : { audience }) },
+        input,
+      );
+    };
+  }
+  return wrapped as unknown as H;
+}
+/* oxlint-enable typescript/no-unsafe-type-assertion */

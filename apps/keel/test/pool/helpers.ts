@@ -1,15 +1,17 @@
 import { runInDurableObject } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { env } from "cloudflare:workers";
-import { type Agent, type Scope } from "@keeltown/core/domain/identity";
-import { Instant, makeId } from "@keeltown/core/kernel";
+import { type Agent, type Role, type Scope } from "@keeltown/core/domain/identity";
+import { PROJECT, ProjectRecord } from "@keeltown/core/application/integration";
+import { Instant, makeId, OrgId, type ProjectId, UserId } from "@keeltown/core/kernel";
 import { ulid } from "ulid";
 import { hashSecret, sampleProjectId } from "@keeltown/testing";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import { AgentDirectoryD1 } from "../../src/adapters/driven/d1/agent-directory.ts";
-import { AgentDirectory } from "@keeltown/core/ports";
+import { AgentDirectory, EntityStore } from "@keeltown/core/ports";
 import { expect, vi } from "vitest";
 import { armedAlarms } from "../../src/adapters/driving/do/alarm.ts";
+import type { ProjectDO } from "../../src/adapters/driving/do/project.ts";
 import { OUTBOX_FLUSH, OUTBOX_REDELIVERY } from "../../src/adapters/driving/do/keel-object.ts";
 
 export const BASE = "https://keel.localhost";
@@ -20,11 +22,94 @@ export interface SeededAgent {
   readonly clientSecret: string;
 }
 
-/** Writes an agent and its credential into the D1 projection, as enrolment's projector will. */
+/**
+ * The tenant pool agents live in unless a test says otherwise: org `pool`,
+ * owned by the user who sponsors them, as the cutover leaves every agent.
+ */
+export const POOL_ORG = Schema.decodeSync(OrgId)("org_01M4P00000000000000000000A");
+export const POOL_SPONSOR = Schema.decodeSync(UserId)("usr_01M4P00000000000000000000S");
+
+/** A second tenant, org `elsewhere`, for what a caller outside org `pool` sees. */
+export const OTHER_ORG = Schema.decodeSync(OrgId)("org_01M4P00000000000000000000B");
+export const OTHER_SPONSOR = Schema.decodeSync(UserId)("usr_01M4P00000000000000000000T");
+
+/** Better Auth's rows for a user, as its D1 adapter writes them (dates as ISO text). */
+async function insertUser(userId: string, handle: string, admin = false): Promise<void> {
+  const at = new Date().toISOString();
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO "user" (id, name, email, emailVerified, createdAt, updatedAt, username, role)
+     VALUES (?, ?, ?, 0, ?, ?, ?, ?)`,
+  )
+    .bind(userId, handle, `${handle}@users.keel.invalid`, at, at, handle, admin ? "admin" : null)
+    .run();
+}
+
+/** An org and a member of it, written as Better Auth writes them; each is kept if already there. */
+export async function seedOrg(
+  org: OrgId,
+  slug: string,
+  owner: UserId,
+  ownerHandle: string,
+): Promise<void> {
+  await insertUser(owner, ownerHandle);
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO organization (id, name, slug, createdAt) VALUES (?, ?, ?, ?)`,
+    ).bind(org, slug, slug, new Date().toISOString()),
+    env.DB.prepare(
+      `INSERT INTO member (id, organizationId, userId, role, createdAt)
+       SELECT ?, ?, ?, 'owner', ? WHERE NOT EXISTS (SELECT 1 FROM member WHERE organizationId = ? AND userId = ?)`,
+    ).bind(ulid(), org, owner, new Date().toISOString(), org, owner),
+  ]);
+}
+
+/** A project's place in an org, as project creation (or the cutover's move) writes it. */
+export async function placeProject(
+  projectId: ProjectId | string,
+  org: OrgId = POOL_ORG,
+): Promise<void> {
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO projects (id, org_id, name, created_at) VALUES (?, ?, ?, 0)`,
+  )
+    .bind(projectId, org, projectId.toLowerCase())
+    .run();
+}
+
+const encodeProjectRecord = Schema.encodeSync(ProjectRecord);
+
+/**
+ * A project its Project DO holds, as createProject leaves its record: its
+ * settings the defaults (private) until a PUT changes them. With a place, it
+ * is a project the policy sees. A project already created is left as it is.
+ */
+export async function establishProject(projectId: ProjectId): Promise<void> {
+  const stub = env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`));
+  await runInDurableObject(stub, (instance: ProjectDO) =>
+    instance["runtime"].runPromise(
+      EntityStore.use((store) =>
+        Effect.sync(() => {
+          if (store.get(PROJECT, projectId) !== undefined) return;
+          const record = { id: projectId, name: "pool-project", createdAt: Instant(0) };
+          store.put(PROJECT, projectId, JSON.parse(JSON.stringify(encodeProjectRecord(record))));
+        }),
+      ),
+    ),
+  );
+}
+
+/**
+ * Writes an agent and its credential into the D1 projection, as enrolment's
+ * projector will: in org `pool`, sponsored by its owner, its project placed
+ * there and held by its Project DO, so the policy sees it. `placed: false`
+ * writes an agent enrolled before tenancy, with neither.
+ */
 export async function seedAgent(
   overrides: Partial<Agent> = {},
   scopes: readonly Scope[] = ["agent:read", "agent:work"],
+  options: { readonly placed?: boolean } = {},
 ): Promise<SeededAgent> {
+  const placed = options.placed ?? true;
+  if (placed) await seedOrg(POOL_ORG, "pool", POOL_SPONSOR, "pool-sponsor");
   const agent: Agent = {
     id: makeId("agt", ulid()),
     projectId: sampleProjectId,
@@ -34,8 +119,13 @@ export async function seedAgent(
     state: "active",
     revocationEpoch: 0,
     createdAt: Instant(Date.UTC(2026, 9, 10)),
+    ...(placed ? { org: POOL_ORG, sponsor: POOL_SPONSOR } : {}),
     ...overrides,
   };
+  if (placed && agent.org !== undefined) {
+    await placeProject(agent.projectId, agent.org);
+    await establishProject(agent.projectId);
+  }
   const clientId = `client-${crypto.randomUUID()}`;
   const clientSecret = `secret-${crypto.randomUUID()}`;
   const secretHash = await hashSecret(clientSecret);
@@ -45,6 +135,62 @@ export async function seedAgent(
     ),
   );
   return { agent, clientId, clientSecret };
+}
+
+/** An agent of org `elsewhere`, sponsored by its owner, in a project of its own placed there. */
+export async function seedForeignAgent(
+  overrides: Partial<Agent> = {},
+  scopes: readonly Scope[] = ["agent:read", "agent:work"],
+): Promise<SeededAgent> {
+  await seedOrg(OTHER_ORG, "elsewhere", OTHER_SPONSOR, "elsewhere-owner");
+  return seedAgent(
+    { org: OTHER_ORG, sponsor: OTHER_SPONSOR, projectId: makeId("prj", ulid()), ...overrides },
+    scopes,
+  );
+}
+
+/** A handle no other user in the file holds: `prefix` and a random tail. */
+export const uniqueHandle = (prefix: string): string =>
+  `${prefix}-${ulid().toLowerCase().slice(-12)}`;
+
+/** A signed-in user: a Better Auth session presented as a bearer. */
+export interface SeededUser {
+  readonly userId: UserId;
+  readonly handle: string;
+  /** `Authorization: Bearer <token>`. */
+  readonly token: string;
+}
+
+/**
+ * A user with a session, written as Better Auth writes them, and a member of
+ * `org` (org `pool` by default; `pool` and `elsewhere` are seeded if need be)
+ * with `role` unless `role` is null.
+ */
+export async function seedUser(
+  handle: string,
+  options: { readonly role?: Role | null; readonly org?: OrgId; readonly admin?: boolean } = {},
+): Promise<SeededUser> {
+  const org = options.org ?? POOL_ORG;
+  if (org === POOL_ORG) await seedOrg(POOL_ORG, "pool", POOL_SPONSOR, "pool-sponsor");
+  if (org === OTHER_ORG) await seedOrg(OTHER_ORG, "elsewhere", OTHER_SPONSOR, "elsewhere-owner");
+  const userId = makeId("usr", ulid());
+  await insertUser(userId, handle, options.admin === true);
+  const at = new Date().toISOString();
+  const token = crypto.randomUUID().replaceAll("-", "");
+  const role = options.role === undefined ? "member" : options.role;
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO session (id, expiresAt, token, createdAt, updatedAt, userId) VALUES (?, ?, ?, ?, ?, ?)`,
+    ).bind(ulid(), new Date(Date.now() + 3_600_000).toISOString(), token, at, at, userId),
+    ...(role === null
+      ? []
+      : [
+          env.DB.prepare(
+            `INSERT INTO member (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, ?, ?)`,
+          ).bind(ulid(), org, userId, role, at),
+        ]),
+  ]);
+  return { userId, handle, token };
 }
 
 export async function exchange(seeded: SeededAgent, scope?: string): Promise<Response> {

@@ -17,7 +17,16 @@ import type { ProjectDO } from "../../src/adapters/driving/do/project.ts";
 import { backbone } from "../../src/composition/do.ts";
 import { decodeExit, ProjectCodecs } from "../../src/rpc/index.ts";
 import { ok, refusal } from "./change-harness.ts";
-import { BASE, drainAfter, seedAgent, tokenFor, worker } from "./helpers.ts";
+import {
+  BASE,
+  drainAfter,
+  placeProject,
+  seedAgent,
+  seedUser,
+  tokenFor,
+  uniqueHandle,
+  worker,
+} from "./helpers.ts";
 
 const SOURCE = { namespace: "keel-core", name: "seed-app" };
 
@@ -207,63 +216,68 @@ const settingsCall = (token: string, projectId: string, body?: object, requestId
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
+/** A maintainer of org `pool`, which the projects under test are placed in. */
+const maintainer = async () => seedUser(uniqueHandle("maintainer"), { role: "maintainer" });
+
 describe("a project's settings through the operator routes", () => {
-  it("[b12.settings-operator] refuses an agent's token, and lets an operator of another project read and replace them", async () => {
+  it("[b12.settings-operator] refuses an agent's token, and lets a maintainer of the project's org read and replace them", async () => {
     const p = await projectUnderTest();
     ok(await p.create());
+    await placeProject(p.projectId);
     const agent = await tokenFor(await seedAgent());
-    const operatorAgent = await seedAgent({}, ["operator"]);
-    const operator = await tokenFor(operatorAgent);
+    const user = await maintainer();
     const off = { protectedPaths: ["infra/**"], maxBatchSize: 1, verification: "off" };
 
     const agentGet = await settingsCall(agent, p.projectId);
     const agentPut = await settingsCall(agent, p.projectId, off);
-    const put = await settingsCall(operator, p.projectId, off);
-    const got = await settingsCall(operator, p.projectId);
+    const put = await settingsCall(user.token, p.projectId, off);
+    const got = await settingsCall(user.token, p.projectId);
     const changes = await settingsChanges(p);
 
-    // Operator authority is instance-wide at L1: this operator's token names another project.
-    expect(operatorAgent.agent.projectId).toBe(sampleProjectId);
+    // The agent works in another project of the org: it reads none of this one, and governs nothing.
     expect(sampleProjectId).not.toBe(p.projectId);
     expect([agentGet.status, agentPut.status]).toEqual([403, 403]);
+    expect([
+      (await agentGet.json<{ detail: string }>()).detail,
+      (await agentPut.json<{ detail: string }>()).detail,
+    ]).toEqual(["Refused: foreign-project.", "Refused: users-only."]);
     expect(put.status).toBe(200);
     expect(await put.json()).toEqual({ ...off, visibility: "private" });
     expect(got.status).toBe(200);
     expect(await got.json()).toEqual({ ...off, visibility: "private" });
     expect(changes).toHaveLength(1);
     expect(changes[0]).toMatchObject({
-      actor: `operator:${operatorAgent.agent.id}`,
-      payload: { by: operatorAgent.agent.id },
+      actor: `operator:${user.userId}`,
+      payload: { by: user.userId },
     });
   });
 
-  it("[b12.settings-operator] answers 404 with a next action for a project that was never created", async () => {
-    const operator = await tokenFor(await seedAgent({}, ["operator"]));
+  it("[b12.settings-operator] answers 404 resource.not_found for a project that was never created", async () => {
+    const user = await maintainer();
     const missing = makeId("prj", ulid());
-    const response = await settingsCall(operator, missing);
-    const body = await response.json<{ nextActions: { operationId?: string }[] }>();
+    const response = await settingsCall(user.token, missing);
+    const body = await response.json<{ code: string }>();
 
     expect(response.status).toBe(404);
-    expect(body.nextActions.map((action) => action.operationId)).toEqual([
-      "Operator_createProject",
-    ]);
+    expect(body.code).toBe("resource.not_found");
   });
 
   it("[b12.settings-replay] answers a replayed request as it stands, and a reused request id with other settings 409", async () => {
     const p = await projectUnderTest();
     ok(await p.create());
-    const operator = await tokenFor(await seedAgent({}, ["operator"]));
+    await placeProject(p.projectId);
+    const user = (await maintainer()).token;
     const off = { protectedPaths: [], maxBatchSize: 1, verification: "off" };
     const other = { protectedPaths: ["infra/**"], maxBatchSize: 2 };
     const r1 = `r1-${ulid()}`;
     const r2 = `r2-${ulid()}`;
 
-    const first = await settingsCall(operator, p.projectId, off, r1);
-    const replayed = await settingsCall(operator, p.projectId, off, r1);
-    const reused = await settingsCall(operator, p.projectId, other, r1);
+    const first = await settingsCall(user, p.projectId, off, r1);
+    const replayed = await settingsCall(user, p.projectId, off, r1);
+    const reused = await settingsCall(user, p.projectId, other, r1);
     // An unchanged PUT commits no event, and its request id is still spent.
-    const unchanged = await settingsCall(operator, p.projectId, off, r2);
-    const reusedUnchanged = await settingsCall(operator, p.projectId, other, r2);
+    const unchanged = await settingsCall(user, p.projectId, off, r2);
+    const reusedUnchanged = await settingsCall(user, p.projectId, other, r2);
     const body = await reused.json<{ code: string; nextActions: { operationId?: string }[] }>();
 
     expect([first.status, replayed.status, unchanged.status]).toEqual([200, 200, 200]);
@@ -278,12 +292,13 @@ describe("a project's settings through the operator routes", () => {
   it("[b12.settings-visibility] keeps a public project public, audits each change, and reads settings stored before visibility as private", async () => {
     const p = await projectUnderTest();
     ok(await p.create());
-    const operator = await tokenFor(await seedAgent({}, ["operator"]));
+    await placeProject(p.projectId);
+    const user = (await maintainer()).token;
     const put = { protectedPaths: [], maxBatchSize: 1 };
 
-    const published = await settingsCall(operator, p.projectId, { ...put, visibility: "public" });
-    const readPublic = await settingsCall(operator, p.projectId);
-    const hidden = await settingsCall(operator, p.projectId, put);
+    const published = await settingsCall(user, p.projectId, { ...put, visibility: "public" });
+    const readPublic = await settingsCall(user, p.projectId);
+    const hidden = await settingsCall(user, p.projectId, put);
     const changes = await settingsChanges(p);
     // A row written before `visibility` existed: the stored settings hold none.
     await runInDurableObject(p.stub, (instance: ProjectDO) =>

@@ -1,10 +1,10 @@
 // The live check that a change verifies under the plan Precheck compiled
 // Precheck compiled for it, through the deployed Keel.
 //
-//   KEEL_OPERATOR=<file> node apps/keel-verify/test/live/d21-live.ts <run>
+//   KEEL_SESSION=<token> [KEEL_ORG=<org>] node apps/keel-verify/test/live/d21-live.ts <run>
 //
-// KEEL_OPERATOR names a JSON file holding an operator's {clientId,
-// clientSecret}; it is read, never printed. In a project of its own (d21-live,
+// KEEL_SESSION is the maintainer's bearer session (a maintainer of KEEL_ORG,
+// `keel` by default), which governs the project; it is read, never printed. In a project of its own (d21-live,
 // forked from the seeded fixture repo), one agent declares, pushes and submits:
 //   land:   a new file under src/ → Precheck compiles a plan, ChangeQueued
 //           carries its hash, KeelVerify's verdict is `land` under that hash,
@@ -33,8 +33,9 @@ const SETTLE_MS = 10 * 60_000;
 const run = process.argv[2];
 if (run === undefined || !/^[a-z0-9-]+$/.test(run))
   throw new Error("usage: d21-live.ts <run>, the run a lower-case slug");
-const operatorFile = process.env["KEEL_OPERATOR"];
-if (operatorFile === undefined) throw new Error("set KEEL_OPERATOR to the operator's JSON file");
+const session = process.env["KEEL_SESSION"];
+if (session === undefined) throw new Error("set KEEL_SESSION to the maintainer's session");
+const ORG = process.env["KEEL_ORG"] ?? "keel";
 
 const wrangler = (...args: string[]) =>
   execFileSync("pnpm", ["exec", "wrangler", ...args], {
@@ -44,13 +45,9 @@ const wrangler = (...args: string[]) =>
     env: { ...process.env, npm_config_userconfig: "/dev/null", WRANGLER_SEND_METRICS: "false" },
   });
 
+/** The maintainer: it creates the project, puts its settings and enrols its agent, which it sponsors. */
 function operatorClient(): KeelClient {
-  const json: unknown = JSON.parse(readFileSync(operatorFile ?? "", "utf8"));
-  const clientId: unknown = Reflect.get(Object(json), "clientId");
-  const clientSecret: unknown = Reflect.get(Object(json), "clientSecret");
-  if (typeof clientId !== "string" || typeof clientSecret !== "string")
-    throw new Error("KEEL_OPERATOR's file holds no {clientId, clientSecret}");
-  return new KeelClient({ baseUrl: KEEL_URL, clientId, clientSecret });
+  return new KeelClient({ baseUrl: KEEL_URL, session: session ?? "" });
 }
 
 type EventRecord = Awaited<ReturnType<KeelClient["events"]>>["items"][number];
@@ -232,7 +229,7 @@ try {
   );
   operator = operatorClient();
   const project = await operator.createProject(
-    { name: PROJECT, source: FIXTURE },
+    { org: ORG, name: PROJECT, source: FIXTURE },
     { idempotencyKey: `live:${PROJECT}:project` },
   );
   console.log(`     project ${PROJECT}: ${project.id}`);

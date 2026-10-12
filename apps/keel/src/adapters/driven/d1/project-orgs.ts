@@ -63,6 +63,13 @@ export function ProjectOrgsD1(db: D1Database) {
         Effect.promise(() =>
           db.prepare(`${SELECT} WHERE org_id = ? ORDER BY name`).bind(org).all(),
         ).pipe(Effect.map(({ results }) => results.map(toPlace))),
+      all: (after, limit) =>
+        Effect.promise(() =>
+          db
+            .prepare(`${SELECT} WHERE id > ? ORDER BY id LIMIT ?`)
+            .bind(after ?? "", limit)
+            .all(),
+        ).pipe(Effect.map(({ results }) => results.map(toPlace))),
     }),
   );
 }

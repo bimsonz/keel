@@ -7,13 +7,31 @@ using Http;
 
 namespace Keel;
 
+/** A project and where it lives: `/<org>/<name>`. */
 model ProjectView {
   id: ProjectId;
+
+  /** The project's org, by name. */
+  org: string;
+
+  /** The project's name in its org, lower-case. */
   name: string;
-  createdAt: utcDateTime;
+
+  visibility: "private" | "public";
+
+  /** When the project was created: answered on creation. */
+  createdAt?: utcDateTime;
+
+  /** The reader's role in the project's org; absent for anyone who is not a member of it. */
+  viewer?: Viewer;
 }
 
 model CreateProjectRequest {
+  /** The org the project is created in, by name; the caller must be a member of it. */
+  @minLength(1)
+  org: string;
+
+  /** The project's name in its org, unique there in any case. */
   @minLength(1)
   name: string;
 
@@ -54,11 +72,8 @@ model EnrolAgentRequest {
   kind: AgentKind;
   scopes: Scope[];
 
-  /** The one project the agent works in. Defaults to the operator's own project. */
-  projectId?: ProjectId;
-
-  /** The human the agent acts on behalf of: its sponsor. */
-  onBehalfOf?: Sponsor;
+  /** The one project the agent works in. The caller, a member of its org, becomes the agent's sponsor. */
+  projectId: ProjectId;
 }
 
 model SuspendAgentRequest {
@@ -111,14 +126,15 @@ model RulingRequest {
 
 @tag("Operator")
 interface Operator {
+  /** The projects the caller may read: a visitor's are the public ones; each project is decided by its read rule. */
   @summary("List projects")
-  @useAuth(OperatorScope)
+  @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/projects")
   @get
   listProjects(...PageQuery): ProjectPage | StandardErrors;
 
   @summary("Create a project")
-  @useAuth(OperatorScope)
+  @useAuth(SessionAuth)
   @route("/projects")
   @post
   createProject(...IdempotencyKey, @body body: CreateProjectRequest): {
@@ -127,39 +143,39 @@ interface Operator {
   } | NotFound | Conflict | StandardErrors;
 
   @summary("Get a project's settings")
-  @useAuth(OperatorScope)
+  @useAuth(AgentRead | SessionAuth)
   @route("/projects/{projectId}/settings")
   @get
   getSettings(@path projectId: ProjectId): ProjectSettings | NotFound | StandardErrors;
 
   @summary("Replace a project's settings")
-  @useAuth(OperatorScope)
+  @useAuth(SessionAuth)
   @route("/projects/{projectId}/settings")
   @put
   putSettings(@path projectId: ProjectId, @body body: ProjectSettings): ProjectSettings | NotFound | Conflict | StandardErrors;
 
   @summary("Enrol an agent")
-  @useAuth(OperatorScope)
+  @useAuth(SessionAuth)
   @route("/agents")
   @post
   enrolAgent(...IdempotencyKey, @body body: EnrolAgentRequest): {
     @statusCode statusCode: 201;
     @body body: EnrolledAgent;
-  } | Conflict | StandardErrors;
+  } | NotFound | Conflict | StandardErrors;
 
   /**
    * Suspend an agent: its next request is refused until an operator reinstates it. Only an active
    * agent can be suspended (409 `agent.state_refused` otherwise).
    */
   @summary("Suspend an agent")
-  @useAuth(OperatorScope)
+  @useAuth(SessionAuth)
   @route("/agents/{agentId}/suspend")
   @post
   suspendAgent(@path agentId: AgentId, ...IdempotencyKey, @body body: SuspendAgentRequest): AgentProfile | NotFound | Conflict | StandardErrors;
 
   /** Reinstate a suspended agent: its tokens are accepted again. */
   @summary("Reinstate an agent")
-  @useAuth(OperatorScope)
+  @useAuth(SessionAuth)
   @route("/agents/{agentId}/reinstate")
   @post
   reinstateAgent(@path agentId: AgentId, ...IdempotencyKey): AgentProfile | NotFound | Conflict | StandardErrors;
@@ -169,19 +185,19 @@ interface Operator {
    * once, and it can never be reinstated.
    */
   @summary("Revoke an agent")
-  @useAuth(OperatorScope)
+  @useAuth(SessionAuth)
   @route("/agents/{agentId}/revoke")
   @post
   revokeAgent(@path agentId: AgentId, ...IdempotencyKey): AgentProfile | NotFound | Conflict | StandardErrors;
 
   @summary("List escalations")
-  @useAuth(OperatorScope)
+  @useAuth(AgentRead | SessionAuth)
   @route("/escalations")
   @get
   listEscalations(@query state?: "open" | "ruled" | "withdrawn", ...PageQuery): EscalationPage | StandardErrors;
 
   @summary("Rule on an escalation")
-  @useAuth(OperatorScope)
+  @useAuth(SessionAuth)
   @route("/escalations/{escalationId}/ruling")
   @post
   giveRuling(@path escalationId: EscalationId, ...IdempotencyKey, @body body: RulingRequest): EscalationView | NotFound | Conflict | StandardErrors;

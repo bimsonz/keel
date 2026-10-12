@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/gate.test.ts -t gate.timing
+# kills: gate.timing
+# why: the gate's cost never reaches Server-Timing, so the session read's per-request price cannot be measured before a cookie cache is considered
+diff --git a/apps/keel/src/adapters/driving/http/route-deps.ts b/apps/keel/src/adapters/driving/http/route-deps.ts
+--- a/apps/keel/src/adapters/driving/http/route-deps.ts
++++ b/apps/keel/src/adapters/driving/http/route-deps.ts
+@@ -56,7 +56,6 @@
+       if (gated instanceof Response) return gated;
+       ADMITTED.set(c.req.raw, gated.admitted);
+       await next();
+-      c.res.headers.append("server-timing", gated.timing);
+       return undefined;
+     },
+     context: (c) => {

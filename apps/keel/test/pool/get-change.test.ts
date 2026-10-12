@@ -8,7 +8,16 @@ import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
 import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
 import { changeUnderTest, ok } from "./change-harness.ts";
-import { BASE, drainOutbox, seedAgent, tokenFor, worker } from "./helpers.ts";
+import {
+  BASE,
+  drainOutbox,
+  seedAgent,
+  seedForeignAgent,
+  seedUser,
+  tokenFor,
+  uniqueHandle,
+  worker,
+} from "./helpers.ts";
 import { inertPrecheck } from "./inert-precheck.ts";
 import { project } from "./project-harness.ts";
 
@@ -105,23 +114,29 @@ describe("[b12.get-change] a change by id, from its own DO", () => {
   });
 
   it("[b12.get-change] answers 404 change.not_found for a change that was never declared, and 400 for an id that is not one", async () => {
-    const observer = await tokenFor(await seedAgent({}, ["observer"]));
+    const member = (await seedUser(uniqueHandle("member"))).token;
     const missing = makeId("chg", ulid());
-    const response = await read(missing, observer);
+    const response = await read(missing, member);
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({ code: "change.not_found" });
-    expect((await read("not-a-change", observer)).status).toBe(400);
+    expect((await read("not-a-change", member)).status).toBe(400);
   });
 });
 
 describe("[b12.get-change-audience] who reads a change by id", () => {
-  it("[b12.get-change-audience] a private project's change: its agent and an observer read it; another project's agent and a caller without a token get the 404 of a change that does not exist", async () => {
+  it("[b12.get-change-audience] a private project's change: its agent and a member of its org read it; another project's agent of the org is refused by name; another org's agent and a caller without a token get the 404 of a change that does not exist", async () => {
     const { projectId } = await project();
     const { c, member } = await declaredIn(projectId);
-    const observer = await tokenFor(await seedAgent({}, ["observer"]));
-    const outsider = await tokenFor(await seedAgent());
+    const user = (await seedUser(uniqueHandle("member"))).token;
+    const sibling = await tokenFor(await seedAgent());
+    const outsider = await tokenFor(await seedForeignAgent());
     expect((await read(c.changeId, member)).status).toBe(200);
-    expect((await read(c.changeId, observer)).status).toBe(200);
+    expect((await read(c.changeId, user)).status).toBe(200);
+    const refused = await read(c.changeId, sibling);
+    expect([refused.status, (await refused.json<{ detail: string }>()).detail]).toEqual([
+      403,
+      "Refused: foreign-project.",
+    ]);
 
     const missing = makeId("chg", ulid());
     const unknown = await notFound(await read(missing, outsider), missing);

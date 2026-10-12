@@ -1,15 +1,14 @@
-# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/operator-rpc.test.ts -t a11s
-# kills: a11s.enrol
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/operator-rpc.test.ts -t "tenancy.enrol-rpc"
+# kills: tenancy.enrol-rpc
 # why: the enrol adapter fingerprints the sponsor but never sends it to the AgentSession DO
 diff --git a/apps/keel/src/adapters/driven/do-rpc/enrolments.ts b/apps/keel/src/adapters/driven/do-rpc/enrolments.ts
-index 52015a5..80eda03 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/enrolments.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/enrolments.ts
-@@ -58,7 +58,6 @@ export function EnrolmentsRpc(
-                 name: input.name,
+@@ -59,7 +59,6 @@
                  kind: input.kind,
                  scopes: input.scopes,
--                ...sponsor,
+                 org,
+-                sponsor,
                  clientId,
                  secretHash,
                  idempotencyKey: input.idempotencyKey,

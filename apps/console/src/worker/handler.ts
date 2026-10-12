@@ -20,7 +20,6 @@ import type {
   Repo_getBlobInput,
   Repo_getTreeInput,
   Repo_listCommitsInput,
-  Scope as KeelScope,
   TokenRequest,
   TokenResponse,
   WireOutputs,
@@ -52,7 +51,9 @@ export interface Env {
 }
 
 /** The two of Keel's scopes this Worker holds a credential for. */
-type Scope = Extract<KeelScope, "observer" | "operator">;
+// The proxy's two scopes, which the API stopped granting at the tenancy cutover; the console's own
+// commit drops the proxy, and this type with it.
+type Scope = "observer" | "operator";
 
 /** What reading the log may carry: the operation's own inputs, by Keel's names for them. */
 const EVENTS_QUERY = [

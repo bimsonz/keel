@@ -658,10 +658,7 @@ model AgentEnrolled {
   name: string;
 
   kind: AgentKind;
-  scopes: Scope[];
-
-  /** The human the agent acts on behalf of, when the operator named one. */
-  onBehalfOf?: Sponsor;
+  scopes: RecordedScope[];
 
   /** The agent's org. Optional only so agents enrolled before tenancy still decode. */
   org?: OrgId;
@@ -1417,8 +1414,8 @@ model SessionOpened {
   harness?: string;
   `model`?: string;
 
-  /** The human the agent acts for in this session, when it has a sponsor. */
-  onBehalfOf?: Sponsor;
+  /** The user who sponsors the agent, from its enrolment, when it has one. */
+  sponsor?: UserId;
 }
 
 model MessagesCaptured {

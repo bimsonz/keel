@@ -84,7 +84,7 @@ interface Inbox {
    * moves stay with the project's members. Without a token and without `project`, 401.
    */
   @summary("Read events")
-  @useAuth(NoAuth | Observer | AgentRead)
+  @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/events")
   @get
   listEvents(
@@ -100,7 +100,7 @@ interface Inbox {
    * forward from it. Head only. Scoped as `listChanges`, a public project's without a token too.
    */
   @summary("Snapshot at the head")
-  @useAuth(NoAuth | Observer | AgentRead)
+  @useAuth(NoAuth | AgentRead | SessionAuth)
   @route("/events/snapshot")
   @get
   getSnapshot(@query project?: ProjectId): FeedSnapshot | NotFound | StandardErrors;

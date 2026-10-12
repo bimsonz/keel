@@ -1,13 +1,7 @@
 import { Effect, Result, Schema } from "effect";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import { ProjectCreated } from "../../domain/integration/index.ts";
-import {
-  type AgentId,
-  agentActor,
-  type EntityRef,
-  InstantSchema,
-  ProjectId,
-} from "../../domain/kernel/index.ts";
+import { type EntityRef, InstantSchema, ProjectId } from "../../domain/kernel/index.ts";
 import {
   type Clock,
   CodeHost,
@@ -34,12 +28,13 @@ export const ProjectRecord = Schema.Struct({
 });
 export type ProjectRecord = typeof ProjectRecord.Type;
 
-/** An operator's new project: trunk is forked from `source`, a repo in the core namespace. */
+/** A new project: trunk is forked from `source`, a repo in the core namespace. */
 export interface CreateProject {
   readonly projectId: ProjectId;
   readonly name: string;
   readonly source: string;
-  readonly by: AgentId;
+  /** Who creates it, by id: the events' `by`, and the commit's actor `operator:<by>`. */
+  readonly by: string;
   readonly idempotencyKey: string;
   readonly fingerprint: string;
 }
@@ -81,7 +76,7 @@ const alreadyMade = () => Effect.void;
  * 3. trunk is initialized at its head, then synced, which brings staging and
  *    the mirror to that head;
  * 4. the pool is configured last, so it never forks an empty mirror;
- * 5. ProjectCreated commits, keyed by the operator's Idempotency-Key.
+ * 5. ProjectCreated commits, keyed by the creator's Idempotency-Key.
  * A replay of a finished bootstrap answers from what it committed. A missing
  * source is the code host's RepoNotFound, as it is.
  */
@@ -129,7 +124,7 @@ export const createProject: (
       entity,
       cause: command.idempotencyKey,
       fingerprint: command.fingerprint,
-      actor: agentActor(command.by),
+      actor: `operator:${command.by}`,
       project: projectId,
     },
     (tx) => {

@@ -78,8 +78,7 @@ const abandon = async (c: ChangeUnderTest, leaseId: string, key: string) =>
   decodeExit(
     ChangeCodecs.abandon,
     await c.stub.abandon({
-      agentId: c.agentId,
-      authority: { _tag: "Lease", leaseId },
+      authority: { _tag: "Lease", leaseId, agentId: c.agentId },
       idempotencyKey: key,
     }),
   );

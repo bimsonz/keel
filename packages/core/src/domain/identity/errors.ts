@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { AgentId, NextAction, OrgId } from "../kernel/index.ts";
-import { AgentState, Sponsor } from "./agent.ts";
+import { AgentState } from "./agent.ts";
 
 /** No agent has this id. */
 export class AgentNotKnown extends Schema.TaggedError<AgentNotKnown>()("AgentNotKnown", {
@@ -34,21 +34,6 @@ export class IdempotencyConflict extends Schema.TaggedError<IdempotencyConflict>
   "IdempotencyConflict",
   {
     idempotencyKey: Schema.String,
-  },
-) {}
-
-/**
- * A session named a sponsor its agent does not act for. A session's sponsor is
- * its token's `obo`, else the agent's enrolment sponsor; an agent never names
- * its own.
- */
-export class SessionSponsorRefused extends Schema.TaggedError<SessionSponsorRefused>()(
-  "SessionSponsorRefused",
-  {
-    agentId: AgentId,
-    requested: Sponsor,
-    /** The sponsor the agent acts for, when it has one. */
-    sponsor: Schema.optional(Sponsor),
   },
 ) {}
 

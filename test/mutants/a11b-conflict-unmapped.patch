@@ -2,10 +2,10 @@
 # kills: a11b.conflict
 # why: a reused key on createProject answers 404 instead of 409 request.idempotency_conflict
 diff --git a/apps/keel/src/adapters/driving/http/operator.ts b/apps/keel/src/adapters/driving/http/operator.ts
-index f03a226..431da0b 100644
+index f943b73..af94e52 100644
 --- a/apps/keel/src/adapters/driving/http/operator.ts
 +++ b/apps/keel/src/adapters/driving/http/operator.ts
-@@ -62,7 +62,10 @@ export function createProjectError(
+@@ -185,7 +185,10 @@ export function createProjectError(
  ): Operator_createProjectResult {
    switch (error._tag) {
      case "IdempotencyConflict":
@@ -14,6 +14,6 @@ index f03a226..431da0b 100644
 +        status: 404,
 +        body: problem(404, "resource.not_found", caller.requestId, { detail: error.idempotencyKey }),
 +      };
-     case "RepoNotFound":
+     case "ProjectNameTaken":
        return {
-         status: 404,
+         status: 409,

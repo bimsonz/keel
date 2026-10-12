@@ -1,10 +1,11 @@
-import { type InboxPage, isBootstrap } from "@keeltown/core/domain/identity";
+import { authorize, type InboxPage } from "@keeltown/core/domain/identity";
 import type { AgentId } from "@keeltown/core/kernel";
+import { Result } from "effect";
 import type { Hono } from "hono";
 import type { AppEnv, RouteDeps } from "../../../generated/http/runtime.gen.ts";
 import { isInboxCursor, sseEvent } from "../notices.ts";
 import type { Caller } from "./caller.ts";
-import { bootstrapConfined } from "./operator.ts";
+import { agentsOnly, refusalResult } from "./authorize-handlers.ts";
 import { problemResponse } from "./problems.ts";
 
 /**
@@ -27,9 +28,6 @@ export interface InboxStreams {
 export const INBOX_STREAM_PATH = "/v1/inbox/stream";
 export const INBOX_SOCKET_PATH = "/v1/inbox/socket";
 
-/** Both routes read the inbox, so both need `agent:read`, as `GET /v1/inbox` does. */
-const AGENT_READ = [{ OAuth2Auth: ["agent:read"] }] as const;
-
 /** How long one read of the SSE loop waits for a notice; an empty wait sends a keep-alive comment. */
 const SSE_WAIT_SECONDS = 25;
 
@@ -45,14 +43,15 @@ export function registerInboxStreams(
   deps: RouteDeps<AppEnv, Caller>,
   streams: InboxStreams,
 ): void {
-  const authorize = deps.authorize(AGENT_READ);
+  const gate = deps.authorize([]);
 
-  app.get(INBOX_STREAM_PATH, authorize, (c) => {
+  app.get(INBOX_STREAM_PATH, gate, (c) => {
     const caller = deps.context(c, "required");
     if (caller === null) return deps.noContext(c);
+    const refused = inboxRefusal(caller);
+    if (refused !== undefined) return refused;
     const { principal } = caller;
-    if (principal === null) return deps.noContext(c);
-    if (isBootstrap(principal)) return confined(caller);
+    if (principal._tag !== "Agent") return deps.noContext(c);
     const resumeFrom = c.req.header("last-event-id") ?? c.req.query("cursor");
     if (resumeFrom !== undefined && !isInboxCursor(resumeFrom)) return badCursor(caller);
 
@@ -88,12 +87,13 @@ export function registerInboxStreams(
     });
   });
 
-  app.get(INBOX_SOCKET_PATH, authorize, async (c) => {
+  app.get(INBOX_SOCKET_PATH, gate, async (c) => {
     const caller = deps.context(c, "required");
     if (caller === null) return deps.noContext(c);
+    const refused = inboxRefusal(caller);
+    if (refused !== undefined) return refused;
     const { principal } = caller;
-    if (principal === null) return deps.noContext(c);
-    if (isBootstrap(principal)) return confined(caller);
+    if (principal._tag !== "Agent") return deps.noContext(c);
     if (c.req.header("upgrade")?.toLowerCase() !== "websocket")
       return problemResponse(400, "request.invalid", caller.requestId, {
         detail: "This route is a WebSocket: send `Upgrade: websocket`.",
@@ -116,10 +116,22 @@ function badCursor(caller: Caller): Response {
   });
 }
 
-function confined(caller: Caller): Response {
-  const { status, body } = bootstrapConfined(caller.requestId);
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/problem+json" },
-  });
+/**
+ * The inbox is the caller's own (`inbox`, decided on Self like `GET /v1/inbox`),
+ * and only an agent has one: the policy refuses anyone else first.
+ */
+function inboxRefusal(caller: Caller): Response | undefined {
+  const decided = authorize(caller.principal, "inbox", { _tag: "Self" });
+  const result = Result.isFailure(decided)
+    ? refusalResult("inbox", {}, caller.requestId, decided.failure)
+    : caller.principal._tag === "Agent"
+      ? undefined
+      : agentsOnly(caller.requestId);
+  return (
+    result &&
+    new Response(JSON.stringify(result.body), {
+      status: result.status,
+      headers: { "content-type": "application/problem+json" },
+    })
+  );
 }

@@ -24,12 +24,12 @@ import {
 } from "../ports/index.ts";
 import { AGENT } from "./enrol.ts";
 
-/** The operator's moves on an agent's standing. */
+/** The moves on an agent's standing. */
 export type StandingMove = "suspend" | "reinstate" | "revoke";
 
-/** An operator's suspension, reinstatement or revocation, as the isolate sends it. */
+/** A suspension, reinstatement or revocation, as the isolate sends it. */
 export interface StandingChange {
-  /** The operator, as `operator:<agentId>`: the events' `by` and the commit's actor. */
+  /** Who moves it, as `operator:<the actor's id>`: the events' `by` and the commit's actor. */
   readonly by: `operator:${string}`;
   /** Why the agent is suspended; a suspension needs one, the others take none. */
   readonly reason?: string | undefined;

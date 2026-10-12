@@ -1,6 +1,6 @@
+import type { EnrolAgentInput } from "@keeltown/core/application/identity";
 import type {
   Enrolment,
-  EnrolInput,
   ProjectRecord,
   ProjectSettings,
   PutProjectSettings,
@@ -12,6 +12,7 @@ import type {
   AgentNotKnown,
   AgentStateRefused,
   IdempotencyConflict,
+  ProjectNameTaken,
 } from "@keeltown/core/domain/identity";
 import type { ProjectNotFound } from "@keeltown/core/domain/integration";
 import { AgentId, Glob, ProjectId } from "@keeltown/core/kernel";
@@ -42,19 +43,21 @@ const iso = (ms: number) => new Date(ms).toISOString();
 const decodeProjectId = Schema.decodeUnknownOption(ProjectId);
 const decodeGlobs = Schema.decodeUnknownOption(Schema.Array(Glob));
 
-export function enrolInput(input: Input<"Operator_enrolAgent">): Result.Result<EnrolInput, Issues> {
-  const base = {
-    name: input.name,
-    kind: input.kind,
-    scopes: [...input.scopes],
-    ...(input.onBehalfOf === undefined ? {} : { onBehalfOf: input.onBehalfOf }),
-    idempotencyKey: input["idempotency-key"],
-  };
-  if (input.projectId === undefined) return Result.succeed(base);
+export function enrolInput(
+  input: Input<"Operator_enrolAgent">,
+): Result.Result<EnrolAgentInput, Issues> {
   const projectId = decodeProjectId(input.projectId);
   return projectId._tag === "Some"
-    ? Result.succeed({ ...base, projectId: projectId.value })
-    : Result.fail([{ path: ["body", "projectId"], message: "Expected a project id (prj_…)" }]);
+    ? Result.succeed({
+        name: input.name,
+        kind: input.kind,
+        scopes: [...input.scopes],
+        projectId: projectId.value,
+        idempotencyKey: input["idempotency-key"],
+      })
+    : Result.fail([
+        { path: ["body", "projectId"], message: "Name the project the agent works in (prj_…)" },
+      ]);
 }
 
 /** The project a settings operation names in its path. */
@@ -144,10 +147,22 @@ export function putSettingsError(
   }
 }
 
-export function createProjectOk(project: ProjectRecord): Operator_createProjectResult {
+/** A new project as its creator reads it: private until its settings say otherwise, in the org named. */
+export function createProjectOk(
+  project: ProjectRecord,
+  org: string,
+  role: "owner" | "maintainer" | "member" | undefined,
+): Operator_createProjectResult {
   return {
     status: 201,
-    body: { id: project.id, name: project.name, createdAt: iso(project.createdAt) },
+    body: {
+      id: project.id,
+      org,
+      name: project.name,
+      visibility: "private",
+      createdAt: iso(project.createdAt),
+      ...(role === undefined ? {} : { viewer: { role } }),
+    },
   };
 }
 
@@ -166,11 +181,21 @@ const conflict = (
 
 export function createProjectError(
   caller: Caller,
-  error: IdempotencyConflict | RepoNotFound,
+  error: IdempotencyConflict | RepoNotFound | ProjectNameTaken,
 ): Operator_createProjectResult {
   switch (error._tag) {
     case "IdempotencyConflict":
       return conflict(caller, error, "Operator_createProject", "project");
+    case "ProjectNameTaken":
+      return {
+        status: 409,
+        body: problem(409, "project.name_taken", caller.requestId, {
+          detail: `The org already has a project named "${error.name}", in some case.`,
+          nextActions: [
+            { kind: "call", title: "Choose another name", operationId: "Operator_createProject" },
+          ],
+        }),
+      };
     case "RepoNotFound":
       return {
         status: 404,
@@ -205,13 +230,20 @@ export function enrolAgentOk(enrolment: Enrolment): Operator_enrolAgentResult {
 
 export function enrolAgentError(
   caller: Caller,
-  error: IdempotencyConflict,
+  error: IdempotencyConflict | ProjectNotFound,
 ): Operator_enrolAgentResult {
   switch (error._tag) {
     case "IdempotencyConflict":
       return conflict(caller, error, "Operator_enrolAgent", "enrolment");
+    case "ProjectNotFound":
+      return {
+        status: 404,
+        body: problem(404, "resource.not_found", caller.requestId, {
+          detail: `No project ${error.projectId} in an org.`,
+        }),
+      };
     default: {
-      const unmapped: never = error._tag;
+      const unmapped: never = error;
       return unmapped;
     }
   }
@@ -286,27 +318,4 @@ export function standingError(
       return unmapped;
     }
   }
-}
-
-/**
- * The 403 for the bootstrap credential anywhere but enrolment: it exists only
- * to enrol the first operator, who does everything else.
- */
-export function bootstrapConfined(requestId: string): {
-  readonly status: 403;
-  readonly body: ProblemBody;
-} {
-  return {
-    status: 403,
-    body: problem(403, "auth.insufficient_scope", requestId, {
-      detail: "The bootstrap credential may only enrol agents.",
-      nextActions: [
-        {
-          kind: "call",
-          title: "Enrol an operator, then call this as that operator",
-          operationId: "Operator_enrolAgent",
-        },
-      ],
-    }),
-  };
 }

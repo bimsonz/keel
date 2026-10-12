@@ -35,7 +35,8 @@ export function agentProfile(agent: Agent) {
     name: agent.name,
     kind: agent.kind,
     scopes: [...agent.scopes],
-    ...(agent.onBehalfOf === undefined ? {} : { onBehalfOf: agent.onBehalfOf }),
+    ...(agent.org === undefined ? {} : { org: agent.org }),
+    ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
     revocationEpoch: agent.revocationEpoch,
     state: agent.state,
     createdAt: iso(agent.createdAt),
@@ -71,7 +72,6 @@ export function whoamiOk(identity: Identity): WhoamiResult {
       result: {
         agent: agentProfile(agent),
         session: identity.session === null ? null : { id: identity.session.id },
-        ...(identity.onBehalfOf === undefined ? {} : { onBehalfOf: identity.onBehalfOf }),
       },
       findings: [],
       next: [],

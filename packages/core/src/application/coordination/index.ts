@@ -5,12 +5,12 @@ import type {
   PoolExhausted,
   Preflight,
   Proposition,
-  WithdrawAuthority,
 } from "../../domain/coordination/index.ts";
 import type { AgentToken } from "../../domain/identity/index.ts";
 import type { ChangeId, CommitSha, Instant, LeaseId, SketchId } from "../../domain/kernel/index.ts";
 import { stub } from "../not-implemented.ts";
 import type { Clock, Ids, WorkspacePool, WorkspaceGrant } from "../ports/index.ts";
+import type { Withdrawal } from "./change.ts";
 
 /**
  * coordination use-cases. The isolate reaches a change through the `Changes`
@@ -45,12 +45,12 @@ export interface Adopted {
 }
 
 /**
- * Withdraw a change: under its lease, or as an operator. The Change DO
- * authorises the lease; the doorway has decided the authority from the scope.
+ * Withdraw a change: under its lease, or as a maintainer of its project. The
+ * Change DO authorises the lease and confines the maintainer to the project.
  */
 export interface AbandonInput {
   readonly changeId: ChangeId;
-  readonly authority: WithdrawAuthority;
+  readonly authority: Withdrawal;
   readonly reason?: string;
   readonly idempotencyKey: string;
 }

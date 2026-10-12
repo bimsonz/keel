@@ -36,25 +36,25 @@ model LanePage is Page<LaneView>;
 @tag("Views")
 interface Views {
   @summary("Get a verdict")
-  @useAuth(AgentRead | Observer)
+  @useAuth(AgentRead | SessionAuth)
   @route("/verdicts/{verdictId}")
   @get
   getVerdict(@path verdictId: VerdictId): VerdictView | NotFound | StandardErrors;
 
   @summary("Get a candidate")
-  @useAuth(AgentRead | Observer)
+  @useAuth(AgentRead | SessionAuth)
   @route("/candidates/{candidateId}")
   @get
   getCandidate(@path candidateId: CandidateId): CandidateView | NotFound | StandardErrors;
 
   @summary("List a project's lanes")
-  @useAuth(AgentRead | Observer)
+  @useAuth(AgentRead | SessionAuth)
   @route("/projects/{projectId}/lanes")
   @get
   listLanes(@path projectId: ProjectId, ...PageQuery): LanePage | NotFound | StandardErrors;
 
   @summary("Get a project's trunk")
-  @useAuth(AgentRead | Observer)
+  @useAuth(AgentRead | SessionAuth)
   @route("/projects/{projectId}/trunk")
   @get
   getTrunk(@path projectId: ProjectId): TrunkView | NotFound | StandardErrors;

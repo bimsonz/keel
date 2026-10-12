@@ -2,15 +2,15 @@
 # kills: a11.inbox
 # why: the inbox ignores the cursor, so every read repeats every notice
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
-index 3419bb7..f035061 100644
+index 3a2a5ed..7b38942 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -186,7 +186,7 @@ export function makeHandlers(run: Runner) {
-         run(
-           caller,
-           principalOf(caller).pipe(
--            Effect.flatMap((principal) => readInbox(principal, input.cursor, input.wait)),
-+            Effect.flatMap((principal) => readInbox(principal, undefined, input.wait)),
-             Effect.map(inboxOk),
-           ),
-         ),
+@@ -448,7 +448,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, makeUser: MakeU
+             : run(
+                 caller,
+                 tokenOf(caller).pipe(
+-                  Effect.flatMap((principal) => readInbox(principal, input.cursor, input.wait)),
++                  Effect.flatMap((principal) => readInbox(principal, undefined, input.wait)),
+                   Effect.map(inboxOk),
+                 ),
+               ),

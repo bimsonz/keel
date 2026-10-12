@@ -1,0 +1,125 @@
+import { Effect, Option, Schema } from "effect";
+import {
+  admits,
+  type Agent,
+  AgentNotAdmitted,
+  AgentNotKnown,
+  type AgentToken,
+  isBootstrap,
+  type Principal,
+  TokenRejected,
+} from "../../domain/identity/index.ts";
+import { AgentId, UserId } from "../../domain/kernel/index.ts";
+import { AgentDirectory, Memberships, TokenIssuer, Users } from "../ports/index.ts";
+
+/** What a request presents, as the doorway reads it: a Keel token, a user's session, or nothing. */
+export type Credential =
+  | { readonly _tag: "Token"; readonly token: string }
+  | { readonly _tag: "Session"; readonly userId: UserId }
+  | { readonly _tag: "None" };
+
+/** Who the gate admitted, and for an agent (or the bootstrap credential) the token it verified. */
+export interface Admitted {
+  readonly principal: Principal;
+  readonly token?: AgentToken;
+}
+
+/**
+ * An agent enrolled before tenancy that the cutover has not placed: it has no
+ * org or no sponsor, so no rights can be derived for it. Refused by name, never
+ * given a default.
+ */
+export class AgentUnplaced extends Schema.TaggedError<AgentUnplaced>()("AgentUnplaced", {
+  agentId: AgentId,
+}) {}
+
+/** A session whose user no longer exists. */
+export class UserNotKnown extends Schema.TaggedError<UserNotKnown>()("UserNotKnown", {
+  userId: UserId,
+}) {}
+
+/** Why an agent may not act, or null when it may. */
+export function whyNotAdmitted(
+  agent: Agent,
+  principal: AgentToken | null,
+): AgentNotAdmitted["reason"] | null {
+  if (agent.state === "suspended") return "suspended";
+  if (agent.state === "revoked") return "revoked";
+  if (principal !== null && !admits(agent, principal)) return "stale-epoch";
+  return null;
+}
+
+/**
+ * The agent behind a verified token, if it may still act: the token's
+ * revocation epoch must match the agent's current one. It reads only the
+ * AgentDirectory, so the request gate never calls an AgentSession DO.
+ */
+export const admit: (
+  principal: AgentToken,
+) => Effect.Effect<Agent, AgentNotKnown | AgentNotAdmitted, AgentDirectory> = Effect.fn(
+  "identity/admit",
+)(function* (principal: AgentToken) {
+  const directory = yield* AgentDirectory;
+  const agent = yield* directory.findAgent(principal.agentId);
+  if (Option.isNone(agent)) return yield* new AgentNotKnown({ agentId: principal.agentId });
+  const reason = whyNotAdmitted(agent.value, principal);
+  if (reason !== null) return yield* new AgentNotAdmitted({ agentId: principal.agentId, reason });
+  return agent.value;
+});
+
+export type GateRefusal =
+  | TokenRejected
+  | AgentNotKnown
+  | AgentNotAdmitted
+  | AgentUnplaced
+  | UserNotKnown;
+
+/**
+ * Who is asking: a Keel token is an agent, or the
+ * bootstrap credential; a session is a user; nothing is anonymous. An agent
+ * stands on its D1 row: its epoch, its org, and its sponsor's standing in that
+ * org, read on every request. A token whose `org` is not its agent's current
+ * one (minted before the agent was placed) is stale, and the agent exchanges
+ * its credential again.
+ */
+export const principalOf: (
+  credential: Credential,
+) => Effect.Effect<Admitted, GateRefusal, TokenIssuer | AgentDirectory | Users | Memberships> =
+  Effect.fn("identity/principalOf")(function* (credential: Credential) {
+    switch (credential._tag) {
+      case "None":
+        return { principal: { _tag: "Anonymous" } };
+      case "Session": {
+        const user = yield* Users.use((users) => users.principal(credential.userId));
+        if (Option.isNone(user)) return yield* new UserNotKnown({ userId: credential.userId });
+        return { principal: user.value };
+      }
+      case "Token": {
+        const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
+        const agent = yield* admit(token);
+        if (isBootstrap(token)) return { principal: { _tag: "Bootstrap" }, token };
+        if (agent.org === undefined || agent.sponsor === undefined)
+          return yield* new AgentUnplaced({ agentId: agent.id });
+        if (token.org !== agent.org) return yield* new TokenRejected({ reason: "claims" });
+        const { org, sponsor: sponsorId } = agent;
+        const sponsor = yield* Memberships.use((memberships) =>
+          memberships.standing(sponsorId, org),
+        );
+        return {
+          principal: {
+            _tag: "Agent",
+            agentId: agent.id,
+            org,
+            projectId: agent.projectId,
+            scopes: token.scopes,
+            sponsor,
+          },
+          token,
+        };
+      }
+      default: {
+        const unmatched: never = credential;
+        return unmatched;
+      }
+    }
+  });

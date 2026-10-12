@@ -25,7 +25,7 @@ describe("the published contract, through the Worker's fetch handler", () => {
     expect(response.status).toBe(401);
     expect(response.headers.get("content-type")).toBe("application/problem+json");
     const body = await response.json<{ code: string; nextActions: { operationId?: string }[] }>();
-    expect(body.code).toBe("auth.invalid_token");
+    expect(body.code).toBe("auth.required");
     expect(body.nextActions.map((a) => a.operationId)).toEqual(["Auth_exchangeToken"]);
   });
 
@@ -53,7 +53,7 @@ describe("the published contract, through the Worker's fetch handler", () => {
     expect((await response.json<{ code: string }>()).code).toBe("service.not_implemented");
   });
 
-  it("[a11.mcp-gate] lists exactly the mcp-tagged operations as tools, filtered by the caller's scopes", async () => {
+  it("[a11.mcp-gate] lists exactly the mcp-tagged operations as tools, to every caller: the policy decides each call", async () => {
     const tagged = Object.values(openApiDocument.paths)
       .flatMap((path) => Object.values(path))
       .filter(
@@ -67,32 +67,19 @@ describe("the published contract, through the Worker's fetch handler", () => {
     const all = await mcpResult(await mcp(await tokenFor(worker), "tools/list"));
     const readOnly = await mcpResult(await mcp(await tokenFor(reader), "tools/list"));
     expect(toolNames(all)).toEqual(tagged.toSorted());
-    expect(toolNames(readOnly)).toEqual(["change", "inbox", "nearby", "status", "whoami", "why"]);
+    expect(toolNames(readOnly)).toEqual(tagged.toSorted());
   });
 
-  it("[a11d.why-observer] lets an observer ask why, over REST and as an MCP tool", async () => {
-    const observer = await tokenFor(await seedAgent({}, ["observer"]));
-    const response = await exports.default.fetch(`${BASE}/v1/why?subject=authz.permissions`, {
-      headers: { authorization: `Bearer ${observer}` },
-    });
-    // `why` is still a stub: the observer reaches it (503), not the scope gate (403).
-    expect(response.status).toBe(503);
-    expect((await response.json<{ code: string }>()).code).toBe("service.not_implemented");
-    expect(toolNames(await mcpResult(await mcp(observer, "tools/list")))).toContain("why");
-  });
-
-  it("[lattice.rest] answers an observer every predicate's lattice, exactly as the domain publishes it", async () => {
-    const observer = await tokenFor(await seedAgent({}, ["observer"]));
+  it("[lattice.rest] answers anyone every predicate's lattice, exactly as the domain publishes it", async () => {
+    const reader = await tokenFor(await seedAgent({}, ["agent:read"]));
+    const anonymous = await exports.default.fetch(`${BASE}/v1/lattices`);
     const response = await exports.default.fetch(`${BASE}/v1/lattices`, {
-      headers: { authorization: `Bearer ${observer}` },
+      headers: { authorization: `Bearer ${reader}` },
     });
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ items: JSON.parse(JSON.stringify(LATTICES)) });
-    const worker = await tokenFor(await seedAgent({}, ["agent:work"]));
-    const refused = await exports.default.fetch(`${BASE}/v1/lattices`, {
-      headers: { authorization: `Bearer ${worker}` },
-    });
-    expect(refused.status).toBe(403);
+    expect([anonymous.status, response.status]).toEqual([200, 200]);
+    const items = { items: JSON.parse(JSON.stringify(LATTICES)) };
+    expect(await response.json()).toEqual(items);
+    expect(await anonymous.json()).toEqual(items);
   });
 
   it("refuses the MCP endpoint without a token", async () => {

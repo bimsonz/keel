@@ -41,6 +41,7 @@ import {
   PrecheckStartedCommand,
   SubmitCommand,
 } from "../../src/rpc/index.ts";
+import type { Caller } from "../../src/adapters/driving/http/caller.ts";
 import { rebaseError } from "../../src/adapters/driving/http/work-loop.ts";
 
 const changeId = Schema.decodeUnknownSync(ChangeId)("chg_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
@@ -281,7 +282,11 @@ describe("rebase", () => {
 });
 
 describe("rebase over HTTP", () => {
-  const caller = { requestId: "req-1", principal: null, signal: new AbortController().signal };
+  const caller: Caller = {
+    requestId: "req-1",
+    principal: { _tag: "Anonymous" },
+    signal: new AbortController().signal,
+  };
 
   it("[rebase.problems] a busy workspace is 503 workspace.busy with Retry-After and a rebase to retry; a pack over the cap is 409 with an escalation", () => {
     const busy = rebaseError(caller, new PushRejected({ reason: "busy" }));

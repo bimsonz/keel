@@ -92,6 +92,18 @@ export interface BootstrapPrincipal {
   readonly _tag: "Bootstrap";
 }
 
+/**
+ * Who a granted command is by, as a use-case records it: the agent or the user
+ * the policy already granted. It decides nothing; it names.
+ */
+export type Actor =
+  | { readonly _tag: "Agent"; readonly agentId: AgentId }
+  | { readonly _tag: "User"; readonly userId: UserId };
+
+/** The actor's id: its agent's or its user's. */
+export const actorId = (actor: Actor): string =>
+  actor._tag === "Agent" ? actor.agentId : actor.userId;
+
 /** The instance itself: its quotas, its users, its spend. */
 export interface InstanceResource {
   readonly _tag: "Instance";

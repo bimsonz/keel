@@ -2,15 +2,14 @@
 # kills: b12.event-audience
 # why: an event type the build does not know is served publicly instead of staying with members
 diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
-index 66bc55e..54b891e 100644
 --- a/packages/core/src/application/coordination/read-scope.ts
 +++ b/packages/core/src/application/coordination/read-scope.ts
-@@ -140,7 +140,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
+@@ -144,7 +144,7 @@
  const AUDIENCE = new Map<string, Audience>(Object.entries(EVENT_AUDIENCE));
  
  /** An envelope type's audience: members only for a type this build does not know. */
 -export const audienceOf = (type: string): Audience => AUDIENCE.get(type) ?? "members";
 +export const audienceOf = (type: string): Audience => AUDIENCE.get(type) ?? "public";
  
- /** A read that spans every project, or a token's own, asked without a token. */
- export class TokenRequired extends Schema.TaggedError<TokenRequired>()("TokenRequired", {}) {}
+ /**
+  * One project's reads, as the doorway authorised them: whether the reader sees

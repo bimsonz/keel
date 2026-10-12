@@ -1,11 +1,11 @@
-// A run's live event chain, read from the observer's feed: pnpm e2e:chain [env] <cursor> [project]
+// A run's live event chain, read from the seed user's feed: pnpm e2e:chain [env] <cursor> [project]
 //
 // Prints every event after `cursor` (the feed position S-0 prints when it
 // starts) in one project, oldest first, one line each with the fields a reader
 // needs to follow a change from declare to landing or bounce. With no project,
 // forge-lite. The chain goes to stdout; pipe it beside the run's record.
 import { execFileSync } from "node:child_process";
-import { clientFor, readSeeded } from "./lib/seeded.ts";
+import { readSeeded, userClient } from "./lib/seeded.ts";
 
 const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 const [environment = "staging", cursor, projectName = "forge-lite"] = process.argv.slice(2);
@@ -16,7 +16,7 @@ if (cursor === undefined) {
 const seeded = readSeeded(root, environment);
 const projectId = seeded.projects[projectName]?.id;
 if (projectId === undefined) throw new Error(`no seeded project ${projectName}`);
-const observer = clientFor(seeded.keelUrl, seeded.observer);
+const reader = userClient(seeded.keelUrl, seeded.seedUser);
 
 /** The fields of a payload worth a line: ids, outcomes and shas, short. */
 function brief(payload: Readonly<Record<string, unknown>>): string {
@@ -57,7 +57,7 @@ function brief(payload: Readonly<Record<string, unknown>>): string {
   return parts.join(" ");
 }
 
-let page = await observer.events({ cursor, limit: 500 });
+let page = await reader.events({ cursor, limit: 500 });
 let count = 0;
 while (page.items.length > 0) {
   for (const event of page.items) {
@@ -68,6 +68,6 @@ while (page.items.length > 0) {
       `${event.at}  ${event.label ?? ""}\t${event.payload._tag.padEnd(20)} ${brief(payload)}`,
     );
   }
-  page = await observer.events({ cursor: page.nextCursor, limit: 500 });
+  page = await reader.events({ cursor: page.nextCursor, limit: 500 });
 }
 console.log(`${count} events in ${projectName} (${projectId}) after ${cursor}`);

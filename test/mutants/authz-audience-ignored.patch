@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/authz.test.ts -t authz.audience
+# kills: authz.audience
+# why: every granted read sees as a member, so an outsider reading a public project gets its members-only events
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -317,7 +317,7 @@
+         return refusalResult(action, input, caller.requestId, decided.failure);
+       const { audience } = decided.success;
+       return handler(
+-        { ...caller, resource: resolved, ...(audience === undefined ? {} : { audience }) },
++        { ...caller, resource: resolved, audience: "members" },
+         input,
+       );
+     };

@@ -1,12 +1,7 @@
 import type { AppEnv, RouteDeps } from "../../../generated/http/runtime.gen.ts";
-import {
-  admitsAnonymous,
-  bearerToken,
-  type Caller,
-  namesScheme,
-  satisfies,
-  type TokenVerifier,
-} from "./caller.ts";
+import type { Admitted } from "@keeltown/core/application/identity";
+import type { Caller } from "./caller.ts";
+import type { Gated } from "./gate.ts";
 import { type ProblemBody, problemResponse } from "./problems.ts";
 
 type Issues = NonNullable<ProblemBody["issues"]>;
@@ -42,52 +37,37 @@ function issuesOf(result: { readonly success: boolean }): Issues {
   });
 }
 
+/** The gate, bound to its dependencies: an admitted caller, or the response that refuses it. */
+export type BoundGate = (request: Request, requestId: string) => Promise<Gated | Response>;
+
+const ADMITTED = new WeakMap<Request, Admitted>();
+
 /**
- * How the generated routes reach the app: the auth gate the document publishes,
- * the caller each handler receives, and the responses for requests that never
- * reach a handler.
+ * How the generated routes reach the app: the gate every operation passes, the
+ * caller each handler receives, and the responses for requests that never
+ * reach a handler. The document's security requirements describe who may call
+ * an operation; they decide nothing here. One policy, `authorizeHandlers`,
+ * decides every operation for every principal the gate admits.
  */
-export function routeDeps(verify: TokenVerifier): RouteDeps<AppEnv, Caller> {
+export function routeDeps(gate: BoundGate): RouteDeps<AppEnv, Caller> {
   return {
-    authorize: (requirements) => async (c, next) => {
-      const header = c.req.header("authorization");
-      // An optional route (anonymous beside a real scheme) still reads a presented
-      // credential, so a token's own access applies; a bad one is refused, never
-      // read as anonymous. A route with no real scheme ignores it.
-      if (admitsAnonymous(requirements) && (header === undefined || !namesScheme(requirements)))
-        return next();
-      const requestId = c.get("requestId");
-      const token = bearerToken(header);
-      const verification = token === null ? ({ refused: "invalid" } as const) : await verify(token);
-      if ("refused" in verification) {
-        return verification.refused === "revoked"
-          ? problemResponse(401, "auth.revoked", requestId, {
-              nextActions: [{ kind: "escalate", title: "Ask an operator to reinstate the agent" }],
-            })
-          : problemResponse(401, "auth.invalid_token", requestId, {
-              nextActions: [
-                {
-                  kind: "call",
-                  title: "Exchange your client credentials for a token",
-                  operationId: "Auth_exchangeToken",
-                },
-              ],
-            });
-      }
-      const { principal } = verification;
-      if (!satisfies(requirements, principal)) {
-        return problemResponse(403, "auth.insufficient_scope", requestId, {
-          detail: `This operation requires one of: ${requirements.map((r) => Object.values(r).flat().join(" + ")).join(", ")}.`,
-        });
-      }
-      c.set("principal", principal);
-      return next();
+    authorize: () => async (c, next) => {
+      const gated = await gate(c.req.raw, c.get("requestId"));
+      if (gated instanceof Response) return gated;
+      ADMITTED.set(c.req.raw, gated.admitted);
+      await next();
+      c.res.headers.append("server-timing", gated.timing);
+      return undefined;
     },
-    context: (c) => ({
-      requestId: c.get("requestId"),
-      principal: c.get("principal") ?? null,
-      signal: c.req.raw.signal,
-    }),
+    context: (c) => {
+      const admitted = ADMITTED.get(c.req.raw) ?? { principal: { _tag: "Anonymous" } };
+      return {
+        requestId: c.get("requestId"),
+        principal: admitted.principal,
+        ...(admitted.token === undefined ? {} : { token: admitted.token }),
+        signal: c.req.raw.signal,
+      };
+    },
     noContext: (c) => problemResponse(401, "auth.invalid_token", c.get("requestId")),
     notAcceptable: (c, offered) =>
       problemResponse(406, "request.invalid", c.get("requestId"), {

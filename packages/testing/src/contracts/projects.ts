@@ -1,12 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { AgentToken } from "@keeltown/core/domain/identity";
+import type { Actor } from "@keeltown/core/domain/identity";
 import {
-  AgentId,
   type ChangeId,
   EventEnvelope,
   Glob,
   makeId,
   ProjectId,
+  UserId,
 } from "@keeltown/core/kernel";
 import { Projects, type ProjectSettings } from "@keeltown/core/ports";
 import { Effect, type Layer, Schema } from "effect";
@@ -28,14 +28,21 @@ const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const ulid = () =>
   [...crypto.getRandomValues(new Uint8Array(26))].map((b) => CROCKFORD[b % 32] ?? "0").join("");
 
-const operator = (): AgentToken => ({
-  agentId: Schema.decodeUnknownSync(AgentId)(`agt_${ulid()}`),
-  projectId: Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`),
-  scopes: ["operator"],
-  revocationEpoch: 0,
+/** A user the doorway let create the project. */
+const creator = (): Actor => ({
+  _tag: "User",
+  userId: Schema.decodeUnknownSync(UserId)(`usr_${ulid()}`),
 });
 
 const key = () => `key-${crypto.randomUUID()}`;
+
+/** A project to create, under a fresh id and key: a real adapter's DOs outlive one case. */
+const creating = (source: string, name = "forge") => ({
+  projectId: Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`),
+  name,
+  source,
+  idempotencyKey: key(),
+});
 
 /** An event of `changeId` at `seq` on its log, encoded as the fan-out delivers it. */
 const eventOf = (
@@ -86,16 +93,13 @@ const declaring = (
 
 export function describeProjectsContract(adapter: string, make: () => ProjectsHarness) {
   describe(`Projects contract: ${adapter}`, () => {
-    it.live("creates a project named as asked", () => {
+    it.live("creates the project it is given the id of, named as asked", () => {
       const harness = make();
       return Effect.gen(function* () {
-        const project = yield* (yield* Projects).create(operator(), {
-          name: "forge",
-          source: harness.source,
-          idempotencyKey: key(),
-        });
+        const input = creating(harness.source);
+        const project = yield* (yield* Projects).create(creator(), input);
         expect(project.name).toBe("forge");
-        expect(Schema.is(ProjectId)(project.id)).toBe(true);
+        expect(project.id).toBe(input.projectId);
       }).pipe(Effect.provide(harness.layer));
     });
 
@@ -103,8 +107,8 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
       const harness = make();
       return Effect.gen(function* () {
         const projects = yield* Projects;
-        const by = operator();
-        const input = { name: "forge", source: harness.source, idempotencyKey: key() };
+        const by = creator();
+        const input = creating(harness.source);
         const first = yield* projects.create(by, input);
         expect(yield* projects.create(by, input)).toEqual(first);
       }).pipe(Effect.provide(harness.layer));
@@ -114,24 +118,11 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
       const harness = make();
       return Effect.gen(function* () {
         const projects = yield* Projects;
-        const by = operator();
-        const idempotencyKey = key();
-        yield* projects.create(by, { name: "forge", source: harness.source, idempotencyKey });
-        const reused = yield* Effect.flip(
-          projects.create(by, { name: "other", source: harness.source, idempotencyKey }),
-        );
+        const by = creator();
+        const input = creating(harness.source);
+        yield* projects.create(by, input);
+        const reused = yield* Effect.flip(projects.create(by, { ...input, name: "other" }));
         expect(reused._tag).toBe("IdempotencyConflict");
-      }).pipe(Effect.provide(harness.layer));
-    });
-
-    it.live("keeps two operators' projects apart even under the same key", () => {
-      const harness = make();
-      return Effect.gen(function* () {
-        const projects = yield* Projects;
-        const input = { name: "forge", source: harness.source, idempotencyKey: key() };
-        const a = yield* projects.create(operator(), input);
-        const b = yield* projects.create(operator(), input);
-        expect(a.id).not.toBe(b.id);
       }).pipe(Effect.provide(harness.layer));
     });
 
@@ -139,13 +130,7 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
       const harness = make();
       return Effect.gen(function* () {
         const missing = `missing-${ulid().toLowerCase()}`;
-        const error = yield* Effect.flip(
-          (yield* Projects).create(operator(), {
-            name: "forge",
-            source: missing,
-            idempotencyKey: key(),
-          }),
-        );
+        const error = yield* Effect.flip((yield* Projects).create(creator(), creating(missing)));
         expect(error._tag).toBe("RepoNotFound");
         if (error._tag === "RepoNotFound") expect(error.repo.name).toBe(missing);
       }).pipe(Effect.provide(harness.layer));
@@ -170,11 +155,7 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
         const harness = make();
         return Effect.gen(function* () {
           const projects = yield* Projects;
-          const project = yield* projects.create(operator(), {
-            name: "forge",
-            source: harness.source,
-            idempotencyKey: key(),
-          });
+          const project = yield* projects.create(creator(), creating(harness.source));
           expect(yield* projects.settings(project.id)).toEqual({
             protectedPaths: [],
             maxBatchSize: 1,
@@ -189,12 +170,8 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
       const harness = make();
       return Effect.gen(function* () {
         const projects = yield* Projects;
-        const by = operator();
-        const project = yield* projects.create(by, {
-          name: "forge",
-          source: harness.source,
-          idempotencyKey: key(),
-        });
+        const by = creator();
+        const project = yield* projects.create(by, creating(harness.source));
         const off = { protectedPaths: [Glob.make("infra/**")], maxBatchSize: 1 } as const;
         const turnedOff = yield* projects.putSettings(
           by,
@@ -218,12 +195,8 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
         const harness = make();
         return Effect.gen(function* () {
           const projects = yield* Projects;
-          const by = operator();
-          const project = yield* projects.create(by, {
-            name: "forge",
-            source: harness.source,
-            idempotencyKey: key(),
-          });
+          const by = creator();
+          const project = yield* projects.create(by, creating(harness.source));
           const put = { protectedPaths: [], maxBatchSize: 1 } as const;
           const published = yield* projects.putSettings(
             by,
@@ -246,12 +219,8 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
       const harness = make();
       return Effect.gen(function* () {
         const projects = yield* Projects;
-        const by = operator();
-        const project = yield* projects.create(by, {
-          name: "forge",
-          source: harness.source,
-          idempotencyKey: key(),
-        });
+        const by = creator();
+        const project = yield* projects.create(by, creating(harness.source));
         const off = { protectedPaths: [], maxBatchSize: 1, verification: "off" } as const;
         const first = yield* projects.putSettings(by, project.id, off, "req-1");
         const replayed = yield* projects.putSettings(by, project.id, off, "req-1");
@@ -271,7 +240,7 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
         const missing = Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`);
         const error = yield* Effect.flip(
           (yield* Projects).putSettings(
-            operator(),
+            creator(),
             missing,
             { protectedPaths: [], maxBatchSize: 1 },
             "req-1",

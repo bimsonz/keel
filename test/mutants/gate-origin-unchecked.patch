@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/gate.test.ts -t gate.origin
+# kills: gate.origin
+# why: a cookie-signed mutation with no Origin header passes, so a request from a context that sends none changes things on the user's behalf (the check must fail closed)
+diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
+--- a/apps/keel/src/adapters/driving/http/gate.ts
++++ b/apps/keel/src/adapters/driving/http/gate.ts
+@@ -110,7 +110,8 @@
+       credential = { _tag: "Session", userId };
+     }
+   } else if (options.cookies && hasSessionCookie(request.headers.get("cookie"))) {
+-    if (!SAFE_METHODS.has(request.method) && request.headers.get("origin") !== deps.origin)
++    const origin = request.headers.get("origin");
++    if (!SAFE_METHODS.has(request.method) && origin !== null && origin !== deps.origin)
+       return problemResponse(403, "auth.cross_site", requestId, {
+         detail: `A request signed in by the session cookie may change something only from ${deps.origin}.`,
+         nextActions: [

@@ -11,21 +11,14 @@ model OpenSessionRequest {
 
   /** The model, pinned to a revision where the provider allows. */
   `model`?: string;
-
-  /**
-   * The human the agent acts for in this session. Optional: the session takes
-   * the token's sponsor, else the enrolment's. Naming any other is refused
-   * (`session.sponsor_refused`); an agent never names its own sponsor.
-   */
-  onBehalfOf?: Sponsor;
 }
 
 model Session {
   id: SessionId;
   agentId: AgentId;
 
-  /** The human the agent acts for in this session: its token's sponsor, else its enrolment's. */
-  onBehalfOf?: Sponsor;
+  /** The user who sponsors the agent, from its enrolment: never named by the request. */
+  sponsor?: UserId;
 
   openedAt: utcDateTime;
 }

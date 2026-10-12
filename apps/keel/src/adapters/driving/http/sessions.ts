@@ -2,7 +2,6 @@ import type {
   AgentNotAdmitted,
   AgentNotKnown,
   IdempotencyConflict,
-  SessionSponsorRefused,
 } from "@keeltown/core/domain/identity";
 import type { Session } from "@keeltown/core/domain/memory";
 import type { OpenSessionInput } from "@keeltown/core/ports";
@@ -18,7 +17,6 @@ export function sessionInput(input: Input<"Sessions_openSession">): OpenSessionI
   return {
     ...(input.harness === undefined ? {} : { harness: input.harness }),
     ...(input.model === undefined ? {} : { model: input.model }),
-    ...(input.onBehalfOf === undefined ? {} : { onBehalfOf: input.onBehalfOf }),
     idempotencyKey: input["idempotency-key"],
   };
 }
@@ -29,7 +27,7 @@ export function sessionOk(session: Session): Sessions_openSessionResult {
     body: {
       id: session.id,
       agentId: session.agentId,
-      ...(session.onBehalfOf === undefined ? {} : { onBehalfOf: session.onBehalfOf }),
+      ...(session.sponsor === undefined ? {} : { sponsor: session.sponsor }),
       openedAt: new Date(session.openedAt).toISOString(),
     },
   };
@@ -37,7 +35,7 @@ export function sessionOk(session: Session): Sessions_openSessionResult {
 
 export function sessionError(
   caller: Caller,
-  error: AgentNotKnown | AgentNotAdmitted | IdempotencyConflict | SessionSponsorRefused,
+  error: AgentNotKnown | AgentNotAdmitted | IdempotencyConflict,
 ): Sessions_openSessionResult {
   switch (error._tag) {
     // The gate admitted the caller a moment ago, so these are races, answered as whoami answers them.
@@ -55,30 +53,6 @@ export function sessionError(
               title: "Open the session with a fresh Idempotency-Key",
               operationId: "Sessions_openSession",
             },
-          ],
-        }),
-      };
-    case "SessionSponsorRefused":
-      return {
-        status: 403,
-        body: problem(403, "session.sponsor_refused", caller.requestId, {
-          detail:
-            error.sponsor === undefined
-              ? `${error.agentId} has no sponsor, and an agent never names its own: ${error.requested} is refused.`
-              : `${error.agentId} acts for ${error.sponsor}, not ${error.requested}.`,
-          nextActions: [
-            error.sponsor === undefined
-              ? {
-                  kind: "call",
-                  title: "Open the session without onBehalfOf",
-                  operationId: "Sessions_openSession",
-                }
-              : {
-                  kind: "call",
-                  title: `Open the session on behalf of ${error.sponsor}, or without onBehalfOf`,
-                  operationId: "Sessions_openSession",
-                  args: { onBehalfOf: error.sponsor },
-                },
           ],
         }),
       };

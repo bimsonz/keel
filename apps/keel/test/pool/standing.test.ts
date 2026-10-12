@@ -1,6 +1,6 @@
-// An agent's standing through the real doorway: an operator enrols the agent
-// over REST (its AgentSession DO holds it), then suspends, reinstates and
-// revokes it; the agent's own token is judged by the directory row each move
+// An agent's standing through the real doorway: a maintainer of the project's
+// org enrols the agent over REST (its AgentSession DO holds it), then suspends,
+// reinstates and revokes it; the agent's own token is judged by the directory row each move
 // wrote before answering. The Projector's repair is fed an event directly.
 import { env, exports } from "cloudflare:workers";
 import { EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
@@ -8,7 +8,16 @@ import { PROJECTOR } from "@keeltown/core/ports";
 import { Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
-import { BASE, drainAfter, seedAgent, tokenFor } from "./helpers.ts";
+import {
+  BASE,
+  drainAfter,
+  establishProject,
+  placeProject,
+  seedAgent,
+  seedUser,
+  tokenFor,
+  uniqueHandle,
+} from "./helpers.ts";
 
 interface Answer {
   readonly status: number;
@@ -45,10 +54,12 @@ async function gate(token: string): Promise<number> {
   return response.status;
 }
 
-/** An operator, and an agent it enrolled over REST in a project of its own, with a token of the agent's. */
+/** A maintainer of org `pool`, and an agent it enrolled over REST in a project of the org, with a token of the agent's. */
 async function enrolled() {
   const projectId: ProjectId = makeId("prj", ulid());
-  const operator = await tokenFor(await seedAgent({ projectId }, ["operator"]), "operator");
+  await placeProject(projectId);
+  await establishProject(projectId);
+  const operator = (await seedUser(uniqueHandle("maintainer"), { role: "maintainer" })).token;
   const enrolment = await call(operator, "/agents", `enrol-${ulid()}`, {
     name: "standing-agent",
     kind: "interactive",
@@ -70,7 +81,7 @@ async function enrolled() {
   return { operator, agentId, token };
 }
 
-describe("[b11.standing-route] an operator's moves on an agent's standing", () => {
+describe("[b11.standing-route] a maintainer's moves on an agent's standing", () => {
   it("[b11.standing-route] suspend refuses the agent's next request at once, reinstate admits it again, revoke is final and bumps the epoch", async () => {
     const { operator, agentId, token } = await enrolled();
     expect(await gate(token)).toBe(200);

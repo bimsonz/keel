@@ -354,7 +354,14 @@ async function signingKey(): Promise<string> {
 const FROM_TERRAFORM: Readonly<Record<string, string>> = {
   KEEL_BOOTSTRAP_SECRET: "bootstrap_secret",
   BETTER_AUTH_SECRET: "better_auth_secret",
+  KEEL_CLAIM_DIGEST: "claim_code",
 };
+
+/**
+ * Secrets the Worker holds only as the lower-case hex SHA-256 of their output:
+ * the claim code is presented to Keel, never kept by it.
+ */
+const AS_DIGEST: ReadonlySet<string> = new Set(["KEEL_CLAIM_DIGEST"]);
 
 /** The secrets a config's `secrets.required` names. */
 function requiredSecrets(config: Json): string[] {
@@ -364,8 +371,9 @@ function requiredSecrets(config: Json): string[] {
 
 /**
  * The value of every secret the config requires. CLOUDFLARE_ACCOUNT_ID,
- * KEEL_BOOTSTRAP_SECRET and BETTER_AUTH_SECRET (Terraform's outputs, so
- * replacing one there rotates it here) are set on every deploy; KEEL_SIGNING_KEY only when the Worker lacks
+ * KEEL_BOOTSTRAP_SECRET, BETTER_AUTH_SECRET and KEEL_CLAIM_DIGEST (Terraform's
+ * outputs, so replacing one there rotates it here; the claim code as its digest)
+ * are set on every deploy; KEEL_SIGNING_KEY only when the Worker lacks
  * one, because a new key invalidates every token already issued. The
  * console's observer and operator credentials come from the seed on every
  * deploy; its capability and presenter keys as `consoleKeyFor` decides.
@@ -389,7 +397,10 @@ async function secretsFor(
     if (secret === "CLOUDFLARE_ACCOUNT_ID") {
       values[secret] = accountId();
     } else if (FROM_TERRAFORM[secret] !== undefined) {
-      values[secret] = requireOutput(outputs, FROM_TERRAFORM[secret], secret);
+      const output = requireOutput(outputs, FROM_TERRAFORM[secret], secret);
+      values[secret] = AS_DIGEST.has(secret)
+        ? createHash("sha256").update(output).digest("hex")
+        : output;
     } else if (secret === "KEEL_SIGNING_KEY") {
       if (existing.has(secret)) {
         console.log(`${name}: KEEL_SIGNING_KEY kept`);

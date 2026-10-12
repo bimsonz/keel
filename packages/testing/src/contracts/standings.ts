@@ -1,10 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { AgentToken } from "@keeltown/core/domain/identity";
-import { AgentId, ProjectId } from "@keeltown/core/kernel";
+import type { Actor } from "@keeltown/core/domain/identity";
+import { AgentId, OrgId, ProjectId, UserId } from "@keeltown/core/kernel";
 import { AgentDirectory, Enrolments, Standings } from "@keeltown/core/ports";
 import { Effect, type Layer, Option, Schema } from "effect";
 
-/** The `Standings` suite enrols its agents through `Enrolments`, as an operator would, and reads their rows back from the directory. */
+/** The `Standings` suite enrols its agents through `Enrolments`, as a sponsoring user would, and reads their rows back from the directory. */
 export interface StandingsHarness {
   readonly layer: Layer.Layer<Standings | Enrolments | AgentDirectory>;
 }
@@ -13,20 +13,24 @@ const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const ulid = () =>
   [...crypto.getRandomValues(new Uint8Array(26))].map((b) => CROCKFORD[b % 32] ?? "0").join("");
 
-const operator = (): AgentToken => ({
-  agentId: Schema.decodeUnknownSync(AgentId)(`agt_${ulid()}`),
-  projectId: Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`),
-  scopes: ["operator"],
-  revocationEpoch: 0,
+type UserActor = Extract<Actor, { readonly _tag: "User" }>;
+
+/** A user the doorway let move the agent's standing: here, its sponsor. */
+const user = (): UserActor => ({
+  _tag: "User",
+  userId: Schema.decodeUnknownSync(UserId)(`usr_${ulid()}`),
 });
 
-const enrolled = (by: AgentToken) =>
+const enrolled = (by: UserActor) =>
   Effect.map(
     Effect.flatMap(Enrolments, (enrolments) =>
       enrolments.enrol(by, {
         name: "standing-agent",
         kind: "interactive",
         scopes: ["agent:read", "agent:work"],
+        projectId: Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`),
+        org: Schema.decodeUnknownSync(OrgId)(`org_${ulid()}`),
+        sponsor: by.userId,
         idempotencyKey: `enrol-${crypto.randomUUID()}`,
       }),
     ),
@@ -50,7 +54,7 @@ export function describeStandingsContract(adapter: string, make: () => Standings
         const harness = make();
         return Effect.gen(function* () {
           const standings = yield* Standings;
-          const by = operator();
+          const by = user();
           const agentId = yield* enrolled(by);
           const suspended = yield* standings.suspend(by, {
             agentId,
@@ -79,7 +83,7 @@ export function describeStandingsContract(adapter: string, make: () => Standings
         const harness = make();
         return Effect.gen(function* () {
           const standings = yield* Standings;
-          const by = operator();
+          const by = user();
           const agentId = yield* enrolled(by);
           const input = { agentId, reason: "runaway retries", idempotencyKey: "suspend-0001" };
           yield* standings.suspend(by, input);

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/authz.test.ts -t authz.mcp
+# kills: authz.mcp
+# why: a bearer the gate refuses is served over MCP as an anonymous caller instead of a 401
+diff --git a/apps/keel/src/adapters/driving/mcp/server.ts b/apps/keel/src/adapters/driving/mcp/server.ts
+--- a/apps/keel/src/adapters/driving/mcp/server.ts
++++ b/apps/keel/src/adapters/driving/mcp/server.ts
+@@ -63,7 +63,7 @@
+         });
+         const gated = await gate(presented, crypto.randomUUID(), deps, { cookies: false });
+         if (gated instanceof Response)
+-          throw new OAuthError(OAuthErrorCode.InvalidToken, "The bearer token is not admitted");
++          return { token, clientId: "anonymous", scopes: [], expiresAt: Math.floor(Date.now() / 1000) + 60, extra: {} };
+         const { principal } = gated.admitted;
+         return {
+           token,

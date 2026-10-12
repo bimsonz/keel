@@ -9,9 +9,9 @@ import {
   SessionId,
   SubjectId,
   TenetId,
+  UserId,
 } from "../kernel/index.ts";
 import { Predicate } from "../coordination/index.ts";
-import { Sponsor } from "../identity/index.ts";
 
 export const RulingGiven = Schema.TaggedStruct("RulingGiven", {
   escalationId: EscalationId,
@@ -99,8 +99,8 @@ export const SessionOpened = Schema.TaggedStruct("SessionOpened", {
   agentId: AgentId,
   harness: Schema.optional(Schema.String),
   model: Schema.optional(Schema.String),
-  /** The human the agent acts for in this session, when it has a sponsor. */
-  onBehalfOf: Schema.optional(Sponsor),
+  /** The user who sponsors the agent, from its enrolment, when it has one. */
+  sponsor: Schema.optional(UserId),
 });
 export const MessagesCaptured = Schema.TaggedStruct("MessagesCaptured", {
   sessionId: SessionId,

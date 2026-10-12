@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/project-place.test.ts -t "project.create-heals"
+# kills: project.create-heals
+# why: each create mints a fresh project id, so a retry after a crash finds its own name taken instead of finishing the project it placed
+diff --git a/packages/core/src/application/coordination/projects.ts b/packages/core/src/application/coordination/projects.ts
+--- a/packages/core/src/application/coordination/projects.ts
++++ b/packages/core/src/application/coordination/projects.ts
+@@ -53,7 +53,7 @@
+   Projects | ProjectOrgs
+ > = Effect.fn("coordination/createProject")(function* (actor: Actor, input: NewProject) {
+   const { org, source, idempotencyKey } = input;
+-  const projectId = projectIdFor(actor, idempotencyKey);
++  const projectId = projectIdFor(actor, crypto.randomUUID());
+   const name = input.name.toLowerCase();
+   const places = yield* ProjectOrgs;
+   const placed = yield* places.byId(projectId);

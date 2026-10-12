@@ -39,6 +39,7 @@ const T0 = Instant(1_760_000_000_000);
 const ulid = (n: number): string => String(n).padStart(26, "0");
 const CHANGE = makeId("chg", ulid(1));
 const AGENT = makeId("agt", ulid(1));
+const MAINTAINER = makeId("usr", ulid(1));
 const NEVER_ISSUED = makeId("lse", "Z".repeat(26));
 const SHA = CommitSha.make("c".repeat(40));
 const BASE = CommitSha.make("b".repeat(40));
@@ -396,7 +397,7 @@ const build = (
       return {
         _tag: "Withdraw",
         authority: step.operator
-          ? { _tag: "Operator", by: "operator:zb" }
+          ? { _tag: "Maintainer", by: MAINTAINER }
           : { _tag: "Lease", leaseId: token },
       };
     case "Supersede":
@@ -788,9 +789,9 @@ const note = (policy: "advise" | "annotate"): ChangeCommand => ({
   predicate: "freshness",
   policy,
 });
-const withdrawByOperator: ChangeCommand = {
+const withdrawByMaintainer: ChangeCommand = {
   _tag: "Withdraw",
-  authority: { _tag: "Operator", by: "operator:zb" },
+  authority: { _tag: "Maintainer", by: MAINTAINER },
 };
 const tags = (log: readonly ChangeEvent[]): string[] => log.map((e) => e._tag);
 /** A refusal as plain data: its tag, its reason if it has one, and what its next actions point at. */
@@ -880,7 +881,7 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
       ...[declare, start, submit, precheck, compile, queue, batch, land].map(
         (c) => [c, 1] as const,
       ),
-      [withdrawByOperator, 1],
+      [withdrawByMaintainer, 1],
     ]);
     expect(landed.keys.at(-1)).toBe("landed");
     expect(failureTag(landed.results.at(-1))).toBe("ChangeStateRefused");

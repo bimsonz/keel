@@ -8,7 +8,7 @@ import {
   type ProjectId,
   type UserId,
 } from "../kernel/index.ts";
-import type { Agent, AgentKind, Scope, Sponsor } from "./agent.ts";
+import type { Agent, AgentKind, Scope } from "./agent.ts";
 import { AgentNotKnown, AgentStateRefused } from "./errors.ts";
 import {
   AgentEnrolled,
@@ -26,7 +26,6 @@ export type AgentCommand =
       readonly name: string;
       readonly kind: AgentKind;
       readonly scopes: readonly Scope[];
-      readonly onBehalfOf?: Sponsor;
       readonly org?: OrgId;
       /** The user minting the credential, who becomes the agent's sponsor. */
       readonly sponsor?: UserId;
@@ -64,7 +63,6 @@ export const decideAgent = (
             name: command.name,
             kind: command.kind,
             scopes: command.scopes,
-            ...(command.onBehalfOf === undefined ? {} : { onBehalfOf: command.onBehalfOf }),
             ...(command.org === undefined ? {} : { org: command.org }),
             ...(command.sponsor === undefined ? {} : { sponsor: command.sponsor }),
           }),
@@ -123,7 +121,6 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
           name: event.name,
           kind: event.kind,
           scopes: event.scopes,
-          ...(event.onBehalfOf === undefined ? {} : { onBehalfOf: event.onBehalfOf }),
           ...(event.org === undefined ? {} : { org: event.org }),
           ...(event.sponsor === undefined ? {} : { sponsor: event.sponsor }),
           state: "active",

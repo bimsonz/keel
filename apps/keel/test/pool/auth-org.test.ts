@@ -31,6 +31,32 @@ function refused(answer: Answer, status: number, code: string) {
   ]);
 }
 
+const setRole = (jar: Jar, organizationId: string, memberId: string, role: string) =>
+  call("/organization/update-member-role", { body: { organizationId, memberId, role }, jar });
+
+const remove = (jar: Jar, organizationId: string, memberIdOrEmail: string) =>
+  call("/organization/remove-member", { body: { organizationId, memberIdOrEmail }, jar });
+
+/** Each member's handle and role in an org, read from D1. */
+async function rolesIn(organizationId: string): Promise<Record<string, string>> {
+  const { results } = await env.DB.prepare(
+    `SELECT u.username, m.role FROM member m JOIN user u ON u.id = m.userId WHERE m.organizationId = ?1`,
+  )
+    .bind(organizationId)
+    .all<{ username: string; role: string }>();
+  return Object.fromEntries(results.map((r) => [r.username, r.role]));
+}
+
+async function memberIdOf(organizationId: string, handle: string): Promise<string> {
+  const row = await env.DB.prepare(
+    `SELECT m.id FROM member m JOIN user u ON u.id = m.userId WHERE m.organizationId = ?1 AND u.username = ?2`,
+  )
+    .bind(organizationId, handle)
+    .first<{ id: string }>();
+  if (row === null) throw new Error(`${handle} is not a member`);
+  return row.id;
+}
+
 /** The emails in an answer, wherever they sit. */
 const emailsIn = (answer: Answer) =>
   [...answer.text.matchAll(/[\w.+-]+@[\w.-]+/g)].map((m) => m[0]);
@@ -284,5 +310,54 @@ describe("orgs at /v1/auth/organization", () => {
       await call("/organization/leave", { body: { organizationId: teal }, jar: tam.jar }),
       200,
     );
+  });
+
+  it("[ba.org-roles] a maintainer invites, removes, and moves members between member and maintainer; making or unmaking an owner, and deleting the org, stay with owners; a member can't invite", async () => {
+    const uma = await handled("uma@example.com", "uma");
+    const urn = await orgOf(uma.jar, "urn");
+    const ula = await signUpByPasskey("ula");
+    const uli = await signUpByPasskey("uli");
+    answered(
+      await accept(ula.jar, (await invite(uma.jar, urn, { handle: "ula" }, "maintainer")).json.id),
+      200,
+    );
+    answered(await accept(uli.jar, (await invite(uma.jar, urn, { handle: "uli" })).json.id), 200);
+
+    // Ula, a maintainer, invites a member, moves members between member and maintainer, and removes one.
+    const uno = await signUpByPasskey("uno");
+    const toUno = await invite(ula.jar, urn, { handle: "uno" });
+    answered(toUno, 200);
+    answered(await accept(uno.jar, toUno.json.id), 200);
+    answered(await setRole(ula.jar, urn, await memberIdOf(urn, "uli"), "maintainer"), 200);
+    answered(await setRole(ula.jar, urn, await memberIdOf(urn, "uli"), "member"), 200);
+    answered(await remove(ula.jar, urn, await memberIdOf(urn, "uno")), 200);
+    expect(await rolesIn(urn)).toEqual({ uma: "owner", ula: "maintainer", uli: "member" });
+
+    // Owners are made and unmade by owners alone, as Keel's policy says, and told so.
+    const promoted = await setRole(ula.jar, urn, await memberIdOf(urn, "uli"), "owner");
+    refused(promoted, 403, "OWNERS_ONLY");
+    expect(promoted.json.nextActions).toEqual([
+      { kind: "escalate", title: "Ask an owner: this needs that role" },
+    ]);
+    refused(
+      await setRole(ula.jar, urn, await memberIdOf(urn, "uma"), "member"),
+      403,
+      "OWNERS_ONLY",
+    );
+    refused(await remove(ula.jar, urn, await memberIdOf(urn, "uma")), 403, "OWNERS_ONLY");
+    refused(await invite(ula.jar, urn, { handle: "uno" }, "owner"), 403, "OWNERS_ONLY");
+    const deleted = await call("/organization/delete", {
+      body: { organizationId: urn },
+      jar: ula.jar,
+    });
+    expect(deleted.status).toBe(403);
+    expect(await rolesIn(urn)).toEqual({ uma: "owner", ula: "maintainer", uli: "member" });
+
+    // Uli, a member, can't invite.
+    const byMember = await invite(uli.jar, urn, { handle: "uno" });
+    expect(byMember.status).toBe(403);
+    // The owner still makes an owner.
+    answered(await setRole(uma.jar, urn, await memberIdOf(urn, "uli"), "owner"), 200);
+    expect(await rolesIn(urn)).toEqual({ uma: "owner", ula: "maintainer", uli: "owner" });
   });
 });

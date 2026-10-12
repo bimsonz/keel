@@ -1,5 +1,7 @@
 import { exports } from "cloudflare:workers";
 import { env } from "cloudflare:workers";
+import { makeId } from "@keeltown/core/kernel";
+import { ulid } from "ulid";
 import { describe, expect, it } from "vitest";
 import { BASE, exchange, mcp, mcpResult, seedAgent, tokenFor } from "./helpers.ts";
 
@@ -65,26 +67,20 @@ describe("whoami", () => {
     expect(tool["structuredContent"]).toEqual(rest);
   });
 
-  it("[a11s.whoami] echoes the token's sponsor and the agent's, the MCP tool equal to REST", async () => {
-    const seeded = await seedAgent({ onBehalfOf: "github:bimsonz" });
-    const token = await tokenFor(seeded);
+  it("[tenancy.whoami] answers the agent's org and sponsoring user, the MCP tool equal to REST", async () => {
+    const org = makeId("org", ulid());
+    const sponsor = makeId("usr", ulid());
+    const token = await tokenFor(await seedAgent({ org, sponsor }));
     const rest = await (
       await exports.default.fetch(`${BASE}/v1/agents/me`, {
         headers: { authorization: `Bearer ${token}` },
       })
-    ).json<{ result: { onBehalfOf?: string; agent: { onBehalfOf?: string } } }>();
-    expect(rest.result.onBehalfOf).toBe("github:bimsonz");
-    expect(rest.result.agent.onBehalfOf).toBe("github:bimsonz");
+    ).json<{ result: { agent: { org?: string; sponsor?: string } } }>();
+    expect([rest.result.agent.org, rest.result.agent.sponsor]).toEqual([org, sponsor]);
     const tool = await mcpResult(
       await mcp(token, "tools/call", { name: "whoami", arguments: {} }, "whoami"),
     );
     expect(tool["structuredContent"]).toEqual(rest);
-    const bare = await (
-      await exports.default.fetch(`${BASE}/v1/agents/me`, {
-        headers: { authorization: `Bearer ${await tokenFor(await seedAgent())}` },
-      })
-    ).json<{ result: Record<string, unknown> }>();
-    expect("onBehalfOf" in bare.result).toBe(false);
   });
 
   it("refuses a token minted before the agent's revocation epoch moved, as auth.revoked", async () => {

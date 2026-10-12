@@ -16,6 +16,7 @@ import {
   reviseChange,
   submissionOf,
   submitChange,
+  type Withdrawer,
 } from "@keeltown/core/application/coordination";
 import {
   enrolAgent,
@@ -32,14 +33,26 @@ import {
   readRepoCommit,
   readRepoTree,
 } from "@keeltown/core/application/integration";
-import { isBootstrap, Scope } from "@keeltown/core/domain/identity";
-import { ProjectId } from "@keeltown/core/kernel";
-import { Effect, Result, Schema } from "effect";
+import {
+  type Actor,
+  type Audience,
+  GrantableScope,
+  type ProjectResource,
+} from "@keeltown/core/domain/identity";
+import { ProjectId as ProjectIdSchema, type ProjectId } from "@keeltown/core/kernel";
+import { Orgs, ProjectOrgs, type Projects } from "@keeltown/core/ports";
+import { Effect, Option, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
+import {
+  agentsOnly,
+  authorizeHandlers,
+  decideEach,
+  projectResource,
+  RESOLVERS,
+} from "./authorize-handlers.ts";
 import type { Caller, AgentToken } from "./caller.ts";
 import { latticesOk, tokenError, tokenOk, whoamiError, whoamiOk } from "./mappers.ts";
 import {
-  bootstrapConfined,
   createProjectError,
   createProjectOk,
   enrolAgentError,
@@ -56,7 +69,7 @@ import {
   standingOk,
 } from "./operator.ts";
 import { eventsInput, eventsOk } from "./events.ts";
-import { changeListInput, changesOk, readRefused, snapshotOk } from "./views.ts";
+import { changeListInput, changesOk, snapshotOk } from "./views.ts";
 import { piggyback } from "./piggyback.ts";
 import {
   blobOk,
@@ -68,7 +81,7 @@ import {
   treeOk,
 } from "./repo.ts";
 import { sessionError, sessionInput, sessionOk } from "./sessions.ts";
-import { notImplemented } from "./problems.ts";
+import { notImplemented, problem } from "./problems.ts";
 import type { Runner } from "./run.ts";
 import {
   abandonError,
@@ -107,43 +120,93 @@ import {
 /** Every operation not yet implemented answers the declared 503 `service.not_implemented`. */
 const notYet = (caller: Caller) => notImplemented(caller.requestId);
 
-/** The authorize middleware admitted this caller; a missing principal here is a defect, never a response. */
-function principalOf(caller: Caller): Effect.Effect<AgentToken> {
-  return caller.principal === null
-    ? Effect.die(new Error("an authenticated operation ran without a principal"))
-    : Effect.succeed(caller.principal);
+/** The token of the agent calling: the policy grants work to agents only, so one is there. */
+function tokenOf(caller: Caller): Effect.Effect<AgentToken> {
+  return caller.principal._tag === "Agent" && caller.token !== undefined
+    ? Effect.succeed(caller.token)
+    : Effect.die(new Error("an agent's operation ran without an agent's token"));
 }
 
-const decodeScopes = Schema.decodeUnknownOption(Schema.Array(Scope));
+/** Who withdraws a change: its agent (with its lease) or a maintainer of its project's org, as the policy granted. */
+function withdrawerOf(caller: Caller): Effect.Effect<Withdrawer> {
+  const { principal } = caller;
+  if (principal._tag === "Agent" && caller.token !== undefined)
+    return Effect.succeed({ _tag: "Agent", token: caller.token });
+  if (principal._tag === "User")
+    return Effect.succeed({
+      _tag: "Maintainer",
+      userId: principal.userId,
+      projectId: projectOf(caller).projectId,
+    });
+  return Effect.die(new Error("abandon ran for neither an agent nor a user"));
+}
 
-/** What the bootstrap credential may call: enrolment, and the anonymous token exchange. */
-export const BOOTSTRAP_MAY_CALL: ReadonlySet<string> = new Set([
-  "Auth_exchangeToken",
-  "Operator_enrolAgent",
-]);
+/** The user governing: the policy grants governance to users only. */
+function actorOf(caller: Caller): Effect.Effect<Actor & { readonly _tag: "User" }> {
+  return caller.principal._tag === "User"
+    ? Effect.succeed({ _tag: "User", userId: caller.principal.userId })
+    : Effect.die(new Error("a governing operation ran without a user"));
+}
+
+/** The project the call was decided on, as `authorizeHandlers` resolved it. */
+function projectOf(caller: Caller): ProjectResource {
+  if (caller.resource?._tag !== "Project")
+    throw new Error("a project's operation ran without its project resolved");
+  return caller.resource;
+}
+
+/** The project a read was granted, and who it reads as. */
+const scopeOf = (caller: Caller): { readonly project: ProjectId; readonly audience: Audience } => ({
+  project: projectOf(caller).projectId,
+  audience: caller.audience ?? "public",
+});
+
+/** The reader's role in an org, when it is a member there. */
+const roleIn = (principal: Caller["principal"], org: string) =>
+  principal._tag === "User"
+    ? principal.memberships.find((membership) => membership.org === org)?.role
+    : undefined;
+
+const decodeScopes = Schema.decodeUnknownOption(Schema.Array(GrantableScope));
+
+type ProjectViewBody = Extract<
+  Awaited<ReturnType<Operations<Caller>["Orgs_getProject"]>>,
+  { readonly status: 200 }
+>["body"];
+
+const decodeCursor = (cursor: string) => Schema.decodeUnknownOption(ProjectIdSchema)(cursor);
 
 /**
- * Least privilege for the bootstrap credential: every operation but those it
- * may call answers 403 with a next action, before its handler runs. One check
- * at the handler object covers REST and MCP alike.
+ * A project as the caller may read it, decided by the policy (the project's
+ * read rule), with its org's name and the reader's role there; undefined when
+ * the caller may not see it.
  */
-function confineBootstrap<H extends Operations<Caller>>(handlers: H): H {
-  return new Proxy(handlers, {
-    get(target, operation, receiver) {
-      const handler: unknown = Reflect.get(target, operation, receiver);
-      if (
-        typeof operation !== "string" ||
-        typeof handler !== "function" ||
-        BOOTSTRAP_MAY_CALL.has(operation)
-      )
-        return handler;
-      return (caller: Caller, ...rest: readonly unknown[]) =>
-        isBootstrap(caller.principal)
-          ? bootstrapConfined(caller.requestId)
-          : Reflect.apply(handler, target, [caller, ...rest]);
-    },
+const readableView = (caller: Caller, projectId: ProjectId, name: string) =>
+  Effect.gen(function* () {
+    const resource = yield* projectResource(projectId);
+    if (resource._tag !== "Project" || Result.isFailure(decideEach(caller.principal, resource)))
+      return undefined;
+    const org = yield* Orgs.use((orgs) => orgs.byId(resource.org));
+    const role = roleIn(caller.principal, resource.org);
+    return {
+      id: projectId,
+      org: Option.match(org, { onNone: () => resource.org, onSome: (record) => record.name }),
+      name,
+      visibility: resource.visibility,
+      ...(role === undefined ? {} : { viewer: { role } }),
+    } satisfies ProjectViewBody;
   });
-}
+
+/** A user the instance admin (or the bootstrap credential) creates for automation, or why not. */
+export type MakeUser = (handle: string) => Promise<
+  | {
+      readonly userId: string;
+      readonly handle: string;
+      readonly org: string;
+      readonly session: { readonly token: string; readonly expiresAt: Date };
+    }
+  | { readonly refused: "NAME_REFUSED" | "NAME_TAKEN"; readonly message: string }
+>;
 
 /**
  * The one handler object. The generated Hono routes and the generated MCP tools
@@ -157,7 +220,7 @@ export interface SignInMethods {
   readonly github: boolean;
 }
 
-export function makeHandlers(run: Runner, signIn: SignInMethods) {
+export function makeHandlers(run: Runner, signIn: SignInMethods, makeUser: MakeUser) {
   /** An operator's move on an agent's standing, answered as the agent's profile. */
   const standing = (
     caller: Caller,
@@ -169,8 +232,8 @@ export function makeHandlers(run: Runner, signIn: SignInMethods) {
     if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
     return run(
       caller,
-      principalOf(caller).pipe(
-        Effect.flatMap((principal) => move(principal, decoded.success)),
+      actorOf(caller).pipe(
+        Effect.flatMap((actor) => move(actor, decoded.success)),
         Effect.match({
           onSuccess: standingOk,
           onFailure: (error) => standingError(caller, operation, error),
@@ -180,354 +243,495 @@ export function makeHandlers(run: Runner, signIn: SignInMethods) {
   };
   return piggyback(
     run,
-    confineBootstrap({
-      Auth_exchangeToken: (
-        caller: Caller,
-        input: {
-          readonly client_id: string;
-          readonly client_secret: string;
-          readonly scope?: string;
+    authorizeHandlers(
+      {
+        Auth_exchangeToken: (
+          caller: Caller,
+          input: {
+            readonly client_id: string;
+            readonly client_secret: string;
+            readonly scope?: string;
+          },
+        ) => {
+          const requested =
+            input.scope === undefined
+              ? undefined
+              : decodeScopes(input.scope.split(" ").filter(Boolean));
+          if (requested !== undefined && requested._tag === "None") {
+            return {
+              status: 400 as const,
+              body: { error: "invalid_scope" as const, error_description: "Unknown scope." },
+            };
+          }
+          return run(
+            caller,
+            exchangeToken({
+              clientId: input.client_id,
+              clientSecret: input.client_secret,
+              ...(requested === undefined ? {} : { scopes: requested.value }),
+            }).pipe(
+              Effect.map(tokenOk),
+              Effect.catch((error) => Effect.succeed(tokenError(error))),
+            ),
+          );
         },
-      ) => {
-        const requested =
-          input.scope === undefined
-            ? undefined
-            : decodeScopes(input.scope.split(" ").filter(Boolean));
-        if (requested !== undefined && requested._tag === "None") {
-          return {
-            status: 400 as const,
-            body: { error: "invalid_scope" as const, error_description: "Unknown scope." },
-          };
-        }
-        return run(
-          caller,
-          exchangeToken({
-            clientId: input.client_id,
-            clientSecret: input.client_secret,
-            ...(requested === undefined ? {} : { scopes: requested.value }),
-          }).pipe(
-            Effect.map(tokenOk),
-            Effect.catch((error) => Effect.succeed(tokenError(error))),
-          ),
-        );
-      },
-      whoami: (caller: Caller) =>
-        run(
-          caller,
-          principalOf(caller).pipe(
-            Effect.flatMap(whoami),
-            Effect.match({ onSuccess: whoamiOk, onFailure: (error) => whoamiError(caller, error) }),
-          ),
-        ),
-      Sessions_openSession: (caller: Caller, input: Input<"Sessions_openSession">) =>
-        run(
-          caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) => openAgentSession(principal, sessionInput(input))),
-            Effect.match({
-              onSuccess: sessionOk,
-              onFailure: (error) => sessionError(caller, error),
-            }),
-          ),
-        ),
-      declare: (caller: Caller, input: Input<"declare">) => {
-        const decoded = declareInput(input);
-        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-        return run(
-          caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) => declareChange(principal, decoded.success)),
-            Effect.match({
-              onSuccess: declareOk,
-              onFailure: (error) => declareError(caller, error),
-            }),
-          ),
-        );
-      },
-      Changes_listChanges: (caller: Caller, input: Input<"Changes_listChanges">) => {
-        const decoded = changeListInput(input);
-        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-        return run(
-          caller,
-          readChangeList(caller.principal, decoded.success).pipe(
-            Effect.match({ onSuccess: changesOk, onFailure: (e) => readRefused(caller, e) }),
-          ),
-        );
-      },
-      change: (caller: Caller, input: Input<"change">) => {
-        const decoded = changeIdInput(input.changeId);
-        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-        return run(
-          caller,
-          readChange(caller.principal, decoded.success).pipe(
-            Effect.match({
-              onSuccess: ({ change }) => changeOk(change),
-              onFailure: (error) => changeReadError(caller, error),
-            }),
-          ),
-        );
-      },
-      revise: (caller: Caller, input: Input<"revise">) => {
-        const decoded = reviseInput(input);
-        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-        return run(
-          caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) => reviseChange(principal, decoded.success)),
-            Effect.match({ onSuccess: reviseOk, onFailure: (error) => reviseError(caller, error) }),
-          ),
-        );
-      },
-      rely: (caller: Caller, input: Input<"rely">) => {
-        const decoded = relyInput(input);
-        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-        return run(
-          caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) => relyOn(principal, decoded.success)),
-            Effect.match({ onSuccess: relyOk, onFailure: (error) => relyError(caller, error) }),
-          ),
-        );
-      },
-      nearby: (caller: Caller, input: Input<"nearby">) => {
-        const decoded = changeIdInput(input.changeId);
-        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-        const changeId = decoded.success;
-        return run(
-          caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) => nearbyOf(principal, changeId)),
-            Effect.match({
-              onSuccess: (preflight) => nearbyOk(changeId, preflight),
-              onFailure: (error) => nearbyError(caller, error),
-            }),
-          ),
-        );
-      },
-      abandon: (caller: Caller, input: Input<"abandon">) => {
-        const decoded = abandonInput(input);
-        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-        return run(
-          caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) => abandonChange(principal, decoded.success)),
-            Effect.match({
-              onSuccess: abandonOk,
-              onFailure: (error) => abandonError(caller, error),
-            }),
-          ),
-        );
-      },
-      adopt: (caller: Caller, input: Input<"adopt">) => {
-        const decoded = adoptInput(input);
-        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-        return run(
-          caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) => adoptChange(principal, decoded.success)),
-            Effect.match({ onSuccess: adoptOk, onFailure: (error) => adoptError(caller, error) }),
-          ),
-        );
-      },
-      rebase: (caller: Caller, input: Input<"rebase">) => {
-        const decoded = rebaseInput(input);
-        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-        return run(
-          caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) => rebaseChange(principal, decoded.success)),
-            Effect.match({ onSuccess: rebaseOk, onFailure: (error) => rebaseError(caller, error) }),
-          ),
-        );
-      },
-      sketch: notYet,
-      Workspaces_refreshWorkspaceToken: notYet,
-      Workspaces_releaseWorkspace: notYet,
-      submit: (caller: Caller, input: Input<"submit">) => {
-        const decoded = submitInput(input);
-        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-        return run(
-          caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) => submitChange(principal, decoded.success)),
-            Effect.match({
-              onSuccess: (change) => submitOk(change, decoded.success.commitSha),
-              onFailure: (error) => submitError(caller, error),
-            }),
-          ),
-        );
-      },
-      status: (caller: Caller, input: Input<"status">) => {
-        const changeId = changeIdInput(input.changeId);
-        if (Result.isFailure(changeId)) return invalid(caller, changeId.failure);
-        return run(
-          caller,
-          submissionOf(changeId.success, input.wait).pipe(
-            Effect.match({
-              onSuccess: (status) => statusOk(caller, status),
-              onFailure: (error) => statusError(caller, error),
-            }),
-          ),
-        );
-      },
-      Conflicts_listConflicts: notYet,
-      Conflicts_getConflict: notYet,
-      resolve: notYet,
-      why: notYet,
-      Memory_listDecisions: notYet,
-      Memory_getDecision: notYet,
-      inbox: (caller: Caller, input: Input<"inbox">) =>
-        run(
-          caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) => readInbox(principal, input.cursor, input.wait)),
-            Effect.map(inboxOk),
-          ),
-        ),
-      Inbox_listEvents: (caller: Caller, input: Input<"Inbox_listEvents">) => {
-        const decoded = eventsInput(input);
-        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-        return run(
-          caller,
-          readEvents(caller.principal, decoded.success).pipe(
-            Effect.match({ onSuccess: eventsOk, onFailure: (e) => readRefused(caller, e) }),
-          ),
-        );
-      },
-      Inbox_getSnapshot: (caller: Caller, input: Input<"Inbox_getSnapshot">) =>
-        run(
-          caller,
-          readSnapshot(
-            caller.principal,
-            input.project === undefined ? undefined : ProjectId.make(input.project),
-          ).pipe(Effect.match({ onSuccess: snapshotOk, onFailure: (e) => readRefused(caller, e) })),
-        ),
-      Lattices_listLattices: latticesOk,
-      // The repo reads admit a caller without a token: the use-case decides by the project's visibility.
-      Repo_getTree: (caller: Caller, input: Input<"Repo_getTree">) => {
-        const projectId = settingsProject(input.projectId);
-        if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
-        return run(
-          caller,
-          readRepoTree(caller.principal, projectId.success, {
-            ...(input.ref === undefined ? {} : { ref: input.ref }),
-            path: input.path ?? "",
-          }).pipe(Effect.match({ onSuccess: treeOk, onFailure: (e) => repoError(caller, e) })),
-        );
-      },
-      Repo_getBlob: (caller: Caller, input: Input<"Repo_getBlob">) => {
-        const projectId = settingsProject(input.projectId);
-        if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
-        return run(
-          caller,
-          readRepoBlob(caller.principal, projectId.success, {
-            ...(input.ref === undefined ? {} : { ref: input.ref }),
-            path: input.path,
-          }).pipe(Effect.match({ onSuccess: blobOk, onFailure: (e) => repoError(caller, e) })),
-        );
-      },
-      Repo_listCommits: (caller: Caller, input: Input<"Repo_listCommits">) => {
-        const projectId = settingsProject(input.projectId);
-        if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
-        const from = commitsFrom(input.cursor);
-        if (Result.isFailure(from)) return invalid(caller, from.failure);
-        return run(
-          caller,
-          listRepoCommits(caller.principal, projectId.success, {
-            ...(input.ref === undefined ? {} : { ref: input.ref }),
-            ...(from.success === undefined ? {} : { from: from.success }),
-            ...(input.limit === undefined ? {} : { limit: input.limit }),
-          }).pipe(Effect.match({ onSuccess: commitsOk, onFailure: (e) => repoError(caller, e) })),
-        );
-      },
-      Repo_getCommit: (caller: Caller, input: Input<"Repo_getCommit">) => {
-        const projectId = settingsProject(input.projectId);
-        if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
-        const sha = commitParam(input.sha);
-        if (Result.isFailure(sha)) return invalid(caller, sha.failure);
-        return run(
-          caller,
-          readRepoCommit(caller.principal, projectId.success, sha.success).pipe(
-            Effect.match({ onSuccess: commitOk, onFailure: (e) => repoError(caller, e) }),
-          ),
-        );
-      },
-      Views_getVerdict: notYet,
-      Views_getCandidate: notYet,
-      Views_listLanes: notYet,
-      Views_getTrunk: notYet,
-      Operator_listProjects: notYet,
-      Operator_createProject: (caller: Caller, input: Input<"Operator_createProject">) =>
-        run(
-          caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) =>
-              createProject(principal, {
-                name: input.name,
-                source: input.source,
-                idempotencyKey: input["idempotency-key"],
+        whoami: (caller: Caller) =>
+          caller.principal._tag !== "Agent"
+            ? agentsOnly(caller.requestId)
+            : run(
+                caller,
+                tokenOf(caller).pipe(
+                  Effect.flatMap(whoami),
+                  Effect.match({
+                    onSuccess: whoamiOk,
+                    onFailure: (error) => whoamiError(caller, error),
+                  }),
+                ),
+              ),
+        Sessions_openSession: (caller: Caller, input: Input<"Sessions_openSession">) =>
+          run(
+            caller,
+            tokenOf(caller).pipe(
+              Effect.flatMap((principal) => openAgentSession(principal, sessionInput(input))),
+              Effect.match({
+                onSuccess: sessionOk,
+                onFailure: (error) => sessionError(caller, error),
               }),
             ),
-            Effect.match({
-              onSuccess: createProjectOk,
-              onFailure: (error) => createProjectError(caller, error),
-            }),
           ),
-        ),
-      Operator_getSettings: (caller: Caller, input: Input<"Operator_getSettings">) => {
-        const projectId = settingsProject(input.projectId);
-        if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
-        return run(
-          caller,
-          getSettings(projectId.success).pipe(
-            Effect.match({
-              onSuccess: settingsOk,
-              onFailure: (error) => settingsError(caller, error),
-            }),
-          ),
-        );
-      },
-      Operator_putSettings: (caller: Caller, input: Input<"Operator_putSettings">) => {
-        const decoded = putSettingsInput(input);
-        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-        const { projectId, settings } = decoded.success;
-        return run(
-          caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) =>
-              putSettings(principal, projectId, settings, caller.requestId),
+        declare: (caller: Caller, input: Input<"declare">) => {
+          const decoded = declareInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            tokenOf(caller).pipe(
+              Effect.flatMap((principal) => declareChange(principal, decoded.success)),
+              Effect.match({
+                onSuccess: declareOk,
+                onFailure: (error) => declareError(caller, error),
+              }),
             ),
-            Effect.match({
-              onSuccess: settingsOk,
-              onFailure: (error) => putSettingsError(caller, error),
+          );
+        },
+        Changes_listChanges: (caller: Caller, input: Input<"Changes_listChanges">) => {
+          const decoded = changeListInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            readChangeList(scopeOf(caller), decoded.success).pipe(Effect.map(changesOk)),
+          );
+        },
+        change: (caller: Caller, input: Input<"change">) => {
+          const decoded = changeIdInput(input.changeId);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            readChange(decoded.success).pipe(
+              Effect.match({
+                onSuccess: ({ change }) => changeOk(change),
+                onFailure: (error) => changeReadError(caller, error),
+              }),
+            ),
+          );
+        },
+        revise: (caller: Caller, input: Input<"revise">) => {
+          const decoded = reviseInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            tokenOf(caller).pipe(
+              Effect.flatMap((principal) => reviseChange(principal, decoded.success)),
+              Effect.match({
+                onSuccess: reviseOk,
+                onFailure: (error) => reviseError(caller, error),
+              }),
+            ),
+          );
+        },
+        rely: (caller: Caller, input: Input<"rely">) => {
+          const decoded = relyInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            tokenOf(caller).pipe(
+              Effect.flatMap((principal) => relyOn(principal, decoded.success)),
+              Effect.match({ onSuccess: relyOk, onFailure: (error) => relyError(caller, error) }),
+            ),
+          );
+        },
+        nearby: (caller: Caller, input: Input<"nearby">) => {
+          const decoded = changeIdInput(input.changeId);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          const changeId = decoded.success;
+          return run(
+            caller,
+            nearbyOf(projectOf(caller).projectId, changeId).pipe(
+              Effect.match({
+                onSuccess: (preflight) => nearbyOk(changeId, preflight),
+                onFailure: (error) => nearbyError(caller, error),
+              }),
+            ),
+          );
+        },
+        abandon: (caller: Caller, input: Input<"abandon">) => {
+          const decoded = abandonInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            withdrawerOf(caller).pipe(
+              Effect.flatMap((by) => abandonChange(by, decoded.success)),
+              Effect.match({
+                onSuccess: abandonOk,
+                onFailure: (error) => abandonError(caller, error),
+              }),
+            ),
+          );
+        },
+        adopt: (caller: Caller, input: Input<"adopt">) => {
+          const decoded = adoptInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            tokenOf(caller).pipe(
+              Effect.flatMap((principal) => adoptChange(principal, decoded.success)),
+              Effect.match({ onSuccess: adoptOk, onFailure: (error) => adoptError(caller, error) }),
+            ),
+          );
+        },
+        rebase: (caller: Caller, input: Input<"rebase">) => {
+          const decoded = rebaseInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            tokenOf(caller).pipe(
+              Effect.flatMap((principal) => rebaseChange(principal, decoded.success)),
+              Effect.match({
+                onSuccess: rebaseOk,
+                onFailure: (error) => rebaseError(caller, error),
+              }),
+            ),
+          );
+        },
+        sketch: notYet,
+        Workspaces_refreshWorkspaceToken: notYet,
+        Workspaces_releaseWorkspace: notYet,
+        submit: (caller: Caller, input: Input<"submit">) => {
+          const decoded = submitInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            tokenOf(caller).pipe(
+              Effect.flatMap((principal) => submitChange(principal, decoded.success)),
+              Effect.match({
+                onSuccess: (change) => submitOk(change, decoded.success.commitSha),
+                onFailure: (error) => submitError(caller, error),
+              }),
+            ),
+          );
+        },
+        status: (caller: Caller, input: Input<"status">) => {
+          const changeId = changeIdInput(input.changeId);
+          if (Result.isFailure(changeId)) return invalid(caller, changeId.failure);
+          return run(
+            caller,
+            submissionOf(changeId.success, input.wait).pipe(
+              Effect.match({
+                onSuccess: (status) => statusOk(caller, status),
+                onFailure: (error) => statusError(caller, error),
+              }),
+            ),
+          );
+        },
+        Conflicts_listConflicts: notYet,
+        Conflicts_getConflict: notYet,
+        resolve: notYet,
+        why: notYet,
+        Memory_listDecisions: notYet,
+        Memory_getDecision: notYet,
+        inbox: (caller: Caller, input: Input<"inbox">) =>
+          caller.principal._tag !== "Agent"
+            ? agentsOnly(caller.requestId)
+            : run(
+                caller,
+                tokenOf(caller).pipe(
+                  Effect.flatMap((principal) => readInbox(principal, input.cursor, input.wait)),
+                  Effect.map(inboxOk),
+                ),
+              ),
+        Inbox_listEvents: (caller: Caller, input: Input<"Inbox_listEvents">) => {
+          const decoded = eventsInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          const { project: _named, ...read } = decoded.success;
+          if (caller.resource !== undefined)
+            return run(
+              caller,
+              readEvents({ _tag: "Project", ...scopeOf(caller) }, read).pipe(Effect.map(eventsOk)),
+            );
+          if (caller.principal._tag !== "User")
+            return invalid(caller, [
+              {
+                path: ["project"],
+                message: "Name a project: only a signed-in user reads across projects.",
+              },
+            ]);
+          const { principal } = caller;
+          // A user naming no project reads every project it may, each decided by the policy once per request.
+          return run(
+            caller,
+            Effect.gen(function* () {
+              const services = yield* Effect.context<ProjectOrgs | Orgs | Projects>();
+              const decided = new Map<ProjectId, Audience | undefined>();
+              const audienceOf = (project: ProjectId) =>
+                decided.has(project)
+                  ? Effect.succeed(decided.get(project))
+                  : projectResource(project).pipe(
+                      Effect.map((resource) => {
+                        const decision = decideEach(principal, resource);
+                        const audience = Result.isSuccess(decision)
+                          ? (decision.success.audience ?? "public")
+                          : undefined;
+                        decided.set(project, audience);
+                        return audience;
+                      }),
+                      Effect.provideContext(services),
+                    );
+              return eventsOk(yield* readEvents({ _tag: "Readable", audienceOf }, read));
             }),
-          ),
-        );
-      },
-      Operator_enrolAgent: (caller: Caller, input: Input<"Operator_enrolAgent">) => {
-        const decoded = enrolInput(input);
-        if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
-        return run(
-          caller,
-          principalOf(caller).pipe(
-            Effect.flatMap((principal) => enrolAgent(principal, decoded.success)),
-            Effect.match({
-              onSuccess: enrolAgentOk,
-              onFailure: (error) => enrolAgentError(caller, error),
+          );
+        },
+        Inbox_getSnapshot: (caller: Caller, _input: Input<"Inbox_getSnapshot">) =>
+          run(caller, readSnapshot(scopeOf(caller)).pipe(Effect.map(snapshotOk))),
+        Lattices_listLattices: latticesOk,
+        // The repo reads admit a caller without a token: the policy decided by the project's visibility.
+        Repo_getTree: (caller: Caller, input: Input<"Repo_getTree">) => {
+          const projectId = settingsProject(input.projectId);
+          if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+          return run(
+            caller,
+            readRepoTree(projectId.success, {
+              ...(input.ref === undefined ? {} : { ref: input.ref }),
+              path: input.path ?? "",
+            }).pipe(Effect.match({ onSuccess: treeOk, onFailure: (e) => repoError(caller, e) })),
+          );
+        },
+        Repo_getBlob: (caller: Caller, input: Input<"Repo_getBlob">) => {
+          const projectId = settingsProject(input.projectId);
+          if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+          return run(
+            caller,
+            readRepoBlob(projectId.success, {
+              ...(input.ref === undefined ? {} : { ref: input.ref }),
+              path: input.path,
+            }).pipe(Effect.match({ onSuccess: blobOk, onFailure: (e) => repoError(caller, e) })),
+          );
+        },
+        Repo_listCommits: (caller: Caller, input: Input<"Repo_listCommits">) => {
+          const projectId = settingsProject(input.projectId);
+          if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+          const from = commitsFrom(input.cursor);
+          if (Result.isFailure(from)) return invalid(caller, from.failure);
+          return run(
+            caller,
+            listRepoCommits(projectId.success, {
+              ...(input.ref === undefined ? {} : { ref: input.ref }),
+              ...(from.success === undefined ? {} : { from: from.success }),
+              ...(input.limit === undefined ? {} : { limit: input.limit }),
+            }).pipe(Effect.match({ onSuccess: commitsOk, onFailure: (e) => repoError(caller, e) })),
+          );
+        },
+        Repo_getCommit: (caller: Caller, input: Input<"Repo_getCommit">) => {
+          const projectId = settingsProject(input.projectId);
+          if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+          const sha = commitParam(input.sha);
+          if (Result.isFailure(sha)) return invalid(caller, sha.failure);
+          return run(
+            caller,
+            readRepoCommit(projectId.success, sha.success).pipe(
+              Effect.match({ onSuccess: commitOk, onFailure: (e) => repoError(caller, e) }),
+            ),
+          );
+        },
+        Views_getVerdict: notYet,
+        Views_getCandidate: notYet,
+        Views_listLanes: notYet,
+        Views_getTrunk: notYet,
+        // Anyone lists projects: each is decided by the policy, so a visitor sees the public ones.
+        Operator_listProjects: (caller: Caller, input: Input<"Operator_listProjects">) => {
+          const after = input.cursor === undefined ? undefined : decodeCursor(input.cursor);
+          if (after !== undefined && Option.isNone(after))
+            return invalid(caller, [{ path: ["cursor"], message: "Not a cursor Keel gave out" }]);
+          const limit = Math.min(input.limit ?? 50, 100);
+          return run(
+            caller,
+            Effect.gen(function* () {
+              const items: ProjectViewBody[] = [];
+              let cursor = after === undefined ? undefined : Option.getOrUndefined(after);
+              let exhausted = false;
+              // Read pages until `limit` projects the caller may read are found, or none are left.
+              while (items.length < limit && !exhausted) {
+                const page = yield* ProjectOrgs.use((places) => places.all(cursor, limit));
+                exhausted = page.length < limit;
+                for (const place of page) {
+                  cursor = place.projectId;
+                  const view = yield* readableView(caller, place.projectId, place.name);
+                  if (view !== undefined) items.push(view);
+                  if (items.length === limit) break;
+                }
+              }
+              return {
+                status: 200 as const,
+                body: {
+                  items,
+                  ...(exhausted || cursor === undefined ? {} : { nextCursor: cursor }),
+                },
+              };
             }),
+          );
+        },
+        Operator_createProject: (caller: Caller, input: Input<"Operator_createProject">) =>
+          run(
+            caller,
+            actorOf(caller).pipe(
+              Effect.flatMap((actor) => {
+                const org = caller.resource?._tag === "Org" ? caller.resource.org : undefined;
+                if (org === undefined)
+                  return Effect.die(new Error("createProject ran without its org"));
+                return createProject(actor, {
+                  org,
+                  name: input.name,
+                  source: input.source,
+                  idempotencyKey: input["idempotency-key"],
+                }).pipe(
+                  Effect.map((project) =>
+                    createProjectOk(
+                      project,
+                      input.org.toLowerCase(),
+                      roleIn(caller.principal, org),
+                    ),
+                  ),
+                );
+              }),
+              Effect.catch((error) => Effect.succeed(createProjectError(caller, error))),
+            ),
           ),
-        );
-      },
-      Operator_suspendAgent: (caller: Caller, input: Input<"Operator_suspendAgent">) =>
-        standing(caller, "Operator_suspendAgent", input, suspendAgent),
-      Operator_reinstateAgent: (caller: Caller, input: Input<"Operator_reinstateAgent">) =>
-        standing(caller, "Operator_reinstateAgent", input, reinstateAgent),
-      Operator_revokeAgent: (caller: Caller, input: Input<"Operator_revokeAgent">) =>
-        standing(caller, "Operator_revokeAgent", input, revokeAgent),
-      Operator_listEscalations: notYet,
-      Operator_giveRuling: notYet,
-      SignIn_methods: async () => ({ status: 200 as const, body: { ...signIn } }),
-    } satisfies Operations<Caller>),
+        Orgs_getProject: (caller: Caller, input: Input<"Orgs_getProject">) =>
+          run(
+            caller,
+            readableView(caller, projectOf(caller).projectId, input.name.toLowerCase()).pipe(
+              Effect.map((view) =>
+                view === undefined
+                  ? {
+                      status: 404 as const,
+                      body: problem(404, "resource.not_found", caller.requestId),
+                    }
+                  : { status: 200 as const, body: view },
+              ),
+            ),
+          ),
+        Users_me: (caller: Caller) => {
+          const { principal } = caller;
+          if (principal._tag !== "User")
+            return Promise.reject(new Error("Users_me ran without a user"));
+          return run(
+            caller,
+            Effect.forEach(principal.memberships, (membership) =>
+              Orgs.use((orgs) => orgs.byId(membership.org)).pipe(
+                Effect.map((org) => ({
+                  id: membership.org,
+                  name: Option.match(org, { onNone: () => membership.org, onSome: (o) => o.name }),
+                  role: membership.role,
+                })),
+              ),
+            ).pipe(
+              Effect.map((orgs) => ({
+                status: 200 as const,
+                body: {
+                  userId: principal.userId,
+                  ...(principal.handle === undefined ? {} : { handle: principal.handle }),
+                  instanceAdmin: principal.instanceAdmin,
+                  orgs,
+                },
+              })),
+            ),
+          );
+        },
+        Admin_createUser: async (caller: Caller, input: Input<"Admin_createUser">) => {
+          const made = await makeUser(input.handle);
+          if ("refused" in made)
+            return {
+              status: 409 as const,
+              body: problem(409, "user.handle_refused", caller.requestId, {
+                detail: `${made.refused}: ${made.message}`,
+              }),
+            };
+          return {
+            status: 201 as const,
+            body: {
+              userId: made.userId,
+              handle: made.handle,
+              org: made.org,
+              session: {
+                token: made.session.token,
+                expiresAt: made.session.expiresAt.toISOString(),
+              },
+            },
+          };
+        },
+        Operator_getSettings: (caller: Caller, input: Input<"Operator_getSettings">) => {
+          const projectId = settingsProject(input.projectId);
+          if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+          return run(
+            caller,
+            getSettings(projectId.success).pipe(
+              Effect.match({
+                onSuccess: settingsOk,
+                onFailure: (error) => settingsError(caller, error),
+              }),
+            ),
+          );
+        },
+        Operator_putSettings: (caller: Caller, input: Input<"Operator_putSettings">) => {
+          const decoded = putSettingsInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          const { projectId, settings } = decoded.success;
+          return run(
+            caller,
+            actorOf(caller).pipe(
+              Effect.flatMap((actor) => putSettings(actor, projectId, settings, caller.requestId)),
+              Effect.match({
+                onSuccess: settingsOk,
+                onFailure: (error) => putSettingsError(caller, error),
+              }),
+            ),
+          );
+        },
+        Operator_enrolAgent: (caller: Caller, input: Input<"Operator_enrolAgent">) => {
+          const decoded = enrolInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            actorOf(caller).pipe(
+              Effect.flatMap((actor) => enrolAgent(actor.userId, decoded.success)),
+              Effect.match({
+                onSuccess: enrolAgentOk,
+                onFailure: (error) => enrolAgentError(caller, error),
+              }),
+            ),
+          );
+        },
+        Operator_suspendAgent: (caller: Caller, input: Input<"Operator_suspendAgent">) =>
+          standing(caller, "Operator_suspendAgent", input, suspendAgent),
+        Operator_reinstateAgent: (caller: Caller, input: Input<"Operator_reinstateAgent">) =>
+          standing(caller, "Operator_reinstateAgent", input, reinstateAgent),
+        Operator_revokeAgent: (caller: Caller, input: Input<"Operator_revokeAgent">) =>
+          standing(caller, "Operator_revokeAgent", input, revokeAgent),
+        Operator_listEscalations: notYet,
+        Operator_giveRuling: notYet,
+        SignIn_methods: async () => ({ status: 200 as const, body: { ...signIn } }),
+      } satisfies Operations<Caller>,
+      RESOLVERS,
+      run,
+    ),
   );
 }
 

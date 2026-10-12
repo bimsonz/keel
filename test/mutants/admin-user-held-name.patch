@@ -1,0 +1,24 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-claim.test.ts -t admin.create-user-backend
+# kills: admin.create-user-backend
+# why: an automation user may take a name held for the claimant, which only the claim code should release
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -278,7 +278,7 @@
+       username({
+         minUsernameLength: 1,
+         maxUsernameLength: 39,
+-        usernameValidator: (name) => nameRefusal(name, held) === undefined,
++        usernameValidator: (name) => nameRefusal(name) === undefined,
+         // The handle is the personal org's slug, so it never changes.
+         immutableUsername: true,
+       }),
+@@ -425,7 +425,7 @@
+   handle: string,
+ ): Promise<CreatedUser | NameRefusal> {
+   const { db } = config;
+-  const held = config.heldNames ?? NOTHING_HELD;
++  const held = NOTHING_HELD;
+   const unavailable = await nameUnavailable(db, held, handle);
+   if (unavailable !== undefined) return unavailable;
+   const name = handle.toLowerCase();

@@ -31,6 +31,7 @@ import {
   NextAction,
   ProjectId,
   SketchId,
+  UserId,
   VerdictId,
   WorkspaceId,
 } from "@keeltown/core/kernel";
@@ -101,7 +102,7 @@ export const RelyCommand = Schema.Struct({
 });
 export type RelyCommand = typeof RelyCommand.Type;
 
-/** Read what is near a change. `projectId` is the reader's, from its token: a change in another project is ChangeInOtherProject. */
+/** Read what is near a change. `projectId` is the one the reader was authorised on: a change in another project is ChangeInOtherProject. */
 export const NearbyCommand = Schema.Struct({ projectId: ProjectId });
 export type NearbyCommand = typeof NearbyCommand.Type;
 
@@ -115,16 +116,19 @@ export type AwaitSubmissionCommand = typeof AwaitSubmissionCommand.Type;
 export const AwaitPlanCommand = AwaitSubmissionCommand;
 export type AwaitPlanCommand = typeof AwaitPlanCommand.Type;
 
-/** Who may withdraw a change: the holder of its lease, or an operator (a parked change, say). */
+/**
+ * Who may withdraw a change: the agent holding its lease, or a maintainer of
+ * its project (a parked change, say), whom the doorway authorised. A
+ * maintainer of another project is answered ChangeNotFound.
+ */
 export const WithdrawAuthority = Schema.Union([
-  Schema.TaggedStruct("Lease", { leaseId: LeaseId }),
-  Schema.TaggedStruct("Operator", { by: Schema.String }),
+  Schema.TaggedStruct("Lease", { leaseId: LeaseId, agentId: AgentId }),
+  Schema.TaggedStruct("Maintainer", { by: UserId, projectId: ProjectId }),
 ]);
 export type WithdrawAuthority = typeof WithdrawAuthority.Type;
 
 /** Withdraw a change. */
 export const AbandonCommand = Schema.Struct({
-  agentId: AgentId,
   authority: WithdrawAuthority,
   reason: Schema.optional(Schema.String),
   idempotencyKey: Schema.String,

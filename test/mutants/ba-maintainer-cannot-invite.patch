@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-org.test.ts -t ba.org-roles
+# kills: ba.org-roles
+# why: Better Auth's maintainer role is fixed to nothing instead of derived from ManageMembers, so a maintainer can't invite or remove members as Keel's policy says they may
+diff --git a/apps/keel/src/adapters/driven/better-auth/roles.ts b/apps/keel/src/adapters/driven/better-auth/roles.ts
+--- a/apps/keel/src/adapters/driven/better-auth/roles.ts
++++ b/apps/keel/src/adapters/driven/better-auth/roles.ts
+@@ -70,6 +70,6 @@
+ export const orgAccess = createAccessControl(defaultStatements);
+ export const ORG_ROLES = {
+   owner: orgAccess.newRole(statementsOf("owner")),
+-  maintainer: orgAccess.newRole(statementsOf("maintainer")),
++  maintainer: orgAccess.newRole({}),
+   member: orgAccess.newRole(statementsOf("member")),
+ } satisfies Record<Role, unknown>;

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/directory-org.test.ts
+# kills: tenancy.directory-org-kept
+# why: an enrolment replayed by its key writes the agent's row without its org and sponsor, so a placed agent is unplaced and refused
+diff --git a/apps/keel/src/adapters/driven/d1/agent-directory.ts b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+--- a/apps/keel/src/adapters/driven/d1/agent-directory.ts
++++ b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+@@ -115,7 +115,7 @@
+               .prepare(
+                 `INSERT INTO agents (id, project_id, name, kind, scopes, org_id, sponsor_user, state, revocation_epoch, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  ON CONFLICT (id) DO UPDATE SET project_id = excluded.project_id, name = excluded.name, kind = excluded.kind, scopes = excluded.scopes,
+-                   org_id = COALESCE(excluded.org_id, agents.org_id), sponsor_user = COALESCE(excluded.sponsor_user, agents.sponsor_user), state = excluded.state,
++                   org_id = excluded.org_id, sponsor_user = excluded.sponsor_user, state = excluded.state,
+                    revocation_epoch = excluded.revocation_epoch`,
+               )
+               .bind(

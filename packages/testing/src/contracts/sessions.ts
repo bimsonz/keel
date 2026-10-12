@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { Agent, AgentToken, Sponsor } from "@keeltown/core/domain/identity";
-import { AgentId, ProjectId } from "@keeltown/core/kernel";
+import type { Agent, AgentToken } from "@keeltown/core/domain/identity";
+import { AgentId, OrgId, ProjectId, UserId } from "@keeltown/core/kernel";
 import {
   type AgentDirectory,
   Enrolments,
@@ -10,9 +10,9 @@ import {
 import { Effect, type Layer, Schema } from "effect";
 
 /**
- * The `Sessions` suite enrols its agents through `Enrolments`, as an operator
- * would, and suspends one through the harness, as the operator's `Standings`
- * suspend does on a real adapter.
+ * The `Sessions` suite enrols its agents through `Enrolments`, as a sponsoring
+ * user would, and suspends one through the harness, as `Standings` suspend
+ * does on a real adapter.
  */
 export interface SessionsHarness {
   readonly layer: Layer.Layer<Sessions | Enrolments | AgentDirectory>;
@@ -24,33 +24,34 @@ const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const ulid = () =>
   [...crypto.getRandomValues(new Uint8Array(26))].map((b) => CROCKFORD[b % 32] ?? "0").join("");
 const agentId = () => Schema.decodeUnknownSync(AgentId)(`agt_${ulid()}`);
+const userId = () => Schema.decodeUnknownSync(UserId)(`usr_${ulid()}`);
 
-const operator = (): AgentToken => ({
-  agentId: agentId(),
-  projectId: Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`),
-  scopes: ["operator"],
-  revocationEpoch: 0,
-});
+const projectId = () => Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`);
 
-/** Enrols an agent, sponsored when `sponsor` is given, and answers its principal with the token's `obo`. */
-const enrolled = (sponsor?: Sponsor, obo?: Sponsor) =>
+/** Enrols an agent, sponsored by `sponsor`, and answers its principal as its token carries it. */
+const enrolled = (sponsor: UserId = userId()) =>
   Effect.gen(function* () {
-    const { agent } = yield* (yield* Enrolments).enrol(operator(), {
-      name: "session-agent",
-      kind: "interactive",
-      scopes: ["agent:read", "agent:work"],
-      ...(sponsor === undefined ? {} : { onBehalfOf: sponsor }),
-      idempotencyKey: `enrol-${crypto.randomUUID()}`,
-    });
-    return { agent, principal: principalOf(agent, obo) };
+    const { agent } = yield* (yield* Enrolments).enrol(
+      { _tag: "User", userId: sponsor },
+      {
+        name: "session-agent",
+        kind: "interactive",
+        scopes: ["agent:read", "agent:work"],
+        projectId: projectId(),
+        org: Schema.decodeUnknownSync(OrgId)(`org_${ulid()}`),
+        sponsor,
+        idempotencyKey: `enrol-${crypto.randomUUID()}`,
+      },
+    );
+    return { agent, principal: principalOf(agent) };
   });
 
-const principalOf = (agent: Agent, obo?: Sponsor): AgentToken => ({
+const principalOf = (agent: Agent): AgentToken => ({
   agentId: agent.id,
   projectId: agent.projectId,
   scopes: agent.scopes,
   revocationEpoch: agent.revocationEpoch,
-  ...(obo === undefined ? {} : { onBehalfOf: obo }),
+  ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
 });
 
 const asking = (overrides: Partial<OpenSessionInput> = {}): OpenSessionInput => ({
@@ -68,7 +69,8 @@ export function describeSessionsContract(adapter: string, make: () => SessionsHa
         const harness = make();
         return Effect.gen(function* () {
           const sessions = yield* Sessions;
-          const { agent, principal } = yield* enrolled("github:enrolled");
+          const sponsor = userId();
+          const { agent, principal } = yield* enrolled(sponsor);
           expect(yield* sessions.current(agent.id)).toBeNull();
 
           const request = asking();
@@ -77,7 +79,7 @@ export function describeSessionsContract(adapter: string, make: () => SessionsHa
             agentId: agent.id,
             harness: "claude-code",
             model: "a-model-2026-10",
-            onBehalfOf: "github:enrolled",
+            sponsor,
           });
           expect(first.id).toMatch(/^ses_/);
           expect(yield* sessions.current(agent.id)).toEqual(first);
@@ -112,46 +114,20 @@ export function describeSessionsContract(adapter: string, make: () => SessionsHa
     });
 
     it.live(
-      "[b11.session-obo] acts for the token's sponsor, else the enrolment's, and refuses any other",
+      "[b11.session-sponsor] takes the agent's sponsor from its enrolment, whatever its token claims",
       () => {
         const harness = make();
         return Effect.gen(function* () {
           const sessions = yield* Sessions;
-          const tokened = yield* enrolled("github:enrolled", "github:token");
-          expect(yield* sessions.open(tokened.principal, asking())).toMatchObject({
-            onBehalfOf: "github:token",
-          });
-          expect(
-            yield* sessions.open(tokened.principal, asking({ onBehalfOf: "github:token" })),
-          ).toMatchObject({ onBehalfOf: "github:token" });
-          expect(
-            yield* Effect.flip(
-              sessions.open(tokened.principal, asking({ onBehalfOf: "github:enrolled" })),
-            ),
-          ).toMatchObject({
-            _tag: "SessionSponsorRefused",
-            agentId: tokened.agent.id,
-            requested: "github:enrolled",
-            sponsor: "github:token",
-          });
-
-          const enrolledOnly = yield* enrolled("github:enrolled");
-          expect(
-            yield* sessions.open(enrolledOnly.principal, asking({ onBehalfOf: "github:enrolled" })),
-          ).toMatchObject({ onBehalfOf: "github:enrolled" });
-
-          const bare = yield* enrolled();
-          const unsponsored = yield* sessions.open(bare.principal, asking());
-          expect(unsponsored).not.toHaveProperty("onBehalfOf");
-          const refused = yield* Effect.flip(
-            sessions.open(bare.principal, asking({ onBehalfOf: "github:itself" })),
-          );
-          expect(refused).toMatchObject({
-            _tag: "SessionSponsorRefused",
-            requested: "github:itself",
-          });
-          expect(refused).not.toHaveProperty("sponsor");
-          expect(yield* sessions.current(bare.agent.id)).toEqual(unsponsored);
+          const sponsor = userId();
+          const sponsored = yield* enrolled(sponsor);
+          const { sponsor: _claimed, ...unclaimed } = sponsored.principal;
+          for (const principal of [
+            sponsored.principal,
+            { ...sponsored.principal, sponsor: userId() },
+            unclaimed,
+          ])
+            expect(yield* sessions.open(principal, asking())).toMatchObject({ sponsor });
         }).pipe(Effect.provide(harness.layer));
       },
     );
@@ -160,7 +136,12 @@ export function describeSessionsContract(adapter: string, make: () => SessionsHa
       const harness = make();
       return Effect.gen(function* () {
         const sessions = yield* Sessions;
-        const stranger: AgentToken = { ...operator(), scopes: ["agent:work"] };
+        const stranger: AgentToken = {
+          agentId: agentId(),
+          projectId: projectId(),
+          scopes: ["agent:work"],
+          revocationEpoch: 0,
+        };
         expect(yield* Effect.flip(sessions.open(stranger, asking()))).toMatchObject({
           _tag: "AgentNotKnown",
           agentId: stranger.agentId,

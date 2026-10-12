@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/authorize-handlers.test.ts -t authz.no-hand-checks
+# kills: authz.no-hand-checks
+# why: a handler decides by a scope again, beside the policy: two places to change and one to forget
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -461,7 +461,7 @@
+               caller,
+               readEvents({ _tag: "Project", ...scopeOf(caller) }, read).pipe(Effect.map(eventsOk)),
+             );
+-          if (caller.principal._tag !== "User")
++          if (caller.principal._tag !== "User" && caller.token?.scopes.includes("observer") !== true)
+             return invalid(caller, [
+               {
+                 path: ["project"],

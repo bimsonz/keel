@@ -10,9 +10,9 @@ import {
   SessionId,
   SubjectId,
   TenetId,
+  UserId,
 } from "../kernel/index.ts";
 import { Predicate, Relation } from "../coordination/index.ts";
-import { Sponsor } from "../identity/index.ts";
 
 export const DecisionState = Schema.Literals(["active", "superseded", "overruled"]);
 export type DecisionState = typeof DecisionState.Type;
@@ -69,8 +69,8 @@ export const Session = Schema.Struct({
   agentId: AgentId,
   harness: Schema.optional(Schema.String),
   model: Schema.optional(Schema.String),
-  /** The human the agent acts for in this session, when it names one. */
-  onBehalfOf: Schema.optional(Sponsor),
+  /** The user who sponsors the agent, from its enrolment, when it has one. */
+  sponsor: Schema.optional(UserId),
   openedAt: InstantSchema,
 });
 export type Session = typeof Session.Type;

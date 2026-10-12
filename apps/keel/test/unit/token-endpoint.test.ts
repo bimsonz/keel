@@ -1,21 +1,28 @@
 import { TOKEN_TTL_SECONDS } from "@keeltown/core/application/identity";
 import type { Agent } from "@keeltown/core/domain/identity";
 import { AgentId, Instant } from "@keeltown/core/kernel";
-import { Clock } from "@keeltown/core/ports";
+import { Clock, TokenIssuer } from "@keeltown/core/ports";
 import {
   hashSecret,
   makeAgentDirectoryMemory,
   makeChangesMemory,
+  makeClockMemory,
   makeCodeHostMemory,
   makeEnrolmentsMemory,
   makeIdsMemory,
   makeEventFeedMemory,
   makeProjectViewsMemory,
   makeInboxMemory,
+  makeMembershipsMemory,
+  makeOrgsMemory,
+  makeProjectOrgsMemory,
   makeProjectsMemory,
   makeSessionsMemory,
   makeStandingsMemory,
+  makeUsersMemory,
+  sampleOrgId,
   sampleProjectId,
+  sampleSponsorId,
 } from "@keeltown/testing";
 import { decodeJwt } from "jose";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
@@ -51,39 +58,57 @@ function steppingClock(readings: readonly number[]) {
   );
 }
 
+/** The handlers over in-memory ports and the real token issuer, with `seeded` holding credential `client`/`secret`. */
+async function serve(seeded: Agent, clock: Layer.Layer<Clock>) {
+  const directory = makeAgentDirectoryMemory();
+  directory.seed(seeded, {
+    clientId: "client",
+    agentId: seeded.id,
+    secretHash: await hashSecret("secret"),
+  });
+  const inbox = makeInboxMemory();
+  const runtime = ManagedRuntime.make(
+    Layer.mergeAll(
+      directory.layer,
+      TokenIssuerJose({ privateJwk, issuer: "keel.unit" }).pipe(Layer.provide(clock)),
+      clock,
+      makeIdsMemory().layer,
+      makeChangesMemory().layer,
+      inbox.layer,
+      inbox.notifier,
+      makeEventFeedMemory().layer,
+      makeProjectViewsMemory().layer,
+      makeProjectsMemory().layer,
+      makeEnrolmentsMemory().layer.pipe(Layer.provide(directory.layer)),
+      makeCodeHostMemory().layer,
+      makeSessionsMemory().layer.pipe(Layer.provide(directory.layer)),
+      makeStandingsMemory().layer.pipe(Layer.provide(directory.layer)),
+      makeUsersMemory().layer,
+      makeMembershipsMemory().layer,
+      makeOrgsMemory().layer,
+      makeProjectOrgsMemory().layer,
+    ),
+  );
+  const handlers = makeHandlers(
+    makeRunner(runtime),
+    { emailCode: false, github: false },
+    async () => {
+      throw new Error("the token endpoint makes no users");
+    },
+  );
+  const answer = await handlers.Auth_exchangeToken(
+    { requestId: "req-1", principal: { _tag: "Anonymous" }, signal: new AbortController().signal },
+    { client_id: "client", client_secret: "secret" },
+  );
+  return { runtime, answer };
+}
+
 describe("the token endpoint", () => {
   it("[c6.expires-in] answers expires_in as the token's lifetime, its exp is iat + TTL, with the clock at x.999 s and moving", async () => {
-    const directory = makeAgentDirectoryMemory();
-    directory.seed(agent, {
-      clientId: "client",
-      agentId,
-      secretHash: await hashSecret("secret"),
-    });
     // The first reading stamps the token; every later one is past the next second.
-    const clock = steppingClock([1_760_000_000_999, 1_760_000_001_250]);
-    const inbox = makeInboxMemory();
-    const runtime = ManagedRuntime.make(
-      Layer.mergeAll(
-        directory.layer,
-        TokenIssuerJose({ privateJwk, issuer: "keel.unit" }).pipe(Layer.provide(clock)),
-        clock,
-        makeIdsMemory().layer,
-        makeChangesMemory().layer,
-        inbox.layer,
-        inbox.notifier,
-        makeEventFeedMemory().layer,
-        makeProjectViewsMemory().layer,
-        makeProjectsMemory().layer,
-        makeEnrolmentsMemory().layer.pipe(Layer.provide(directory.layer)),
-        makeCodeHostMemory().layer,
-        makeSessionsMemory().layer.pipe(Layer.provide(directory.layer)),
-        makeStandingsMemory().layer.pipe(Layer.provide(directory.layer)),
-      ),
-    );
-    const handlers = makeHandlers(makeRunner(runtime), { emailCode: false, github: false });
-    const answer = await handlers.Auth_exchangeToken(
-      { requestId: "req-1", principal: null, signal: new AbortController().signal },
-      { client_id: "client", client_secret: "secret" },
+    const { runtime, answer } = await serve(
+      agent,
+      steppingClock([1_760_000_000_999, 1_760_000_001_250]),
     );
     await runtime.dispose();
     expect(answer.status).toBe(200);
@@ -92,5 +117,27 @@ describe("the token endpoint", () => {
     const claims = decodeJwt(String(Reflect.get(Object(body), "access_token")));
     expect(claims.iat).toBe(1_760_000_000);
     expect(claims.exp).toBe(1_760_000_000 + TOKEN_TTL_SECONDS);
+  });
+
+  it("[tenancy.token-exchange] a token for an agent with an org and a sponsoring user verifies to both, its obo the user's id", async () => {
+    const tenant: Agent = {
+      ...agent,
+      org: sampleOrgId,
+      sponsor: sampleSponsorId,
+    };
+    const { runtime, answer } = await serve(tenant, makeClockMemory().layer);
+    const token = String(Reflect.get(Object(Reflect.get(Object(answer), "body")), "access_token"));
+    const verified = await runtime.runPromise(TokenIssuer.use((issuer) => issuer.verify(token)));
+    await runtime.dispose();
+    expect(answer.status).toBe(200);
+    expect(verified).toEqual({
+      agentId,
+      projectId: sampleProjectId,
+      scopes: ["agent:read"],
+      revocationEpoch: 0,
+      org: sampleOrgId,
+      sponsor: sampleSponsorId,
+    });
+    expect(decodeJwt(token)).toMatchObject({ org: sampleOrgId, obo: sampleSponsorId });
   });
 });

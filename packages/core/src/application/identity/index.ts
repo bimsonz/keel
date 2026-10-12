@@ -1,9 +1,9 @@
 import { Effect, Option } from "effect";
 import {
-  admits,
+  type Actor,
   type Agent,
   AgentNotAdmitted,
-  AgentNotKnown,
+  type AgentNotKnown,
   type AgentStateRefused,
   CredentialRejected,
   type IdempotencyConflict,
@@ -11,9 +11,11 @@ import {
   type AgentToken,
   type Scope,
   ScopeNotGranted,
-  type SessionSponsorRefused,
 } from "../../domain/identity/index.ts";
+import { ProjectNotFound } from "../../domain/integration/index.ts";
+import type { UserId } from "../../domain/kernel/index.ts";
 import type { Session } from "../../domain/memory/index.ts";
+import { admit, whyNotAdmitted } from "./gate.ts";
 import {
   AgentDirectory,
   type Clock,
@@ -22,6 +24,7 @@ import {
   Enrolments,
   type IssuedToken,
   type OpenSessionInput,
+  ProjectOrgs,
   Sessions,
   type StandingInput,
   Standings,
@@ -30,43 +33,14 @@ import {
 
 /** identity use-cases. `whoami` and `exchangeToken` are the exemplar for the rest. */
 
-/** Why an agent may not act, or null when it may. */
-function refusal(agent: Agent, principal: AgentToken | null): AgentNotAdmitted["reason"] | null {
-  if (agent.state === "suspended") return "suspended";
-  if (agent.state === "revoked") return "revoked";
-  if (principal !== null && !admits(agent, principal)) return "stale-epoch";
-  return null;
-}
-
-/**
- * The agent behind a verified token, if it may still act: the token's
- * revocation epoch must match the agent's current one. It reads only the
- * AgentDirectory, so the request gate never calls an AgentSession DO.
- */
-export const admit: (
-  principal: AgentToken,
-) => Effect.Effect<Agent, AgentNotKnown | AgentNotAdmitted, AgentDirectory> = Effect.fn(
-  "identity/admit",
-)(function* (principal: AgentToken) {
-  const directory = yield* AgentDirectory;
-  const agent = yield* directory.findAgent(principal.agentId);
-  if (Option.isNone(agent)) return yield* new AgentNotKnown({ agentId: principal.agentId });
-  const reason = refusal(agent.value, principal);
-  if (reason !== null) return yield* new AgentNotAdmitted({ agentId: principal.agentId, reason });
-  return agent.value;
-});
-
-/** Who the caller is: its admitted agent, its current session, and the sponsor its token acts for. */
+/** Who the caller is: its admitted agent, with its org and sponsor, and its current session. */
 export const whoami: (
   principal: AgentToken,
 ) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted, AgentDirectory | Sessions> =
   Effect.fn("identity/whoami")(function* (principal: AgentToken) {
     const agent = yield* admit(principal);
     const current = yield* (yield* Sessions).current(agent.id);
-    const session = current === null ? null : { id: current.id };
-    return principal.onBehalfOf === undefined
-      ? { agent, session }
-      : { agent, session, onBehalfOf: principal.onBehalfOf };
+    return { agent, session: current === null ? null : { id: current.id } };
   });
 
 export interface TokenRequest {
@@ -85,7 +59,10 @@ export interface GrantedToken extends IssuedToken {
 /** How long a bearer token lives. Short: an agent exchanges its credential again, cheaply. */
 export const TOKEN_TTL_SECONDS = 3600;
 
-/** Exchanges a client credential for a short-lived bearer token carrying the agent's current epoch. */
+/**
+ * Exchanges a client credential for a short-lived bearer token carrying the
+ * agent's current epoch, its org and its sponsor.
+ */
 export const exchangeToken: (
   request: TokenRequest,
 ) => Effect.Effect<
@@ -99,77 +76,90 @@ export const exchangeToken: (
   const agent = yield* directory.findAgent(agentId.value);
   // A credential whose agent has gone is as good as a wrong secret.
   if (Option.isNone(agent)) return yield* new CredentialRejected();
-  const reason = refusal(agent.value, null);
+  const reason = whyNotAdmitted(agent.value, null);
   if (reason !== null) return yield* new AgentNotAdmitted({ agentId: agent.value.id, reason });
   const held = new Set(agent.value.scopes);
   const scopes = request.scopes ?? agent.value.scopes;
   const missing = scopes.filter((scope) => !held.has(scope));
   if (missing.length > 0) return yield* new ScopeNotGranted({ requested: missing });
   const issuer = yield* TokenIssuer;
+  const { org, sponsor } = agent.value;
   const token = yield* issuer.issue(
     {
       agentId: agent.value.id,
       projectId: agent.value.projectId,
       scopes,
       revocationEpoch: agent.value.revocationEpoch,
-      ...(agent.value.onBehalfOf === undefined ? {} : { onBehalfOf: agent.value.onBehalfOf }),
+      ...(org === undefined ? {} : { org }),
+      ...(sponsor === undefined ? {} : { sponsor }),
     },
     TOKEN_TTL_SECONDS,
   );
   return { ...token, scopes, expiresInSeconds: TOKEN_TTL_SECONDS };
 });
 
+/** An enrolment as the doorway hands it over: its org is its project's, and its sponsor the caller. */
+export type EnrolAgentInput = Omit<EnrolInput, "org" | "sponsor">;
+
 /**
- * Enrols an agent in its AgentSession DO, which projects it into the
- * AgentDirectory before answering. The doorways have already checked the
- * operator scope; the bootstrap credential may call only this.
+ * Enrols an agent in a project, sponsored by the user minting its credential,
+ * whom the doorway authorised on the project. The agent's org is the project's;
+ * a project with no place is ProjectNotFound. Its AgentSession DO projects it
+ * into the AgentDirectory before answering.
  */
 export const enrolAgent: (
-  principal: AgentToken,
-  input: EnrolInput,
-) => Effect.Effect<Enrolment, IdempotencyConflict, Enrolments> = (principal, input) =>
-  Enrolments.use((enrolments) => enrolments.enrol(principal, input));
+  sponsor: UserId,
+  input: EnrolAgentInput,
+) => Effect.Effect<Enrolment, IdempotencyConflict | ProjectNotFound, Enrolments | ProjectOrgs> =
+  Effect.fn("identity/enrolAgent")(function* (sponsor: UserId, input: EnrolAgentInput) {
+    const place = yield* (yield* ProjectOrgs).byId(input.projectId);
+    if (Option.isNone(place)) return yield* new ProjectNotFound({ projectId: input.projectId });
+    return yield* (yield* Enrolments).enrol(
+      { _tag: "User", userId: sponsor },
+      { ...input, org: place.value.org, sponsor },
+    );
+  });
 
 /**
- * An operator suspends, reinstates or revokes an agent in its AgentSession
- * DO, which writes the directory row before answering. The doorways have
- * already checked the operator scope.
+ * Suspends, reinstates or revokes an agent in its AgentSession DO, which
+ * writes the directory row before answering, as the actor the doorway
+ * authorised.
  */
 export const suspendAgent: (
-  principal: AgentToken,
+  actor: Actor,
   input: StandingInput,
 ) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict, Standings> = (
-  principal,
+  actor,
   input,
-) => Standings.use((standings) => standings.suspend(principal, input));
+) => Standings.use((standings) => standings.suspend(actor, input));
 
 export const reinstateAgent: (
-  principal: AgentToken,
+  actor: Actor,
   input: StandingInput,
 ) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict, Standings> = (
-  principal,
+  actor,
   input,
-) => Standings.use((standings) => standings.reinstate(principal, input));
+) => Standings.use((standings) => standings.reinstate(actor, input));
 
 export const revokeAgent: (
-  principal: AgentToken,
+  actor: Actor,
   input: StandingInput,
 ) => Effect.Effect<Agent, AgentNotKnown | AgentStateRefused | IdempotencyConflict, Standings> = (
-  principal,
+  actor,
   input,
-) => Standings.use((standings) => standings.revoke(principal, input));
+) => Standings.use((standings) => standings.revoke(actor, input));
 
 /** Opens a session for the caller's agent in its AgentSession DO, which makes it the agent's current one. */
 export const openAgentSession: (
   principal: AgentToken,
   input: OpenSessionInput,
-) => Effect.Effect<
-  Session,
-  AgentNotKnown | AgentNotAdmitted | IdempotencyConflict | SessionSponsorRefused,
-  Sessions
-> = (principal, input) => Sessions.use((sessions) => sessions.open(principal, input));
+) => Effect.Effect<Session, AgentNotKnown | AgentNotAdmitted | IdempotencyConflict, Sessions> = (
+  principal,
+  input,
+) => Sessions.use((sessions) => sessions.open(principal, input));
 
 export * from "./enrol.ts";
+export * from "./gate.ts";
 export * from "./inbox.ts";
 export * from "./org-usage.ts";
 export * from "./reservations.ts";

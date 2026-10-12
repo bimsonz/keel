@@ -2,14 +2,13 @@
 # kills: ba.passkey-first
 # why: passkey-first sign-up takes any handle, a reserved path or one already taken among them
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index 38f5a72..104acd9 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -271,7 +271,6 @@ export function authOptions(config: AuthConfig) {
-           resolveUser: async ({ context }) => {
+@@ -335,7 +335,6 @@
+           resolveUser: async ({ ctx, context }) => {
              if (typeof context !== "string" || context === "")
                throw refuse("HANDLE_REQUIRED", "Choose a handle to sign up with a passkey");
--            await claimable(db, held, context);
+-            await claims(ctx.headers, context);
              return { id: `usr_${ulid()}`, name: context.toLowerCase() };
            },
            afterVerification: async ({ ctx, user, context }) => {

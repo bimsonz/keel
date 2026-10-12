@@ -143,8 +143,10 @@ describe("the work loop over REST and MCP", () => {
     const started = Date.now();
     const waiting = rest(via, token, `/changes/${changeId}/submission?wait=20`);
     await new Promise((resolve) => setTimeout(resolve, 300));
+    // The read passes the gate and the policy before it waits: the change moves again until it is answered.
     changes.settle(changeId, "landed");
-    const moved = await waiting;
+    const settling = setInterval(() => changes.settle(changeId, "landed"), 100);
+    const moved = await waiting.finally(() => clearInterval(settling));
     expect(moved.body.result.state).toBe("landed");
     expect(Date.now() - started).toBeLessThan(10_000);
   });
@@ -175,7 +177,7 @@ describe("the work loop over REST and MCP", () => {
     const reader = await tokenFor(await seedAgent({}, ["agent:read"]));
     const refused = await declare(via, reader, "declare-key-0005");
     expect(refused.status).toBe(403);
-    expect(refused.body.code).toBe("auth.insufficient_scope");
+    expect([refused.body.code, refused.body.detail]).toEqual(["auth.forbidden", "Refused: scope."]);
   });
 
   it("[a11.problems] maps each refusal to its problem code and a way forward", async () => {

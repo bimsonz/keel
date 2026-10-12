@@ -13,7 +13,7 @@
 // names the instance, precheck-<eventId>), and the Precheck instance's steps
 // are read back with wrangler. The bootstrap secret comes from Terraform's
 // output; no credential is printed. KEEL_URL overrides the workers.dev URL.
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -59,17 +59,6 @@ function git(cwd: string, args: readonly string[], token?: string): string {
           }),
     },
   }).trim();
-}
-
-function bootstrapSecret(): string {
-  const out = spawnSync(
-    "terraform",
-    [`-chdir=${join(ROOT, "infra/staging")}`, "output", "-raw", "bootstrap_secret"],
-    { encoding: "utf8" },
-  );
-  if (out.status !== 0 || out.stdout.trim() === "")
-    throw new Error(`terraform output bootstrap_secret failed:\n${out.stderr}`);
-  return out.stdout.trim();
 }
 
 interface Case {
@@ -169,22 +158,12 @@ const check = (ok: boolean, what: string) => {
 };
 
 try {
-  const bootstrap = new KeelClient({
-    baseUrl: KEEL_URL,
-    clientId: "keel-bootstrap",
-    clientSecret: bootstrapSecret(),
-  });
-  const operatorEnrolled = await bootstrap.enrolAgent(
-    { name: "d12-operator", kind: "hosted", scopes: ["operator"] },
-    { idempotencyKey: key("operator") },
-  );
-  const operator = new KeelClient({
-    baseUrl: KEEL_URL,
-    clientId: operatorEnrolled.clientId,
-    clientSecret: operatorEnrolled.clientSecret,
-  });
+  // The lane user governs: it creates the project and enrols the agent, which it sponsors.
+  const session = process.env["KEEL_SESSION"];
+  if (session === undefined) throw new Error("set KEEL_SESSION to the maintainer's session");
+  const operator = new KeelClient({ baseUrl: KEEL_URL, session });
   const project = await operator.createProject(
-    { name: PROJECT, source: FIXTURE },
+    { org: process.env["KEEL_ORG"] ?? "keel", name: PROJECT, source: FIXTURE },
     { idempotencyKey: key("project") },
   );
   console.log(`     project ${PROJECT}: ${project.id}`);

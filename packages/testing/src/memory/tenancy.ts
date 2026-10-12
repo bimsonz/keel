@@ -192,6 +192,13 @@ export function makeProjectOrgsMemory() {
               .filter((place) => place.org === org)
               .toSorted((a, b) => binary(a.name, b.name)),
           ),
+        all: (after, limit) =>
+          Effect.sync(() =>
+            [...places.values()]
+              .filter((place) => after === undefined || binary(place.projectId, after) > 0)
+              .toSorted((a, b) => binary(a.projectId, b.projectId))
+              .slice(0, limit),
+          ),
       }),
     ),
   };

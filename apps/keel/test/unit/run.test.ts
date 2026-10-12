@@ -8,10 +8,14 @@ import {
   makeProjectViewsMemory,
   makeInboxMemory,
   makeIdsMemory,
+  makeMembershipsMemory,
+  makeOrgsMemory,
+  makeProjectOrgsMemory,
   makeProjectsMemory,
   makeSessionsMemory,
   makeStandingsMemory,
   makeTokenIssuerMemory,
+  makeUsersMemory,
 } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { afterAll, describe, expect, it } from "vitest";
@@ -36,6 +40,10 @@ const runtime = ManagedRuntime.make(
     makeEventFeedMemory().layer,
     makeProjectViewsMemory().layer,
     makeCodeHostMemory().layer,
+    makeUsersMemory().layer,
+    makeMembershipsMemory().layer,
+    makeOrgsMemory().layer,
+    makeProjectOrgsMemory().layer,
   ),
 );
 const run = makeRunner(runtime);
@@ -51,7 +59,7 @@ describe("a client abort interrupts the request's fiber (pitfall 4)", () => {
     const started = performance.now();
     setTimeout(() => abort.abort(), 20);
     const result = await run(
-      { requestId: "req-abort", principal: null, signal: abort.signal },
+      { requestId: "req-abort", principal: { _tag: "Anonymous" }, signal: abort.signal },
       slow,
     );
     expect(result).toMatchObject({ status: 503, body: { code: "service.unavailable" } });
