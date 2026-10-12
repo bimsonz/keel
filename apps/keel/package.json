@@ -21,13 +21,16 @@
     "@keeltown/core": "workspace:*",
     "@keeltown/gitcore": "workspace:*",
     "@keeltown/runner-protocol": "workspace:*",
+    "@keeltown/syntax": "workspace:*",
     "@modelcontextprotocol/server": "catalog:",
     "better-auth": "catalog:",
     "diff": "catalog:",
     "effect": "catalog:",
     "hono": "catalog:",
     "jose": "catalog:",
+    "tree-sitter-typescript": "catalog:",
     "ulid": "catalog:",
+    "web-tree-sitter": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

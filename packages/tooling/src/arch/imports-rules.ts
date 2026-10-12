@@ -33,9 +33,12 @@ function check(
   return violations;
 }
 
-/** R5: the hexagon and gitcore never import a framework, a runtime, or an MCP SDK. */
+/** R5: the hexagon, gitcore and syntax never import a framework, a runtime, or an MCP SDK. */
 export function checkR5(root: string, options: GuardOptions = {}): GuardResult {
-  const files = scanFiles(root, sourcesUnder(root, ["packages/core/src", "packages/gitcore/src"]));
+  const files = scanFiles(
+    root,
+    sourcesUnder(root, ["packages/core/src", "packages/gitcore/src", "packages/syntax/src"]),
+  );
   const violations = check("R5", files, (specifier) => {
     const pkg = packageOf(specifier);
     const banned =
@@ -46,7 +49,7 @@ export function checkR5(root: string, options: GuardOptions = {}): GuardResult {
       pkg.startsWith("@cloudflare/") ||
       pkg.startsWith("@modelcontextprotocol/");
     return banned
-      ? `imports ${specifier}; core and gitcore stay free of frameworks and runtimes`
+      ? `imports ${specifier}; core, gitcore and syntax stay free of frameworks and runtimes`
       : null;
   });
   return withVacuityCheck(

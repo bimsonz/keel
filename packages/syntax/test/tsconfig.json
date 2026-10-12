@@ -1,0 +1,9 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    // The tests read the Wasm modules and forge-lite's trees from disk.
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "../src/**/*.ts", "../scripts/**/*.ts"]
+}

@@ -8,6 +8,8 @@ coverage/
 *.gen.ts
 src/generated/
 worker-configuration.d.ts
+packages/syntax/src/generated/
+packages/testing/src/generated/
 packages/spec/tsp-output/
 
 # Seeded credentials and run transcripts (scripts/seed.ts, e2e): never committed

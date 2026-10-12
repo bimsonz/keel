@@ -21,6 +21,7 @@ import type {
   ProbeSources,
   ProbeStore,
   Projects,
+  SyntaxSource,
   Trunks,
   VerifierRuntime,
   WorkspacePool,
@@ -35,6 +36,8 @@ import {
 import { BatchVerdictsRpc, isLaneNamespace } from "../adapters/driven/do-rpc/batch-verdicts.ts";
 import { AdmittedGuardsCodeHost } from "../adapters/driven/gitcore/admitted-guards.ts";
 import { FlowSpecSourceCodeHost } from "../adapters/driven/gitcore/flow-spec-source.ts";
+import { SyntaxSourceTreeSitter } from "../adapters/driven/syntax/syntax-source.ts";
+import { SYNTAX_WASM } from "../adapters/driven/syntax/wasm.ts";
 import { ChangePrecheckRpc } from "../adapters/driven/do-rpc/change-precheck.ts";
 import { ProbeChangesRpc } from "../adapters/driven/do-rpc/probe-changes.ts";
 import { ProbeLedgerRpc } from "../adapters/driven/do-rpc/probe-ledger.ts";
@@ -134,7 +137,7 @@ export const durableReport =
 export function precheckRuntime(
   env: Env,
 ): ManagedRuntime.ManagedRuntime<
-  ChangePrecheck | Projects | CodeHost | FlowSpecSource | AdmittedGuards | PlanStore,
+  ChangePrecheck | Projects | CodeHost | FlowSpecSource | AdmittedGuards | SyntaxSource | PlanStore,
   never
 > {
   const project = (projectId: string) =>
@@ -145,7 +148,11 @@ export function precheckRuntime(
       ChangePrecheckRpc(env.CHANGE),
       ProjectsRpc(project),
       code,
-      Layer.mergeAll(FlowSpecSourceCodeHost, AdmittedGuardsCodeHost()).pipe(Layer.provide(code)),
+      Layer.mergeAll(
+        FlowSpecSourceCodeHost,
+        AdmittedGuardsCodeHost(),
+        SyntaxSourceTreeSitter(SYNTAX_WASM),
+      ).pipe(Layer.provide(code)),
       PlanStoreR2(env.ARCHIVE),
     ),
   );

@@ -1,0 +1,38 @@
+F08: the sibling decoy. A per-session cache of a repository's owner, read by the repo view.
+
+The change spike S17b's F08.diff describes, written as a patch that applies to the real tree: the spike's own diff has wrong hunk counts and applies only with --recount.
+
+Apply from fixtures/forge-lite on the base fixture: git apply <this file>
+
+diff --git a/src/routes/repos.ts b/src/routes/repos.ts
+index 9228ca7..64c459f 100644
+--- a/src/routes/repos.ts
++++ b/src/routes/repos.ts
+@@ -15,7 +15,7 @@ import { check, optionalString, readJsonObject, requiredString } from "../http/b
+ import type { AppEnv } from "../http/env.ts";
+ import { conflict, validationFailed } from "../http/problem.ts";
+ import { repoView, type RepoView } from "../http/views.ts";
+-import type { RepoRecord, RepoSettings } from "../store/types.ts";
++import type { RepoRecord, RepoSettings, UserRecord } from "../store/types.ts";
+ 
+ const DEFAULT_LABEL_COLOR = "ededed";
+ 
+@@ -132,9 +132,16 @@ function checkDescription(description: string): void {
+   }
+ }
+ 
++const ownerCache = new Map<string, UserRecord>();
++
+ /** The repository as the caller sees it, with their role from requirePermission. */
+ function view(c: Context<AppEnv>, repo: RepoRecord): RepoView {
+-  const owner = c.var.deps.store.getUser(repo.ownerId);
+-  if (owner === undefined) throw new Error(`repository ${repo.id} has no owner`);
++  const cacheKey = `${c.var.session?.id ?? "-"}:${repo.ownerId}`;
++  let owner = ownerCache.get(cacheKey);
++  if (owner === undefined) {
++    owner = c.var.deps.store.getUser(repo.ownerId);
++    if (owner === undefined) throw new Error(`repository ${repo.id} has no owner`);
++    ownerCache.set(cacheKey, owner);
++  }
+   return repoView(repo, owner, c.var.role);
+ }

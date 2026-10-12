@@ -1,0 +1,76 @@
+F04: a role cache keyed by (user, repository), each entry expiring after 60 s.
+
+The change spike S17b's F04.diff describes, written as a patch that applies to the real tree: the spike's own diff was hand-written against a comment-stripped copy and applies only with fuzz.
+
+Apply from fixtures/forge-lite on the base fixture: git apply <this file>
+
+diff --git a/src/authz/cache.ts b/src/authz/cache.ts
+new file mode 100644
+index 0000000..06a8537
+--- /dev/null
++++ b/src/authz/cache.ts
+@@ -0,0 +1,33 @@
++import type { CollaboratorRole } from "../domain/roles.ts";
++import type { Store } from "../store/types.ts";
++
++const ENTRY_LIFETIME_MS = 60_000;
++
++export class RoleCache {
++  readonly #entries = new Map<string, { role: CollaboratorRole; expiresAt: number }>();
++
++  get(userId: string, repoId: string, now: number): CollaboratorRole | undefined {
++    const entry = this.#entries.get(key(userId, repoId));
++    if (entry === undefined || entry.expiresAt <= now) return undefined;
++    return entry.role;
++  }
++
++  set(userId: string, repoId: string, role: CollaboratorRole, now: number): void {
++    this.#entries.set(key(userId, repoId), { role, expiresAt: now + ENTRY_LIFETIME_MS });
++  }
++}
++
++const caches = new WeakMap<Store, RoleCache>();
++
++export function roleCacheFor(store: Store): RoleCache {
++  let cache = caches.get(store);
++  if (cache === undefined) {
++    cache = new RoleCache();
++    caches.set(store, cache);
++  }
++  return cache;
++}
++
++function key(userId: string, repoId: string): string {
++  return `${userId}:${repoId}`;
++}
+diff --git a/src/authz/require-permission.ts b/src/authz/require-permission.ts
+index f33711c..a07563a 100644
+--- a/src/authz/require-permission.ts
++++ b/src/authz/require-permission.ts
+@@ -4,6 +4,7 @@ import type { Role } from "../domain/roles.ts";
+ import type { AppEnv } from "../http/env.ts";
+ import { forbidden, notFound, unauthenticated, type Problem } from "../http/problem.ts";
+ import type { RepoRecord } from "../store/types.ts";
++import { roleCacheFor } from "./cache.ts";
+ import { evaluateRole } from "./evaluate.ts";
+ 
+ /**
+@@ -33,7 +34,17 @@ export function requirePermission(action: Action): MiddlewareHandler<AppEnv> {
+ function callerRole(c: Context<AppEnv>, repo: RepoRecord): Role | null {
+   const { user } = c.var;
+   if (user === undefined) return null;
+-  return evaluateRole(c.var.deps.store, repo, user.id);
++  if (repo.ownerId === user.id) return "owner";
++
++  const { store, clock } = c.var.deps;
++  const cache = roleCacheFor(store);
++  const now = clock.now();
++  const cached = cache.get(user.id, repo.id, now);
++  if (cached !== undefined) return cached;
++
++  const role = evaluateRole(store, repo, user.id);
++  if (role !== null && role !== "owner") cache.set(user.id, repo.id, role, now);
++  return role;
+ }
+ 
+ function loadRepo(c: Context<AppEnv>): RepoRecord {

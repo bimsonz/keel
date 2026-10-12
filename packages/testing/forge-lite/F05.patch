@@ -1,0 +1,40 @@
+F05: a role memo held on the request's context.
+
+The change spike S17b's F05.diff describes, written as a patch that applies to the real tree: the spike's own diff applies only with fuzz.
+
+Apply from fixtures/forge-lite on the base fixture: git apply <this file>
+
+diff --git a/src/authz/require-permission.ts b/src/authz/require-permission.ts
+index f33711c..abd7f43 100644
+--- a/src/authz/require-permission.ts
++++ b/src/authz/require-permission.ts
+@@ -33,7 +33,16 @@ export function requirePermission(action: Action): MiddlewareHandler<AppEnv> {
+ function callerRole(c: Context<AppEnv>, repo: RepoRecord): Role | null {
+   const { user } = c.var;
+   if (user === undefined) return null;
+-  return evaluateRole(c.var.deps.store, repo, user.id);
++  let memo = c.get("roleMemo");
++  if (memo === undefined) {
++    memo = new Map();
++    c.set("roleMemo", memo);
++  }
++  const known = memo.get(repo.id);
++  if (known !== undefined) return known;
++  const role = evaluateRole(c.var.deps.store, repo, user.id);
++  memo.set(repo.id, role);
++  return role;
+ }
+ 
+ function loadRepo(c: Context<AppEnv>): RepoRecord {
+diff --git a/src/http/env.ts b/src/http/env.ts
+index 9e4cb7e..cf7da3e 100644
+--- a/src/http/env.ts
++++ b/src/http/env.ts
+@@ -11,6 +11,7 @@ export interface AppVariables {
+   /** Set by requirePermission, so only present on routes it guards. */
+   repo: RepoRecord;
+   role: Role | null;
++  roleMemo: Map<string, Role | null> | undefined;
+ }
+ 
+ export interface AppEnv {

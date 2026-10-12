@@ -11,6 +11,9 @@ packages:
 allowBuilds:
   esbuild: true
   workerd: true
+  # Their install script builds a native addon (node-gyp-build); only the prebuilt .wasm grammar is used.
+  tree-sitter-javascript: false
+  tree-sitter-typescript: false
 
 # Every third-party version used anywhere in the workspace is pinned here, once.
 # Packages refer to these with `catalog:`. Read the registry (`pnpm view`) before
@@ -52,6 +55,9 @@ catalog:
   ulid: 3.0.2
   diff: 9.0.0
   isomorphic-git: 1.43.3
+  # The parser behind SyntaxSource: the runtime and its TypeScript grammar, both shipped as Wasm. They move together.
+  web-tree-sitter: 0.27.1
+  tree-sitter-typescript: 0.23.2
 
   # API first
   "@typespec/compiler": 1.17.0

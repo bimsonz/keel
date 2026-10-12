@@ -1,6 +1,7 @@
 /** In-memory adapters for every port, and the contract suites every adapter must pass. */
 export * from "./code-host-fixture.ts";
 export * from "./forge-lite-facts.ts";
+export * from "./forge-lite-trees.ts";
 export * from "./plans.ts";
 export * from "./memory/code-host.ts";
 export * from "./memory/coordination.ts";
@@ -12,6 +13,7 @@ export * from "./memory/live-changes.ts";
 export * from "./memory/probe-changes.ts";
 export * from "./memory/probe-ledger.ts";
 export * from "./memory/probe-sources.ts";
+export * from "./memory/syntax-source.ts";
 export * from "./memory/integration.ts";
 export * from "./memory/operator.ts";
 export * from "./memory/project-views.ts";
@@ -34,6 +36,7 @@ export * from "./contracts/live-changes.ts";
 export * from "./contracts/probe-changes.ts";
 export * from "./contracts/probe-ledger.ts";
 export * from "./contracts/probe-sources.ts";
+export * from "./contracts/syntax-source.ts";
 export * from "./contracts/projects.ts";
 export * from "./contracts/notifier.ts";
 export * from "./contracts/event-feed.ts";

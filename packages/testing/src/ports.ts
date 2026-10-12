@@ -32,6 +32,11 @@ import {
   type ProbeSourcesHarness,
 } from "./contracts/probe-sources.ts";
 import { makeNoopWorldsMemory, makeProbeSourcesMemory } from "./memory/probe-sources.ts";
+import {
+  describeSyntaxSourceContract,
+  type SyntaxSourceHarness,
+} from "./contracts/syntax-source.ts";
+import { makeSyntaxSourceMemory } from "./memory/syntax-source.ts";
 import { makeSessionsMemory } from "./memory/sessions.ts";
 import { makeOrgUsageMemory } from "./memory/org-usage.ts";
 import { makeStandingsMemory } from "./memory/standings.ts";
@@ -117,6 +122,7 @@ import type {
   WorkspaceRebaser,
   Sessions,
   Standings,
+  SyntaxSource,
   Users,
   OrgUsage,
 } from "@keeltown/core/ports";
@@ -495,6 +501,10 @@ export const PORTS = {
   NoopWorlds: harnessed<NoopWorlds, NoopWorldsHarness>(
     makeNoopWorldsMemory,
     describeNoopWorldsContract,
+  ),
+  SyntaxSource: harnessed<SyntaxSource, SyntaxSourceHarness>(
+    makeSyntaxSourceMemory,
+    describeSyntaxSourceContract,
   ),
   ProbeChanges: harnessed<ProbeChanges, ProbeChangesHarness>(
     () => makeProbeChangesMemory(),

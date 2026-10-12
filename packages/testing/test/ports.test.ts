@@ -37,6 +37,7 @@ const CONTRACT_PORTS = [
   "AdmittedGuards",
   "ProbeSources",
   "NoopWorlds",
+  "SyntaxSource",
   "BatchVerdicts",
   "ChangePrecheck",
   "ProbeChanges",

@@ -55,6 +55,7 @@ export * from "./sessions.ts";
 export * from "./standings.ts";
 export * from "./staging-writer.ts";
 export * from "./subject-registry.ts";
+export * from "./syntax-source.ts";
 export * from "./token-issuer.ts";
 export * from "./trunk-writer.ts";
 export * from "./trunks.ts";
