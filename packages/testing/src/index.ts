@@ -1,5 +1,6 @@
 /** In-memory adapters for every port, and the contract suites every adapter must pass. */
 export * from "./code-host-fixture.ts";
+export * from "./forge-lite-facts.ts";
 export * from "./plans.ts";
 export * from "./memory/code-host.ts";
 export * from "./memory/coordination.ts";

@@ -29,6 +29,7 @@ export const ExtractedEffect = Schema.Struct({
   method: Schema.Literal("extractor"),
   evidenceClass: Schema.Literal("ruling"),
 });
+export type ExtractedEffect = typeof ExtractedEffect.Type;
 /** Answered by a decision model: opinion, always with its probability. */
 export const DecisionModelEffect = Schema.Struct({
   ...derivedFields,
