@@ -97,6 +97,8 @@ export const Change = Schema.Struct({
   baseSha: Schema.optional(CommitSha),
   /** The commit last submitted; it is the commit that lands. */
   commitSha: Schema.optional(CommitSha),
+  /** Its commit on trunk (`ChangeLanded.commitSha`): set when it lands, never before. */
+  landedCommit: Schema.optional(CommitSha),
   /** The lane it was queued on, while Queued or Integrating. */
   laneId: Schema.optional(Schema.String),
   /** The batch it belongs to, while Integrating. Requeue and bounce from Integrating are fenced on it. */

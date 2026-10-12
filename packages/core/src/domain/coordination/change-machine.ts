@@ -899,7 +899,9 @@ export const evolveChange = (
         ? moveTo(change, "queued", ["batchId"])
         : illegal(change, event);
     case "ChangeLanded":
-      return from("integrating") ? released(change, "landed") : illegal(change, event);
+      return from("integrating")
+        ? { ...released(change, "landed"), landedCommit: event.commitSha }
+        : illegal(change, event);
     case "ChangeBounced":
       if (event.declined !== undefined)
         return from("integrating") && event.declined.batchId === change.batchId

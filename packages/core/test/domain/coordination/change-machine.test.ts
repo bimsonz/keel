@@ -1740,6 +1740,41 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(recompiled).not.toHaveProperty("predicatePolicy");
   });
 
+  it("[change.landed-commit] a change carries its commit on trunk from the moment it lands, and never before", () => {
+    let landings = 0;
+    fc.assert(
+      fc.property(planArb, (plan) => {
+        let onTrunk: string | undefined;
+        return run(plan).records.every((r) => {
+          if (r.threw) return true;
+          if (r.result !== undefined && Result.isSuccess(r.result)) {
+            for (const e of r.result.success) {
+              if (e._tag === "ChangeLanded") {
+                onTrunk = e.commitSha;
+                landings++;
+              }
+            }
+          }
+          return (
+            r.after?.landedCommit === onTrunk &&
+            (r.after === undefined || "landedCommit" in r.after === (r.after.state === "landed"))
+          );
+        });
+      }),
+    );
+    expect(landings).toBeGreaterThan(0);
+    const queued = [declare, start, submit, precheck, compile, queue, batch].map(
+      (c) => [c, 1] as const,
+    );
+    const integrating = drive(queued).state;
+    expect(integrating?.state).toBe("integrating");
+    expect(integrating).not.toHaveProperty("landedCommit");
+    // Landed as the restacked commit, which is not the commit it submitted.
+    const landed = drive([...queued, [land, 1]]).state;
+    expect(landed).toMatchObject({ state: "landed", landedCommit: ON_TRUNK });
+    expect(landed?.commitSha).not.toBe(ON_TRUNK);
+  });
+
   it("[change.preflight-alternatives] PreflightIssued carries the preflight's alternatives as they were given, on declare, revise and rely, and none when the preflight names none", () => {
     const others = [31, 32, 33].map((n) => makeId("chg", ulid(n)));
     fc.assert(
