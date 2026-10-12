@@ -100,6 +100,9 @@ function parseConfig(text: string, source: string): Json {
   return config;
 }
 
+/** Outputs whose empty value means "none" (`held_names`: no names held), not "missing". */
+const MAY_BE_EMPTY: ReadonlySet<string> = new Set(["held_names"]);
+
 function terraformOutputs(): Map<string, string> {
   const run = spawnSync(
     "terraform",
@@ -113,7 +116,9 @@ function terraformOutputs(): Map<string, string> {
   if (isObject(raw)) {
     for (const [name, output] of Object.entries(raw)) {
       const value = isObject(output) ? output["value"] : undefined;
-      if (typeof value === "string" && value !== "") outputs.set(name, value);
+      // An empty output is as good as missing, except a list that may hold nothing.
+      if (typeof value === "string" && (value !== "" || MAY_BE_EMPTY.has(name)))
+        outputs.set(name, value);
     }
   }
   return outputs;
