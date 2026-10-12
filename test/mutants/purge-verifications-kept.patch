@@ -1,0 +1,25 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/retention.test.ts -t purge.verifications
+# kills: purge.verifications
+# why: the batch leaves verification out, so sign-in codes and passkey challenges outlive their minutes
+diff --git a/apps/keel/src/adapters/driven/better-auth/retention.ts b/apps/keel/src/adapters/driven/better-auth/retention.ts
+--- a/apps/keel/src/adapters/driven/better-auth/retention.ts
++++ b/apps/keel/src/adapters/driven/better-auth/retention.ts
+@@ -21,16 +21,15 @@
+  */
+ export async function purgeExpired(db: D1Database, now: Date): Promise<Purged> {
+   const at = now.toISOString();
+-  const [sessions, verifications, deviceCodes, invitations] = await db.batch([
++  const [sessions, deviceCodes, invitations] = await db.batch([
+     db.prepare(`DELETE FROM "session" WHERE "expiresAt" < ?1`).bind(at),
+-    db.prepare(`DELETE FROM "verification" WHERE "expiresAt" < ?1`).bind(at),
+     db.prepare(`DELETE FROM "deviceCode" WHERE "expiresAt" < ?1`).bind(at),
+     // Answered: accepted, rejected or canceled.
+     db.prepare(`DELETE FROM "invitation" WHERE "expiresAt" < ?1 OR "status" <> 'pending'`).bind(at),
+   ]);
+   return {
+     sessions: sessions?.meta.changes ?? 0,
+-    verifications: verifications?.meta.changes ?? 0,
++    verifications: 0,
+     deviceCodes: deviceCodes?.meta.changes ?? 0,
+     invitations: invitations?.meta.changes ?? 0,
+   };

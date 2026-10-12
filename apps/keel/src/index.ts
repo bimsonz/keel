@@ -1,5 +1,6 @@
 import { consumeQueue } from "./adapters/driving/queue/consumer.ts";
 import { isolateFor } from "./composition/isolate.ts";
+import { enforceRetention } from "./composition/retention.ts";
 
 export { AgentSessionDO } from "./adapters/driving/do/agent-session.ts";
 export { ChangeDO } from "./adapters/driving/do/change.ts";
@@ -21,5 +22,8 @@ export default {
   },
   queue(batch, env, _ctx): Promise<void> {
     return consumeQueue(batch, isolateFor(env).runtime);
+  },
+  scheduled(controller, env, ctx): void {
+    ctx.waitUntil(enforceRetention(env, controller.scheduledTime));
   },
 } satisfies ExportedHandler<Env>;

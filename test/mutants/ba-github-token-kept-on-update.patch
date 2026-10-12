@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts -t ba.github-no-token
+# kills: ba.github-no-token
+# why: signing in with GitHub again writes its fresh tokens to the account row the first sign-in left empty
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -228,7 +228,6 @@
+       // the profile with it at sign-in and never again, so no account row holds it.
+       account: {
+         create: { before: async (account) => ({ data: { ...account, ...NO_PROVIDER_TOKENS } }) },
+-        update: { before: async (account) => ({ data: { ...account, ...NO_PROVIDER_TOKENS } }) },
+       },
+     },
+     plugins: [

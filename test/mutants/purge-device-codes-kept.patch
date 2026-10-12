@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/retention.test.ts -t purge.device-codes
+# kills: purge.device-codes
+# why: only a device code that was approved or denied is purged, so one that lapsed while pending stays
+diff --git a/apps/keel/src/adapters/driven/better-auth/retention.ts b/apps/keel/src/adapters/driven/better-auth/retention.ts
+--- a/apps/keel/src/adapters/driven/better-auth/retention.ts
++++ b/apps/keel/src/adapters/driven/better-auth/retention.ts
+@@ -24,7 +24,7 @@
+   const [sessions, verifications, deviceCodes, invitations] = await db.batch([
+     db.prepare(`DELETE FROM "session" WHERE "expiresAt" < ?1`).bind(at),
+     db.prepare(`DELETE FROM "verification" WHERE "expiresAt" < ?1`).bind(at),
+-    db.prepare(`DELETE FROM "deviceCode" WHERE "expiresAt" < ?1`).bind(at),
++    db.prepare(`DELETE FROM "deviceCode" WHERE "expiresAt" < ?1 AND "status" <> 'pending'`).bind(at),
+     // Answered: accepted, rejected or canceled.
+     db.prepare(`DELETE FROM "invitation" WHERE "expiresAt" < ?1 OR "status" <> 'pending'`).bind(at),
+   ]);

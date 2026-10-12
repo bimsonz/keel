@@ -111,6 +111,15 @@ function generateId({ model }: { model: string }): string {
 
 const refuse = (code: string, message: string) => APIError.from("BAD_REQUEST", { code, message });
 
+/** A sign-in provider's tokens, as every account row stores them: not at all. */
+const NO_PROVIDER_TOKENS = {
+  accessToken: null,
+  refreshToken: null,
+  idToken: null,
+  accessTokenExpiresAt: null,
+  refreshTokenExpiresAt: null,
+};
+
 /** Refuses a name already used as a handle or an org slug: the two share one namespace. */
 async function claimable(
   db: D1Database,
@@ -214,6 +223,12 @@ export function authOptions(config: AuthConfig) {
       user: {
         create: { after: personalOrg },
         update: { after: personalOrg },
+      },
+      // keel.town's privacy notice promises GitHub's token is never kept: Keel reads
+      // the profile with it at sign-in and never again, so no account row holds it.
+      account: {
+        create: { before: async (account) => ({ data: { ...account, ...NO_PROVIDER_TOKENS } }) },
+        update: { before: async (account) => ({ data: { ...account, ...NO_PROVIDER_TOKENS } }) },
       },
     },
     plugins: [

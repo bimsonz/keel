@@ -100,6 +100,8 @@
     { "name": "keel-push-observed", "binding": "PUSH_OBSERVED", "class_name": "PushObserved" },
   ],
   "triggers": {
+    // Enforces the privacy notice's retention deadlines (composition/retention.ts).
+    "crons": ["*/10 * * * *"],
     // One namespace-wide rule per shard (S6); per-repo subscriptions dropped pushes.
     "events": [
       {

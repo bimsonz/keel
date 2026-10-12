@@ -1,7 +1,7 @@
 import { createExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { getMigrations } from "better-auth/db/migration";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { authOptions } from "../../src/adapters/driven/better-auth/auth.ts";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
 import { type Answer, caller, Jar, SESSION_COOKIE } from "./auth-harness.ts";
@@ -26,6 +26,16 @@ function holdsNoToken(answer: Answer, token: string) {
 }
 
 const from = (ip: string) => ({ body: {}, headers: { "cf-connecting-ip": ip } });
+
+/** What a user's GitHub account row holds of GitHub's tokens. */
+const githubTokens = async (userId: string) =>
+  (
+    await env.DB.prepare(
+      `SELECT accessToken, refreshToken, idToken, accessTokenExpiresAt, refreshTokenExpiresAt FROM account WHERE providerId = 'github' AND userId = ?1`,
+    )
+      .bind(userId)
+      .all()
+  ).results;
 
 describe("Better Auth at /v1/auth", () => {
   it("[ba.schema] migration 0006 holds every table and column Keel's auth options need", async () => {
@@ -66,6 +76,83 @@ describe("Better Auth at /v1/auth", () => {
       withGithub.app.fetch(request, env, createExecutionContext()),
     );
     expect((await viaGithub("/methods")).json).toEqual({ emailCode: false, github: true });
+  });
+
+  it("[ba.github-no-token] signs in with GitHub and keeps none of GitHub's tokens, at sign-up or at a later sign-in", async () => {
+    const githubEnv: Env & { GITHUB_CLIENT_ID: string; GITHUB_CLIENT_SECRET: string } = {
+      ...env,
+      GITHUB_CLIENT_ID: "id",
+      GITHUB_CLIENT_SECRET: "secret",
+    };
+    const withGithub = makeIsolate(githubEnv, isolateLayer(env));
+    const viaGithub = caller(async (request) =>
+      withGithub.app.fetch(request, env, createExecutionContext()),
+    );
+    // GitHub, as Better Auth's provider calls it: the token exchange, then the profile and its emails.
+    const asked: string[] = [];
+    const strays: string[] = [];
+    const github = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const request = new Request(input, init);
+      const at = `${request.method} ${request.url.split("?")[0]}`;
+      asked.push(at);
+      switch (at) {
+        case "POST https://github.com/login/oauth/access_token":
+          return Response.json({
+            access_token: "gho_access",
+            refresh_token: "ghr_refresh",
+            expires_in: 28_800,
+            refresh_token_expires_in: 15_897_600,
+            token_type: "bearer",
+            scope: "read:user,user:email",
+          });
+        case "GET https://api.github.com/user":
+          return Response.json({ id: 4242, login: "octo", name: "Octo", email: null });
+        case "GET https://api.github.com/user/emails":
+          return Response.json([{ email: "octo@example.com", primary: true, verified: true }]);
+        default:
+          strays.push(at);
+          throw new Error(`no fetch to ${at} was expected`);
+      }
+    });
+    const signIn = async () => {
+      const jar = new Jar();
+      const started = await viaGithub("/sign-in/social", {
+        body: { provider: "github", callbackURL: "/" },
+        jar,
+      });
+      answered(started, 200);
+      const authorize = new URL(started.json.url);
+      expect(`${authorize.origin}${authorize.pathname}`).toBe(
+        "https://github.com/login/oauth/authorize",
+      );
+      const state = authorize.searchParams.get("state") ?? "";
+      const back = await viaGithub(`/callback/github?code=x&state=${encodeURIComponent(state)}`, {
+        jar,
+      });
+      expect([back.status, back.headers.get("location")]).toEqual([302, "/"]);
+      const session = await viaGithub("/get-session", { jar });
+      answered(session, 200);
+      expect(session.json.user.email).toBe("octo@example.com");
+      return String(session.json.user.id);
+    };
+    const none = {
+      accessToken: null,
+      refreshToken: null,
+      idToken: null,
+      accessTokenExpiresAt: null,
+      refreshTokenExpiresAt: null,
+    };
+    try {
+      const userId = await signIn();
+      expect(await githubTokens(userId)).toEqual([none]);
+      // Signing in again updates the same account, and keeps no token either.
+      expect(await signIn()).toBe(userId);
+      expect(await githubTokens(userId)).toEqual([none]);
+      expect(asked.filter((at) => at.includes("access_token"))).toHaveLength(2);
+      expect(strays).toEqual([]);
+    } finally {
+      github.mockRestore();
+    }
   });
 
   it("[ba.cookie] keeps the session in a __Secure-, HttpOnly, SameSite=Lax cookie for the whole site", async () => {
