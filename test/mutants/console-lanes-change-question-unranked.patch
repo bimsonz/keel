@@ -2,11 +2,11 @@
 # kills: lanes.asked-of-change
 # why: a lane where a person is asked about a change itself is ranked as one where nobody is asked
 diff --git a/apps/console/src/engine/lanes.ts b/apps/console/src/engine/lanes.ts
-index 9c5b911..96098de 100644
+index e2cb40d..702bb2a 100644
 --- a/apps/console/src/engine/lanes.ts
 +++ b/apps/console/src/engine/lanes.ts
-@@ -286,7 +286,7 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
-         changes,
+@@ -332,7 +332,7 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
+         touching: others,
          // A person is asked about a conflict here, or about one of the changes here.
          rank:
 -          open.some((conflict) => conflict.state === "escalated") || changes.some(waiting)

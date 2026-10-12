@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/lanes.test.ts
+# kills: lanes.touched
+# why: a change shown in a second lane is counted there as well as in its own
+diff --git a/apps/console/src/engine/lanes.ts b/apps/console/src/engine/lanes.ts
+index e2cb40d..e3670e3 100644
+--- a/apps/console/src/engine/lanes.ts
++++ b/apps/console/src/engine/lanes.ts
+@@ -465,7 +465,7 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
+     const summary = {
+       key,
+       subject: drawnSubject,
+-      changes: changes.length,
++      changes: changes.length + others.length,
+       byState: tally(changes),
+       references: others.length,
+       conflicts: open.length,

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/lanes.test.ts
+# kills: lanes.touched-swarm
+# why: in a swarm, a subject that a real session's change touches and no change stands on has no lane
+diff --git a/apps/console/src/engine/lanes.ts b/apps/console/src/engine/lanes.ts
+index e2cb40d..5fa57b0 100644
+--- a/apps/console/src/engine/lanes.ts
++++ b/apps/console/src/engine/lanes.ts
+@@ -349,7 +349,6 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
+       (lane) =>
+         lane.changes.length > 0 ||
+         lane.here.length > 0 ||
+-        lane.touching.some(real) ||
+         (drawAll &&
+           (lane.touching.length > 0 ||
+             lane.subject.guardIds.length > 0 ||

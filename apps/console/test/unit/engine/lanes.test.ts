@@ -158,6 +158,7 @@ describe("Mission Control's lanes follow what is happening", () => {
       agent: 0,
       change: 1,
       stack: 1,
+      reference: 1,
       subject: 2,
       conflict: 3,
       probe: 4,
@@ -501,5 +502,227 @@ describe("Mission Control at the scale of a swarm", () => {
       nodes: [],
       conflicts: 1,
     });
+  });
+});
+
+type Premise = { subject: string; predicate: "bound"; relation: "at-most"; value: string };
+const premiseOn = (subject: string, value = "tight"): Premise => ({
+  subject,
+  predicate: "bound",
+  relation: "at-most",
+  value,
+});
+
+/** A log's opening: its agents, and a subject minted for each key. */
+function openingOf(
+  seed: number,
+  agents: [string, "hosted" | "synthetic" | "interactive"][],
+  keys: string[],
+): ScriptBuilder {
+  const b = new ScriptBuilder("2026-10-13T16:00:00.000Z", createRng(seed));
+  b.at(0);
+  for (const [agentId, kind] of agents)
+    b.emit({
+      type: "AgentEnrolled",
+      entity: { kind: "agent", id: agentId },
+      payload: { agentId, projectId: "prj_1", name: agentId, kind, scopes: ["agent:work"] },
+    });
+  for (const key of keys)
+    b.emit({
+      type: "SubjectMinted",
+      entity: { kind: "subject", id: `sub_${key}` },
+      payload: { subjectId: `sub_${key}`, key, anchors: [], gloss: "", mintedBy: "agent" },
+    });
+  return b;
+}
+
+function declareChange(b: ScriptBuilder, id: string, agentId: string, premises: Premise[]): void {
+  b.after(1).emit({
+    type: "IntentDeclared",
+    entity: { kind: "change", id },
+    payload: {
+      changeId: id,
+      agentId,
+      origin: "agent",
+      revision: 1,
+      goal: id,
+      footprint: [],
+      premises,
+      leaseId: "l",
+    },
+  });
+}
+
+function foldedLog(b: ScriptBuilder): World {
+  const world = new World();
+  const log = b.build();
+  log.events.forEach((event, index) => world.apply(event, log.eventTimes[index] ?? 0));
+  return world;
+}
+
+const referencesIn = (lanes: Lanes, key: string): Extract<GraphNode, { kind: "reference" }>[] =>
+  (lanes.lanes.find((lane) => lane.key === key)?.nodes ?? []).flatMap((node) =>
+    node.kind === "reference" ? [node] : [],
+  );
+
+describe("a change that touches more than one subject", () => {
+  it("[lanes.touched] shows it in the lane of each other subject it touches, and counts it once", () => {
+    const b = openingOf(7, [["agt_1", "hosted"]], ["a", "b", "c"]);
+    // One relies on `a`, and Keel reads off its diff that it alters `b` and `c`. The other relies on `b` and on `c`.
+    declareChange(b, "chg_1", "agt_1", [premiseOn("a")]);
+    declareChange(b, "chg_2", "agt_1", [premiseOn("b"), premiseOn("c")]);
+    b.after(1).emit({
+      type: "EffectsDerived",
+      entity: { kind: "change", id: "chg_1" },
+      payload: {
+        changeId: "chg_1",
+        revision: 1,
+        effects: [
+          {
+            method: "extractor",
+            evidenceClass: "ruling",
+            declared: false,
+            proposition: { ...premiseOn("b", "loose"), gloss: "" },
+            anchors: [],
+          },
+          {
+            method: "extractor",
+            evidenceClass: "ruling",
+            declared: false,
+            proposition: { ...premiseOn("c", "slack"), gloss: "" },
+            anchors: [],
+          },
+        ],
+        derivationRef: "mfp:derivation:chg_1:1",
+      },
+    });
+    // Keel suspects a conflict on `b` between the two: the one whose own lane is `a` is the side that alters.
+    b.after(1).emit({
+      type: "ConflictSuspected",
+      entity: { kind: "conflict", id: "cfl_1" },
+      payload: {
+        conflictId: "cfl_1",
+        kind: "semantic",
+        parties: ["chg_2", "chg_1"],
+        subjectId: "sub_b",
+        predicate: "bound",
+      },
+    });
+    const lanes = lanesOf(foldedLog(b), 60_000);
+
+    // The contested subject first. `c` has a lane though no change is its own: two that stand elsewhere touch it.
+    expect(lanes.lanes.map((lane) => [lane.key, lane.changes, lane.references])).toEqual([
+      ["b", 1, 1],
+      ["a", 1, 0],
+      ["c", 0, 2],
+    ]);
+    // Each change is counted once, in the lane of its first subject, and drawn once with its agent beside it.
+    expect(lanes.changes).toBe(2);
+    expect(
+      lanes.lanes.map((lane) =>
+        lane.nodes.flatMap((node) => (node.kind === "change" ? [node.changeId] : [])),
+      ),
+    ).toEqual([["chg_2"], ["chg_1"], []]);
+    expect(nodesOf(lanes).filter((node) => node.kind === "agent")).toHaveLength(2);
+    const ids = nodesOf(lanes).map((node) => node.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    // In the conflict's lane the side that alters stands beside it, with what ties it to this subject.
+    expect(referencesIn(lanes, "b")).toEqual([
+      {
+        id: "reference:chg_1:sub_b",
+        kind: "reference",
+        changeId: "chg_1",
+        label: expect.any(String),
+        state: expect.any(String),
+        holds: { text: "alters: at most loose", derived: true },
+        home: "a",
+      },
+    ]);
+    expect(referencesIn(lanes, "c")).toMatchObject([
+      {
+        id: "reference:chg_1:sub_c",
+        changeId: "chg_1",
+        holds: { text: "alters: at most slack", derived: true },
+        home: "a",
+      },
+      {
+        id: "reference:chg_2:sub_c",
+        changeId: "chg_2",
+        holds: { text: "relies on: at most tight", derived: false },
+        home: "b",
+      },
+    ]);
+    expect(referencesIn(lanes, "a")).toEqual([]);
+    // Each is tied to the subject of the lane it is shown in, as a change of that lane is. The conflict is on
+    // `b`, so that is where the side that alters is marked, and not on `c`, which it alters uncontested.
+    expect(
+      lanes.lanes.flatMap((lane) =>
+        lane.edges.flatMap((edge) =>
+          edge.from.startsWith("reference:")
+            ? [`${edge.from} > ${edge.to} ${edge.tone}${edge.derived === true ? " derived" : ""}`]
+            : [],
+        ),
+      ),
+    ).toEqual([
+      "reference:chg_1:sub_b > subject:sub_b proven derived",
+      "reference:chg_1:sub_c > subject:sub_c plain derived",
+      "reference:chg_2:sub_c > subject:sub_c plain",
+    ]);
+    // A reader who closes a lane is still told what stands elsewhere and touches it.
+    expect(lanesOf(foldedLog(b), 60_000, { closed: new Set(["c"]) }).lanes.at(-1)).toMatchObject({
+      key: "c",
+      open: false,
+      changes: 0,
+      references: 2,
+      nodes: [],
+    });
+  });
+
+  it("[lanes.touched-swarm] shows a swarm's ordinary change in its own lane only, and a real session's wherever it touches", () => {
+    const b = openingOf(
+      9,
+      [
+        ["agt_s", "synthetic"],
+        ["agt_r", "interactive"],
+      ],
+      ["a", "b", "c", "d"],
+    );
+    // Fifteen of a swarm's changes on `a`. The first of them relies on `b` and on `c` as well.
+    declareChange(b, "chg_0", "agt_s", [premiseOn("a"), premiseOn("b"), premiseOn("c")]);
+    for (let n = 1; n < 15; n += 1) declareChange(b, `chg_${n}`, "agt_s", [premiseOn("a")]);
+    // A real session's change relies on `c`, and on `d`.
+    declareChange(b, "chg_r", "agt_r", [premiseOn("c"), premiseOn("d")]);
+    const world = foldedLog(b);
+    const lanes = lanesOf(world, 60_000);
+
+    // Where a real session is working comes first, and `d` is such a place. `b` is touched only by an ordinary
+    // change of the swarm, which is counted beside `a` and gives `b` no lane.
+    expect(lanes.lanes.map((lane) => [lane.key, lane.open, lane.changes, lane.references])).toEqual(
+      [
+        ["c", true, 1, 0],
+        ["d", true, 0, 1],
+        ["a", false, 15, 0],
+      ],
+    );
+    expect(referencesIn(lanes, "d")).toMatchObject([{ changeId: "chg_r", home: "c" }]);
+    // The swarm's change that relies on `c` is not drawn there, where the real session's own change is.
+    expect(lanes.lanes[0]?.nodes.map((node) => node.kind).toSorted()).toEqual([
+      "agent",
+      "change",
+      "subject",
+    ]);
+    // Counted once, each of them.
+    expect(lanes.changes).toBe(16);
+    expect(lanes.lanes.reduce((sum, lane) => sum + lane.changes, 0) + lanes.more.changes).toBe(16);
+    // Opened, the swarm's lane counts its changes beside the subject, and none of them is shown anywhere else.
+    const opened = lanesOf(world, 60_000, { opened: new Set(["a"]) });
+    expect(
+      opened.lanes
+        .at(-1)
+        ?.nodes.map((node) => node.kind)
+        .toSorted(),
+    ).toEqual(["stack", "subject"]);
+    expect(nodesOf(opened).filter((node) => node.kind === "reference")).toHaveLength(1);
   });
 });

@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/lanes.test.ts
+# kills: lanes.touched
+# why: the side that alters is marked on every subject it alters, and not only on the one the conflict is on
+diff --git a/apps/console/src/engine/lanes.ts b/apps/console/src/engine/lanes.ts
+index e2cb40d..abb7241 100644
+--- a/apps/console/src/engine/lanes.ts
++++ b/apps/console/src/engine/lanes.ts
+@@ -508,7 +508,11 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
+     }
+     // The changes that stand in another lane and touch this subject, each with what ties it to it.
+     for (const change of others) {
+-      const tied = tie(change, key, altering.has(`${change.id} ${subject.id}`));
++      const tied = tie(
++        change,
++        key,
++        [...altering].some((each) => each.startsWith(`${change.id} `)),
++      );
+       const referenceNode = `reference:${change.id}:${subject.id}`;
+       const first = subjectOf(change);
+       nodes.push({

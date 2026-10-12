@@ -1368,6 +1368,33 @@ export function continueInvalidate(
       ],
     },
   });
+  // The revision relies on a subject nobody had named until now. Keel mints a subject at an agent's first
+  // word about it, under an id it derives from the key, and records the premise against it.
+  const revocation = "sub_01M4V0618GREV0CAT10N000000";
+  const reliesOnRevocation: Proposition = {
+    subject: "collab.revocation",
+    predicate: "presence",
+    relation: "is",
+    value: true,
+    gloss: "Revocation calls permissionCache.invalidate",
+    strength: "must",
+  };
+  b.emit({
+    type: "SubjectMinted",
+    entity: subjectRef(revocation),
+    payload: {
+      subjectId: revocation,
+      key: reliesOnRevocation.subject,
+      anchors: [],
+      gloss: "Revocation calls permissionCache.invalidate",
+      mintedBy: "agent",
+    },
+  });
+  b.emit({
+    type: "PremiseRelied",
+    entity: subjectRef(revocation),
+    payload: { subjectId: revocation, changeId: p.changeB, premise: reliesOnRevocation },
+  });
   b.after(0.3).emit({
     type: "PreflightIssued",
     entity: changeRef(p.changeB),

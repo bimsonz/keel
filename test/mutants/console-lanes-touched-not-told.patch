@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/lanes.test.ts
+# kills: lanes.touched
+# why: a lane does not say how many changes of other lanes it shows, so closed it reads as empty
+diff --git a/apps/console/src/engine/lanes.ts b/apps/console/src/engine/lanes.ts
+index e2cb40d..6c9bdfa 100644
+--- a/apps/console/src/engine/lanes.ts
++++ b/apps/console/src/engine/lanes.ts
+@@ -467,7 +467,7 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
+       subject: drawnSubject,
+       changes: changes.length,
+       byState: tally(changes),
+-      references: others.length,
++      references: 0,
+       conflicts: open.length,
+     };
+     const isOpen =

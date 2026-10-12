@@ -5,6 +5,10 @@
 // after it lands; a conflict brings its probe, its question and its guard
 // with it. What evidence earned (guards, decisions) stays.
 //
+// A change stands in one lane, that of the first subject it touches, and is
+// counted there. In the lane of each other subject it touches it is shown
+// again as a reference: what ties it to that subject, and where it stands.
+//
 // Lanes are in order of what most needs looking at: what a person is being
 // asked about, then what is contested, then where a real session is working,
 // then the busiest. Those of the first three kinds are drawn in full. The
@@ -53,6 +57,19 @@ export type GraphNode = { id: string } & (
       count: number;
       /** How many of the subject's changes are drawn beside it. */ beside: number;
       byState: [ChangeState, number][];
+    }
+  /**
+   * A change that stands in another lane, shown here for what ties it to this lane's subject. Its agent, and
+   * anything a person is asked about it, are beside it in its own lane, where it is counted.
+   */
+  | {
+      kind: "reference";
+      changeId: string;
+      label: string;
+      state: ChangeState;
+      holds?: { text: string; derived: boolean };
+      /** The key of the lane it stands in: its first subject's, or `NO_SUBJECT`. */
+      home: string;
     }
   | {
       kind: "subject";
@@ -124,6 +141,8 @@ export interface Lane {
   /** Changes on this subject that are still going. */
   changes: number;
   byState: [ChangeState, number][];
+  /** Changes that stand in another lane and are shown in this one, for touching its subject. Counted there, not here. */
+  references: number;
   /** Conflicts on this subject that are not settled. */
   conflicts: number;
   /** Empty while the lane is one line. */
@@ -164,9 +183,19 @@ const OVER = new Set<ChangeState>(["landed", "withdrawn", "superseded"]);
 const SETTLED = new Set<ConflictState>(["resolved", "dismissed"]);
 const WORLDS: WorldId[] = ["trunk", "A-noop", "A", "B", "AB"];
 
+/** Every subject a change touches, each once: those it relies on, then those it alters. */
+export function subjectsOf(change: ChangeEntry): string[] {
+  return [
+    ...new Set([
+      ...change.premises.map((premise) => premise.subject),
+      ...change.effects.map((effect) => effect.proposition.subject),
+    ]),
+  ];
+}
+
 /** The subject a change is about: the one it relies on, or else the one its first effect is on. */
 export function subjectOf(change: ChangeEntry): string | undefined {
-  return change.premises[0]?.subject ?? change.effects[0]?.proposition.subject ?? undefined;
+  return subjectsOf(change)[0];
 }
 
 function words(value: string): string {
@@ -223,6 +252,8 @@ interface Ranked {
   here: ConflictEntry[];
   open: ConflictEntry[];
   changes: ChangeEntry[];
+  /** Changes that stand in another lane and touch this subject, where they are drawn one by one. */
+  touching: ChangeEntry[];
   /** 0: a person is being asked. 1: contested. 2: a real session is working here. 3: busy, and nothing more. */
   rank: 0 | 1 | 2 | 3;
   since: number;
@@ -241,9 +272,15 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
   );
   const unsettled = conflicts.filter((conflict) => !SETTLED.has(conflict.state));
   const contested = new Set(unsettled.flatMap((conflict) => conflict.parties));
-  // An effect does not say what it contradicts: the conflict does, by naming the change that alters.
+  // An effect does not say what it contradicts: the conflict does, by naming the change that alters, and the
+  // subject it is on. A change that alters two subjects is marked on the contested one only.
   const altering = new Set(
-    unsettled.flatMap((conflict) => sidesOf(world, conflict)?.other.id ?? []),
+    unsettled.flatMap((conflict) => {
+      const other = sidesOf(world, conflict)?.other.id;
+      return other === undefined || conflict.subjectId === undefined
+        ? []
+        : [`${other} ${conflict.subjectId}`];
+    }),
   );
   const live = [
     ...going,
@@ -272,6 +309,13 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
     change.state === "parked" ||
     change.state === "bounced" ||
     real(change);
+  // A change stands in the lane of its first subject. Each other subject it touches shows it too, where it is
+  // one that is drawn: a swarm's ordinary changes are counted beside their own subject and nowhere else.
+  const minted = new Set([...world.subjects.values()].map((subject) => subject.key));
+  const touching = new Map<string, ChangeEntry[]>();
+  for (const change of live.filter(notable))
+    for (const key of subjectsOf(change).slice(1))
+      touching.set(key, [...(touching.get(key) ?? []), change]);
 
   // ── Which subjects have a lane, and in what order ──
   const ranked = [...world.subjects.values()]
@@ -279,29 +323,37 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
       const here = conflicts.filter((conflict) => conflict.subjectId === subject.id);
       const open = here.filter((conflict) => !SETTLED.has(conflict.state));
       const changes = bySubject.get(subject.key) ?? [];
+      const others = touching.get(subject.key) ?? [];
       return {
         subject,
         here,
         open,
         changes,
+        touching: others,
         // A person is asked about a conflict here, or about one of the changes here.
         rank:
           open.some((conflict) => conflict.state === "escalated") || changes.some(waiting)
             ? 0
             : here.length > 0
               ? 1
-              : changes.some(real)
+              : changes.some(real) || others.some(real)
                 ? 2
                 : 3,
         since: Math.min(...here.map((conflict) => Date.parse(conflict.openedAt))),
       };
     })
-    // With a few agents a subject keeps its lane for what it has earned. A swarm's lanes are for what is going on.
+    // With a few agents a subject keeps its lane for what it has earned, and has one for any change that
+    // touches it. A swarm's lanes are for what is going on: of what stands elsewhere, only a real session's
+    // change makes a lane here.
     .filter(
       (lane) =>
         lane.changes.length > 0 ||
         lane.here.length > 0 ||
-        (drawAll && (lane.subject.guardIds.length > 0 || lane.subject.decisionIds.length > 0)),
+        lane.touching.some(real) ||
+        (drawAll &&
+          (lane.touching.length > 0 ||
+            lane.subject.guardIds.length > 0 ||
+            lane.subject.decisionIds.length > 0)),
     )
     .toSorted(
       (a, b) =>
@@ -384,6 +436,7 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
 
   const lanes = showing.map((lane): Lane => {
     const { subject, here, open, changes } = lane;
+    const others = lane.touching;
     const { key } = subject;
     const guards = subject.guardIds
       .flatMap((id) => world.guards.get(id) ?? [])
@@ -414,6 +467,7 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
       subject: drawnSubject,
       changes: changes.length,
       byState: tally(changes),
+      references: others.length,
       conflicts: open.length,
     };
     const isOpen =
@@ -433,7 +487,7 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
     // Changes on this subject, each with the agent working on it. The ordinary ones of a swarm are counted.
     const drawn = changes.filter(notable);
     for (const change of drawn) {
-      const tied = tie(change, key, altering.has(change.id));
+      const tied = tie(change, key, altering.has(`${change.id} ${subject.id}`));
       edge(draw(change, nodes, edges, tied.holds), subjectNode, {
         tone: tied.tone,
         ...(tied.holds?.derived === true ? { derived: true } : {}),
@@ -451,6 +505,25 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
         byState: tally(stacked),
       });
       edge(stackNode, subjectNode, { tone: "plain" });
+    }
+    // The changes that stand in another lane and touch this subject, each with what ties it to it.
+    for (const change of others) {
+      const tied = tie(change, key, altering.has(`${change.id} ${subject.id}`));
+      const referenceNode = `reference:${change.id}:${subject.id}`;
+      const first = subjectOf(change);
+      nodes.push({
+        id: referenceNode,
+        kind: "reference",
+        changeId: change.id,
+        label: change.label,
+        state: change.state,
+        ...(tied.holds === undefined ? {} : { holds: tied.holds }),
+        home: first !== undefined && minted.has(first) ? first : NO_SUBJECT,
+      });
+      edge(referenceNode, subjectNode, {
+        tone: tied.tone,
+        ...(tied.holds?.derived === true ? { derived: true } : {}),
+      });
     }
 
     // A conflict brings its probe and its question. A proven one leaves a guard, and a ruled one a decision.
@@ -577,6 +650,7 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
       key: NO_SUBJECT,
       changes: stillGoing.length,
       byState: tally(stillGoing),
+      references: 0,
       conflicts: 0,
     };
     const drawn = loose.filter(notable);

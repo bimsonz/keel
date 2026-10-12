@@ -37,7 +37,7 @@ import {
   arrange,
   zoomFor,
 } from "../engine/arrange.ts";
-import type { GraphNode, Lane, Lanes, Tone } from "../engine/lanes.ts";
+import { type GraphNode, type Lane, type Lanes, NO_SUBJECT, type Tone } from "../engine/lanes.ts";
 import type { Mode } from "../theme/mode.ts";
 import { ChangeLink, ConflictLink, EscalationLink, SubjectLink } from "./links.tsx";
 import { AgentMark, CLASS_WORD, RunMark } from "./parts.tsx";
@@ -121,6 +121,33 @@ function Body({ node }: { node: GraphNode }) {
         </>
       );
     }
+    // A change that stands in another lane: what ties it to this subject, and where it stands.
+    case "reference": {
+      const holds =
+        node.holds === undefined
+          ? ""
+          : `${node.holds.text}${node.holds.derived ? " · derived" : ""}`;
+      const home = node.home === NO_SUBJECT ? "changes on no subject yet" : node.home;
+      return (
+        <>
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5">
+              <Kind>Change</Kind>
+              <b className="font-semibold text-kumo-strong">{node.label}</b>
+            </span>
+            <span className="a-chip" data-tone={CHANGE_TONE[node.state] ?? "quiet"}>
+              {node.state}
+            </span>
+          </div>
+          <div className="truncate text-kumo-default" title={holds}>
+            {holds}
+          </div>
+          <div className="mt-auto truncate text-[13px] text-kumo-subtle" title={home}>
+            in the lane of <span className="a-mono">{home}</span>
+          </div>
+        </>
+      );
+    }
     case "stack":
       return (
         <>
@@ -145,7 +172,10 @@ function Body({ node }: { node: GraphNode }) {
             {node.key}
           </div>
           <div className="truncate text-[13px] text-kumo-default">{node.gloss}</div>
-          <div className="mt-auto flex items-center gap-2 text-[13px] text-kumo-subtle">
+          <div
+            data-counts
+            className="mt-auto flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-[13px] text-kumo-subtle"
+          >
             <span>
               <span className="a-num">{node.premises}</span>{" "}
               {node.premises === 1 ? "premise" : "premises"}
@@ -345,6 +375,7 @@ function Thing({ data }: NodeProps<ThingNode>) {
         </SubjectLink>
       );
     case "change":
+    case "reference":
       return (
         <ChangeLink id={node.changeId} {...drawn} data-open>
           {body}
@@ -444,6 +475,12 @@ function LaneBand({ data }: NodeProps<BandNode>) {
               .slice(0, 3)
               .map(([state, each]) => `${each} ${state}`)
               .join(" · ")}
+          </span>
+        )}
+        {lane.references > 0 && (
+          <span className="text-kumo-subtle">
+            {" "}
+            · {count(lane.references)} from {lane.references === 1 ? "another lane" : "other lanes"}
           </span>
         )}
       </span>

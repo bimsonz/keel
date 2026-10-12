@@ -1077,6 +1077,69 @@ expectEqual(
   "1",
 );
 
+// A change stands in one lane and is counted there. In the lane of each other subject it touches it is shown
+// again, as a reference to it. In scenario 1 the first change comes back relying on a second subject, which Keel
+// mints at an agent's first word about it.
+await page.goto(at("/mission-control", "scenario=s1&t=8:30&play=0"), { waitUntil: "networkidle" });
+await page.locator('.a-fn[data-kind="subject"]').first().waitFor({ timeout: 20_000 });
+const reference = page.locator('.a-fn[data-kind="reference"]');
+expectEqual(
+  "graph: a change that relies on a second subject is shown in that subject's lane too, with what ties it there",
+  squash((await reference.allInnerTexts()).join(" / ")),
+  "Change #1 working relies on: is true in the lane of authz.permission-evaluation",
+);
+expectEqual(
+  "graph: and it stands inside the band of the subject it relies on",
+  String(
+    await page.evaluate(() => {
+      const band = document
+        .querySelector('.a-lane[data-lane="collab.revocation"]')
+        ?.getBoundingClientRect();
+      const box = document.querySelector('.a-fn[data-kind="reference"]')?.getBoundingClientRect();
+      return (
+        band !== undefined && box !== undefined && box.top >= band.top && box.bottom <= band.bottom
+      );
+    }),
+  ),
+  "true",
+);
+expectEqual(
+  "graph: the change itself is drawn once, with its agent beside it, and counted once",
+  `${await page.locator('.a-fn[data-kind="change"]').count()} change, ${await page.locator('.a-fn[data-kind="agent"]').count()} agent, ${squash(await page.locator("[data-working]").innerText())}`,
+  "1 change, 1 agent, 2 REAL agents · 1 change open",
+);
+expectEqual(
+  "graph: a subject's counts stay on one line when it has premises, a guard and a decision",
+  String(
+    await page
+      .locator('.a-fn[data-kind="subject"] [data-counts]')
+      .first()
+      .evaluate((row) => row.getBoundingClientRect().height <= 22),
+  ),
+  "true",
+);
+// Closed, that lane says that what it shows is another lane's change.
+await page
+  .locator('.a-lane[data-lane="collab.revocation"] .a-lane-toggle')
+  .click({ timeout: 5000 })
+  .catch(() => {});
+const closedLane = page.locator('button.a-lane[data-lane="collab.revocation"]');
+await closedLane.waitFor({ timeout: 5000 }).catch(() => {});
+expectEqual(
+  "graph: a closed lane counts no change as its own, and says one of another lane touches it",
+  squash((await closedLane.allInnerTexts()).join(" / ")).includes("0 changes · 1 from another lane")
+    ? "said"
+    : squash((await closedLane.allInnerTexts()).join(" / ")),
+  "said",
+);
+await closedLane.click({ timeout: 5000 }).catch(() => {});
+await reference
+  .first()
+  .click({ timeout: 5000 })
+  .catch(() => {});
+await page.waitForURL("**/demo/changes/1**", { timeout: 5000 }).catch(() => {});
+expectEqual("graph: a reference opens the change's own page", pathOf(page), "/demo/changes/1");
+
 // The graph's size is measured from the room there is, even where the page opened with nothing to draw.
 await page.setViewportSize({ width: 1400, height: 900 });
 await page.goto(at("/mission-control", "scenario=s1&t=20&speed=16"), { waitUntil: "networkidle" });

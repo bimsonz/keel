@@ -601,7 +601,8 @@
   justify-content: center;
 }
 
-:root .a-fn[data-kind="stack"] {
+:root .a-fn[data-kind="stack"],
+:root .a-fn[data-kind="reference"] {
   border-style: dashed;
   background: transparent;
 }

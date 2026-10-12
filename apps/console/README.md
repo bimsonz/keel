@@ -104,6 +104,7 @@ With nothing else in the address, the page reads Keel through its Worker at `/ap
 | `/?scenario=s1` | The instance with scenario 1's one project, `demo` |
 | `/demo/conflicts/C-1?scenario=s1&t=7:23&play=0` | Conflict C-1, with the world matrix one run from full |
 | `/demo/mission-control?scenario=swarm` | 800 of a load generator's agents in Mission Control, beside three REAL sessions |
+| `/demo/mission-control?scenario=s1&t=8:30&play=0` | The first change has come back relying on a second subject: it stands in its own lane, and the second subject's lane shows it again, as a reference to where it stands |
 | `/demo/changes/1205?scenario=s2&t=3:20&play=0` | Nine days on: a careless change bounces on guard G-1, citing decision D-1 |
 | `/demo/changes/1?scenario=s3&t=8:15&play=0` | Scenario 1's conflict where the changes' plans say nothing of its predicate: Keel notes it on both and holds neither, and #1 lands as written |
 | `/demo/changes/1?scenario=s4&t=7:40&play=0` | The same conflict where the plans block on its predicate: both changes bounce on the conflict itself, with no verdict |
