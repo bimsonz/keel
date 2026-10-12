@@ -37,6 +37,8 @@ export function TrunksRpc(
           Effect.map(({ head }) => ({ head, staging: head, mirror: head })),
           Effect.orDie,
         ),
+      destroy: (projectId, by) =>
+        callObject(TrunkCodecs.destroy, () => trunk(projectId).destroy(by)),
     }),
   );
 }

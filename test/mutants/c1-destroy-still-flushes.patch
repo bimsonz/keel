@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.destroy-stops"
+# kills: trunk.destroy-stops
+# why: a destroyed trunk still decides a group and writes its WAL
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index 909e58c..6be16c7 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -314,8 +314,7 @@ const factsOf = (projectId: ProjectId, head: CommitSha, batch: QueuedBatch) =>
+  */
+ export const flushTrunk = Effect.fn("integration/flushTrunk")(function* (projectId: ProjectId) {
+   const trunk = trunkOf(yield* EntityStore, projectId);
+-  if (trunk?.phase !== "debouncing" || trunkDestroyed(yield* EntityStore, projectId))
+-    return trunk?.phase;
++  if (trunk?.phase !== "debouncing") return trunk?.phase;
+   const observedHead = yield* (yield* TrunkWriter).head;
+   const [front] = trunk.queue;
+   const inputs = front === undefined ? [] : [yield* factsOf(projectId, trunk.head, front)];

@@ -84,5 +84,12 @@ export class WorkspacePool extends Context.Service<
       pushId: string,
       push: ObservedPush,
     ) => Effect.Effect<PushObservation>;
+    /**
+     * Destroys the project's pool, for good (its project was deleted): no
+     * workspace is granted from here on, not even to a holder again, and
+     * every workspace repo the pool holds is deleted, retried until none is
+     * left. Idempotent.
+     */
+    readonly destroy: (projectId: ProjectId) => Effect.Effect<void>;
   }
 >()("keel/WorkspacePool") {}

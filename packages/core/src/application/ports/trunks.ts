@@ -30,5 +30,11 @@ export class Trunks extends Context.Service<
     readonly head: (projectId: ProjectId) => Effect.Effect<CommitSha>;
     /** Brings staging and the project's mirror to trunk's head. Idempotent. */
     readonly sync: (projectId: ProjectId) => Effect.Effect<TrunkSynced>;
+    /**
+     * Destroys the project's trunk, for good (its project was deleted): it
+     * promotes nothing from here on, and its trunk, staging, mirror and guards
+     * repos are deleted, retried until none is left. Idempotent.
+     */
+    readonly destroy: (projectId: ProjectId, by: string) => Effect.Effect<void>;
   }
 >()("keel/Trunks") {}

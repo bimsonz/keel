@@ -259,4 +259,51 @@ describe("the WorkspacePool DO", () => {
     // Every event the pool commits, the reaction's included, carries its project.
     expect(log.map((e) => e.project)).toEqual([projectId, projectId, projectId]);
   });
+
+  it("[pool.do.destroy] destroy gives up every workspace, its collection deadline deletes their repos, and nothing stays armed", async () => {
+    const projectId = freshProject();
+    await stock(projectId, 2, true);
+    const stub = poolStub(projectId);
+    const grant = valueOf(WorkspacePoolCodecs.grant, await stub.grant(holder()));
+    expect(await exists(grant.repo.name)).toBe(true);
+
+    expect(valueOf(WorkspacePoolCodecs.destroy, await stub.destroy())).toMatchObject({
+      ready: 0,
+      granted: 0,
+      forking: 0,
+      destroyed: true,
+    });
+    await runDurableObjectAlarm(stub);
+    await vi.waitFor(
+      async () =>
+        expect(await statusOf(projectId)).toMatchObject({ collecting: 0, destroyed: true }),
+      WAIT,
+    );
+    expect(await exists(grant.repo.name)).toBe(false);
+    const slots = await runInDurableObject(stub, (_instance: WorkspacePoolDO, state) =>
+      state.storage.sql
+        .exec<{ value: string }>("SELECT value FROM entities WHERE kind = 'workspace'")
+        .toArray(),
+    );
+    expect(slots).toHaveLength(2);
+    for (const row of slots) {
+      const slot: unknown = JSON.parse(row.value);
+      expect(slot).toMatchObject({ state: "collected" });
+      const name: unknown = Reflect.get(Object(Reflect.get(Object(slot), "repo")), "name");
+      expect(await exists(String(name))).toBe(false);
+    }
+    await vi.waitFor(
+      async () => expect(await alarmsOf(projectId)).toEqual({ armed: [], alarm: null }),
+      WAIT,
+    );
+    // Destroying again changes nothing and arms nothing that stays.
+    expect(valueOf(WorkspacePoolCodecs.destroy, await stub.destroy())).toMatchObject({
+      collecting: 0,
+      destroyed: true,
+    });
+    const refused = decodeExit(WorkspacePoolCodecs.grant, await stub.grant(holder()));
+    expect(Exit.isFailure(refused) ? JSON.stringify(refused.cause) : "granted").toContain(
+      "PoolExhausted",
+    );
+  });
 });

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.destroy"
+# kills: trunk.destroy
+# why: the deletion pass runs on a trunk nobody destroyed, and deletes a live project's repos
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index 909e58c..4833488 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -203,8 +203,6 @@ export interface DestroyReport {
+ export const deleteProjectRepos = Effect.fn("integration/deleteProjectRepos")(function* (
+   projectId: ProjectId,
+ ) {
+-  if (!trunkDestroyed(yield* EntityStore, projectId))
+-    return { deleted: 0, pending: 0 } satisfies DestroyReport;
+   const host = yield* CodeHost;
+   const repos = Object.values(projectRepos(projectId));
+   const outcomes = yield* Effect.forEach(repos, (repo) => Effect.exit(host.delete(repo)), {

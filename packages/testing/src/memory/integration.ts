@@ -168,19 +168,22 @@ export function makeStagingWriterMemory(main: MainRef = cellOf()) {
 }
 
 /**
- * Each project's trunk head once initialized, and how often it was synced.
- * `journal` records each call in order beside other adapters'; `failSyncOnce`
- * makes the first sync die, as a crash mid-bootstrap would.
+ * Each project's trunk head once initialized, how often it was synced, and
+ * who destroyed it. `journal` records each call in order beside other
+ * adapters'; `failSyncOnce` makes the first sync die, as a crash
+ * mid-bootstrap would.
  */
 export function makeTrunksMemory(
   options: { readonly journal?: string[]; readonly failSyncOnce?: boolean } = {},
 ) {
   const heads = new Map<ProjectId, CommitSha>();
   const syncs = new Map<ProjectId, number>();
+  const destroyed = new Map<ProjectId, string>();
   let failures = options.failSyncOnce === true ? 1 : 0;
   return {
     heads,
     syncs,
+    destroyed,
     layer: Layer.succeed(
       Trunks,
       Trunks.of({
@@ -213,6 +216,11 @@ export function makeTrunksMemory(
             syncs.set(projectId, (syncs.get(projectId) ?? 0) + 1);
             options.journal?.push(`sync ${projectId}`);
             return Effect.succeed({ head, staging: head, mirror: head });
+          }),
+        destroy: (projectId, by) =>
+          Effect.sync(() => {
+            if (!destroyed.has(projectId)) destroyed.set(projectId, by);
+            options.journal?.push(`destroy trunk ${projectId}`);
           }),
       }),
     ),

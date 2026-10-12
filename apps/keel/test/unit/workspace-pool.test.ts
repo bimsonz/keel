@@ -5,6 +5,7 @@ import {
   collectOnChangeEnd,
   collectWorkspaces,
   configurePool,
+  destroyPool,
   grantWorkspace,
   GRANT_TTL_SECONDS,
   observePush,
@@ -107,6 +108,26 @@ const push = (workspaceId: WorkspaceId, sha: CommitSha) => ({
 /** The WorkspacePushed the pool committed for a workspace. */
 const pushed = (id: WorkspaceId) =>
   Effect.map(eventsOf(id), (events) => events.filter((p) => tagOf(p) === "WorkspacePushed"));
+
+/** Whether the code host still holds the repo. */
+const onHost = (repo: { readonly namespace: string; readonly name: string }) =>
+  Effect.flatMap(CodeHost, (host) =>
+    host.info(repo).pipe(
+      Effect.as(true),
+      Effect.catchTag("RepoNotFound", () => Effect.succeed(false)),
+    ),
+  );
+/** How many of the pool's workspace repos the code host still holds. */
+const reposLeft = Effect.gen(function* () {
+  const there = yield* Effect.forEach(yield* slotsHeld, (slot) => onHost(slot.repo));
+  return there.filter(Boolean).length;
+});
+const collectedAs = (id: WorkspaceId) =>
+  Effect.map(eventsOf(id), (events) =>
+    events
+      .filter((p) => tagOf(p) === "WorkspaceCollected")
+      .map((p) => (typeof p === "object" && p !== null ? Reflect.get(p, "reason") : undefined)),
+  );
 
 describe("WorkspacePool", () => {
   it.effect(
@@ -412,5 +433,105 @@ describe("WorkspacePool", () => {
           "workspaceId",
         ]);
       }).pipe(Effect.provide(pool())),
+  );
+  it.effect(
+    "[pool.destroy] destroying the pool gives up every workspace, ready or granted, and collection deletes each repo; the mirror is not the pool's to delete",
+    () =>
+      Effect.gen(function* () {
+        yield* seedMirror;
+        yield* configurePool(PROJECT, { source: MIRROR, target: 3 });
+        yield* refillPool(PROJECT);
+        const grant = yield* grantWorkspace(PROJECT, holder(1));
+        expect(yield* poolStatus()).toMatchObject({ ready: 2, granted: 1, destroyed: false });
+
+        yield* destroyPool(PROJECT);
+        expect(yield* poolStatus()).toMatchObject({
+          target: 0,
+          ready: 0,
+          forking: 0,
+          granted: 0,
+          collecting: 3,
+          destroyed: true,
+        });
+        expect(yield* reposLeft).toBe(3);
+        expect(yield* collectWorkspaces(PROJECT)).toEqual({ deleted: 3, pending: 0 });
+        expect(yield* reposLeft).toBe(0);
+        expect(yield* onHost(MIRROR)).toBe(true);
+        expect(yield* poolStatus()).toMatchObject({ collecting: 0, destroyed: true });
+
+        // Each workspace is collected once, as withdrawn, however often the pool is destroyed.
+        yield* destroyPool(PROJECT);
+        for (const slot of yield* slotsHeld) {
+          expect(slot.state).toBe("collected");
+          expect(yield* collectedAs(slot.id)).toEqual(["withdrawn"]);
+        }
+        expect(yield* collectedAs(grant.workspaceId)).toEqual(["withdrawn"]);
+      }).pipe(Effect.provide(pool())),
+  );
+
+  it.effect(
+    "[destroy.refuses-grants] a destroyed pool grants nothing, not a holder's own workspace again, and forks nothing whatever it is configured to",
+    () =>
+      Effect.gen(function* () {
+        yield* seedMirror;
+        yield* configurePool(PROJECT, { source: MIRROR, target: 2 });
+        yield* refillPool(PROJECT);
+        yield* grantWorkspace(PROJECT, holder(1));
+        yield* destroyPool(PROJECT);
+        yield* collectWorkspaces(PROJECT);
+
+        for (const who of [holder(1), holder(2)])
+          expect(yield* Effect.flip(grantWorkspace(PROJECT, who))).toMatchObject({
+            _tag: "PoolExhausted",
+            retryAfterMs: 15_000,
+          });
+        expect(yield* configurePool(PROJECT, { source: MIRROR, target: 2 })).toMatchObject({
+          target: 2,
+          destroyed: true,
+        });
+        expect(yield* refillPool(PROJECT)).toEqual({
+          started: 0,
+          ready: 0,
+          failed: 0,
+          abandoned: 0,
+        });
+        expect(yield* slotsHeld).toHaveLength(2);
+        expect(yield* reposLeft).toBe(0);
+        expect((yield* Effect.flip(grantWorkspace(PROJECT, holder(3))))._tag).toBe("PoolExhausted");
+      }).pipe(Effect.provide(pool())),
+  );
+
+  it.effect(
+    "[pool.destroy-mid-fork] a fork in flight when the pool is destroyed is deleted once it resolves, and never becomes a workspace",
+    () =>
+      Effect.gen(function* () {
+        const gate = yield* Deferred.make<void>();
+        yield* Effect.gen(function* () {
+          yield* seedMirror;
+          yield* configurePool(PROJECT, { source: MIRROR, target: 2 });
+          const refill = yield* Effect.forkChild(refillPool(PROJECT));
+          for (let i = 0; i < 100 && (yield* poolStatus()).forking < 2; i++) yield* Effect.yieldNow;
+          expect(yield* poolStatus()).toMatchObject({ forking: 2 });
+
+          yield* destroyPool(PROJECT);
+          expect(yield* poolStatus()).toMatchObject({ forking: 0, collecting: 2 });
+          // Collection runs before the forks resolve: there is no repo to delete yet.
+          expect(yield* collectWorkspaces(PROJECT)).toEqual({ deleted: 2, pending: 0 });
+
+          yield* Deferred.succeed(gate, undefined);
+          expect(yield* Fiber.join(refill)).toEqual({
+            started: 2,
+            ready: 0,
+            failed: 2,
+            abandoned: 0,
+          });
+          expect(yield* reposLeft).toBe(2);
+          expect(yield* poolStatus()).toMatchObject({ ready: 0, collecting: 2 });
+          expect(yield* collectWorkspaces(PROJECT)).toEqual({ deleted: 2, pending: 0 });
+          expect(yield* reposLeft).toBe(0);
+          for (const slot of yield* slotsHeld)
+            expect((yield* eventsOf(slot.id)).map(tagOf)).toEqual([]);
+        }).pipe(Effect.provide(pool({ forkGate: gate })));
+      }),
   );
 });

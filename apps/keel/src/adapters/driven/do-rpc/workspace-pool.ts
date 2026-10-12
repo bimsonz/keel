@@ -40,6 +40,8 @@ export function WorkspacePoolRpc(
         ),
       observePush: (projectId, pushId, push) =>
         call(WorkspacePoolCodecs.observePush, () => pool(projectId).observePush(pushId, push)),
+      destroy: (projectId) =>
+        call(WorkspacePoolCodecs.destroy, () => pool(projectId).destroy()).pipe(Effect.asVoid),
     }),
   );
 }

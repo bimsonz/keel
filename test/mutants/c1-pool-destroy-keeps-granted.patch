@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t "pool.destroy"
+# kills: pool.destroy
+# why: a destroyed pool gives up its ready workspaces only: a granted one keeps its repo and its holder
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 19f3916..baf4006 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -342,7 +342,8 @@ export const destroyPool = Effect.fn("coordination/destroyPool")(function* (proj
+     },
+   );
+   for (const slot of slots(store)) {
+-    if (slot.state === "collecting" || slot.state === "collected") continue;
++    if (slot.state === "collecting" || slot.state === "collected" || slot.state === "granted")
++      continue;
+     const now = yield* (yield* Clock).now;
+     yield* commit(
+       { entity: { kind: "workspace", id: slot.id }, cause: `destroy:${slot.id}`, project },

@@ -10,7 +10,12 @@ import type { Transaction } from "../../ports/index.ts";
 export const RepoName = Schema.Struct({ namespace: Schema.String, name: Schema.String });
 export type RepoName = typeof RepoName.Type;
 
-export const PoolSettings = Schema.Struct({ source: Schema.NullOr(RepoName), target: Schema.Int });
+export const PoolSettings = Schema.Struct({
+  source: Schema.NullOr(RepoName),
+  target: Schema.Int,
+  /** Set when the project is destroyed, and never unset: the pool then forks and grants nothing. */
+  destroyed: Schema.optionalKey(Schema.Boolean),
+});
 export type PoolSettings = typeof PoolSettings.Type;
 
 export const SlotState = Schema.Literals([
@@ -54,7 +59,14 @@ export const settingsOf = (store: Store): PoolSettings => {
 };
 
 export const putSettings = (store: Store, settings: PoolSettings): void =>
-  store.put(SETTINGS, "pool", { source: settings.source, target: settings.target });
+  store.put(SETTINGS, "pool", {
+    source: settings.source,
+    target: settings.target,
+    ...(settings.destroyed === true ? { destroyed: true } : {}),
+  });
+
+/** Whether the project was destroyed: its pool forks and grants nothing, whatever it is configured to. */
+export const isDestroyed = (store: Store): boolean => settingsOf(store).destroyed === true;
 
 export const slotOf = (store: Store, id: string): Slot | undefined => {
   const stored = store.get(SLOT, id);

@@ -1,4 +1,4 @@
-import { Effect, Result, Schema } from "effect";
+import { Effect, Exit, Result, Schema } from "effect";
 import {
   BatchVerified,
   type CommutationFacts,
@@ -33,6 +33,8 @@ import { projectRepos } from "./project-repos.ts";
 
 /** The EntityStore kind holding a trunk's folded state, keyed by its project. */
 const TRUNK = "trunk";
+/** The EntityStore kind marking a trunk destroyed, keyed by its project. */
+const DESTROYED = "trunk-destroyed";
 
 // JSON codecs: the domain's optional fields encode as absent keys, which is what EntityStore and the outbox hold.
 const decodeTrunk = Schema.decodeUnknownSync(Schema.toCodecJson(Trunk));
@@ -80,6 +82,12 @@ export const trunkOf = (
   const stored = store.get(TRUNK, projectId);
   return stored === undefined ? undefined : decodeTrunk(stored);
 };
+
+/** Whether the project's trunk was destroyed: it then takes no batch and its repos are deleted. */
+export const trunkDestroyed = (
+  store: (typeof EntityStore)["Service"],
+  projectId: ProjectId,
+): boolean => store.get(DESTROYED, projectId) !== undefined;
 
 /**
  * Runs one Promotion command in one transaction: decide on the folded trunk,
@@ -155,10 +163,55 @@ export const syncTrunk = Effect.fn("integration/syncTrunk")(function* (projectId
   return { head, staging, mirror };
 });
 
-/** Copies trunk's head into the project's mirror after an advance; staging is the Lane's to move. Idempotent. */
+/** Copies trunk's head into the project's mirror after an advance; staging is the Lane's to move. Idempotent. A destroyed trunk syncs nothing. */
 export const syncMirror = Effect.fn("integration/syncMirror")(function* (projectId: ProjectId) {
+  if (trunkDestroyed(yield* EntityStore, projectId)) return undefined;
   const { head, outcomes } = yield* (yield* TrunkWriter).sync([projectRepos(projectId).mirror]);
   return { head, mirror: outcomes[0] };
+});
+
+/**
+ * Marks the project's trunk destroyed, for good: from here on it takes no
+ * batch, and `deleteProjectRepos` may delete its repos. `by` is who asked.
+ * Destroying again is a no-op.
+ */
+export const destroyTrunk = Effect.fn("integration/destroyTrunk")(function* (
+  projectId: ProjectId,
+  by: string,
+) {
+  yield* commit(
+    { entity: { kind: "trunk", id: projectId }, cause: "destroy", project: projectId },
+    (tx) => {
+      tx.store.put(DESTROYED, projectId, { by, at: tx.at });
+      return Result.succeed({ value: undefined, drafts: [] });
+    },
+  );
+});
+
+/** What a deletion pass did; `pending` repos still await deletion. */
+export interface DestroyReport {
+  readonly deleted: number;
+  readonly pending: number;
+}
+
+/**
+ * Deletes every repo of a destroyed project: trunk, staging, the mirror and
+ * the guards repo. A failed deletion stays pending for the next pass, and a
+ * repo already gone counts as deleted. A trunk that was not destroyed keeps
+ * its repos: nothing is deleted.
+ */
+export const deleteProjectRepos = Effect.fn("integration/deleteProjectRepos")(function* (
+  projectId: ProjectId,
+) {
+  if (!trunkDestroyed(yield* EntityStore, projectId))
+    return { deleted: 0, pending: 0 } satisfies DestroyReport;
+  const host = yield* CodeHost;
+  const repos = Object.values(projectRepos(projectId));
+  const outcomes = yield* Effect.forEach(repos, (repo) => Effect.exit(host.delete(repo)), {
+    concurrency: "unbounded",
+  });
+  const deleted = outcomes.filter(Exit.isSuccess).length;
+  return { deleted, pending: repos.length - deleted } satisfies DestroyReport;
 });
 
 /** The one lane of a project at L1 (`lane:<projectId>:main`), until BatchVerified carries its lane. */
@@ -177,14 +230,15 @@ const decodeVerified = Schema.decodeUnknownSync(BatchVerified);
  * it, the lane to every TrunkAdvanced and PromotionDeclined. A redelivery, a
  * batch trunk already holds, or one before TrunkInitialized (the domain
  * refuses it: a project's trunk is initialized before any change can exist)
- * changes nothing. True when the trunk changed.
+ * changes nothing, and neither does any batch once the trunk is destroyed.
+ * True when the trunk changed.
  */
 export const trunkHeard = (
   tx: Transaction,
   projectId: ProjectId,
   event: EventEnvelope,
 ): boolean => {
-  if (event.type !== "BatchVerified") return false;
+  if (event.type !== "BatchVerified" || trunkDestroyed(tx.store, projectId)) return false;
   const verified = decodeVerified(event.payload);
   const { members, base } = verified;
   if (members === undefined || base === undefined)
@@ -255,11 +309,13 @@ const factsOf = (projectId: ProjectId, head: CommitSha, batch: QueuedBatch) =>
  * The debounce deadline: reads trunk's head and the front batch's facts, then
  * decides the group in one commit. FIFO with one batch per group at L1, so
  * only the front batch's facts are looked up and the queue stops behind it. A
- * head trunk does not know freezes promotion. Answers the trunk's phase.
+ * head trunk does not know freezes promotion. Answers the trunk's phase. A
+ * destroyed trunk decides nothing: what it had queued stays queued.
  */
 export const flushTrunk = Effect.fn("integration/flushTrunk")(function* (projectId: ProjectId) {
   const trunk = trunkOf(yield* EntityStore, projectId);
-  if (trunk?.phase !== "debouncing") return trunk?.phase;
+  if (trunk?.phase !== "debouncing" || trunkDestroyed(yield* EntityStore, projectId))
+    return trunk?.phase;
   const observedHead = yield* (yield* TrunkWriter).head;
   const [front] = trunk.queue;
   const inputs = front === undefined ? [] : [yield* factsOf(projectId, trunk.head, front)];
@@ -295,13 +351,15 @@ const restingAs = (trunk: Trunk | undefined): PushOutcome =>
  * batch of one change, pushed as its candidate was composed: the WAL records
  * the candidate's commit once, before the first push, and every retry pushes
  * that SHA with the WAL's old value. The read-back decides: the recorded SHA
- * advances trunk, the old head means push again, anything else freezes.
+ * advances trunk, the old head means push again, anything else freezes. A
+ * destroyed trunk pushes nothing, even a group it had opened.
  */
 export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
   projectId: ProjectId,
 ) {
   const opened = trunkOf(yield* EntityStore, projectId);
   const wal = opened?.wal;
+  if (trunkDestroyed(yield* EntityStore, projectId)) return "idle" satisfies PushOutcome;
   if (opened?.phase !== "promoting" || wal === undefined) return restingAs(opened);
   if (wal.composed === undefined) {
     const [batch, ...more] = wal.batches;

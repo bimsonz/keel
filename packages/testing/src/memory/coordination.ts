@@ -72,7 +72,8 @@ const MEMORY_TRUNK_HEAD = CommitSha.make("7".repeat(40));
 /**
  * Grants workspaces up to `capacity`, then refuses with PoolExhausted. A
  * holder's second grant returns its workspace again with a new token, as the
- * real pool does; every grant's base is `baseSha`.
+ * real pool does; every grant's base is `baseSha`. Once destroyed it grants
+ * nothing, and what it had granted is released as withdrawn.
  */
 export function makeWorkspacePoolMemory(
   options: {
@@ -91,18 +92,20 @@ export function makeWorkspacePoolMemory(
   const pushed = new Map<string, ObservedPush>();
   let counter = 0;
   let tokens = 0;
+  const state = { destroyed: false };
   return {
     granted,
     released,
     configured,
     pushed,
+    state,
     layer: Layer.succeed(
       WorkspacePool,
       WorkspacePool.of({
         grant: (_projectId, holder) =>
           Effect.gen(function* () {
             const held = [...granted].find(([, h]) => h === holder)?.[0];
-            if (held === undefined && granted.size >= capacity)
+            if (state.destroyed || (held === undefined && granted.size >= capacity))
               return yield* new PoolExhausted({ retryAfterMs: 1000 });
             const workspaceId = held ?? makeId("wsp", (counter += 1).toString().padStart(26, "0"));
             granted.set(workspaceId, holder);
@@ -132,6 +135,13 @@ export function makeWorkspacePoolMemory(
             if (!granted.has(push.workspaceId)) return "ignored";
             pushed.set(pushId, push);
             return "recorded";
+          }),
+        destroy: (projectId) =>
+          Effect.sync(() => {
+            state.destroyed = true;
+            for (const workspaceId of granted.keys()) released.set(workspaceId, "withdrawn");
+            granted.clear();
+            options.journal?.push(`destroy pool ${projectId}`);
           }),
       }),
     ),

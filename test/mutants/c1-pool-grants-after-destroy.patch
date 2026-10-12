@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t "destroy.refuses-grants"
+# kills: destroy.refuses-grants
+# why: the pool never reads itself as destroyed: configured again, it forks and grants as before
+diff --git a/packages/core/src/application/coordination/workspace-pool/state.ts b/packages/core/src/application/coordination/workspace-pool/state.ts
+index 0adcc42..2419b16 100644
+--- a/packages/core/src/application/coordination/workspace-pool/state.ts
++++ b/packages/core/src/application/coordination/workspace-pool/state.ts
+@@ -66,7 +66,7 @@ export const putSettings = (store: Store, settings: PoolSettings): void =>
+   });
+ 
+ /** Whether the project was destroyed: its pool forks and grants nothing, whatever it is configured to. */
+-export const isDestroyed = (store: Store): boolean => settingsOf(store).destroyed === true;
++export const isDestroyed = (store: Store): boolean => settingsOf(store).destroyed === null;
+ 
+ export const slotOf = (store: Store, id: string): Slot | undefined => {
+   const stored = store.get(SLOT, id);

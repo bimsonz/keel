@@ -4,13 +4,17 @@
 // debounce and push deadlines run `flushTrunk` and `pushPromotion`.
 import { describe, expect, it } from "@effect/vitest";
 import {
+  deleteProjectRepos,
+  destroyTrunk,
   flushTrunk,
   initializeTrunk,
   mainLane,
   projectRepos,
   pushPromotion,
   resumeTrunk,
+  syncMirror,
   syncTrunk,
+  trunkDestroyed,
   trunkHeard,
   trunkOf,
 } from "@keeltown/core/application/integration";
@@ -495,5 +499,121 @@ describe("the Trunk's promotion", () => {
         expect(trunkOf(yield* EntityStore, PROJECT)).toMatchObject({ phase: "idle", queue: [] });
       }).pipe(Effect.provide(w.layer));
     },
+  );
+});
+
+/** Whether the code host still holds the repo. */
+const onHost = (repo: { readonly namespace: string; readonly name: string }) =>
+  Effect.flatMap(CodeHost, (host) =>
+    host.info(repo).pipe(
+      Effect.as(true),
+      Effect.catchTag("RepoNotFound", () => Effect.succeed(false)),
+    ),
+  );
+const world = () => Layer.mergeAll(makeCodeHostMemory().layer, ports());
+
+describe("the Trunk's destroy", () => {
+  const REPOS = Object.values(projectRepos(PROJECT));
+  /** The project's four repos on the host, and its trunk initialized. */
+  const project = Effect.gen(function* () {
+    const host = yield* CodeHost;
+    for (const repo of REPOS) yield* host.create(repo);
+    yield* initializeTrunk(PROJECT, sha("a"), "seed");
+  });
+
+  it.effect(
+    "[trunk.destroy] a destroyed trunk's four repos are deleted and it takes no batch; one that was not destroyed keeps its repos",
+    () =>
+      Effect.gen(function* () {
+        yield* project;
+        expect(REPOS).toHaveLength(4);
+        // Nothing but a destroy lets the repos go.
+        expect(yield* deleteProjectRepos(PROJECT)).toEqual({ deleted: 0, pending: 0 });
+        expect(yield* Effect.forEach(REPOS, onHost)).toEqual([true, true, true, true]);
+        expect(trunkDestroyed(yield* EntityStore, PROJECT)).toBe(false);
+
+        yield* destroyTrunk(PROJECT, "user:owner");
+        yield* destroyTrunk(PROJECT, "user:owner");
+        expect(trunkDestroyed(yield* EntityStore, PROJECT)).toBe(true);
+        expect(yield* deleteProjectRepos(PROJECT)).toEqual({ deleted: 4, pending: 0 });
+        expect(yield* Effect.forEach(REPOS, onHost)).toEqual([false, false, false, false]);
+        // A repo already gone counts as deleted: a second pass has nothing pending.
+        expect(yield* deleteProjectRepos(PROJECT)).toEqual({ deleted: 4, pending: 0 });
+
+        const before = trunkOf(yield* EntityStore, PROJECT);
+        expect(yield* deliver(verified(1, sha("a")))).toBe(false);
+        expect(trunkOf(yield* EntityStore, PROJECT)).toEqual(before);
+        expect(before).toMatchObject({ phase: "idle", queue: [] });
+        // No event of the trunk's says it was destroyed: ProjectDeleted is the Project's to commit.
+        expect(yield* logOf(PROJECT)).toEqual(["TrunkInitialized"]);
+      }).pipe(Effect.provide(world())),
+  );
+
+  it.effect(
+    "[trunk.destroy-pending] a repo whose deletion fails stays pending, and the next pass deletes it",
+    () => {
+      const code = makeCodeHostMemory();
+      const mirror = projectRepos(PROJECT).mirror;
+      let failures = 2;
+      const flaky = Layer.effect(
+        CodeHost,
+        Effect.gen(function* () {
+          const inner = yield* CodeHost;
+          return CodeHost.of({
+            ...inner,
+            delete: (repo) =>
+              repo.name === mirror.name && failures > 0
+                ? Effect.sync(() => void (failures -= 1)).pipe(
+                    Effect.andThen(Effect.die(new Error("the host did not answer"))),
+                  )
+                : inner.delete(repo),
+          });
+        }),
+      ).pipe(Layer.provide(code.layer));
+      return Effect.gen(function* () {
+        yield* project;
+        yield* destroyTrunk(PROJECT, "user:owner");
+        expect(yield* deleteProjectRepos(PROJECT)).toEqual({ deleted: 3, pending: 1 });
+        expect(yield* deleteProjectRepos(PROJECT)).toEqual({ deleted: 3, pending: 1 });
+        expect(code.repos.has(`${mirror.namespace}/${mirror.name}`)).toBe(true);
+        expect(yield* deleteProjectRepos(PROJECT)).toEqual({ deleted: 4, pending: 0 });
+        expect(code.repos.size).toBe(0);
+      }).pipe(Effect.provide(Layer.mergeAll(flaky, ports())));
+    },
+  );
+
+  it.effect(
+    "[trunk.destroy-stops] a destroyed trunk decides no group, pushes none it had opened, and syncs no mirror",
+    () =>
+      Effect.gen(function* () {
+        // A batch waiting on the debounce when the trunk is destroyed: the flush decides nothing.
+        const queued = promotion();
+        yield* Effect.gen(function* () {
+          const base = yield* queued.seeded;
+          yield* queued.composed(1, base);
+          expect(yield* deliver(verified(1, base))).toBe(true);
+          yield* destroyTrunk(PROJECT, "user:owner");
+          expect(yield* flushTrunk(PROJECT)).toBe("debouncing");
+          expect(yield* pushPromotion(PROJECT)).toBe("idle");
+          expect(yield* typesOf).toEqual(["TrunkInitialized"]);
+          expect(queued.writer.pushes()).toEqual([]);
+          expect(yield* syncMirror(PROJECT)).toBeUndefined();
+          expect(queued.writer.synced(projectRepos(PROJECT).mirror)).toBeUndefined();
+        }).pipe(Effect.provide(queued.layer));
+
+        // A group already open, its WAL written, when the trunk is destroyed: it is never pushed.
+        const opened = promotion();
+        yield* Effect.gen(function* () {
+          const base = yield* opened.seeded;
+          yield* opened.composed(1, base);
+          yield* deliver(verified(1, base));
+          expect(yield* flushTrunk(PROJECT)).toBe("promoting");
+          yield* destroyTrunk(PROJECT, "user:owner");
+          expect(yield* pushPromotion(PROJECT)).toBe("idle");
+          expect(opened.writer.pushes()).toEqual([]);
+          expect(opened.writer.head()).toBe(base);
+          expect(yield* typesOf).toEqual(["TrunkInitialized", "PromotionStarted"]);
+        }).pipe(Effect.provide(opened.layer));
+      }),
   );
 });

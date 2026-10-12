@@ -1,5 +1,7 @@
 import {
   DEBOUNCE_MS,
+  deleteProjectRepos,
+  destroyTrunk,
   flushTrunk,
   initializeTrunk,
   pushPromotion,
@@ -28,6 +30,8 @@ import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 export const TRUNK_DEBOUNCE = "trunk debounce";
 export const TRUNK_PUSH = "trunk push";
 export const MIRROR_SYNC = "mirror sync";
+/** A destroyed project's repos to delete. */
+export const TRUNK_DESTROY = "trunk destroy";
 
 const decodeHead = Schema.decodeUnknownEffect(CommitSha);
 const decodeProject = Schema.decodeUnknownSync(ProjectId);
@@ -49,8 +53,10 @@ const statusOf = (trunk: Trunk) => ({ head: trunk.head, promotion: trunk.phase, 
  * batch; the debounce deadline decides the group and writes the WAL, then the
  * push and read-back run, every I/O before the commit it informs. A push to
  * retry and the mirror's sync after an advance are deadlines of their own;
- * a failing deadline is retried 1 s·2ⁿ up to 60 s. Repo-touching: callers
- * place it with the deployment's `locationHint`.
+ * a failing deadline is retried 1 s·2ⁿ up to 60 s. Once destroyed it takes
+ * no batch, its promotion and sync deadlines do nothing, and it deletes its
+ * project's repos on a deadline retried the same way until none is left.
+ * Repo-touching: callers place it with the deployment's `locationHint`.
  */
 export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
   /** Consecutive failures per deadline, for its backoff; an evicted object starts again at 1 s. */
@@ -103,6 +109,16 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
     return this.answer(TrunkCodecs.sync, syncTrunk(this.projectId));
   }
 
+  async destroy(by: string) {
+    const answer = await this.answer(TrunkCodecs.destroy, destroyTrunk(this.projectId, by));
+    await scheduleAlarm(this.ctx.storage, {
+      kind: "deadline",
+      reason: TRUNK_DESTROY,
+      at: Date.now(),
+    });
+    return answer;
+  }
+
   /** A delivered BatchVerified joins the queue; redelivery is a no-op. */
   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
     return trunkHeard(tx, this.projectId, event) ? { drafts: [] } : undefined;
@@ -117,6 +133,14 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
   protected override async onDeadline(request: AlarmRequest): Promise<void> {
     const projectId = this.projectId;
     const { reason } = request;
+    if (reason === TRUNK_DESTROY) {
+      const exit = await this.runtime.runPromiseExit(deleteProjectRepos(projectId));
+      if (Exit.isFailure(exit)) return this.retry(reason, Cause.pretty(exit.cause));
+      if (exit.value.pending > 0)
+        return this.retry(reason, `${exit.value.pending} repos still to delete`);
+      this.failures.delete(reason);
+      return;
+    }
     if (reason === TRUNK_DEBOUNCE || reason === TRUNK_PUSH) {
       const program = Effect.gen(function* () {
         if (reason === TRUNK_DEBOUNCE) yield* flushTrunk(projectId);

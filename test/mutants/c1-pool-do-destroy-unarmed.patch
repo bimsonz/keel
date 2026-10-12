@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts -t "pool.do.destroy"
+# kills: pool.do.destroy
+# why: destroy gives the workspaces up but arms no collection, so their repos stay
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index f03cd79..e672bb5 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -117,11 +117,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+       WorkspacePoolCodecs.destroy,
+       Effect.andThen(destroyPool(project), poolStatus()),
+     );
+-    await scheduleAlarm(this.ctx.storage, {
+-      kind: "deadline",
+-      reason: POOL_COLLECT,
+-      at: Date.now(),
+-    });
+     return answer;
+   }
+ 

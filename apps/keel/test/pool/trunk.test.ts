@@ -189,7 +189,7 @@ async function promoting() {
       await runDurableObjectAlarm(stub);
       await settled();
     }, WAIT);
-  return { projectId, stub, writer, base, composed, verified, status, log, until };
+  return { projectId, stub, code, writer, base, composed, verified, status, log, until };
 }
 
 // Per-project ids, so the isolate's shared memory never mixes two tests' batches.
@@ -283,5 +283,54 @@ describe("the Trunk DO's promotion", () => {
       "TrunkAdvanced",
     ]);
     expect(t.writer.pushes()).toEqual([{ from: moved, to: tip }]);
+  });
+
+  it("[destroy.resumes] a destroyed trunk deletes its project's four repos, trying a failed deletion again until none is left, and promotes nothing meanwhile", async () => {
+    const t = await promoting();
+    const repos = Object.values(projectRepos(t.projectId));
+    await Effect.runPromise(
+      Effect.forEach(repos, (repo) =>
+        Effect.flatMap(CodeHost, (host) => Effect.ignore(host.create(repo))),
+      ).pipe(Effect.provide(t.code.layer)),
+    );
+    expect(t.code.repos.size).toBe(4);
+    // The host fails the mirror's first deletion, as an outage would.
+    const mirror = projectRepos(t.projectId).mirror.name;
+    const mirrorDeletions: string[] = [];
+    const flaky = Layer.effect(
+      CodeHost,
+      Effect.gen(function* () {
+        const inner = yield* CodeHost;
+        return CodeHost.of({
+          ...inner,
+          delete: (repo) => {
+            if (repo.name !== mirror) return inner.delete(repo);
+            mirrorDeletions.push(mirrorDeletions.length === 0 ? "failed" : "deleted");
+            return mirrorDeletions.length === 1
+              ? Effect.die(new Error("the host did not answer"))
+              : inner.delete(repo);
+          },
+        });
+      }),
+    ).pipe(Layer.provide(t.code.layer));
+    await runInDurableObject(t.stub, (instance: TrunkDO, state) => {
+      Reflect.set(
+        instance,
+        "runtime",
+        ManagedRuntime.make(Layer.mergeAll(backbone(state.storage), flaky, t.writer.layer)),
+      );
+    });
+
+    expect(decodeExit(TrunkCodecs.destroy, await t.stub.destroy("user:owner"))).toEqual(Exit.void);
+    expect(decodeExit(TrunkCodecs.destroy, await t.stub.destroy("user:owner"))).toEqual(Exit.void);
+    // A batch verified before the project went: delivered now, it is never queued or pushed.
+    await t.stub.receive([t.verified(1, t.base)]);
+    await t.until(async () => expect(t.code.repos.size).toBe(0));
+    expect(mirrorDeletions).toEqual(["failed", "deleted"]);
+    expect(await t.status()).toEqual(
+      Exit.succeed({ head: t.base, promotion: "idle", redCount: 0 }),
+    );
+    expect((await t.log()).map((e) => e.type)).toEqual(["TrunkInitialized"]);
+    expect(t.writer.pushes()).toEqual([]);
   });
 });

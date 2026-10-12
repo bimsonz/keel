@@ -149,5 +149,31 @@ export function describeWorkspacePoolContract(adapter: string, make: StockedPool
           }),
         ),
     );
+
+    it.live(
+      "[pool.contract.destroy] a destroyed pool grants nothing, not even a holder's own workspace again; destroying twice is a no-op",
+      () =>
+        withPool(make, 2, (projectId) =>
+          Effect.gen(function* () {
+            const pool = yield* WorkspacePool;
+            const who = holder();
+            const held = yield* pool.grant(projectId, who);
+            yield* pool.destroy(projectId);
+            yield* pool.destroy(projectId);
+            expect((yield* Effect.flip(pool.grant(projectId, who)))._tag).toBe("PoolExhausted");
+            expect((yield* Effect.flip(pool.grant(projectId, holder())))._tag).toBe(
+              "PoolExhausted",
+            );
+            // The workspace it held is gone with the pool: a push to it is nobody's.
+            expect(
+              yield* pool.observePush(projectId, randomUlid(), {
+                workspaceId: held.workspaceId,
+                ref: "refs/heads/main",
+                sha: held.baseSha,
+              }),
+            ).toBe("ignored");
+          }),
+        ),
+    );
   });
 }

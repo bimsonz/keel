@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.destroy-stops"
+# kills: trunk.destroy-stops
+# why: a destroyed trunk still syncs its mirror
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index 909e58c..907021c 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -165,7 +165,6 @@ export const syncTrunk = Effect.fn("integration/syncTrunk")(function* (projectId
+ 
+ /** Copies trunk's head into the project's mirror after an advance; staging is the Lane's to move. Idempotent. A destroyed trunk syncs nothing. */
+ export const syncMirror = Effect.fn("integration/syncMirror")(function* (projectId: ProjectId) {
+-  if (trunkDestroyed(yield* EntityStore, projectId)) return undefined;
+   const { head, outcomes } = yield* (yield* TrunkWriter).sync([projectRepos(projectId).mirror]);
+   return { head, mirror: outcomes[0] };
+ });

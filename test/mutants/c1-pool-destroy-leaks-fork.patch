@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts -t "pool.destroy-mid-fork"
+# kills: pool.destroy-mid-fork
+# why: a fork that resolves after its slot was given up is left on the host: nothing collects it again
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 19f3916..408e975 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -246,8 +246,6 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
+         const current = slotOf(tx.store, slot.id);
+         if (current?.state !== "forking") {
+           // Given up while its fork ran, and perhaps deleted before the repo existed: it exists now.
+-          if (current !== undefined)
+-            putSlot(tx.store, { ...current, state: "collecting", since: at });
+           return Result.succeed({ value: false, drafts: [] });
+         }
+         putSlot(tx.store, {

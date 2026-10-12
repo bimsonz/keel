@@ -2,13 +2,13 @@
 # kills: pool.idempotent
 # why: A holder's retry ignores the workspace it holds and asks for another
 diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
-index 548404e..111cb01 100644
+index 19f3916..debfa38 100644
 --- a/packages/core/src/application/coordination/workspace-pool/pool.ts
 +++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
-@@ -73,7 +73,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
-   const host = yield* CodeHost;
+@@ -83,7 +83,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
    // Each lost race leaves one ready slot fewer, so the loop ends; the bound catches a slot that can never be granted.
    for (let attempt = 0; attempt < GRANT_ATTEMPTS; attempt++) {
+     if (isDestroyed(store)) return yield* new PoolExhausted({ retryAfterMs: 15_000 });
 -    const held = heldBy(store, holder);
 +    const held: ReturnType<typeof heldBy> = undefined;
      const slot = held === undefined ? undefined : slotOf(store, held);

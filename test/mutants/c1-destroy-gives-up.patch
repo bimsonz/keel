@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/trunk.test.ts -t "destroy.resumes"
+# kills: destroy.resumes
+# why: a deletion pass that leaves a repo behind is never tried again
+diff --git a/apps/keel/src/adapters/driving/do/trunk.ts b/apps/keel/src/adapters/driving/do/trunk.ts
+index cbfba98..b895afd 100644
+--- a/apps/keel/src/adapters/driving/do/trunk.ts
++++ b/apps/keel/src/adapters/driving/do/trunk.ts
+@@ -136,8 +136,6 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
+     if (reason === TRUNK_DESTROY) {
+       const exit = await this.runtime.runPromiseExit(deleteProjectRepos(projectId));
+       if (Exit.isFailure(exit)) return this.retry(reason, Cause.pretty(exit.cause));
+-      if (exit.value.pending > 0)
+-        return this.retry(reason, `${exit.value.pending} repos still to delete`);
+       this.failures.delete(reason);
+       return;
+     }

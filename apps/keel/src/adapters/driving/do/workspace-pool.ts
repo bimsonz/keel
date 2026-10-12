@@ -2,6 +2,7 @@ import {
   collectOnChangeEnd,
   collectWorkspaces,
   configurePool,
+  destroyPool,
   grantWorkspace,
   observePush,
   poolStatus,
@@ -108,6 +109,20 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
       Effect.flatMap((pushed) => observePush(project, pushId, pushed)),
     );
     return this.answer(WorkspacePoolCodecs.observePush, program);
+  }
+
+  async destroy() {
+    const project = this.project;
+    const answer = await this.answer(
+      WorkspacePoolCodecs.destroy,
+      Effect.andThen(destroyPool(project), poolStatus()),
+    );
+    await scheduleAlarm(this.ctx.storage, {
+      kind: "deadline",
+      reason: POOL_COLLECT,
+      at: Date.now(),
+    });
+    return answer;
   }
 
   /** A change that landed, was withdrawn or was superseded gives its workspace up; redelivery is a no-op. */

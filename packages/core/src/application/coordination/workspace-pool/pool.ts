@@ -33,6 +33,7 @@ import {
   countIn,
   heldBy,
   holdFor,
+  isDestroyed,
   oldestReady,
   type PoolSettings,
   putSettings,
@@ -70,7 +71,8 @@ const handout = (slot: Slot) =>
  * re-mints the token for the same workspace. The choice is re-checked inside
  * the transaction, so concurrent grants never share a workspace; the loser
  * takes the next ready one. The write token is minted after the commit and
- * never stored. Every pool commit is stamped with the pool's `project`.
+ * never stored. Every pool commit is stamped with the pool's `project`. A
+ * destroyed pool grants nothing, not even a holder's own workspace again.
  */
 export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function* (
   project: ProjectId,
@@ -80,6 +82,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
   const host = yield* CodeHost;
   // Each lost race leaves one ready slot fewer, so the loop ends; the bound catches a slot that can never be granted.
   for (let attempt = 0; attempt < GRANT_ATTEMPTS; attempt++) {
+    if (isDestroyed(store)) return yield* new PoolExhausted({ retryAfterMs: 15_000 });
     const held = heldBy(store, holder);
     const slot = held === undefined ? undefined : slotOf(store, held);
     if (slot !== undefined) {
@@ -108,7 +111,8 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
         if (
           chosen?.state !== "ready" ||
           chosen.baseSha === undefined ||
-          heldBy(tx.store, holder) !== undefined
+          heldBy(tx.store, holder) !== undefined ||
+          isDestroyed(tx.store)
         ) {
           return Result.fail("taken" as const);
         }
@@ -189,7 +193,9 @@ export const observePush = Effect.fn("coordination/observePush")(function* (
  * (a fork is ready when the call resolves, spike S2); each that resolves
  * commits `ready` with `WorkspaceForked`, and each that fails is collected.
  * Names come from fresh workspace ids, so a name is never reused. A slot left
- * forking by a refill that died is collected.
+ * forking by a refill that died is collected. A slot given up while its fork
+ * ran (the pool was destroyed) is collected again once the fork resolves, as
+ * its repo exists from then. A destroyed pool forks nothing.
  */
 export const refillPool = Effect.fn("coordination/refillPool")(function* (project: ProjectId) {
   const store = yield* EntityStore;
@@ -200,7 +206,7 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
   for (const slot of stuck) yield* markCollecting(project, slot.id, "fork-abandoned");
   const source = settings.source;
   const need = settings.target - countIn(store, "ready") - countIn(store, "forking");
-  if (source === null || need <= 0)
+  if (source === null || need <= 0 || isDestroyed(store))
     return { started: 0, ready: 0, failed: 0, abandoned: stuck.length } satisfies RefillReport;
 
   const fresh: Slot[] = [];
@@ -234,11 +240,16 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
       continue;
     }
     const at = yield* (yield* Clock).now;
-    yield* commit(
+    const forked = yield* commit(
       { entity: { kind: "workspace", id: slot.id }, cause: `forked:${slot.id}`, project },
       (tx) => {
         const current = slotOf(tx.store, slot.id);
-        if (current?.state !== "forking") return Result.succeed({ value: undefined, drafts: [] });
+        if (current?.state !== "forking") {
+          // Given up while its fork ran, and perhaps deleted before the repo existed: it exists now.
+          if (current !== undefined)
+            putSlot(tx.store, { ...current, state: "collecting", since: at });
+          return Result.succeed({ value: false, drafts: [] });
+        }
         putSlot(tx.store, {
           ...current,
           state: "ready",
@@ -247,7 +258,7 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
           baseSha: outcome.value.baseSha,
         });
         return Result.succeed({
-          value: undefined,
+          value: true,
           drafts: [
             draft(WorkspaceForked, {
               _tag: "WorkspaceForked",
@@ -259,7 +270,7 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
         });
       },
     );
-    ready += 1;
+    if (forked.duplicate || forked.value) ready += 1;
   }
   return {
     started: fresh.length,
@@ -313,6 +324,40 @@ export const releaseWorkspace = Effect.fn("coordination/releaseWorkspace")(funct
         ? Result.fail(new WorkspaceNotFound({ workspaceId }))
         : Result.succeed({ value: undefined, drafts: collectIn(tx, workspaceId, reason, now) }),
   );
+});
+
+/**
+ * Destroys the project's pool, for good: it forks and grants nothing from
+ * here on, and every workspace it holds (ready, granted or still forking) is
+ * given up for collection, which deletes its repo. A ready or granted one
+ * commits `WorkspaceCollected` as a release does. Destroying again is a no-op.
+ */
+export const destroyPool = Effect.fn("coordination/destroyPool")(function* (project: ProjectId) {
+  const store = yield* EntityStore;
+  yield* commit(
+    { entity: { kind: "project", id: project }, cause: "destroy-pool", project },
+    (tx) => {
+      putSettings(tx.store, { ...settingsOf(tx.store), target: 0, destroyed: true });
+      return Result.succeed({ value: undefined, drafts: [] });
+    },
+  );
+  for (const slot of slots(store)) {
+    if (slot.state === "collecting" || slot.state === "collected") continue;
+    const now = yield* (yield* Clock).now;
+    yield* commit(
+      { entity: { kind: "workspace", id: slot.id }, cause: `destroy:${slot.id}`, project },
+      (tx) => {
+        const current = slotOf(tx.store, slot.id);
+        if (current?.state !== "forking")
+          return Result.succeed({
+            value: undefined,
+            drafts: collectIn(tx, slot.id, "withdrawn", now),
+          });
+        putSlot(tx.store, { ...current, state: "collecting", since: now });
+        return Result.succeed({ value: undefined, drafts: [] });
+      },
+    );
+  }
 });
 
 /** How a change's end collects its workspace: superseded counts as withdrawn. */
@@ -399,6 +444,8 @@ export interface PoolStatus {
   readonly forking: number;
   readonly granted: number;
   readonly collecting: number;
+  /** The project was destroyed: once `collecting` is 0, none of its workspace repos is left. */
+  readonly destroyed: boolean;
 }
 
 export const poolStatus = Effect.fn("coordination/poolStatus")(function* () {
@@ -411,10 +458,11 @@ export const poolStatus = Effect.fn("coordination/poolStatus")(function* () {
     forking: countIn(store, "forking"),
     granted: countIn(store, "granted"),
     collecting: countIn(store, "collecting"),
+    destroyed: isDestroyed(store),
   } satisfies PoolStatus;
 });
 
-/** Sets what the pool forks from and how many ready workspaces it keeps. `project` is the pool's project, the entity the change is recorded on. */
+/** Sets what the pool forks from and how many ready workspaces it keeps; a destroyed pool stays destroyed. `project` is the pool's project, the entity the change is recorded on. */
 export const configurePool = Effect.fn("coordination/configurePool")(function* (
   project: ProjectId,
   settings: PoolSettings,
@@ -423,7 +471,7 @@ export const configurePool = Effect.fn("coordination/configurePool")(function* (
   yield* commit(
     { entity: { kind: "project", id: project }, cause: `configure-pool@${now}`, project },
     (tx) => {
-      putSettings(tx.store, settings);
+      putSettings(tx.store, { ...settings, destroyed: isDestroyed(tx.store) });
       return Result.succeed({ value: undefined, drafts: [] });
     },
   );

@@ -33,7 +33,7 @@ export const PoolConfig = Schema.Struct({
   target: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 });
 
-/** Workspaces by state. `forking` are not yet grantable; `collecting` are released and awaiting their repo's deletion. */
+/** Workspaces by state. `forking` are not yet grantable; `collecting` are released and awaiting their repo's deletion. A `destroyed` pool with none collecting has no repo left. */
 export const PoolStatus = Schema.Struct({
   source: Schema.NullOr(RepoRef),
   target: Schema.Int,
@@ -41,6 +41,7 @@ export const PoolStatus = Schema.Struct({
   forking: Schema.Int,
   granted: Schema.Int,
   collecting: Schema.Int,
+  destroyed: Schema.Boolean,
 });
 
 export const WorkspacePoolCodecs = {
@@ -49,6 +50,7 @@ export const WorkspacePoolCodecs = {
   configure: exitCodec(PoolStatus, Schema.Never),
   status: exitCodec(PoolStatus, Schema.Never),
   observePush: exitCodec(PushObservation, Schema.Never),
+  destroy: exitCodec(PoolStatus, Schema.Never),
 };
 
 /** The WorkspacePool DO (`pool:<project>`): pre-forked workspaces and sketches. */
@@ -64,4 +66,13 @@ export interface WorkspacePoolRpc {
   status(): Promise<ExitJson>;
   /** WorkspacePushed for a push to a granted workspace, once per `pushId`; any other push is ignored. */
   observePush(pushId: string, push: typeof ObservedPush.Encoded): Promise<ExitJson>;
+  /**
+   * Destroys the pool for good, when its project is deleted: it grants and
+   * forks nothing from here on, and deletes every workspace repo it holds on
+   * its collection deadline, retried until none is left. Idempotent; answers
+   * the pool's status, whose `collecting` counts the repos still to delete.
+   * A grant then answers PoolExhausted: the caller commits ProjectDeleted
+   * before it destroys, so the retry meets the gate's 404 for the project.
+   */
+  destroy(): Promise<ExitJson>;
 }

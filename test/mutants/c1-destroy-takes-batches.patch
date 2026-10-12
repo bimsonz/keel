@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.destroy"
+# kills: trunk.destroy
+# why: a destroyed trunk still queues a verified batch
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index 909e58c..8e1133c 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -238,7 +238,7 @@ export const trunkHeard = (
+   projectId: ProjectId,
+   event: EventEnvelope,
+ ): boolean => {
+-  if (event.type !== "BatchVerified" || trunkDestroyed(tx.store, projectId)) return false;
++  if (event.type !== "BatchVerified") return false;
+   const verified = decodeVerified(event.payload);
+   const { members, base } = verified;
+   if (members === undefined || base === undefined)

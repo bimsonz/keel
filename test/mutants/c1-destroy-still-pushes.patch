@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.destroy-stops"
+# kills: trunk.destroy-stops
+# why: a destroyed trunk still pushes the group it had opened
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index 909e58c..bd8f9c7 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -359,7 +359,6 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+ ) {
+   const opened = trunkOf(yield* EntityStore, projectId);
+   const wal = opened?.wal;
+-  if (trunkDestroyed(yield* EntityStore, projectId)) return "idle" satisfies PushOutcome;
+   if (opened?.phase !== "promoting" || wal === undefined) return restingAs(opened);
+   if (wal.composed === undefined) {
+     const [batch, ...more] = wal.batches;

@@ -33,6 +33,7 @@ export const TrunkCodecs = {
   resume: exitCodec(TrunkStatus, Schema.Never),
   initialize: exitCodec(TrunkStatus, PromotionStateRefused),
   sync: exitCodec(TrunkSync, Schema.Union([RepoNotFound, PackTooLarge])),
+  destroy: exitCodec(Schema.Void, Schema.Never),
 };
 
 /** The Trunk DO (`trunk:<project>`): the one writer of trunk. Promotion is driven by `BatchVerified`, not by RPC. */
@@ -54,4 +55,12 @@ export interface TrunkRpc {
    * has one writer, the Lane.
    */
   sync(): Promise<ExitJson>;
+  /**
+   * Destroys the trunk for good, when its project is deleted: it takes no
+   * batch and promotes nothing from here on, and deletes the project's trunk,
+   * staging, mirror and guards repos on a deadline of its own, retried until
+   * none is left. Idempotent. The caller commits ProjectDeleted first, so
+   * whatever is refused here meets the gate's 404 for the project on a retry.
+   */
+  destroy(by: string): Promise<ExitJson>;
 }
