@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/git-harness.test.ts
+# kills: harness.no-background-git
+# why: git reads no config again, so its auto-maintenance is on: a fetch or a push leaves a detached repack behind it, writing into a directory the test removes
+diff --git a/packages/gitcore/test/git-harness.ts b/packages/gitcore/test/git-harness.ts
+index 6404510..1f096b1 100644
+--- a/packages/gitcore/test/git-harness.ts
++++ b/packages/gitcore/test/git-harness.ts
+@@ -19,7 +19,7 @@ import { type CommitInfo, decodeCommit, decodeTree, type TreeEntry } from "../sr
+ export const GIT_ENV = {
+   ...process.env,
+   GIT_CONFIG_NOSYSTEM: "1",
+-  GIT_CONFIG_GLOBAL: join(import.meta.dirname, "harness.gitconfig"),
++  GIT_CONFIG_GLOBAL: "/dev/null",
+   GIT_AUTHOR_NAME: "t",
+   GIT_AUTHOR_EMAIL: "t@example.com",
+   GIT_COMMITTER_NAME: "t",

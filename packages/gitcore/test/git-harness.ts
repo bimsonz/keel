@@ -9,10 +9,17 @@ import { join } from "node:path";
 import { MissingObject, type TreeReader } from "../src/diff.ts";
 import { type CommitInfo, decodeCommit, decodeTree, type TreeEntry } from "../src/objects.ts";
 
+/**
+ * Every git child's environment. Its one config file turns auto-maintenance
+ * off: a fetch or a receive-pack otherwise starts `git maintenance run --auto
+ * --detach`, which from git 2.54 repacks after its command has returned and
+ * re-creates files in a repo the test is removing (ENOTEMPTY on the temp
+ * directory, on CI).
+ */
 export const GIT_ENV = {
   ...process.env,
   GIT_CONFIG_NOSYSTEM: "1",
-  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_GLOBAL: join(import.meta.dirname, "harness.gitconfig"),
   GIT_AUTHOR_NAME: "t",
   GIT_AUTHOR_EMAIL: "t@example.com",
   GIT_COMMITTER_NAME: "t",
@@ -40,6 +47,8 @@ export interface GitSyncOptions {
   readonly input?: string | Uint8Array | undefined;
   readonly maxBuffer?: number | undefined;
   readonly timeoutMs?: number | undefined;
+  /** Variables set over GIT_ENV for this child (and every git it starts). */
+  readonly env?: Readonly<Record<string, string>> | undefined;
 }
 
 /** The subcommand of a git command line, past its `-c key=value` pairs and flags. */
@@ -63,7 +72,7 @@ export function gitSync(args: string[], opts: GitSyncOptions = {}) {
   const timeoutMs = opts.timeoutMs ?? GIT_TIMEOUT_MS;
   const run = spawnSync("git", args, {
     cwd: opts.cwd,
-    env: GIT_ENV,
+    env: opts.env === undefined ? GIT_ENV : { ...GIT_ENV, ...opts.env },
     input: opts.input,
     maxBuffer: opts.maxBuffer ?? 1 << 28,
     timeout: timeoutMs,

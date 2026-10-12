@@ -1,0 +1,5 @@
+# The global config of every git child gitcore's tests start (git-harness.ts, GIT_ENV).
+# It is a file, not GIT_CONFIG_COUNT: git drops those variables from the
+# environment of the receive-pack a push to a local path starts.
+[maintenance]
+	auto = false

@@ -260,7 +260,8 @@ describe("restack", { timeout: PROPERTY_TIMEOUT }, () => {
     ]);
     const members = heads.map((h, i) => memberOf(i, base, h));
     const once = await restack(wsReader, base, members, KEEL);
-    const again = await restack(new CatFileReader(workspaces.dir), base, members, KEEL);
+    const fresh = new CatFileReader(workspaces.dir);
+    const again = await restack(fresh, base, members, KEEL).finally(() => fresh.close());
     expect(again).toEqual(once);
     const later = await restack(wsReader, base, members, { ...KEEL, time: KEEL.time + 1 });
     expect(later.commits.map((c) => c.tree)).toEqual(once.commits.map((c) => c.tree));
