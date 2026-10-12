@@ -15899,12 +15899,53 @@
           },
           "proposition": {
             "$ref": "#/components/schemas/EventProposition"
+          },
+          "evidence": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SuspectEvidence"
+              }
+            ],
+            "description": "How the effect is known, as fallout judged it. Absent on older events."
           }
         },
         "additionalProperties": {
           "not": {}
         },
         "description": "The effect that contradicts the premise, and the change making it."
+      },
+      "SuspectEvidence": {
+        "type": "object",
+        "required": [
+          "declared",
+          "evidenceClass"
+        ],
+        "properties": {
+          "declared": {
+            "type": "boolean"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "extractor",
+              "clef",
+              "code-model"
+            ]
+          },
+          "evidenceClass": {
+            "type": "string",
+            "enum": [
+              "proof",
+              "ruling",
+              "testimony",
+              "opinion"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "How a suspect effect is known. With no `method` it is the agent's own claim: `declared` is true and the class is\n`testimony`. With a method Keel derived it, and the method fixes the class: `extractor` is a `ruling`, `clef` and\n`code-model` are `opinion`; `declared` then says whether the agent's declared effects spoke for it. Core refuses any\nother combination."
       },
       "SuspectPremise": {
         "type": "object",

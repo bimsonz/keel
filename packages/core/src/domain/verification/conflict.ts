@@ -4,12 +4,20 @@ import {
   ConflictId,
   DecisionId,
   EscalationId,
+  EvidenceClass,
   InstantSchema,
   ProbeId,
   SubjectId,
   TenetId,
 } from "../kernel/index.ts";
-import { Move, Predicate, Proposition, SubjectKey } from "../coordination/index.ts";
+import {
+  DerivationMethod,
+  type JudgedEffect,
+  Move,
+  Predicate,
+  Proposition,
+  SubjectKey,
+} from "../coordination/index.ts";
 
 /** Footprint overlap is not a kind: proximity is exposure and never opens a conflict. */
 /**
@@ -20,8 +28,48 @@ import { Move, Predicate, Proposition, SubjectKey } from "../coordination/index.
 export const SuspectPremise = Schema.Struct({ holder: ChangeId, proposition: Proposition });
 export type SuspectPremise = typeof SuspectPremise.Type;
 
+/** The evidence class each derivation method gives, as on a DerivedEffect. */
+const CLASS_OF: Readonly<Record<DerivationMethod, EvidenceClass>> = {
+  extractor: "ruling",
+  clef: "opinion",
+  "code-model": "opinion",
+};
+
+/**
+ * How a suspect effect is known, as fallout judged it. With no method it is
+ * the agent's own claim: declared, and testimony. With a method Keel derived
+ * it, and the method fixes the evidence class as it does on a DerivedEffect:
+ * an extractor rules, a model has an opinion. `declared` then says whether the
+ * agent's declared effects spoke for what Keel derived.
+ */
+export const SuspectEvidence = Schema.Struct({
+  declared: Schema.Boolean,
+  method: Schema.optional(DerivationMethod),
+  evidenceClass: EvidenceClass,
+}).check(
+  Schema.makeFilter(
+    (e) =>
+      (e.method === undefined
+        ? e.declared && e.evidenceClass === "testimony"
+        : e.evidenceClass === CLASS_OF[e.method]) ||
+      "an effect with no method is its agent's declared testimony; a method fixes the evidence class",
+  ),
+);
+export type SuspectEvidence = typeof SuspectEvidence.Type;
+
+/** The evidence of an effect as fallout judged it: what a ConflictSuspected says of its effect. */
+export const suspectEvidence = (judged: JudgedEffect): SuspectEvidence =>
+  judged.method === "declared"
+    ? { declared: true, evidenceClass: "testimony" }
+    : { declared: judged.declared, method: judged.method, evidenceClass: judged.evidenceClass };
+
 /** The effect that contradicts the premise, and the change making it. */
-export const SuspectEffect = Schema.Struct({ changeId: ChangeId, proposition: Proposition });
+export const SuspectEffect = Schema.Struct({
+  changeId: ChangeId,
+  proposition: Proposition,
+  /** How the effect is known. Absent on events older than the field. */
+  evidence: Schema.optional(SuspectEvidence),
+});
 export type SuspectEffect = typeof SuspectEffect.Type;
 
 export const ConflictKind = Schema.Literals(["textual", "semantic", "precedent", "interaction"]);

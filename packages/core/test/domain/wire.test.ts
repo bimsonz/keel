@@ -8,8 +8,10 @@ import { describe, expect, it } from "vitest";
 import {
   ChangeBounced,
   DecisionModelEffect,
+  declaredEffect,
   DerivedEffect,
   InvalidProbeCost,
+  type JudgedEffect,
   PlanCompiled,
   Proposition,
 } from "../../src/domain/coordination/index.ts";
@@ -17,10 +19,13 @@ import { TrunkAdvanced } from "../../src/domain/integration/index.ts";
 import { CommitSha, InstantSchema, makeId } from "../../src/domain/kernel/index.ts";
 import { Tenet, TenetEstablished } from "../../src/domain/memory/index.ts";
 import {
+  ConflictSuspected,
   GateThreshold,
   GuardFailed,
   OpinionAsk,
   StepResult,
+  SuspectEvidence,
+  suspectEvidence,
   VerdictIssued,
   VerificationPlan,
   WorldCheckRan,
@@ -33,6 +38,17 @@ const decodes =
   (value: unknown): boolean => {
     try {
       Schema.decodeUnknownSync(schema)(value);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+const encodes =
+  (schema: Schema.Codec<unknown>) =>
+  (value: unknown): boolean => {
+    try {
+      Schema.encodeUnknownSync(schema)(value);
       return true;
     } catch {
       return false;
@@ -101,6 +117,69 @@ const effect = (fields: object) => ({
   declared: false,
   ...fields,
 });
+
+const HOLDER = makeId("chg", ulid(8));
+const CLAIM = Schema.decodeUnknownSync(Proposition)({
+  subject: "authz.permission-evaluation",
+  predicate: "freshness",
+  relation: "is",
+  value: "per-session",
+});
+/** A semantic conflict whose effect carries these extra fields. */
+const suspected = (extra: object) => ({
+  _tag: "ConflictSuspected",
+  conflictId: CONFLICT,
+  kind: "semantic",
+  parties: [CHANGE, HOLDER],
+  premise: { holder: HOLDER, proposition: CLAIM },
+  effect: { changeId: CHANGE, proposition: CLAIM, ...extra },
+});
+/** A ConflictSuspected as it comes back from the log: decoded, encoded, through JSON, decoded. */
+const suspectedBack = (extra: object): typeof ConflictSuspected.Type =>
+  Schema.decodeUnknownSync(ConflictSuspected)(
+    JSON.parse(
+      JSON.stringify(
+        Schema.encodeSync(ConflictSuspected)(
+          Schema.decodeUnknownSync(ConflictSuspected)(suspected(extra)),
+        ),
+      ),
+    ),
+  );
+
+/**
+ * Every way a suspect effect may be known, written out apart from the schema.
+ * With no method it is the agent's own claim. With one, Keel derived it, and
+ * the agent's declared effects may or may not have spoken for it.
+ */
+const LAWFUL_EVIDENCE: readonly object[] = [
+  { declared: true, evidenceClass: "testimony" },
+  { declared: true, method: "extractor", evidenceClass: "ruling" },
+  { declared: false, method: "extractor", evidenceClass: "ruling" },
+  { declared: true, method: "clef", evidenceClass: "opinion" },
+  { declared: false, method: "clef", evidenceClass: "opinion" },
+  { declared: true, method: "code-model", evidenceClass: "opinion" },
+  { declared: false, method: "code-model", evidenceClass: "opinion" },
+];
+/** Every evidence the wire could carry: declared or not, by no method or one of three, in each class. */
+const EVERY_EVIDENCE: readonly object[] = [true, false].flatMap((declared) =>
+  [undefined, "extractor", "clef", "code-model"].flatMap((method) =>
+    ["proof", "ruling", "testimony", "opinion"].map((evidenceClass) => ({
+      declared,
+      ...(method === undefined ? {} : { method }),
+      evidenceClass,
+    })),
+  ),
+);
+/** Whether two flat records hold the same fields with the same values, in any order. */
+const sameRecord = (a: object, b: object): boolean =>
+  Object.keys(a).length === Object.keys(b).length &&
+  Object.entries(a).every(([key, value]) => Reflect.get(b, key) === value);
+const isLawfulEvidence = (evidence: object): boolean =>
+  LAWFUL_EVIDENCE.some((lawful) => sameRecord(lawful, evidence));
+
+/** A derived effect as fallout holds it, decoded from its wire form. */
+const derived = (fields: object): JudgedEffect =>
+  Schema.decodeUnknownSync(DerivedEffect)(effect(fields));
 
 const nextActionArb = fc.record(
   {
@@ -232,6 +311,53 @@ describe("the wire", () => {
       effect({ method: "extractor", evidenceClass: "ruling", p: 0.9 }),
     );
     expect(ruled).not.toHaveProperty("p");
+  });
+
+  it("[events.suspect-evidence-shape] a suspect effect's evidence has no method and is declared testimony, or has a method that fixes its class, and survives the wire; an effect without it stays without", () => {
+    expect(EVERY_EVIDENCE).toHaveLength(32);
+    const taken = EVERY_EVIDENCE.filter((evidence) =>
+      decodes(ConflictSuspected)(suspected({ evidence })),
+    );
+    expect(taken).toEqual(EVERY_EVIDENCE.filter(isLawfulEvidence));
+    expect(taken).toHaveLength(LAWFUL_EVIDENCE.length);
+    // Fallout writes the event, it does not read it: encoding refuses what decoding does.
+    const written = EVERY_EVIDENCE.filter((evidence) =>
+      encodes(ConflictSuspected)(suspected({ evidence })),
+    );
+    expect(written).toEqual(EVERY_EVIDENCE.filter(isLawfulEvidence));
+
+    for (const evidence of LAWFUL_EVIDENCE)
+      expect(suspectedBack({ evidence }).effect?.evidence).toStrictEqual(evidence);
+
+    // An event written before the field decodes, and gains nothing on the way.
+    const older = suspectedBack({});
+    expect(older.effect).toStrictEqual({ changeId: CHANGE, proposition: CLAIM });
+  });
+
+  it("[events.suspect-evidence-of-judged] the evidence of a judged effect is lawful and says what the effect says: its method, its class, and whether it was declared", () => {
+    const judged: readonly JudgedEffect[] = [
+      declaredEffect(CLAIM),
+      ...[true, false].flatMap((declared) => [
+        derived({ declared, method: "extractor", evidenceClass: "ruling" }),
+        derived({ declared, method: "clef", evidenceClass: "opinion", p: 0.6 }),
+        derived({ declared, method: "code-model", evidenceClass: "opinion" }),
+      ]),
+    ];
+    const evidence = judged.map(suspectEvidence);
+    expect(evidence).toStrictEqual([
+      { declared: true, evidenceClass: "testimony" },
+      { declared: true, method: "extractor", evidenceClass: "ruling" },
+      { declared: true, method: "clef", evidenceClass: "opinion" },
+      { declared: true, method: "code-model", evidenceClass: "opinion" },
+      { declared: false, method: "extractor", evidenceClass: "ruling" },
+      { declared: false, method: "clef", evidenceClass: "opinion" },
+      { declared: false, method: "code-model", evidenceClass: "opinion" },
+    ]);
+    expect(evidence.filter((one) => !decodes(SuspectEvidence)(one))).toEqual([]);
+    // Between them they are every lawful evidence: nothing fallout judges is left unsayable.
+    expect(
+      LAWFUL_EVIDENCE.filter((lawful) => !evidence.some((one) => sameRecord(lawful, one))),
+    ).toEqual([]);
   });
 
   it("[events.verdict-next-actions] a verdict's next actions, set by its issuer, survive the wire unchanged; a verdict without them stays without", () => {

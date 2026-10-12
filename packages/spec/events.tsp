@@ -821,6 +821,21 @@ model SuspectPremise {
 model SuspectEffect {
   changeId: ChangeId;
   proposition: EventProposition;
+
+  /** How the effect is known, as fallout judged it. Absent on older events. */
+  evidence?: SuspectEvidence;
+}
+
+/**
+ * How a suspect effect is known. With no `method` it is the agent's own claim: `declared` is true and the class is
+ * `testimony`. With a method Keel derived it, and the method fixes the class: `extractor` is a `ruling`, `clef` and
+ * `code-model` are `opinion`; `declared` then says whether the agent's declared effects spoke for it. Core refuses any
+ * other combination.
+ */
+model SuspectEvidence {
+  declared: boolean;
+  method?: "extractor" | "clef" | "code-model";
+  evidenceClass: "proof" | "ruling" | "testimony" | "opinion";
 }
 
 model ProbeDrafted {
