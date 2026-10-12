@@ -19,7 +19,7 @@ import {
 import { LEGAL } from "../legal/legal.ts";
 import { Footer } from "../views/Footer.tsx";
 import { Invite, NewOrg, OrgPages } from "./OrgPages.tsx";
-import { Card, HANDLE, Refusal, go, useAsking } from "./parts.tsx";
+import { Card, HANDLE, Refusal, type Said, go, saidOf, useAsking } from "./parts.tsx";
 // oxlint-disable-next-line import/no-unassigned-import -- a stylesheet
 import "../views/tokens.css";
 
@@ -458,7 +458,7 @@ function Device({ account, who, userCode }: { account: Account; who: Who; userCo
   const [typed, setTyped] = useState("");
   const [claimed, setClaimed] = useState(false);
   const [answer, setAnswer] = useState<"approved" | "denied" | null>(null);
-  const [unclaimed, setUnclaimed] = useState<string | null>(null);
+  const [unclaimed, setUnclaimed] = useState<Said | null>(null);
   const { busy, refused, ask } = useAsking();
   // Opening the page with a code claims it for whoever is signed in. Nothing is approved by that.
   useEffect(() => {
@@ -469,8 +469,7 @@ function Device({ account, who, userCode }: { account: Account; who: Who; userCo
         await account.claimDevice(userCode);
         if (here) setClaimed(true);
       } catch (error) {
-        if (here)
-          setUnclaimed(error instanceof Error ? error.message : "Keel could not be reached");
+        if (here) setUnclaimed(saidOf(error));
       }
     };
     void claim();

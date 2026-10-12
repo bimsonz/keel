@@ -2,15 +2,15 @@
 # kills: orgs.invite
 # why: an invitation made to someone else is not read as none: the page is given Keel's refusal to show
 diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
-index d254bb8..747eddb 100644
+index 2cca937..5ba4849 100644
 --- a/apps/console/src/account/account.ts
 +++ b/apps/console/src/account/account.ts
-@@ -424,7 +424,7 @@ export function createAccount(options: AccountOptions) {
-     async invitation(id: string): Promise<Invited | null> {
-       const asked = await client.organization.getInvitation({ query: { id } });
-       // Keel refuses one that is answered, lapsed, someone else's or not there, and a page tells none of them apart.
+@@ -464,7 +464,7 @@ export function createAccount(options: AccountOptions) {
+       const closed = CLOSED.get(asked.error?.code ?? "");
+       if (closed !== undefined) return { closed, said: asked.error?.message ?? UNSAID };
+       // One that is someone else's and one that is not there Keel refuses alike, and a page tells neither apart.
 -      if (asked.error?.status === 400 || asked.error?.status === 403) return null;
-+      if (asked.error?.status === 400) return null;
++      if (asked.error?.status === 403) return null;
        const answer: typeof asked.data & { inviterHandle?: string } = taken(asked);
        if (answer.status !== "pending") return null;
        return {

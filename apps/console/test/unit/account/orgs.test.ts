@@ -118,8 +118,80 @@ describe("an org, to its members", () => {
       ["maintainer", true],
       ["owner", false],
     ]);
-    // Answered, it is no longer an invitation.
-    expect(await grace.account.invitation(invitation.id)).toBeNull();
+    // Answered, it is no longer one she can take.
+    expect(await grace.account.invitation(invitation.id)).toMatchObject({ closed: "answered" });
+  });
+
+  it("[orgs.answered] tells the person an invitation was made to that it was answered, in Keel's own words, and tells nobody else", async () => {
+    const { identity, ada, grace, org } = await lovelace();
+    const eve = await person(identity, "eve");
+    const joined = await ada.account.invite(org, { handle: "grace" }, "member");
+    await grace.account.acceptInvitation(joined.id);
+    expect(await grace.account.invitation(joined.id)).toEqual({
+      closed: "answered",
+      said: "This invitation was already accepted",
+    });
+    const declined = await ada.account.invite(org, { handle: "eve" }, "member");
+    await eve.account.declineInvitation(declined.id);
+    expect(await eve.account.invitation(declined.id)).toEqual({
+      closed: "answered",
+      said: "This invitation was already rejected",
+    });
+    const withdrawn = await ada.account.invite(org, { handle: "eve" }, "member");
+    await ada.account.cancelInvitation(withdrawn.id);
+    expect(await eve.account.invitation(withdrawn.id)).toEqual({
+      closed: "answered",
+      said: "This invitation was already canceled",
+    });
+    // To anyone else each is still one that is not there: to the member who made it, and to another member.
+    expect(await ada.account.invitation(joined.id)).toBeNull();
+    expect(await grace.account.invitation(declined.id)).toBeNull();
+    // Answering it a second time is refused in the same words.
+    await expect(grace.account.acceptInvitation(joined.id)).rejects.toMatchObject({
+      code: "INVITATION_ANSWERED",
+      message: "This invitation was already accepted",
+    });
+  });
+
+  it("[orgs.lapsed] tells them that an invitation has lapsed, in Keel's own words, and Keel takes no answer to it", async () => {
+    const { identity, ada, grace, org } = await lovelace();
+    const invitation = await ada.account.invite(org, { handle: "grace" }, "member");
+    await identity.lapse(invitation.id);
+    expect(await grace.account.invitation(invitation.id)).toEqual({
+      closed: "lapsed",
+      said: "This invitation has lapsed; ask the org for a new one",
+    });
+    await expect(grace.account.acceptInvitation(invitation.id)).rejects.toMatchObject({
+      code: "INVITATION_LAPSED",
+      message: "This invitation has lapsed; ask the org for a new one",
+    });
+    expect(await grace.account.org("lovelace", grace.who)).toBeNull();
+    expect(await ada.account.invitation(invitation.id)).toBeNull();
+  });
+
+  it("[orgs.only-owner] gives an org's only owner Keel's refusal with the way forward Keel names, and lets them go once there is another owner", async () => {
+    const { ada, grace, org } = await lovelace();
+    const invitation = await ada.account.invite(org, { handle: "grace" }, "member");
+    await grace.account.acceptInvitation(invitation.id);
+    const left: unknown = await ada.account.leave(org).catch((error: unknown) => error);
+    expect(left).toBeInstanceOf(Refused);
+    expect(left).toMatchObject({
+      code: "ONLY_OWNER",
+      message:
+        "An org always has an owner: make another member an owner before you leave or step down",
+      next: ["Make another member an owner first"],
+    });
+    // A refusal Keel gives no way forward with carries none.
+    const taken: unknown = await grace.account
+      .createOrg("Mine too", "lovelace")
+      .catch((error: unknown) => error);
+    expect(taken).toBeInstanceOf(Refused);
+    expect(taken).toMatchObject({ next: [] });
+    const member = (await ada.account.org("lovelace", ada.who))?.members.find((m) => !m.you);
+    if (member === undefined) throw new Error("she did not join");
+    await ada.account.setRole(org, member, "owner");
+    await ada.account.leave(org);
+    expect(await ada.account.org("lovelace", ada.who)).toBeNull();
   });
 
   it("[orgs.no-address] gives a page no member's address, and not the one a handle was resolved to, though Keel's answers carry them", async () => {

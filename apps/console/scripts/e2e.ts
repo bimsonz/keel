@@ -2230,6 +2230,18 @@ expectEqual(
   `${whereOf(grace)} ${squash(await grace.getByRole("heading", { level: 1 }).innerText())}`,
   "/orgs/lovelace Lovelace maintainer",
 );
+/** An invitation's page where it is no longer one to answer: its heading, and what is said under it. */
+const closedOf = async (shown: Page): Promise<string> => {
+  await shown.getByRole("heading", { level: 1 }).waitFor();
+  return `${squash(await shown.getByRole("heading", { level: 1 }).innerText())}: ${squash(await shown.locator("main h1 + p").innerText())}`;
+};
+// The link still opens. Keel tells her what became of the invitation, and the page says it in Keel's words.
+await grace.goto(invitation.href, { waitUntil: "domcontentloaded" });
+expectEqual(
+  "orgs: answered, the invitation says so to the person it was made to, in Keel's own words",
+  await closedOf(grace),
+  "This invitation has been answered: This invitation was already accepted",
+);
 
 // The owner changes her role, and then removes her.
 await person.goto(`${built}/orgs/lovelace/members`, { waitUntil: "domcontentloaded" });
@@ -2262,6 +2274,53 @@ expectEqual(
   String(await grace.getByRole("navigation", { name: "Org" }).count()),
   "0",
 );
+
+// Ada invites her again, as an owner, and nobody answers in time. Keel says it has lapsed, and so does the page.
+const inviteAsOwner = async (): Promise<URL> => {
+  await person.getByLabel("Invite by handle").fill("grace");
+  await person.getByLabel("Role for the invitation").selectOption("owner");
+  await person.getByRole("button", { name: "Invite", exact: true }).click();
+  await link.waitFor();
+  return new URL(await link.innerText());
+};
+const late = await inviteAsOwner();
+await identity.lapse(late.pathname.slice("/invite/".length));
+await grace.goto(late.href, { waitUntil: "domcontentloaded" });
+expectEqual(
+  "orgs: lapsed, the invitation says so to the person it was made to, in Keel's own words",
+  await closedOf(grace),
+  "This invitation has lapsed: This invitation has lapsed; ask the org for a new one",
+);
+await person.getByRole("button", { name: "Withdraw" }).click();
+await link.waitFor({ state: "detached" });
+const asOwner = await inviteAsOwner();
+await grace.goto(asOwner.href, { waitUntil: "domcontentloaded" });
+await grace.getByRole("button", { name: "Join" }).click();
+await grace.getByRole("heading", { level: 1, name: /^Lovelace/ }).waitFor();
+
+// An org always has an owner. With two, each is offered a way out; the other owner takes hers first, and Ada's
+// page is behind. Keel refuses the only owner, and the page says so in Keel's words, with the way forward it gave.
+await person.goto(`${built}/orgs/lovelace/members`, { waitUntil: "domcontentloaded" });
+const leave = person.getByRole("button", { name: "Leave" });
+await leave.waitFor();
+await grace.goto(`${built}/orgs/lovelace/members`, { waitUntil: "domcontentloaded" });
+await grace.getByRole("button", { name: "Leave" }).click();
+await grace.waitForURL(`${built}/settings`);
+await leave.click();
+await Promise.race([person.getByRole("alert").waitFor(), person.waitForURL(`${built}/settings`)]);
+const refusedToLeave = person.getByRole("alert");
+expectEqual(
+  "orgs: the only owner is refused in Keel's own words, and is still on the org's page",
+  `${whereOf(person)} ${(await refusedToLeave.count()) === 0 ? "nothing said" : squash(await refusedToLeave.locator("p").innerText())}`,
+  "/orgs/lovelace/members An org always has an owner: make another member an owner before you leave or step down",
+);
+const wayForward = person.getByRole("list", { name: "Ways forward Keel gave" });
+expectEqual(
+  "orgs: under the refusal is the way forward Keel gave",
+  (await wayForward.count()) === 0 ? "none" : squash(await wayForward.innerText()),
+  "Make another member an owner first",
+);
+await shot(person, "only-owner");
 await second.close();
 
 // Deleting an org is deliberate: its handle is typed first.

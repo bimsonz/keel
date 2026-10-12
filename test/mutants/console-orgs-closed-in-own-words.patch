@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgs.test.ts
+# kills: orgs.answered, orgs.lapsed
+# why: what became of an invitation is told in the console's words, and not in Keel's
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index 2cca937..66963bd 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -462,7 +462,7 @@ export function createAccount(options: AccountOptions) {
+       const asked = await client.organization.getInvitation({ query: { id } });
+       // Keel tells the person an invitation was made to that it was answered or has lapsed, and nobody else.
+       const closed = CLOSED.get(asked.error?.code ?? "");
+-      if (closed !== undefined) return { closed, said: asked.error?.message ?? UNSAID };
++      if (closed !== undefined) return { closed, said: `This invitation is ${closed}` };
+       // One that is someone else's and one that is not there Keel refuses alike, and a page tells neither apart.
+       if (asked.error?.status === 400 || asked.error?.status === 403) return null;
+       const answer: typeof asked.data & { inviterHandle?: string } = taken(asked);

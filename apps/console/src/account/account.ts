@@ -80,6 +80,12 @@ export interface Methods {
 }
 
 /** Who to invite: a user of this Keel by their handle, or someone by an address the reader types. */
+/** An invitation its reader can no longer answer, and what Keel said of it, in Keel's own words. */
+export interface Closed {
+  closed: "answered" | "lapsed";
+  said: string;
+}
+
 export type Invitee = { handle: string } | { email: string };
 
 /** Keel serves no identity here: it answers 404 where its sign-in routes would be. */
@@ -90,13 +96,18 @@ export class NotOpen extends Error {
   }
 }
 
-/** Keel refused, and said why. `code` is Better Auth's own. */
+/**
+ * Keel refused, and said why. `code` is Keel's, or Better Auth's own. `next` is the ways forward Keel gave with
+ * the refusal, each by its title; most refusals come with none.
+ */
 export class Refused extends Error {
   readonly code: string;
-  constructor(code: string, message: string) {
+  readonly next: readonly string[];
+  constructor(code: string, message: string, next: readonly string[] = []) {
     super(message);
     this.name = "Refused";
     this.code = code;
+    this.next = next;
   }
 }
 
@@ -111,11 +122,28 @@ interface Failure {
   status?: number;
   code?: string | undefined;
   message?: string | undefined;
+  /** Keel's NextActions, where it gave any with the refusal. */
+  nextActions?: unknown;
+}
+
+const UNSAID = "Keel refused, and did not say why";
+
+/** The titles of the ways forward Keel gave, in Keel's order. */
+function nextOf(given: unknown): string[] {
+  if (!Array.isArray(given)) return [];
+  return given.flatMap((action: unknown) =>
+    typeof action === "object" &&
+    action !== null &&
+    "title" in action &&
+    typeof action.title === "string"
+      ? [action.title]
+      : [],
+  );
 }
 
 function refusal(error: Failure): Error {
   if (error.status === 404) return new NotOpen();
-  return new Refused(error.code ?? "", error.message ?? "Keel refused, and did not say why");
+  return new Refused(error.code ?? "", error.message ?? UNSAID, nextOf(error.nextActions));
 }
 
 /** A result of Better Auth's client, opened: its data, or the refusal thrown. */
@@ -193,6 +221,12 @@ function invitationOf(answer: InvitationAnswer): Invitation {
 
 /** Better Auth's answers where there is no such org, or it is not the reader's to see. */
 const NOT_THEIRS = new Set(["ORGANIZATION_NOT_FOUND", "USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION"]);
+
+/** Keel's two refusals that tell an invitation's own reader what became of it. */
+const CLOSED: ReadonlyMap<string, Closed["closed"]> = new Map([
+  ["INVITATION_ANSWERED", "answered"],
+  ["INVITATION_LAPSED", "lapsed"],
+]);
 
 /** As `taken`, but null where the thing asked for is not there for this reader: a private one and none look the same. */
 function takenIfTheirs<Data>(result: { data: Data | null; error: Failure | null }): Data | null {
@@ -420,10 +454,16 @@ export function createAccount(options: AccountOptions) {
       taken(await client.organization.leave({ organizationId: org.id }));
     },
 
-    /** An invitation made to the reader that is still open, or null: one made to someone else looks like none. */
-    async invitation(id: string): Promise<Invited | null> {
+    /**
+     * An invitation made to the reader: one still open, or one that is closed with what Keel said of it. Null
+     * where there is none for this reader: one made to someone else looks like none.
+     */
+    async invitation(id: string): Promise<Invited | Closed | null> {
       const asked = await client.organization.getInvitation({ query: { id } });
-      // Keel refuses one that is answered, lapsed, someone else's or not there, and a page tells none of them apart.
+      // Keel tells the person an invitation was made to that it was answered or has lapsed, and nobody else.
+      const closed = CLOSED.get(asked.error?.code ?? "");
+      if (closed !== undefined) return { closed, said: asked.error?.message ?? UNSAID };
+      // One that is someone else's and one that is not there Keel refuses alike, and a page tells neither apart.
       if (asked.error?.status === 400 || asked.error?.status === 403) return null;
       const answer: typeof asked.data & { inviterHandle?: string } = taken(asked);
       if (answer.status !== "pending") return null;

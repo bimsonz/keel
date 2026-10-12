@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/orgs.test.ts
+# kills: orgs.answered
+# why: an invitation that was answered is told to the person it was made to as one that is not there, where Keel said what became of it
+diff --git a/apps/console/src/account/account.ts b/apps/console/src/account/account.ts
+index 2cca937..64009f4 100644
+--- a/apps/console/src/account/account.ts
++++ b/apps/console/src/account/account.ts
+@@ -224,7 +224,6 @@ const NOT_THEIRS = new Set(["ORGANIZATION_NOT_FOUND", "USER_IS_NOT_A_MEMBER_OF_T
+ 
+ /** Keel's two refusals that tell an invitation's own reader what became of it. */
+ const CLOSED: ReadonlyMap<string, Closed["closed"]> = new Map([
+-  ["INVITATION_ANSWERED", "answered"],
+   ["INVITATION_LAPSED", "lapsed"],
+ ]);
+ 

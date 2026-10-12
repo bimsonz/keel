@@ -6,6 +6,7 @@ import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from
 import { type OrgTab, hrefOf } from "../places.ts";
 import {
   type Account,
+  type Closed,
   type Invitation,
   type Invited,
   type Member,
@@ -569,7 +570,7 @@ export function NewOrg({ account }: { account: Account }) {
 
 /** An invitation, opened by whoever has its link. Keel reads it only to the person it was made to. */
 export function Invite({ account, who, id }: { account: Account; who: Who; id: string }) {
-  const [invited, setInvited] = useState<Invited | null>();
+  const [invited, setInvited] = useState<Invited | Closed | null>();
   const [declined, setDeclined] = useState(false);
   const { busy, refused, ask } = useAsking();
   useEffect(() => {
@@ -594,7 +595,21 @@ export function Invite({ account, who, id }: { account: Account; who: Who; id: s
     return (
       <Card
         title="This invitation is not open to you"
-        lede={`It was made to someone else, or it has been answered or withdrawn. You are signed in as ${nameOf(who)}.`}
+        lede={`It was made to someone else, or Keel holds no such invitation. You are signed in as ${nameOf(who)}.`}
+      >
+        {null}
+      </Card>
+    );
+  // Keel tells the person it was made to what became of it, and the page says that in Keel's words.
+  if ("closed" in invited)
+    return (
+      <Card
+        title={
+          invited.closed === "answered"
+            ? "This invitation has been answered"
+            : "This invitation has lapsed"
+        }
+        lede={invited.said}
       >
         {null}
       </Card>

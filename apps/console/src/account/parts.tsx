@@ -1,25 +1,37 @@
 // What the pages above every project are made of.
 
 import { type ReactNode, useCallback, useState } from "react";
+import { Refused } from "./account.ts";
 
 /** A handle is a user's name on this Keel, or an org's: the first segment of every address under it. */
 export const HANDLE = /^[a-z0-9](?:-?[a-z0-9]){0,38}$/;
 
+/** What Keel said in refusing, and the ways forward it gave with that, each by its title. */
+export interface Said {
+  words: string;
+  next: readonly string[];
+}
+
+export const saidOf = (error: unknown): Said => ({
+  words: error instanceof Error ? error.message : "Keel could not be reached",
+  next: error instanceof Refused ? error.next : [],
+});
+
 /** Runs one thing the reader asked for, and says so if Keel refuses it. */
 export function useAsking(): {
   busy: boolean;
-  refused: string | null;
+  refused: Said | null;
   ask: (what: () => Promise<void>) => Promise<void>;
 } {
   const [busy, setBusy] = useState(false);
-  const [refused, setRefused] = useState<string | null>(null);
+  const [refused, setRefused] = useState<Said | null>(null);
   const ask = useCallback(async (what: () => Promise<void>) => {
     setBusy(true);
     setRefused(null);
     try {
       await what();
     } catch (error) {
-      setRefused(error instanceof Error ? error.message : "Keel could not be reached");
+      setRefused(saidOf(error));
     } finally {
       setBusy(false);
     }
@@ -27,12 +39,24 @@ export function useAsking(): {
   return { busy, refused, ask };
 }
 
-export function Refusal({ said }: { said: string | null }) {
+/** Keel's refusal in Keel's words, and under it the ways forward Keel gave, where it gave any. */
+export function Refusal({ said }: { said: Said | null }) {
   if (said === null) return null;
   return (
-    <p role="alert" className="text-sm" style={{ color: "var(--a-critical-ink, #f87171)" }}>
-      {said}
-    </p>
+    <div
+      role="alert"
+      className="flex flex-col gap-1 text-sm"
+      style={{ color: "var(--a-critical-ink, #f87171)" }}
+    >
+      <p>{said.words}</p>
+      {said.next.length > 0 && (
+        <ul className="list-disc pl-5" aria-label="Ways forward Keel gave">
+          {said.next.map((title) => (
+            <li key={title}>{title}</li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
