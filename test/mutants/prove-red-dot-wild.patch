@@ -2,12 +2,12 @@
 # kills: prove-red.claims-only
 # why: the brackets are escaped and the dot is not, so a claim of `[a.b]` also runs a test titled `[aXb]`.
 diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
-index 3f6955d..0335358 100644
+index 660b8c4..65e6ef3 100644
 --- a/packages/tooling/src/prove-red.ts
 +++ b/packages/tooling/src/prove-red.ts
-@@ -1,7 +1,7 @@
- // What `scripts/prove-red.ts` adds to a mutant's command so that it runs only
- // the tests the mutant claims to kill. Pure: the script does the running.
+@@ -3,7 +3,7 @@
+ // kill, the baseline it takes before the patch is applied, and the rule for
+ // red. Pure: the script does the running and the patching, and hands both in.
  
 -const escaped = (text: string): string => text.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
 +const escaped = (text: string): string => text.replace(/[\\^$*+?()[\]{}|]/g, "\\$&");

@@ -1,0 +1,16 @@
+# expect-red: node test/controls/prove-red/red-without-mutant.ts
+# kills: control.red-without-mutant
+# why: control for prove:red's baseline. The command reports [control.red-without-mutant] failing whether or not this patch is applied, so the failure is never the patch's doing. The runner must report BASELINE RED, never red, and must not apply the patch.
+diff --git a/test/controls/prove-red/red-without-mutant.ts b/test/controls/prove-red/red-without-mutant.ts
+index e6009a0..1cf133c 100644
+--- a/test/controls/prove-red/red-without-mutant.ts
++++ b/test/controls/prove-red/red-without-mutant.ts
+@@ -5,7 +5,7 @@
+ // title's wording, so the failure is never the patch's doing.
+ import { writeFileSync } from "node:fs";
+ 
+-const wording = "fails before any patch is applied";
++const wording = "fails after the patch too";
+ 
+ const flag = "--outputFile=";
+ const report = process.argv.find((arg) => arg.startsWith(flag))?.slice(flag.length);

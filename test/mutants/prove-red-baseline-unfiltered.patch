@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.baseline
+# why: the baseline runs the command as written, not narrowed to the claimed tests as the mutated runs are, so it is another command than the one it vouches for and replays the whole file.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 660b8c4..fac9996 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -159,7 +159,7 @@ export function prover(given: {
+   /** Red only if every claimed tag fails in every run: each fixed seed, then the unseeded runs. */
+   const tagged = ({ command, kills, mutated }: Mutant): Proof => {
+     const filtered = filteredToClaims(command, kills);
+-    const fault = baselineFault(baseline(filtered, true), kills);
++    const fault = baselineFault(baseline(command, true), kills);
+     if (fault !== null) return { verdict: "baseline-red", note: "", detail: fault };
+     return mutated(() => {
+       let note = "no tests";

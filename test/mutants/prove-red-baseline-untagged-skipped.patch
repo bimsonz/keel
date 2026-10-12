@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.baseline-untagged
+# why: an untagged mutant is applied whatever its command does with no patch, so a guard that is already red makes every one of its mutants count.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 660b8c4..944a21c 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -209,7 +209,7 @@ export function prover(given: {
+   /** Red when the command exits non-zero with the patch applied, having exited 0 without it. */
+   const untagged = ({ command, mutated }: Mutant): Proof => {
+     const clean = baseline(command, false);
+-    if (clean.status !== 0)
++    if (clean.status === null)
+       return {
+         verdict: "baseline-red",
+         note: "",

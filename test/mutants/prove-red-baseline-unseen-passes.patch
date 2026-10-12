@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.baseline
+# why: a claimed tag that no test carries passes the baseline, so the patch is applied and run five times to learn what the clean tree already said.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 660b8c4..a03da86 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -127,7 +127,6 @@ function baselineFault(clean: Ran, kills: readonly string[]): string | null {
+     );
+   const { failed, seen } = tagsIn(clean.report);
+   const unseen = kills.filter((tag) => !seen.has(tag));
+-  if (unseen.length > 0) return `no test carries ${bracketed(unseen)} without the mutant`;
+   const red = kills.filter((tag) => failed.has(tag));
+   if (red.length > 0)
+     return `${bracketed(red)} ${red.length === 1 ? "fails" : "fail"} without the mutant`;

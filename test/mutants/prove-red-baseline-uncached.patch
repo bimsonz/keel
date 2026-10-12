@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.baseline-shared
+# why: the kept baseline is never read, so every mutant runs its command with no patch again, also the hundreds that share one.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 660b8c4..47c7dad 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -150,7 +150,6 @@ export function prover(given: {
+   const baseline = (command: string, reported: boolean): Ran => {
+     const key = `${reported ? "report" : "exit"} ${command}`;
+     const kept = baselines.get(key);
+-    if (kept !== undefined) return kept;
+     const clean = run({ command, seed: SEEDS[0], reported });
+     baselines.set(key, clean);
+     return clean;

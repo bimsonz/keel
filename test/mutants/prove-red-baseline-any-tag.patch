@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.baseline-claims-only
+# why: any tag failing with no patch applied holds the mutant back, claimed or not, so one unrelated broken test in a file stops every mutant of that file from being proved.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 660b8c4..c0ddb8a 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -128,7 +128,7 @@ function baselineFault(clean: Ran, kills: readonly string[]): string | null {
+   const { failed, seen } = tagsIn(clean.report);
+   const unseen = kills.filter((tag) => !seen.has(tag));
+   if (unseen.length > 0) return `no test carries ${bracketed(unseen)} without the mutant`;
+-  const red = kills.filter((tag) => failed.has(tag));
++  const red = [...failed];
+   if (red.length > 0)
+     return `${bracketed(red)} ${red.length === 1 ? "fails" : "fail"} without the mutant`;
+   return null;

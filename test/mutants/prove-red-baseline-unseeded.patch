@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.baseline, prove-red.baseline-untagged
+# why: the baseline runs with no seed, so whether a patch is held back can differ from one run of the script to the next.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 660b8c4..29615a5 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -151,7 +151,7 @@ export function prover(given: {
+     const key = `${reported ? "report" : "exit"} ${command}`;
+     const kept = baselines.get(key);
+     if (kept !== undefined) return kept;
+-    const clean = run({ command, seed: SEEDS[0], reported });
++    const clean = run({ command, seed: undefined, reported });
+     baselines.set(key, clean);
+     return clean;
+   };

@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.baseline
+# why: a baseline run that left no report is described as a tag no test carries, so a suite that never started reads as a mistyped tag.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 660b8c4..1edf355 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -120,11 +120,6 @@ const bracketed = (tags: readonly string[]): string => tags.map((tag) => `[${tag
+  * does not claim may fail here: it decides nothing about this mutant.
+  */
+ function baselineFault(clean: Ran, kills: readonly string[]): string | null {
+-  if (clean.report === undefined)
+-    return withExcerpt(
+-      `no JSON report without the mutant (exit ${clean.status}); the suite did not run`,
+-      clean.output,
+-    );
+   const { failed, seen } = tagsIn(clean.report);
+   const unseen = kills.filter((tag) => !seen.has(tag));
+   if (unseen.length > 0) return `no test carries ${bracketed(unseen)} without the mutant`;
