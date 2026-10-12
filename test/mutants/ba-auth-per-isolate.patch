@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-per-request.test.ts
+# kills: ba.per-request
+# why: one Better Auth per isolate, made in its first request: when that request ends first, the init and schema check it started never settle, and every later /v1/auth request on the isolate hangs
+diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
+index 9dea732..3bb1ada 100644
+--- a/apps/keel/src/composition/isolate.ts
++++ b/apps/keel/src/composition/isolate.ts
+@@ -181,10 +181,9 @@ export function makeIsolate(
+    * pending, and every later /v1/auth request on the isolate waited for ever.
+    * Each request makes its own, so what it awaits is its own.
+    */
+-  const auth = () => {
+-    authOverrides.made?.();
+-    return identity(env, authOverrides);
+-  };
++  authOverrides.made?.();
++  const once = identity(env, authOverrides);
++  const auth = () => once;
+   const app = makeApp({
+     handlers,
+     verify,

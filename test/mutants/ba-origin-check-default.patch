@@ -2,7 +2,7 @@
 # kills: ba.cross-site
 # why: Better Auth's own default stands, which skips the origin check under a test runner, so the pool cannot see a forged write
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index e646105..eeb567c 100644
+index c065c51..079c13e 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
 @@ -155,8 +155,6 @@ export function authOptions(config: AuthConfig) {
@@ -12,5 +12,5 @@ index e646105..eeb567c 100644
 -      disableOriginCheck: false,
 -      disableCSRFCheck: false,
        ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
-       database: { generateId },
-       ...(config.background === undefined
+       // [ba.schema] holds the migrations equal to these options in CI. Checked at
+       // runtime too, it would cost a D1 query on every request, each making its own instance.

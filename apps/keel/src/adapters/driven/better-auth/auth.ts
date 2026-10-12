@@ -158,7 +158,9 @@ export function authOptions(config: AuthConfig) {
       disableOriginCheck: false,
       disableCSRFCheck: false,
       ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
-      database: { generateId },
+      // [ba.schema] holds the migrations equal to these options in CI. Checked at
+      // runtime too, it would cost a D1 query on every request, each making its own instance.
+      database: { generateId, validateSchema: false },
       ...(config.background === undefined
         ? {}
         : { backgroundTasks: { handler: config.background } }),

@@ -144,6 +144,8 @@ function inboxStreams(env: Env, runtime: IsolateRuntime): InboxStreams {
 export interface AuthOverrides {
   /** Email codes; production has no sender until Keel can send mail, so none are offered. */
   readonly sendOtp?: OtpSender;
+  /** Told of each Better Auth instance as it is made, so a test can count them. */
+  readonly made?: () => void;
 }
 
 /** Better Auth over the Worker's D1, with GitHub only once both of its secrets are set. */
@@ -171,14 +173,25 @@ export function makeIsolate(
   const runtime = ManagedRuntime.make(layer);
   const handlers = makeHandlers(makeRunner(runtime));
   const verify = makeVerifier(runtime);
-  const auth = identity(env, authOverrides);
+  /**
+   * Better Auth starts its initialisation (D1 included) when it is made and
+   * shares that promise, and its adapter's schema check, with every later
+   * caller. Made once per isolate, it was made inside whichever request came
+   * first; when that request finished first, Workers dropped the work it left
+   * pending, and every later /v1/auth request on the isolate waited for ever.
+   * Each request makes its own, so what it awaits is its own.
+   */
+  const auth = () => {
+    authOverrides.made?.();
+    return identity(env, authOverrides);
+  };
   const app = makeApp({
     handlers,
     verify,
     mcp: makeMcpEndpoint(handlers, verify, [env.KEEL_HOST]),
     auth: {
       basePath: AUTH_BASE_PATH,
-      handler: (request) => auth.handler(request),
+      handler: (request) => auth().handler(request),
       admit: async (key) => (await env.AUTH_LIMIT.limit({ key })).success,
     },
     streams: inboxStreams(env, runtime),
