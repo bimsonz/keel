@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "orgusage.contract"
+# kills: orgusage.contract.daily-reset
+# why: Every kind resets at midnight, so a full repo quota is free again the next day
+diff --git a/packages/core/src/application/identity/org-usage.ts b/packages/core/src/application/identity/org-usage.ts
+index 94a206b..6cf8d1d 100644
+--- a/packages/core/src/application/identity/org-usage.ts
++++ b/packages/core/src/application/identity/org-usage.ts
+@@ -42,7 +42,7 @@ const usedAt = (store: Store, org: OrgId, kind: QuotaKind, now: Instant): number
+ };
+ 
+ const putUsed = (store: Store, org: OrgId, kind: QuotaKind, used: number, now: Instant): void => {
+-  const resetsAt = resetAt(kind, now);
++  const resetsAt = resetAt("container-minutes", now);
+   store.put(
+     COUNT,
+     countId(org, kind),

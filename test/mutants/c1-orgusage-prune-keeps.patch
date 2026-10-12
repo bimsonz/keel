@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/org-usage.test.ts
+# kills: orgusage.prune
+# why: Prune counts the old keys but removes none, so the keys grow for good
+diff --git a/packages/core/src/application/identity/org-usage.ts b/packages/core/src/application/identity/org-usage.ts
+index 94a206b..0a0f536 100644
+--- a/packages/core/src/application/identity/org-usage.ts
++++ b/packages/core/src/application/identity/org-usage.ts
+@@ -124,7 +124,6 @@ export const pruneUsageKeys = Effect.fn("identity/pruneUsageKeys")(function* ()
+     const old = store
+       .list(KEY)
+       .filter(({ value }) => decodeKeyed(value).at + USAGE_KEY_TTL_MS <= now);
+-    for (const { id } of old) store.remove(KEY, id);
+     return old.length;
+   });
+ });

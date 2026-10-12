@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "orgusage.contract"
+# kills: orgusage.contract.idempotent
+# why: An admission ignores its key, so a retry is decided and counted again
+diff --git a/packages/core/src/application/identity/org-usage.ts b/packages/core/src/application/identity/org-usage.ts
+index 94a206b..cfd954a 100644
+--- a/packages/core/src/application/identity/org-usage.ts
++++ b/packages/core/src/application/identity/org-usage.ts
+@@ -68,7 +68,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
+   const answer = store.transaction((): Result.Result<QuotaAdmitted, QuotaExceeded> => {
+     const id = `${org}/${kind}/admit/${key}`;
+     const first = store.get(KEY, id);
+-    if (first !== undefined) {
++    if (first !== undefined && amount < 0) {
+       const keyed = decodeKeyed(first);
+       if (keyed.exceeded !== undefined) return Result.fail(keyed.exceeded);
+       if (keyed.admitted !== undefined) return Result.succeed(keyed.admitted);

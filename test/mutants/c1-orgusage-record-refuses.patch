@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "orgusage.contract"
+# kills: orgusage.contract.record-never-refuses
+# why: A record over the limit is dropped, so what already happened goes uncounted
+diff --git a/packages/core/src/application/identity/org-usage.ts b/packages/core/src/application/identity/org-usage.ts
+index 94a206b..fb9a6db 100644
+--- a/packages/core/src/application/identity/org-usage.ts
++++ b/packages/core/src/application/identity/org-usage.ts
+@@ -111,7 +111,9 @@ export const recordUsage = Effect.fn("identity/recordUsage")(function* (
+   store.transaction(() => {
+     const id = `${org}/${kind}/record/${key}`;
+     if (store.get(KEY, id) !== undefined) return;
+-    putUsed(store, org, kind, Math.max(0, usedAt(store, org, kind, now) + amount), now);
++    const used = usedAt(store, org, kind, now);
++    if (Result.isFailure(admitQuota({ kind, amount, used, now, halted: false }))) return;
++    putUsed(store, org, kind, Math.max(0, used + amount), now);
+     store.put(KEY, id, encodeKeyed({ at: now }));
+   });
+ });

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/org-usage.test.ts
+# kills: orgusage.prune
+# why: Prune forgets every key, however young, so a retry minutes later is counted again
+diff --git a/packages/core/src/application/identity/org-usage.ts b/packages/core/src/application/identity/org-usage.ts
+index 94a206b..d0c5b25 100644
+--- a/packages/core/src/application/identity/org-usage.ts
++++ b/packages/core/src/application/identity/org-usage.ts
+@@ -123,7 +123,7 @@ export const pruneUsageKeys = Effect.fn("identity/pruneUsageKeys")(function* ()
+   return store.transaction(() => {
+     const old = store
+       .list(KEY)
+-      .filter(({ value }) => decodeKeyed(value).at + USAGE_KEY_TTL_MS <= now);
++      .filter(({ value }) => decodeKeyed(value).at <= now);
+     for (const { id } of old) store.remove(KEY, id);
+     return old.length;
+   });

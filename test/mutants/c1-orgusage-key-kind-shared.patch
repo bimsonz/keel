@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "orgusage.contract"
+# kills: orgusage.contract.apart
+# why: A key is shared across kinds, so one job's key for container-minutes answers its model calls
+diff --git a/packages/core/src/application/identity/org-usage.ts b/packages/core/src/application/identity/org-usage.ts
+index 94a206b..d130797 100644
+--- a/packages/core/src/application/identity/org-usage.ts
++++ b/packages/core/src/application/identity/org-usage.ts
+@@ -66,7 +66,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
+   const store = yield* EntityStore;
+   const now = yield* (yield* Clock).now;
+   const answer = store.transaction((): Result.Result<QuotaAdmitted, QuotaExceeded> => {
+-    const id = `${org}/${kind}/admit/${key}`;
++    const id = `${org}/admit/${key}`;
+     const first = store.get(KEY, id);
+     if (first !== undefined) {
+       const keyed = decodeKeyed(first);

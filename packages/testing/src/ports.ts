@@ -14,6 +14,7 @@ import type { CodeHostFixture } from "./code-host-fixture.ts";
 import { describeCodeHostContract } from "./contracts/code-host.ts";
 import { describeEnrolmentsContract, type EnrolmentsHarness } from "./contracts/enrolments.ts";
 import { describeSessionsContract, type SessionsHarness } from "./contracts/sessions.ts";
+import { describeOrgUsageContract, freshOrg, type OrgUsageHarness } from "./contracts/org-usage.ts";
 import { describeStandingsContract, type StandingsHarness } from "./contracts/standings.ts";
 import { describeLiveChangesContract, type LiveChangesHarness } from "./contracts/live-changes.ts";
 import { describeProbeLedgerContract, type ProbeLedgerHarness } from "./contracts/probe-ledger.ts";
@@ -27,6 +28,7 @@ import {
 } from "./contracts/probe-sources.ts";
 import { makeNoopWorldsMemory, makeProbeSourcesMemory } from "./memory/probe-sources.ts";
 import { makeSessionsMemory } from "./memory/sessions.ts";
+import { makeOrgUsageMemory } from "./memory/org-usage.ts";
 import { makeStandingsMemory } from "./memory/standings.ts";
 import { describeEventFeedContract, type EventFeedHarness } from "./contracts/event-feed.ts";
 import {
@@ -110,6 +112,7 @@ import type {
   Sessions,
   Standings,
   Users,
+  OrgUsage,
 } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 
@@ -316,6 +319,17 @@ function memorySessionsHarness(): SessionsHarness {
   };
 }
 
+/** In-memory OrgUsage counts for any org, on a clock the suite moves. */
+function memoryOrgUsageHarness(): OrgUsageHarness {
+  const usage = makeOrgUsageMemory();
+  return {
+    layer: usage.layer,
+    org: () => Effect.sync(freshOrg),
+    now: Effect.sync(usage.clock.now),
+    advance: (ms) => Effect.sync(() => usage.clock.advance(ms)),
+  };
+}
+
 /** In-memory Standings move the agents that in-memory Enrolments write into one in-memory AgentDirectory. */
 function memoryStandingsHarness(): StandingsHarness {
   const directory = identity.makeAgentDirectoryMemory();
@@ -365,6 +379,7 @@ export const PORTS = {
     pending("Trunks", ["initialize", "sync"]),
   ),
   Lanes: port(() => integration.makeLanesMemory().layer, pending("Lanes", ["destroy"])),
+  OrgUsage: harnessed<OrgUsage, OrgUsageHarness>(memoryOrgUsageHarness, describeOrgUsageContract),
   SubjectRegistry: port(
     () => coordination.makeSubjectRegistryMemory().layer,
     pending("SubjectRegistry", ["byKey", "byAnchor", "mint"]),
