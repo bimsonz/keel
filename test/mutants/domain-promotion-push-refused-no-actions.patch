@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.push-refused-declines
+# why: a declined batch tells its members' agents what they can do
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5f25f53..959b9f6 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -384,7 +384,6 @@ export const decidePromotion = (
+             batchId: b.batchId,
+             reason: command.reason,
+             reverify: bounces ? [] : b.members,
+-            nextActions: refusedActions(command.reason, alone),
+           }),
+         ),
+       );

@@ -1,0 +1,21 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.bounce-declined
+# why: a declined batch bounces only the changes in it: a queued change is in no batch
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 9216b02..4363f40 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -642,7 +642,12 @@ export const decideChange = (
+       const beforeBatch = at("deriving", "verifying", "queued");
+       if (command.declined !== undefined) {
+         // A declined batch bounces only its own members, and only while they are in it.
+-        if (!(at("integrating") && command.declined.batchId === change.batchId))
++        if (
++          !(
++            at("queued") ||
++            (at("integrating") && command.declined.batchId === change.batchId)
++          )
++        )
+           return refuse(change, command);
+         return intoAgentOwned(
+           change,

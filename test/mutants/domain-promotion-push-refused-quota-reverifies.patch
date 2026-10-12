@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.push-refused-solo
+# why: a full repo is not cured by verifying again: every member bounces until room is made
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5f25f53..fec268d 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -376,7 +376,7 @@ export const decidePromotion = (
+         return refuse(trunk, command);
+       // Only a batch refused on its own is known to be too large; a full repo is no batch's fault to verify away.
+       const alone = wal.batches.length === 1;
+-      const bounces = alone || command.reason === "repo-bytes-quota";
++      const bounces = alone;
+       return Result.succeed(
+         wal.batches.map((b) =>
+           PromotionDeclined.make({

@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.push-refused-fenced
+# why: a push that may have landed is read back, never declined: the refusal is fenced on trunk still being on the old head
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5f25f53..8c97f2b 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -370,8 +370,7 @@ export const decidePromotion = (
+     case "PushRefused": {
+       if (
+         trunk.phase !== "promoting" ||
+-        wal?.composed === undefined ||
+-        command.observed !== wal.old
++        wal?.composed === undefined
+       )
+         return refuse(trunk, command);
+       // Only a batch refused on its own is known to be too large; a full repo is no batch's fault to verify away.

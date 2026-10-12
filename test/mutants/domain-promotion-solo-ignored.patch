@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.push-refused-solo
+# why: after a group's pack was refused as too large, each group is one batch until a push lands
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5f25f53..481eaff 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -236,7 +236,6 @@ const flush = (trunk: Trunk, command: Extract<PromotionCommand, { _tag: "Flush"
+     }
+     group.push({ batch, touched: facts.touched, proofId: outcome.proofId });
+     // After a group's pack was refused as too large, one batch at a time until a push lands.
+-    if (trunk.solo === true) break;
+   }
+   if (group.length > 0) {
+     events.push(

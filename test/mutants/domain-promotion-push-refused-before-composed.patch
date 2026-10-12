@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.push-refused-fenced
+# why: there is no pack to refuse before the group is composed
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5f25f53..0d7b3f8 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -370,7 +370,7 @@ export const decidePromotion = (
+     case "PushRefused": {
+       if (
+         trunk.phase !== "promoting" ||
+-        wal?.composed === undefined ||
++        wal === undefined ||
+         command.observed !== wal.old
+       )
+         return refuse(trunk, command);

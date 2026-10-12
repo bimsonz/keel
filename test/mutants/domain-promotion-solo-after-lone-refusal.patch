@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.push-refused-solo
+# why: a batch refused alone is itself too large: grouping the batches behind it is not what failed
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5f25f53..98c1f7f 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -506,7 +506,7 @@ export const evolvePromotion = (
+             ? { ...trunk, wal: { ...wal, batches } }
+             : { ...without(trunk, "wal"), phase: settled(trunk.queue) };
+         // Members sent to be verified again were refused as a group: promote one batch at a time.
+-        return event.reason === "pack-too-large" && event.reverify.length > 0
++        return event.reason === "pack-too-large"
+           ? { ...left, solo: true }
+           : left;
+       }

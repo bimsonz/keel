@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts
+# kills: promotion.push-refused-declines
+# why: the group's last declined batch ends the group, so the next one can start
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5f25f53..f95bbdb 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -502,7 +502,7 @@ export const evolvePromotion = (
+         const batches = wal.batches.filter((b) => b.batchId !== event.batchId);
+         // The group's last batch ends it: trunk never moved, so there is nothing to read back.
+         const left: Trunk =
+-          batches.length > 0
++          batches.length >= 0
+             ? { ...trunk, wal: { ...wal, batches } }
+             : { ...without(trunk, "wal"), phase: settled(trunk.queue) };
+         // Members sent to be verified again were refused as a group: promote one batch at a time.

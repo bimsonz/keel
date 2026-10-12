@@ -2,15 +2,15 @@
 # kills: events.bounce-cause
 # why: a bounce names exactly one cause; without the check, none or both decode
 diff --git a/packages/core/src/domain/coordination/events.ts b/packages/core/src/domain/coordination/events.ts
-index afe7435..cdda0a1 100644
+index 542117c..54a8558 100644
 --- a/packages/core/src/domain/coordination/events.ts
 +++ b/packages/core/src/domain/coordination/events.ts
-@@ -171,7 +171,7 @@ export const ChangeBounced = Schema.TaggedStruct("ChangeBounced", {
+@@ -177,7 +177,7 @@ export const ChangeBounced = Schema.TaggedStruct("ChangeBounced", {
  }).check(
    Schema.makeFilter(
      (e) =>
--      (e.verdictId === undefined) !== (e.conflictId === undefined) ||
+-      [e.verdictId, e.conflictId, e.declined].filter((cause) => cause !== undefined).length === 1 ||
 +      true ||
-       "a bounce names exactly one cause: its verdict or its conflict",
+       "a bounce names exactly one cause: its verdict, its conflict or its declined batch",
    ),
  );
