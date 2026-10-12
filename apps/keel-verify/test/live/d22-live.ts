@@ -583,6 +583,105 @@ try {
     );
   } else check(false, "C compiled a plan to read the guard step from");
 
+  console.log("\n[derive] each Precheck derives its submission's effects from the code");
+  /** The derivation record a Precheck kept, read from the archive by its hash. */
+  const derivationOf = (ref: string): unknown => {
+    try {
+      return JSON.parse(
+        wrangler(
+          "r2",
+          "object",
+          "get",
+          `${archiveBucket()}/evidence/${ref.slice("sha256:".length)}`,
+          "--remote",
+          "--pipe",
+        ),
+      );
+    } catch (error) {
+      console.log(
+        `     the derivation ${ref} was not read: ${error instanceof Error ? (error.message.split("\n")[0] ?? "") : String(error)}`,
+      );
+      return undefined;
+    }
+  };
+  const derived: Record<"A" | "B" | "C", unknown[]> = { A: [], B: [], C: [] };
+  for (const [name, changeId] of [
+    ["A", A],
+    ["B", B],
+    ["C", C],
+  ] as const) {
+    const submitted = about(changeId, "ChangeSubmitted");
+    const precheck =
+      submitted === undefined
+        ? undefined
+        : describe("keel-precheck", `precheck-${submitted.eventId}`);
+    const names = precheck?.steps.map((s) => s.name.replace(/-\d+$/, "")) ?? [];
+    console.log(
+      `     ${name} precheck-${submitted?.eventId ?? "?"}: ${precheck?.status ?? "?"}, steps ${names.join(" → ")}`,
+    );
+    const at = (step: string) => names.indexOf(step);
+    check(
+      at("guards") >= 0 &&
+        at("derive") > at("guards") &&
+        at("derived") === at("derive") + 1 &&
+        at("decide") > at("derived"),
+      `${name}'s Precheck ran derive and then derived, after guards and before decide`,
+    );
+    const derive = stepNamed(precheck?.steps ?? [], "derive");
+    console.log(
+      `     ${name} derive step (${derive?.ms ?? "?"} ms): ${brief(derive?.output, 500)}`,
+    );
+    const event = about(changeId, "EffectsDerived");
+    const ref = event === undefined ? undefined : field(event, "derivationRef");
+    // The step answers `{_tag: "Done", value: {derivationRef, subjects}}`.
+    const kept = Reflect.get(Object(Reflect.get(Object(derive?.output), "value")), "derivationRef");
+    check(
+      typeof ref === "string" && kept === ref,
+      `${name}: EffectsDerived ${event?.eventId ?? "(none)"} names the record its derive step kept, ${String(ref)}`,
+    );
+    const record = typeof ref === "string" ? derivationOf(ref) : undefined;
+    const readings = Object(Reflect.get(Object(record), "readings"));
+    const parsers = [
+      Reflect.get(Object(Reflect.get(readings, "base")), "parser"),
+      Reflect.get(Object(Reflect.get(readings, "head")), "parser"),
+    ];
+    console.log(
+      `     ${name} record: kind ${String(Reflect.get(Object(record), "kind"))}, base ${String(Reflect.get(Object(record), "base")).slice(0, 12)}, head ${String(Reflect.get(Object(record), "head")).slice(0, 12)}, seeds ${brief(Reflect.get(Object(record), "seeds"), 400)}, readings ${brief(readings, 500)}, undecided ${brief(Reflect.get(Object(record), "undecided"), 300)}`,
+    );
+    check(
+      Reflect.get(Object(record), "kind") === "keel.derivation/1" &&
+        parsers.every((p) => typeof p === "string" && p.startsWith("keel-syntax/")),
+      `${name}: the kept record holds a reading of its base and of its head, each stamped by the parser (${String(parsers[1])})`,
+    );
+    const effects = event === undefined ? undefined : field(event, "effects");
+    if (Array.isArray(effects)) derived[name].push(...effects);
+    console.log(`     ${name} derived ${derived[name].length} effect(s): ${brief(effects, 900)}`);
+  }
+  /** The role cache's effect, as B's code makes it: freshness is per-session on the permission check. */
+  const perSession = (effect: unknown): boolean => {
+    const proposition = Object(Reflect.get(Object(effect), "proposition"));
+    return (
+      Reflect.get(proposition, "subject") === SUBJECT &&
+      Reflect.get(proposition, "predicate") === "freshness" &&
+      Reflect.get(proposition, "relation") === "is" &&
+      Reflect.get(proposition, "value") === "per-session"
+    );
+  };
+  const cache = derived.B.filter(perSession);
+  check(
+    cache.length > 0,
+    `B's commit derives freshness is per-session on ${SUBJECT}: the role cache, read from the code`,
+  );
+  check(
+    cache.length > 0 && cache.every((e) => Reflect.get(Object(e), "declared") === true),
+    "and the derivation marks it as an effect B declared",
+  );
+  // The arm that can fail: A adds a route and C a comment, and neither holds a cache.
+  check(
+    !derived.A.some(perSession) && !derived.C.some(perSession),
+    "A's commit and C's derive no such effect: neither adds a cache",
+  );
+
   await feed.until(
     () =>
       about(C, "ChangeBounced") !== undefined ||
