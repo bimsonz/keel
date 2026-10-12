@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts
+# kills: pool.do.refresh-push-ignored, pool.contract.observe-push
+# why: Through the real object: a push that left a granted workspace's main where Keel put it is recorded as the holder's
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 8c6fed6..5805b9e 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -200,7 +200,7 @@ export const observePush = Effect.fn("coordination/observePush")(function* (
+     (tx) => {
+       const slot = slotOf(tx.store, push.workspaceId);
+       return Result.succeed(
+-        slot?.state === "granted" && !keelsOwn(slot, push.sha)
++        slot?.state === "granted"
+           ? {
+               value: "recorded" as const,
+               drafts: [draft(WorkspacePushed, { _tag: "WorkspacePushed", ...push })],

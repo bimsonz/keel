@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.refresh-trail-bounded
+# why: Every commit ever relayed to a workspace is kept, so a slot that idles through a busy day grows without bound
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 8c6fed6..b2c18cc 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -446,7 +446,7 @@ const refreshOne = (project: ProjectId, id: WorkspaceId, head: CommitSha) =>
+         if (!isReady(current) || from === undefined || from === head)
+           return Result.succeed({ value: undefined, drafts: [] });
+         // Remembered before the relay, so a push that landed with its answer lost is known as Keel's too.
+-        const relayed = [...(current.relayed ?? []), head].slice(-RELAYS_KEPT);
++        const relayed = [...(current.relayed ?? []), head];
+         putSlot(tx.store, {
+           ...current,
+           state: "refreshing",

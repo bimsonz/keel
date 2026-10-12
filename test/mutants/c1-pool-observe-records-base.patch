@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool.test.ts
+# kills: push.no-self-loop
+# why: Only relayed commits count as Keel's, so a push that leaves main on the workspace's own base is recorded as the holder's work
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 8c6fed6..35c14db 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -178,7 +178,7 @@ export const RELAYS_KEPT = 8;
+  * until it has moved past these.
+  */
+ const keelsOwn = (slot: Slot, sha: CommitSha): boolean =>
+-  slot.baseSha === sha || (slot.relayed ?? []).includes(sha);
++  (slot.relayed ?? []).includes(sha);
+ 
+ /**
+  * Records an agent's push to the workspace it holds as WorkspacePushed, once

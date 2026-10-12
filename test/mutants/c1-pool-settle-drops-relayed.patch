@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.refresh-push-ignored, pool.refresh-trail-bounded
+# why: A settled workspace forgets the commits relayed to it, so only its last refresh is known as Keel's
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 8c6fed6..b129139 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -384,7 +384,6 @@ const settledAt = (slot: Slot, base: CommitSha, at: number): Slot => ({
+   since: at,
+   ...(slot.remote === undefined ? {} : { remote: slot.remote }),
+   baseSha: base,
+-  ...(slot.relayed === undefined ? {} : { relayed: slot.relayed }),
+ });
+ 
+ /**

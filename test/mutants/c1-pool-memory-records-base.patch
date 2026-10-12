@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts
+# kills: pool.contract.observe-push
+# why: The in-memory pool records a push that leaves a workspace on its base, so a test double wakes agents the real pool never would
+diff --git a/packages/testing/src/memory/coordination.ts b/packages/testing/src/memory/coordination.ts
+index 5f6aa46..4233c9b 100644
+--- a/packages/testing/src/memory/coordination.ts
++++ b/packages/testing/src/memory/coordination.ts
+@@ -133,7 +133,7 @@ export function makeWorkspacePoolMemory(
+         observePush: (_projectId, pushId, push) =>
+           Effect.sync(() => {
+             if (pushed.has(pushId)) return "recorded";
+-            if (!granted.has(push.workspaceId) || push.sha === baseSha) return "ignored";
++            if (!granted.has(push.workspaceId)) return "ignored";
+             pushed.set(pushId, push);
+             return "recorded";
+           }),

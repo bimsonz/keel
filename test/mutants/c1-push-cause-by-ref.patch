@@ -2,15 +2,15 @@
 # kills: push.no-self-loop
 # why: The push is deduplicated by its branch, so every push after the first to that branch is swallowed as a replay
 diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
-index 2f50536..1805f8e 100644
+index 8c6fed6..559b278 100644
 --- a/packages/core/src/application/coordination/workspace-pool/pool.ts
 +++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
-@@ -167,7 +167,7 @@ export const observePush = Effect.fn("coordination/observePush")(function* (
+@@ -196,7 +196,7 @@ export const observePush = Effect.fn("coordination/observePush")(function* (
    push: ObservedPush,
  ) {
    const done = yield* commit(
 -    { entity: { kind: "workspace", id: push.workspaceId }, cause: `push:${pushId}`, project },
 +    { entity: { kind: "workspace", id: push.workspaceId }, cause: `push:${push.ref}`, project },
-     (tx) =>
-       Result.succeed(
-         slotOf(tx.store, push.workspaceId)?.state === "granted"
+     (tx) => {
+       const slot = slotOf(tx.store, push.workspaceId);
+       return Result.succeed(

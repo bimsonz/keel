@@ -166,13 +166,29 @@ const forkOne = (source: RepoName, repo: RepoName) =>
     return { remote: info.remote, baseSha };
   });
 
+/** How many of the trunk commits relayed onto a workspace's main its slot remembers. */
+export const RELAYS_KEPT = 8;
+
+/**
+ * Whether a push that left a workspace's main at `sha` was Keel's own write:
+ * main is on the workspace's base (its fork's head, or where a refresh took
+ * it), or on a trunk commit a refresh relayed on the way there. A push is
+ * observed some time after it lands, so a refresh's push can be reported
+ * once its workspace is already granted; nothing an agent made is on main
+ * until it has moved past these.
+ */
+const keelsOwn = (slot: Slot, sha: CommitSha): boolean =>
+  slot.baseSha === sha || (slot.relayed ?? []).includes(sha);
+
 /**
  * Records an agent's push to the workspace it holds as WorkspacePushed, once
  * per push: `pushId` (the observing Workflow's instance) is the cause, so a
  * retried observation commits nothing new and answers the same. A push to a
  * workspace that is not granted (ready, forking, collecting) or that this
- * pool never forked was Keel's own write or nobody's, and is ignored: no
- * agent is woken by Keel's writes (ADR 0009, no self-loops).
+ * pool never forked was Keel's own write or nobody's, and so was one that
+ * left a granted workspace's main where Keel itself put it (a refresh's
+ * relay, reported late): each is ignored, since no agent is woken by Keel's
+ * writes (ADR 0009, no self-loops).
  */
 export const observePush = Effect.fn("coordination/observePush")(function* (
   project: ProjectId,
@@ -181,15 +197,17 @@ export const observePush = Effect.fn("coordination/observePush")(function* (
 ) {
   const done = yield* commit(
     { entity: { kind: "workspace", id: push.workspaceId }, cause: `push:${pushId}`, project },
-    (tx) =>
-      Result.succeed(
-        slotOf(tx.store, push.workspaceId)?.state === "granted"
+    (tx) => {
+      const slot = slotOf(tx.store, push.workspaceId);
+      return Result.succeed(
+        slot?.state === "granted" && !keelsOwn(slot, push.sha)
           ? {
               value: "recorded" as const,
               drafts: [draft(WorkspacePushed, { _tag: "WorkspacePushed", ...push })],
             }
           : { value: "ignored" as const, drafts: [] },
-      ),
+      );
+    },
   );
   return (
     done.duplicate ? (done.events.length > 0 ? "recorded" : "ignored") : done.value
@@ -358,7 +376,7 @@ type Refreshed = "advanced" | "kept" | "collected" | "left" | "unsettled";
 const decided = (value: Refreshed, drafts: readonly EventDraft[] = []) =>
   Result.succeed({ value, drafts });
 
-/** A slot whose main is known again: ready at `base`, with nothing of its refresh left on it. */
+/** A slot whose main is known again: ready at `base`, with nothing of its refresh left on it but the commits it relayed. */
 const settledAt = (slot: Slot, base: CommitSha, at: number): Slot => ({
   id: slot.id,
   repo: slot.repo,
@@ -366,6 +384,7 @@ const settledAt = (slot: Slot, base: CommitSha, at: number): Slot => ({
   since: at,
   ...(slot.remote === undefined ? {} : { remote: slot.remote }),
   baseSha: base,
+  ...(slot.relayed === undefined ? {} : { relayed: slot.relayed }),
 });
 
 /**
@@ -426,7 +445,15 @@ const refreshOne = (project: ProjectId, id: WorkspaceId, head: CommitSha) =>
         const from = current?.baseSha;
         if (!isReady(current) || from === undefined || from === head)
           return Result.succeed({ value: undefined, drafts: [] });
-        putSlot(tx.store, { ...current, state: "refreshing", since: tx.at, advancingTo: head });
+        // Remembered before the relay, so a push that landed with its answer lost is known as Keel's too.
+        const relayed = [...(current.relayed ?? []), head].slice(-RELAYS_KEPT);
+        putSlot(tx.store, {
+          ...current,
+          state: "refreshing",
+          since: tx.at,
+          advancingTo: head,
+          relayed,
+        });
         return Result.succeed({ value: { repo: current.repo, from }, drafts: [] });
       },
     );

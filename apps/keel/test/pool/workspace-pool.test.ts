@@ -322,6 +322,35 @@ describe("the WorkspacePool DO", () => {
     expect(followed.relays).toHaveLength(1);
   });
 
+  it("[pool.do.refresh-push-ignored] through the real object, a refresh's push reported after its workspace was granted is ignored, and the holder's own push is recorded", async () => {
+    const projectId = freshProject();
+    const followed = await stock(projectId, 1);
+    const stub = poolStub(projectId);
+    const head = commitSha("e");
+    followed.head = head;
+    valueOf(WorkspacePoolCodecs.grant, await stub.grant(holder()));
+    // The refill forks behind trunk, and the refresh relays trunk's head onto the fork.
+    await runDurableObjectAlarm(stub);
+    await vi.waitFor(async () => {
+      expect(followed.relays).toHaveLength(1);
+      expect(await statusOf(projectId)).toMatchObject({ ready: 1, refreshing: 0, forking: 0 });
+    }, WAIT);
+    await stub.configure({ source: { namespace: "keel-ws-00", name: "unused" }, target: 0 });
+    const next = valueOf(WorkspacePoolCodecs.grant, await stub.grant(holder()));
+    expect(next.baseSha).toBe(head);
+    const observed = async (pushId: string, sha: string) =>
+      valueOf(
+        WorkspacePoolCodecs.observePush,
+        await stub.observePush(pushId, {
+          workspaceId: next.workspaceId,
+          ref: "refs/heads/main",
+          sha,
+        }),
+      );
+    expect(await observed(`relay-${projectId}`, head)).toBe("ignored");
+    expect(await observed(`agent-${projectId}`, commitSha("f"))).toBe("recorded");
+  });
+
   it("[pool.do.refresh-after-refill] a refill from a mirror that lags trunk arms a refresh: the workspace it forked is brought to trunk's head before anyone is granted it", async () => {
     const projectId = freshProject();
     const followed = await stock(projectId, 1);

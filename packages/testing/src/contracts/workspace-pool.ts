@@ -122,17 +122,29 @@ export function describeWorkspacePoolContract(adapter: string, make: StockedPool
     );
 
     it.live(
-      "[pool.contract.observe-push] a push to a granted workspace is recorded, a retry answers the same, and a push to a released or unknown one is ignored",
+      "[pool.contract.observe-push] a push that moves a granted workspace past its base is recorded, a retry answers the same, and one that leaves it on its base, or to a released or unknown workspace, is ignored",
       () =>
         withPool(make, 1, (projectId) =>
           Effect.gen(function* () {
             const pool = yield* WorkspacePool;
             const grant = yield* pool.grant(projectId, holder());
-            const push = (workspaceId: WorkspaceId) => ({
+            // A commit of the holder's: any commit but the base the workspace was granted at.
+            const mine = CommitSha.make(
+              `${grant.baseSha.startsWith("f") ? "0" : "f"}${grant.baseSha.slice(1)}`,
+            );
+            const push = (workspaceId: WorkspaceId, sha: CommitSha = mine) => ({
               workspaceId,
               ref: "refs/heads/main",
-              sha: grant.baseSha,
+              sha,
             });
+            // Main on the base holds nothing of the holder's: Keel put it there.
+            expect(
+              yield* pool.observePush(
+                projectId,
+                randomUlid(),
+                push(grant.workspaceId, grant.baseSha),
+              ),
+            ).toBe("ignored");
             const pushId = randomUlid();
             expect(yield* pool.observePush(projectId, pushId, push(grant.workspaceId))).toBe(
               "recorded",

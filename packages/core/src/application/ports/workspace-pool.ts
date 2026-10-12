@@ -74,10 +74,12 @@ export class WorkspacePool extends Context.Service<
      */
     readonly configure: (projectId: ProjectId, config: PoolConfig) => Effect.Effect<void>;
     /**
-     * Commits WorkspacePushed for a push to a workspace granted to its
-     * holder, once per `pushId` (a retried observation answers the same). A
-     * push to any other repo is Keel's own write or nobody's and is ignored,
-     * so no agent is woken by Keel's writes (ADR 0009: no self-loops).
+     * Commits WorkspacePushed for a push that moved a workspace granted to
+     * its holder past its base, once per `pushId` (a retried observation
+     * answers the same). A push to any other repo, or one that leaves the
+     * workspace's branch on the base it was granted at, is Keel's own write
+     * or nobody's and is ignored, so no agent is woken by Keel's writes (ADR
+     * 0009: no self-loops).
      */
     readonly observePush: (
       projectId: ProjectId,

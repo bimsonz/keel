@@ -2,15 +2,15 @@
 # kills: push.no-self-loop
 # why: A push to a ready or released workspace (a refill, Keel's own write) is recorded as the agent's, so Keel wakes itself
 diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
-index 2f50536..8a0b415 100644
+index 8c6fed6..37de203 100644
 --- a/packages/core/src/application/coordination/workspace-pool/pool.ts
 +++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
-@@ -170,7 +170,7 @@ export const observePush = Effect.fn("coordination/observePush")(function* (
-     { entity: { kind: "workspace", id: push.workspaceId }, cause: `push:${pushId}`, project },
-     (tx) =>
-       Result.succeed(
--        slotOf(tx.store, push.workspaceId)?.state === "granted"
-+        slotOf(tx.store, push.workspaceId) !== undefined
+@@ -200,7 +200,7 @@ export const observePush = Effect.fn("coordination/observePush")(function* (
+     (tx) => {
+       const slot = slotOf(tx.store, push.workspaceId);
+       return Result.succeed(
+-        slot?.state === "granted" && !keelsOwn(slot, push.sha)
++        slot !== undefined && !keelsOwn(slot, push.sha)
            ? {
                value: "recorded" as const,
                drafts: [draft(WorkspacePushed, { _tag: "WorkspacePushed", ...push })],

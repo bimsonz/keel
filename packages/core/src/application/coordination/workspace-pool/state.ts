@@ -42,6 +42,8 @@ export const Slot = Schema.Struct({
   baseSha: Schema.optionalKey(CommitSha),
   /** While refreshing: the trunk commit the relay is taking main to. `baseSha` is still where main was. */
   advancingTo: Schema.optionalKey(CommitSha),
+  /** The trunk commits Keel relayed onto main, the newest last and only the last few: a push observed at one of them was Keel's write, not the holder's. */
+  relayed: Schema.optionalKey(Schema.Array(CommitSha)),
   /** Failed deletions of the repo so far, while collecting. */
   attempts: Schema.optionalKey(Schema.Int),
 });

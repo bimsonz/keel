@@ -8,9 +8,11 @@ import {
   countBehind,
   destroyPool,
   grantWorkspace,
+  observePush,
   poolStatus,
   refillPool,
   refreshSlots,
+  RELAYS_KEPT,
   Slot,
   STUCK_REFRESH_MS,
 } from "@keeltown/core/application/coordination";
@@ -289,6 +291,52 @@ describe("WorkspacePool refresh", () => {
         expect(kept).toMatchObject({ state: "ready", baseSha: head });
         expect("advancingTo" in kept).toBe(false);
         expect(yield* mainOf(kept.repo)).toBe(head);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[pool.refresh-push-ignored] a refresh's pushes, reported once their workspace is granted, are Keel's own and wake nobody: only the holder's push is recorded",
+    () => {
+      // The first relay lands and its answer is lost; the read-back settles it.
+      const w = world(["lost"]);
+      return Effect.gen(function* () {
+        yield* w.stock(1);
+        const first = yield* w.land(1);
+        yield* refreshSlots(PROJECT);
+        const second = yield* w.land(2);
+        yield* refreshSlots(PROJECT);
+        const grant = yield* grantWorkspace(PROJECT, holder(1));
+        expect(grant.baseSha).toBe(second);
+        const observed = (pushId: string, sha: CommitSha) =>
+          observePush(PROJECT, pushId, { workspaceId: grant.workspaceId, ref: MAIN, sha });
+        // Artifacts reports each relay's push late, after the grant.
+        expect(yield* observed("relay-1", first)).toBe("ignored");
+        expect(yield* observed("relay-2", second)).toBe("ignored");
+        const mine = yield* w.fixture.commit(grant.repo, MAIN, { "README.md": "the agent's\n" });
+        expect(yield* observed("agent-1", mine)).toBe("recorded");
+        const pushed = (yield* eventsOf(grant.workspaceId)).filter(
+          (payload) => tagOf(payload) === "WorkspacePushed",
+        );
+        expect(pushed).toEqual([
+          { _tag: "WorkspacePushed", workspaceId: grant.workspaceId, ref: MAIN, sha: mine },
+        ]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[pool.refresh-trail-bounded] a workspace refreshed landing after landing remembers only the last few commits relayed to it",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.stock(1);
+        const heads: CommitSha[] = [];
+        for (let n = 1; n <= RELAYS_KEPT + 2; n++) {
+          heads.push(yield* w.land(n));
+          yield* refreshSlots(PROJECT);
+        }
+        expect((yield* onlySlot).relayed).toEqual(heads.slice(-RELAYS_KEPT));
       }).pipe(Effect.provide(w.layer));
     },
   );

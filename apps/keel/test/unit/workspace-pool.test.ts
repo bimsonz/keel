@@ -300,7 +300,7 @@ describe("WorkspacePool", () => {
   );
 
   it.effect(
-    "[push.no-self-loop] only a push to a granted workspace is an agent's: each is recorded once, and a push to a ready, released or unknown one is ignored",
+    "[push.no-self-loop] only a push that moves a granted workspace past its base is an agent's: each is recorded once, and a push to a ready, released or unknown one, or one that leaves main on its base, is ignored",
     () =>
       Effect.gen(function* () {
         const base = yield* seedMirror;
@@ -309,14 +309,21 @@ describe("WorkspacePool", () => {
         const grant = yield* grantWorkspace(PROJECT, holder(1));
         const ready = (yield* slotsHeld).find((slot) => slot.state === "ready")?.id;
         if (ready === undefined) throw new Error("the pool kept no ready workspace");
-        const next = yield* Effect.flatMap(CodeHostFixture, (fixture) =>
+        const first = yield* Effect.flatMap(CodeHostFixture, (fixture) =>
           fixture.commit(grant.repo, "refs/heads/main", { "README.md": "the agent's edit\n" }),
         );
-        expect(yield* observePush(PROJECT, "push-1", push(grant.workspaceId, base))).toBe(
+        const next = yield* Effect.flatMap(CodeHostFixture, (fixture) =>
+          fixture.commit(grant.repo, "refs/heads/main", { "README.md": "its next edit\n" }),
+        );
+        // Main on the workspace's own base holds nothing of the agent's: Keel put it there.
+        expect(yield* observePush(PROJECT, "push-0", push(grant.workspaceId, base))).toBe(
+          "ignored",
+        );
+        expect(yield* observePush(PROJECT, "push-1", push(grant.workspaceId, first))).toBe(
           "recorded",
         );
         // The same Workflow instance, retried, and the agent's next push.
-        expect(yield* observePush(PROJECT, "push-1", push(grant.workspaceId, base))).toBe(
+        expect(yield* observePush(PROJECT, "push-1", push(grant.workspaceId, first))).toBe(
           "recorded",
         );
         expect(yield* observePush(PROJECT, "push-2", push(grant.workspaceId, next))).toBe(
@@ -330,7 +337,7 @@ describe("WorkspacePool", () => {
           "ignored",
         );
         expect(yield* pushed(grant.workspaceId)).toEqual([
-          { _tag: "WorkspacePushed", ...push(grant.workspaceId, base) },
+          { _tag: "WorkspacePushed", ...push(grant.workspaceId, first) },
           { _tag: "WorkspacePushed", ...push(grant.workspaceId, next) },
         ]);
         expect(yield* pushed(ready)).toEqual([]);

@@ -72,7 +72,8 @@ const MEMORY_TRUNK_HEAD = CommitSha.make("7".repeat(40));
 /**
  * Grants workspaces up to `capacity`, then refuses with PoolExhausted. A
  * holder's second grant returns its workspace again with a new token, as the
- * real pool does; every grant's base is `baseSha`. Once destroyed it grants
+ * real pool does; every grant's base is `baseSha`, and a push observed at
+ * that commit is not the holder's. Once destroyed it grants
  * nothing, and what it had granted is released as withdrawn.
  */
 export function makeWorkspacePoolMemory(
@@ -132,7 +133,7 @@ export function makeWorkspacePoolMemory(
         observePush: (_projectId, pushId, push) =>
           Effect.sync(() => {
             if (pushed.has(pushId)) return "recorded";
-            if (!granted.has(push.workspaceId)) return "ignored";
+            if (!granted.has(push.workspaceId) || push.sha === baseSha) return "ignored";
             pushed.set(pushId, push);
             return "recorded";
           }),

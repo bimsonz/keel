@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.refresh-push-ignored, pool.refresh-trail-bounded
+# why: A refresh does not remember what it relayed, so an earlier relay's push reported after the grant is taken for the holder's
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 8c6fed6..877c78f 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -452,7 +452,6 @@ const refreshOne = (project: ProjectId, id: WorkspaceId, head: CommitSha) =>
+           state: "refreshing",
+           since: tx.at,
+           advancingTo: head,
+-          relayed,
+         });
+         return Result.succeed({ value: { repo: current.repo, from }, drafts: [] });
+       },
