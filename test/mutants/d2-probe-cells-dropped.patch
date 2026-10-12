@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/probe-conflict.test.ts
+# kills: probe-conflict.reports
+# why: An admitted draft is reported with no cells, so the ledger never sees the matrix that admits it
+diff --git a/packages/core/src/application/verification/probe-conflict.ts b/packages/core/src/application/verification/probe-conflict.ts
+index ed4ad70..6bd5415 100644
+--- a/packages/core/src/application/verification/probe-conflict.ts
++++ b/packages/core/src/application/verification/probe-conflict.ts
+@@ -234,7 +234,7 @@ export const reportsOf = (outcome: DraftOutcome): ProbeReport => {
+       _tag: "Drafted",
+       attempts: outcome.attempts,
+       probe: outcome.probe,
+-      cells: outcome.cells,
++      cells: [],
+       files: outcome.files,
+     };
+   if (outcome._tag === "Abstained")

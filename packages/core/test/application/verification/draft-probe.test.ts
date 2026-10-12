@@ -220,7 +220,12 @@ describe("draftProbe: template first, repaired from deterministic text only", ()
       (_, world) => discriminates(world),
     );
     const outcome = await d.run();
-    expect(outcome).toMatchObject({ _tag: "Admitted", probe: hash(1001), attempts: 1 });
+    expect(outcome).toMatchObject({
+      _tag: "Admitted",
+      probe: hash(1001),
+      files: FRESHNESS_TEMPLATE.render(good()),
+      attempts: 1,
+    });
     expect(d.calls).toHaveLength(1);
     expect(d.calls[0]).toMatchObject({
       name: "keel.probe.freshness",
@@ -324,6 +329,15 @@ describe("draftProbe: template first, repaired from deterministic text only", ()
     const outcome = await d.run();
     expect(outcome).toMatchObject({ _tag: "Discarded", reason: "non-discriminating", attempts: 1 });
     expect(d.calls).toHaveLength(1);
+    // It ran clean, so the domain decides it from its own matrix: the probe, its files and every cell.
+    expect(outcome).toMatchObject({
+      ran: {
+        probe: hash(1001),
+        files: FRESHNESS_TEMPLATE.render(good()),
+        cells: expect.arrayContaining([expect.objectContaining({ world: "A-noop", run: 3 })]),
+      },
+    });
+    expect(outcome._tag === "Discarded" ? outcome.ran?.cells : []).toHaveLength(15);
   });
 
   it("[draft.abstained] ends when the model abstains, with nothing run and no repair", async () => {

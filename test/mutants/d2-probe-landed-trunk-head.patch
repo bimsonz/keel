@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/probe-conflict.test.ts
+# kills: probe-conflict.landed-worlds
+# why: With A landed, the trunk world stays trunk's head, which already holds A, so trunk and A are one world
+diff --git a/packages/core/src/application/verification/probe-conflict.ts b/packages/core/src/application/verification/probe-conflict.ts
+index ed4ad70..2a7edcf 100644
+--- a/packages/core/src/application/verification/probe-conflict.ts
++++ b/packages/core/src/application/verification/probe-conflict.ts
+@@ -169,8 +169,7 @@ export const probeWorldPlan = (
+   const a = side(A);
+   const b = side(B);
+   const landed = A._tag === "Landed" ? A : B._tag === "Landed" ? B : undefined;
+-  const base: RepoCommit =
+-    landed === undefined ? trunk : { repo: trunk.repo, commit: landed.parent };
++  const base: RepoCommit = trunk;
+   return Result.succeed({
+     trunk: base,
+     A: a.world,

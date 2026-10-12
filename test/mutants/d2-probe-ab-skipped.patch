@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/probe-conflict.test.ts
+# kills: probe-conflict.reports
+# why: A and B that do not compose are drafted anyway, with B standing in for AB
+diff --git a/packages/core/src/application/verification/probe-conflict.ts b/packages/core/src/application/verification/probe-conflict.ts
+index ed4ad70..464a4e2 100644
+--- a/packages/core/src/application/verification/probe-conflict.ts
++++ b/packages/core/src/application/verification/probe-conflict.ts
+@@ -200,9 +200,7 @@ export interface BuiltWorlds {
+ export const draftWorlds = (
+   built: BuiltWorlds,
+ ): Result.Result<Readonly<Record<FlowWorld, ContentHash>>, "worlds-unbuildable"> =>
+-  built.AB === undefined
+-    ? Result.fail("worlds-unbuildable")
+-    : Result.succeed({ trunk: built.trunk, A: built.A, B: built.B, AB: built.AB });
++  Result.succeed({ trunk: built.trunk, A: built.A, B: built.B, AB: built.AB ?? built.B });
+ 
+ /** What the Probe Workflow reports to the conflict's ledger for a draft. */
+ export type ProbeReport =

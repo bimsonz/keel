@@ -72,6 +72,7 @@ export * from "./guard-step.ts";
 export * from "./packs.ts";
 export * from "./plan-codec.ts";
 export * from "./precheck.ts";
+export * from "./probe-conflict.ts";
 export * from "./probe-run.ts";
 export * from "./probe-templates/freshness.ts";
 export * from "./probe-templates/template.ts";

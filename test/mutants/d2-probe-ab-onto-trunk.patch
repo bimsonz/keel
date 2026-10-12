@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/probe-conflict.test.ts
+# kills: probe-conflict.landed-worlds
+# why: With A landed, AB composes B onto trunk's head instead of A's landing commit, so a later landing confounds AB
+diff --git a/packages/core/src/application/verification/probe-conflict.ts b/packages/core/src/application/verification/probe-conflict.ts
+index ed4ad70..ff99bd3 100644
+--- a/packages/core/src/application/verification/probe-conflict.ts
++++ b/packages/core/src/application/verification/probe-conflict.ts
+@@ -178,7 +178,7 @@ export const probeWorldPlan = (
+     AB:
+       landed === undefined
+         ? { onto: trunk.commit, members: ["A", "B"] }
+-        : { onto: landed.landing, members: A._tag === "Landed" ? ["B"] : ["A"] },
++        : { onto: trunk.commit, members: A._tag === "Landed" ? ["B"] : ["A"] },
+     hunks: { A: a.hunks, B: b.hunks },
+     source: base,
+   });

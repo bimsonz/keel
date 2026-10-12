@@ -2,11 +2,11 @@
 # kills: draft.noop-from-slots
 # why: The matrix runs A's own world as A-noop, so the do-nothing mutant the slots name is never built and a probe that ignores the revoke can still fail there for another reason
 diff --git a/packages/core/src/application/verification/draft-probe.ts b/packages/core/src/application/verification/draft-probe.ts
-index 449e21a..666888f 100644
+index 6fb1421..bb6033a 100644
 --- a/packages/core/src/application/verification/draft-probe.ts
 +++ b/packages/core/src/application/verification/draft-probe.ts
-@@ -237,7 +237,7 @@ export const draftProbe = <S, R>(
-       const probe = yield* store.put(template.render(slots.success));
+@@ -249,7 +249,7 @@ export const draftProbe = <S, R>(
+       const probe = yield* store.put(files);
        const { cells, harnessErrors } = yield* runMatrix(
          probe,
 -        { ...worlds, "A-noop": noop.success },

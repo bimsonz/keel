@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/probe-conflict.test.ts
+# kills: probe-conflict.reports
+# why: A probe that ran clean and was found non-discriminating or unstable is reported as a failed draft, so its cells never reach the domain
+diff --git a/packages/core/src/application/verification/probe-conflict.ts b/packages/core/src/application/verification/probe-conflict.ts
+index ed4ad70..6837085 100644
+--- a/packages/core/src/application/verification/probe-conflict.ts
++++ b/packages/core/src/application/verification/probe-conflict.ts
+@@ -239,11 +239,6 @@ export const reportsOf = (outcome: DraftOutcome): ProbeReport => {
+     };
+   if (outcome._tag === "Abstained")
+     return { _tag: "DraftFailed", attempts: outcome.attempts, reason: "abstained" };
+-  if (
+-    (outcome.reason === "non-discriminating" || outcome.reason === "unstable") &&
+-    outcome.ran !== undefined
+-  )
+-    return { _tag: "Drafted", attempts: outcome.attempts, ...outcome.ran };
+   return {
+     _tag: "DraftFailed",
+     attempts: outcome.attempts,

@@ -1,0 +1,24 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/probe-conflict.test.ts
+# kills: probe-conflict.anchors
+# why: An anchor the premise and the effect both name is given to the draft twice
+diff --git a/packages/core/src/application/verification/probe-conflict.ts b/packages/core/src/application/verification/probe-conflict.ts
+index ed4ad70..09a732a 100644
+--- a/packages/core/src/application/verification/probe-conflict.ts
++++ b/packages/core/src/application/verification/probe-conflict.ts
+@@ -86,12 +86,10 @@ export const submissionStateOf = (change: PartyChange): PartySubmission => {
+ 
+ /** The code a draft is about: the anchors the premise and the effect name, premise first, each once. */
+ export const anchorsOf = (parties: ProbeParties): readonly string[] => [
+-  ...new Set(
+-    [
+-      ...(parties.premise.proposition.anchors ?? []),
+-      ...(parties.effect.proposition.anchors ?? []),
+-    ].map((a) => (a.symbol === undefined ? a.path : `${a.path} ${a.symbol}`)),
+-  ),
++  ...[
++    ...(parties.premise.proposition.anchors ?? []),
++    ...(parties.effect.proposition.anchors ?? []),
++  ].map((a) => (a.symbol === undefined ? a.path : `${a.path} ${a.symbol}`)),
+ ];
+ 
+ /** What a draft is drafted from, given the project's source at trunk and each change's hunks. */

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/probe-conflict.test.ts
+# kills: probe-conflict.reports
+# why: A probe that ran clean and was not admitted is drafted without its cells, so the domain never sees the matrix that discards it
+diff --git a/packages/core/src/application/verification/probe-conflict.ts b/packages/core/src/application/verification/probe-conflict.ts
+index ed4ad70..fc94e55 100644
+--- a/packages/core/src/application/verification/probe-conflict.ts
++++ b/packages/core/src/application/verification/probe-conflict.ts
+@@ -243,7 +243,7 @@ export const reportsOf = (outcome: DraftOutcome): ProbeReport => {
+     (outcome.reason === "non-discriminating" || outcome.reason === "unstable") &&
+     outcome.ran !== undefined
+   )
+-    return { _tag: "Drafted", attempts: outcome.attempts, ...outcome.ran };
++    return { _tag: "Drafted", attempts: outcome.attempts, ...outcome.ran, cells: [] };
+   return {
+     _tag: "DraftFailed",
+     attempts: outcome.attempts,

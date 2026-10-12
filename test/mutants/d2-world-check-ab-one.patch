@@ -1,0 +1,13 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/probe-conflict.test.ts
+# kills: probe-conflict.world-checks
+# why: AB runs only A's suite, so B's own suite breaking under A goes unseen
+diff --git a/packages/core/src/application/verification/probe-conflict.ts b/packages/core/src/application/verification/probe-conflict.ts
+index ed4ad70..f82cb38 100644
+--- a/packages/core/src/application/verification/probe-conflict.ts
++++ b/packages/core/src/application/verification/probe-conflict.ts
+@@ -270,5 +270,4 @@ export const worldChecks = (parties: ProbeParties): readonly WorldCheckSpec[] =>
+   { world: "A", check: `suite:${parties.A}` },
+   { world: "B", check: `suite:${parties.B}` },
+   { world: "AB", check: `suite:${parties.A}` },
+-  { world: "AB", check: `suite:${parties.B}` },
+ ];

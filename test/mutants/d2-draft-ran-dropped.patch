@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/draft-probe.test.ts
+# kills: draft.vacuous-discarded
+# why: A probe that ran clean and was discarded keeps none of what it ran, so the domain is never shown the matrix it is discarded on
+diff --git a/packages/core/src/application/verification/draft-probe.ts b/packages/core/src/application/verification/draft-probe.ts
+index 6fb1421..ddf3f7f 100644
+--- a/packages/core/src/application/verification/draft-probe.ts
++++ b/packages/core/src/application/verification/draft-probe.ts
+@@ -271,7 +271,6 @@ export const draftProbe = <S, R>(
+         reason: admission._tag === "rejected" ? admission.reason : "incomplete",
+         attempts: attempt,
+         feedback,
+-        ran: { probe, files, cells },
+       } satisfies DraftOutcome;
+     }
+     return {

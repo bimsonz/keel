@@ -14,7 +14,7 @@ import {
   type ProbeRunnerUnavailable,
   ProbeStore,
 } from "../ports/index.ts";
-import type { ProbeTemplate } from "./probe-templates/template.ts";
+import type { ProbeFile, ProbeTemplate } from "./probe-templates/template.ts";
 import { type MatrixCell, type MatrixHarnessError, runMatrix } from "./run-matrix.ts";
 import {
   describeNoNoop,
@@ -44,11 +44,21 @@ export interface DraftContext {
   readonly hunks: { readonly A: string; readonly B: string };
 }
 
+/** A probe that ran its whole matrix clean: as ProbeStore holds it, the files it was rendered as, and every cell. */
+export interface DraftRan {
+  readonly probe: ContentHash;
+  /** What its guard commits beside guard.json, if the domain admits it. */
+  readonly files: readonly ProbeFile[];
+  readonly cells: readonly MatrixCell[];
+}
+
 /** How drafting ended. Only an admitted probe goes on; any other end escalates its conflict. */
 export type DraftOutcome =
   | {
       readonly _tag: "Admitted";
       readonly probe: ContentHash;
+      /** The rendered probe, as ProbeStore holds it under `probe`: what its guard commits beside guard.json. */
+      readonly files: readonly ProbeFile[];
       readonly cells: readonly MatrixCell[];
       readonly attempts: number;
     }
@@ -58,7 +68,8 @@ export type DraftOutcome =
       readonly attempts: number;
       /** What every failed attempt was told, in order. */
       readonly feedback: readonly string[];
-      readonly cells?: readonly MatrixCell[];
+      /** A probe that ran clean and was not admitted: the probe, its files and its matrix. */
+      readonly ran?: DraftRan;
     }
   | { readonly _tag: "Abstained"; readonly reason: string; readonly attempts: number };
 
@@ -234,7 +245,8 @@ export const draftProbe = <S, R>(
         feedback.push(`attempt ${attempt}: noop: ${describeNoNoop(noop.failure)}`);
         continue;
       }
-      const probe = yield* store.put(template.render(slots.success));
+      const files = template.render(slots.success);
+      const probe = yield* store.put(files);
       const { cells, harnessErrors } = yield* runMatrix(
         probe,
         { ...worlds, "A-noop": noop.success },
@@ -253,13 +265,13 @@ export const draftProbe = <S, R>(
       }
       const admission = admit(cells);
       if (admission._tag === "admitted")
-        return { _tag: "Admitted", probe, cells, attempts: attempt } satisfies DraftOutcome;
+        return { _tag: "Admitted", probe, files, cells, attempts: attempt } satisfies DraftOutcome;
       return {
         _tag: "Discarded",
         reason: admission._tag === "rejected" ? admission.reason : "incomplete",
         attempts: attempt,
         feedback,
-        cells,
+        ran: { probe, files, cells },
       } satisfies DraftOutcome;
     }
     return {
