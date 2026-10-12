@@ -8,6 +8,7 @@ import {
   type InstanceEvents,
   probeStart,
   sendToInstance,
+  waitingWorkflowFor,
 } from "../../src/adapters/driven/do-rpc/fan-out.ts";
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -52,7 +53,7 @@ function probes(status: string, refuses: boolean) {
     Effect.runPromise(
       Effect.exit(sendToInstance(workflow, instance, `workflow:Probe/${instance}`, events)),
     );
-  return { sent, deliver };
+  return { sent, deliver, workflow };
 }
 
 describe("the fan-out's Probe cases", () => {
@@ -68,6 +69,15 @@ describe("the fan-out's Probe cases", () => {
         payload: Schema.encodeSync(EventEnvelope)(event),
       },
     ]);
+  });
+
+  it("[fan-out.waiting-route] an instance address reaches its own Workflow: a Probe's the Probe binding, a world check's the world-check binding, and no other Workflow waits", () => {
+    const [probe, worldCheck] = [probes("running", false), probes("running", false)];
+    const env = { PROBE: probe.workflow, WORLD_CHECK: worldCheck.workflow };
+    expect(waitingWorkflowFor(env, "Probe")).toBe(probe.workflow);
+    expect(waitingWorkflowFor(env, "KeelWorldCheck")).toBe(worldCheck.workflow);
+    for (const name of ["Precheck", "KeelVerify", "keelworldcheck", ""])
+      expect(waitingWorkflowFor(env, name)).toBeUndefined();
   });
 
   it("[fan-out.send-finished] an event an instance refuses is acknowledged once it has finished, and stays owed while it runs", async () => {

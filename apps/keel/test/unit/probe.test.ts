@@ -54,6 +54,7 @@ import {
 import { Effect, Layer, Schema } from "effect";
 import { FlowSpecSourceCodeHost } from "../../src/adapters/driven/gitcore/flow-spec-source.ts";
 import { ProbeSourcesCodeHost } from "../../src/adapters/driven/gitcore/probe-sources.ts";
+import { memorySteps } from "./memory-steps.ts";
 
 const MAIN = "refs/heads/main";
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -142,10 +143,6 @@ const ran = (outcome: ProbeOutcome): ProbeRun => ({
   reason: outcome,
   observations: [],
 });
-
-/** The plans each party was verified under. */
-const PLAN_A = hash(51);
-const PLAN_B = hash(52);
 
 /** The A-noop world the probe's NoopWorlds double answers. */
 const A_NOOP = hash(99);
@@ -320,8 +317,8 @@ function probeWorld(options: Options = {}) {
       readonly headB: CommitSha;
     }) =>
       Effect.all([
-        changes.submit(A, { repo: wsA, head: heads.headA, base: heads.T, planHash: PLAN_A }),
-        changes.submit(B, { repo: wsB, head: heads.headB, base: heads.T, planHash: PLAN_B }),
+        changes.submit(A, { repo: wsA, head: heads.headA, base: heads.T }),
+        changes.submit(B, { repo: wsB, head: heads.headB, base: heads.T }),
       ]),
     run: (steps: ProbeSteps) => probeConflict(call, steps).pipe(Effect.provide(layer)),
     log: (entity: EntityRef) => ledger.log(at, entity),
@@ -331,58 +328,6 @@ function probeWorld(options: Options = {}) {
         return yield* (yield* ProbeLedger).conflict(at, conflictId);
       }).pipe(Effect.provide(layer), Effect.orDie),
   };
-}
-
-/**
- * The Workflow's steps in memory: each step's value kept as JSON by name, so
- * running the program again over the same `kept` replays it; a name used
- * twice in one run is a defect, since the Workflow would answer the first
- * value again. `onWait` decides each wait; `after` runs a hook once a named
- * step has run.
- */
-function memorySteps(
-  options: {
-    readonly onWait?: (type: string, timeoutMs: number) => Effect.Effect<boolean>;
-    readonly after?: Readonly<Record<string, Effect.Effect<void>>>;
-  } = {},
-) {
-  const kept = new Map<string, string>();
-  const done: string[] = [];
-  const waits: { readonly name: string; readonly type: string; readonly timeoutMs: number }[] = [];
-  const steps = (): ProbeSteps => {
-    const seen = new Set<string>();
-    const once = (name: string) =>
-      Effect.suspend(() => {
-        if (seen.has(name)) return Effect.die(new Error(`step ${name} is named twice`));
-        seen.add(name);
-        return Effect.void;
-      });
-    return {
-      step: <A, R>(name: string, effect: Effect.Effect<A, never, R>) =>
-        Effect.gen(function* () {
-          yield* once(name);
-          const held = kept.get(name);
-          if (held !== undefined) return JSON.parse(held);
-          const value: A = yield* effect;
-          done.push(name);
-          kept.set(name, JSON.stringify(value));
-          const hook = options.after?.[name];
-          if (hook !== undefined) yield* hook;
-          return value;
-        }),
-      waitFor: (name, type, timeoutMs) =>
-        Effect.gen(function* () {
-          yield* once(`wait ${name}`);
-          const held = kept.get(`wait ${name}`);
-          if (held !== undefined) return JSON.parse(held) === true;
-          waits.push({ name, type, timeoutMs });
-          const heard = yield* (options.onWait ?? (() => Effect.succeed(false)))(type, timeoutMs);
-          kept.set(`wait ${name}`, JSON.stringify(heard));
-          return heard;
-        }),
-    };
-  };
-  return { kept, ran: done, waits, steps };
 }
 
 const types = (log: readonly { readonly type: string }[]) => log.map((e) => e.type);
@@ -445,8 +390,9 @@ describe("probeConflict", () => {
         const probeLog = yield* w.log({ kind: "probe", id: end.probeId });
         expect(types(probeLog)).toContain("GuardAdmitted");
         expect(types(probeLog).filter((t) => t === "ProbeRan")).toHaveLength(15);
-        // One world check per world, started once the probe was drafted: each party's suite under
-        // the plan it was verified under, both in AB, and trunk's from trunk's own flow.
+        // One world check per world, started once the probe was drafted: each party's suite names
+        // its change, whose plan the check reads when it runs (no Precheck has compiled one here),
+        // both in AB, and trunk's from trunk's own flow.
         const started = [...w.worldChecks.entries()];
         expect(started.map(([id]) => id)).toEqual(
           ["trunk", "A", "B", "AB"].map((world) => `world-${w.conflictId}-${world}`),
@@ -454,14 +400,14 @@ describe("probeConflict", () => {
         const checksOf = (world: string) =>
           started.find(([, job]) => job.world === world)?.[1].checks;
         expect(checksOf("A")).toEqual([
-          { check: `suite:${w.A}`, plan: { _tag: "Planned", planHash: PLAN_A } },
+          { check: `suite:${w.A}`, plan: { _tag: "OfChange", changeId: w.A } },
         ]);
         expect(checksOf("B")).toEqual([
-          { check: `suite:${w.B}`, plan: { _tag: "Planned", planHash: PLAN_B } },
+          { check: `suite:${w.B}`, plan: { _tag: "OfChange", changeId: w.B } },
         ]);
         expect(checksOf("AB")).toEqual([
-          { check: `suite:${w.A}`, plan: { _tag: "Planned", planHash: PLAN_A } },
-          { check: `suite:${w.B}`, plan: { _tag: "Planned", planHash: PLAN_B } },
+          { check: `suite:${w.A}`, plan: { _tag: "OfChange", changeId: w.A } },
+          { check: `suite:${w.B}`, plan: { _tag: "OfChange", changeId: w.B } },
         ]);
         expect(checksOf("trunk")).toEqual([
           { check: "suite:trunk", plan: { _tag: "Planned", planHash: expect.any(String) } },

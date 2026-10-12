@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/world-check-plan.test.ts
+# kills: world-check-plan.waits, world-check-plan.compiled-before-wait
+# why: A party read while its Precheck runs is given up on at once, so its suite never runs: the n/a the live S-1 run recorded for four of five checks
+diff --git a/packages/core/src/application/verification/world-check-plan.ts b/packages/core/src/application/verification/world-check-plan.ts
+index d9fd1ce..17de869 100644
+--- a/packages/core/src/application/verification/world-check-plan.ts
++++ b/packages/core/src/application/verification/world-check-plan.ts
+@@ -60,7 +60,7 @@ export const partyCheckPlan = (
+         return unplanned(`${changeId} is ${read.state} with no compiled plan`);
+       if (read._tag === "Missing") return unplanned(`${changeId} is not a change`);
+       const now = yield* steps.step(`clock ${check} ${n}`, clock.now);
+-      if (now >= deadline) return late;
++      if (now >= deadline || n >= 1) return late;
+       const heard = yield* steps.waitFor(
+         `change ${check} ${n}`,
+         partyEventType(changeId),

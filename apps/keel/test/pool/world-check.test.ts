@@ -5,13 +5,32 @@ import { ContentHash } from "@keeltown/core/kernel";
 import { EventOutbox, PlanStore, WorldChecks } from "@keeltown/core/ports";
 import { suitePlan } from "@keeltown/testing";
 import { Effect, Schema } from "effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PlanStoreR2 } from "../../src/adapters/driven/r2/plan-store.ts";
 import { WorldChecksWorkflow } from "../../src/adapters/driven/workflow/world-checks.ts";
+import type { ChangeDO } from "../../src/adapters/driving/do/change.ts";
 import type { SubjectDO } from "../../src/adapters/driving/do/subject.ts";
-import { type WorldCheckJob, worldCheckParams } from "../../src/rpc/index.ts";
+import {
+  ChangeCodecs,
+  decodeExit,
+  type WorldCheckJob,
+  worldCheckParams,
+} from "../../src/rpc/index.ts";
 import { suiteStdout } from "../support-suite-stdout.ts";
-import { admitted, drafted, hash, LEAF, logOf, subjectOf, suspected } from "./probe-harness.ts";
+import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
+import { forgetOwed } from "./helpers.ts";
+import { inertPrecheck } from "./inert-precheck.ts";
+import {
+  admitted,
+  deliver,
+  drafted,
+  hash,
+  kept,
+  LEAF,
+  logOf,
+  subjectOf,
+  suspected,
+} from "./probe-harness.ts";
 
 const SUITE = suitePlan();
 const SUITE_STEP = "js-ts.suite";
@@ -46,6 +65,50 @@ const jobOf = (
   bundle: Schema.decodeUnknownSync(ContentHash)(hash("d")),
   checks,
 });
+/** A's own check in a world, its plan to be read from the change when the check runs. */
+const partyJob = (s: Awaited<ReturnType<typeof suspected>>, world: FlowWorld): WorldCheckJob =>
+  jobOf(s, world, [{ check: `suite:${s.A}`, plan: { _tag: "OfChange", changeId: s.A } }]);
+
+/** The Precheck pass a case answers by hand, for a change's first submission. */
+const PASS = { revision: 1, instanceId: "precheck-by-hand" };
+
+/**
+ * A real change on its own Change DO, submitted. Its ChangeSubmitted started
+ * a real Precheck, which the case holds inert: no plan and no refusal has
+ * come of the submission.
+ */
+async function submittedChange(precheck: Awaited<ReturnType<typeof inertPrecheck>>) {
+  const c = await changeUnderTest();
+  ok(await c.declare());
+  const commitSha = await c.push();
+  ok(
+    decodeExit(
+      ChangeCodecs.submit,
+      await c.stub.submit({
+        agentId: c.agentId,
+        leaseId: (await c.current()).lease.id,
+        commitSha,
+        idempotencyKey: "submit-1",
+      }),
+    ),
+  );
+  await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(1), {
+    timeout: 10_000,
+    interval: 50,
+  });
+  return c;
+}
+
+/** Who the change's next event of `type` would notify now. */
+const hearing = (c: ChangeUnderTest, type: string) =>
+  runInDurableObject(c.stub, (instance: ChangeDO) =>
+    instance["runtime"].runPromise(
+      Effect.map(EventOutbox, (outbox) =>
+        outbox.subscribers(type, { entity: { kind: "change", id: c.changeId }, affected: [] }),
+      ),
+    ),
+  );
+
 /** A WorldCheckRan's cell, as the Subject DO records it. */
 const Cell = Schema.Struct({
   world: Schema.String,
@@ -117,7 +180,10 @@ describe("KeelWorldCheck", () => {
     await drafted(s.projectId, s.conflictId);
     await runWorld(
       jobOf(s, "B", [
-        { check: `suite:${s.B}`, plan: { _tag: "Unplanned", reason: `${s.B} has no stored plan` } },
+        {
+          check: `suite:${s.B}`,
+          plan: { _tag: "Unplanned", reason: `${s.B} is bounced with no compiled plan` },
+        },
       ]),
     );
     expect(await recorded(s)).toEqual([
@@ -126,9 +192,135 @@ describe("KeelWorldCheck", () => {
         check: `suite:${s.B}`,
         run: 1,
         outcome: "n/a",
-        reason: `${s.B} has no stored plan`,
+        reason: `${s.B} is bounced with no compiled plan`,
       },
     ]);
+  });
+
+  it("[d22.pool.world-check-waits] a check started before its party's Precheck compiled waits as that change's one-shot subscriber, and runs the suite once the change's own PlanCompiled reaches it", async () => {
+    await using precheck = await inertPrecheck();
+    const c = await submittedChange(precheck);
+    const s = await suspected({ A: c.changeId });
+    await drafted(s.projectId, s.conflictId);
+    const planHash = await stored();
+    const id = `world-${s.conflictId}-A`;
+    await using instance = await introspectWorkflowInstance(env.WORLD_CHECK, id);
+    const stdout = await suiteStdout(200, 0);
+    await instance.modify(async (m) => {
+      await m.mockStepResult({ name: SUITE_STEP }, runnerOutput(stdout));
+    });
+    await env.WORLD_CHECK.create({ id, params: worldCheckParams(partyJob(s, "A")) });
+    // The order the live run had: the check reads its party before Precheck has answered.
+    await instance.waitForStepResult({ name: `clock suite:${s.A} 1` });
+    expect(await hearing(c, "PlanCompiled")).toContain(`workflow:KeelWorldCheck/${id}`);
+    expect(await recorded(s)).toEqual([]);
+    // Precheck answers: the Change DO's own outbox tells the instance, through the fan-out.
+    ok(decodeExit(ChangeCodecs.precheckStarted, await c.stub.precheckStarted(PASS)));
+    ok(
+      decodeExit(
+        ChangeCodecs.planCompiled,
+        await c.stub.planCompiled({ ...PASS, planHash, steps: 1, costEstimate: 1 }),
+      ),
+    );
+    await instance.waitForStatus("complete");
+    expect(await recorded(s)).toEqual([
+      { world: "A", check: `suite:${s.A}`, run: 1, outcome: "pass" },
+    ]);
+    expect(await hearing(c, "PlanCompiled")).not.toContain(`workflow:KeelWorldCheck/${id}`);
+  });
+
+  it("[d22.pool.world-check-told-early] a plan's event sent before the instance reaches its wait still wakes it: the check reads the change again and runs its suite", async () => {
+    await using precheck = await inertPrecheck();
+    const c = await submittedChange(precheck);
+    const s = await suspected({ A: c.changeId });
+    await drafted(s.projectId, s.conflictId);
+    const planHash = await stored();
+    ok(decodeExit(ChangeCodecs.precheckStarted, await c.stub.precheckStarted(PASS)));
+    ok(
+      decodeExit(
+        ChangeCodecs.planCompiled,
+        await c.stub.planCompiled({ ...PASS, planHash, steps: 1, costEstimate: 1 }),
+      ),
+    );
+    const compiled = (await c.log()).find((e) => e.type === "PlanCompiled");
+    if (compiled === undefined) throw new Error("no PlanCompiled committed");
+    const id = `world-${s.conflictId}-A`;
+    await using instance = await introspectWorkflowInstance(env.WORLD_CHECK, id);
+    const stdout = await suiteStdout(200, 0);
+    await instance.modify(async (m) => {
+      // The first read is kept as Waiting: the plan compiled right after it answered.
+      await m.mockStepResult({ name: `plan of suite:${s.A} 1` }, kept({ _tag: "Waiting" }));
+      await m.mockStepResult({ name: SUITE_STEP }, runnerOutput(stdout));
+    });
+    await env.WORLD_CHECK.create({ id, params: worldCheckParams(partyJob(s, "A")) });
+    // Sent with the start, before any wait began.
+    expect((await deliver(`workflow:KeelWorldCheck/${id}`, [compiled]))._tag).toBe("Success");
+    await instance.waitForStatus("complete");
+    expect(await recorded(s)).toEqual([
+      { world: "A", check: `suite:${s.A}`, run: 1, outcome: "pass" },
+    ]);
+  });
+
+  it("[d22.pool.world-check-refused] a party whose Precheck refuses while its check waits is recorded n/a, saying the change bounced, and runs nothing", async () => {
+    await using precheck = await inertPrecheck();
+    const c = await submittedChange(precheck);
+    const s = await suspected({ A: c.changeId });
+    await drafted(s.projectId, s.conflictId);
+    const id = `world-${s.conflictId}-A`;
+    await using instance = await introspectWorkflowInstance(env.WORLD_CHECK, id);
+    await env.WORLD_CHECK.create({ id, params: worldCheckParams(partyJob(s, "A")) });
+    await instance.waitForStepResult({ name: `clock suite:${s.A} 1` });
+    ok(decodeExit(ChangeCodecs.precheckStarted, await c.stub.precheckStarted(PASS)));
+    ok(
+      decodeExit(
+        ChangeCodecs.precheckRefused,
+        await c.stub.precheckRefused({
+          ...PASS,
+          reasons: ["precheck:protected:src/secret.ts"],
+          nextActions: [
+            {
+              kind: "call",
+              title: "Move the change off the protected paths",
+              operationId: "submit",
+            },
+          ],
+        }),
+      ),
+    );
+    await instance.waitForStatus("complete");
+    expect(await recorded(s)).toEqual([
+      {
+        world: "A",
+        check: `suite:${s.A}`,
+        run: 1,
+        outcome: "n/a",
+        reason: `${s.A} is bounced with no compiled plan`,
+      },
+    ]);
+  });
+
+  it("[d22.pool.world-check-deadline] a party whose Precheck never answers within the wait is recorded n/a, saying so", async () => {
+    await using precheck = await inertPrecheck();
+    const c = await submittedChange(precheck);
+    const s = await suspected({ A: c.changeId });
+    await drafted(s.projectId, s.conflictId);
+    const id = `world-${s.conflictId}-A`;
+    await using instance = await introspectWorkflowInstance(env.WORLD_CHECK, id);
+    await instance.modify(async (m) => {
+      await m.forceEventTimeout({ name: `change suite:${s.A} 1` });
+    });
+    await env.WORLD_CHECK.create({ id, params: worldCheckParams(partyJob(s, "A")) });
+    await instance.waitForStatus("complete");
+    expect(await recorded(s)).toEqual([
+      {
+        world: "A",
+        check: `suite:${s.A}`,
+        run: 1,
+        outcome: "n/a",
+        reason: `${s.A}'s Precheck compiled no plan within 5 minutes`,
+      },
+    ]);
+    await forgetOwed(c.stub, `workflow:KeelWorldCheck/${id}`);
   });
 
   it("[d22.pool.world-check-decided] a conflict whose probe has decided still takes its checks: they are evidence for people, not for admission", async () => {
@@ -136,7 +328,10 @@ describe("KeelWorldCheck", () => {
     await admitted(s.projectId, s.conflictId);
     await runWorld(
       jobOf(s, "A", [
-        { check: `suite:${s.A}`, plan: { _tag: "Unplanned", reason: `${s.A} has no stored plan` } },
+        {
+          check: `suite:${s.A}`,
+          plan: { _tag: "Unplanned", reason: `${s.A} is withdrawn with no compiled plan` },
+        },
       ]),
     );
     expect(await recorded(s)).toEqual([
@@ -145,7 +340,7 @@ describe("KeelWorldCheck", () => {
         check: `suite:${s.A}`,
         run: 1,
         outcome: "n/a",
-        reason: `${s.A} has no stored plan`,
+        reason: `${s.A} is withdrawn with no compiled plan`,
       },
     ]);
   });

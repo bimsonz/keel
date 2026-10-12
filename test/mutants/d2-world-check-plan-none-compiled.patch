@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/world-check-plan.test.ts
+# kills: world-check-plan.none, world-check-plan.refused-while-waiting
+# why: A check whose party bounced at Precheck says the wait ran out, so a person reading the n/a looks for a slow Precheck that in fact refused
+diff --git a/packages/core/src/application/verification/world-check-plan.ts b/packages/core/src/application/verification/world-check-plan.ts
+index d9fd1ce..2bf3df1 100644
+--- a/packages/core/src/application/verification/world-check-plan.ts
++++ b/packages/core/src/application/verification/world-check-plan.ts
+@@ -56,8 +56,7 @@ export const partyCheckPlan = (
+       );
+       if (read._tag === "Compiled")
+         return { _tag: "Planned", planHash: read.planHash } satisfies ResolvedCheckPlan;
+-      if (read._tag === "None")
+-        return unplanned(`${changeId} is ${read.state} with no compiled plan`);
++      if (read._tag === "None") return late;
+       if (read._tag === "Missing") return unplanned(`${changeId} is not a change`);
+       const now = yield* steps.step(`clock ${check} ${n}`, clock.now);
+       if (now >= deadline) return late;

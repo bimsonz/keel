@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fan-out-probe.test.ts
+# kills: fan-out.waiting-route
+# why: A change's plan is sent to a Probe instance of the world check's id, which does not exist, so the event stays owed and the check waits out its deadline
+diff --git a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+index 689382b..17e0a0a 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+@@ -218,7 +218,7 @@ export function waitingWorkflowFor(
+     case "Probe":
+       return env.PROBE;
+     case "KeelWorldCheck":
+-      return env.WORLD_CHECK;
++      return env.PROBE;
+     default:
+       return undefined;
+   }

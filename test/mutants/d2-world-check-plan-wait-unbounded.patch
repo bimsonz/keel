@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/world-check-plan.test.ts
+# kills: world-check-plan.deadline
+# why: Every wake starts a fresh five minutes, so a change that keeps moving without a plan holds a world check open with no bound
+diff --git a/packages/core/src/application/verification/world-check-plan.ts b/packages/core/src/application/verification/world-check-plan.ts
+index d9fd1ce..5c9e4d9 100644
+--- a/packages/core/src/application/verification/world-check-plan.ts
++++ b/packages/core/src/application/verification/world-check-plan.ts
+@@ -60,11 +60,10 @@ export const partyCheckPlan = (
+         return unplanned(`${changeId} is ${read.state} with no compiled plan`);
+       if (read._tag === "Missing") return unplanned(`${changeId} is not a change`);
+       const now = yield* steps.step(`clock ${check} ${n}`, clock.now);
+-      if (now >= deadline) return late;
+       const heard = yield* steps.waitFor(
+         `change ${check} ${n}`,
+         partyEventType(changeId),
+-        deadline - now,
++        WORLD_CHECK_PLAN_WAIT_MS,
+       );
+       if (!heard) return late;
+     }

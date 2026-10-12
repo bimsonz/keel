@@ -86,4 +86,5 @@ export * from "./typecheck.ts";
 export * from "./verify-candidate.ts";
 export * from "./verify-plan.ts";
 export * from "./world-check.ts";
+export * from "./world-check-plan.ts";
 export * from "./world-matrix.ts";

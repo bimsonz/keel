@@ -1,12 +1,13 @@
 import { SubjectKey } from "@keeltown/core/domain/coordination";
 import { FlowWorld, WorldCheck } from "@keeltown/core/domain/verification";
-import { ConflictId, ContentHash, ProjectId } from "@keeltown/core/kernel";
+import { ChangeId, ConflictId, ContentHash, ProjectId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { KEEL_BUNDLE_PROVIDER } from "./keel-verify.ts";
 
-/** Where a check's plan comes from (core's `CheckPlan`): its stored hash, or why there is none. */
+/** Where a check's plan comes from (core's `CheckPlan`): its stored hash, the change whose plan the check reads when it runs, or why there is none. */
 export const CheckPlan = Schema.Union([
   Schema.TaggedStruct("Planned", { planHash: ContentHash }),
+  Schema.TaggedStruct("OfChange", { changeId: ChangeId }),
   Schema.TaggedStruct("Unplanned", { reason: Schema.String }),
 ]);
 

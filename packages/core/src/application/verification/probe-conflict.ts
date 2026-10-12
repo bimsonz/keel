@@ -139,18 +139,14 @@ export const draftContextOf = (
 });
 
 /** A party's side of the matrix: its submitted commit on its own base, or the commit it landed as and that commit's first parent. */
-export type PartyWorld = (
+export type PartyWorld =
   | {
       readonly _tag: "Submitted";
       readonly repo: RepoRef;
       readonly head: CommitSha;
       readonly base: CommitSha;
     }
-  | { readonly _tag: "Landed"; readonly landing: CommitSha; readonly parent: CommitSha }
-) & {
-  /** The plan the party was verified under (PlanCompiled's hash): its world check runs its suite from it. */
-  readonly planHash?: ContentHash | undefined;
-};
+  | { readonly _tag: "Landed"; readonly landing: CommitSha; readonly parent: CommitSha };
 
 export interface RepoCommit {
   readonly repo: RepoRef;

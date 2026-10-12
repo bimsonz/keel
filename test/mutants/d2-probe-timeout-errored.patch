@@ -1,11 +1,11 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/probe.test.ts -t "d22.pool.probe-deadline"
 # kills: d22.pool.probe-deadline
 # why: A wait that runs out errors the instance, so a party that never submits leaves its conflict suspected with no failed draft
-diff --git a/apps/keel/src/adapters/driving/workflow/probe.ts b/apps/keel/src/adapters/driving/workflow/probe.ts
-index a9dca48..2c2294d 100644
---- a/apps/keel/src/adapters/driving/workflow/probe.ts
-+++ b/apps/keel/src/adapters/driving/workflow/probe.ts
-@@ -37,7 +37,7 @@ const POLICIES: Readonly<Record<StepPolicy, WorkflowStepConfig>> = {
+diff --git a/apps/keel/src/adapters/driving/workflow/steps.ts b/apps/keel/src/adapters/driving/workflow/steps.ts
+index 576638e..9de56fb 100644
+--- a/apps/keel/src/adapters/driving/workflow/steps.ts
++++ b/apps/keel/src/adapters/driving/workflow/steps.ts
+@@ -14,7 +14,7 @@ const POLICIES: Readonly<Record<StepPolicy, WorkflowStepConfig>> = {
  /** A waitForEvent that ran out: the platform throws, and the program reads it as no event. */
  const timedOut = (error: unknown) =>
    error instanceof Error &&
@@ -13,4 +13,4 @@ index a9dca48..2c2294d 100644
 +  error.name === "NoSuchError";
  
  /**
-  * The Workflow's durable steps for the core program: each `step` runs its
+  * A Workflow's durable steps for a core program: each `step` runs its

@@ -11,6 +11,7 @@ import {
 import { SubjectKey } from "@keeltown/core/domain/coordination";
 import type { ConflictCommand } from "@keeltown/core/domain/verification";
 import {
+  type ChangeId,
   type ConflictId,
   ContentHash,
   type EventEnvelope,
@@ -51,11 +52,16 @@ const premise = (value: string, relation: "at-most" | "is") => ({
  * would.
  */
 export async function suspected(
-  options: { readonly effect?: boolean; readonly subjectKey?: boolean } = {},
+  options: {
+    readonly effect?: boolean;
+    readonly subjectKey?: boolean;
+    /** The premise holder, when the case has a real change for it. */
+    readonly A?: ChangeId;
+  } = {},
 ) {
   const projectId = makeId("prj", ulid());
   const conflictId = makeId("cfl", ulid());
-  const [A, B] = [makeId("chg", ulid()), makeId("chg", ulid())];
+  const [A, B] = [options.A ?? makeId("chg", ulid()), makeId("chg", ulid())];
   const command: Extract<ConflictCommand, { _tag: "Suspect" }> = {
     _tag: "Suspect",
     kind: "semantic",

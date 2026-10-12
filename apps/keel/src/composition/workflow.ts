@@ -243,7 +243,7 @@ export function worldCheckRuntime(
   env: Env,
   engine: { readonly runner: SuiteRunner; readonly step: WorkflowStep },
 ): ManagedRuntime.ManagedRuntime<
-  Clock | Ids | EvidenceStore | VerifierRuntime | PlanStore | ProbeLedger,
+  Clock | Ids | EvidenceStore | VerifierRuntime | PlanStore | ProbeLedger | ProbeChanges,
   never
 > {
   const durable: Durable = (name, effect) =>
@@ -257,6 +257,9 @@ export function worldCheckRuntime(
       evidence,
       PlanStoreR2(env.ARCHIVE),
       ProbeLedgerRpc((address) => env.SUBJECT.get(env.SUBJECT.idFromName(address))),
+      ProbeChangesRpc((changeId) =>
+        env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`)),
+      ).pipe(Layer.provide(codeHostLayer(env))),
       SuiteRuntimeCi({
         runner: engine.runner,
         durable,

@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/world-check-plan.test.ts
+# kills: world-check-plan.deadline
+# why: Each check of a world counts its own five minutes, so AB waits ten for two parties whose Prechecks never answer
+diff --git a/packages/core/src/application/verification/world-check-plan.ts b/packages/core/src/application/verification/world-check-plan.ts
+index d9fd1ce..70db55d 100644
+--- a/packages/core/src/application/verification/world-check-plan.ts
++++ b/packages/core/src/application/verification/world-check-plan.ts
+@@ -91,8 +91,7 @@ export const resolveCheckPlans = (
+         resolved.push({ check, plan });
+         continue;
+       }
+-      if (deadline === undefined)
+-        deadline = (yield* steps.step("started", clock.now)) + WORLD_CHECK_PLAN_WAIT_MS;
++      deadline = (yield* steps.step(`started ${check}`, clock.now)) + WORLD_CHECK_PLAN_WAIT_MS;
+       resolved.push({
+         check,
+         plan: yield* partyCheckPlan(check, plan.changeId, instanceId, deadline, steps),

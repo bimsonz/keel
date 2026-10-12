@@ -1,14 +1,19 @@
 import { projectRepos } from "@keeltown/core/application/integration";
-import { submissionStateOf } from "@keeltown/core/application/verification";
+import { planStateOf, submissionStateOf } from "@keeltown/core/application/verification";
 import type { ChangeNotFound } from "@keeltown/core/domain/coordination";
 import type { ChangeId } from "@keeltown/core/kernel";
-import { CodeHost, type PartyAnswer, ProbeChanges } from "@keeltown/core/ports";
+import { CodeHost, type PartyAnswer, type PlanAnswer, ProbeChanges } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
-import { AwaitSubmissionCommand, ChangeCodecs, type ChangeRpc } from "../../../rpc/index.ts";
+import {
+  AwaitPlanCommand,
+  AwaitSubmissionCommand,
+  ChangeCodecs,
+  type ChangeRpc,
+} from "../../../rpc/index.ts";
 import { callObject } from "./answer.ts";
 
 /** The Change DO methods `ProbeChanges` calls (`change:<ULID>`), answering Exit envelopes. */
-export type ProbeChangeStub = Pick<ChangeRpc, "awaitSubmission" | "workspace">;
+export type ProbeChangeStub = Pick<ChangeRpc, "awaitPlan" | "awaitSubmission" | "workspace">;
 
 /** How many times a party is read again when its workspace went away between two reads: it landed or left. */
 const READS = 3;
@@ -18,10 +23,11 @@ const READS = 3;
  * contract, never its storage. The answer is classified by core's
  * `submissionStateOf`: a submitted change's world is in its workspace (read from
  * `workspace()`), and a landed one's is its landing commit in staging, over
- * that commit's first parent; either carries the plan the change was
- * verified under (`Change.planHash`), which its world check runs. A change the DO answered that core reads as
- * having no current submission is a defect: the DO recorded no subscriber,
- * so a wait for it would never end.
+ * that commit's first parent. Its plan is a separate read (`awaitPlan`),
+ * classified by core's `planStateOf`, made by the world check that runs it. A
+ * change the DO answered that core reads as still waiting (no current
+ * submission, or a plan still to come) is a defect: the DO recorded no
+ * subscriber, so a wait for it would never end.
  */
 export function ProbeChangesRpc(
   change: (changeId: ChangeId) => ProbeChangeStub,
@@ -60,7 +66,6 @@ export function ProbeChangesRpc(
               _tag: "Landed",
               landing: submission.landing,
               parent,
-              planHash: answer.change.planHash,
             } satisfies PartyAnswer;
           }
           const workspace = yield* callObject(ChangeCodecs.workspace, () => stub.workspace()).pipe(
@@ -79,11 +84,25 @@ export function ProbeChangesRpc(
             repo: workspace,
             head: submission.head,
             base: submission.base,
-            planHash: answer.change.planHash,
           } satisfies PartyAnswer;
         });
       return ProbeChanges.of({
         awaitSubmission: (changeId, subscriber) => read(changeId, subscriber, READS),
+        awaitPlan: (changeId, subscriber) =>
+          Effect.gen(function* () {
+            const answer = yield* callObject(ChangeCodecs.awaitPlan, () =>
+              change(changeId).awaitPlan(Schema.encodeSync(AwaitPlanCommand)({ subscriber })),
+            );
+            if ("waiting" in answer) return { _tag: "Waiting" } satisfies PlanAnswer;
+            const plan = planStateOf(answer.change);
+            if (plan._tag === "Pending")
+              return yield* Effect.die(
+                new Error(
+                  `${changeId} is ${answer.change.state} with its plan still to come, but awaitPlan answered it without a wait`,
+                ),
+              );
+            return plan;
+          }),
       });
     }),
   );

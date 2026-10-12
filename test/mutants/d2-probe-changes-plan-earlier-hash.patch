@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: probe-changes.plan-resubmitted
+# why: A resubmitted change answers its earlier submission's plan, so its suite check runs a plan compiled for a commit that is no longer its head
+diff --git a/packages/testing/src/memory/probe-changes.ts b/packages/testing/src/memory/probe-changes.ts
+index 27279c5..645ae27 100644
+--- a/packages/testing/src/memory/probe-changes.ts
++++ b/packages/testing/src/memory/probe-changes.ts
+@@ -52,7 +52,10 @@ export function makeProbeChangesMemory(
+       Effect.sync(() => {
+         changes.set(changeId, {
+           party: { _tag: "Submitted", ...world } satisfies PartyWorld,
+-          plan: { _tag: "Pending" },
++          plan:
++            changes.get(changeId)?.plan._tag === "Compiled"
++              ? (changes.get(changeId)?.plan ?? { _tag: "Pending" })
++              : { _tag: "Pending" },
+         });
+         tell(waiting.submission, changeId);
+       }),

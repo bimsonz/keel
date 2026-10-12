@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/world-check.test.ts
+# kills: d22.pool.world-check-waits
+# why: A change whose Precheck is still running is read as having no plan coming, so its suite check is n/a at once: the defect the live S-1 run found
+diff --git a/apps/keel/src/adapters/driven/do-rpc/probe-changes.ts b/apps/keel/src/adapters/driven/do-rpc/probe-changes.ts
+index b7a086c..6700bc2 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/probe-changes.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/probe-changes.ts
+@@ -93,7 +93,8 @@ export function ProbeChangesRpc(
+             const answer = yield* callObject(ChangeCodecs.awaitPlan, () =>
+               change(changeId).awaitPlan(Schema.encodeSync(AwaitPlanCommand)({ subscriber })),
+             );
+-            if ("waiting" in answer) return { _tag: "Waiting" } satisfies PlanAnswer;
++            if ("waiting" in answer)
++              return { _tag: "None", state: "submitted" } satisfies PlanAnswer;
+             const plan = planStateOf(answer.change);
+             if (plan._tag === "Pending")
+               return yield* Effect.die(

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/world-check.test.ts apps/keel/test/unit/probe.test.ts
+# kills: world-check.jobs, probe.admits
+# why: A party's suite check reads the other party's plan, so A's world is judged by the steps B was verified under
+diff --git a/packages/core/src/application/verification/world-check.ts b/packages/core/src/application/verification/world-check.ts
+index e2761fc..077020b 100644
+--- a/packages/core/src/application/verification/world-check.ts
++++ b/packages/core/src/application/verification/world-check.ts
+@@ -74,7 +74,7 @@ export const worldCheckJobs = (
+   const planOf = (check: string): CheckPlan =>
+     check === "suite:trunk"
+       ? trunk
+-      : { _tag: "OfChange", changeId: check === `suite:${parties.A}` ? parties.A : parties.B };
++      : { _tag: "OfChange", changeId: check === `suite:${parties.A}` ? parties.B : parties.A };
+   const specs = worldChecks(parties);
+   return (["trunk", "A", "B", "AB"] as const).map((world) => ({
+     ...conflict,

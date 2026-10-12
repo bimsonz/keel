@@ -1,6 +1,12 @@
 import { Effect, Result } from "effect";
 import type { SubjectKey } from "../../domain/coordination/index.ts";
-import type { CommitSha, ConflictId, ContentHash, ProjectId } from "../../domain/kernel/index.ts";
+import type {
+  ChangeId,
+  CommitSha,
+  ConflictId,
+  ContentHash,
+  ProjectId,
+} from "../../domain/kernel/index.ts";
 import {
   coerce,
   compile,
@@ -17,12 +23,15 @@ import { TIER2_STEP_IDS } from "./packs.ts";
 import { type ProbeParties, worldChecks } from "./probe-conflict.ts";
 
 /**
- * Where a check's plan comes from: a party's own stored plan (PlanCompiled's
- * hash on its Change), or trunk's, compiled from trunk head's flow with no
- * subjects; or why there is none, which the check records as n/a.
+ * Where a check's plan comes from: trunk's, compiled from trunk head's flow
+ * with no subjects; a party's own (`OfChange`), read from its Change when the
+ * check runs, because the Probe reads a party the moment it submits, before
+ * its Precheck has compiled; or why there is none, which the check records
+ * as n/a.
  */
 export type CheckPlan =
   | { readonly _tag: "Planned"; readonly planHash: ContentHash }
+  | { readonly _tag: "OfChange"; readonly changeId: ChangeId }
   | { readonly _tag: "Unplanned"; readonly reason: string };
 
 /** One party's suite to run in a world: `suite:trunk` or `suite:<changeId>`, and its plan. */
@@ -49,7 +58,8 @@ export const worldCheckInstanceId = (conflictId: ConflictId, world: FlowWorld): 
  * The world checks a drafted conflict runs:
  * trunk's suite on trunk, each party's own suite in its world, and both in
  * AB, each on that world's bundle with the plan its party was verified
- * under. Grouped one job per world, in matrix order.
+ * under, which the check's own instance reads. Grouped one job per world, in
+ * matrix order.
  */
 export const worldCheckJobs = (
   conflict: {
@@ -59,10 +69,12 @@ export const worldCheckJobs = (
   },
   parties: ProbeParties,
   worlds: Readonly<Record<FlowWorld, ContentHash>>,
-  plans: { readonly trunk: CheckPlan; readonly A: CheckPlan; readonly B: CheckPlan },
+  trunk: CheckPlan,
 ): readonly WorldCheckJob[] => {
   const planOf = (check: string): CheckPlan =>
-    check === "suite:trunk" ? plans.trunk : check === `suite:${parties.A}` ? plans.A : plans.B;
+    check === "suite:trunk"
+      ? trunk
+      : { _tag: "OfChange", changeId: check === `suite:${parties.A}` ? parties.A : parties.B };
   const specs = worldChecks(parties);
   return (["trunk", "A", "B", "AB"] as const).map((world) => ({
     ...conflict,

@@ -54,12 +54,7 @@ import {
 } from "./probe-conflict.ts";
 import { FRESHNESS_TEMPLATE } from "./probe-templates/freshness.ts";
 import { type MatrixCell, storeCell } from "./run-matrix.ts";
-import {
-  type CheckPlan,
-  trunkCheckPlan,
-  worldCheckInstanceId,
-  worldCheckJobs,
-} from "./world-check.ts";
+import { trunkCheckPlan, worldCheckInstanceId, worldCheckJobs } from "./world-check.ts";
 
 /** The conflict a Probe instance is drafting for, and where it reports. */
 export interface ProbeCall {
@@ -522,17 +517,11 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
       "trunk plan",
       trunkCheckPlan(call.staging, planned.plan.trunk.commit),
     );
-    const partyPlan = (side: "A" | "B"): CheckPlan => {
-      const planHash = planned?.sides[side].planHash;
-      return planHash === undefined
-        ? { _tag: "Unplanned", reason: `${parties[side]} has no stored plan` }
-        : { _tag: "Planned", planHash };
-    };
     const jobs = worldCheckJobs(
       { projectId: call.projectId, key: call.key, conflictId: call.conflictId },
       parties,
       worlds.success,
-      { trunk: trunkPlan, A: partyPlan("A"), B: partyPlan("B") },
+      trunkPlan,
     );
     yield* steps.step(
       "world checks",

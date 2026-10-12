@@ -160,42 +160,47 @@ describe("world checks", () => {
     });
   });
 
-  it("[world-check.jobs] one job per world: trunk's suite on trunk, each party's in its world, both in AB, each under its own plan", () => {
+  it("[world-check.jobs] one job per world: trunk's suite on trunk under trunk's plan, each party's in its world, both in AB, each naming the change whose plan it reads", () => {
     const worlds = { trunk: hash(1), A: hash(2), B: hash(3), AB: hash(4) };
-    const plans: { trunk: CheckPlan; A: CheckPlan; B: CheckPlan } = {
-      trunk: { _tag: "Planned", planHash: hash(10) },
-      A: { _tag: "Planned", planHash: hash(11) },
-      B: { _tag: "Unplanned", reason: "no stored plan" },
-    };
+    const trunk: CheckPlan = { _tag: "Planned", planHash: hash(10) };
+    const [ofA, ofB]: CheckPlan[] = [
+      { _tag: "OfChange", changeId: A },
+      { _tag: "OfChange", changeId: B },
+    ];
     const conflict = { projectId: makeId("prj", ulid(3)), key, conflictId: makeId("cfl", ulid(4)) };
-    expect(worldCheckJobs(conflict, PARTIES, worlds, plans)).toEqual([
+    expect(worldCheckJobs(conflict, PARTIES, worlds, trunk)).toEqual([
       {
         ...conflict,
         world: "trunk",
         bundle: hash(1),
-        checks: [{ check: "suite:trunk", plan: plans.trunk }],
+        checks: [{ check: "suite:trunk", plan: trunk }],
       },
       {
         ...conflict,
         world: "A",
         bundle: hash(2),
-        checks: [{ check: `suite:${A}`, plan: plans.A }],
+        checks: [{ check: `suite:${A}`, plan: ofA }],
       },
       {
         ...conflict,
         world: "B",
         bundle: hash(3),
-        checks: [{ check: `suite:${B}`, plan: plans.B }],
+        checks: [{ check: `suite:${B}`, plan: ofB }],
       },
       {
         ...conflict,
         world: "AB",
         bundle: hash(4),
         checks: [
-          { check: `suite:${A}`, plan: plans.A },
-          { check: `suite:${B}`, plan: plans.B },
+          { check: `suite:${A}`, plan: ofA },
+          { check: `suite:${B}`, plan: ofB },
         ],
       },
+    ]);
+    // An unplanned trunk is carried as it is, with its reason.
+    const unplanned: CheckPlan = { _tag: "Unplanned", reason: "trunk's flow is invalid" };
+    expect(worldCheckJobs(conflict, PARTIES, worlds, unplanned)[0]?.checks).toEqual([
+      { check: "suite:trunk", plan: unplanned },
     ]);
   });
 

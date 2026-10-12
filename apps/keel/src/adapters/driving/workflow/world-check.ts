@@ -4,6 +4,7 @@ import {
   readStoredPlan,
   recordWorldCheck,
   ResolvedPlan,
+  resolveCheckPlans,
   resolvePlan,
   runJob,
   type WorldCheckOutcome,
@@ -16,6 +17,7 @@ import { worldCheckRuntime } from "../../../composition/workflow.ts";
 import { WorldCheckJob } from "../../../rpc/index.ts";
 import { keelBundleSource } from "./bundle-source.ts";
 import { CIWorkflow, type CiContext, type CiParams } from "./ci.js";
+import { workflowSteps } from "./steps.ts";
 
 const RECORD_RETRIES = {
   retries: { limit: 3, delay: "2 seconds", backoff: "constant" },
@@ -31,10 +33,15 @@ const RECORD_RETRIES = {
  * `ci.runner`s on keel-verify's KeelSandbox, hydrated from the world's
  * bundle, never from git and never with a token.
  *
- * Steps: `plan <check>` for each check with a plan, then every Tier 2 step
- * those plans hold, each run once (the same step on the same bundle answers
- * the same for every check, and AB holds two), then `record <check>`. A plan
- * the store does not hold, or holds corrupt, makes its check n/a, saying why.
+ * Steps: a party's check first reads its change's plan (core's
+ * `resolveCheckPlans`): the Probe starts these the moment a party submits, so
+ * a plan its Precheck has not compiled yet is waited for by event, up to five
+ * minutes, never polled. Then `plan <check>` for each check with a plan,
+ * every Tier 2 step those plans hold, each run once (the same step on the
+ * same bundle answers the same for every check, and AB holds two), and
+ * `record <check>`. A change that ends with no plan, a wait that runs out, or
+ * a plan the store does not hold or holds corrupt makes its check n/a,
+ * saying why.
  */
 export class KeelWorldCheck extends CIWorkflow<Env> {
   static override getProvider() {
@@ -63,8 +70,11 @@ export class KeelWorldCheck extends CIWorkflow<Env> {
       step,
     });
     try {
+      const checks = await runtime.runPromise(
+        resolveCheckPlans(job.checks, event.instanceId, workflowSteps(step)),
+      );
       const plans = new Map<string, Result.Result<FlowPlan, string>>();
-      for (const { check, plan } of job.checks) {
+      for (const { check, plan } of checks) {
         if (plan._tag === "Unplanned") {
           plans.set(check, Result.fail(plan.reason));
           continue;

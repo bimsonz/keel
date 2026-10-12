@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: probe-changes.plan-waiting
+# why: A Waiting answer that records nobody leaves the check waiting on a subscription no one holds: the plan compiles and nothing tells it
+diff --git a/packages/testing/src/memory/probe-changes.ts b/packages/testing/src/memory/probe-changes.ts
+index 27279c5..4e4b6c2 100644
+--- a/packages/testing/src/memory/probe-changes.ts
++++ b/packages/testing/src/memory/probe-changes.ts
+@@ -106,7 +106,6 @@ export function makeProbeChangesMemory(
+             const change = changes.get(changeId);
+             if (change === undefined) return yield* new ChangeNotFound({ changeId });
+             if (change.plan._tag !== "Pending") return change.plan;
+-            keep(waiting.plan, changeId, subscriber);
+             return { _tag: "Waiting" } satisfies PlanAnswer;
+           }),
+       }),

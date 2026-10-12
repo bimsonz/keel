@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/world-check.test.ts
+# kills: d22.pool.world-check-waits
+# why: The waiting check names an instance that does not exist as its subscriber, so the change's PlanCompiled never reaches it and the party's suite is n/a at the deadline
+diff --git a/apps/keel/src/adapters/driving/workflow/world-check.ts b/apps/keel/src/adapters/driving/workflow/world-check.ts
+index ab20297..e27cccf 100644
+--- a/apps/keel/src/adapters/driving/workflow/world-check.ts
++++ b/apps/keel/src/adapters/driving/workflow/world-check.ts
+@@ -71,7 +71,7 @@ export class KeelWorldCheck extends CIWorkflow<Env> {
+     });
+     try {
+       const checks = await runtime.runPromise(
+-        resolveCheckPlans(job.checks, event.instanceId, workflowSteps(step)),
++        resolveCheckPlans(job.checks, job.conflictId, workflowSteps(step)),
+       );
+       const plans = new Map<string, Result.Result<FlowPlan, string>>();
+       for (const { check, plan } of checks) {

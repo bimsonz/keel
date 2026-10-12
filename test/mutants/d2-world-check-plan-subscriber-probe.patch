@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/world-check-plan.test.ts
+# kills: world-check-plan.waits, world-check-plan.compiled-before-wait
+# why: The change tells a Probe instance that does not exist of its plan, so the waiting world check never hears and records n/a at its deadline
+diff --git a/packages/core/src/application/verification/world-check-plan.ts b/packages/core/src/application/verification/world-check-plan.ts
+index d9fd1ce..98b7dd7 100644
+--- a/packages/core/src/application/verification/world-check-plan.ts
++++ b/packages/core/src/application/verification/world-check-plan.ts
+@@ -9,7 +9,7 @@ export const WORLD_CHECK_PLAN_WAIT_MS = 5 * 60 * 1000;
+ 
+ /** The address a waiting check's change tells of its plan, or of the end that left it without one: this instance. */
+ export const worldCheckSubscriber = (instanceId: string): Subscriber =>
+-  `workflow:KeelWorldCheck/${instanceId}`;
++  `workflow:Probe/${instanceId}`;
+ 
+ /** A check's plan once read: the hash to run, or why there is none. */
+ export type ResolvedCheckPlan = Exclude<CheckPlan, { readonly _tag: "OfChange" }>;

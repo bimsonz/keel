@@ -198,6 +198,32 @@ export interface InstanceEvents {
   }>;
 }
 
+/** The bindings whose instances wait for events. */
+export interface WaitingWorkflows {
+  readonly PROBE: InstanceEvents;
+  readonly WORLD_CHECK: InstanceEvents;
+}
+
+/**
+ * The Workflows whose waiting instances an event can be sent to
+ * (`workflow:<Name>/<instanceId>`): a Probe waiting for a party's submission,
+ * and a world check waiting for a party's plan. A world check is started by
+ * its Probe, never by an event, so it is addressed only as an instance.
+ */
+export function waitingWorkflowFor(
+  env: WaitingWorkflows,
+  name: string,
+): InstanceEvents | undefined {
+  switch (name) {
+    case "Probe":
+      return env.PROBE;
+    case "KeelWorldCheck":
+      return env.WORLD_CHECK;
+    default:
+      return undefined;
+  }
+}
+
 /** States in which an instance takes no more events: a send to one is acknowledged, since nothing is waiting. */
 const FINISHED: ReadonlySet<string> = new Set(["complete", "errored", "terminated"]);
 
@@ -238,8 +264,8 @@ export function sendToInstance(
 /**
  * The fan-out over the Worker's bindings: each address resolves to a Durable
  * Object (its `receive` RPC), a Workflow (one instance per event; a Probe,
- * one per conflict), a waiting Workflow instance (an event sent to it) or
- * the Projector. An address that resolves to nothing fails, so the event stays
+ * one per conflict), a waiting Workflow instance (an event sent to it: a
+ * Probe's, or a world check's) or the Projector. An address that resolves to nothing fails, so the event stays
  * owed and shows in the backlog instead of being dropped.
  */
 export function FanOutRpc(env: Env): FanOut {
@@ -249,11 +275,15 @@ export function FanOutRpc(env: Env): FanOut {
         const address = subscriber.slice("workflow:".length);
         const slash = address.indexOf("/");
         const name = slash === -1 ? address : address.slice(0, slash);
+        if (slash !== -1) {
+          const waiting = waitingWorkflowFor(env, name);
+          return waiting === undefined
+            ? Effect.fail(failed(subscriber, `no Workflow named ${name} waits for events`))
+            : sendToInstance(waiting, address.slice(slash + 1), subscriber, events);
+        }
         const workflow = workflowFor(env, name);
         if (workflow === undefined)
           return Effect.fail(failed(subscriber, `no Workflow named ${name}`));
-        if (slash !== -1)
-          return sendToInstance(workflow, address.slice(slash + 1), subscriber, events);
         return name === "Probe"
           ? startProbes(workflow, subscriber, events)
           : startWorkflow(workflow, name, subscriber, events);
