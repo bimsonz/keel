@@ -11,6 +11,7 @@ export * from "./exit.ts";
 export * from "./keel-verify.ts";
 export * from "./world-check.ts";
 export * from "./lane.ts";
+export * from "./org-usage.ts";
 export * from "./project.ts";
 export * from "./projector.ts";
 export * from "./subject.ts";

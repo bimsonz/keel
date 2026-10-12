@@ -2,15 +2,15 @@
 # kills: orgusage.prune
 # why: Prune forgets every key, however young, so a retry minutes later is counted again
 diff --git a/packages/core/src/application/identity/org-usage.ts b/packages/core/src/application/identity/org-usage.ts
-index 94a206b..d0c5b25 100644
+index 140355c..4207606 100644
 --- a/packages/core/src/application/identity/org-usage.ts
 +++ b/packages/core/src/application/identity/org-usage.ts
-@@ -123,7 +123,7 @@ export const pruneUsageKeys = Effect.fn("identity/pruneUsageKeys")(function* ()
+@@ -153,7 +153,7 @@ export const pruneUsageKeys = Effect.fn("identity/pruneUsageKeys")(function* ()
+   const now = yield* (yield* Clock).now;
    return store.transaction(() => {
-     const old = store
-       .list(KEY)
--      .filter(({ value }) => decodeKeyed(value).at + USAGE_KEY_TTL_MS <= now);
-+      .filter(({ value }) => decodeKeyed(value).at <= now);
+     const held = store.list(KEY);
+-    const old = held.filter(({ value }) => decodeKeyed(value).at + USAGE_KEY_TTL_MS <= now);
++    const old = held.filter(({ value }) => decodeKeyed(value).at <= now);
      for (const { id } of old) store.remove(KEY, id);
-     return old.length;
+     return { forgotten: old.length, kept: held.length - old.length };
    });

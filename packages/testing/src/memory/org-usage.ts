@@ -1,4 +1,9 @@
-import { admitUsage, recordUsage } from "@keeltown/core/application/identity";
+import {
+  admitUsage,
+  configureUsage,
+  recordUsage,
+  usageSettings,
+} from "@keeltown/core/application/identity";
 import { OrgUsage } from "@keeltown/core/ports";
 import { Effect, Layer } from "effect";
 import { type ManualClock, makeManualClock } from "./event-outbox.ts";
@@ -21,6 +26,8 @@ export function makeOrgUsageMemory(options: { readonly clock?: ManualClock } = {
           admitUsage(org, kind, amount, key).pipe(Effect.provide(held)),
         record: (org, kind, amount, key) =>
           recordUsage(org, kind, amount, key).pipe(Effect.provide(held)),
+        settings: (org) => usageSettings(org).pipe(Effect.provide(held)),
+        configure: (org, settings) => configureUsage(org, settings).pipe(Effect.provide(held)),
       }),
     ),
   };

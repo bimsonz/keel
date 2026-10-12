@@ -5,6 +5,7 @@ import { enforceRetention } from "./composition/retention.ts";
 export { AgentSessionDO } from "./adapters/driving/do/agent-session.ts";
 export { ChangeDO } from "./adapters/driving/do/change.ts";
 export { LaneDO } from "./adapters/driving/do/lane.ts";
+export { OrgUsageDO } from "./adapters/driving/do/org-usage.ts";
 export { ProjectDO } from "./adapters/driving/do/project.ts";
 export { ProjectorDO } from "./adapters/driving/do/projector.ts";
 export { SubjectDO } from "./adapters/driving/do/subject.ts";

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { DEFAULT_QUOTAS, type QuotaKind } from "@keeltown/core/domain/identity";
 import { type Instant, OrgId } from "@keeltown/core/kernel";
-import { OrgUsage } from "@keeltown/core/ports";
+import { OrgUsage, type UsageSettings } from "@keeltown/core/ports";
 import { Effect, Exit, type Layer, Schema } from "effect";
 
 /**
@@ -28,6 +28,13 @@ const admit = (org: OrgId, kind: QuotaKind, amount: number, k = key()) =>
   Effect.flatMap(OrgUsage, (usage) => usage.admit(org, kind, amount, k));
 const record = (org: OrgId, kind: QuotaKind, amount: number, k = key()) =>
   Effect.flatMap(OrgUsage, (usage) => usage.record(org, kind, amount, k));
+
+const configure = (org: OrgId, settings: UsageSettings) =>
+  Effect.flatMap(OrgUsage, (usage) => usage.configure(org, settings));
+const settingsOf = (org: OrgId) => Effect.flatMap(OrgUsage, (usage) => usage.settings(org));
+
+/** The kinds a halt stops: what verification spends. */
+const SPEND: readonly QuotaKind[] = ["container-minutes", "model-calls", "concurrent-containers"];
 
 /** The limit of `projects`, small enough to count to. */
 const LIMIT = DEFAULT_QUOTAS.projects;
@@ -180,6 +187,94 @@ export function describeOrgUsageContract(adapter: string, make: () => OrgUsageHa
           const stillFull = yield* Effect.flip(admit(org, "repo-bytes", 1));
           expect(stillFull).toMatchObject({ reason: "limit", used: bytes });
           expect(stillFull.retryAt).toBeUndefined();
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[orgusage.contract.settings] an org's settings start empty, read back as configured, are replaced whole, and are no other org's",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const [one, two] = [yield* harness.org(), yield* harness.org()];
+          expect(yield* settingsOf(one)).toEqual({ overrides: {}, halted: false });
+          yield* configure(one, { overrides: { projects: 3, "repo-bytes": 5 }, halted: true });
+          expect(yield* settingsOf(one)).toEqual({
+            overrides: { projects: 3, "repo-bytes": 5 },
+            halted: true,
+          });
+          expect(yield* settingsOf(two)).toEqual({ overrides: {}, halted: false });
+          yield* configure(one, { overrides: { agents: 1 }, halted: false });
+          expect(yield* settingsOf(one)).toEqual({ overrides: { agents: 1 }, halted: false });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[orgusage.contract.override] an org's own limit takes precedence over the instance's, below it and above it, for that org and that kind alone",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const [small, large, plain] = [
+            yield* harness.org(),
+            yield* harness.org(),
+            yield* harness.org(),
+          ];
+          yield* configure(small, { overrides: { projects: 3 }, halted: false });
+          expect(yield* admit(small, "projects", 3)).toEqual({ limit: 3, remaining: 0 });
+          expect(yield* Effect.flip(admit(small, "projects", 1))).toMatchObject({
+            reason: "limit",
+            limit: 3,
+            used: 3,
+          });
+          expect(yield* admit(small, "agents", 1)).toEqual({
+            limit: DEFAULT_QUOTAS.agents,
+            remaining: DEFAULT_QUOTAS.agents - 1,
+          });
+          yield* configure(large, { overrides: { projects: LIMIT + 5 }, halted: false });
+          expect(yield* admit(large, "projects", LIMIT + 5)).toEqual({
+            limit: LIMIT + 5,
+            remaining: 0,
+          });
+          expect(yield* admit(plain, "projects", LIMIT)).toEqual({ limit: LIMIT, remaining: 0 });
+          expect(yield* Effect.flip(admit(plain, "projects", 1))).toMatchObject({ limit: LIMIT });
+          // A raised limit admits what the old one refused, on what was already counted.
+          yield* configure(small, { overrides: { projects: 4 }, halted: false });
+          expect(yield* admit(small, "projects", 1)).toEqual({ limit: 4, remaining: 0 });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[orgusage.contract.halted] a halted org's spend kinds are refused and count nothing, its other kinds are admitted, and lifting the halt admits again",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const [org, other] = [yield* harness.org(), yield* harness.org()];
+          yield* configure(org, { overrides: {}, halted: true });
+          for (const kind of SPEND)
+            expect(yield* Effect.flip(admit(org, kind, 1))).toMatchObject({
+              _tag: "QuotaExceeded",
+              kind,
+              reason: "halted",
+              used: 0,
+            });
+          expect(yield* admit(org, "repo-bytes", 1)).toEqual({
+            limit: DEFAULT_QUOTAS["repo-bytes"],
+            remaining: DEFAULT_QUOTAS["repo-bytes"] - 1,
+          });
+          expect(yield* admit(org, "projects", 1)).toEqual({ limit: LIMIT, remaining: LIMIT - 1 });
+          expect(yield* admit(other, "model-calls", 1)).toEqual({
+            limit: DEFAULT_QUOTAS["model-calls"],
+            remaining: DEFAULT_QUOTAS["model-calls"] - 1,
+          });
+          yield* configure(org, { overrides: {}, halted: false });
+          // Nothing was counted while it was halted.
+          for (const kind of SPEND)
+            expect(yield* admit(org, kind, 1)).toEqual({
+              limit: DEFAULT_QUOTAS[kind],
+              remaining: DEFAULT_QUOTAS[kind] - 1,
+            });
         }).pipe(Effect.provide(harness.layer));
       },
     );

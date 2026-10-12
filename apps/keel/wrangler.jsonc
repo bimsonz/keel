@@ -70,6 +70,7 @@
       { "name": "PROJECT", "class_name": "ProjectDO" },
       { "name": "WORKSPACE_POOL", "class_name": "WorkspacePoolDO" },
       { "name": "PROJECTOR", "class_name": "ProjectorDO" },
+      { "name": "ORG_USAGE", "class_name": "OrgUsageDO" },
       { "name": "MERGEBOX", "class_name": "MergeBox" },
       { "name": "BOXGATE", "class_name": "BoxGate" },
       // Tier 2 runners live in keel-verify, which holds no credentials.
@@ -92,6 +93,7 @@
         "BoxGate",
       ],
     },
+    { "tag": "v2", "new_sqlite_classes": ["OrgUsageDO"] },
   ],
   "workflows": [
     { "name": "keel-precheck", "binding": "PRECHECK", "class_name": "Precheck" },

@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/org-usage.test.ts -t "orgusage.do.prune"
+# kills: orgusage.do.prune
+# why: An admission arms no prune, so an org that only admits keeps every key for good
+diff --git a/apps/keel/src/adapters/driving/do/org-usage.ts b/apps/keel/src/adapters/driving/do/org-usage.ts
+index c678cfa..464e102 100644
+--- a/apps/keel/src/adapters/driving/do/org-usage.ts
++++ b/apps/keel/src/adapters/driving/do/org-usage.ts
+@@ -49,7 +49,6 @@ export class OrgUsageDO extends KeelObject implements OrgUsageRpc {
+         Effect.flatMap(({ kind, amount, key }) => admitUsage(org, kind, amount, key)),
+       ),
+     );
+-    await this.armPrune();
+     return answer;
+   }
+ 

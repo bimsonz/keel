@@ -2,13 +2,13 @@
 # kills: orgusage.contract.admit-counts
 # why: An admitted amount is not counted, so an org is admitted past its limit one call at a time
 diff --git a/packages/core/src/application/identity/org-usage.ts b/packages/core/src/application/identity/org-usage.ts
-index 94a206b..3e3454a 100644
+index 140355c..5a78498 100644
 --- a/packages/core/src/application/identity/org-usage.ts
 +++ b/packages/core/src/application/identity/org-usage.ts
-@@ -75,7 +75,6 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
-     }
+@@ -106,7 +106,6 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
      const used = usedAt(store, org, kind, now);
-     const decided = admitQuota({ kind, amount, used, now, halted: false });
+     const { overrides, halted } = settingsOf(store, org);
+     const decided = admitQuota({ kind, amount, used, now, overrides, halted });
 -    if (Result.isSuccess(decided)) putUsed(store, org, kind, used + amount, now);
      store.put(
        KEY,

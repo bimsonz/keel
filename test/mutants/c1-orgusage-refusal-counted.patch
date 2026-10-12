@@ -2,13 +2,13 @@
 # kills: orgusage.contract.refusal-counts-nothing
 # why: A refused amount is counted all the same, so a refusal eats the room that was left
 diff --git a/packages/core/src/application/identity/org-usage.ts b/packages/core/src/application/identity/org-usage.ts
-index 94a206b..1c9d0d2 100644
+index 140355c..decbcfe 100644
 --- a/packages/core/src/application/identity/org-usage.ts
 +++ b/packages/core/src/application/identity/org-usage.ts
-@@ -75,7 +75,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
-     }
+@@ -106,7 +106,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
      const used = usedAt(store, org, kind, now);
-     const decided = admitQuota({ kind, amount, used, now, halted: false });
+     const { overrides, halted } = settingsOf(store, org);
+     const decided = admitQuota({ kind, amount, used, now, overrides, halted });
 -    if (Result.isSuccess(decided)) putUsed(store, org, kind, used + amount, now);
 +    putUsed(store, org, kind, used + amount, now);
      store.put(

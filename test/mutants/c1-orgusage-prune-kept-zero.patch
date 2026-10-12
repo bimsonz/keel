@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/org-usage.test.ts
+# kills: orgusage.prune
+# why: Prune reports no key held whatever is left, so the object stops pruning while keys remain and they are kept for good
+diff --git a/packages/core/src/application/identity/org-usage.ts b/packages/core/src/application/identity/org-usage.ts
+index 140355c..7a8bbcb 100644
+--- a/packages/core/src/application/identity/org-usage.ts
++++ b/packages/core/src/application/identity/org-usage.ts
+@@ -155,7 +155,7 @@ export const pruneUsageKeys = Effect.fn("identity/pruneUsageKeys")(function* ()
+     const held = store.list(KEY);
+     const old = held.filter(({ value }) => decodeKeyed(value).at + USAGE_KEY_TTL_MS <= now);
+     for (const { id } of old) store.remove(KEY, id);
+-    return { forgotten: old.length, kept: held.length - old.length };
++    return { forgotten: old.length, kept: 0 };
+   });
+ });
+ 

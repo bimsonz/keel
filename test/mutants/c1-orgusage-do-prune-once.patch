@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/org-usage.test.ts -t "orgusage.do.prune"
+# kills: orgusage.do.prune
+# why: The prune runs once and is never armed again, so the keys still held after it are kept for good
+diff --git a/apps/keel/src/adapters/driving/do/org-usage.ts b/apps/keel/src/adapters/driving/do/org-usage.ts
+index c678cfa..74e75f1 100644
+--- a/apps/keel/src/adapters/driving/do/org-usage.ts
++++ b/apps/keel/src/adapters/driving/do/org-usage.ts
+@@ -84,7 +84,7 @@ export class OrgUsageDO extends KeelObject implements OrgUsageRpc {
+   protected override async onDeadline(request: AlarmRequest): Promise<void> {
+     if (request.reason !== USAGE_PRUNE) return super.onDeadline(request);
+     const { kept } = await this.runtime.runPromise(pruneUsageKeys());
+-    if (kept > 0) await this.armPrune();
++    void kept;
+   }
+ 
+   /** Arms the prune a day from now unless it is armed already, so a burst of counts never postpones it. */
