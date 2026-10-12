@@ -6,7 +6,9 @@ import {
   ID_PREFIXES,
   type IdPrefix,
   Instant,
+  OrgId,
   ProjectId,
+  UserId,
 } from "@keeltown/core/kernel";
 import { AgentDirectory, Clock, EntityStore, Ids, TokenIssuer } from "@keeltown/core/ports";
 import { Effect, type Layer, Option, Schema } from "effect";
@@ -77,6 +79,10 @@ export function describeIdsContract(adapter: string, make: LayerFactory<Ids>) {
 export const sampleProjectId = Schema.decodeUnknownSync(ProjectId)(
   "prj_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
 );
+
+/** The org and the sponsoring user of the tenancy fixtures. */
+export const sampleOrgId = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+export const sampleSponsorId = Schema.decodeUnknownSync(UserId)("usr_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 
 export const sampleAgent: Agent = {
   id: agentId,
@@ -153,6 +159,31 @@ export function describeAgentDirectoryContract(
           expect(yield* directory.findAgent(sponsored.id)).toEqual(Option.some(sponsored));
           const found = yield* directory.findAgent(unsponsored.id);
           expect(Option.map(found, (agent) => "onBehalfOf" in agent)).toEqual(Option.some(false));
+        }).pipe(Effect.provide(make())),
+    );
+    it.effect(
+      "[tenancy.directory-org] returns an agent's org and sponsoring user exactly, and neither for an agent without them",
+      () =>
+        Effect.gen(function* () {
+          const directory = yield* AgentDirectory;
+          const sponsored = {
+            ...sampleAgent,
+            id: freshAgentId(),
+            org: sampleOrgId,
+            sponsor: sampleSponsorId,
+          };
+          const bare = { ...sampleAgent, id: freshAgentId() };
+          for (const agent of [sponsored, bare])
+            yield* directory.upsert(agent, {
+              clientId: `client-${agent.id}`,
+              agentId: agent.id,
+              secretHash: `sha256:${"a".repeat(64)}`,
+            });
+          expect(yield* directory.findAgent(sponsored.id)).toEqual(Option.some(sponsored));
+          const found = yield* directory.findAgent(bare.id);
+          expect(Option.map(found, (agent) => ["org" in agent, "sponsor" in agent])).toEqual(
+            Option.some([false, false]),
+          );
         }).pipe(Effect.provide(make())),
     );
     it.effect("[a11e.synthetic] returns a synthetic agent, the load generator's, exactly", () =>

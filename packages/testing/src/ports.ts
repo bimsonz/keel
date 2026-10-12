@@ -62,6 +62,13 @@ import {
   freshId,
 } from "./contracts/verification.ts";
 import { describeProjectsContract, type ProjectsHarness } from "./contracts/projects.ts";
+import {
+  describeMembershipsContract,
+  describeOrgsContract,
+  describeProjectOrgsContract,
+  describeUsersContract,
+  type TenancyHarness,
+} from "./contracts/tenancy.ts";
 import * as codeHost from "./memory/code-host.ts";
 import * as coordination from "./memory/coordination.ts";
 import * as delivery from "./memory/delivery.ts";
@@ -72,6 +79,7 @@ import * as integration from "./memory/integration.ts";
 import * as operator from "./memory/operator.ts";
 import * as projectViews from "./memory/project-views.ts";
 import * as storage from "./memory/storage.ts";
+import * as tenancy from "./memory/tenancy.ts";
 import * as verification from "./memory/verification.ts";
 import { SubjectKey } from "@keeltown/core/domain/coordination";
 import { CommitSha, makeId } from "@keeltown/core/kernel";
@@ -90,6 +98,8 @@ import type {
   ProbeStore,
   Inbox,
   LiveChanges,
+  Memberships,
+  Orgs,
   ProbeLedger,
   NoopWorlds,
   ProbeSources,
@@ -99,6 +109,7 @@ import type {
   WorkspaceRebaser,
   Sessions,
   Standings,
+  Users,
 } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 
@@ -315,6 +326,19 @@ function memoryStandingsHarness(): StandingsHarness {
   };
 }
 
+/** A tenancy port's suite seeds Better Auth's rows into the memory its adapter reads. */
+function memoryTenancyHarness<S>(
+  make: (rows: tenancy.BetterAuthMemory) => { readonly layer: Layer.Layer<S> },
+): () => TenancyHarness<S> {
+  return () => {
+    const rows = tenancy.makeBetterAuthMemory();
+    return {
+      layer: make(rows).layer,
+      seed: (seeded) => Effect.sync(() => rows.seed(seeded)),
+    };
+  };
+}
+
 const GENESIS = Schema.decodeUnknownSync(CommitSha)("0".repeat(40));
 
 export const PORTS = {
@@ -375,6 +399,19 @@ export const PORTS = {
     memoryStandingsHarness,
     describeStandingsContract,
   ),
+  Orgs: harnessed<Orgs, TenancyHarness<Orgs>>(
+    memoryTenancyHarness(tenancy.makeOrgsMemory),
+    describeOrgsContract,
+  ),
+  Users: harnessed<Users, TenancyHarness<Users>>(
+    memoryTenancyHarness(tenancy.makeUsersMemory),
+    describeUsersContract,
+  ),
+  Memberships: harnessed<Memberships, TenancyHarness<Memberships>>(
+    memoryTenancyHarness(tenancy.makeMembershipsMemory),
+    describeMembershipsContract,
+  ),
+  ProjectOrgs: port(() => tenancy.makeProjectOrgsMemory().layer, describeProjectOrgsContract),
   EntityStore: port(() => storage.makeEntityStoreMemory().layer, describeEntityStoreContract),
   EventOutbox: eventOutbox,
   EventFeed: harnessed<EventFeed, EventFeedHarness>(

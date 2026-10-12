@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t ports.users-roles
+# kills: ports.users-roles
+# why: a member Better Auth holds as member,owner reads as a member, so an owner loses the org
+diff --git a/packages/core/src/domain/identity/tenancy.ts b/packages/core/src/domain/identity/tenancy.ts
+index d074105..f47c404 100644
+--- a/packages/core/src/domain/identity/tenancy.ts
++++ b/packages/core/src/domain/identity/tenancy.ts
+@@ -26,7 +26,7 @@ export type Role = typeof Role.Type;
+  * is ignored, so none at all answers undefined.
+  */
+ export const strongestRole = (names: readonly string[]): Role | undefined =>
+-  Role.literals.find((role) => names.includes(role));
++  Role.literals.toReversed().find((role) => names.includes(role));
+ 
+ /**
+  * Whether a ban still suspends its user at `now`: Better Auth's bans may carry

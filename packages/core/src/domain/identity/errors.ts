@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { AgentId, NextAction } from "../kernel/index.ts";
+import { AgentId, NextAction, OrgId } from "../kernel/index.ts";
 import { AgentState, Sponsor } from "./agent.ts";
 
 /** No agent has this id. */
@@ -104,6 +104,15 @@ export const RefusalReason = Schema.Literals([
   "private-source",
 ]);
 export type RefusalReason = typeof RefusalReason.Type;
+
+/**
+ * The org already has a project by this name (in any case), or the project
+ * already has another place: a project never moves.
+ */
+export class ProjectNameTaken extends Schema.TaggedError<ProjectNameTaken>()("ProjectNameTaken", {
+  org: OrgId,
+  name: Schema.String,
+}) {}
 
 /** 403: the caller sees the resource but may not do this. */
 export class AccessRefused extends Schema.TaggedError<AccessRefused>()("AccessRefused", {

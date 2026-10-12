@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/tenancy-d1.test.ts -t ports.memberships-none
+# kills: ports.memberships-none
+# why: a sponsor's standing takes a role from another org or another member, so an agent whose sponsor left its org keeps working
+diff --git a/apps/keel/src/adapters/driven/d1/memberships.ts b/apps/keel/src/adapters/driven/d1/memberships.ts
+index afc3e9c..e0bd6c8 100644
+--- a/apps/keel/src/adapters/driven/d1/memberships.ts
++++ b/apps/keel/src/adapters/driven/d1/memberships.ts
+@@ -26,7 +26,7 @@ export function MembershipsD1(db: D1Database) {
+           db.batch([
+             db.prepare(`SELECT banned, banExpires FROM "user" WHERE id = ?`).bind(userId),
+             db
+-              .prepare("SELECT role FROM member WHERE userId = ? AND organizationId = ?")
++              .prepare("SELECT role FROM member WHERE userId = ? OR organizationId = ?")
+               .bind(userId, org),
+           ]),
+         ).pipe(

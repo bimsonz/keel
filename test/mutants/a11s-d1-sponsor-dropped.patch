@@ -2,15 +2,15 @@
 # kills: a11s.directory-sponsor
 # why: the D1 projection never stores the sponsor
 diff --git a/apps/keel/src/adapters/driven/d1/agent-directory.ts b/apps/keel/src/adapters/driven/d1/agent-directory.ts
-index ae4ec44..3d52f7f 100644
+index 42b7514..3759669 100644
 --- a/apps/keel/src/adapters/driven/d1/agent-directory.ts
 +++ b/apps/keel/src/adapters/driven/d1/agent-directory.ts
-@@ -109,7 +109,7 @@ export function AgentDirectoryD1(db: D1Database) {
+@@ -124,7 +124,7 @@ export function AgentDirectoryD1(db: D1Database) {
                  agent.name,
                  agent.kind,
                  JSON.stringify(agent.scopes),
 -                agent.onBehalfOf ?? null,
 +                null,
+                 agent.org ?? null,
+                 agent.sponsor ?? null,
                  agent.state,
-                 agent.revocationEpoch,
-                 agent.createdAt,

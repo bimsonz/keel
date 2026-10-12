@@ -238,6 +238,12 @@ export function authOptions(config: AuthConfig) {
               handle: { type: "string", required: false, input: true, index: true },
             },
           },
+          // Only the instance admin suspends an org, never through Better Auth's own routes.
+          organization: {
+            additionalFields: {
+              suspended: { type: "boolean", required: false, input: false, defaultValue: false },
+            },
+          },
         },
         organizationHooks: {
           beforeCreateOrganization: async ({ organization: org, user }) => {

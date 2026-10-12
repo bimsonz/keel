@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/tenancy-d1.test.ts -t ports.users-principal
+# kills: ports.users-principal
+# why: a user the instance admin banned reads as unsuspended, so the policy lets them act
+diff --git a/apps/keel/src/adapters/driven/d1/users.ts b/apps/keel/src/adapters/driven/d1/users.ts
+index 6fb6bb7..050600f 100644
+--- a/apps/keel/src/adapters/driven/d1/users.ts
++++ b/apps/keel/src/adapters/driven/d1/users.ts
+@@ -72,7 +72,7 @@ export function UsersD1(db: D1Database) {
+               userId: user.id,
+               ...(user.username === null ? {} : { handle: user.username }),
+               instanceAdmin: roleNames(user.role).includes("admin"),
+-              suspended: rowBanHolds(user, now),
++              suspended: false,
+               memberships,
+             });
+           }),

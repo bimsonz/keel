@@ -20,6 +20,21 @@ export type Handle = typeof Handle.Type;
 export const Role = Schema.Literals(["owner", "maintainer", "member"]);
 export type Role = typeof Role.Type;
 
+/**
+ * The strongest role among `names` (a member's roles, which Better Auth may
+ * hold several of): `Role` lists them strongest first. A name that is no role
+ * is ignored, so none at all answers undefined.
+ */
+export const strongestRole = (names: readonly string[]): Role | undefined =>
+  Role.literals.find((role) => names.includes(role));
+
+/**
+ * Whether a ban still suspends its user at `now`: Better Auth's bans may carry
+ * an end (`banExpires`), and a user whose ban has ended is no longer suspended.
+ */
+export const banHolds = (banned: boolean, banExpires: Date | undefined, now: number): boolean =>
+  banned && (banExpires === undefined || banExpires.getTime() > now);
+
 /** One of a user's memberships, as the Memberships port reads it from D1. */
 export interface Membership {
   readonly org: OrgId;
