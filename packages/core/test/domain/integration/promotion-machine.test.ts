@@ -59,12 +59,20 @@ type Kind = PromotionCommand["_tag"];
 type Phase = "none" | Trunk["phase"];
 type Decision = ReturnType<typeof decidePromotion>;
 
-const KINDS: readonly Kind[] = ["Initialize", "Enqueue", "Flush", "Composed", "ReadBack", "Resume"];
+const KINDS: readonly Kind[] = [
+  "Initialize",
+  "Enqueue",
+  "Flush",
+  "Composed",
+  "ReadBack",
+  "PushRefused",
+  "Resume",
+];
 const PROGRESS: Readonly<Record<Phase, readonly Kind[]>> = {
   none: ["Initialize"],
   idle: ["Enqueue"],
   debouncing: ["Flush", "Flush", "Enqueue"],
-  promoting: ["Composed", "ReadBack", "ReadBack", "Enqueue"],
+  promoting: ["Composed", "ReadBack", "ReadBack", "PushRefused", "Enqueue"],
   frozen: ["Resume", "Enqueue"],
 };
 
@@ -192,6 +200,19 @@ const build = (
           : (wal?.composed ?? H0);
       return { _tag: "ReadBack", observed };
     }
+    case "PushRefused": {
+      const wal = state?.wal;
+      return {
+        _tag: "PushRefused",
+        reason: step.path % 2 === 0 ? "pack-too-large" : "repo-bytes-quota",
+        // Mostly the old head, as a refused push leaves it; now and then the composed SHA or a stray one.
+        observed: step.honest
+          ? (wal?.old ?? H0)
+          : step.pick % 2 === 0
+            ? (wal?.composed ?? STRAY)
+            : STRAY,
+      };
+    }
     case "Resume":
       return {
         _tag: "Resume",
@@ -299,7 +320,11 @@ const expectedFlush = (trunk: Trunk, command: Extract<PromotionCommand, { _tag: 
     });
     if (out._tag === "wait") break;
     if (out._tag === "reverify") declined.push(b.batchId);
-    else group.push({ id: b.batchId, touched: facts.touched, members: b.members });
+    else {
+      group.push({ id: b.batchId, touched: facts.touched, members: b.members });
+      // After a group's pack was refused as too large, a group is one batch until a push lands.
+      if (trunk.solo === true) break;
+    }
   }
   return { group: group.map((g) => g.id), declined };
 };
@@ -339,6 +364,13 @@ const oracle = (
       if (before.phase !== "promoting" || wal?.composed === undefined) return "refused";
       if (command.observed === wal.old) return "noop";
       return command.observed === wal.composed ? settled(before, 0) : "frozen";
+    case "PushRefused":
+      // Only once composed, and only with trunk still on the old head: the group ends, declined.
+      return before.phase === "promoting" &&
+        wal?.composed !== undefined &&
+        command.observed === wal.old
+        ? settled(before, 0)
+        : "refused";
     case "Resume":
       return before.phase === "frozen" ? settled(before, 0) : "refused";
     default: {
@@ -419,6 +451,10 @@ const composedAs = (members: readonly ChangeId[], at: CommitSha = NEW): Promotio
 });
 const composed = composedAs([C1]);
 const readBack = (observed: CommitSha): PromotionCommand => ({ _tag: "ReadBack", observed });
+const pushRefused = (
+  reason: "pack-too-large" | "repo-bytes-quota",
+  observed: CommitSha = H0,
+): PromotionCommand => ({ _tag: "PushRefused", reason, observed });
 const l1Path = [init, enqueue(1, C1), flush([facts(1, C1, "src/a.ts")]), composed];
 
 /**
@@ -728,18 +764,27 @@ describe("trunk promotion", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(blocked.state?.queue.map((b) => b.members[0])).toEqual([C1, C2]);
   });
 
-  it("[promotion.group-resolves-once] every WAL group ends exactly once, advanced or frozen", () => {
+  it("[promotion.group-resolves-once] every WAL group ends exactly once: advanced, frozen, or declined batch by batch after a refused push", () => {
     let groups = 0;
     fc.assert(
       fc.property(planArb, (steps) => {
         const played = run(steps);
         const log = played.at(-1)?.log ?? [];
         let open: string | undefined;
+        let left = 0;
         for (const { payload: e } of log) {
           if (e._tag === "PromotionStarted") {
             groups++;
             if (open !== undefined) return false;
             open = e.groupId;
+            left = e.batches.length;
+          } else if (
+            e._tag === "PromotionDeclined" &&
+            (e.reason === "pack-too-large" || e.reason === "repo-bytes-quota")
+          ) {
+            if (open === undefined) return false;
+            left -= 1;
+            if (left === 0) open = undefined;
           } else if (e._tag === "TrunkAdvanced") {
             if (open !== e.groupId) return false;
             open = undefined;
@@ -753,6 +798,190 @@ describe("trunk promotion", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(groups).toBeGreaterThan(0);
     const done = drive([...l1Path, readBack(NEW), readBack(NEW)]);
     expect(failureTag(done.results.at(-1))).toBe("PromotionStateRefused");
+    const refused = drive([...l1Path, pushRefused("pack-too-large"), readBack(NEW)]);
+    expect(failureTag(refused.results.at(-1))).toBe("PromotionStateRefused");
+  });
+
+  it("[promotion.push-refused-declines] a refused push declines every batch of the group for its reason, each with a way forward, and ends the group: trunk does not move and nothing freezes", () => {
+    let refusals = 0;
+    fc.assert(
+      fc.property(planArb, (steps) =>
+        run(steps).every((r) =>
+          r.probes.every((p) => {
+            if (p.command._tag !== "PushRefused" || !Result.isSuccess(p.result)) return true;
+            refusals++;
+            const before = r.before;
+            const wal = before?.wal;
+            const { reason } = p.command;
+            return (
+              before !== undefined &&
+              wal !== undefined &&
+              !p.threw &&
+              p.result.success.length === wal.batches.length &&
+              p.result.success.every(
+                (e, i) =>
+                  e._tag === "PromotionDeclined" &&
+                  e.batchId === wal.batches[i]?.batchId &&
+                  e.reason === reason &&
+                  (e.nextActions ?? []).length > 0,
+              ) &&
+              p.after !== undefined &&
+              p.after.wal === undefined &&
+              p.after.frozen === undefined &&
+              p.after.phase === (before.queue.length === 0 ? "idle" : "debouncing") &&
+              p.after.head === before.head &&
+              JSON.stringify(p.after.promoted) === JSON.stringify(before.promoted) &&
+              JSON.stringify(p.after.queue) === JSON.stringify(before.queue)
+            );
+          }),
+        ),
+      ),
+    );
+    expect(refusals).toBeGreaterThan(0);
+    for (const reason of ["pack-too-large", "repo-bytes-quota"] as const) {
+      const refused = drive([...l1Path, pushRefused(reason)]);
+      expect(refused.tags.at(-1)).toEqual(["PromotionDeclined"]);
+      expect(eventsOf(refused.results.at(-1) ?? Result.succeed([]))).toMatchObject([
+        { batchId: makeId("bat", ulid(1)), reason },
+      ]);
+      expect(refused.state).toMatchObject({ phase: "idle", head: H0, promoted: [] });
+      expect(refused.state).not.toHaveProperty("wal");
+      expect(refused.state).not.toHaveProperty("frozen");
+    }
+  });
+
+  it("[promotion.push-refused-fenced] a push counts as refused only once the group is composed and trunk is still on the old head; anything else is turned away and commits nothing", () => {
+    fc.assert(
+      fc.property(planArb, (steps) =>
+        run(steps).every((r) =>
+          r.probes.every((p) => {
+            if (p.command._tag !== "PushRefused") return true;
+            const wal = r.before?.wal;
+            const fenced =
+              r.before?.phase === "promoting" &&
+              wal?.composed !== undefined &&
+              p.command.observed === wal.old;
+            return (
+              Result.isSuccess(p.result) === fenced &&
+              !p.threw &&
+              (fenced ||
+                (p.after === r.before &&
+                  failureTag(p.result) ===
+                    (r.before === undefined ? "TrunkNotInitialized" : "PromotionStateRefused")))
+            );
+          }),
+        ),
+      ),
+    );
+    // Before the group is composed there is no pack to refuse.
+    const started = [init, enqueue(1, C1), flush([facts(1, C1, "src/a.ts")])];
+    expect(failureTag(drive([...started, pushRefused("pack-too-large")]).results.at(-1))).toBe(
+      "PromotionStateRefused",
+    );
+    // The composed SHA on trunk means the push landed: that is a read-back, and trunk advances.
+    const landed = drive([...l1Path, pushRefused("pack-too-large", NEW), readBack(NEW)]);
+    expect(failureTag(landed.results.at(-2))).toBe("PromotionStateRefused");
+    expect(landed.tags.at(-1)).toEqual(["TrunkAdvanced"]);
+    // A stray head is not a refusal either, and a refusal never freezes.
+    const stray = drive([...l1Path, pushRefused("repo-bytes-quota", STRAY)]);
+    expect(failureTag(stray.results.at(-1))).toBe("PromotionStateRefused");
+    expect(stray.state?.phase).toBe("promoting");
+    expect(failureTag(drive([init, pushRefused("pack-too-large")]).results.at(-1))).toBe(
+      "PromotionStateRefused",
+    );
+  });
+
+  it("[promotion.push-refused-solo] a pack too large bounces only a batch refused alone; a group of several is verified again and promoted one batch at a time until a push lands; a full repo bounces every member", () => {
+    fc.assert(
+      fc.property(planArb, (steps) => {
+        const played = run(steps);
+        const eachRefusal = played.every((r) =>
+          r.probes.every((p) => {
+            if (p.command._tag !== "PushRefused" || !Result.isSuccess(p.result)) return true;
+            const wal = r.before?.wal;
+            if (wal === undefined) return false;
+            const again = p.command.reason === "pack-too-large" && wal.batches.length > 1;
+            return (
+              p.result.success.every(
+                (e, i) =>
+                  e._tag === "PromotionDeclined" &&
+                  JSON.stringify(e.reverify) ===
+                    JSON.stringify(again ? wal.batches[i]?.members : []),
+              ) && (p.after?.solo === true) === (again || r.before?.solo === true)
+            );
+          }),
+        );
+        let solo = false;
+        const oneAtATime = (played.at(-1)?.log ?? []).every(({ payload: e }) => {
+          if (e._tag === "PromotionDeclined" && e.reason === "pack-too-large")
+            solo = solo || e.reverify.length > 0;
+          if (e._tag === "TrunkAdvanced") solo = false;
+          return e._tag !== "PromotionStarted" || !solo || e.batches.length === 1;
+        });
+        return eachRefusal && oneAtATime && (played.at(-1)?.after?.solo === true) === solo;
+      }),
+    );
+    const [b1, b2, b3, b4, b5] = [1, 2, 3, 4, 5].map((n) => makeId("bat", ulid(n)));
+    const declines = (r: Decision | undefined) =>
+      eventsOf(r ?? Result.succeed([])).flatMap((e) =>
+        e._tag === "PromotionDeclined" ? [[e.batchId, e.reverify]] : [],
+      );
+    // One batch refused alone made the pack too large itself: its members bounce, and grouping carries on.
+    const alone = drive([...l1Path, pushRefused("pack-too-large")]);
+    expect(declines(alone.results.at(-1))).toEqual([[b1, []]]);
+    expect(alone.state).not.toHaveProperty("solo");
+    // Two batches refused together: neither is blamed, both are verified again.
+    const pair = [
+      init,
+      enqueue(1, C1),
+      enqueue(2, C2),
+      flush([facts(1, C1, "src/a.ts"), facts(2, C2, "src/b.ts")]),
+      composedAs([C1, C2]),
+    ];
+    const together = drive([...pair, pushRefused("pack-too-large")]);
+    expect(declines(together.results.at(-1))).toEqual([
+      [b1, [C1]],
+      [b2, [C2]],
+    ]);
+    expect(together.state).toMatchObject({ phase: "idle", solo: true, head: H0 });
+    // A full repo is no batch's doing: every member bounces, and nothing is promoted alone for it.
+    const full = drive([...pair, pushRefused("repo-bytes-quota")]);
+    expect(declines(full.results.at(-1))).toEqual([
+      [b1, []],
+      [b2, []],
+    ]);
+    expect(full.state).not.toHaveProperty("solo");
+    // Verified again, the two would commute into one group; the next group is the first of them only.
+    const second = [
+      ...pair,
+      pushRefused("pack-too-large"),
+      enqueue(3, C1),
+      enqueue(4, C2),
+      flush([facts(3, C1, "src/a.ts"), facts(4, C2, "src/b.ts")], H0, "group-2"),
+    ];
+    const one = drive(second);
+    expect(eventsOf(one.results.at(-1) ?? Result.succeed([]))).toMatchObject([
+      { _tag: "PromotionStarted", batches: [b3] },
+    ]);
+    expect(one.state?.queue.map((b) => b.batchId)).toEqual([b4]);
+    // Refused again, now alone: it bounces, and the trunk still promotes one batch at a time.
+    const twice = drive([...second, composedAs([C1]), pushRefused("pack-too-large")]);
+    expect(declines(twice.results.at(-1))).toEqual([[b3, []]]);
+    expect(twice.state?.solo).toBe(true);
+    // Once a push lands, grouping resumes: the next flush takes two batches again.
+    const C3 = makeId("chg", ulid(3));
+    const resumed = drive([
+      ...second,
+      composedAs([C1]),
+      readBack(NEW),
+      enqueue(5, C3),
+      flush([facts(4, C2, "src/b.ts"), facts(5, C3, "src/c.ts")], NEW, "group-3"),
+    ]);
+    expect(resumed.results.map(tagsOf).at(-3)).toEqual(["TrunkAdvanced"]);
+    expect(eventsOf(resumed.results.at(-1) ?? Result.succeed([]))).toMatchObject([
+      { _tag: "PromotionStarted", batches: [b4, b5] },
+    ]);
+    expect(resumed.state).not.toHaveProperty("solo");
   });
 
   it("[promotion.landings] an advance lands every member of its group once, in order, each with its own batch's candidate and proof and its commit on trunk", () => {
@@ -927,15 +1156,19 @@ const promotionTour = (): readonly Fold<Trunk, TrunkEvent>[] => {
     signature: (t) =>
       [
         phaseOf(t),
-        // The first two queued batches, each by what the flush will make of it: behind, waiting, or neither.
+        // The first two queued batches, each by what the flush will make of it: behind, waiting, or neither,
+        // and the path it touched, since two batches join one group only on different paths.
         (t?.queue ?? [])
           .slice(0, 2)
           .map(
             (b) =>
-              `${world.behind.has(b.batchId) ? "b" : ""}${b.predecessors.length > 0 ? "w" : ""}.`,
+              `${world.behind.has(b.batchId) ? "b" : ""}${b.predecessors.length > 0 ? "w" : ""}${world.touched.get(b.batchId) ?? ""}.`,
           )
           .join(""),
         t?.wal === undefined ? "-" : t.wal.composed === undefined ? "started" : "composed",
+        // A group of one batch or of several: a refused push treats them differently.
+        Math.min(t?.wal?.batches.length ?? 0, 2),
+        t?.solo === true ? "solo" : "-",
         t?.frozen === undefined ? "-" : "frozen",
       ].join("|"),
   });

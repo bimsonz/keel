@@ -186,6 +186,12 @@ export const promotionChart: Chart = {
         BatchVerified: p("promoting"),
         PromotionComposed: p("promoting"),
         ...settles("TrunkAdvanced"),
+        // A refused push declines the group's batches one by one; the last ends the group.
+        PromotionDeclined: [
+          { target: p("promoting"), guard: "group-open" },
+          { target: p("idle"), guard: "queue-empty" },
+          { target: p("debouncing"), guard: "batches-waiting" },
+        ],
         PromotionFrozen: p("frozen"),
       },
     },

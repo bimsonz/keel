@@ -453,16 +453,22 @@ model ChangeLanded {
   proofId: string;
 }
 
-/** The change went back to its agent for exactly one cause: the verdict that failed it, or the conflict proven against it under `block`. */
+/** The change went back to its agent for exactly one cause: the verdict that failed it, the conflict proven against it under `block`, or the promotion that declined its batch because the push was refused. */
 model ChangeBounced {
   _tag: "ChangeBounced";
   changeId: ChangeId;
 
-  /** The verdict that failed the change. Exactly one of `verdictId` and `conflictId` is set. */
+  /** The verdict that failed the change. Exactly one of `verdictId`, `conflictId` and `declined` is set. */
   verdictId?: VerdictId;
 
-  /** The conflict proven against the change under a `block` policy. Exactly one of `verdictId` and `conflictId` is set. */
+  /** The conflict proven against the change under a `block` policy. Exactly one of `verdictId`, `conflictId` and `declined` is set. */
   conflictId?: ConflictId;
+
+  /** The batch promotion declined, and why its push was refused. Exactly one of `verdictId`, `conflictId` and `declined` is set. */
+  declined?: {
+    batchId: BatchId;
+    reason: PushRefusedReason;
+  };
 
   reasons: string[];
 
@@ -1148,15 +1154,25 @@ model TrunkAdvanced {
   height?: integer;
 }
 
+/** Why Artifacts would not take a promotion's push: the pack is larger than one request may carry, or it would take the repo past its size quota. */
+union PushRefusedReason {
+  "pack-too-large",
+  "repo-bytes-quota",
+}
+
 model PromotionDeclined {
   _tag: "PromotionDeclined";
   projectId: ProjectId;
   batchId: BatchId;
 
-  /** `frozen`: the batch was in the group a freeze stopped, and the operator's resume drops it. */
-  reason: "commutation-failed" | "frozen";
+  /** `frozen`: the batch was in the group a freeze stopped, and the operator's resume drops it. `pack-too-large` and `repo-bytes-quota`: the group's push was refused, and trunk did not move. */
+  reason: "commutation-failed" | "frozen" | "pack-too-large" | "repo-bytes-quota";
 
+  /** The members to verify again. Empty when a refused push bounces them instead. */
   reverify: ChangeId[];
+
+  /** What the members' agents can do; always set when a push was refused. */
+  nextActions?: EventNextAction[];
 }
 
 /** Why promotion froze: the head moved under the flush, a recompose disagreed with the recorded SHA, or the read-back head was neither the old nor the composed one. */

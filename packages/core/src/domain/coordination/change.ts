@@ -46,6 +46,13 @@ export const isAgentOwned = (state: ChangeState): boolean => AGENT_OWNED.has(sta
 export const ParkReason = Schema.Literals(["awaiting-ruling", "lease-lapsed"]);
 export type ParkReason = typeof ParkReason.Type;
 
+/**
+ * Why Artifacts would not take a promotion's push: the pack is larger than one
+ * receive-pack request may carry, or it would take the repo past its size quota.
+ */
+export const PushRefusedReason = Schema.Literals(["pack-too-large", "repo-bytes-quota"]);
+export type PushRefusedReason = typeof PushRefusedReason.Type;
+
 export const ChangeOrigin = Schema.Literals(["agent", "auditor", "operator"]);
 export type ChangeOrigin = typeof ChangeOrigin.Type;
 

@@ -19,7 +19,7 @@ import {
   VerdictId,
   WorkspaceId,
 } from "../kernel/index.ts";
-import { ChangeOrigin, ParkReason } from "./change.ts";
+import { ChangeOrigin, ParkReason, PushRefusedReason } from "./change.ts";
 import { DerivedEffect, Drift } from "./derivation.ts";
 import { Contradiction, MoveBasis, Neighbour, PrecedentRef } from "./preflight.ts";
 import {
@@ -162,20 +162,23 @@ export const ChangeLanded = Schema.TaggedStruct("ChangeLanded", {
 });
 /**
  * The change went back to its agent, for one cause: the verdict that failed
- * it, or the conflict proven against it under a `block` policy (proof, ADR 0005).
+ * it, the conflict proven against it under a `block` policy (proof, ADR 0005),
+ * or the promotion that declined its batch because Artifacts refused the push.
  */
 export const ChangeBounced = Schema.TaggedStruct("ChangeBounced", {
   changeId: ChangeId,
   verdictId: Schema.optional(VerdictId),
   conflictId: Schema.optional(ConflictId),
+  /** The batch promotion declined, and why its push was refused. */
+  declined: Schema.optional(Schema.Struct({ batchId: BatchId, reason: PushRefusedReason })),
   reasons: Schema.Array(Schema.String),
   /** Always set, never empty, by `decideChange`; optional only so events committed before it was added still decode. */
   nextActions: Schema.optional(Schema.Array(NextAction)),
 }).check(
   Schema.makeFilter(
     (e) =>
-      (e.verdictId === undefined) !== (e.conflictId === undefined) ||
-      "a bounce names exactly one cause: its verdict or its conflict",
+      [e.verdictId, e.conflictId, e.declined].filter((cause) => cause !== undefined).length === 1 ||
+      "a bounce names exactly one cause: its verdict, its conflict or its declined batch",
   ),
 );
 /**

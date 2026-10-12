@@ -6,11 +6,13 @@ import {
   CommitSha,
   ContentHash,
   InstantSchema,
+  NextAction,
   ProjectId,
   Tier,
   UserId,
   VerdictId,
 } from "../kernel/index.ts";
+import { PushRefusedReason } from "../coordination/index.ts";
 
 /**
  * Who a failed batch is blamed on: one member, a refused composition
@@ -117,9 +119,15 @@ export const TrunkAdvanced = Schema.TaggedStruct("TrunkAdvanced", {
 export const PromotionDeclined = Schema.TaggedStruct("PromotionDeclined", {
   projectId: ProjectId,
   batchId: BatchId,
-  /** `frozen`: the batch was in the group a freeze stopped, and the operator's resume drops it. */
-  reason: Schema.Literals(["commutation-failed", "frozen"]),
+  /**
+   * `frozen`: the batch was in the group a freeze stopped, and the operator's resume drops it.
+   * `pack-too-large` and `repo-bytes-quota`: Artifacts refused the group's push, and trunk did not move.
+   */
+  reason: Schema.Literals(["commutation-failed", "frozen", ...PushRefusedReason.literals]),
+  /** The members to verify again. Empty when a refused push bounces them instead. */
   reverify: Schema.Array(ChangeId),
+  /** What the members' agents can do; always set when a push was refused. */
+  nextActions: Schema.optional(Schema.Array(NextAction)),
 });
 /**
  * Why promotion froze: the head moved under the flush (`head-moved`), a

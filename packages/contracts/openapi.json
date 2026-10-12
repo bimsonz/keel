@@ -7301,7 +7301,7 @@
                 "$ref": "#/components/schemas/VerdictId"
               }
             ],
-            "description": "The verdict that failed the change. Exactly one of `verdictId` and `conflictId` is set."
+            "description": "The verdict that failed the change. Exactly one of `verdictId`, `conflictId` and `declined` is set."
           },
           "conflictId": {
             "allOf": [
@@ -7309,7 +7309,26 @@
                 "$ref": "#/components/schemas/ConflictId"
               }
             ],
-            "description": "The conflict proven against the change under a `block` policy. Exactly one of `verdictId` and `conflictId` is set."
+            "description": "The conflict proven against the change under a `block` policy. Exactly one of `verdictId`, `conflictId` and `declined` is set."
+          },
+          "declined": {
+            "type": "object",
+            "properties": {
+              "batchId": {
+                "$ref": "#/components/schemas/BatchId"
+              },
+              "reason": {
+                "$ref": "#/components/schemas/PushRefusedReason"
+              }
+            },
+            "required": [
+              "batchId",
+              "reason"
+            ],
+            "additionalProperties": {
+              "not": {}
+            },
+            "description": "The batch promotion declined, and why its push was refused. Exactly one of `verdictId`, `conflictId` and `declined` is set."
           },
           "reasons": {
             "type": "array",
@@ -7328,7 +7347,7 @@
         "additionalProperties": {
           "not": {}
         },
-        "description": "The change went back to its agent for exactly one cause: the verdict that failed it, or the conflict proven against it under `block`."
+        "description": "The change went back to its agent for exactly one cause: the verdict that failed it, the conflict proven against it under `block`, or the promotion that declined its batch because the push was refused."
       },
       "ChangeDrifted": {
         "type": "object",
@@ -13789,15 +13808,25 @@
             "type": "string",
             "enum": [
               "commutation-failed",
-              "frozen"
+              "frozen",
+              "pack-too-large",
+              "repo-bytes-quota"
             ],
-            "description": "`frozen`: the batch was in the group a freeze stopped, and the operator's resume drops it."
+            "description": "`frozen`: the batch was in the group a freeze stopped, and the operator's resume drops it. `pack-too-large` and `repo-bytes-quota`: the group's push was refused, and trunk did not move."
           },
           "reverify": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ChangeId"
-            }
+            },
+            "description": "The members to verify again. Empty when a refused push bounces them instead."
+          },
+          "nextActions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventNextAction"
+            },
+            "description": "What the members' agents can do; always set when a push was refused."
           }
         },
         "additionalProperties": {
@@ -13941,6 +13970,14 @@
           "not": {}
         },
         "description": "The write-ahead log entry (ADR 0003): the group about to be pushed, written before the compose."
+      },
+      "PushRefusedReason": {
+        "type": "string",
+        "enum": [
+          "pack-too-large",
+          "repo-bytes-quota"
+        ],
+        "description": "Why Artifacts would not take a promotion's push: the pack is larger than one request may carry, or it would take the repo past its size quota."
       },
       "Rebased": {
         "type": "object",

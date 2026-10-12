@@ -327,6 +327,19 @@ const build = (
         reason: "infra-failure",
       };
     case "Bounce":
+      // Now and then promotion declined the change's batch: its own batch, or one it was never in.
+      if (step.pick % 4 === 3)
+        return {
+          _tag: "Bounce",
+          declined: {
+            batchId: step.flag && state?.batchId !== undefined ? state.batchId : mint.next("bat"),
+            reason: step.operator ? "repo-bytes-quota" : "pack-too-large",
+          },
+          reasons: ["the promotion's push was refused"],
+          nextActions: step.blocked
+            ? [{ kind: "call", title: "Submit a smaller commit", operationId: "submit" }]
+            : [],
+        };
       return {
         _tag: "Bounce",
         // A conflict proven under block half the time, else the verdict that failed it.
@@ -538,6 +551,11 @@ const oracle = (
     case "Requeue":
       return key === "integrating" && batchMatches(command.batchId) ? "queued" : "refused";
     case "Bounce":
+      // A declined batch bounces only its own members, while they are in it.
+      if (command.declined !== undefined)
+        return key === "integrating" && batchMatches(command.declined.batchId)
+          ? intoAgent("bounced")
+          : "refused";
       // A conflict bounces a change only before it is batched; a verdict also from a batch or a ruling.
       return key === "deriving" ||
         key === "verifying" ||
@@ -720,6 +738,15 @@ const preflightsIssued = (lists: readonly (readonly ChangeId[])[], premise: Prop
     .map((e) => e.payload)
     .flatMap((e) => (e._tag === "PreflightIssued" ? [e] : []));
 };
+const declinedBounce = (
+  batchId: typeof BATCH,
+  reason: "pack-too-large" | "repo-bytes-quota",
+): ChangeCommand => ({
+  _tag: "Bounce",
+  declined: { batchId, reason },
+  reasons: ["the promotion's push was refused"],
+  nextActions: [],
+});
 const note = (policy: "advise" | "annotate"): ChangeCommand => ({
   _tag: "NoteConflict",
   conflictId: makeId("cfl", ulid(9)),
@@ -976,7 +1003,9 @@ describe("the Change machine", { timeout: PROPERTY_TIMEOUT }, () => {
           .records.filter(
             (r) =>
               keyOf(r.before) === "queued" &&
-              (r.command?._tag === "Bounce" || (r.command?._tag === "Batch" && r.step.blocked)),
+              // A declined batch is no conflict, and bounces no change that is not yet in it.
+              ((r.command?._tag === "Bounce" && r.command.declined === undefined) ||
+                (r.command?._tag === "Batch" && r.step.blocked)),
           )
           .every((r) => {
             pulled++;
@@ -1511,6 +1540,82 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
       [{ ...proven, batchId: BATCH }, 0],
     ]);
     expect(failureTag(batched.results.at(-1))).toBe("ChangeStateRefused");
+  });
+
+  it("[change.bounce-declined] promotion's declined batch bounces a change only while it is integrating in that batch, and the bounce names that batch and its reason, no verdict and no conflict, with the way forward for that reason", () => {
+    let bounced = 0;
+    fc.assert(
+      fc.property(planArb, (plan) =>
+        run(plan).records.every((r) =>
+          r.probes.every((p) => {
+            if (p.command._tag !== "Bounce" || p.command.declined === undefined) return true;
+            const { declined } = p.command;
+            const inBatch =
+              keyOf(r.before) === "integrating" && r.before?.batchId === declined.batchId;
+            if (!Result.isSuccess(p.result)) return !inBatch;
+            const bounces = p.result.success.filter((e) => e._tag === "ChangeBounced");
+            bounced += bounces.length;
+            return (
+              inBatch &&
+              bounces.length === 1 &&
+              bounces.every(
+                (e) =>
+                  e.verdictId === undefined &&
+                  e.conflictId === undefined &&
+                  JSON.stringify(e.declined) === JSON.stringify(declined) &&
+                  (e.nextActions ?? []).length > 0,
+              )
+            );
+          }),
+        ),
+      ),
+    );
+    expect(bounced).toBeGreaterThan(0);
+    const queued = [declare, start, submit, precheck, compile, queue].map((c) => [c, 0] as const);
+    const integrating = [...queued, [batch, 0] as const];
+    const large = drive([...integrating, [declinedBounce(BATCH, "pack-too-large"), 0]]);
+    expect(large.state?.state).toBe("bounced");
+    expect(large.state).not.toHaveProperty("batchId");
+    const event = large.log.at(-1);
+    expect(event).toMatchObject({
+      _tag: "ChangeBounced",
+      declined: { batchId: BATCH, reason: "pack-too-large" },
+    });
+    expect(event).not.toHaveProperty("verdictId");
+    expect(event).not.toHaveProperty("conflictId");
+    // Too large a pack is the change's to split; a full repo is a person's to make room in.
+    expect(
+      event?._tag === "ChangeBounced" && event.nextActions?.map((a) => [a.kind, a.operationId]),
+    ).toEqual([
+      ["call", "declare"],
+      ["call", "submit"],
+    ]);
+    const full = drive([...integrating, [declinedBounce(BATCH, "repo-bytes-quota"), 0]]).log.at(-1);
+    expect(
+      full?._tag === "ChangeBounced" && full.nextActions?.map((a) => [a.kind, a.operationId]),
+    ).toEqual([
+      ["escalate", undefined],
+      ["call", "submit"],
+    ]);
+    // Not before the batch, and not for a batch the change is not in.
+    const early = drive([...queued, [declinedBounce(BATCH, "pack-too-large"), 0]]);
+    expect(failureTag(early.results.at(-1))).toBe("ChangeStateRefused");
+    expect(early.state?.state).toBe("queued");
+    const other = drive([
+      ...integrating,
+      [declinedBounce(makeId("bat", ulid(44)), "pack-too-large"), 0],
+    ]);
+    expect(failureTag(other.results.at(-1))).toBe("ChangeStateRefused");
+    expect(other.state?.state).toBe("integrating");
+    // A bounce names exactly one cause: two, or none, do not decode.
+    const decode = Schema.decodeUnknownSync(ChangeEvent);
+    const base = { _tag: "ChangeBounced", changeId: CHANGE, reasons: [] };
+    const cause = { declined: { batchId: BATCH, reason: "pack-too-large" } };
+    expect(decode({ ...base, ...cause })).toMatchObject(cause);
+    expect(() => decode({ ...base, ...cause, verdictId: makeId("vrd", ulid(6)) })).toThrow(
+      /exactly one cause/,
+    );
+    expect(() => decode(base)).toThrow(/exactly one cause/);
   });
 
   it("[change.conflict-noted] a conflict noted under advise or annotate is recorded in every non-terminal state and moves nothing; advise names the ways forward, annotate none", () => {

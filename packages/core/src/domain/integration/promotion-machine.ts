@@ -1,4 +1,5 @@
 import { Result, Schema } from "effect";
+import type { PushRefusedReason } from "../coordination/index.ts";
 import {
   type BatchId,
   type CandidateId,
@@ -8,6 +9,7 @@ import {
   type Glob,
   IllegalTransition,
   type Instant,
+  type NextAction,
   type ProjectId,
   type VerdictId,
 } from "../kernel/index.ts";
@@ -83,6 +85,16 @@ export type PromotionCommand =
       readonly commits: readonly MemberCommit[];
     }
   | { readonly _tag: "ReadBack"; readonly observed: CommitSha }
+  | {
+      /**
+       * Artifacts refused the group's push, or the composed pack would take
+       * the repo past its quota, and trunk is still on the old head as
+       * `observed` says. A push that may have landed goes through ReadBack.
+       */
+      readonly _tag: "PushRefused";
+      readonly reason: PushRefusedReason;
+      readonly observed: CommitSha;
+    }
   | { readonly _tag: "Resume"; readonly by: string; readonly head: CommitSha };
 
 /** Facts from I/O: the time, and the project whose trunk this is (the Trunk DO's key). */
@@ -124,6 +136,45 @@ const landingsOf = (group: PendingGroup, commits: readonly MemberCommit[]): Memb
         : [{ changeId, commitSha: commit.commitSha, candidateId: batch.candidateId, proofId }];
     }),
   );
+
+/**
+ * What the members' agents can do about a refused push. A pack too large for
+ * one batch alone is the change's to split; in a group of several, no batch
+ * is blamed and each is verified again and promoted alone. A full repo is for
+ * a person to make room in.
+ */
+const refusedActions = (reason: PushRefusedReason, alone: boolean): readonly NextAction[] => {
+  if (reason === "repo-bytes-quota")
+    return [
+      {
+        kind: "escalate",
+        title:
+          "The repo is at its size quota: ask an owner to free space, or the instance admin to raise the quota",
+      },
+      { kind: "call", title: "Submit the change again once there is room", operationId: "submit" },
+    ];
+  return alone
+    ? [
+        {
+          kind: "call",
+          title:
+            "The change's pack is too large to push: declare part of the work as its own change",
+          operationId: "declare",
+        },
+        {
+          kind: "call",
+          title: "Submit this change again with a smaller commit",
+          operationId: "submit",
+        },
+      ]
+    : [
+        {
+          kind: "wait",
+          title:
+            "The group's pack was too large to push: each batch is verified again and promoted alone",
+        },
+      ];
+};
 
 /** The SHA a push of the open group must carry: recorded once, before the first push, and never recomposed. */
 export const pushTarget = (trunk: Trunk): CommitSha | undefined =>
@@ -184,6 +235,8 @@ const flush = (trunk: Trunk, command: Extract<PromotionCommand, { _tag: "Flush" 
       continue;
     }
     group.push({ batch, touched: facts.touched, proofId: outcome.proofId });
+    // After a group's pack was refused as too large, one batch at a time until a push lands.
+    if (trunk.solo === true) break;
   }
   if (group.length > 0) {
     events.push(
@@ -314,6 +367,29 @@ export const decidePromotion = (
         }),
       ]);
 
+    case "PushRefused": {
+      if (
+        trunk.phase !== "promoting" ||
+        wal?.composed === undefined ||
+        command.observed !== wal.old
+      )
+        return refuse(trunk, command);
+      // Only a batch refused on its own is known to be too large; a full repo is no batch's fault to verify away.
+      const alone = wal.batches.length === 1;
+      const bounces = alone || command.reason === "repo-bytes-quota";
+      return Result.succeed(
+        wal.batches.map((b) =>
+          PromotionDeclined.make({
+            projectId,
+            batchId: b.batchId,
+            reason: command.reason,
+            reverify: bounces ? [] : b.members,
+            nextActions: refusedActions(command.reason, alone),
+          }),
+        ),
+      );
+    }
+
     case "Resume":
       return trunk.phase === "frozen"
         ? Result.succeed([
@@ -416,6 +492,24 @@ export const evolvePromotion = (
             }
           : illegal(trunk, event);
       }
+      if (event.reason === "pack-too-large" || event.reason === "repo-bytes-quota") {
+        if (
+          trunk.phase !== "promoting" ||
+          wal?.composed === undefined ||
+          !wal.batches.some((b) => b.batchId === event.batchId)
+        )
+          return illegal(trunk, event);
+        const batches = wal.batches.filter((b) => b.batchId !== event.batchId);
+        // The group's last batch ends it: trunk never moved, so there is nothing to read back.
+        const left: Trunk =
+          batches.length > 0
+            ? { ...trunk, wal: { ...wal, batches } }
+            : { ...without(trunk, "wal"), phase: settled(trunk.queue) };
+        // Members sent to be verified again were refused as a group: promote one batch at a time.
+        return event.reason === "pack-too-large" && event.reverify.length > 0
+          ? { ...left, solo: true }
+          : left;
+      }
       if (trunk.phase !== "debouncing" || !trunk.queue.some((b) => b.batchId === event.batchId))
         return illegal(trunk, event);
       const queue = trunk.queue.filter((b) => b.batchId !== event.batchId);
@@ -470,7 +564,8 @@ export const evolvePromotion = (
           event.height === trunk.height + 1)
         ? {
             // An advance without a height (an older Trunk DO's) leaves the height unknown.
-            ...without(trunk, "wal", "height"),
+            // A push landed: grouping resumes.
+            ...without(trunk, "wal", "height", "solo"),
             head: event.to,
             promoted: [...trunk.promoted, ...event.landings.map((l) => l.changeId)],
             phase: settled(trunk.queue),

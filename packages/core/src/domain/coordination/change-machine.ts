@@ -24,6 +24,7 @@ import {
   type ChangeOrigin,
   type ChangeState,
   isAgentOwned,
+  type PushRefusedReason,
   TERMINAL,
 } from "./change.ts";
 import { canonicalProposition } from "./claim.ts";
@@ -223,8 +224,22 @@ export type ChangeCommand =
  * batched (Deriving, Verifying, Queued).
  */
 export type BounceCause =
-  | { readonly verdictId: VerdictId; readonly conflictId?: undefined }
-  | { readonly conflictId: ConflictId; readonly verdictId?: undefined };
+  | {
+      readonly verdictId: VerdictId;
+      readonly conflictId?: undefined;
+      readonly declined?: undefined;
+    }
+  | {
+      readonly conflictId: ConflictId;
+      readonly verdictId?: undefined;
+      readonly declined?: undefined;
+    }
+  | {
+      /** Promotion declined the change's batch because its push was refused: from Integrating only. */
+      readonly declined: { readonly batchId: BatchId; readonly reason: PushRefusedReason };
+      readonly verdictId?: undefined;
+      readonly conflictId?: undefined;
+    };
 
 /** Facts from I/O that every decision may read: the time, and the change this DO holds (its key). */
 export interface ChangeFacts {
@@ -291,6 +306,37 @@ const defaultBounceActions = (changeId: ChangeId): readonly NextAction[] => [
     args: { changeId },
   },
 ];
+
+/** The ways forward when promotion declined the change's batch because its push was refused. */
+const declinedActions = (changeId: ChangeId, reason: PushRefusedReason): readonly NextAction[] =>
+  reason === "pack-too-large"
+    ? [
+        {
+          kind: "call",
+          title:
+            "The change's pack is too large to push: declare part of the work as its own change",
+          operationId: "declare",
+        },
+        {
+          kind: "call",
+          title: "Submit this change again with a smaller commit",
+          operationId: "submit",
+          args: { changeId },
+        },
+      ]
+    : [
+        {
+          kind: "escalate",
+          title:
+            "The repo is at its size quota: ask an owner to free space, or the instance admin to raise the quota",
+        },
+        {
+          kind: "call",
+          title: "Submit the change again once there is room",
+          operationId: "submit",
+          args: { changeId },
+        },
+      ];
 
 /** The plan the change was compiled to, for an enqueue event to carry, when it has one. */
 const planOf = (change: Change): { readonly planHash?: ContentHash } =>
@@ -594,6 +640,24 @@ export const decideChange = (
       const awaitingRuling = at("parked") && change.parkReason === "awaiting-ruling";
       const fromBatch = at("integrating") && command.batchId === change.batchId;
       const beforeBatch = at("deriving", "verifying", "queued");
+      if (command.declined !== undefined) {
+        // A declined batch bounces only its own members, and only while they are in it.
+        if (!(at("integrating") && command.declined.batchId === change.batchId))
+          return refuse(change, command);
+        return intoAgentOwned(
+          change,
+          now,
+          ChangeBounced.make({
+            changeId: id,
+            declined: command.declined,
+            reasons: command.reasons,
+            nextActions:
+              command.nextActions.length > 0
+                ? command.nextActions
+                : declinedActions(id, command.declined.reason),
+          }),
+        );
+      }
       const cause =
         command.conflictId === undefined
           ? { verdictId: command.verdictId }
@@ -837,6 +901,10 @@ export const evolveChange = (
     case "ChangeLanded":
       return from("integrating") ? released(change, "landed") : illegal(change, event);
     case "ChangeBounced":
+      if (event.declined !== undefined)
+        return from("integrating") && event.declined.batchId === change.batchId
+          ? moveTo(change, "bounced", ["parkReason", "escalationId", "batchId", "laneId"])
+          : illegal(change, event);
       return from("deriving", "verifying", "queued") ||
         (event.conflictId === undefined &&
           (from("integrating") || (from("parked") && change.parkReason === "awaiting-ruling")))

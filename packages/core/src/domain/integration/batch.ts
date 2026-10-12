@@ -100,6 +100,11 @@ export const Trunk = Schema.Struct({
   /** How many times Keel has advanced trunk since TrunkInitialized; absent in state folded before it was kept. */
   height: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   wal: Schema.optional(PendingGroup),
+  /**
+   * Set once a group of several batches was refused as too large a pack:
+   * each group is then one batch, until a push lands.
+   */
+  solo: Schema.optional(Schema.Literal(true)),
   frozen: Schema.optional(
     Schema.Struct({
       expected: CommitSha,
