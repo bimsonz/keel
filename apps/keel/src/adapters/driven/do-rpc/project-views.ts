@@ -4,6 +4,7 @@ import {
   type ChangesRead,
   type ConflictRead,
   type ConflictsRead,
+  type ProbeConflictRead,
   ProjectorCodecs,
   type SnapshotRead,
 } from "../../../rpc/index.ts";
@@ -15,6 +16,7 @@ export interface ProjectViewsStub {
   snapshot(request: typeof SnapshotRead.Encoded): Promise<unknown>;
   conflicts(request: typeof ConflictsRead.Encoded): Promise<unknown>;
   conflict(request: typeof ConflictRead.Encoded): Promise<unknown>;
+  probeConflict(request: typeof ProbeConflictRead.Encoded): Promise<unknown>;
 }
 
 /**
@@ -50,6 +52,10 @@ export function ProjectViewsRpc(projector: () => ProjectViewsStub): Layer.Layer<
         ),
       conflict: (project, conflictId) =>
         callObject(ProjectorCodecs.conflict, () => projector().conflict({ project, conflictId })),
+      probeConflict: (project, probeId) =>
+        callObject(ProjectorCodecs.probeConflict, () =>
+          projector().probeConflict({ project, probeId }),
+        ),
     }),
   );
 }

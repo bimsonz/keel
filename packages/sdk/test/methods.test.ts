@@ -8,6 +8,7 @@ const SAMPLE: Readonly<Record<string, string>> = {
   changeId: "chg_1",
   workspaceId: "wsp_1",
   conflictId: "cfl_1",
+  probeId: "prb_1",
   decisionId: "dec_1",
   verdictId: "vrd_1",
   candidateId: "cnd_1",
@@ -56,6 +57,7 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
   Inbox_getSnapshot: (c) => c.snapshot({ project: "prj_1" }),
   Conflicts_listConflicts: (c) => c.conflicts({ changeId: "chg_1" }),
   Conflicts_getConflict: (c) => c.conflict("cfl_1"),
+  Probes_getProbeSource: (c) => c.probeSource("prb_1"),
   resolve: (c) => c.resolve("cfl_1", { move: "refine", changeId: "chg_1" }, LEASE),
   why: (c) => c.why({ subject: "authz.permissions" }),
   Memory_listDecisions: (c) => c.decisions({ subject: "authz.permissions" }),
@@ -120,6 +122,7 @@ const QUERY: Readonly<Record<QueriedOperation, (client: KeelClient) => Promise<u
       limit: 5,
     }),
   Conflicts_getConflict: (c) => c.conflict("cfl_1", { project: "prj_1" }),
+  Probes_getProbeSource: (c) => c.probeSource("prb_1", { project: "prj_1" }),
   why: (c) => c.why({ path: "src/a.ts", line: 3, subject: "authz.permissions" }),
   Memory_listDecisions: (c) =>
     c.decisions({ subject: "authz.permissions", cursor: "c1", limit: 5 }),

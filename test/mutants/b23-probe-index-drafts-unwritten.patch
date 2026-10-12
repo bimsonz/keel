@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: b23.probe-conflict
+# why: a drafted probe is not written to the project's probe index, so its conflict and its bundle cannot be found from the probe
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index bf19001..4c409f1 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -253,7 +253,7 @@ function foldConflict(store: Store, event: EventEnvelope): string | undefined {
+   if (labelOf(store, project, "C-", conflictId) === undefined)
+     return `${conflictId} has no C-n in ${project}`;
+   store.put(CONFLICT_VIEWS.conflict(project), conflictId, asStored(encodeFolded(folded)));
+-  if (payload._tag === "ProbeDrafted" || payload._tag === "ProbeDiscarded")
++  if (payload._tag === "ProbeDiscarded")
+     store.put(CONFLICT_VIEWS.probe(project), payload.probeId, conflictId);
+   if (payload._tag === "GuardAdmitted")
+     store.put(CONFLICT_VIEWS.guard(project), payload.guardId, conflictId);

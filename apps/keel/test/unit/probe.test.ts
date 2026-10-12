@@ -228,7 +228,13 @@ function probeWorld(options: Options = {}) {
       }),
     ),
     Layer.succeed(PlatformFunction, PlatformFunction.of({ call: () => Effect.succeed(SLOTS) })),
-    Layer.succeed(ProbeStore, ProbeStore.of({ put: () => Effect.succeed(hash(7)) })),
+    Layer.succeed(
+      ProbeStore,
+      ProbeStore.of({
+        put: () => Effect.succeed(hash(7)),
+        get: () => Effect.die("the Probe never reads a probe's source back"),
+      }),
+    ),
     Layer.succeed(
       ProbeRunner,
       ProbeRunner.of({

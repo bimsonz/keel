@@ -11,6 +11,7 @@ import {
   readChangeList,
   readConflict,
   readConflictList,
+  readProbeSource,
   readEvents,
   readInbox,
   readSnapshot,
@@ -41,7 +42,12 @@ import {
   GrantableScope,
   type ProjectResource,
 } from "@keeltown/core/domain/identity";
-import { ConflictId, ProjectId as ProjectIdSchema, type ProjectId } from "@keeltown/core/kernel";
+import {
+  ConflictId,
+  ProbeId,
+  ProjectId as ProjectIdSchema,
+  type ProjectId,
+} from "@keeltown/core/kernel";
 import { Orgs, ProjectOrgs, type Projects } from "@keeltown/core/ports";
 import { Effect, Option, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
@@ -78,6 +84,8 @@ import {
   conflictNotFound,
   conflictOk,
   conflictsOk,
+  probeNotFound,
+  probeSourceOk,
   snapshotOk,
 } from "./views.ts";
 import { piggyback } from "./piggyback.ts";
@@ -467,6 +475,16 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, makeUser: MakeU
               Effect.match({
                 onSuccess: conflictOk,
                 onFailure: (e) => conflictNotFound(caller, e),
+              }),
+            ),
+          ),
+        Probes_getProbeSource: (caller: Caller, input: Input<"Probes_getProbeSource">) =>
+          run(
+            caller,
+            readProbeSource(scopeOf(caller), ProbeId.make(input.probeId)).pipe(
+              Effect.match({
+                onSuccess: probeSourceOk,
+                onFailure: (e) => probeNotFound(caller, e),
               }),
             ),
           ),

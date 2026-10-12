@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/methods.test.ts -t "sdk.query"
+# kills: sdk.query
+# why: the client's probeSource() takes project but never puts it on the URL, so a public project's probe can't be read through the SDK
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index feeb15e..a6fb3ed 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -368,7 +368,7 @@ export class KeelClient {
+     probeId: string,
+     options: CallOptions & { readonly project?: string } = {},
+   ): Promise<WireOutputs["Probes_getProbeSource"]> {
+-    return this.call("Probes_getProbeSource", { probeId, project: options.project }, options);
++    return this.call("Probes_getProbeSource", { probeId }, options);
+   }
+ 
+   /** Resolves a conflict by a move, under the lease of the change named in the resolution. */

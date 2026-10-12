@@ -247,6 +247,26 @@ export function describeProbeStoreContract(adapter: string, make: () => ProbeSto
     );
 
     it.effect(
+      "[probe-store.get] reads a kept probe's files back through the port, and fails BundleMissing for a hash nothing is kept under",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const store = yield* ProbeStore;
+          const [first, second] = [probeFiles(random(8)), probeFiles(random(8))];
+          const hash = yield* store.put(first.toReversed());
+          yield* store.put(second);
+          const unkept = ContentHash.make(`sha256:${"0".repeat(64)}`);
+
+          expect(byPath(yield* store.get(hash))).toEqual(byPath(first));
+          expect(yield* Effect.flip(store.get(unkept))).toMatchObject({
+            _tag: "BundleMissing",
+            hash: unkept,
+          });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
       "[probe-store.stable] the same files in any order answer one hash, and other text another",
       () => {
         const harness = make();

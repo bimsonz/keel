@@ -5,17 +5,18 @@ import type {
   Clock,
   CodeHost,
   Enrolments,
-  Sessions,
-  Standings,
   EventFeed,
   Ids,
   Inbox,
   Memberships,
   Notifier,
   Orgs,
+  ProbeStore,
   ProjectOrgs,
   Projects,
   ProjectViews,
+  Sessions,
+  Standings,
   TokenIssuer,
   Users,
 } from "@keeltown/core/ports";
@@ -35,6 +36,7 @@ export type IsolateServices =
   | Notifier
   | Projects
   | ProjectViews
+  | ProbeStore
   | Enrolments
   | CodeHost
   | Sessions

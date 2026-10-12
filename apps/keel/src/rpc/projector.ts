@@ -7,6 +7,7 @@ import {
   ConflictState,
   DraftFailure,
   Probe,
+  ProbeNotFound,
   ProbeOutcome,
   World,
   WorldCheck,
@@ -173,6 +174,8 @@ export const ConflictPage = Schema.Struct({
 
 export const ConflictRead = Schema.Struct({ project: ProjectId, conflictId: ConflictId });
 
+export const ProbeConflictRead = Schema.Struct({ project: ProjectId, probeId: ProbeId });
+
 export const ProjectorCodecs = {
   nudge: exitCodec(Schema.Struct({ drained: Schema.Int }), Schema.Never),
   read: exitCodec(FeedPage, Schema.Never),
@@ -180,6 +183,7 @@ export const ProjectorCodecs = {
   snapshot: exitCodec(ViewSnapshot, Schema.Never),
   conflicts: exitCodec(ConflictPage, Schema.Never),
   conflict: exitCodec(ConflictRecord, ConflictNotFound),
+  probeConflict: exitCodec(ConflictRecord, ProbeNotFound),
 };
 
 /**
@@ -201,4 +205,6 @@ export interface ProjectorRpc extends EventReceiverRpc {
   conflicts(request: typeof ConflictsRead.Encoded): Promise<ExitJson>;
   /** One conflict of a project: its sides, probe, matrix cells and guard as folded. ConflictNotFound when the project's feed has none by that id. */
   conflict(request: typeof ConflictRead.Encoded): Promise<ExitJson>;
+  /** The conflict a probe of a project belongs to, as `conflict` answers it. ProbeNotFound when the project's feed has no such probe. */
+  probeConflict(request: typeof ProbeConflictRead.Encoded): Promise<ExitJson>;
 }

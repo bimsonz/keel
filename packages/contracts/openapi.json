@@ -4236,6 +4236,141 @@
         ]
       }
     },
+    "/probes/{probeId}/source": {
+      "get": {
+        "operationId": "Probes_getProbeSource",
+        "summary": "Read a probe's source",
+        "description": "The source of a conflict's probe, as it was run in each world. An agent's\nown project unless `project` names another. A probe the caller may not\nread is the 404 of an unknown one.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProbePath"
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProbeSource"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Conflicts"
+        ],
+        "security": [
+          {},
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/projects": {
       "get": {
         "operationId": "Operator_listProjects",
@@ -6713,6 +6848,14 @@
           "maximum": 100
         },
         "explode": false
+      },
+      "ProbePath": {
+        "name": "probeId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/ProbeId"
+        }
       },
       "WaitQuery": {
         "name": "wait",
@@ -14704,6 +14847,57 @@
           "not": {}
         }
       },
+      "ProbeSource": {
+        "type": "object",
+        "required": [
+          "probeId",
+          "files"
+        ],
+        "properties": {
+          "probeId": {
+            "$ref": "#/components/schemas/ProbeId"
+          },
+          "bundleHash": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContentHash"
+              }
+            ],
+            "description": "Absent when none of the probe's drafts compiled: it has no source."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProbeSourceFile"
+            },
+            "description": "The bundle's files. None when the probe has no bundle, and none beside a\n`bundleHash` when that bundle is no longer kept."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A probe's source: the files of the bundle its last draft was kept under."
+      },
+      "ProbeSourceFile": {
+        "type": "object",
+        "required": [
+          "path",
+          "text"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "The file's path under `.keel/`."
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One file of a probe's source, as its bundle holds it."
+      },
       "ProbeState": {
         "type": "string",
         "enum": [
@@ -14733,6 +14927,7 @@
           "internal.defect",
           "change.not_found",
           "conflict.not_found",
+          "probe.not_found",
           "change.lease_stale",
           "change.lease_not_lapsed",
           "change.state_refused",

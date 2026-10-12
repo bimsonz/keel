@@ -3,6 +3,7 @@ import {
   foldViews,
   listChanges,
   listConflicts,
+  probeConflict,
   recordFeed,
   viewSnapshot,
 } from "@keeltown/core/application/memory";
@@ -41,6 +42,7 @@ export function makeProjectViewsMemory() {
         snapshot: (project) => provided(viewSnapshot(project)),
         conflicts: (read) => provided(listConflicts(read)),
         conflict: (project, conflictId) => provided(conflictRecord(project, conflictId)),
+        probeConflict: (project, probeId) => provided(probeConflict(project, probeId)),
       }),
     ),
   };

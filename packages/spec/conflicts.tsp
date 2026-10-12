@@ -287,3 +287,44 @@ interface Conflicts {
     @body body: ResolveRequest,
   ): ResolvedEnvelope | NotFound | Conflict | StandardErrors;
 }
+
+model ProbePath {
+  @path probeId: ProbeId;
+}
+
+/** One file of a probe's source, as its bundle holds it. */
+model ProbeSourceFile {
+  /** The file's path under `.keel/`. */
+  path: string;
+
+  text: string;
+}
+
+/** A probe's source: the files of the bundle its last draft was kept under. */
+model ProbeSource {
+  probeId: ProbeId;
+
+  /** Absent when none of the probe's drafts compiled: it has no source. */
+  bundleHash?: ContentHash;
+
+  /**
+   * The bundle's files. None when the probe has no bundle, and none beside a
+   * `bundleHash` when that bundle is no longer kept.
+   */
+  files: ProbeSourceFile[];
+}
+
+@tag("Conflicts")
+@route("/probes")
+interface Probes {
+  /**
+   * The source of a conflict's probe, as it was run in each world. An agent's
+   * own project unless `project` names another. A probe the caller may not
+   * read is the 404 of an unknown one.
+   */
+  @summary("Read a probe's source")
+  @useAuth(NoAuth | AgentRead | SessionAuth)
+  @route("/{probeId}/source")
+  @get
+  getProbeSource(...ProbePath, @query project?: ProjectId): ProbeSource | NotFound | StandardErrors;
+}

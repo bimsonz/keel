@@ -14,6 +14,7 @@ import {
 } from "@keeltown/core/domain/coordination";
 import { CandidateNotFound, ResultFenced } from "@keeltown/core/domain/integration";
 import {
+  BundleMissing,
   type AdmittedGuard,
   ModelAbstained,
   type StepResult,
@@ -545,6 +546,12 @@ export function makeProbeStoreMemory(): ProbeStoreHarness & {
             stored.set(hash, sorted);
             return hash;
           }),
+        get: (hash) => {
+          const files = stored.get(hash);
+          return files === undefined
+            ? Effect.fail(new BundleMissing({ hash }))
+            : Effect.succeed(files);
+        },
       }),
     ),
   };

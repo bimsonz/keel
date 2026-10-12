@@ -363,6 +363,14 @@ export class KeelClient {
     return this.call("Conflicts_getConflict", { conflictId, project: options.project }, options);
   }
 
+  /** The source of a conflict's probe, file by file: the token's own project unless `project` names another. */
+  probeSource(
+    probeId: string,
+    options: CallOptions & { readonly project?: string } = {},
+  ): Promise<WireOutputs["Probes_getProbeSource"]> {
+    return this.call("Probes_getProbeSource", { probeId, project: options.project }, options);
+  }
+
   /** Resolves a conflict by a move, under the lease of the change named in the resolution. */
   resolve(
     conflictId: string,

@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.probe-source
+# why: a bundle the store no longer keeps fails the read instead of answering the probe with no files
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 899e685..753811a 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -333,9 +333,7 @@ export const readProbeSource: (
+     const bundleHash = probe?.bundleHash;
+     if (bundleHash === undefined) return { probeId, files: NO_FILES };
+     const store = yield* ProbeStore;
+-    const files = yield* store
+-      .get(bundleHash)
+-      .pipe(Effect.catchTag("BundleMissing", () => Effect.succeed(NO_FILES)));
++    const files = yield* store.get(bundleHash).pipe(Effect.orDie);
+     return { probeId, bundleHash, files };
+   });
+ 

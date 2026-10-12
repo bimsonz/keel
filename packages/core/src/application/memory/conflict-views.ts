@@ -6,6 +6,7 @@ import {
   type EventEnvelope,
   IllegalTransition,
   type Instant,
+  type ProbeId,
   type ProjectId,
 } from "../../domain/kernel/index.ts";
 import {
@@ -22,6 +23,7 @@ import {
   GuardRetired,
   ProbeDiscarded,
   ProbeDrafted,
+  ProbeNotFound,
   ProbeRan,
   type World,
   WorldCheckRan,
@@ -389,6 +391,27 @@ export const conflictRecord: (
   if (stored === undefined) return yield* new ConflictNotFound({ conflictId });
   return recordOf(store, project, decodeFolded(stored));
 });
+
+/**
+ * The conflict a probe of a project belongs to, as `conflictRecord` answers
+ * it. ProbeNotFound for a probe the project's feed has not seen drafted or
+ * discarded, which is also a probe of another project.
+ */
+export const probeConflict: (
+  project: ProjectId,
+  probeId: ProbeId,
+) => Effect.Effect<ConflictRecord, ProbeNotFound, EntityStore> = Effect.fn("memory/probeConflict")(
+  function* (project: ProjectId, probeId: ProbeId) {
+    const store = yield* EntityStore;
+    const conflictId = store.get(CONFLICT_VIEWS.probe(project), probeId);
+    const stored =
+      typeof conflictId === "string"
+        ? store.get(CONFLICT_VIEWS.conflict(project), conflictId)
+        : undefined;
+    if (stored === undefined) return yield* new ProbeNotFound({ probeId });
+    return recordOf(store, project, decodeFolded(stored));
+  },
+);
 
 /** One world of a conflict's matrix: the probe's runs there in run order, and each suite's latest run. */
 export interface MatrixWorld {

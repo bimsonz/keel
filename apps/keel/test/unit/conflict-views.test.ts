@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { probeIdOf } from "@keeltown/core/application/coordination";
+import { probeIdOf, readProbeSource } from "@keeltown/core/application/coordination";
 import { isOpenConflict, matrixOf, sidesOf } from "@keeltown/core/application/memory";
 import { SubjectKey } from "@keeltown/core/domain/coordination";
 import {
@@ -14,16 +14,23 @@ import {
   ContentHash,
   type EventEnvelope,
   makeId,
+  ProbeId,
   type ProjectId,
 } from "@keeltown/core/kernel";
 import {
   type ConflictListRead,
   ProbeLedger,
+  ProbeStore,
   ProjectViews,
   type SubjectRef,
 } from "@keeltown/core/ports";
-import { makeProbeLedgerMemory, makeProjectViewsMemory, projectEvents } from "@keeltown/testing";
-import { Effect, Schema } from "effect";
+import {
+  makeProbeLedgerMemory,
+  makeProbeStoreMemory,
+  makeProjectViewsMemory,
+  projectEvents,
+} from "@keeltown/testing";
+import { Effect, Layer, Schema } from "effect";
 import * as fc from "fast-check";
 import { conflictOk } from "../../src/adapters/driving/http/views.ts";
 
@@ -599,3 +606,59 @@ describe(
     });
   },
 );
+
+/** A fresh id of one kind, distinct across the file. */
+const fresh = (prefix: "prb" | "cfl" | "chg") => makeId(prefix, nextId("x").slice(2));
+
+describe("[b23.probe-source] a probe's source, from the bundle its draft was kept under", () => {
+  it.effect(
+    "[b23.probe-source] the kept bundle's files are answered with its hash; a bundle no longer kept leaves the hash and no files, a probe never drafted has neither, and a probe the project does not have is not found",
+    () => {
+      const views = makeProjectViewsMemory();
+      const store = makeProbeStoreMemory();
+      const mine = projectEvents();
+      const theirs = projectEvents();
+      const [probeId, lost, undrafted, unknown] = [
+        ProbeId.make(fresh("prb")),
+        ProbeId.make(fresh("prb")),
+        ProbeId.make(fresh("prb")),
+        ProbeId.make(fresh("prb")),
+      ];
+      const files = [
+        { path: ".keel/freshness.test.ts", text: "test('freshness', () => {});\n" },
+        { path: ".keel/support/actors.ts", text: "export const actors = [];\n" },
+      ];
+      const scope = { project: mine.project, audience: "public" } as const;
+      const opened = (probe: (conflictId: string) => EventEnvelope) => {
+        const conflictId = fresh("cfl");
+        return Effect.andThen(
+          views.arrive(mine.suspected(conflictId, fresh("chg"), fresh("chg"))),
+          views.arrive(probe(conflictId)),
+        );
+      };
+      return Effect.gen(function* () {
+        const kept = yield* (yield* ProbeStore).put(files.toReversed());
+        yield* opened((conflictId) => mine.probeDrafted(conflictId, probeId, kept));
+        yield* opened((conflictId) => mine.probeDrafted(conflictId, lost));
+        yield* opened((conflictId) => mine.probeDraftFailed(conflictId, undrafted));
+
+        expect(yield* readProbeSource(scope, probeId)).toEqual({
+          probeId,
+          bundleHash: kept,
+          files,
+        });
+        const gone = yield* readProbeSource(scope, lost);
+        expect(gone).toEqual({ probeId: lost, bundleHash: gone.bundleHash, files: [] });
+        expect(gone.bundleHash).toMatch(/^sha256:a{64}$/);
+        expect(yield* readProbeSource(scope, undrafted)).toEqual({ probeId: undrafted, files: [] });
+        expect(yield* Effect.flip(readProbeSource(scope, unknown))).toMatchObject({
+          _tag: "ProbeNotFound",
+          probeId: unknown,
+        });
+        expect(
+          yield* Effect.flip(readProbeSource({ ...scope, project: theirs.project }, probeId)),
+        ).toMatchObject({ _tag: "ProbeNotFound", probeId });
+      }).pipe(Effect.provide(Layer.mergeAll(views.layer, store.layer)));
+    },
+  );
+});

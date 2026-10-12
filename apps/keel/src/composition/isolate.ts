@@ -40,6 +40,7 @@ import { InboxRpc } from "../adapters/driven/do-rpc/inbox.ts";
 import { NotifierRpc } from "../adapters/driven/do-rpc/notifier.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { TokenIssuerJose } from "../adapters/driven/jose/token-issuer.ts";
+import { ProbeStoreR2 } from "../adapters/driven/r2/probe-store.ts";
 import { ClockLive, SystemLive } from "../adapters/driven/system.ts";
 import { makeApp } from "../adapters/driving/http/app.ts";
 import { gate, type GateDeps } from "../adapters/driving/http/gate.ts";
@@ -73,6 +74,7 @@ export function isolateLayer(
     overrides.inbox ?? InboxRpc(agentSession),
     overrides.eventFeed ?? EventFeedRpc(projector),
     ProjectViewsRpc(projector),
+    ProbeStoreR2(env.BUNDLES),
     overrides.notifier ?? NotifierRpc(agentSession),
     overrides.projects ?? ProjectsRpc(project),
     (overrides.enrolments ?? EnrolmentsRpc(agentSession)).pipe(Layer.provide(directory)),

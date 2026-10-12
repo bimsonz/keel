@@ -187,6 +187,7 @@ function drafting(
             expect(files.map((f) => f.path)).toEqual([".keel/freshness.test.ts"]);
             return probe;
           }),
+        get: () => Effect.die("drafting never reads a probe's source back"),
       }),
     ),
     Layer.succeed(

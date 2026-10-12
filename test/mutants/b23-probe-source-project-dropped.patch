@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/conflicts-read.test.ts
+# kills: b23.probe-source-audience
+# why: a probe's source is decided on the caller's own project whatever project it names, so a public project's probe cannot be read without a token or by a user
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index 91279af..eaa5235 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -196,7 +196,7 @@ export const RESOLVERS: Resolvers = {
+   Views_getVerdict: ownProject,
+   Conflicts_listConflicts: (input, caller) => projectOrOwn(input.project, caller),
+   Conflicts_getConflict: (input, caller) => projectOrOwn(input.project, caller),
+-  Probes_getProbeSource: (input, caller) => projectOrOwn(input.project, caller),
++  Probes_getProbeSource: ownProject,
+   Memory_listDecisions: ownProject,
+   Memory_getDecision: ownProject,
+   why: ownProject,

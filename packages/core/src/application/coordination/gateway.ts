@@ -21,11 +21,13 @@ import type {
 import {
   ChangeId,
   type ConflictId,
+  type ContentHash,
   type LeaseId,
+  type ProbeId,
   type ProjectId,
   type UserId,
 } from "../../domain/kernel/index.ts";
-import type { ConflictNotFound } from "../../domain/verification/index.ts";
+import type { ConflictNotFound, ProbeNotFound } from "../../domain/verification/index.ts";
 import {
   type ChangeListPage,
   type ChangeListRead,
@@ -38,6 +40,7 @@ import {
   type EventFeedEntry,
   type EventFeedPage,
   Inbox,
+  ProbeStore,
   ProjectViews,
   type SubmissionStatus,
   type ViewSnapshot,
@@ -301,6 +304,40 @@ export const readConflict: (
   conflictId: ConflictId,
 ) => Effect.Effect<ConflictRecord, ConflictNotFound, ProjectViews> = (scope, conflictId) =>
   ProjectViews.use((views) => views.conflict(scope.project, conflictId));
+
+/** A probe's source: the files of the bundle its last draft was kept under, by path. */
+export interface ProbeSource {
+  readonly probeId: ProbeId;
+  readonly bundleHash?: ContentHash;
+  readonly files: readonly { readonly path: string; readonly text: string }[];
+}
+
+const NO_FILES: ProbeSource["files"] = [];
+
+/**
+ * The source of a probe of the project the doorway authorised the read on.
+ * The Projector says which conflict the probe belongs to, and so the bundle
+ * its draft was kept under; the files come from the store the Probe Workflow
+ * wrote them to. A probe none of whose drafts compiled has no bundle and no
+ * files. A bundle the store no longer keeps leaves its hash and no files: the
+ * probe is there, its source is not. ProbeNotFound for a probe the project
+ * does not have, which is also a probe of another project.
+ */
+export const readProbeSource: (
+  scope: ProjectScope,
+  probeId: ProbeId,
+) => Effect.Effect<ProbeSource, ProbeNotFound, ProjectViews | ProbeStore> = (scope, probeId) =>
+  Effect.gen(function* () {
+    const views = yield* ProjectViews;
+    const { probe } = yield* views.probeConflict(scope.project, probeId);
+    const bundleHash = probe?.bundleHash;
+    if (bundleHash === undefined) return { probeId, files: NO_FILES };
+    const store = yield* ProbeStore;
+    const files = yield* store
+      .get(bundleHash)
+      .pipe(Effect.catchTag("BundleMissing", () => Effect.succeed(NO_FILES)));
+    return { probeId, bundleHash, files };
+  });
 
 /** A project's changes and trunk at the feed's head, with the cursor to fold forward from. */
 export const readSnapshot: (

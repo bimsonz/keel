@@ -2,7 +2,7 @@
 # kills: b23.conflicts-audience
 # why: an agent's read of one conflict is decided on its own project while the handler reads the project the query names, so an agent reads a private project's conflict by naming it
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-index f2b7817..9cdd0a2 100644
+index 91279af..056fbc5 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 @@ -195,7 +195,10 @@ export const RESOLVERS: Resolvers = {
@@ -14,14 +14,14 @@ index f2b7817..9cdd0a2 100644
 +    caller.principal._tag === "Agent"
 +      ? ownProject(input, caller)
 +      : projectOrOwn(input.project, caller),
+   Probes_getProbeSource: (input, caller) => projectOrOwn(input.project, caller),
    Memory_listDecisions: ownProject,
    Memory_getDecision: ownProject,
-   why: ownProject,
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
-index fd0dc84..8b742e4 100644
+index ca55324..49e4f93 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -463,7 +463,12 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, makeUser: MakeU
+@@ -471,7 +471,12 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, makeUser: MakeU
          Conflicts_getConflict: (caller: Caller, input: Input<"Conflicts_getConflict">) =>
            run(
              caller,

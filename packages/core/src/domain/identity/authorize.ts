@@ -79,6 +79,7 @@ export const SPEC_ACTIONS = {
   Views_listLanes: rule("Project", "read"),
   Conflicts_listConflicts: rule("Project", "read"),
   Conflicts_getConflict: rule("Project", "read"),
+  Probes_getProbeSource: rule("Project", "read"),
   Memory_listDecisions: rule("Project", "read"),
   Memory_getDecision: rule("Project", "read"),
   Inbox_listEvents: rule("Project", "read"),

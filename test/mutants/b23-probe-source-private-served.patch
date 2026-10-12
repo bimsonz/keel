@@ -1,0 +1,37 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/conflicts-read.test.ts
+# kills: b23.probe-source-audience
+# why: an agent's read of a probe's source is decided on its own project while the handler reads the project the query names, so an agent reads a private project's probe by naming it
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index 91279af..d34bc6b 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -196,7 +196,10 @@ export const RESOLVERS: Resolvers = {
+   Views_getVerdict: ownProject,
+   Conflicts_listConflicts: (input, caller) => projectOrOwn(input.project, caller),
+   Conflicts_getConflict: (input, caller) => projectOrOwn(input.project, caller),
+-  Probes_getProbeSource: (input, caller) => projectOrOwn(input.project, caller),
++  Probes_getProbeSource: (input, caller) =>
++    caller.principal._tag === "Agent"
++      ? ownProject(input, caller)
++      : projectOrOwn(input.project, caller),
+   Memory_listDecisions: ownProject,
+   Memory_getDecision: ownProject,
+   why: ownProject,
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index ca55324..4b8455c 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -481,7 +481,12 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, makeUser: MakeU
+         Probes_getProbeSource: (caller: Caller, input: Input<"Probes_getProbeSource">) =>
+           run(
+             caller,
+-            readProbeSource(scopeOf(caller), ProbeId.make(input.probeId)).pipe(
++            readProbeSource(
++              input.project === undefined
++                ? scopeOf(caller)
++                : { project: ProjectIdSchema.make(input.project), audience: "public" },
++              ProbeId.make(input.probeId),
++            ).pipe(
+               Effect.match({
+                 onSuccess: probeSourceOk,
+                 onFailure: (e) => probeNotFound(caller, e),

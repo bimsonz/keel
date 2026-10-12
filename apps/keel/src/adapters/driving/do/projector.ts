@@ -3,6 +3,7 @@ import {
   foldViews,
   listChanges,
   listConflicts,
+  probeConflict,
   readFeed,
   recordFeed,
   viewSnapshot,
@@ -16,6 +17,7 @@ import {
   ChangesRead,
   ConflictRead,
   ConflictsRead,
+  ProbeConflictRead,
   ProjectorCodecs,
   ProjectorRead,
   type ProjectorRpc,
@@ -111,5 +113,13 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
       Effect.flatMap(({ project, conflictId }) => conflictRecord(project, conflictId)),
     );
     return this.answer(ProjectorCodecs.conflict, program);
+  }
+
+  async probeConflict(request: typeof ProbeConflictRead.Encoded) {
+    const program = Schema.decodeUnknownEffect(ProbeConflictRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ project, probeId }) => probeConflict(project, probeId)),
+    );
+    return this.answer(ProjectorCodecs.probeConflict, program);
   }
 }

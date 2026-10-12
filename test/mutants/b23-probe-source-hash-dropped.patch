@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/conflicts-read.test.ts
+# kills: b23.probe-source
+# why: the served source leaves out the bundle's hash, so a reader cannot tell a probe never drafted from one whose bundle is gone, or match the source to the runs
+diff --git a/apps/keel/src/adapters/driving/http/views.ts b/apps/keel/src/adapters/driving/http/views.ts
+index 9c20dc4..9b6fe62 100644
+--- a/apps/keel/src/adapters/driving/http/views.ts
++++ b/apps/keel/src/adapters/driving/http/views.ts
+@@ -334,7 +334,6 @@ export function probeSourceOk(source: ProbeSource): Probes_getProbeSourceResult
+     status: 200,
+     body: {
+       probeId: source.probeId,
+-      ...(source.bundleHash === undefined ? {} : { bundleHash: source.bundleHash }),
+       files: source.files.map(({ path, text }) => ({ path, text })),
+     },
+   };

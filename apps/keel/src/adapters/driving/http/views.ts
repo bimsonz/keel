@@ -1,3 +1,4 @@
+import type { ProbeSource } from "@keeltown/core/application/coordination";
 import {
   type ConflictSide,
   isOpenConflict,
@@ -20,6 +21,7 @@ import type {
   Conflicts_getConflictResult,
   Conflicts_listConflictsResult,
   Inbox_getSnapshotResult,
+  Probes_getProbeSourceResult,
 } from "../../../generated/http/app.gen.ts";
 import { problem, type ProblemBody } from "./problems.ts";
 import { apiActions, type Input } from "./work-loop.ts";
@@ -319,6 +321,43 @@ export function conflictNotFound(
         {
           kind: "read",
           title: "List the project's conflicts",
+          operationId: "Conflicts_listConflicts",
+        },
+      ],
+    }),
+  };
+}
+
+/** A probe's source as the API serves it. */
+export function probeSourceOk(source: ProbeSource): Probes_getProbeSourceResult {
+  return {
+    status: 200,
+    body: {
+      probeId: source.probeId,
+      ...(source.bundleHash === undefined ? {} : { bundleHash: source.bundleHash }),
+      files: source.files.map(({ path, text }) => ({ path, text })),
+    },
+  };
+}
+
+/**
+ * A probe that is not in the project, with the way forward. The policy
+ * answers a probe of a project the caller may not see with this too
+ * (`refusalResult`), so a missing probe, a private project and an unknown one
+ * read alike.
+ */
+export function probeNotFound(
+  caller: { readonly requestId: string },
+  error: { readonly probeId: string },
+) {
+  return {
+    status: 404 as const,
+    body: problem(404, "probe.not_found", caller.requestId, {
+      detail: `No probe ${error.probeId} in that project.`,
+      nextActions: [
+        {
+          kind: "read",
+          title: "List the project's conflicts, each with its probe",
           operationId: "Conflicts_listConflicts",
         },
       ],

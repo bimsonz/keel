@@ -19,6 +19,7 @@ import {
   ConflictEscalated,
   DraftFailure,
   Probe,
+  type ProbeNotFound,
   ProbeOutcome,
   World,
   WorldCheck,
@@ -188,5 +189,10 @@ export class ProjectViews extends Context.Service<
       project: ProjectId,
       conflictId: ConflictId,
     ) => Effect.Effect<ConflictRecord, ConflictNotFound>;
+    /** The conflict a probe of the project belongs to. ProbeNotFound for a probe the project's feed has not seen drafted or discarded. */
+    readonly probeConflict: (
+      project: ProjectId,
+      probeId: ProbeId,
+    ) => Effect.Effect<ConflictRecord, ProbeNotFound>;
   }
 >()("keel/ProjectViews") {}

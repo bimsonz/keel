@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { ChangeId, ConflictId, EventEnvelope, ProjectId } from "@keeltown/core/kernel";
+import { ChangeId, ConflictId, EventEnvelope, ProbeId, ProjectId } from "@keeltown/core/kernel";
 import { ProjectViews } from "@keeltown/core/ports";
 import { Effect, type Layer, Schema } from "effect";
 
@@ -118,13 +118,22 @@ export function projectEvents(project: string = id("prj")) {
           },
         },
       } as { _tag: string }),
-    probeDrafted: (conflictId: string, probeId: string) =>
+    probeDrafted: (conflictId: string, probeId: string, bundleHash: string = BUNDLE) =>
       envelope({ kind: "probe", id: probeId }, {
         _tag: "ProbeDrafted",
         probeId,
         conflictId,
         attempts: 2,
-        bundleHash: BUNDLE,
+        bundleHash,
+      } as { _tag: string }),
+    /** A probe none of whose drafts compiled: it begins discarded, with no bundle. */
+    probeDraftFailed: (conflictId: string, probeId: string) =>
+      envelope({ kind: "probe", id: probeId }, {
+        _tag: "ProbeDiscarded",
+        probeId,
+        conflictId,
+        reason: "draft-failed",
+        detail: "no-propositions",
       } as { _tag: string }),
     probeRan: (conflictId: string, probeId: string, world: string, run: number, outcome: string) =>
       envelope({ kind: "probe", id: probeId }, {
@@ -427,6 +436,52 @@ export function describeProjectViewsContract(adapter: string, make: () => Projec
           expect(record.conflict.state).toBe("suspected");
           expect(record.runs).toEqual([]);
           expect(page.items.map((item) => item.conflict.id)).toEqual([conflictId]);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.live(
+      "[b23.probe-conflict] answers the conflict a probe belongs to, with the bundle its draft was kept under, in the probe's own project only",
+      () => {
+        const harness = make();
+        const mine = projectEvents();
+        const theirs = projectEvents();
+        const [conflictId, probeId] = [id("cfl"), ProbeId.make(id("prb"))];
+        const [failed, undrafted] = [id("cfl"), ProbeId.make(id("prb"))];
+        const unknown = ProbeId.make(id("prb"));
+        return Effect.gen(function* () {
+          const views = yield* ProjectViews;
+          yield* harness.arrive(theirs.suspected(id("cfl"), id("chg"), id("chg")));
+          yield* harness.arrive(mine.suspected(conflictId, id("chg"), id("chg")));
+          yield* harness.arrive(mine.probeDrafted(conflictId, probeId));
+          yield* harness.arrive(mine.suspected(failed, id("chg"), id("chg")));
+          yield* harness.arrive(mine.probeDraftFailed(failed, undrafted));
+
+          const drafted = yield* views.probeConflict(mine.project, probeId);
+          expect([
+            drafted.conflict.id,
+            drafted.labels.conflict,
+            drafted.probe?.id,
+            drafted.probe?.bundleHash,
+          ]).toEqual([conflictId, "C-1", probeId, BUNDLE]);
+          expect(drafted).toEqual(yield* views.conflict(mine.project, ConflictId.make(conflictId)));
+          // A probe that began discarded is found too, and names no bundle.
+          const discarded = yield* views.probeConflict(mine.project, undrafted);
+          expect([
+            discarded.conflict.id,
+            discarded.probe?.id,
+            discarded.probe?.state,
+            discarded.probe?.bundleHash,
+          ]).toEqual([failed, undrafted, "discarded", undefined]);
+          // Another project's feed has no such probe, and nor has this one for an id it never saw.
+          expect(yield* Effect.flip(views.probeConflict(theirs.project, probeId))).toMatchObject({
+            _tag: "ProbeNotFound",
+            probeId,
+          });
+          expect(yield* Effect.flip(views.probeConflict(mine.project, unknown))).toMatchObject({
+            _tag: "ProbeNotFound",
+            probeId: unknown,
+          });
         }).pipe(Effect.provide(harness.layer));
       },
     );

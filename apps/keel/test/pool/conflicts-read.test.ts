@@ -3,15 +3,23 @@
 // opens the conflict, its probe is drafted and run through the ledger, and the
 // events reach the real Projector over the fan-out. The audience cases place
 // a conflict's event on the Projector as an outbox delivers it, in a real
-// Project DO whose visibility a maintainer changes.
+// Project DO whose visibility a maintainer changes. A probe's source is read
+// from the real R2 bucket, written there as the Probe Workflow writes it.
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { conflictIdOf, worldCheckRan } from "@keeltown/core/application/coordination";
+import { conflictIdOf, probeDrafted, worldCheckRan } from "@keeltown/core/application/coordination";
 import { Proposition } from "@keeltown/core/domain/coordination";
-import { type EventEnvelope, EventEnvelope as Envelope, makeId } from "@keeltown/core/kernel";
-import { Schema } from "effect";
+import {
+  type ContentHash,
+  type EventEnvelope,
+  EventEnvelope as Envelope,
+  makeId,
+} from "@keeltown/core/kernel";
+import { ProbeStore } from "@keeltown/core/ports";
+import { Effect, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
+import { ProbeStoreR2 } from "../../src/adapters/driven/r2/probe-store.ts";
 import type { SubjectDO } from "../../src/adapters/driving/do/subject.ts";
 import { changeUnderTest, ok } from "./change-harness.ts";
 import {
@@ -84,6 +92,26 @@ interface ProblemBody {
   readonly code: string;
   readonly detail?: string;
 }
+interface SourceBody {
+  readonly probeId: string;
+  readonly bundleHash?: string;
+  readonly files: readonly { readonly path: string; readonly text: string }[];
+}
+
+/** A probe's files, in path order, as a draft leaves them. */
+const SOURCE = [
+  {
+    path: ".keel/freshness.test.ts",
+    text: "test('a session never outlives a request', () => {});\n",
+  },
+  { path: ".keel/support/actors.ts", text: "export const actors = ['holder', 'other'];\n" },
+];
+
+/** Keeps a probe's files in the real bucket, as the Probe Workflow's store does, and answers their hash. */
+const kept = (files: typeof SOURCE): Promise<ContentHash> =>
+  Effect.runPromise(
+    ProbeStore.use((store) => store.put(files)).pipe(Effect.provide(ProbeStoreR2(env.BUNDLES))),
+  );
 
 /** A GET through the doorway, with a bearer token or with none. */
 const get = (path: string, token?: string) =>
@@ -222,6 +250,115 @@ describe("[b23.conflicts-read] a project's conflicts over REST, from the Project
       [],
       [{ check: `suite:${b.changeId}`, run: 1, outcome: "fail", counts }],
     ]);
+  });
+});
+
+describe("[b23.probe-source] a probe's source over REST, from the bundle the store keeps", () => {
+  it("[b23.probe-source] a probe drafted through the ledger is read file by file from the bucket its bundle was written to", async () => {
+    await using probes = await inertProbe();
+    const projectId = makeId("prj", ulid());
+    const [a, b] = [
+      await changeUnderTest(projectId, "project"),
+      await changeUnderTest(projectId, "project"),
+    ];
+    ok(await a.declare(`declare-${a.changeId}`, { premises: [relied] }));
+    await drainOutbox(a.stub);
+    ok(await b.declare(`declare-${b.changeId}`, { declaredEffects: [cached] }));
+    await drainOutbox(b.stub);
+    const conflictId = conflictIdOf(projectId, {
+      premise: { holder: a.changeId, proposition: relied },
+      effect: { changeId: b.changeId, proposition: cached },
+    });
+    await vi.waitFor(async () => expect(await probes.get()).toHaveLength(1), WAIT);
+    const bundleHash = await kept(SOURCE.toReversed());
+    await runInDurableObject(subjectOf(projectId), async (instance: SubjectDO) => {
+      await instance["runtime"].runPromise(
+        probeDrafted(projectId, { conflictId, attempts: 1, bundleHash }),
+      );
+      await instance["armFlush"]();
+    });
+    await drainOutbox(subjectOf(projectId));
+    const probeId = await probeIdOf(projectId, conflictId);
+    const token = await tokenFor(await seedAgent({ projectId }));
+
+    const source = await vi.waitFor(async () => {
+      const response = await get(`/v1/probes/${probeId}/source`, token);
+      expect(response.status).toBe(200);
+      return response.json<SourceBody>();
+    }, WAIT);
+    expect(source).toEqual({ probeId, bundleHash, files: SOURCE });
+    // The conflict's own page names the same probe and bundle.
+    const detail = await (
+      await get(`/v1/conflicts/${conflictId}`, token)
+    ).json<{
+      readonly probe?: { readonly id: string; readonly bundleHash?: string };
+    }>();
+    expect(detail.probe).toMatchObject({ id: probeId, bundleHash });
+  });
+});
+
+describe("[b23.probe-source-audience] who may read a probe's source", () => {
+  it("[b23.probe-source-audience] a private project's probe is read by its own agent and a member of its org; outside the org it is the 404 of a probe that does not exist, and once the project is public anyone reads it", async () => {
+    const p = await project();
+    const [conflictId, probeId] = [makeId("cfl", ulid()), makeId("prb", ulid())];
+    const [lostConflict, lost] = [makeId("cfl", ulid()), makeId("prb", ulid())];
+    const bundleHash = await kept(SOURCE);
+    await arrive(
+      p.events.suspected(conflictId, makeId("chg", ulid()), makeId("chg", ulid())),
+      p.events.probeDrafted(conflictId, probeId, bundleHash),
+      p.events.suspected(lostConflict, makeId("chg", ulid()), makeId("chg", ulid())),
+      p.events.probeDrafted(lostConflict, lost),
+    );
+    const own = await tokenFor(await seedAgent({ projectId: p.projectId }));
+    const member = (await seedUser(uniqueHandle("member"))).token;
+    const neighbour = await tokenFor(await seedAgent({ projectId: makeId("prj", ulid()) }));
+    const outsider = await tokenFor(await seedForeignAgent());
+    const visitor = (await seedUser(uniqueHandle("visitor"), { org: OTHER_ORG })).token;
+    const nowhere = makeId("prj", ulid());
+    const one = (projectId: string, id: string = probeId) =>
+      `/v1/probes/${id}/source?project=${projectId}`;
+    const served = { probeId, bundleHash, files: SOURCE };
+
+    expect(await (await get(`/v1/probes/${probeId}/source`, own)).json<SourceBody>()).toEqual(
+      served,
+    );
+    expect(await (await get(one(p.projectId), member)).json<SourceBody>()).toEqual(served);
+    // A bundle the bucket does not keep: the probe is there, its source is not.
+    const gone = await (await get(one(p.projectId, lost), own)).json<SourceBody>();
+    expect(gone).toEqual({ probeId: lost, bundleHash: gone.bundleHash, files: [] });
+    expect(gone.bundleHash).toMatch(/^sha256:a{64}$/);
+
+    const hidden = await refusal(await get(one(p.projectId)));
+    expect(hidden).toEqual({
+      status: 404,
+      code: "probe.not_found",
+      detail: `No probe ${probeId} in that project.`,
+    });
+    expect([
+      await refusal(await get(one(nowhere))),
+      await refusal(await get(one(p.projectId), outsider)),
+      await refusal(await get(one(p.projectId), visitor)),
+      await refusal(await get(`/v1/probes/${probeId}/source`, neighbour)),
+      await refusal(await get(`/v1/probes/${probeId}/source`)),
+    ]).toEqual([hidden, hidden, hidden, hidden, hidden]);
+    expect(await refusal(await get(one(p.projectId, makeId("prb", ulid())), own))).toMatchObject({
+      status: 404,
+      code: "probe.not_found",
+    });
+    expect(await refusal(await get(one(p.projectId), neighbour))).toEqual({
+      status: 403,
+      code: "auth.forbidden",
+      detail: "Refused: foreign-project.",
+    });
+
+    await p.open();
+    expect(
+      await Promise.all(
+        [undefined, neighbour, outsider, visitor].map(async (token) =>
+          (await get(one(p.projectId), token)).json<SourceBody>(),
+        ),
+      ),
+    ).toEqual([served, served, served, served]);
   });
 });
 
