@@ -241,29 +241,8 @@ export function nameOf(who: Who): string {
 
 export type Account = ReturnType<typeof createAccount>;
 
-/**
- * The two calls that make a passkey for a new person. Keel reads a claim code on these and on nothing else, and
- * Better Auth's client lets a caller put a header on the second alone, so the code is put on both here.
- */
-const CLAIMED: ReadonlySet<string> = new Set([
-  "/v1/auth/passkey/generate-register-options",
-  "/v1/auth/passkey/verify-registration",
-]);
-
 export function createAccount(options: AccountOptions) {
   const send: typeof fetch = options.fetch ?? ((input, init) => fetch(input, init));
-  // A claim code is held here while the sign-up it was typed for is made, and nowhere else: not in storage, not
-  // in an address, not in anything written down. It is forgotten when that sign-up ends, either way.
-  let claiming: string | undefined;
-  const carrying: typeof fetch = (input, init) => {
-    if (claiming === undefined) return send(input, init);
-    const asked = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    if (!CLAIMED.has(new URL(asked, options.origin).pathname)) return send(input, init);
-    const headers = new Headers(input instanceof Request ? input.headers : undefined);
-    for (const [name, value] of new Headers(init?.headers)) headers.set(name, value);
-    headers.set("Keel-Claim", claiming);
-    return send(input, { ...init, headers });
-  };
   const client = createAuthClient({
     baseURL: options.origin,
     basePath: "/v1/auth",
@@ -274,7 +253,7 @@ export function createAccount(options: AccountOptions) {
       deviceAuthorizationClient(),
       organizationClient({ ac, roles }),
     ],
-    fetchOptions: { customFetchImpl: carrying },
+    fetchOptions: { customFetchImpl: send },
   });
 
   return {
@@ -297,16 +276,14 @@ export function createAccount(options: AccountOptions) {
 
     /**
      * Signs a new person up with a passkey made on this device, and in. The handle is theirs from the start: Keel
-     * makes the user only once the passkey verifies. `claim` is the code of whoever set this Keel up: it rides
-     * on the two calls that make the passkey, as the header Keel reads it from, and Keel says what it is worth.
+     * makes the user only once the passkey verifies. Everyone signs up this way, whoever set the Keel up included.
      */
-    async signUpWithPasskey(handle: string, claim?: string): Promise<Who> {
-      claiming = claim === undefined || claim === "" ? undefined : claim;
-      const answer = await client.passkey
-        .addPasskey({ name: handle, context: handle, createSession: true })
-        .finally(() => {
-          claiming = undefined;
-        });
+    async signUpWithPasskey(handle: string): Promise<Who> {
+      const answer = await client.passkey.addPasskey({
+        name: handle,
+        context: handle,
+        createSession: true,
+      });
       if (answer.error !== null) throw refusal(answer.error);
       const who = await this.who();
       if (who === null) throw new Refused("", "The passkey was made and no session came back");

@@ -136,7 +136,8 @@ export type CatalogueIsWhole = Assert<
 
 /**
  * One entry of Keel's log, as Keel publishes it: who it is about, its place in that entity's own sequence,
- * when, who caused it (`agent:<id>` or `operator:<by>`, absent when the platform did), the project, and the
+ * when, who caused it (`agent:<AgentId>` or `user:<UserId>`, absent when the platform did; `operator:<by>` is
+ * how a person was named before Keel had users, read in older entries and never written), the project, and the
  * short name Keel's Projector gave what the event created (#7, C-1, P-1, G-1, E-1, D-1). The console numbers
  * nothing itself. `type` tells the payload apart.
  */

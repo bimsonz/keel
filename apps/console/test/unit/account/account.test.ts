@@ -91,37 +91,6 @@ describe("who the page is, to Keel", () => {
     expect(await full.methods()).toEqual({ emailCode: true, github: false });
   });
 
-  it("[account.claim] carries a claim code on the call that begins a new person's passkey, on no other call, in no address, and forgets it", async () => {
-    const identity = createIdentity(ORIGIN, { emailCodes: false });
-    const account = createAccount({ origin: ORIGIN, fetch: browser(identity).serve });
-    const claimed = (): string[] =>
-      identity.requests
-        .filter((request) => request.headers.has("keel-claim"))
-        .map((request) => `${new URL(request.url).pathname} ${request.headers.get("keel-claim")}`);
-    await account.who();
-    await account.methods();
-    await account.handleIsFree("zach");
-    // No authenticator stands behind this test, so the sign-up ends at the browser's own part of it. The call
-    // before that part was made, and it is the one seen here; the browser checks see the one after it too.
-    // A read the page makes while that sign-up is under way is not part of it, and carries nothing.
-    const signingUp = account.signUpWithPasskey("zach", "the-claim-code").catch(() => undefined);
-    await account.who();
-    await signingUp;
-    expect(claimed()).toEqual(["/v1/auth/passkey/generate-register-options the-claim-code"]);
-    // Once that sign-up has ended, nothing carries the code: not the next read, not a passkey added from the
-    // settings, which begins with the same call, and not the next sign-up.
-    await account.who();
-    await account.handleIsFree("zach");
-    await account.addPasskey("a second device").catch(() => undefined);
-    await account.signUpWithPasskey("zach").catch(() => undefined);
-    expect(claimed()).toEqual(["/v1/auth/passkey/generate-register-options the-claim-code"]);
-    const begun = identity.requests.filter((request) =>
-      request.url.includes("/passkey/generate-register-options"),
-    );
-    expect(begun).toHaveLength(3);
-    expect(identity.requests.some((request) => request.url.includes("the-claim-code"))).toBe(false);
-  });
-
   it("[account.placeholder] gives a page no address for a user who has none, though Keel keeps one that can never receive mail", async () => {
     // A user who signed up with a passkey alone is kept by Keel under an address in a domain that does not exist.
     const { tab, account, who } = await signedUp("ada@users.keel.invalid");

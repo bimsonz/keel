@@ -66,10 +66,6 @@ function handleError(handle: string, taken: boolean): { error: string } | Record
 function PasskeySignUp({ account, next }: { account: Account; next: string }) {
   const [handle, setHandle] = useState("");
   const [taken, setTaken] = useState(false);
-  // `/signup?claim` is where whoever set this Keel up makes its first account. The code is typed, never in an
-  // address, and is kept only in this field until it is sent.
-  const claiming = new URLSearchParams(window.location.search).has("claim");
-  const [claim, setClaim] = useState("");
   const { busy, refused, ask } = useAsking();
   const create = (event: FormEvent) => {
     event.preventDefault();
@@ -78,11 +74,7 @@ function PasskeySignUp({ account, next }: { account: Account; next: string }) {
         setTaken(true);
         return;
       }
-      try {
-        await account.signUpWithPasskey(handle, claiming ? claim : undefined);
-      } finally {
-        setClaim("");
-      }
+      await account.signUpWithPasskey(handle);
       go(next);
     });
   };
@@ -103,24 +95,11 @@ function PasskeySignUp({ account, next }: { account: Account; next: string }) {
           setHandle(event.target.value.toLowerCase());
         }}
       />
-      {claiming && (
-        <Input
-          label="Claim code"
-          name="claim"
-          type="password"
-          autoComplete="off"
-          spellCheck={false}
-          required
-          value={claim}
-          description="The code this Keel gave whoever set it up. It is used once, with the account made here."
-          onChange={(event) => setClaim(event.target.value)}
-        />
-      )}
       <Button
         className="w-full justify-center"
         type="submit"
         variant="primary"
-        disabled={busy || !HANDLE.test(handle) || (claiming && claim === "")}
+        disabled={busy || !HANDLE.test(handle)}
       >
         Create your account with a passkey
       </Button>

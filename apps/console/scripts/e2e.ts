@@ -1500,8 +1500,6 @@ const shut = createFakeKeel({ org: ORG, visibility: "private", readerOf, ahead: 
 interface Sent {
   path: string;
   authorization: string | undefined;
-  /** The claim code, where a request carried one. */
-  claim: string | undefined;
 }
 
 interface Deployed {
@@ -1535,7 +1533,6 @@ async function asDeployed(context: BrowserContext, deployed: Deployed): Promise<
     sent.push({
       path: pathname,
       authorization: headers["authorization"],
-      claim: headers["keel-claim"],
     });
     const posted = request.postData();
     const asked = new Request(request.url(), {
@@ -2799,87 +2796,6 @@ expectEqual(
   "0",
 );
 await door.close();
-
-// Whoever set a Keel up makes its first account at /signup?claim, with the code they were given. The code is typed,
-// and rides on the two passkey calls and on nothing else. Once the sign-up has ended the page holds it nowhere.
-const CLAIM = "a-claim-code-for-this-run-only";
-const founding = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-const sentClaiming: Sent[] = [];
-await asDeployed(founding, { keel: open, identity: passkeysAlone, sent: sentClaiming });
-const founder = watch(await founding.newPage(), "account, the claim");
-const foundersKey = await founding.newCDPSession(founder);
-await foundersKey.send("WebAuthn.enable");
-await foundersKey.send("WebAuthn.addVirtualAuthenticator", {
-  options: {
-    protocol: "ctap2",
-    transport: "internal",
-    hasResidentKey: true,
-    hasUserVerification: true,
-    isUserVerified: true,
-    automaticPresenceSimulation: true,
-  },
-});
-const withTheCode = (): string =>
-  sentClaiming
-    .filter((request) => request.claim !== undefined)
-    .map(
-      (request) =>
-        `${request.path.replace("/v1/auth/passkey/", "")}${request.claim === CLAIM ? "" : " with another code"}`,
-    )
-    .join(" ");
-await founder.goto(`${built}/signup`, { waitUntil: "domcontentloaded" });
-await founder.getByLabel("Handle").waitFor();
-expectEqual(
-  "claim: a sign-up page nobody asked a claim of has no field for one",
-  String(await founder.getByLabel("Claim code").count()),
-  "0",
-);
-await founder.goto(`${built}/signup?claim`, { waitUntil: "domcontentloaded" });
-await founder.getByLabel("Claim code").waitFor();
-await founder.getByLabel("Handle").fill("lamarr");
-expectEqual(
-  "claim: with no code typed, there is no account to make",
-  String(
-    await founder.getByRole("button", { name: "Create your account with a passkey" }).isDisabled(),
-  ),
-  "true",
-);
-await founder.getByLabel("Claim code").fill(CLAIM);
-await shot(founder, "signup-claim");
-await founder.getByRole("button", { name: "Create your account with a passkey" }).click();
-// Signed up or not, the page ends somewhere with a heading: the checks below say which.
-await founder.waitForURL(`${built}/`, { timeout: 10_000 }).catch(() => undefined);
-expectEqual(
-  "claim: the code rode on both passkey calls, and on nothing else",
-  withTheCode(),
-  "generate-register-options verify-registration",
-);
-await founder.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
-await founder.getByRole("heading", { name: "Your account" }).waitFor();
-await founder.getByRole("list", { name: "Your passkeys" }).getByRole("listitem").first().waitFor();
-expectEqual(
-  "claim: the account is made, and once it is nothing more carries the code",
-  `${squash(await founder.locator("main header").innerText())} | ${withTheCode()}`,
-  "Your account lamarr | generate-register-options verify-registration",
-);
-expectEqual(
-  "claim: and the page keeps it in no storage and no address",
-  String(
-    await founder.evaluate(
-      (code) =>
-        JSON.stringify([
-          Object.entries(window.localStorage),
-          Object.entries(window.sessionStorage),
-          document.cookie,
-          window.location.href,
-          window.history.state,
-        ]).includes(code),
-      CLAIM,
-    ),
-  ),
-  "false",
-);
-await founding.close();
 
 // Where Keel serves no identity yet, the pages say so, and take nobody for a visitor to be signed up.
 const early = await browser.newContext({ viewport: { width: 1280, height: 900 } });

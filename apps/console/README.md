@@ -32,7 +32,6 @@ Keel's users sign up and sign in through Better Auth, which Keel mounts at `/v1/
 
 | Address | What it is |
 |---|---|
-| `/signup?claim` | Where whoever set a Keel up makes its first account: the same page with a "Claim code" field. The code is typed, never in an address. It rides as `Keel-Claim` on the two passkey calls and on nothing else, and the page keeps it nowhere once the sign-up has ended |
 | `/signup`, `/login` | A passkey, always: a new person signs up with a handle and a passkey made on their own device, and is asked for no address. A code sent by email and GitHub are shown only where this Keel offers them; someone who signs up by one of those chooses their handle next. The handle is their name on this Keel, and their own projects live under it. Signing up says nothing of an org: a person needs none |
 | `/settings` | The user's passkeys, and signing out here or everywhere else |
 | `/device` | Approving a terminal that is running `keeltown login`, by the code it shows |
@@ -160,8 +159,7 @@ It drives the pages on the fixtures the dev server serves (every tab and row a l
 - **someone signed in who is no member, on a public project**: told of its questions what a visitor is;
 - **a visitor, and someone signed in who is no member, on a private project**: both are told what they are told of a project that is not there;
 - **a member**: her org's home lists the project, the frame drops down on the org and on the project, the QR code beside a question says the question's own address, and her answer reaches Keel as its own operation with no credential of the page's;
-- **an owner, on the project's settings**: the tab is offered to her and not to a visitor, making the project public waits for its whole name, Keel is sent the settings whole with that one field changed, a visitor then reads the project and is refused its settings in Keel's word, and one click makes it private again;
-- **the claim**: the code rides on the two passkey calls and on nothing else, and is in no storage and no address afterwards.
+- **an owner, on the project's settings**: the tab is offered to her and not to a visitor, making the project public waits for its whole name, Keel is sent the settings whole with that one field changed, a visitor then reads the project and is refused its settings in Keel's word, and one click makes it private again.
 
 The dev server goes on serving the old version of a file that a script has written, so restart it before running this after an edit.
 
