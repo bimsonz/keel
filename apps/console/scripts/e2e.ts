@@ -1459,6 +1459,24 @@ expectEqual(
 if ((process.env["SHOTS"] ?? "") !== "")
   await presenter.screenshot({ path: `${process.env["SHOTS"] ?? "."}/switcher.png` });
 await presenter.keyboard.press("Escape");
+// A file's address costs Keel one read of the file: the page does not first ask for it as a directory and wait
+// to be refused.
+const beforeTheFile = keel.calls.length;
+await presenter.goto(`${built}/demo/blob/trunk/src/authz/check.ts`, {
+  waitUntil: "domcontentloaded",
+});
+await presenter.locator(".a-code").first().waitFor({ timeout: 10_000 });
+expectEqual(
+  "presenter: a file's address asks Keel for the file, and never for a directory of its name",
+  keel.calls
+    .slice(beforeTheFile)
+    .filter((call) => new URLSearchParams(call.query).get("path") === "src/authz/check.ts")
+    .map((call) => call.path.split("/").at(-1))
+    .join(" "),
+  "blob",
+);
+await presenter.goto(`${built}/demo`, { waitUntil: "domcontentloaded" });
+await presenter.locator(".a-prose h2").first().waitFor();
 // Keel has no clone address to give yet, and the console makes none up.
 expectEqual(
   "presenter: no clone address is made up",

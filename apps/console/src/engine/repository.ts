@@ -17,6 +17,8 @@ export interface RepoAddress {
   ref?: string;
   /** A directory or a file, from the root. The root is the empty path. */
   path: string;
+  /** What the address says the path is. Only Keel knows; this is what whoever made the link saw there. */
+  kind?: "tree" | "blob";
   /** In the history: the commit whose diff is open. */
   commit?: string;
 }
@@ -109,7 +111,7 @@ export class RepositoryReader {
       });
     });
     if (address.view === "code") {
-      this.#wantPath(id, ref, address.path);
+      this.#wantPath(id, ref, address.path, address.kind ?? "tree");
       if (address.path !== "") {
         const parts = address.path.split("/");
         for (const directory of [
@@ -151,29 +153,14 @@ export class RepositoryReader {
     this.resolved.set(this.keyOf(ref, ""), tree.commit);
   }
 
-  #wantPath(id: string, ref: string, path: string): void {
+  #wantPath(id: string, ref: string, path: string, first: "tree" | "blob"): void {
     const key = this.keyOf(ref, path);
     const at = { ...(ref === HEAD ? {} : { ref }), path };
-    // A path is a directory or a file, and only Keel knows which. A directory is tried first: Keel answers a
-    // tree read of a file's path with its own code for a path that is not there, and the file is read then.
-    this.#once(`path ${key}`, async () => {
-      try {
-        this.#keep(key, ref, await this.#source.getTree(id, at));
-        return;
-      } catch (error) {
-        // No such project for this reader is the answer to every read of it. Nothing more is asked.
-        if (error instanceof RepoRefused && error.code === NO_SUCH_PROJECT) {
-          this.#refused.add(id);
-          return;
-        }
-      }
-      let blob: RepoBlob;
-      try {
-        blob = await this.#source.getBlob(id, at);
-      } catch {
-        this.absent.add(key);
-        return;
-      }
+    const asDirectory = async (): Promise<void> => {
+      this.#keep(key, ref, await this.#source.getTree(id, at));
+    };
+    const asFile = async (): Promise<void> => {
+      const blob: RepoBlob = await this.#source.getBlob(id, at);
       // A file whose notes cannot be read is still a file, and Keel has no notes to read yet.
       const notes =
         (await this.#source.getNotes?.(at).then(
@@ -184,6 +171,25 @@ export class RepositoryReader {
       this.blobs.set(key, blob);
       this.notes.set(key, notes);
       this.resolved.set(this.keyOf(ref, ""), blob.commit);
+    };
+    // A path is a directory or a file, and only Keel knows which. What the address says it is is asked for
+    // first, so a link to a file costs one read and not a refused one before it. Keel answers the wrong kind
+    // of read with its own code for a path that is not there, and the other kind is read then.
+    this.#once(`path ${key}`, async () => {
+      for (const read of first === "blob" ? [asFile, asDirectory] : [asDirectory, asFile]) {
+        try {
+          // oxlint-disable-next-line no-await-in-loop -- the second read is asked only once Keel has refused the first
+          await read();
+          return;
+        } catch (error) {
+          // No such project for this reader is the answer to every read of it. Nothing more is asked.
+          if (error instanceof RepoRefused && error.code === NO_SUCH_PROJECT) {
+            this.#refused.add(id);
+            return;
+          }
+        }
+      }
+      this.absent.add(key);
     });
     // A directory's README is shown beneath it.
     const readme = this.trees

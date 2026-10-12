@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/repository.test.ts
+# kills: repository.file-first
+# why: a link to a file is read as a directory first, so every file costs Keel a refused read before the real one
+diff --git a/apps/console/src/engine/repository.ts b/apps/console/src/engine/repository.ts
+index 7a33992..48fc359 100644
+--- a/apps/console/src/engine/repository.ts
++++ b/apps/console/src/engine/repository.ts
+@@ -176,7 +176,7 @@ export class RepositoryReader {
+     // first, so a link to a file costs one read and not a refused one before it. Keel answers the wrong kind
+     // of read with its own code for a path that is not there, and the other kind is read then.
+     this.#once(`path ${key}`, async () => {
+-      for (const read of first === "blob" ? [asFile, asDirectory] : [asDirectory, asFile]) {
++      for (const read of [asDirectory, asFile]) {
+         try {
+           // oxlint-disable-next-line no-await-in-loop -- the second read is asked only once Keel has refused the first
+           await read();

@@ -15,7 +15,7 @@ function addressOf(route: CodeRoute): RepoAddress {
   const at = route.ref === TRUNK ? {} : { ref: route.ref };
   return route.at === "commits"
     ? { view: "history", path: "", ...at }
-    : { view: "code", path: route.path, ...at };
+    : { view: "code", path: route.path, kind: route.kind, ...at };
 }
 
 /** True where `directory` is `path`, or on the way to it. */

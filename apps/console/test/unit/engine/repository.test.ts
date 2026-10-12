@@ -71,6 +71,26 @@ const ready = (state: RepositoryState): Extract<RepositoryState, { status: "read
   return state;
 };
 
+/** What Keel is asked about a path itself when an address is opened cold, and what the view then shows there. */
+const reads = async (address: RepoAddress): Promise<{ asked: string[]; kind: string }> => {
+  const source = createMockSource({ scenario: "s1", seed: 42 });
+  const asked: string[] = [];
+  const counting: typeof source = {
+    ...source,
+    getTree: (id, at) => (asked.push(`tree ${at.path}`), source.getTree(id, at)),
+    getBlob: (id, at) => (asked.push(`blob ${at.path}`), source.getBlob(id, at)),
+  };
+  const player = showing(counting);
+  await player.load();
+  player.seek(700_000);
+  const state = await shown(player, address);
+  // Only the reads of the path itself: the directories on the way to it are read beside it either way.
+  return {
+    asked: asked.filter((read) => read.endsWith(` ${address.path}`)),
+    kind: ready(state).view.kind,
+  };
+};
+
 describe("the repository view", () => {
   it("opens on the project: its name, where to clone it, trunk's head, and the root with its README beneath", async () => {
     const player = await playerAt("s1", 700);
@@ -335,6 +355,28 @@ describe("the repository view", () => {
       "tree src/authz",
       "blob src/authz/check.ts",
     ]);
+  });
+
+  it("[repository.file-first] asks for what the address says the path is, and for the other kind only when Keel refuses that", async () => {
+    // A link to a file: one read, and no refused directory read before it.
+    expect(await reads({ view: "code", path: "src/authz/check.ts", kind: "blob" })).toEqual({
+      asked: ["blob src/authz/check.ts"],
+      kind: "file",
+    });
+    // A link to a directory: one read.
+    expect(await reads({ view: "code", path: "src/authz", kind: "tree" })).toEqual({
+      asked: ["tree src/authz"],
+      kind: "tree",
+    });
+    // An address that is wrong about what is there still shows it: Keel refuses, and the other kind is read.
+    expect(await reads({ view: "code", path: "src/authz/check.ts", kind: "tree" })).toEqual({
+      asked: ["tree src/authz/check.ts", "blob src/authz/check.ts"],
+      kind: "file",
+    });
+    expect(await reads({ view: "code", path: "src/authz", kind: "blob" })).toEqual({
+      asked: ["blob src/authz", "tree src/authz"],
+      kind: "tree",
+    });
   });
 
   it("[repository.unknown] says what it cannot show: a project it cannot look up, and one there is no code for", async () => {
