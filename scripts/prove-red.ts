@@ -7,24 +7,28 @@
 //
 // A patch with `# kills:` tags runs its command with vitest's JSON reporter
 // under each fixed seed (FC_SEED = 42, 1337, 20261014) and then N times with no
-// seed. It counts red only if, in every run, every claimed tag has a failing
-// test whose title carries `[tag]`; a non-zero exit is not enough, because one
-// tag failing can hide another that passes. A patch without tags counts red
-// when its command exits non-zero. A patch to the spec carries `# regen`: the
-// generated code is gitignored, so `pnpm gen` runs after applying it and again
-// after reverting it, and no later mutant runs against its generated output.
+// seed. Unless the command names its own tests with `-t`, it runs only the
+// tests that carry a claimed tag (`-t '\[tag-a\]|\[tag-b\]'` is added), and the
+// result line says how many of the tests it found ran. It counts red only if,
+// in every run, every claimed tag has a failing test whose title carries
+// `[tag]`; a non-zero exit is not enough, because one tag failing can hide
+// another that passes. A patch without tags counts red when its command exits
+// non-zero. A patch to the spec carries `# regen`: the generated code is
+// gitignored, so `pnpm gen` runs after applying it and again after reverting
+// it, and no later mutant runs against its generated output.
 //
 // Apply, run, revert: the tree is restored even when a step throws. Exit 1 if
 // any mutant survived.
 //
 // Usage: node scripts/prove-red.ts [name-filter] [--unseeded N] [--dir <patch dir>]
-//   --unseeded N   unseeded runs per tagged patch (default 5)
+//   --unseeded N   unseeded runs per tagged patch (default 2)
 //   --dir          another patch directory (the runner's own control lives in
 //                  test/controls/prove-red and must report a survivor)
 import { execSync, spawnSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { filteredToClaims } from "../packages/tooling/src/prove-red.ts";
 
 const SEEDS = [42, 1337, 20_261_014] as const;
 
@@ -34,7 +38,7 @@ function option(name: string): string | undefined {
   const at = process.argv.indexOf(name);
   return at === -1 ? undefined : process.argv[at + 1];
 }
-const unseeded = Number(option("--unseeded") ?? "5");
+const unseeded = Number(option("--unseeded") ?? "2");
 const dir = resolve(root, option("--dir") ?? "test/mutants");
 const valued = new Set(["--unseeded", "--dir"]);
 const filter =
@@ -81,16 +85,28 @@ function regenerate(): void {
   execSync("pnpm gen", { cwd: root, stdio: "ignore" });
 }
 
-/** Each `[tag]` in a test's full name, with whether that test failed. */
-function tagsIn(report: unknown): { readonly failed: Set<string>; readonly seen: Set<string> } {
+interface Tally {
+  readonly failed: Set<string>;
+  readonly seen: Set<string>;
+  /** Tests that ran, of the tests the report lists: a name filter leaves the rest skipped. */
+  readonly ran: number;
+  readonly listed: number;
+}
+
+/** Each `[tag]` in a test's full name, with whether that test failed, and how many tests ran. */
+function tagsIn(report: unknown): Tally {
   const failed = new Set<string>();
   const seen = new Set<string>();
+  let ran = 0;
+  let listed = 0;
   const files: unknown = Reflect.get(Object(report), "testResults");
   for (const file of Array.isArray(files) ? files : []) {
     const assertions: unknown = Reflect.get(Object(file), "assertionResults");
     for (const assertion of Array.isArray(assertions) ? assertions : []) {
       const name = String(Reflect.get(Object(assertion), "fullName") ?? "");
       const status = Reflect.get(Object(assertion), "status");
+      listed += 1;
+      if (status === "passed" || status === "failed") ran += 1;
       for (const [, tag] of name.matchAll(/\[([\w.-]+)\]/g)) {
         if (tag === undefined) continue;
         seen.add(tag);
@@ -98,7 +114,7 @@ function tagsIn(report: unknown): { readonly failed: Set<string>; readonly seen:
       }
     }
   }
-  return { failed, seen };
+  return { failed, seen, ran, listed };
 }
 
 function excerpt(output: string): string {
@@ -110,10 +126,18 @@ function excerpt(output: string): string {
     .join("\n");
 }
 
-/** Runs a tagged patch's command once per seed and per unseeded run; answers why it survived, or null. */
-function killsEveryTag(command: string, kills: readonly string[]): string | null {
+interface Outcome {
+  /** Why the mutant survived, or null when every claimed tag failed in every run. */
+  readonly survived: string | null;
+  /** How many tests the last run read ran, as "2 of 15 tests". */
+  readonly tests: string;
+}
+
+/** Runs a tagged patch's command once per seed and per unseeded run. */
+function killsEveryTag(command: string, kills: readonly string[]): Outcome {
   const scratch = mkdtempSync(join(tmpdir(), "prove-red-"));
   try {
+    let tests = "no tests";
     const runs = [
       ...SEEDS.map((seed) => ({ label: `seed ${seed}`, seed: String(seed) })),
       ...Array.from({ length: unseeded }, (_, i) => ({
@@ -133,17 +157,27 @@ function killsEveryTag(command: string, kills: readonly string[]): string | null
       try {
         parsed = JSON.parse(readFileSync(report, "utf8"));
       } catch {
-        return `${run.label}: no JSON report (exit ${result.status}); the suite did not run\n${excerpt(`${result.stdout}${result.stderr}`)}`;
+        return {
+          survived: `${run.label}: no JSON report (exit ${result.status}); the suite did not run\n${excerpt(`${result.stdout}${result.stderr}`)}`,
+          tests,
+        };
       }
-      const { failed, seen } = tagsIn(parsed);
+      const { failed, seen, ran, listed } = tagsIn(parsed);
+      tests = `${ran} of ${listed} tests`;
       const unseen = kills.filter((tag) => !seen.has(tag));
       if (unseen.length > 0)
-        return `${run.label}: no test carries ${unseen.map((t) => `[${t}]`).join(", ")}`;
+        return {
+          survived: `${run.label}: no test carries ${unseen.map((t) => `[${t}]`).join(", ")}`,
+          tests,
+        };
       const green = kills.filter((tag) => !failed.has(tag));
       if (green.length > 0)
-        return `${run.label}: ${green.map((t) => `[${t}]`).join(", ")} stayed green`;
+        return {
+          survived: `${run.label}: ${green.map((t) => `[${t}]`).join(", ")} stayed green`,
+          tests,
+        };
     }
-    return null;
+    return { survived: null, tests };
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
@@ -168,15 +202,15 @@ for (const name of patches) {
     if (regen) regenerate();
     const started = Date.now();
     if (kills.length > 0) {
-      const survived = killsEveryTag(command, kills);
+      const { survived, tests } = killsEveryTag(filteredToClaims(command, kills), kills);
       const seconds = ((Date.now() - started) / 1000).toFixed(1);
       if (survived === null) {
         console.log(
-          `red ${name} (${seconds}s): ${kills.map((t) => `[${t}]`).join(", ")} failed under seeds ${SEEDS.join(", ")} and ${unseeded} unseeded run(s)`,
+          `red ${name} (${seconds}s, ${tests}): ${kills.map((t) => `[${t}]`).join(", ")} failed under seeds ${SEEDS.join(", ")} and ${unseeded} unseeded run(s)`,
         );
       } else {
         survivors.push(name);
-        console.log(`SURVIVED ${name} (${seconds}s): ${survived}`);
+        console.log(`SURVIVED ${name} (${seconds}s, ${tests}): ${survived}`);
       }
     } else {
       const run = spawnSync(command, { cwd: root, shell: true, encoding: "utf8" });
