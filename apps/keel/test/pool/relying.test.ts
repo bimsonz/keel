@@ -4,11 +4,7 @@
 // fan-out. The doorways are REST and MCP, from the deployed fetch handler.
 import { runInDurableObject } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
-import {
-  PROBE_WORKFLOW,
-  subjectAddress,
-  subjectIdOf,
-} from "@keeltown/core/application/coordination";
+import { subjectAddress, subjectIdOf } from "@keeltown/core/application/coordination";
 import { Proposition, SubjectKey } from "@keeltown/core/domain/coordination";
 import { type EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
 import { EventOutbox } from "@keeltown/core/ports";
@@ -17,16 +13,8 @@ import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
 import type { SubjectDO } from "../../src/adapters/driving/do/subject.ts";
 import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
-import {
-  BASE,
-  drainAfter,
-  drainOutbox,
-  forgetOwed,
-  mcp,
-  mcpResult,
-  seedAgent,
-  tokenFor,
-} from "./helpers.ts";
+import { BASE, drainAfter, drainOutbox, mcp, mcpResult, seedAgent, tokenFor } from "./helpers.ts";
+import { inertProbe } from "./inert-probe.ts";
 
 const key = (value: string) => Schema.decodeUnknownSync(SubjectKey)(value);
 const LEAF = key("authz.permission-evaluation");
@@ -156,6 +144,7 @@ describe("[b21.relying-subscribes] a declared premise reaches its subject and th
 
 describe("[b21.rely] relying on a premise through the doorways", () => {
   it("[b21.rely] REST adds the premise at the next revision with its preflight, MCP's retry with the key answers the same, and the subject relies it", async () => {
+    await using probes = await inertProbe();
     const { projectId, token, change } = await project();
     const b = await change();
     ok(await b.declare("declare-b", { declaredEffects: [cachedPerSession] }));
@@ -198,8 +187,11 @@ describe("[b21.rely] relying on a premise through the doorways", () => {
       },
       { timeout: 10_000, interval: 50 },
     );
-    // A's premise against B's effect opens a conflict here, and its Probe has no route yet.
-    await forgetOwed(subjectStub(projectId, LEAF), PROBE_WORKFLOW);
+    // A's premise against B's effect opens a conflict here: the fan-out starts its Probe, held inert.
+    await vi.waitFor(async () => expect(await probes.get()).toHaveLength(1), {
+      timeout: 10_000,
+      interval: 50,
+    });
   });
 
   it("[b21.rely] refuses another lease as 409 change.lease_stale, and relies nothing", async () => {

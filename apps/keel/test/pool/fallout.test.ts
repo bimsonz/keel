@@ -13,10 +13,11 @@ import { type EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kerne
 import { EventOutbox } from "@keeltown/core/ports";
 import { Effect, Schema } from "effect";
 import { ulid } from "ulid";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { SubjectDO } from "../../src/adapters/driving/do/subject.ts";
 import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
-import { BASE, drainAfter, drainOutbox, forgetOwed, seedAgent, tokenFor } from "./helpers.ts";
+import { BASE, drainAfter, drainOutbox, seedAgent, tokenFor } from "./helpers.ts";
+import { inertProbe } from "./inert-probe.ts";
 
 const key = (value: string) => Schema.decodeUnknownSync(SubjectKey)(value);
 const LEAF = key("authz.permission-evaluation");
@@ -77,6 +78,7 @@ const suspected = (notices: readonly { kind: string }[]) =>
 describe("[b21.fallout-race] a premise and an effect that breaks it, in either order", () => {
   for (const order of ["premise first", "effect first"] as const)
     it(`[b21.fallout-race] [b21.probe-start] [b21.conflict-subject-key] ${order}: one conflict, its id from the pair, at the leaf only, with the Probe Workflow and both parties notified`, async () => {
+      await using probes = await inertProbe();
       const { projectId, change } = await project();
       const [a, b] = [await change(), await change()];
       if (order === "premise first") {
@@ -107,7 +109,11 @@ describe("[b21.fallout-race] a premise and an effect that breaks it, in either o
       expect(opened?.notified).toEqual(
         expect.arrayContaining([PROBE_WORKFLOW, `change:${a.changeId}`, `change:${b.changeId}`]),
       );
-      await forgetOwed(subjectStub(projectId, LEAF), PROBE_WORKFLOW);
+      // The fan-out starts the conflict's Probe, held inert here.
+      await vi.waitFor(async () => expect(await probes.get()).toHaveLength(1), {
+        timeout: 10_000,
+        interval: 50,
+      });
     });
 });
 

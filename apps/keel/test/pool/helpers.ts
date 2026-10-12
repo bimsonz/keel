@@ -175,9 +175,9 @@ export async function drainRegistered(): Promise<void> {
 }
 
 /**
- * Drops what `stub` owes `subscriber`. The fan-out routes no Probe Workflow
- * yet, so a delivery to one stays owed and its object's
- * outbox would never go quiet.
+ * Drops what `stub` owes `subscriber`: a waiting Workflow instance a test
+ * names without running it. A send to an instance that does not exist fails,
+ * so the delivery stays owed and its object's outbox would never go quiet.
  */
 export const forgetOwed = (stub: DurableObjectStub, subscriber: string) =>
   runInDurableObject(stub, (_instance: unknown, state) => {
