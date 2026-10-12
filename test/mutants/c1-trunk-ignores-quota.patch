@@ -2,16 +2,16 @@
 # kills: trunk.refused-quota
 # why: A pack the org's quota refused is pushed all the same, so the quota bounds nothing
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index cf9cea3..fa60ccf 100644
+index f4e7f68..13b1310 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
 @@ -459,8 +459,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
-       const answer = yield* Effect.result(
-         usage.admit(org, REPO_BYTES, bytes, `promotion:${target}`),
-       );
--      if (Result.isFailure(answer)) refused = "repo-bytes-quota";
--      else admitted = bytes;
-+      admitted = bytes;
-     }
+   else {
+     const bytes = weighed.success - PACK_OVERHEAD_BYTES;
+     const answer = yield* Effect.result(usage.admit(org, REPO_BYTES, bytes, `promotion:${target}`));
+-    if (Result.isFailure(answer)) refused = "repo-bytes-quota";
+-    else admitted = bytes;
++    admitted = bytes;
    }
    if (refused === undefined) {
+     const pushed = yield* Effect.result(writer.push(trunk.wal.old, target));

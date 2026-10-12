@@ -1,15 +1,31 @@
-// What a test gives a real WorkspacePool object before it configures it. A
-// pool with a ready workspace asks its project's Trunk DO for trunk's head,
-// to keep its workspaces on it; a test that stocks a pool for a project with
-// no trunk of its own gives the object one here, as createProject would have.
+// What a test gives a real WorkspacePool object before it configures it, and
+// a real Trunk object before it initializes it. A pool with a ready workspace
+// asks its project's Trunk DO for trunk's head, to keep its workspaces on it;
+// a test that stocks a pool for a project with no trunk of its own gives the
+// object one here, as createProject would have. A trunk counts against its
+// project's org; a test that runs one on memory adapters gives it the place
+// creating the project would have written.
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { PushRejected } from "@keeltown/core/domain/integration";
-import type { CommitSha } from "@keeltown/core/kernel";
+import type { CommitSha, OrgId, ProjectId } from "@keeltown/core/kernel";
 import { CodeHost, Trunks, WorkspaceRefresher } from "@keeltown/core/ports";
+import { makeProjectOrgsMemory } from "@keeltown/testing";
 import { Effect, Layer } from "effect";
 import type { WorkspacePoolDO } from "../../src/adapters/driving/do/workspace-pool.ts";
 import { codeHostLayer, type PoolServices } from "../../src/composition/do.ts";
+import { POOL_ORG } from "./helpers.ts";
+
+/**
+ * A ProjectOrgs in memory that holds `projectId`'s place in `org`, as
+ * creating the project writes it before its trunk exists. A Trunk object run
+ * on memory adapters takes its layer: a project with no place has no trunk.
+ */
+export function placedIn(projectId: ProjectId, org: OrgId = POOL_ORG) {
+  const places = makeProjectOrgsMemory();
+  places.places.set(projectId, { projectId, org, name: projectId.toLowerCase() });
+  return places;
+}
 
 /** What a pool's object follows in a test: the trunk it asks for a head, and the refresher it relays through. */
 export interface Followed {

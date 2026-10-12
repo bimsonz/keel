@@ -40,7 +40,7 @@ import {
   makeProjectOrgsMemory,
   makeTrunkWriterMemory,
 } from "@keeltown/testing";
-import { Effect, Layer, Schema } from "effect";
+import { Cause, Effect, Exit, Layer, Schema } from "effect";
 import * as fc from "fast-check";
 import { ulid } from "ulid";
 
@@ -52,9 +52,23 @@ const PROJECT: ProjectId = makeId("prj", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
 const ORG: OrgId = makeId("org", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
 
-/** The outbox and a clock, a trunk writer at `a`, and a project that has no place until a test gives it one. */
+/** Puts the project in ORG, as creating it does before its trunk exists: its trunk is weighed, and counted into ORG's repo bytes. */
+const place = (places: ReturnType<typeof makeProjectOrgsMemory>) =>
+  places.places.set(PROJECT, { projectId: PROJECT, org: ORG, name: "keel" });
+
+/** Takes the project's place away, which nothing in Keel does: what its trunk then does is the defect's own test. */
+const unplace = (places: ReturnType<typeof makeProjectOrgsMemory>) => places.places.delete(PROJECT);
+
+/** What a program that died said, or undefined for one that did not die. */
+const defectOf = <A, E, R>(program: Effect.Effect<A, E, R>) =>
+  Effect.map(Effect.exit(program), (exit) =>
+    Exit.isFailure(exit) && Cause.hasDies(exit.cause) ? Cause.pretty(exit.cause) : undefined,
+  );
+
+/** The outbox and a clock, a trunk writer at `a`, and the project placed in ORG. */
 const ports = () => {
   const places = makeProjectOrgsMemory();
+  place(places);
   const writer = makeTrunkWriterMemory(sha("a"));
   return {
     places,
@@ -68,10 +82,6 @@ const ports = () => {
     ),
   };
 };
-
-/** Puts the project in ORG: from here its trunk is weighed, and counted into ORG's repo bytes. */
-const place = (places: ReturnType<typeof makeProjectOrgsMemory>) =>
-  places.places.set(PROJECT, { projectId: PROJECT, org: ORG, name: "keel" });
 
 /** ORG's repo bytes as counted now: what an admission of nothing finds used. */
 const counted = Effect.map(
@@ -121,19 +131,33 @@ describe("the Trunk's Initialize", () => {
 
 describe("the Trunk's count at create", () => {
   it.effect(
-    "[trunk.create-counted] a placed project's whole history at its first head is counted into its org once, however often it is initialized; an unplaced project counts nothing",
+    "[trunk.create-counted] a project's whole history at its first head is counted into its org once, however often it is initialized",
     () => {
       const w = ports();
       w.writer.holds(sha("a"), 4_000);
       return Effect.gen(function* () {
-        yield* initializeTrunk(makeId("prj", "01J9YYYYYYYYYYYYYYYYYYYYYY"), sha("a"), "seed");
         expect(yield* counted).toBe(0);
-        place(w.places);
         yield* initializeTrunk(PROJECT, sha("a"), "seed");
         expect(yield* counted).toBe(4_000);
         yield* initializeTrunk(PROJECT, sha("a"), "seed");
         yield* Effect.flip(initializeTrunk(PROJECT, sha("b"), "operator"));
         expect(yield* counted).toBe(4_000);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[trunk.no-org-init] a project with no place is a defect that names it: it is given no trunk, and nothing is counted",
+    () => {
+      const w = ports();
+      unplace(w.places);
+      w.writer.holds(sha("a"), 4_000);
+      return Effect.gen(function* () {
+        const said = yield* defectOf(initializeTrunk(PROJECT, sha("a"), "seed"));
+        expect(said ?? "no defect").toContain(`project ${PROJECT} has no place`);
+        expect(trunkOf(yield* EntityStore, PROJECT)).toBeUndefined();
+        expect(yield* logOf(PROJECT)).toEqual([]);
+        expect(yield* counted).toBe(0);
       }).pipe(Effect.provide(w.layer));
     },
   );
@@ -196,6 +220,7 @@ function promotion() {
   const clock = makeManualClock();
   const writer = makeTrunkWriterMemory(sha("0"));
   const places = makeProjectOrgsMemory();
+  place(places);
   const usage = makeOrgUsageMemory();
   /** Everything but the trunk's writer, for a test that wraps the writer. */
   const rest = Layer.mergeAll(code.layer, outbox.layer, clock.layer, places.layer, usage.layer);
@@ -483,19 +508,37 @@ describe("the Trunk's promotion", () => {
   );
 
   it.effect(
-    "[trunk.no-org] a project with no place is promoted as before: its pack is neither weighed nor counted",
+    "[trunk.no-org] a project with no place is a defect that names it, on every pass: its group is neither weighed, pushed nor counted, and stays open",
     () => {
       const w = promotion();
       return Effect.gen(function* () {
         const base = yield* w.seeded;
+        const held = yield* counted;
         const tip = yield* w.composed(1, base);
         w.writer.weigh(tip, 1_032);
         yield* deliver(verified(1, base));
         yield* flushTrunk(PROJECT);
+        unplace(w.places);
+        for (const pass of [1, 2]) {
+          const said = yield* defectOf(pushPromotion(PROJECT));
+          expect([pass, said]).toEqual([
+            pass,
+            expect.stringContaining(`project ${PROJECT} has no place`),
+          ]);
+        }
+        expect(w.writer.head()).toBe(base);
+        expect(w.writer.pushes()).toEqual([]);
+        expect(w.writer.weighed()).toEqual([]);
+        expect(yield* counted).toBe(held);
+        expect(trunkOf(yield* EntityStore, PROJECT)).toMatchObject({
+          phase: "promoting",
+          head: base,
+        });
+        // Its place given back, the same group lands and is counted once.
+        place(w.places);
         expect(yield* pushPromotion(PROJECT)).toBe("advanced");
         expect(w.writer.head()).toBe(tip);
-        expect(w.writer.weighed()).toEqual([]);
-        expect(yield* counted).toBe(0);
+        expect(yield* counted).toBe(held + 1_000);
       }).pipe(Effect.provide(w.layer));
     },
   );
@@ -504,7 +547,6 @@ describe("the Trunk's promotion", () => {
     "[trunk.admits-once] a landing is counted into its org as its pack less a pack's 32 bytes, once, however many times the group is pushed",
     () => {
       const w = promotion();
-      place(w.places);
       return Effect.gen(function* () {
         const base = yield* w.seeded;
         // What the create counted: the history at the base.
@@ -531,7 +573,6 @@ describe("the Trunk's promotion", () => {
     "[trunk.refused-quota] a pack over what is left of its org's repo bytes is never pushed: its batch is declined with the reason, nothing is counted, and a smaller batch behind it lands",
     () => {
       const w = promotion();
-      place(w.places);
       return Effect.gen(function* () {
         const base = yield* w.seeded;
         // What the create counted: the history at the base.
@@ -569,7 +610,6 @@ describe("the Trunk's promotion", () => {
     "[trunk.gives-back] a group refused after it was admitted gives its bytes back before it is declined",
     () => {
       const w = promotion();
-      place(w.places);
       // Weighed as a small pack and refused as too large when pushed: a refusal that follows an admission.
       const light = Layer.effect(
         TrunkWriter,
@@ -601,7 +641,6 @@ describe("the Trunk's promotion", () => {
       Effect.gen(function* () {
         // Admitted, then trunk moved under the push: frozen with the pack counted, and the resume gives it back.
         const moved = promotion();
-        place(moved.places);
         yield* Effect.gen(function* () {
           const base = yield* moved.seeded;
           // What the create counted: the history at the base.
@@ -621,7 +660,6 @@ describe("the Trunk's promotion", () => {
 
         // The operator put trunk on the group's own commit: it landed, so its bytes stay counted.
         const landed = promotion();
-        place(landed.places);
         yield* Effect.gen(function* () {
           const base = yield* landed.seeded;
           // What the create counted: the history at the base.
@@ -639,7 +677,6 @@ describe("the Trunk's promotion", () => {
 
         // Frozen before it was ever admitted (over the quota, trunk moved): nothing of it was counted, so nothing is given back.
         const refused = promotion();
-        place(refused.places);
         yield* Effect.gen(function* () {
           const base = yield* refused.seeded;
           // What the create counted: the history at the base.
@@ -668,7 +705,6 @@ describe("the Trunk's promotion", () => {
     await fc.assert(
       fc.asyncProperty(fc.integer({ min: 32, max: 5_000_000 }), weights, (history, packs) => {
         const w = promotion();
-        place(w.places);
         return Effect.runPromise(
           Effect.gen(function* () {
             // The harness initializes trunk at its base: weigh that history first.

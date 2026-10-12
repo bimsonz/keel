@@ -1,11 +1,11 @@
-# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "too-large"
-# kills: trunk.refused-too-large
-# why: A pack over the cap is pushed again and again instead of refused, so its group stays open and every batch behind it waits
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts
+# kills: trunk.gives-back
+# why: A pack the push refuses as over the cap is pushed again and again instead of refused, so its group stays open and every batch behind it waits
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index cf9cea3..cf79396 100644
+index f4e7f68..3d485fd 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -467,8 +467,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+@@ -466,8 +466,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
      const pushed = yield* Effect.result(writer.push(trunk.wal.old, target));
      if (Result.isFailure(pushed)) {
        const failure = pushed.failure;

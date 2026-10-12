@@ -2,15 +2,17 @@
 # kills: trunk.admits-once
 # why: Each pass of one group is admitted under a key of its own, so a landing that needed a retry is counted twice
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index cf9cea3..57495dc 100644
+index f4e7f68..98a6a39 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -457,7 +457,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
-     else {
-       const bytes = weighed.success - PACK_OVERHEAD_BYTES;
-       const answer = yield* Effect.result(
--        usage.admit(org, REPO_BYTES, bytes, `promotion:${target}`),
-+        usage.admit(org, REPO_BYTES, bytes, `promotion:${target}:${Math.random()}`),
-       );
-       if (Result.isFailure(answer)) refused = "repo-bytes-quota";
-       else admitted = bytes;
+@@ -458,7 +458,9 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+   if (Result.isFailure(weighed)) refused = "pack-too-large";
+   else {
+     const bytes = weighed.success - PACK_OVERHEAD_BYTES;
+-    const answer = yield* Effect.result(usage.admit(org, REPO_BYTES, bytes, `promotion:${target}`));
++    const answer = yield* Effect.result(
++      usage.admit(org, REPO_BYTES, bytes, `promotion:${target}:${Math.random()}`),
++    );
+     if (Result.isFailure(answer)) refused = "repo-bytes-quota";
+     else admitted = bytes;
+   }

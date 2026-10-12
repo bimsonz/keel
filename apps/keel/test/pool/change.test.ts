@@ -14,7 +14,6 @@ import {
   makeProjectsMemory,
   makeStagingWriterMemory,
   makeOrgUsageMemory,
-  makeProjectOrgsMemory,
   makeTrunkWriterMemory,
   sampleProjectId,
 } from "@keeltown/testing";
@@ -38,6 +37,7 @@ import {
   unrenewed,
 } from "./change-harness.ts";
 import { BASE, drainAfter, mcp, mcpResult, seedAgent, tokenFor } from "./helpers.ts";
+import { placedIn } from "./pool-harness.ts";
 import { inertPrecheck } from "./inert-precheck.ts";
 
 /** How long a test waits for something the object does by itself (a flush, an alarm). */
@@ -592,7 +592,7 @@ async function realTrunk(projectId: ProjectId, lane: Awaited<ReturnType<typeof r
           backbone(state.storage),
           lane.code.layer,
           writer.layer,
-          makeProjectOrgsMemory().layer,
+          placedIn(projectId).layer,
           makeOrgUsageMemory().layer,
         ),
       ),

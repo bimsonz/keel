@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts
+# kills: trunk.refused-too-large
+# why: A pack too large to weigh is tried again and again instead of refused, so its group stays open and every batch behind it waits
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index f4e7f68..e5b5242 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -455,7 +455,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
+   /** The bytes this group holds of its org's quota. */
+   let admitted: number | undefined;
+   const weighed = yield* Effect.result(writer.packBytes(trunk.wal.old, target));
+-  if (Result.isFailure(weighed)) refused = "pack-too-large";
++  if (Result.isFailure(weighed)) return "retry" satisfies PushOutcome;
+   else {
+     const bytes = weighed.success - PACK_OVERHEAD_BYTES;
+     const answer = yield* Effect.result(usage.admit(org, REPO_BYTES, bytes, `promotion:${target}`));

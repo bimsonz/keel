@@ -21,12 +21,11 @@ import {
   freshOrg,
   makeCodeHostMemory,
   makeOrgUsageMemory,
-  makeProjectOrgsMemory,
   makeProjectsMemory,
   makeStagingWriterMemory,
   makeTrunkWriterMemory,
 } from "@keeltown/testing";
-import { Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
+import { Cause, Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
 import { TrunksRpc } from "../../src/adapters/driven/do-rpc/trunks.ts";
 import type { LaneDO } from "../../src/adapters/driving/do/lane.ts";
@@ -34,6 +33,7 @@ import type { TrunkDO } from "../../src/adapters/driving/do/trunk.ts";
 import { backbone, type LaneServices } from "../../src/composition/do.ts";
 import { decodeExit, EventCodecs, TrunkCodecs } from "../../src/rpc/index.ts";
 import { drainAfter } from "./helpers.ts";
+import { placedIn } from "./pool-harness.ts";
 
 const MAIN = "refs/heads/main";
 const WAIT = { timeout: 20_000, interval: 50 };
@@ -46,10 +46,36 @@ const trunkStub = (projectId: string) =>
 const viaTrunks = <A, E>(program: Effect.Effect<A, E, Trunks>) =>
   Effect.runPromiseExit(program.pipe(Effect.provide(TrunksRpc(env.TRUNK))));
 
+/**
+ * A fresh project's Trunk DO with memory adapters in its runtime: a trunk
+ * writer at `head`, and the project's place in an org of its own, which
+ * `initialize` reads before it names a head and counts the history into.
+ */
+async function placedTrunk(head: string) {
+  const projectId: ProjectId = makeId("prj", ulid());
+  const stub = trunkStub(projectId);
+  await runInDurableObject(stub, (instance: TrunkDO, state) => {
+    Reflect.set(
+      instance,
+      "runtime",
+      ManagedRuntime.make(
+        Layer.mergeAll(
+          backbone(state.storage),
+          makeCodeHostMemory().layer,
+          makeTrunkWriterMemory(Schema.decodeUnknownSync(CommitSha)(head)).layer,
+          placedIn(projectId, freshOrg()).layer,
+          makeOrgUsageMemory().layer,
+        ),
+      ),
+    );
+  });
+  return { projectId, stub };
+}
+
 describe("the Trunk DO", () => {
   it("[trunk.do.init] initialize names trunk's first head once; a retry answers it, another head is refused", async () => {
-    const stub = trunkStub(makeId("prj", ulid()));
     const head = "a".repeat(40);
+    const { stub } = await placedTrunk(head);
     const first = decodeExit(TrunkCodecs.initialize, await stub.initialize(head, "seed"));
     expect(first).toEqual(Exit.succeed({ head, promotion: "idle", redCount: 0 }));
     const again = decodeExit(TrunkCodecs.initialize, await stub.initialize(head, "seed"));
@@ -61,8 +87,8 @@ describe("the Trunk DO", () => {
   });
 
   it("[trunks.rpc.initialize] the Trunks port reaches trunk:<projectId>: a retry is a no-op, another head is refused", async () => {
-    const projectId = makeId("prj", ulid());
     const head = Schema.decodeUnknownSync(CommitSha)("c".repeat(40));
+    const { projectId } = await placedTrunk(head);
     const initialize = (sha: CommitSha) =>
       viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.initialize(projectId, sha, "seed")));
     expect(await initialize(head)).toEqual(Exit.void);
@@ -79,19 +105,36 @@ describe("the Trunk DO", () => {
   });
 
   it("[trunks.rpc.head] the Trunks port reads trunk's head as its Trunk DO records it", async () => {
-    const projectId = makeId("prj", ulid());
     const head = Schema.decodeUnknownSync(CommitSha)("e".repeat(40));
+    const { projectId } = await placedTrunk(head);
     await viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.initialize(projectId, head, "seed")));
     expect(await viaTrunks(Effect.flatMap(Trunks, (trunks) => trunks.head(projectId)))).toEqual(
       Exit.succeed(head),
+    );
+  });
+
+  it("[trunk.do.no-org] the real object, reading D1, gives a project with no place no trunk: initialize answers a defect that names it", async () => {
+    const projectId: ProjectId = makeId("prj", ulid());
+    const stub = trunkStub(projectId);
+    const refused = decodeExit(
+      TrunkCodecs.initialize,
+      await stub.initialize("a".repeat(40), "seed"),
+    );
+    expect(Exit.isFailure(refused) ? Cause.pretty(refused.cause) : "succeeded").toContain(
+      `project ${projectId} has no place`,
+    );
+    const status = decodeExit(TrunkCodecs.status, await stub.status());
+    expect(Exit.isFailure(status) ? Cause.pretty(status.cause) : "succeeded").toContain(
+      "is not initialized",
     );
   });
 });
 
 /**
  * A Trunk DO for a fresh project, initialized at staging's one commit,
- * promoting through memory adapters. With `placed`, the project is in that
- * org before its trunk is initialized, and its history weighs `history`.
+ * promoting through memory adapters. The project is placed in an org before
+ * its trunk is initialized: `placed` names that org and what its history
+ * weighs, for a test that reads the org's count.
  */
 async function promoting(placed?: { readonly org: OrgId; readonly history: number }) {
   const projectId: ProjectId = makeId("prj", ulid());
@@ -108,12 +151,9 @@ async function promoting(placed?: { readonly org: OrgId; readonly history: numbe
     }),
   );
   writer.interfere(base);
-  const places = makeProjectOrgsMemory();
+  const places = placedIn(projectId, placed?.org ?? freshOrg());
   const usage = makeOrgUsageMemory();
-  if (placed !== undefined) {
-    places.places.set(projectId, { projectId, org: placed.org, name: "keel" });
-    writer.holds(base, placed.history);
-  }
+  if (placed !== undefined) writer.holds(base, placed.history);
   await runInDurableObject(stub, (instance: TrunkDO, state) => {
     Reflect.set(
       instance,

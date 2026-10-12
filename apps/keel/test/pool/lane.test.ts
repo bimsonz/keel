@@ -22,7 +22,6 @@ import {
   makeProjectsMemory,
   makeStagingWriterMemory,
   makeOrgUsageMemory,
-  makeProjectOrgsMemory,
   makeTrunkWriterMemory,
   suitePlan,
 } from "@keeltown/testing";
@@ -35,6 +34,7 @@ import { armedAlarms, scheduleAlarm } from "../../src/adapters/driving/do/alarm.
 import { LanesRpc } from "../../src/adapters/driven/do-rpc/lanes.ts";
 import { backbone, type LaneServices } from "../../src/composition/do.ts";
 import { drainAfter, drainOutbox } from "./helpers.ts";
+import { placedIn } from "./pool-harness.ts";
 import { decodeExit, EventCodecs, LaneCodecs } from "../../src/rpc/index.ts";
 
 const MAIN = "refs/heads/main";
@@ -68,7 +68,7 @@ async function lane(options: { readonly noStaging?: boolean } = {}) {
             backbone(state.storage),
             code.layer,
             writer.layer,
-            makeProjectOrgsMemory().layer,
+            placedIn(projectId).layer,
             makeOrgUsageMemory().layer,
           ),
         ),

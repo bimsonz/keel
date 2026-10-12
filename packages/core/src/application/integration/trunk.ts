@@ -104,14 +104,20 @@ const REPO_BYTES = "repo-bytes";
 export const PACK_OVERHEAD_BYTES = 32;
 
 /**
- * The org a project's trunk counts against, or undefined for a project that
- * has no place yet: until every project is given one (the tenancy cutover),
- * such a project is neither weighed nor counted.
+ * The org a project's trunk counts against. Every project is placed in an org
+ * when it is created, before its trunk exists, so a project with no place is
+ * a defect, named here: its trunk is never weighed or counted against a
+ * guess, and never pushed unweighed.
  */
 const orgOf = (projectId: ProjectId) =>
-  Effect.map(
+  Effect.flatMap(
     Effect.flatMap(ProjectOrgs, (places) => places.byId(projectId)),
-    (place): OrgId | undefined => (Option.isSome(place) ? place.value.org : undefined),
+    (place): Effect.Effect<OrgId> =>
+      Option.isSome(place)
+        ? Effect.succeed(place.value.org)
+        : Effect.die(
+            new Error(`project ${projectId} has no place: its trunk has no org to count against`),
+          ),
   );
 
 /**
@@ -130,7 +136,6 @@ const giveBack = Effect.fn("integration/giveBack")(function* (
   sha: CommitSha,
 ) {
   const org = yield* orgOf(projectId);
-  if (org === undefined) return;
   const weighed = yield* Effect.result((yield* TrunkWriter).packBytes(old, sha));
   if (Result.isFailure(weighed)) return;
   const bytes = weighed.success - PACK_OVERHEAD_BYTES;
@@ -180,14 +185,15 @@ export const promote = Effect.fn("integration/promote")(function* (
  * with the same head answers the trunk; another head is refused, as is any
  * initialize once trunk has a head. The repo's whole history at that head is
  * then counted into its org's repo bytes, once per project and never refused
- * (the project already exists); a project with no place yet counts nothing,
- * so a project is placed before its trunk is initialized.
+ * (the project already exists). A project is placed before its trunk is
+ * initialized: one with no place is a defect, and is given no trunk.
  */
 export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function* (
   projectId: ProjectId,
   head: CommitSha,
   by: string,
 ) {
+  const org = yield* orgOf(projectId);
   const committed = yield* promote(projectId, { _tag: "Initialize", head, by }, "initialize", head);
   const trunk = trunkOf(yield* EntityStore, projectId);
   if (trunk === undefined)
@@ -200,11 +206,8 @@ export const initializeTrunk = Effect.fn("integration/initializeTrunk")(function
       phase: trunk.phase,
       command: "Initialize",
     });
-  const org = yield* orgOf(projectId);
-  if (org !== undefined) {
-    const bytes = yield* (yield* TrunkWriter).historyBytes(head);
-    yield* (yield* OrgUsage).record(org, REPO_BYTES, bytes, `create:${projectId}`);
-  }
+  const bytes = yield* (yield* TrunkWriter).historyBytes(head);
+  yield* (yield* OrgUsage).record(org, REPO_BYTES, bytes, `create:${projectId}`);
   return trunk;
 });
 
@@ -417,8 +420,8 @@ const restingAs = (trunk: Trunk | undefined): PushOutcome =>
  * one group count once. A pack over the receive-pack cap or over the quota,
  * with trunk still on the old head, is PushRefused: the group is declined,
  * never left open, and what was admitted for it is given back first. A
- * project with no place yet is pushed unweighed. A destroyed trunk pushes
- * nothing, even a group it had opened.
+ * project with no place is a defect: its group is neither weighed nor
+ * pushed. A destroyed trunk pushes nothing, even a group it had opened.
  */
 export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
   projectId: ProjectId,
@@ -453,17 +456,13 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
   let refused: PushRefusedReason | undefined;
   /** The bytes this group holds of its org's quota. */
   let admitted: number | undefined;
-  if (org !== undefined) {
-    const weighed = yield* Effect.result(writer.packBytes(trunk.wal.old, target));
-    if (Result.isFailure(weighed)) refused = "pack-too-large";
-    else {
-      const bytes = weighed.success - PACK_OVERHEAD_BYTES;
-      const answer = yield* Effect.result(
-        usage.admit(org, REPO_BYTES, bytes, `promotion:${target}`),
-      );
-      if (Result.isFailure(answer)) refused = "repo-bytes-quota";
-      else admitted = bytes;
-    }
+  const weighed = yield* Effect.result(writer.packBytes(trunk.wal.old, target));
+  if (Result.isFailure(weighed)) refused = "pack-too-large";
+  else {
+    const bytes = weighed.success - PACK_OVERHEAD_BYTES;
+    const answer = yield* Effect.result(usage.admit(org, REPO_BYTES, bytes, `promotion:${target}`));
+    if (Result.isFailure(answer)) refused = "repo-bytes-quota";
+    else admitted = bytes;
   }
   if (refused === undefined) {
     const pushed = yield* Effect.result(writer.push(trunk.wal.old, target));
@@ -477,7 +476,7 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
   }
   if (refused !== undefined && (yield* writer.head) === trunk.wal.old) {
     // Nothing landed and no retry can help. What the group was admitted is given back before it is declined: a crash between the two then leaves the group open, and the next pass ends it.
-    if (org !== undefined && admitted !== undefined)
+    if (admitted !== undefined)
       yield* usage.record(org, REPO_BYTES, -admitted, `giveback:${target}`);
     // The domain declines the group, so its change bounces and trunk stays free.
     yield* promote(
