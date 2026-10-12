@@ -70,8 +70,9 @@ export class SyntaxUnavailable extends Schema.TaggedError<SyntaxUnavailable>()(
  *
  * **The path rule is the adapter's.** `facts` parses the `seeds` and follows
  * their relative imports to a fixpoint, breadth-first, up to 400 files. The
- * caller gives the files a change touches and the files the live anchors
- * name, at the base and again at the head; it never lists a tree.
+ * caller gives the files a change touches and the files that anchor the
+ * subjects near them (`derivationSeeds`), at the base and again at the head;
+ * it never lists a tree.
  *
  * **Names are resolved, never guessed.** A receiver's class is known only
  * from `new C()`, `this`, a declared type, or the declared return type of a

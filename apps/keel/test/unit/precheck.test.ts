@@ -225,7 +225,11 @@ function precheckWorld(
       return submit(granted, head, granted, instanceId);
     });
 
-  /** The Workflow's steps, in order, on these use-cases and its reads; the change's subjects come from its workspace. */
+  /**
+   * The Workflow's steps, in order, on these use-cases and its reads, bar the
+   * derivation: `derive` and `derived` are taken in precheck-derive.test.ts.
+   * Nothing is derived here, so the plan's subjects are the workspace's.
+   */
   const run = (submission: PrecheckSubmission) =>
     Effect.gen(function* () {
       const workspace = yield* startPrecheck(submission);

@@ -3,7 +3,10 @@ import { NonRetryableError } from "cloudflare:workflows";
 import {
   type Ancestry,
   checkAncestry,
+  commitDerivation,
   decidePrecheck,
+  deriveSubmission,
+  planSubjects,
   PrecheckDecision,
   type PrecheckFindings,
   type PrecheckSubmission,
@@ -74,11 +77,15 @@ const done = <A>(settled: Settled<A>): A => {
  * submitted commit that does not descend from the submission's base; diff
  * one that does against that base, refuse guard and protected paths, read the
  * base's flow and the project's admitted guards, and compile the Verification
- * Plan under them for the change's subjects, refusing any step KeelVerify
- * cannot run. Steps: `start`, `ancestry`, then `diff`, `policy`, `flow` and
- * `guards` for a commit on its base, `decide`, then `refuse` or `compile`
- * (which stores the plan before recording it). Each write is idempotent by
- * this instance's id, so a replayed step commits nothing new.
+ * Plan under them for the subjects the change declared and those its code
+ * was derived to affect, refusing any step KeelVerify cannot run. Steps:
+ * `start`, `ancestry`, then for a commit on its base `diff`, `policy`, `flow`,
+ * `guards`, `derive` (which keeps the derivation record and answers only its
+ * hash and subjects) and `derived` (which commits what was kept), `decide`,
+ * then `refuse` or `compile` (which stores the plan before recording it).
+ * Nothing derives for a commit off its base, or one whose diff could not be
+ * read. Each write is idempotent by this instance's id, so a replayed step
+ * commits nothing new.
  */
 export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
   override async run(
@@ -103,22 +110,47 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
       const ancestry = done(
         await step.do("ancestry", () => settle(runtime, checkAncestry(workspace, submission))),
       );
-      /** A commit on its base: each of precheckReads, one durable step. */
+      /**
+       * A commit on its base: each of precheckReads, one durable step, then
+       * its derivation, kept by `derive` and committed by `derived`. Stale
+       * when the change moved on before the derivation was committed.
+       */
       const descended = async (
         on: Extract<Ancestry, { readonly _tag: "Descends" }>,
-      ): Promise<PrecheckFindings> => {
+      ): Promise<Settled<PrecheckFindings>> => {
         const reads = precheckReads(workspace, submission, on);
-        return {
+        const read = {
           ancestry: on,
           touched: done(await step.do("diff", () => settle(runtime, reads.touched))),
           policy: done(await step.do("policy", () => settle(runtime, reads.policy))),
           flow: done(await step.do("flow", () => settle(runtime, reads.flow))),
           guards: done(await step.do("guards", () => settle(runtime, reads.guards))),
-          subjects: workspace.subjects,
+        };
+        // A diff that could not be read is refused by decide: with no paths, nothing derives.
+        if (read.touched._tag === "Unreadable")
+          return { _tag: "Done", value: { ...read, subjects: workspace.subjects } };
+        const paths = read.touched.paths;
+        const kept = done(
+          await step.do("derive", () =>
+            settle(runtime, deriveSubmission(workspace, submission, on.base, paths)),
+          ),
+        );
+        const derived = await step.do("derived", () =>
+          settle(runtime, commitDerivation(submission, kept.derivationRef)),
+        );
+        if (derived._tag === "Stale") return derived;
+        return {
+          _tag: "Done",
+          value: { ...read, subjects: planSubjects(workspace.subjects, kept.subjects) },
         };
       };
-      const findings: PrecheckFindings =
-        ancestry._tag === "Descends" ? await descended(ancestry) : { ancestry };
+      const found: Settled<PrecheckFindings> =
+        ancestry._tag === "Descends"
+          ? await descended(ancestry)
+          : { _tag: "Done", value: { ancestry } };
+      if (found._tag === "Stale")
+        return { outcome: "stale", step: "derived", reason: found.reason };
+      const findings = found.value;
       // Persisted as JSON, since a next action's args are open; decoded, so a replay is checked too.
       const decision = Schema.decodeUnknownSync(PrecheckDecision)(
         JSON.parse(

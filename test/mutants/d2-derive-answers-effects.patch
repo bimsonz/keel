@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck-derive.test.ts
+# kills: d21.derive.small
+# why: The derive step's output grows with the derivation, so a large one passes the Workflow's 1 MiB step limit and Precheck fails instead of checking the change
+diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
+index ae2251d..269b4b2 100644
+--- a/packages/core/src/application/verification/derive-submission.ts
++++ b/packages/core/src/application/verification/derive-submission.ts
+@@ -189,7 +189,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
+     }),
+   );
+   const subjects = [...new Set(derivation.effects.map((e) => e.proposition.subject))].toSorted();
+-  const kept: DerivationKept = { derivationRef, subjects };
++  const kept = { derivationRef, subjects, effects: derivation.effects };
+   return kept;
+ });
+ 

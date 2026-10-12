@@ -65,6 +65,7 @@ export const getVerdict: (
   verdictId: VerdictId,
 ) => Effect.Effect<VerdictView, VerdictNotFound, EntityStore> = stub("verification/getVerdict");
 
+export * from "./derive-submission.ts";
 export * from "./draft-probe.ts";
 export * from "./flow-spec.ts";
 export * from "./guard-file.ts";

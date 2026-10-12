@@ -34,9 +34,10 @@ import { readStoredPlan, storedPlanText } from "./plan-codec.ts";
 
 /**
  * Precheck's use-cases, one per Workflow step: start, ancestry, diff, policy,
- * flow, guards, decide, then refuse or compile. Each is safe to replay: the Change DO's writes are
- * idempotent by instance, and the reads answer the same thing twice. What
- * passes between steps is plain data, small enough for a step's output.
+ * flow, guards, derive and derived (derive-submission.ts), decide, then refuse
+ * or compile. Each is safe to replay: the Change DO's writes are idempotent by
+ * instance, and the reads answer the same thing twice. What passes between
+ * steps is plain data, small enough for a step's output.
  */
 
 /**
@@ -251,8 +252,9 @@ const reason = (p: RefusedPath) => `precheck:${p.rule}:${p.path} (${p.glob})`;
 /**
  * What Precheck's steps found: the ancestry, and, only for a commit that
  * descends from its base, the paths it touches, the project's policy, the
- * base's flow sources, the project's admitted guards and the subjects the
- * change touches or relies on.
+ * base's flow sources, the project's admitted guards and the plan's subjects
+ * (`planSubjects`): those the change declared it touches or relies on, and
+ * those Precheck derived an effect on.
  */
 export type PrecheckFindings =
   | { readonly ancestry: Exclude<Ancestry, { readonly _tag: "Descends" }> }

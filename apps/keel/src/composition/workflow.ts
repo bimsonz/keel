@@ -132,12 +132,21 @@ export const durableReport =
 
 /**
  * Precheck's composition root, per run: the change through the Change
- * DO, settings through the Project DO, and the diff through the code host.
+ * DO, settings and the live anchors through the Project DO, the diff and the
+ * parsed source through the code host, and the derivation record kept in
+ * ARCHIVE beside the plan.
  */
 export function precheckRuntime(
   env: Env,
 ): ManagedRuntime.ManagedRuntime<
-  ChangePrecheck | Projects | CodeHost | FlowSpecSource | AdmittedGuards | SyntaxSource | PlanStore,
+  | ChangePrecheck
+  | Projects
+  | CodeHost
+  | FlowSpecSource
+  | AdmittedGuards
+  | SyntaxSource
+  | PlanStore
+  | EvidenceStore,
   never
 > {
   const project = (projectId: string) =>
@@ -154,6 +163,7 @@ export function precheckRuntime(
         SyntaxSourceTreeSitter(SYNTAX_WASM),
       ).pipe(Layer.provide(code)),
       PlanStoreR2(env.ARCHIVE),
+      EvidenceStoreR2(env.ARCHIVE),
     ),
   );
 }

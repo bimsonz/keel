@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck-derive.test.ts
+# kills: d21.derive.seeds
+# why: Every anchored path in the project is a seed again, so a project whose live anchors name more than 400 paths is refused by the parser on every pass and derives nothing
+diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
+index 2a8dfe9..8616f45 100644
+--- a/packages/core/src/application/verification/derive-submission.ts
++++ b/packages/core/src/application/verification/derive-submission.ts
+@@ -125,7 +125,7 @@ export const derivationSeeds = (
+   const edited = new Set(touched);
+   const at = anchors.filter((row) => pathsOf(row).some((p) => edited.has(p)));
+   const focus = [...declared, ...at.map((row) => row.subject)];
+-  const near = anchors.filter((row) => focus.some((s) => subjectsNear(s, row.subject)));
++  const near = anchors;
+   return [...new Set([...touched, ...near.flatMap(pathsOf)])].toSorted();
+ };
+ 

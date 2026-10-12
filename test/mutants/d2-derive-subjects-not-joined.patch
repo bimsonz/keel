@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck-derive.test.ts
+# kills: d21.derive.subjects-join
+# why: A subject only the derivation names never reaches compile, so the admitted guard on a subject the change affects without declaring it does not run
+diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
+index ae2251d..64cfb41 100644
+--- a/packages/core/src/application/verification/derive-submission.ts
++++ b/packages/core/src/application/verification/derive-submission.ts
+@@ -120,7 +120,7 @@ export const derivationSeeds = (
+ export const planSubjects = (
+   declared: readonly SubjectKey[],
+   derived: readonly SubjectKey[],
+-): readonly SubjectKey[] => [...new Set([...declared, ...derived])];
++): readonly SubjectKey[] => [...new Set(declared)];
+ 
+ /** One commit's reading, or why none could be made. */
+ type Reading = SyntaxReading | { readonly unavailable: SyntaxUnavailable["reason"] };

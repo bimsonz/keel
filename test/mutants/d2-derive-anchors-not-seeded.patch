@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck-derive.test.ts
+# kills: d21.derive.seeds
+# why: Only the touched paths are parsed, so a cache added in one file is never put on the subject whose anchored code, in another file, reads through it
+diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
+index 2a8dfe9..8a66efd 100644
+--- a/packages/core/src/application/verification/derive-submission.ts
++++ b/packages/core/src/application/verification/derive-submission.ts
+@@ -126,7 +126,7 @@ export const derivationSeeds = (
+   const at = anchors.filter((row) => pathsOf(row).some((p) => edited.has(p)));
+   const focus = [...declared, ...at.map((row) => row.subject)];
+   const near = anchors.filter((row) => focus.some((s) => subjectsNear(s, row.subject)));
+-  return [...new Set([...touched, ...near.flatMap(pathsOf)])].toSorted();
++  return [...new Set(touched)].toSorted();
+ };
+ 
+ /**

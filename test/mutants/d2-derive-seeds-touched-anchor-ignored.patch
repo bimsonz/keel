@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck-derive.test.ts
+# kills: d21.derive.seeds
+# why: A subject anchored in a touched file brings none of its other anchored files and none of its siblings', so an undeclared change is read from its own files alone
+diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
+index 2a8dfe9..82c4333 100644
+--- a/packages/core/src/application/verification/derive-submission.ts
++++ b/packages/core/src/application/verification/derive-submission.ts
+@@ -124,7 +124,7 @@ export const derivationSeeds = (
+ ): readonly string[] => {
+   const edited = new Set(touched);
+   const at = anchors.filter((row) => pathsOf(row).some((p) => edited.has(p)));
+-  const focus = [...declared, ...at.map((row) => row.subject)];
++  const focus = [...declared];
+   const near = anchors.filter((row) => focus.some((s) => subjectsNear(s, row.subject)));
+   return [...new Set([...touched, ...near.flatMap(pathsOf)])].toSorted();
+ };

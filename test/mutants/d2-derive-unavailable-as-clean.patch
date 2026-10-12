@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck-derive.test.ts
+# kills: d21.derive.unavailable, d21.derive.parser-starting
+# why: A commit the parser could not read is recorded as read with nothing left out, so an empty derivation says the code has no effect when it was never read
+diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
+index ae2251d..f7fcbbd 100644
+--- a/packages/core/src/application/verification/derive-submission.ts
++++ b/packages/core/src/application/verification/derive-submission.ts
+@@ -127,7 +127,7 @@ type Reading = SyntaxReading | { readonly unavailable: SyntaxUnavailable["reason
+ 
+ const recorded = (reading: Reading): RecordedReading =>
+   "unavailable" in reading
+-    ? { unavailable: reading.unavailable }
++    ? { parser: "unread", skipped: [] }
+     : { parser: reading.parser, skipped: reading.skipped };
+ 
+ /**

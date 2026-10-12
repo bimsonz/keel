@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/precheck.test.ts
+# kills: d21.pool.derived
+# why: The Workflow compiles for the declared subjects alone, so the guard on a subject the change's code was derived to affect does not run in that pass
+diff --git a/apps/keel/src/adapters/driving/workflow/precheck.ts b/apps/keel/src/adapters/driving/workflow/precheck.ts
+index 6379ddf..6d6316f 100644
+--- a/apps/keel/src/adapters/driving/workflow/precheck.ts
++++ b/apps/keel/src/adapters/driving/workflow/precheck.ts
+@@ -141,7 +141,7 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
+         if (derived._tag === "Stale") return derived;
+         return {
+           _tag: "Done",
+-          value: { ...read, subjects: planSubjects(workspace.subjects, kept.subjects) },
++          value: { ...read, subjects: workspace.subjects },
+         };
+       };
+       const found: Settled<PrecheckFindings> =

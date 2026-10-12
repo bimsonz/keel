@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck-derive.test.ts
+# kills: d21.derive.parser-starting
+# why: A parser that never finishes starting is asked without end, so the derive step never answers and the change stays deriving
+diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
+index ae2251d..9c93536 100644
+--- a/packages/core/src/application/verification/derive-submission.ts
++++ b/packages/core/src/application/verification/derive-submission.ts
+@@ -157,7 +157,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
+     source.facts(workspace.repo, commit, seeds).pipe(
+       Effect.catchTag("SyntaxUnavailable", (e): Effect.Effect<Reading> =>
+         e.reason === "parser-starting" && retry
+-          ? read(commit, false)
++          ? read(commit, true)
+           : Effect.succeed({ unavailable: e.reason }),
+       ),
+       Effect.orDie,

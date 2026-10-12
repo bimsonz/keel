@@ -1,17 +1,30 @@
 import { introspectWorkflow, introspectWorkflowInstance } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { readStoredPlan } from "@keeltown/core/application/verification";
-import { Proposition, SubjectKey } from "@keeltown/core/domain/coordination";
+import { subjectAddress } from "@keeltown/core/application/coordination";
+import {
+  DERIVATION_KIND,
+  DerivationRecord,
+  deriveSubmission,
+  diffSubmission,
+  readStoredPlan,
+} from "@keeltown/core/application/verification";
+import { DerivedEffect, Proposition, SubjectKey } from "@keeltown/core/domain/coordination";
 import type { AdmittedGuard } from "@keeltown/core/domain/verification";
-import { ContentHash, makeId } from "@keeltown/core/kernel";
-import { TEST_GUARD } from "@keeltown/testing";
-import { Result, Schema } from "effect";
+import { CommitSha, ContentHash, type Json, makeId, type ProjectId } from "@keeltown/core/kernel";
+import { CodeHost, EvidenceStore, type PrecheckWorkspace } from "@keeltown/core/ports";
+import { CodeHostFixture, TEST_GUARD } from "@keeltown/testing";
+import { Effect, Layer, Result, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
+import { ProjectsRpc } from "../../src/adapters/driven/do-rpc/projects.ts";
+import { EvidenceStoreR2 } from "../../src/adapters/driven/r2/evidence-store.ts";
 import { planKey } from "../../src/adapters/driven/r2/plan-store.ts";
+import { SyntaxSourceTreeSitter } from "../../src/adapters/driven/syntax/syntax-source.ts";
+import { SYNTAX_WASM } from "../../src/adapters/driven/syntax/wasm.ts";
 import { PrecheckParams } from "../../src/adapters/driving/workflow/precheck.ts";
 import { ChangeCodecs, decodeExit } from "../../src/rpc/index.ts";
-import { changeUnderTest, ok } from "./change-harness.ts";
+import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
+import { drainAfter, drainOutbox } from "./helpers.ts";
 import { inertPrecheck } from "./inert-precheck.ts";
 
 const WAIT = { timeout: 15_000, interval: 50 };
@@ -48,6 +61,18 @@ const guards = (admitted: readonly AdmittedGuard[] = []) => ({
 const key = Schema.decodeUnknownSync(SubjectKey);
 /** TEST_GUARD's tenet, on `authz.sessions`, as a premise the change relies on. */
 const SESSIONS = Schema.decodeUnknownSync(Proposition)(TEST_GUARD.tenet.proposition);
+/** What derivation rules the pushed commit does to `authz.sessions`: within TEST_GUARD's tenet, so nothing conflicts. */
+const derivedAtSessions = (commitSha: string) => {
+  const anchors = [{ path: "src/sessions.ts", symbol: "sessionOf", commit: commitSha }];
+  return Schema.decodeUnknownSync(DerivedEffect)({
+    proposition: { ...SESSIONS, relation: "is", anchors },
+    anchors,
+    declared: false,
+    method: "extractor",
+    evidenceClass: "ruling",
+  });
+};
+
 /** An admitted guard on a subject the change neither relies on nor affects. */
 const INVOICES: AdmittedGuard = {
   guardId: makeId("grd", ulid()),
@@ -55,51 +80,229 @@ const INVOICES: AdmittedGuard = {
   tenet: { proposition: { ...SESSIONS, subject: key("billing.invoice") } },
 };
 
-/** A change declared, pushed and submitted on a Change DO under test; the outbox starts its Precheck. */
-async function submitted(premises: readonly Proposition[] = []) {
+/**
+ * A change declared and pushed on a Change DO under test. `submit` submits
+ * it, and the outbox then starts its Precheck: a test that mocks a step with
+ * something of the change's own mocks it before it submits.
+ */
+async function pushed(premises: readonly Proposition[] = []) {
   const c = await changeUnderTest();
   const lease = ok(await c.declare("declare-1", { premises })).change.lease.id;
   const commitSha = await c.push();
-  ok(
-    decodeExit(
-      ChangeCodecs.submit,
-      await c.stub.submit({ agentId: c.agentId, leaseId: lease, commitSha, idempotencyKey: "s-1" }),
-    ),
-  );
+  const submit = async () =>
+    void ok(
+      decodeExit(
+        ChangeCodecs.submit,
+        await c.stub.submit({
+          agentId: c.agentId,
+          leaseId: lease,
+          commitSha,
+          idempotencyKey: "s-1",
+        }),
+      ),
+    );
+  return { c, commitSha, submit };
+}
+
+/** A change declared, pushed and submitted on a Change DO under test; the outbox starts its Precheck. */
+async function submitted(premises: readonly Proposition[] = []) {
+  const { c, commitSha, submit } = await pushed(premises);
+  await submit();
   return { c, commitSha };
 }
 
 /**
+ * What the derive step answers for the change's pushed commit, with the
+ * record it names kept in ARCHIVE as the step keeps it: a derivation that
+ * read both commits whole and found these effects.
+ */
+async function kept(c: ChangeUnderTest, commitSha: string, effects: readonly DerivedEffect[] = []) {
+  const { repo } = ok(decodeExit(ChangeCodecs.workspace, await c.stub.workspace()));
+  const read = { parser: "mocked", skipped: [] };
+  const record: Json = JSON.parse(
+    JSON.stringify(
+      Schema.encodeSync(DerivationRecord)({
+        kind: DERIVATION_KIND,
+        changeId: c.changeId,
+        revision: 1,
+        repo,
+        base: CommitSha.make(BASE),
+        head: CommitSha.make(commitSha),
+        seeds: ["src/a.ts"],
+        anchors: [],
+        readings: { base: read, head: read },
+        effects,
+        undecided: [],
+      }),
+    ),
+  );
+  const derivationRef = await Effect.runPromise(
+    EvidenceStore.use((store) => store.put(record)).pipe(
+      Effect.provide(EvidenceStoreR2(env.ARCHIVE)),
+    ),
+  );
+  return {
+    _tag: "Done",
+    value: { derivationRef, subjects: effects.map((effect) => effect.proposition.subject) },
+  };
+}
+
+const SESSIONS_FILE = "src/authz/sessions.ts";
+/** The module at the base: `sessionOf` reads the session on every call, and nothing holds one. */
+const UNCACHED = `
+export interface Session {
+  readonly id: string;
+  readonly revoked: boolean;
+}
+
+function readSession(sessionId: string): Session {
+  return { id: sessionId, revoked: false };
+}
+
+export function sessionOf(sessionId: string): Session {
+  return readSession(sessionId);
+}
+`;
+/** The module at the head: `sessionOf` now reads through a Map the module holds, keyed by the session's id. */
+const CACHED = `
+export interface Session {
+  readonly id: string;
+  readonly revoked: boolean;
+}
+
+const cache = new Map<string, Session>();
+
+function readSession(sessionId: string): Session {
+  return { id: sessionId, revoked: false };
+}
+
+export function sessionOf(sessionId: string): Session {
+  const held = cache.get(sessionId);
+  if (held !== undefined) return held;
+  const session = readSession(sessionId);
+  cache.set(sessionId, session);
+  return session;
+}
+`;
+/** Where a neighbour anchors `authz.sessions`: the function that reads a session, pinned at a commit of neither push. */
+const SESSION_OF = { path: SESSIONS_FILE, symbol: "sessionOf", commit: "a".repeat(40) };
+/** What the neighbour relies on there: a session no staler than per-session, which the head's cache keeps. */
+const RELIED = Schema.decodeUnknownSync(Proposition)({
+  ...SESSIONS,
+  value: "per-session",
+  anchors: [SESSION_OF],
+});
+
+/** Pushes two commits to the change's workspace on its in-memory code host, as its agent would: `before`, then `after` on top of it. */
+const pushedOver = (
+  c: ChangeUnderTest,
+  workspace: PrecheckWorkspace,
+  before: Readonly<Record<string, string>>,
+  after: Readonly<Record<string, string>>,
+) =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      yield* (yield* CodeHost).create(workspace.repo);
+      const fixture = yield* CodeHostFixture;
+      const base = yield* fixture.commit(workspace.repo, "refs/heads/main", before);
+      const head = yield* fixture.commit(workspace.repo, "refs/heads/main", after);
+      return { base, head };
+    }).pipe(Effect.provide(c.code.layer)),
+  );
+
+/**
+ * Core's derive step itself, in workerd, on what Precheck's runtime composes
+ * wherever the pool can serve it: the project's live anchors from its Project
+ * DO over RPC, tree-sitter as the Worker's own Wasm, and the record kept in
+ * ARCHIVE. Only the code host is not the Workflow's, which holds no git
+ * content here: the parser reads the commits on the change's in-memory one.
+ * The step reads the submission's change, revision and commit, never its
+ * instance, which no test can name before the outbox starts it.
+ */
+const derivedFrom = (
+  c: ChangeUnderTest,
+  workspace: PrecheckWorkspace,
+  base: CommitSha,
+  commitSha: CommitSha,
+  paths: readonly string[],
+) =>
+  Effect.runPromise(
+    deriveSubmission(
+      workspace,
+      {
+        changeId: c.changeId,
+        revision: 1,
+        commitSha,
+        baseSha: workspace.baseSha,
+        instanceId: "precheck-not-started",
+      },
+      base,
+      paths,
+    ).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          ProjectsRpc((projectId) =>
+            env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)),
+          ),
+          SyntaxSourceTreeSitter(SYNTAX_WASM).pipe(Layer.provide(c.code.layer)),
+          EvidenceStoreR2(env.ARCHIVE),
+        ),
+      ),
+    ),
+  );
+
+/**
  * Precheck through env.PRECHECK, started by the Change DO's outbox on
  * ChangeSubmitted, against the real Change DO over RPC. The ancestry walk,
- * the diff and the base's flow read the workspace on the code host, which the
- * DO under test keeps in memory, and the guard repo and the Project DO's
- * settings() are mocked with them; start, with the change's subjects, decide,
- * and the refusal or the stored plan run for real. Which commit each read
- * takes is core's `precheckReads`, proven in the unit suite.
+ * the diff, the base's flow and the derivation's parse read the workspace on
+ * the code host, which the DO under test keeps in memory, and the guard repo
+ * and the Project DO's settings() are mocked with them; start, with the
+ * change's subjects, derived, which commits the record the mocked derive step
+ * names from ARCHIVE, decide, and the refusal or the stored plan run for
+ * real. Which commit each read takes is core's `precheckReads`, and what
+ * derive reads and keeps is core's `deriveSubmission`, both proven in the
+ * unit suite. One case runs `deriveSubmission` itself here, on tree-sitter,
+ * the Project DO's live anchors and ARCHIVE, and gives the Workflow its
+ * answer as the derive step's: the step taken by the Workflow on its own code
+ * host is left to a live run.
  */
 describe("Precheck", () => {
-  it("[d12.pool.compiled] records the plan of a clean submission on the change", async () => {
+  it("[d12.pool.compiled] records the derivation and then the plan of a clean submission on the change", async () => {
     await using workflows = await introspectWorkflow(env.PRECHECK);
+    const { c, commitSha, submit } = await pushed();
+    const derive = await kept(c, commitSha);
     await workflows.modifyAll(async (m) => {
       await m.mockStepResult({ name: "ancestry" }, descends(BASE));
       await m.mockStepResult({ name: "diff" }, touched(["src/a.ts"]));
       await m.mockStepResult({ name: "policy" }, policy(["infra/**"]));
       await m.mockStepResult({ name: "flow" }, flow());
       await m.mockStepResult({ name: "guards" }, guards());
+      await m.mockStepResult({ name: "derive" }, derive);
     });
-    const { c } = await submitted();
+    await submit();
     await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);
     const [instance] = await workflows.get();
     await instance?.waitForStatus("complete");
 
     expect((await c.current()).state).toBe("queued");
-    const types = (await c.log()).map((e) => e.type);
-    expect(types.slice(-3)).toEqual(["PrecheckStarted", "PlanCompiled", "ChangeQueued"]);
+    const log = await c.log();
+    expect(log.map((e) => e.type).slice(-4)).toEqual([
+      "PrecheckStarted",
+      "EffectsDerived",
+      "PlanCompiled",
+      "ChangeQueued",
+    ]);
+    expect(log.find((e) => e.type === "EffectsDerived")?.payload).toMatchObject({
+      revision: 1,
+      effects: [],
+      derivationRef: derive.value.derivationRef,
+    });
   });
 
   it("[d21.pool.subjects] compiles the change's own subjects against the admitted guards, under the base's policy, and queues the plan it stored", async () => {
     await using workflows = await introspectWorkflow(env.PRECHECK);
+    const { c, commitSha, submit } = await pushed([SESSIONS]);
+    const derive = await kept(c, commitSha);
     await workflows.modifyAll(async (m) => {
       await m.mockStepResult({ name: "ancestry" }, descends(BASE));
       await m.mockStepResult({ name: "diff" }, touched(["src/a.ts"]));
@@ -109,8 +312,9 @@ describe("Precheck", () => {
         flow(JSON.stringify({ predicates: { freshness: "block" } })),
       );
       await m.mockStepResult({ name: "guards" }, guards([TEST_GUARD, INVOICES]));
+      await m.mockStepResult({ name: "derive" }, derive);
     });
-    const { c } = await submitted([SESSIONS]);
+    await submit();
     await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);
     await (await workflows.get())[0]?.waitForStatus("complete");
 
@@ -128,16 +332,217 @@ describe("Precheck", () => {
     ]);
   });
 
+  it("[d21.pool.derived] commits the effects the derive step kept, and compiles the guard of a subject only the derivation names", async () => {
+    await using workflows = await introspectWorkflow(env.PRECHECK);
+    // The change declares no premise and no effect: `authz.sessions` reaches the plan from its derivation alone.
+    const { c, commitSha, submit } = await pushed();
+    const effect = derivedAtSessions(commitSha);
+    const derive = await kept(c, commitSha, [effect]);
+    await workflows.modifyAll(async (m) => {
+      await m.mockStepResult({ name: "ancestry" }, descends(BASE));
+      await m.mockStepResult({ name: "diff" }, touched(["src/a.ts"]));
+      await m.mockStepResult({ name: "policy" }, policy([]));
+      await m.mockStepResult(
+        { name: "flow" },
+        flow(JSON.stringify({ predicates: { freshness: "block" } })),
+      );
+      await m.mockStepResult({ name: "guards" }, guards([TEST_GUARD, INVOICES]));
+      await m.mockStepResult({ name: "derive" }, derive);
+    });
+    await submit();
+    await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);
+    await (await workflows.get())[0]?.waitForStatus("complete");
+
+    const log = await c.log();
+    expect(log.find((e) => e.type === "EffectsDerived")?.payload).toEqual({
+      _tag: "EffectsDerived",
+      changeId: c.changeId,
+      revision: 1,
+      effects: [Schema.encodeSync(DerivedEffect)(effect)],
+      derivationRef: derive.value.derivationRef,
+    });
+    const { planHash } = Schema.decodeUnknownSync(Schema.Struct({ planHash: ContentHash }))(
+      log.find((e) => e.type === "PlanCompiled")?.payload,
+    );
+    const text = await (await env.ARCHIVE.get(planKey(planHash)))?.text();
+    const plan = Result.getOrThrow(readStoredPlan(planHash, text ?? ""));
+    expect(plan.steps.flatMap((s) => (s.guards === undefined ? [] : [s.guards]))).toEqual([
+      { predicate: "freshness", policy: "block", probe: TEST_GUARD.probe },
+    ]);
+  });
+
+  it("[d21.pool.derive-real] core's derivation, run here on tree-sitter, the Project DO's live anchors and ARCHIVE, finds the session cache a head puts under a neighbour's anchored function, and Precheck commits that effect and compiles the subject's guard", async () => {
+    await using workflows = await introspectWorkflow(env.PRECHECK);
+    const projectId: ProjectId = makeId("prj", ulid());
+    const c = await changeUnderTest(projectId, "project");
+    const neighbour = await changeUnderTest(projectId, "project");
+    // The subject and its parent hear the neighbour's premise and this change's derivation, and commit what they make of each.
+    const hearing = [key("authz.sessions"), key("authz")].map((subject) =>
+      drainAfter(env.SUBJECT.get(env.SUBJECT.idFromName(subjectAddress(projectId, subject)))),
+    );
+    // Another live change of the project relies on sessions, anchored at `sessionOf`; drained, so the project's index holds that anchor.
+    ok(await neighbour.declare("declare-neighbour", { premises: [RELIED] }));
+    await drainOutbox(neighbour.stub);
+
+    // This change declares no premise and no effect, and pushes the module without its cache, then with it.
+    const lease = ok(await c.declare("declare-1")).change.lease.id;
+    const workspace = ok(decodeExit(ChangeCodecs.workspace, await c.stub.workspace()));
+    const { base, head } = await pushedOver(
+      c,
+      workspace,
+      { [SESSIONS_FILE]: UNCACHED },
+      { [SESSIONS_FILE]: CACHED },
+    );
+    // What the diff step is mocked with below is what the code host's own diff of the two commits answers.
+    expect(
+      await Effect.runPromise(
+        diffSubmission(workspace, base, head).pipe(Effect.provide(c.code.layer)),
+      ),
+    ).toEqual({ _tag: "Touched", paths: ["src/authz/sessions.ts"] });
+
+    const answer = await derivedFrom(c, workspace, base, head, [SESSIONS_FILE]);
+    expect(answer.subjects).toEqual(["authz.sessions"]);
+    // The control: the same anchors, parser and store over the base read as its own head, where nothing is cached.
+    const unchanged = await derivedFrom(c, workspace, base, base, [SESSIONS_FILE]);
+    expect(unchanged.subjects).toEqual([]);
+
+    await workflows.modifyAll(async (m) => {
+      await m.mockStepResult({ name: "ancestry" }, descends(base));
+      await m.mockStepResult({ name: "diff" }, touched([SESSIONS_FILE]));
+      await m.mockStepResult({ name: "policy" }, policy([]));
+      await m.mockStepResult(
+        { name: "flow" },
+        flow(JSON.stringify({ predicates: { freshness: "block" } })),
+      );
+      await m.mockStepResult({ name: "guards" }, guards([TEST_GUARD, INVOICES]));
+      await m.mockStepResult({ name: "derive" }, { _tag: "Done", value: answer });
+    });
+    ok(
+      decodeExit(
+        ChangeCodecs.submit,
+        await c.stub.submit({
+          agentId: c.agentId,
+          leaseId: lease,
+          commitSha: head,
+          idempotencyKey: "s-1",
+        }),
+      ),
+    );
+    await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);
+    await (await workflows.get())[0]?.waitForStatus("complete");
+
+    // The cache and the anchored function that reads through it, at the head.
+    const anchors = [
+      { path: "src/authz/sessions.ts", symbol: "cache", commit: head },
+      { path: "src/authz/sessions.ts", symbol: "sessionOf", commit: head },
+    ];
+    const effect = {
+      proposition: {
+        subject: "authz.sessions",
+        predicate: "freshness",
+        relation: "is",
+        value: "per-session",
+        anchors,
+      },
+      anchors,
+      declared: false,
+      method: "extractor",
+      evidenceClass: "ruling",
+    };
+    expect((await c.current()).state).toBe("queued");
+    const log = await c.log();
+    expect(log.map((e) => e.type).slice(-4)).toEqual([
+      "PrecheckStarted",
+      "EffectsDerived",
+      "PlanCompiled",
+      "ChangeQueued",
+    ]);
+    expect(log.find((e) => e.type === "EffectsDerived")?.payload).toEqual({
+      _tag: "EffectsDerived",
+      changeId: c.changeId,
+      revision: 1,
+      effects: [effect],
+      derivationRef: answer.derivationRef,
+    });
+    // The change named no subject: the plan holds the guard on `authz.sessions` through the derivation alone.
+    const { planHash } = Schema.decodeUnknownSync(Schema.Struct({ planHash: ContentHash }))(
+      log.find((e) => e.type === "PlanCompiled")?.payload,
+    );
+    const text = await (await env.ARCHIVE.get(planKey(planHash)))?.text();
+    const plan = Result.getOrThrow(readStoredPlan(planHash, text ?? ""));
+    expect(plan.steps.flatMap((s) => (s.guards === undefined ? [] : [s.guards]))).toEqual([
+      { predicate: "freshness", policy: "block", probe: TEST_GUARD.probe },
+    ]);
+
+    // The record ARCHIVE keeps: both commits read whole by tree-sitter, stamped with its rules and packages, against the neighbour's anchor.
+    const read = {
+      parser: expect.stringMatching(
+        /^keel-syntax\/\d+ web-tree-sitter@[\d.]+ tree-sitter-typescript@[\d.]+$/,
+      ),
+      skipped: [],
+    };
+    const record = await Effect.runPromise(
+      EvidenceStore.use((store) => store.get(answer.derivationRef)).pipe(
+        Effect.provide(EvidenceStoreR2(env.ARCHIVE)),
+      ),
+    );
+    expect(record).toEqual({
+      kind: "keel.derivation/1",
+      changeId: c.changeId,
+      revision: 1,
+      repo: workspace.repo,
+      base,
+      head,
+      seeds: ["src/authz/sessions.ts"],
+      anchors: [{ subject: "authz.sessions", anchors: [SESSION_OF] }],
+      readings: { base: read, head: read },
+      effects: [effect],
+      undecided: [],
+    });
+
+    // The subjects heard the derivation from this change's outbox, and what they tell the neighbour's agent is theirs to flush.
+    await drainOutbox(c.stub);
+    await Promise.all(hearing.map((subject) => drainOutbox(subject)));
+  });
+
+  it("[d21.pool.derive-unreadable] refuses a commit whose diff could not be read without deriving from it", async () => {
+    await using workflows = await introspectWorkflow(env.PRECHECK);
+    // No derive step is mocked: taken, it would parse a workspace no code host here serves, and never settle.
+    await workflows.modifyAll(async (m) => {
+      await m.mockStepResult({ name: "ancestry" }, descends(BASE));
+      await m.mockStepResult(
+        { name: "diff" },
+        { _tag: "Done", value: { _tag: "Unreadable", reason: `ObjectNotFound ${BASE}` } },
+      );
+      await m.mockStepResult({ name: "policy" }, policy([]));
+      await m.mockStepResult({ name: "flow" }, flow());
+      await m.mockStepResult({ name: "guards" }, guards());
+    });
+    const { c } = await submitted();
+    await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);
+    await (await workflows.get())[0]?.waitForStatus("complete");
+
+    const log = await c.log();
+    expect(log.at(-1)?.payload).toMatchObject({
+      _tag: "ChangeBounced",
+      reasons: [`precheck:unreadable:ObjectNotFound ${BASE}`],
+    });
+    expect(log.map((e) => e.type)).not.toContain("EffectsDerived");
+  });
+
   it("[d12.pool.refused] bounces a change to a guard path, with next actions and a ruling verdict", async () => {
     await using workflows = await introspectWorkflow(env.PRECHECK);
+    const { c, commitSha, submit } = await pushed();
+    const derive = await kept(c, commitSha);
     await workflows.modifyAll(async (m) => {
       await m.mockStepResult({ name: "ancestry" }, descends(BASE));
       await m.mockStepResult({ name: "diff" }, touched([".keel/guards/g1.test.ts", "src/a.ts"]));
       await m.mockStepResult({ name: "policy" }, policy([]));
       await m.mockStepResult({ name: "flow" }, flow());
       await m.mockStepResult({ name: "guards" }, guards());
+      await m.mockStepResult({ name: "derive" }, derive);
     });
-    const { c } = await submitted();
+    await submit();
     await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);
     const [instance] = await workflows.get();
     await instance?.waitForStatus("complete");
@@ -153,14 +558,17 @@ describe("Precheck", () => {
 
   it("[d12.pool.stale] completes, moving nothing, when the change has moved on", async () => {
     await using workflows = await introspectWorkflow(env.PRECHECK);
+    const { c, commitSha, submit } = await pushed();
+    const derive = await kept(c, commitSha);
     await workflows.modifyAll(async (m) => {
       await m.mockStepResult({ name: "ancestry" }, descends(BASE));
       await m.mockStepResult({ name: "diff" }, touched(["src/a.ts"]));
       await m.mockStepResult({ name: "policy" }, policy([]));
       await m.mockStepResult({ name: "flow" }, flow());
       await m.mockStepResult({ name: "guards" }, guards());
+      await m.mockStepResult({ name: "derive" }, derive);
     });
-    const { c, commitSha } = await submitted();
+    await submit();
     await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);
     await (await workflows.get())[0]?.waitForStatus("complete");
     const before = await c.log();

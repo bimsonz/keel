@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck-derive.test.ts
+# kills: d21.derive.seeds
+# why: A subject is seeded only when it is the very one declared or touched, never a sibling or one beneath it: narrower than the rule that selects a change's guards, so a guard can run on code the derivation never read
+diff --git a/packages/core/src/application/verification/derive-submission.ts b/packages/core/src/application/verification/derive-submission.ts
+index 2a8dfe9..c8d5cf5 100644
+--- a/packages/core/src/application/verification/derive-submission.ts
++++ b/packages/core/src/application/verification/derive-submission.ts
+@@ -125,7 +125,7 @@ export const derivationSeeds = (
+   const edited = new Set(touched);
+   const at = anchors.filter((row) => pathsOf(row).some((p) => edited.has(p)));
+   const focus = [...declared, ...at.map((row) => row.subject)];
+-  const near = anchors.filter((row) => focus.some((s) => subjectsNear(s, row.subject)));
++  const near = anchors.filter((row) => focus.some((s) => s === row.subject));
+   return [...new Set([...touched, ...near.flatMap(pathsOf)])].toSorted();
+ };
+ 
