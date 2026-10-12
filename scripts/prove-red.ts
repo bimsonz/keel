@@ -29,34 +29,40 @@
 // packages/tooling/src/prove-red.ts, where a test can reach them: this script
 // refuses a dirty tree, so it cannot run under its own mutants.
 //
-// Usage: node scripts/prove-red.ts [name-filter] [--unseeded N] [--dir <patch dir>]
-//   --unseeded N   unseeded runs per tagged patch (default 2)
-//   --dir          another patch directory (the runner's own controls live in
-//                  test/controls/prove-red: one must be reported a survivor,
-//                  the other BASELINE RED)
+// `--baseline-only` is the sweep: it takes the baselines and applies nothing,
+// so it proves no mutant. It runs each command once, narrowed to every tag the
+// patches that share it claim, and says of each patch `baseline green` or
+// `BASELINE RED`. It finds the patches whose proof would be a lie at the cost
+// of one run for each command, where a full proof takes six for each patch.
+// Exit 1 if any baseline is red, or any patch is stale or has no header.
+//
+// Usage: node scripts/prove-red.ts [name-filter] [--unseeded N] [--dir <patch dir>] [--baseline-only]
+//   --unseeded N      unseeded runs per tagged patch (default 2)
+//   --dir             another patch directory (the runner's own controls live
+//                     in test/controls/prove-red: one must be reported a
+//                     survivor, the other BASELINE RED)
+//   --baseline-only   take every baseline, apply no patch
 import { execSync, spawnSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { prover, type Ran, type Run } from "../packages/tooling/src/prove-red.ts";
+import {
+  argumentsOf,
+  prover,
+  type Ran,
+  type Run,
+  sweeper,
+} from "../packages/tooling/src/prove-red.ts";
 
 const root = execSync("git rev-parse --show-toplevel", { encoding: "utf8" }).trim();
 
-function option(name: string): string | undefined {
-  const at = process.argv.indexOf(name);
-  return at === -1 ? undefined : process.argv[at + 1];
-}
-const unseeded = Number(option("--unseeded") ?? "2");
-const dir = resolve(root, option("--dir") ?? "test/mutants");
-const valued = new Set(["--unseeded", "--dir"]);
-const filter =
-  process.argv
-    .slice(2)
-    .find((arg, i, args) => !arg.startsWith("--") && !valued.has(args[i - 1] ?? "")) ?? "";
-if (!Number.isInteger(unseeded) || unseeded < 0) {
-  console.error("--unseeded takes a whole number of runs");
+const asked = argumentsOf(process.argv.slice(2));
+if ("refused" in asked) {
+  console.error(asked.refused);
   process.exit(2);
 }
+const { filter, unseeded, baselineOnly } = asked;
+const dir = resolve(root, asked.dir ?? "test/mutants");
 
 const patches = readdirSync(dir)
   .filter((name) => name.endsWith(".patch") && name.includes(filter))
@@ -114,57 +120,98 @@ function run(scratch: string, index: number, { command, seed, reported }: Run): 
   return { status: result.status, report: parsed, output: `${result.stdout}${result.stderr}` };
 }
 
+/** A patch that can be run: it has its header and still applies. */
+interface Usable {
+  readonly name: string;
+  readonly path: string;
+  readonly command: string;
+  readonly kills: readonly string[];
+  readonly regen: boolean;
+}
+
+/** The patch, or nothing once it is reported as one that cannot be run. */
+function usable(name: string): Usable | undefined {
+  const path = join(dir, name);
+  const { command, kills, regen } = headerOf(path);
+  if (command === undefined) {
+    console.log(`SKIP ${name}: first line must be "# expect-red: <command>"`);
+    return undefined;
+  }
+  if (spawnSync("git", ["apply", "--check", path], { cwd: root }).status !== 0) {
+    console.log(`STALE ${name}: no longer applies to the code it mutates; regenerate it`);
+    return undefined;
+  }
+  return { name, path, command, kills, regen };
+}
+
+/** Patches that survived, or that could not be run: in a sweep, only the second. */
 const survivors: string[] = [];
 const baselineRed: string[] = [];
 const scratch = mkdtempSync(join(tmpdir(), "prove-red-"));
 try {
   let runs = 0;
-  const prove = prover({ run: (asked) => run(scratch, runs++, asked), unseeded });
-  for (const name of patches) {
-    const path = join(dir, name);
-    const { command, kills, regen } = headerOf(path);
-    if (command === undefined) {
-      console.log(`SKIP ${name}: first line must be "# expect-red: <command>"`);
-      survivors.push(name);
-      continue;
+  const numbered = (wanted: Run): Ran => run(scratch, runs++, wanted);
+  if (baselineOnly) {
+    const mutants = patches.flatMap((name) => {
+      const patch = usable(name);
+      if (patch === undefined) survivors.push(name);
+      return patch === undefined ? [] : [patch];
+    });
+    const baselineOf = sweeper({ run: numbered, mutants });
+    for (const { name, command, kills } of mutants) {
+      const baseline = baselineOf({ command, kills });
+      if (baseline.verdict === "baseline-red") {
+        baselineRed.push(name);
+        console.log(`BASELINE RED ${name}: ${baseline.detail}`);
+      } else console.log(`baseline green ${name} (${baseline.note})`);
     }
-    if (spawnSync("git", ["apply", "--check", path], { cwd: root }).status !== 0) {
-      console.log(`STALE ${name}: no longer applies to the code it mutates; regenerate it`);
-      survivors.push(name);
-      continue;
-    }
-    const mutated = <T>(body: () => T): T => {
-      execSync(`git apply ${JSON.stringify(path)}`, { cwd: root });
-      try {
-        if (regen) regenerate();
-        return body();
-      } finally {
-        execSync(`git apply -R ${JSON.stringify(path)}`, { cwd: root });
-        if (regen) regenerate();
+  } else {
+    const prove = prover({ run: numbered, unseeded });
+    for (const name of patches) {
+      const patch = usable(name);
+      if (patch === undefined) {
+        survivors.push(name);
+        continue;
       }
-    };
-    const started = Date.now();
-    const { verdict, note, detail } = prove({ command, kills, mutated });
-    const seconds = ((Date.now() - started) / 1000).toFixed(1);
-    if (verdict === "baseline-red") {
-      baselineRed.push(name);
-      console.log(`BASELINE RED ${name}: ${detail}`);
-      continue;
+      const { path, command, kills, regen } = patch;
+      const mutated = <T>(body: () => T): T => {
+        execSync(`git apply ${JSON.stringify(path)}`, { cwd: root });
+        try {
+          if (regen) regenerate();
+          return body();
+        } finally {
+          execSync(`git apply -R ${JSON.stringify(path)}`, { cwd: root });
+          if (regen) regenerate();
+        }
+      };
+      const started = Date.now();
+      const { verdict, note, detail } = prove({ command, kills, mutated });
+      const seconds = ((Date.now() - started) / 1000).toFixed(1);
+      if (verdict === "baseline-red") {
+        baselineRed.push(name);
+        console.log(`BASELINE RED ${name}: ${detail}`);
+        continue;
+      }
+      if (verdict === "survived") survivors.push(name);
+      const timing = note === "" ? `${seconds}s` : `${seconds}s, ${note}`;
+      console.log(`${verdict === "red" ? "red" : "SURVIVED"} ${name} (${timing}): ${detail}`);
     }
-    if (verdict === "survived") survivors.push(name);
-    const timing = note === "" ? `${seconds}s` : `${seconds}s, ${note}`;
-    console.log(`${verdict === "red" ? "red" : "SURVIVED"} ${name} (${timing}): ${detail}`);
   }
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }
 
 const unproven = survivors.length + baselineRed.length;
+const allGood = baselineOnly
+  ? `all ${patches.length} baselines green; nothing was applied, so no mutant is proved`
+  : `all ${patches.length} mutants went red`;
 console.log(
   unproven === 0
-    ? `\nall ${patches.length} mutants went red`
+    ? `\n${allGood}`
     : [
-        ...(survivors.length === 0 ? [] : [`\nsurvivors: ${survivors.join(", ")}`]),
+        ...(survivors.length === 0
+          ? []
+          : [`\n${baselineOnly ? "stale or headerless" : "survivors"}: ${survivors.join(", ")}`]),
         ...(baselineRed.length === 0
           ? []
           : [`\nbaseline red, so nothing proved: ${baselineRed.join(", ")}`]),

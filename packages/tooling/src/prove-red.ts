@@ -1,7 +1,8 @@
 // How `scripts/prove-red.ts` decides whether a mutant went red: what it adds to
 // the mutant's command so that it runs only the tests the mutant claims to
-// kill, the baseline it takes before the patch is applied, and the rule for
-// red. Pure: the script does the running and the patching, and hands both in.
+// kill, the baseline it takes before the patch is applied, the rule for red,
+// the sweep that takes the baselines alone, and how the script's arguments are
+// read. Pure: the script does the running and the patching, and hands both in.
 
 const escaped = (text: string): string => text.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
 
@@ -70,6 +71,8 @@ export interface Proof {
 interface Tally {
   readonly failed: Set<string>;
   readonly seen: Set<string>;
+  /** The tags with a test that ran: a test a name filter left out, or a skipped one, is seen only. */
+  readonly tested: Set<string>;
   /** Tests that ran, of the tests the report lists: a name filter leaves the rest skipped. */
   readonly ran: number;
   readonly listed: number;
@@ -79,6 +82,7 @@ interface Tally {
 function tagsIn(report: unknown): Tally {
   const failed = new Set<string>();
   const seen = new Set<string>();
+  const tested = new Set<string>();
   let ran = 0;
   let listed = 0;
   const files: unknown = Reflect.get(Object(report), "testResults");
@@ -87,16 +91,18 @@ function tagsIn(report: unknown): Tally {
     for (const assertion of Array.isArray(assertions) ? assertions : []) {
       const name = String(Reflect.get(Object(assertion), "fullName") ?? "");
       const status = Reflect.get(Object(assertion), "status");
+      const didRun = status === "passed" || status === "failed";
       listed += 1;
-      if (status === "passed" || status === "failed") ran += 1;
+      if (didRun) ran += 1;
       for (const [, tag] of name.matchAll(/\[([\w.-]+)\]/g)) {
         if (tag === undefined) continue;
         seen.add(tag);
+        if (didRun) tested.add(tag);
         if (status === "failed") failed.add(tag);
       }
     }
   }
-  return { failed, seen, ran, listed };
+  return { failed, seen, tested, ran, listed };
 }
 
 function excerpt(output: string): string {
@@ -116,8 +122,10 @@ const bracketed = (tags: readonly string[]): string => tags.map((tag) => `[${tag
 
 /**
  * Why a run with no patch applied leaves a mutant's claims unproven, or null
- * when every claimed tag has a test and none of them failed. A test the mutant
- * does not claim may fail here: it decides nothing about this mutant.
+ * when every claimed tag has a test that ran and none of them failed. A test
+ * the mutant does not claim may fail here: it decides nothing about this
+ * mutant. A claimed tag whose tests were all left out (by a header's own `-t`,
+ * or skipped in the file) can never fail, so it is no baseline either.
  */
 function baselineFault(clean: Ran, kills: readonly string[]): string | null {
   if (clean.report === undefined)
@@ -125,13 +133,39 @@ function baselineFault(clean: Ran, kills: readonly string[]): string | null {
       `no JSON report without the mutant (exit ${clean.status}); the suite did not run`,
       clean.output,
     );
-  const { failed, seen } = tagsIn(clean.report);
+  const { failed, seen, tested } = tagsIn(clean.report);
   const unseen = kills.filter((tag) => !seen.has(tag));
   if (unseen.length > 0) return `no test carries ${bracketed(unseen)} without the mutant`;
+  const idle = kills.filter((tag) => !tested.has(tag));
+  if (idle.length > 0) return `no test carrying ${bracketed(idle)} ran without the mutant`;
   const red = kills.filter((tag) => failed.has(tag));
   if (red.length > 0)
     return `${bracketed(red)} ${red.length === 1 ? "fails" : "fail"} without the mutant`;
   return null;
+}
+
+/** Why an untagged mutant's command proves nothing: it already exits non-zero with no patch applied. */
+function exitFault(clean: Ran, command: string): string | null {
+  return clean.status === 0
+    ? null
+    : withExcerpt(`\`${command}\` exits ${clean.status} without the mutant`, clean.output);
+}
+
+/**
+ * Takes baselines: a command with no patch applied, under the first seed. Each
+ * is kept, so a command is run once for its report and once for its exit code,
+ * however many mutants ask.
+ */
+function baselineTaker(run: (run: Run) => Ran): (command: string, reported: boolean) => Ran {
+  const baselines = new Map<string, Ran>();
+  return (command, reported) => {
+    const key = `${reported ? "report" : "exit"} ${command}`;
+    const kept = baselines.get(key);
+    if (kept !== undefined) return kept;
+    const clean = run({ command, seed: SEEDS[0], reported });
+    baselines.set(key, clean);
+    return clean;
+  };
 }
 
 /**
@@ -144,17 +178,7 @@ export function prover(given: {
   readonly unseeded: number;
 }): (mutant: Mutant) => Proof {
   const { run, unseeded } = given;
-  const baselines = new Map<string, Ran>();
-
-  /** The command with no patch applied, under the first seed: once per command and kind of run. */
-  const baseline = (command: string, reported: boolean): Ran => {
-    const key = `${reported ? "report" : "exit"} ${command}`;
-    const kept = baselines.get(key);
-    if (kept !== undefined) return kept;
-    const clean = run({ command, seed: SEEDS[0], reported });
-    baselines.set(key, clean);
-    return clean;
-  };
+  const baseline = baselineTaker(run);
 
   /** Red only if every claimed tag fails in every run: each fixed seed, then the unseeded runs. */
   const tagged = ({ command, kills, mutated }: Mutant): Proof => {
@@ -208,16 +232,8 @@ export function prover(given: {
 
   /** Red when the command exits non-zero with the patch applied, having exited 0 without it. */
   const untagged = ({ command, mutated }: Mutant): Proof => {
-    const clean = baseline(command, false);
-    if (clean.status !== 0)
-      return {
-        verdict: "baseline-red",
-        note: "",
-        detail: withExcerpt(
-          `\`${command}\` exits ${clean.status} without the mutant`,
-          clean.output,
-        ),
-      };
+    const fault = exitFault(baseline(command, false), command);
+    if (fault !== null) return { verdict: "baseline-red", note: "", detail: fault };
     const ran = mutated(() => run({ command, seed: undefined, reported: false }));
     return ran.status === 0
       ? { verdict: "survived", note: "", detail: `\`${command}\` stayed green` }
@@ -229,4 +245,99 @@ export function prover(given: {
   };
 
   return (mutant) => (mutant.kills.length > 0 ? tagged(mutant) : untagged(mutant));
+}
+
+/** What a sweep is asked about a mutant: its command and its claims. There is no patch to apply. */
+export type Claim = Pick<Mutant, "command" | "kills">;
+
+/** What a sweep says of a mutant's baseline. Green proves nothing about the mutant: it was never applied. */
+export type Baseline =
+  | {
+      readonly verdict: "baseline-green";
+      /** What the line adds: `2 of 15 tests`, or `exit 0` for an untagged mutant. */
+      readonly note: string;
+    }
+  | {
+      readonly verdict: "baseline-red";
+      /** The prover's own words for it. */
+      readonly detail: string;
+    };
+
+/**
+ * The sweep: every baseline and no patch. It takes one run for each command as
+ * written, narrowed to every tag the given mutants claim under that command,
+ * and reads each mutant's own claims from that one report; an untagged
+ * mutant's command is run for its exit code. So a few hundred runs judge every
+ * patch, where the prover's baselines, one for each set of claims, are twice
+ * as many.
+ *
+ * It is a screen, and the prover is the judge: a test that fails only beside
+ * the other claimed tests of its file, or passes only beside them, reads
+ * differently here than in that mutant's own proof.
+ */
+export function sweeper(given: {
+  readonly run: (run: Run) => Ran;
+  /** Every mutant the sweep will be asked about. */
+  readonly mutants: readonly Claim[];
+}): (claim: Claim) => Baseline {
+  const baseline = baselineTaker(given.run);
+  /** The tags claimed under each command as written, in the order first claimed. */
+  const claimed = new Map<string, readonly string[]>();
+  for (const { command, kills } of given.mutants)
+    claimed.set(command, [...new Set([...(claimed.get(command) ?? []), ...kills])]);
+
+  return ({ command, kills }) => {
+    if (kills.length === 0) {
+      const fault = exitFault(baseline(command, false), command);
+      return fault === null
+        ? { verdict: "baseline-green", note: "exit 0" }
+        : { verdict: "baseline-red", detail: fault };
+    }
+    const clean = baseline(filteredToClaims(command, claimed.get(command) ?? kills), true);
+    const fault = baselineFault(clean, kills);
+    if (fault !== null) return { verdict: "baseline-red", detail: fault };
+    const { ran, listed } = tagsIn(clean.report);
+    return { verdict: "baseline-green", note: `${ran} of ${listed} tests` };
+  };
+}
+
+/** What a run of the script was asked for. */
+export interface Asked {
+  /** Only the patches whose file name contains this. Empty for all of them. */
+  readonly filter: string;
+  /** Unseeded runs per tagged mutant, after the fixed seeds. */
+  readonly unseeded: number;
+  /** The patch directory, when it is not the default. */
+  readonly dir: string | undefined;
+  /** Take each baseline and apply nothing. */
+  readonly baselineOnly: boolean;
+}
+
+/**
+ * The script's arguments, read. An option it does not know is refused: a
+ * mistyped `--baseline-only` would otherwise start a full proof, which applies
+ * every patch.
+ */
+export function argumentsOf(argv: readonly string[]): Asked | { readonly refused: string } {
+  let filter: string | undefined;
+  let unseeded = 2;
+  let dir: string | undefined;
+  let baselineOnly = false;
+  for (let at = 0; at < argv.length; at += 1) {
+    const arg = argv[at] ?? "";
+    if (arg === "--") continue;
+    if (arg === "--baseline-only") baselineOnly = true;
+    else if (arg === "--unseeded") {
+      at += 1;
+      unseeded = Number(argv[at] ?? "none");
+      if (!Number.isInteger(unseeded) || unseeded < 0)
+        return { refused: "--unseeded takes a whole number of runs" };
+    } else if (arg === "--dir") {
+      at += 1;
+      dir = argv[at];
+      if (dir === undefined) return { refused: "--dir takes a patch directory" };
+    } else if (arg.startsWith("--")) return { refused: `unknown option ${arg}` };
+    else filter ??= arg;
+  }
+  return { filter: filter ?? "", unseeded, dir, baselineOnly };
 }

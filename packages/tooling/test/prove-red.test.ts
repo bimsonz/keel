@@ -1,6 +1,15 @@
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
-import { claimedPattern, filteredToClaims, prover, type Ran, type Run } from "../src/prove-red.ts";
+import {
+  argumentsOf,
+  type Claim,
+  claimedPattern,
+  filteredToClaims,
+  prover,
+  type Ran,
+  type Run,
+  sweeper,
+} from "../src/prove-red.ts";
 
 /**
  * `scripts/prove-red.ts` runs a mutant's command narrowed to the tests the
@@ -28,7 +37,7 @@ const nearMisses = (tag: string): string[] => [
 ];
 
 /** What a command's arguments are once a real shell has read them, as the runner spawns it. */
-const argumentsOf = (command: string): string[] => {
+const shellWordsOf = (command: string): string[] => {
   const run = spawnSync(command, { shell: true, encoding: "utf8" });
   return run.status === 0 ? run.stdout.split("\n").slice(0, -1) : [`exit ${run.status}`];
 };
@@ -47,7 +56,7 @@ describe("prove:red's filter to a mutant's claimed tests", () => {
   it("[prove-red.filter-reaches-vitest] hands the command's last two arguments to the shell as -t and the pattern", () => {
     for (const kills of [...CLAIMS, ["it's", "a b"]]) {
       const command = filteredToClaims("printf '%s\\n' run x.test.ts", kills);
-      expect(argumentsOf(command)).toEqual(["run", "x.test.ts", "-t", claimedPattern(kills)]);
+      expect(shellWordsOf(command)).toEqual(["run", "x.test.ts", "-t", claimedPattern(kills)]);
     }
   });
 
@@ -95,17 +104,29 @@ interface Tree {
   readonly reports: boolean;
 }
 
-/** Vitest's JSON report for a file with one test per tag. */
-const reportOf = (tags: readonly string[], failing: ReadonlySet<string>): unknown => ({
-  testResults: [
-    {
-      assertionResults: tags.map((tag) => ({
-        fullName: `a suite [${tag}] holds for every input`,
-        status: failing.has(tag) ? "failed" : "passed",
-      })),
-    },
-  ],
-});
+/** The title of the test at `index`, carrying `tag`. */
+const titleOf = (tag: string, index: number): string =>
+  `suite ${index} [${tag}] holds for every input`;
+
+/** The name pattern a command hands vitest with `-t`, as a shell would read it; none runs every test. */
+const namePatternOf = (command: string): RegExp => {
+  const quoted = /(?:^|\s)-t '((?:[^']|'\\'')*)'/.exec(command)?.[1];
+  return new RegExp(quoted === undefined ? "" : quoted.replaceAll("'\\''", "'"));
+};
+
+/** Each test of the tree as a run of `command` leaves it: the ones its `-t` leaves out are skipped. */
+const statusesOf = (
+  tags: readonly string[],
+  failing: ReadonlySet<string>,
+  command: string,
+): { fullName: string; status: "passed" | "failed" | "skipped" }[] => {
+  const named = namePatternOf(command);
+  return tags.map((tag, index) => {
+    const fullName = titleOf(tag, index);
+    const ran = failing.has(tag) ? "failed" : "passed";
+    return { fullName, status: named.test(fullName) ? ran : "skipped" };
+  });
+};
 
 /** A prover over a tree, with a log of every run it asked for and a count of the patches it applied. */
 const stage = (tree: Tree) => {
@@ -115,9 +136,10 @@ const stage = (tree: Tree) => {
   const run = ({ command, seed, reported }: Run): Ran => {
     log.push(`${patched ? "patched" : "clean"}, seed ${seed ?? "none"}: ${command}`);
     const failing = new Set([...tree.broken, ...(patched ? tree.killed : [])]);
+    const assertionResults = statusesOf(tree.tags, failing, command);
     return {
-      status: failing.size === 0 ? 0 : 1,
-      report: reported && tree.reports ? reportOf(tree.tags, failing) : undefined,
+      status: assertionResults.some(({ status }) => status === "failed") ? 1 : 0,
+      report: reported && tree.reports ? { testResults: [{ assertionResults }] } : undefined,
       output: "",
     };
   };
@@ -130,7 +152,13 @@ const stage = (tree: Tree) => {
       patched = false;
     }
   };
-  return { prove: prover({ run, unseeded: 2 }), mutated, log, applications: () => applications };
+  return {
+    prove: prover({ run, unseeded: 2 }),
+    run,
+    mutated,
+    log,
+    applications: () => applications,
+  };
 };
 
 const COMMAND = "pnpm vitest run --project unit x.test.ts";
@@ -138,6 +166,10 @@ const COMMAND = "pnpm vitest run --project unit x.test.ts";
 const FILTERED = `${COMMAND} -t '\\[a\\.b\\]'`;
 /** A command that names its own tests, so every mutant runs it as written. */
 const EXPLICIT = `${COMMAND} -t 'a|c'`;
+/** A command whose own `-t` leaves the test carrying `a.b` out. */
+const ELSEWHERE = `${COMMAND} -t '\\[c\\.d\\]'`;
+/** A command whose own `-t` runs the file's first test alone. */
+const FIRST = `${COMMAND} -t 'suite 0 '`;
 
 describe("prove:red's baseline", () => {
   it("[prove-red.baseline] never counts a claimed tag red when it fails with no patch applied, and never applies that patch", () => {
@@ -145,7 +177,7 @@ describe("prove:red's baseline", () => {
     const sound = stage({ tags: ["a.b", "c.d"], broken: [], killed: ["a.b"], reports: true });
     expect(sound.prove({ command: COMMAND, kills: ["a.b"], mutated: sound.mutated })).toEqual({
       verdict: "red",
-      note: "2 of 2 tests",
+      note: "1 of 2 tests",
       detail: "[a.b] failed under seeds 42, 1337, 20261014 and 2 unseeded run(s)",
     });
     expect(sound.log).toEqual([
@@ -263,5 +295,209 @@ describe("prove:red's baseline", () => {
       detail: "`pnpm guards` exits 1 without the mutant",
     });
     expect(broken.applications()).toBe(0);
+  });
+});
+
+describe("prove:red's baseline, when a claimed test did not run", () => {
+  it("[prove-red.baseline-ran] never takes a claimed tag whose every test was left out as a green baseline", () => {
+    // The header's own -t leaves the claimed test out: it is listed, skipped, and could never fail.
+    const idle = stage({ tags: ["a.b", "c.d"], broken: [], killed: ["a.b"], reports: true });
+    expect(idle.prove({ command: ELSEWHERE, kills: ["a.b"], mutated: idle.mutated })).toEqual({
+      verdict: "baseline-red",
+      note: "",
+      detail: "no test carrying [a.b] ran without the mutant",
+    });
+    expect(idle.applications()).toBe(0);
+    expect(idle.log).toEqual([`clean, seed 42: ${ELSEWHERE}`]);
+
+    // One test carrying the tag ran and one was left out: that is a baseline, and the kill counts.
+    const partly = stage({ tags: ["a.b", "a.b"], broken: [], killed: ["a.b"], reports: true });
+    expect(partly.prove({ command: FIRST, kills: ["a.b"], mutated: partly.mutated })).toEqual({
+      verdict: "red",
+      note: "1 of 2 tests",
+      detail: "[a.b] failed under seeds 42, 1337, 20261014 and 2 unseeded run(s)",
+    });
+
+    // A sweep asked about a claim it was never told of reads the run it has, which left that test out.
+    const stranger = stage({ tags: ["a.b", "c.d"], broken: [], killed: [], reports: true });
+    const baselineOf = sweeper({
+      run: stranger.run,
+      mutants: [{ command: COMMAND, kills: ["a.b"] }],
+    });
+    expect(baselineOf({ command: COMMAND, kills: ["c.d"] })).toEqual({
+      verdict: "baseline-red",
+      detail: "no test carrying [c.d] ran without the mutant",
+    });
+  });
+});
+
+/**
+ * `--baseline-only` is the sweep: every baseline and no patch, so that the
+ * whole of test/mutants can be checked for proofs that would lie. It takes one
+ * run for each command as written, narrowed to every tag claimed under it.
+ */
+
+/** A tree and a claim on it, with what the sweep must say when it is told of that claim alone. */
+const SWEPT: readonly {
+  readonly tree: Tree;
+  readonly claim: Claim;
+  readonly says: ReturnType<ReturnType<typeof sweeper>>;
+}[] = [
+  {
+    tree: { tags: ["a.b", "c.d"], broken: [], killed: ["a.b"], reports: true },
+    claim: { command: COMMAND, kills: ["a.b"] },
+    says: { verdict: "baseline-green", note: "1 of 2 tests" },
+  },
+  {
+    tree: { tags: ["a.b", "c.d"], broken: ["a.b"], killed: ["a.b"], reports: true },
+    claim: { command: COMMAND, kills: ["a.b"] },
+    says: { verdict: "baseline-red", detail: "[a.b] fails without the mutant" },
+  },
+  {
+    tree: { tags: ["a.b", "c.d"], broken: ["c.d"], killed: ["a.b"], reports: true },
+    claim: { command: EXPLICIT, kills: ["a.b", "c.d"] },
+    says: { verdict: "baseline-red", detail: "[c.d] fails without the mutant" },
+  },
+  {
+    tree: { tags: ["c.d"], broken: [], killed: [], reports: true },
+    claim: { command: COMMAND, kills: ["a.b"] },
+    says: { verdict: "baseline-red", detail: "no test carries [a.b] without the mutant" },
+  },
+  {
+    tree: { tags: ["a.b"], broken: [], killed: ["a.b"], reports: false },
+    claim: { command: COMMAND, kills: ["a.b"] },
+    says: {
+      verdict: "baseline-red",
+      detail: "no JSON report without the mutant (exit 0); the suite did not run",
+    },
+  },
+  {
+    tree: { tags: ["a.b", "c.d"], broken: [], killed: ["a.b"], reports: true },
+    claim: { command: ELSEWHERE, kills: ["a.b"] },
+    says: { verdict: "baseline-red", detail: "no test carrying [a.b] ran without the mutant" },
+  },
+  {
+    tree: { tags: ["a.b"], broken: [], killed: ["a.b"], reports: true },
+    claim: { command: "pnpm guards", kills: [] },
+    says: { verdict: "baseline-green", note: "exit 0" },
+  },
+  {
+    tree: { tags: ["a.b"], broken: ["a.b"], killed: ["a.b"], reports: true },
+    claim: { command: "pnpm guards", kills: [] },
+    says: { verdict: "baseline-red", detail: "`pnpm guards` exits 1 without the mutant" },
+  },
+];
+
+describe("prove:red's sweep of baselines", () => {
+  it("[prove-red.sweep] says of a mutant what its own proof's baseline says, from that one run with no patch", () => {
+    for (const { tree, claim, says } of SWEPT) {
+      const swept = stage(tree);
+      const reported: boolean[] = [];
+      const run = (asked: Run): Ran => {
+        reported.push(asked.reported);
+        return swept.run(asked);
+      };
+      expect(sweeper({ run, mutants: [claim] })(claim)).toEqual(says);
+      // A tagged claim is read from vitest's report; an untagged one from the exit code, with no report asked for.
+      expect(reported).toEqual([claim.kills.length > 0]);
+
+      // The prover on the same tree: red baselines are the same ones, in the same words, and the
+      // sweep's one run is the run the proof begins with.
+      const proved = stage(tree);
+      const proof = proved.prove({ ...claim, mutated: proved.mutated });
+      expect(says.verdict === "baseline-red" ? says.detail : "not red").toBe(
+        proof.verdict === "baseline-red" ? proof.detail : "not red",
+      );
+      expect(swept.log).toEqual(proved.log.slice(0, 1));
+      expect(swept.log).toHaveLength(1);
+    }
+  });
+
+  it("[prove-red.sweep-one-run] takes one run for a command, narrowed to every tag claimed under it, and judges each mutant by its own claims", () => {
+    const { run, log } = stage({
+      tags: ["a.b", "c.d", "e.f"],
+      broken: ["c.d"],
+      killed: [],
+      reports: true,
+    });
+    const mutants: readonly Claim[] = [
+      { command: COMMAND, kills: ["a.b"] },
+      { command: COMMAND, kills: ["c.d"] },
+      { command: COMMAND, kills: ["c.d", "a.b"] },
+      { command: COMMAND, kills: ["a.b"] },
+      // A command that names its own tests runs as written, once for all its mutants.
+      { command: EXPLICIT, kills: ["a.b"] },
+      { command: EXPLICIT, kills: ["c.d"] },
+      // The same command read for its exit code is another run: that one has no report.
+      { command: COMMAND, kills: [] },
+      { command: COMMAND, kills: [] },
+    ];
+    const baselineOf = sweeper({ run, mutants });
+
+    expect(mutants.map((mutant) => baselineOf(mutant))).toEqual([
+      // The sibling's claim fails in the same report and decides nothing here.
+      { verdict: "baseline-green", note: "2 of 3 tests" },
+      { verdict: "baseline-red", detail: "[c.d] fails without the mutant" },
+      { verdict: "baseline-red", detail: "[c.d] fails without the mutant" },
+      { verdict: "baseline-green", note: "2 of 3 tests" },
+      { verdict: "baseline-green", note: "2 of 3 tests" },
+      { verdict: "baseline-red", detail: "[c.d] fails without the mutant" },
+      { verdict: "baseline-red", detail: `\`${COMMAND}\` exits 1 without the mutant` },
+      { verdict: "baseline-red", detail: `\`${COMMAND}\` exits 1 without the mutant` },
+    ]);
+    expect(log).toEqual([
+      `clean, seed 42: ${COMMAND} -t '\\[a\\.b\\]|\\[c\\.d\\]'`,
+      `clean, seed 42: ${EXPLICIT}`,
+      `clean, seed 42: ${COMMAND}`,
+    ]);
+
+    // Asked again, it runs nothing.
+    expect(baselineOf({ command: COMMAND, kills: ["a.b"] }).verdict).toBe("baseline-green");
+    expect(log).toHaveLength(3);
+  });
+});
+
+describe("prove:red's arguments", () => {
+  it("[prove-red.arguments] reads --baseline-only wherever it stands, never as the name filter, and refuses an option it does not know", () => {
+    const plain = { filter: "", unseeded: 2, dir: undefined, baselineOnly: false };
+    expect(argumentsOf([])).toEqual(plain);
+    expect(argumentsOf(["domain-"])).toEqual({ ...plain, filter: "domain-" });
+    expect(argumentsOf(["--baseline-only"])).toEqual({ ...plain, baselineOnly: true });
+
+    // The flag takes no value: the argument after it is still the filter.
+    for (const argv of [
+      ["--baseline-only", "domain-"],
+      ["domain-", "--baseline-only"],
+      ["--", "--baseline-only", "domain-"],
+    ])
+      expect(argumentsOf(argv)).toEqual({ ...plain, filter: "domain-", baselineOnly: true });
+
+    // An option's value is never the filter.
+    expect(argumentsOf(["--unseeded", "5", "--dir", "test/controls/prove-red", "x"])).toEqual({
+      filter: "x",
+      unseeded: 5,
+      dir: "test/controls/prove-red",
+      baselineOnly: false,
+    });
+    expect(argumentsOf(["--dir", "x", "--baseline-only", "--unseeded", "0"])).toEqual({
+      filter: "",
+      unseeded: 0,
+      dir: "x",
+      baselineOnly: true,
+    });
+
+    // A mistyped flag must not start a full proof.
+    expect(argumentsOf(["--baseline-olny"])).toEqual({ refused: "unknown option --baseline-olny" });
+    expect(argumentsOf(["domain-", "--baseline"])).toEqual({
+      refused: "unknown option --baseline",
+    });
+    for (const argv of [
+      ["--unseeded"],
+      ["--unseeded", "two"],
+      ["--unseeded", "-1"],
+      ["--unseeded", "1.5"],
+    ])
+      expect(argumentsOf(argv)).toEqual({ refused: "--unseeded takes a whole number of runs" });
+    expect(argumentsOf(["--dir"])).toEqual({ refused: "--dir takes a patch directory" });
   });
 });
