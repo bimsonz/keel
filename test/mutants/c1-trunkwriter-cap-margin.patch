@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts packages/gitcore/test/fetch.test.ts -t "trunkwriter.pack-bytes-cap|relay.pack-cap"
+# kills: trunkwriter.pack-bytes-cap, relay.pack-cap
+# why: Only the streamed read's cap is left, and it allows 64 KiB for side-band framing: a pack up to that much over the receive-pack cap is weighed and relayed
+diff --git a/packages/gitcore/src/fetch.ts b/packages/gitcore/src/fetch.ts
+index c5d000b..2edcd67 100644
+--- a/packages/gitcore/src/fetch.ts
++++ b/packages/gitcore/src/fetch.ts
+@@ -148,7 +148,6 @@ export async function relayPack(
+   const limit = options.maxPackBytes ?? MAX_RELAY_PACK_BYTES;
+   const haves = move.haves ?? (move.from === null ? [] : [move.from]);
+   const pack = await uploadPack(source, [move.to], haves, { maxBytes: limit });
+-  if (pack.length > limit) throw new PackTooLarge(pack.length, limit);
+   return pack;
+ }
+ 

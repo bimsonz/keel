@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts -t trunkwriter.pack-bytes
+# kills: trunkwriter.pack-bytes
+# why: The meter asks staging for the candidate with no have, so a landing is weighed as the whole history and not as the pack its push relays
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index fe9c407..32fe7a6 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -111,7 +111,7 @@ export const TrunkWriterGitCore = ({ trunk, staging }: { trunk: RepoRef; staging
+           Effect.gen(function* () {
+             const source = yield* remoteOf(staging, "read");
+             const pack = yield* Effect.tryPromise({
+-              try: () => relayPack(source, promotion(from, to)),
++              try: () => relayPack(source, { ...promotion(from, to), haves: [] }),
+               catch: (cause) => cause,
+             }).pipe(Effect.catch(tooLarge(trunk)));
+             return pack.length;

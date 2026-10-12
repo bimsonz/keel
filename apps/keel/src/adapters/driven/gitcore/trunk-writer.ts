@@ -11,7 +11,9 @@ import {
   type GitRemote,
   PackTooLarge as GitPackTooLarge,
   ReceivePackBusy,
+  type RelayMove,
   relay,
+  relayPack,
 } from "@keeltown/gitcore";
 import { Effect, Layer } from "effect";
 
@@ -65,6 +67,9 @@ export const TrunkWriterGitCore = ({ trunk, staging }: { trunk: RepoRef; staging
 
       const trunkHead = host.head(trunk, MAIN).pipe(Effect.catchTag("RefNotFound", Effect.die));
 
+      /** A promotion's move, built once so that weighing it and pushing it ask staging for the same pack. */
+      const promotion = (from: CommitSha, to: CommitSha): RelayMove => ({ ref: MAIN, from, to });
+
       /** One target, relayed until it holds `head`, or until it has moved under us too often. */
       const syncOne = (source: GitRemote, head: CommitSha, target: RepoRef) =>
         Effect.gen(function* () {
@@ -89,7 +94,7 @@ export const TrunkWriterGitCore = ({ trunk, staging }: { trunk: RepoRef; staging
             const source = yield* remoteOf(staging, "read");
             const target = yield* remoteOf(trunk, "write");
             const outcome = yield* Effect.tryPromise({
-              try: () => relay(source, target, { ref: MAIN, from, to }),
+              try: () => relay(source, target, promotion(from, to)),
               catch: (cause) => cause,
             }).pipe(
               Effect.catch((cause): Effect.Effect<never, PackTooLarge | PushRejected> =>
@@ -101,6 +106,15 @@ export const TrunkWriterGitCore = ({ trunk, staging }: { trunk: RepoRef; staging
             // A relay is never `unchanged` here: a promotion's `to` is never its `from`.
             if (outcome.kind === "rejected")
               yield* Effect.fail(new PushRejected({ reason: "stale" }));
+          }).pipe(Effect.catchTag("RepoNotFound", Effect.die)),
+        packBytes: (from, to) =>
+          Effect.gen(function* () {
+            const source = yield* remoteOf(staging, "read");
+            const pack = yield* Effect.tryPromise({
+              try: () => relayPack(source, promotion(from, to)),
+              catch: (cause) => cause,
+            }).pipe(Effect.catch(tooLarge(trunk)));
+            return pack.length;
           }).pipe(Effect.catchTag("RepoNotFound", Effect.die)),
         sync: (targets) =>
           Effect.gen(function* () {

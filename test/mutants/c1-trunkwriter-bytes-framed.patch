@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk-writer.test.ts -t trunkwriter.pack-bytes
+# kills: trunkwriter.pack-bytes
+# why: The meter counts the pack with its side-band framing (5 bytes per 65,515), so every landing is charged bytes trunk never stored
+diff --git a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+index fe9c407..378c712 100644
+--- a/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
++++ b/apps/keel/src/adapters/driven/gitcore/trunk-writer.ts
+@@ -114,7 +114,7 @@ export const TrunkWriterGitCore = ({ trunk, staging }: { trunk: RepoRef; staging
+               try: () => relayPack(source, promotion(from, to)),
+               catch: (cause) => cause,
+             }).pipe(Effect.catch(tooLarge(trunk)));
+-            return pack.length;
++            return pack.length + Math.ceil(pack.length / 65_515) * 5;
+           }).pipe(Effect.catchTag("RepoNotFound", Effect.die)),
+         sync: (targets) =>
+           Effect.gen(function* () {

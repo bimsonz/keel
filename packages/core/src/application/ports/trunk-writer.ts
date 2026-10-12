@@ -35,6 +35,15 @@ export class TrunkWriter extends Context.Service<
       to: CommitSha,
     ) => Effect.Effect<void, PushRejected | UnexpectedHead | PackTooLarge>;
     /**
+     * The length in bytes of the pack `push(from, to)` relays: the same want
+     * and the same have, asked of staging, counted as the pack itself with
+     * none of its transport framing. Trunk's repo grows by that less the 32
+     * bytes of a pack's header and trailer. A pack over the receive-pack cap
+     * is PackTooLarge, as its push would be. It reads staging and writes
+     * nothing.
+     */
+    readonly packBytes: (from: CommitSha, to: CommitSha) => Effect.Effect<number, PackTooLarge>;
+    /**
      * Copies trunk's head into each target's main (staging, the mirror),
      * relaying trunk's own pack so commit ids survive. Idempotent: a target
      * already at the head is left alone, and one that moves meanwhile is read

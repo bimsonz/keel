@@ -139,6 +139,70 @@ describe("TrunkWriter.push", () => {
         expect(server.requests.map((r) => r.service)).toEqual(["upload-pack"]);
       }),
   );
+
+  it.effect(
+    "[trunkwriter.pack-bytes] weighs the very pack a push relays: the same want and have, and the pack's own length",
+    () =>
+      Effect.gen(function* () {
+        // Three side-bands' worth, so a count that kept the framing would differ.
+        const pack = new Uint8Array(150_000);
+        pack.set(PACK);
+        const { server, minted, layer, seeded } = pushing(["ok"], pack);
+        yield* seeded;
+        const bytes = yield* Effect.flatMap(TrunkWriter, (w) => w.packBytes(FROM, TO)).pipe(
+          Effect.provide(layer),
+        );
+        // Weighing reads staging and writes nothing.
+        expect(server.requests.map((r) => r.service)).toEqual(["upload-pack"]);
+        expect(minted).toEqual(["prj-staging read 60s"]);
+        yield* Effect.flatMap(TrunkWriter, (w) => w.push(FROM, TO)).pipe(Effect.provide(layer));
+        const [weighed, fetched] = server.requests;
+        expect(weighed?.lines).toEqual([
+          expect.stringMatching(new RegExp(`^want ${TO} `)),
+          `have ${FROM}`,
+          "done",
+        ]);
+        expect(weighed?.lines).toEqual(fetched?.lines);
+        expect(weighed?.repo).toBe(fetched?.repo);
+        expect(server.received).toEqual([150_000]);
+        expect(bytes).toBe(150_000);
+      }),
+  );
+
+  it.effect(
+    "[trunkwriter.pack-bytes-cap] a pack of exactly the receive-pack cap is weighed, and one byte over is PackTooLarge",
+    () =>
+      Effect.gen(function* () {
+        const cap = 60 * 1024 * 1024;
+        const atCap = new Uint8Array(cap);
+        atCap.set(PACK);
+        const fits = pushing([], atCap);
+        yield* fits.seeded;
+        const bytes = yield* Effect.flatMap(TrunkWriter, (w) => w.packBytes(FROM, TO)).pipe(
+          Effect.provide(fits.layer),
+        );
+        expect(bytes).toBe(cap);
+        vi.unstubAllGlobals();
+
+        // One byte is far inside the side-band framing the streamed read allows for.
+        const justOver = new Uint8Array(cap + 1);
+        justOver.set(PACK);
+        const over = pushing([], justOver);
+        yield* over.seeded;
+        const error = yield* Effect.flip(
+          Effect.flatMap(TrunkWriter, (w) => w.packBytes(FROM, TO)).pipe(
+            Effect.provide(over.layer),
+          ),
+        );
+        expect(error).toMatchObject({
+          _tag: "PackTooLarge",
+          repo: TRUNK,
+          bytes: cap + 1,
+          limit: cap,
+        });
+        expect(over.server.requests.map((r) => r.service)).toEqual(["upload-pack"]);
+      }),
+  );
 });
 
 describe("StagingWriter.fastForward", () => {

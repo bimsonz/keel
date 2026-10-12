@@ -4,7 +4,7 @@
 
 import { afterAll, describe, expect, it } from "vitest";
 import { dec } from "../src/bytes.ts";
-import { PackTooLarge, relay, uploadPack } from "../src/fetch.ts";
+import { PackTooLarge, type RelayMove, relay, relayPack, uploadPack } from "../src/fetch.ts";
 import type { GitRemote } from "../src/push.ts";
 import { git, gitSync, smartHttp, tempRepo } from "./git-harness.ts";
 import { PROPERTY_TIMEOUT } from "./support/fast-check.ts";
@@ -133,6 +133,45 @@ describe("relay", { timeout: PROPERTY_TIMEOUT }, () => {
     expect(sent).toEqual([3]);
     expect(git(repos.target.dir, ["rev-parse", ref]).trim()).toBe(tip);
     expect(connected(repos.target.dir, tip)).toEqual([]);
+  });
+
+  it("[relay.pack] relayPack answers the very pack a relay of the same move sends, byte for byte", async () => {
+    const base = headOf(repos.source.dir) ?? commitFile(repos.source.dir, "a.txt", "x\n");
+    await relay(source, target, { ref: MAIN, from: headOf(repos.target.dir), to: base });
+    const tip = commitFile(repos.source.dir, "e.txt", "weighed before it is sent\n", base);
+    const move: RelayMove = { ref: "refs/heads/weighed", from: null, to: tip, haves: [base] };
+    const weighed = await relayPack(source, move);
+    // tip's commit, tree and blob, as the haves leave it.
+    expect(count(weighed)).toBe(3);
+    const sent: Uint8Array[] = [];
+    const watched: GitRemote = {
+      ...target,
+      fetch: async (url, init) => {
+        const body = init?.body;
+        if (body instanceof Uint8Array) {
+          const at = dec.decode(body).indexOf("PACK");
+          if (at >= 0) sent.push(Uint8Array.from(body.subarray(at)));
+        }
+        return http.fetch(url, init);
+      },
+    };
+    expect(await relay(source, watched, move)).toEqual({ kind: "advanced" });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.length).toBe(weighed.length);
+    expect(sent[0]).toEqual(weighed);
+  });
+
+  it("[relay.pack-cap] a pack of exactly the cap is answered, and one byte over is PackTooLarge", async () => {
+    const tip = headOf(repos.source.dir) ?? commitFile(repos.source.dir, "a.txt", "x\n");
+    const move: RelayMove = { ref: MAIN, from: null, to: tip };
+    const pack = await relayPack(source, move);
+    const atCap = await relayPack(source, move, { maxPackBytes: pack.length });
+    expect(atCap.length).toBe(pack.length);
+    const over = await relayPack(source, move, { maxPackBytes: pack.length - 1 }).catch(
+      (cause: unknown) => cause,
+    );
+    expect(over).toBeInstanceOf(PackTooLarge);
+    expect(over).toMatchObject({ bytes: pack.length, limit: pack.length - 1 });
   });
 
   it("[relay.cap-streamed] an answer over the cap is abandoned as it streams, never read whole", async () => {

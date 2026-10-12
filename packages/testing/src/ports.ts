@@ -515,7 +515,7 @@ export const PORTS = {
   ),
   TrunkWriter: port(
     () => integration.makeTrunkWriterMemory(GENESIS).layer,
-    pending("TrunkWriter", ["head", "push", "sync"]),
+    pending("TrunkWriter", ["head", "push", "packBytes", "sync"]),
   ),
   StagingWriter: port(
     () => integration.makeStagingWriterMemory().layer,

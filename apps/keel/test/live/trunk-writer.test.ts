@@ -7,7 +7,7 @@ import { CodeHost, TrunkWriter } from "@keeltown/core/ports";
 import { CodeHostFixture } from "@keeltown/testing";
 import { env } from "cloudflare:workers";
 import { Effect, Layer } from "effect";
-import { afterAll, expect, it } from "vitest";
+import { afterAll, afterEach, expect, it, vi } from "vitest";
 import { CodeHostArtifacts } from "../../src/adapters/driven/artifacts/code-host.ts";
 import { TrunkWriterGitCore } from "../../src/adapters/driven/gitcore/trunk-writer.ts";
 import { artifactsFixture } from "./fixture.ts";
@@ -20,6 +20,20 @@ const MAIN = "refs/heads/main";
 afterAll(async () => {
   await Promise.all(fixture.made.map((repo) => env.WORKSPACES.delete(repo.name)));
 });
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+/** The length of the raw pack in a receive-pack request: what follows its commands' flush. */
+function packLength(body: Uint8Array): number {
+  let at = 0;
+  for (;;) {
+    const length = Number.parseInt(new TextDecoder().decode(body.subarray(at, at + 4)), 16);
+    if (length === 0) return body.length - at - 4;
+    at += length;
+  }
+}
 
 it("[sync.live] relays trunk into an empty repo, then each new head, keeping commit ids; again is a no-op", async () => {
   const trunk = fixture.fixture.scratch();
@@ -110,4 +124,69 @@ it("[trunkwriter.live] lands a staging commit on trunk byte for byte, and refuse
   expect(report.stale).toMatchObject({ _tag: "PushRejected", reason: "stale" });
   expect(report.afterStale).toBe(report.first);
   expect(report.afterSecond).toBe(report.second);
+});
+
+it("[trunkwriter.live-pack-bytes] weighs a promotion's pack as exactly the bytes its push then sends to trunk", async () => {
+  const trunk = fixture.fixture.scratch();
+  const staging = fixture.fixture.scratch();
+  const run = <A, E>(program: Effect.Effect<A, E, CodeHost | CodeHostFixture | TrunkWriter>) =>
+    Effect.runPromise(
+      program.pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            TrunkWriterGitCore({ trunk, staging }).pipe(Layer.provide(host)),
+            host,
+            fixture.layer,
+          ),
+        ),
+      ),
+    );
+  // Every pack a receive-pack request carries from here on, by length; the request itself goes out untouched.
+  const sent: number[] = [];
+  const real = globalThis.fetch;
+  vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const body = init?.body;
+    if (url.endsWith("/git-receive-pack") && body instanceof Uint8Array)
+      sent.push(packLength(body));
+    return real(input, init);
+  });
+  // Lines that share nothing, so the first pack is a few kilobytes even compressed.
+  const prose = Array.from(
+    { length: 400 },
+    (_, i) => `${i} ${(i * 2_654_435_761) % 4_294_967_291}`,
+  );
+
+  const report = await run(
+    Effect.gen(function* () {
+      const codeHost = yield* CodeHost;
+      const writer = yield* TrunkWriter;
+      const commit = (yield* CodeHostFixture).commit;
+      yield* codeHost.create(trunk);
+      yield* codeHost.create(staging);
+      const base = yield* commit(trunk, MAIN, { "README.md": "base\n" });
+      expect(yield* commit(staging, MAIN, { "README.md": "base\n" })).toBe(base);
+      const first = yield* commit(staging, MAIN, { "README.md": `${prose.join("\n")}\n` });
+      const second = yield* commit(staging, MAIN, { "README.md": "second\n" });
+      sent.length = 0;
+      const firstBytes = yield* writer.packBytes(base, first);
+      const again = yield* writer.packBytes(base, first);
+      const unsent = [...sent];
+      yield* writer.push(base, first);
+      const secondBytes = yield* writer.packBytes(first, second);
+      yield* writer.push(first, second);
+      const whole = yield* writer.packBytes(base, second);
+      const landed = yield* codeHost.head(trunk, MAIN);
+      return { second, firstBytes, again, unsent, secondBytes, whole, landed };
+    }),
+  );
+  console.log(
+    `LIVE packBytes: base → first weighed ${report.firstBytes} bytes (asked again: ${report.again}) and its push sent ${sent[0]}; first → second weighed ${report.secondBytes} and its push sent ${sent[1]}; base → second in one pack would weigh ${report.whole}, the two less one pack's 32 bytes = ${report.firstBytes + report.secondBytes - 32}`,
+  );
+  expect(report.unsent).toEqual([]);
+  expect(report.again).toBe(report.firstBytes);
+  expect(sent).toEqual([report.firstBytes, report.secondBytes]);
+  expect(report.firstBytes).toBeGreaterThan(1024);
+  expect(report.whole).toBe(report.firstBytes + report.secondBytes - 32);
+  expect(report.landed).toBe(report.second);
 });

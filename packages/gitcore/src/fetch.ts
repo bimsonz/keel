@@ -134,6 +134,25 @@ export interface RelayOptions {
 }
 
 /**
+ * The pack a relay of `move` sends: what `move.to` reaches in `source` past
+ * the move's haves (`[from]` unless it names its own). Its length is what the
+ * target's repo takes in, and it is compared with the cap exactly: the room
+ * the streamed read leaves for side-band framing never lets a pack over the
+ * cap through. Over it throws `PackTooLarge`.
+ */
+export async function relayPack(
+  source: GitRemote,
+  move: RelayMove,
+  options: Pick<RelayOptions, "maxPackBytes"> = {},
+): Promise<Uint8Array> {
+  const limit = options.maxPackBytes ?? MAX_RELAY_PACK_BYTES;
+  const haves = move.haves ?? (move.from === null ? [] : [move.from]);
+  const pack = await uploadPack(source, [move.to], haves, { maxBytes: limit });
+  if (pack.length > limit) throw new PackTooLarge(pack.length, limit);
+  return pack;
+}
+
+/**
  * Copies `move.to` from `source` into `target`'s `move.ref`: fetches the pack
  * of what the target lacks (have = `from`) and pushes it with `from` as the
  * explicit old value (zero for an empty target), so a target that moved
@@ -147,10 +166,7 @@ export async function relay(
   options: RelayOptions = {},
 ): Promise<RelayOutcome> {
   if (move.from === move.to) return { kind: "unchanged" };
-  const limit = options.maxPackBytes ?? MAX_RELAY_PACK_BYTES;
-  const haves = move.haves ?? (move.from === null ? [] : [move.from]);
-  const pack = await uploadPack(source, [move.to], haves, { maxBytes: limit });
-  if (pack.length > limit) throw new PackTooLarge(pack.length, limit);
+  const pack = await relayPack(source, move, options);
   const update = { ref: move.ref, old: move.from ?? ZERO_OID, new: move.to };
   const retries = options.busyRetries ?? 3;
   for (let attempt = 0; ; attempt += 1) {

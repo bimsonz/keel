@@ -19,9 +19,24 @@ export interface GitRequest {
   readonly lines: readonly string[];
 }
 
-/** A git server that answers upload-pack with `pack` and receive-pack with each scripted reply in turn, for the ref pushed. */
+/** Where a receive-pack request's commands end and its raw pack begins: just past the first flush. */
+function packStart(body: Uint8Array): number {
+  let at = 0;
+  for (;;) {
+    const length = Number.parseInt(dec.decode(body.subarray(at, at + 4)), 16);
+    if (length === 0) return at + 4;
+    at += length;
+  }
+}
+
+/**
+ * A git server that answers upload-pack with `pack` and receive-pack with each
+ * scripted reply in turn, for the ref pushed. `received` holds the byte length
+ * of the pack each receive-pack request carried.
+ */
 export function gitServer(replies: Reply[], pack: Uint8Array = PACK) {
   const requests: GitRequest[] = [];
+  const received: number[] = [];
   const fetch: typeof globalThis.fetch = async (input, init) => {
     const url = new URL(
       typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
@@ -30,9 +45,9 @@ export function gitServer(replies: Reply[], pack: Uint8Array = PACK) {
     const body = new Uint8Array(await new Response(init?.body).arrayBuffer());
     const lines: string[] = [];
     // receive-pack's commands end at the flush, and the raw pack follows; upload-pack's haves follow theirs.
-    for (const line of readPkts(
-      service === "receive-pack" ? body.subarray(0, body.length - PACK.length) : body,
-    ))
+    const commands = service === "receive-pack" ? packStart(body) : body.length;
+    if (service === "receive-pack") received.push(body.length - commands);
+    for (const line of readPkts(body.subarray(0, commands)))
       if (line !== null) lines.push(dec.decode(line).replace(/\n$/, "").split("\0")[0] ?? "");
     requests.push({
       service,
@@ -54,5 +69,5 @@ export function gitServer(replies: Reply[], pack: Uint8Array = PACK) {
         : [pkt("unpack ok\n"), pkt(reply === "ok" ? `ok ${ref}\n` : `ng ${ref} stale ref\n`)];
     return new Response(concat([...report, FLUSH]));
   };
-  return { fetch, requests };
+  return { fetch, requests, received };
 }

@@ -76,6 +76,16 @@ const repoKey = (repo: RepoRef) => `${repo.namespace}/${repo.name}`;
 /** The most one relayed pack may weigh, as GitCore's relay caps it. */
 const RECEIVE_PACK_CAP_BYTES = 60 * 1024 * 1024;
 
+/** A pack of no objects: its 12-byte header and 20-byte trailer. A candidate nobody weighed adds nothing to trunk. */
+const EMPTY_PACK_BYTES = 32;
+
+const overTheCap = (bytes: number) =>
+  new PackTooLarge({
+    repo: { namespace: "memory", name: "trunk" },
+    bytes,
+    limit: RECEIVE_PACK_CAP_BYTES,
+  });
+
 /**
  * One head. A push from anything but the head is refused, as a fenced writer
  * must refuse it. `sync` copies the head into each target's main, which
@@ -100,7 +110,12 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
     drop: (n: number) => {
       dropping = n;
     },
-    /** The pack that carries `to` weighs `bytes`: over the receive-pack cap, its push is PackTooLarge and moves nothing. */
+    /**
+     * The pack that carries `to` weighs `bytes`, which is what `packBytes`
+     * answers for it (an empty pack's 32 when never weighed): over the
+     * receive-pack cap, weighing it and pushing it are PackTooLarge, and the
+     * push moves nothing.
+     */
     weigh: (to: CommitSha, bytes: number) => {
       weights.set(to, bytes);
     },
@@ -111,15 +126,8 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
         push: (from, to) =>
           Effect.suspend((): Effect.Effect<void, PackTooLarge | UnexpectedHead> => {
             pushes.push({ from, to });
-            const bytes = weights.get(to) ?? 0;
-            if (bytes > RECEIVE_PACK_CAP_BYTES)
-              return Effect.fail(
-                new PackTooLarge({
-                  repo: { namespace: "memory", name: "trunk" },
-                  bytes,
-                  limit: RECEIVE_PACK_CAP_BYTES,
-                }),
-              );
+            const bytes = weights.get(to) ?? EMPTY_PACK_BYTES;
+            if (bytes > RECEIVE_PACK_CAP_BYTES) return Effect.fail(overTheCap(bytes));
             if (from !== current)
               return Effect.fail(new UnexpectedHead({ expected: from, observed: current }));
             if (dropping > 0) {
@@ -128,6 +136,13 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
             }
             current = to;
             return Effect.void;
+          }),
+        packBytes: (_from, to) =>
+          Effect.suspend((): Effect.Effect<number, PackTooLarge> => {
+            const bytes = weights.get(to) ?? EMPTY_PACK_BYTES;
+            return bytes > RECEIVE_PACK_CAP_BYTES
+              ? Effect.fail(overTheCap(bytes))
+              : Effect.succeed(bytes);
           }),
         sync: (repos) =>
           Effect.sync(() => {
