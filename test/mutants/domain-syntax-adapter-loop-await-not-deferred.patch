@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/rules.test.ts
+# kills: syntax.deferred
+# why: what precedes an await in the same loop body is reported as running at once, though the second pass follows the first's await
+diff --git a/packages/syntax/src/model.ts b/packages/syntax/src/model.ts
+index 0590d5e..a673f2d 100644
+--- a/packages/syntax/src/model.ts
++++ b/packages/syntax/src/model.ts
+@@ -534,9 +534,6 @@ const pausedBefore = (level: Level, node: Node): boolean => {
+   level.pauses ??= pausesIn(level.fn);
+   return level.pauses.some(
+     (pause) =>
+-      (pause.loop !== undefined &&
+-        pause.loop[0] <= node.startIndex &&
+-        node.endIndex <= pause.loop[1]) ||
+       (pause.end <= node.endIndex &&
+         !(pause.start <= node.startIndex && node.endIndex <= pause.end)),
+   );

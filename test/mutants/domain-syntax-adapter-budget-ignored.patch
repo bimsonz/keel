@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/limits.test.ts
+# kills: syntax.budget
+# why: a parse is never given up for the work it takes
+diff --git a/packages/syntax/src/parser.ts b/packages/syntax/src/parser.ts
+index 56375f2..a8b67ce 100644
+--- a/packages/syntax/src/parser.ts
++++ b/packages/syntax/src/parser.ts
+@@ -112,7 +112,7 @@ export async function bootParser(wasm: SyntaxWasm): Promise<SourceParser> {
+       if (ready !== parser) return "restart";
+       const budget = parseBudget(text.length);
+       let calls = 0;
+-      const stop = (): boolean => ++calls > budget;
++      const stop = (): boolean => ++calls > budget * 1000;
+       let tree;
+       try {
+         tree = parser.parse(text, null, { progressCallback: stop });

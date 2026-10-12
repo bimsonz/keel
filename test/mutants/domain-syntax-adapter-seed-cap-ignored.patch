@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/limits.test.ts
+# kills: syntax.path-rule
+# why: more than 400 seeds are taken
+diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
+index 8629725..37e99d0 100644
+--- a/packages/syntax/src/reading.ts
++++ b/packages/syntax/src/reading.ts
+@@ -130,7 +130,7 @@ export function openReading(
+     next = new Set();
+   };
+ 
+-  if (new Set(seeds).size > LIMITS.files) unavailable = "too-many-seeds";
++  if (new Set(seeds).size > LIMITS.files * 2) unavailable = "too-many-seeds";
+   else queue(seeds);
+ 
+   const read = (root: Node): FileModel | "syntax-error" | "unparseable" => {

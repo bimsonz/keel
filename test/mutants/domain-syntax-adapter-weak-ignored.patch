@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/forge-lite.test.ts packages/syntax/test/rules.test.ts
+# kills: syntax.forge-lite-facts, syntax.stores
+# why: a WeakMap is reported as holding its keys strongly
+diff --git a/packages/syntax/src/resolve.ts b/packages/syntax/src/resolve.ts
+index cfd9cfb..e73e47f 100644
+--- a/packages/syntax/src/resolve.ts
++++ b/packages/syntax/src/resolve.ts
+@@ -179,7 +179,7 @@ export function factsOf(
+         return {
+           k: "store",
+           at: { path: scope.path, symbol: store },
+-          weak: CONTAINERS[container] === true,
++          weak: false,
+         };
+     }
+     for (const source of sources)

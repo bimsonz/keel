@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/forge-lite.test.ts packages/syntax/test/rules.test.ts
+# kills: syntax.forge-lite-facts, syntax.keys-and-expiry
+# why: a duration named in milliseconds is read as seconds
+diff --git a/packages/syntax/src/model.ts b/packages/syntax/src/model.ts
+index 0590d5e..4e184fc 100644
+--- a/packages/syntax/src/model.ts
++++ b/packages/syntax/src/model.ts
+@@ -485,7 +485,7 @@ export const unitOf = (name: string): number | undefined => {
+     case "ms":
+     case "millis":
+     case "milliseconds":
+-      return 1 / 1000;
++      return 1;
+     case "s":
+     case "sec":
+     case "secs":

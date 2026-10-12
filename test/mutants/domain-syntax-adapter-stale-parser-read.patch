@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/boot.test.ts
+# kills: syntax.stale-parser
+# why: a parser whose runtime was dropped is used anyway
+diff --git a/packages/syntax/src/parser.ts b/packages/syntax/src/parser.ts
+index 56375f2..e7e74cf 100644
+--- a/packages/syntax/src/parser.ts
++++ b/packages/syntax/src/parser.ts
+@@ -109,7 +109,6 @@ export async function bootParser(wasm: SyntaxWasm): Promise<SourceParser> {
+   return {
+     version: PARSER_VERSION,
+     read: (text, read) => {
+-      if (ready !== parser) return "restart";
+       const budget = parseBudget(text.length);
+       let calls = 0;
+       const stop = (): boolean => ++calls > budget;

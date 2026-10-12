@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/rules.test.ts
+# kills: syntax.stores
+# why: a name given a container and then something else is still the container's store
+diff --git a/packages/syntax/src/resolve.ts b/packages/syntax/src/resolve.ts
+index cfd9cfb..445f9a2 100644
+--- a/packages/syntax/src/resolve.ts
++++ b/packages/syntax/src/resolve.ts
+@@ -175,7 +175,7 @@ export function factsOf(
+           source.k === "value" &&
+           (containerOf(source.expr, scope) !== undefined || ownSlot(source.expr)),
+       );
+-      if (whole)
++      if (whole || made.length > 0)
+         return {
+           k: "store",
+           at: { path: scope.path, symbol: store },

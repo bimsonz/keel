@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/rules.test.ts packages/syntax/test/forge-lite.test.ts
+# kills: syntax.unresolved-left-out, syntax.forge-lite-facts
+# why: a call whose receiver did not resolve goes to the one class that has a method of that name
+diff --git a/packages/syntax/src/resolve.ts b/packages/syntax/src/resolve.ts
+index cfd9cfb..dd3546c 100644
+--- a/packages/syntax/src/resolve.ts
++++ b/packages/syntax/src/resolve.ts
+@@ -399,6 +399,14 @@ export function factsOf(
+           });
+         } else if (object?.k === "instance" || object?.k === "class")
+           edge(here, memberValue(object.path, object.cls, callee.property, 0), event.deferred);
++        else {
++          const named = [...files].flatMap(([at, model]) =>
++            [...model.classes.values()].flatMap((cls) =>
++              cls.methods.has(callee.property) ? [memberValue(at, cls.name, callee.property, 0)] : [],
++            ),
++          );
++          if (named.length === 1) edge(here, named[0], event.deferred);
++        }
+       }
+     }
+ 

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/rules.test.ts
+# kills: syntax.unresolved-left-out
+# why: a binding syntax cannot follow is passed over, so a name bound to two things resolves to the one that is known
+diff --git a/packages/syntax/src/resolve.ts b/packages/syntax/src/resolve.ts
+index cfd9cfb..ba13ee2 100644
+--- a/packages/syntax/src/resolve.ts
++++ b/packages/syntax/src/resolve.ts
+@@ -191,7 +191,7 @@ export function factsOf(
+     for (const source of values) {
+       if (source.k !== "value") return undefined;
+       const value = evaluate(source.expr, scope, depth + 1);
+-      if (value === undefined) return undefined;
++      if (value === undefined) continue;
+       if (agreed !== undefined && JSON.stringify(agreed) !== JSON.stringify(value))
+         return undefined;
+       agreed = value;

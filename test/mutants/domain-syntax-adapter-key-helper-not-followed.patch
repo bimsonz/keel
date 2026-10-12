@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/forge-lite.test.ts
+# kills: syntax.forge-lite-facts
+# why: a key built by a helper has no parts: the helper's arguments are not read
+diff --git a/packages/syntax/src/model.ts b/packages/syntax/src/model.ts
+index 0590d5e..0c75a48 100644
+--- a/packages/syntax/src/model.ts
++++ b/packages/syntax/src/model.ts
+@@ -451,7 +451,7 @@ const keyParts = (scope: Scope, node: Node, seen: ReadonlySet<string> = new Set(
+       const known =
+         root !== undefined &&
+         (root === "this" || scope.model.bindings.has(root) || scope.top.has(root));
+-      return each([known ? object : undefined, ...(field(at, "arguments")?.namedChildren ?? [])]);
++      return each([known ? object : undefined]);
+     }
+     default:
+       return [];

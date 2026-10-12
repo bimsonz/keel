@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/forge-lite.test.ts
+# kills: syntax.forge-lite-facts
+# why: what an unnamed function does is not put on the named symbol around it
+diff --git a/packages/syntax/src/model.ts b/packages/syntax/src/model.ts
+index 0590d5e..7d662e7 100644
+--- a/packages/syntax/src/model.ts
++++ b/packages/syntax/src/model.ts
+@@ -561,7 +561,7 @@ const deferredAt = (context: Context, node: Node): boolean =>
+ 
+ const enter = (context: Context, fn: Node, later: boolean): void => {
+   const body = field(fn, "body");
+-  if (body === undefined) return;
++  if (body === undefined || fn.type === "arrow_function") return;
+   emit(
+     {
+       ...context,

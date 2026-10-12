@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/forge-lite.test.ts packages/syntax/test/rules.test.ts
+# kills: syntax.forge-lite-facts, syntax.stores
+# why: a local put on the request's context is held as a plain local
+diff --git a/packages/syntax/src/resolve.ts b/packages/syntax/src/resolve.ts
+index cfd9cfb..d6778ed 100644
+--- a/packages/syntax/src/resolve.ts
++++ b/packages/syntax/src/resolve.ts
+@@ -332,7 +332,7 @@ export function factsOf(
+         noteStore(
+           bindingValue(sources, scope, `${sym.name}.${name}`, name, 0),
+           // A local put on the request's context lives as long as the request.
+-          slotsOf(scope, name, 0).size > 0 ? "request" : "local",
++          "local",
+         );
+     }
+   }

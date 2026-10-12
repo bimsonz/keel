@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/boot.test.ts
+# kills: syntax.one-boot
+# why: a second boot starts beside the first, and the glue's one global runtime is made twice
+diff --git a/packages/syntax/src/parser.ts b/packages/syntax/src/parser.ts
+index 56375f2..8a885ff 100644
+--- a/packages/syntax/src/parser.ts
++++ b/packages/syntax/src/parser.ts
+@@ -81,7 +81,6 @@ function discard(): void {
+ 
+ export async function bootParser(wasm: SyntaxWasm): Promise<SourceParser> {
+   if (ready === undefined) {
+-    if (booting) throw new ParserStarting("the parser is starting in this isolate");
+     booting = true;
+     try {
+       await Parser.init({

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/limits.test.ts
+# kills: syntax.path-rule
+# why: a file over 512 KB is parsed
+diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
+index 8629725..fb5b17a 100644
+--- a/packages/syntax/src/reading.ts
++++ b/packages/syntax/src/reading.ts
+@@ -148,7 +148,7 @@ export function openReading(
+         if (pending.size === 0) queue(next);
+         return "taken";
+       };
+-      if (blob.length > LIMITS.fileBytes) return done("too-large");
++      if (blob.length > LIMITS.fileBytes * 2) return done("too-large");
+       let text: string;
+       try {
+         text = utf8.decode(blob);

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/limits.test.ts
+# kills: syntax.broken-file-skipped
+# why: a file with an error node is half-read instead of skipped whole
+diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
+index 8629725..b991c71 100644
+--- a/packages/syntax/src/reading.ts
++++ b/packages/syntax/src/reading.ts
+@@ -134,7 +134,6 @@ export function openReading(
+   else queue(seeds);
+ 
+   const read = (root: Node): FileModel | "syntax-error" | "unparseable" => {
+-    if (root.hasError) return "syntax-error";
+     return nestsBeyond(root, LIMITS.depth) ? "unparseable" : modelOf(root, vocabulary);
+   };
+ 

@@ -36,6 +36,7 @@ Not yet in `v0.1`: declared premises and semantic conflict detection, a hunk-lev
 | `packages/spec` | The API in TypeSpec: the one source for REST, MCP and the OpenAPI document |
 | `packages/contracts` | The committed OpenAPI document |
 | `packages/gitcore` | Clean-room git algorithms |
+| `packages/syntax` | Source facts for effect derivation, read from a tree-sitter parse |
 | `packages/runner-protocol` | Messages between the control plane and runners |
 | `packages/testing` | In-memory adapters and port contract suites |
 | `packages/tooling` | Architecture rules and guards |

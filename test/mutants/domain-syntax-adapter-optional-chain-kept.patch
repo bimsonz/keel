@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/forge-lite.test.ts
+# kills: syntax.forge-lite-facts
+# why: a key part keeps its `?.`, so one path has two spellings
+diff --git a/packages/syntax/src/model.ts b/packages/syntax/src/model.ts
+index 0590d5e..6b3fd75 100644
+--- a/packages/syntax/src/model.ts
++++ b/packages/syntax/src/model.ts
+@@ -272,7 +272,8 @@ const pathOf = (node: Node): string | undefined => {
+   const object = field(at, "object");
+   const property = field(at, "property");
+   const head = object === undefined ? undefined : pathOf(object);
+-  return head === undefined || property === undefined ? undefined : `${head}.${property.text}`;
++  const link = at.namedChildren.some((child) => child.type === "optional_chain") ? "?." : ".";
++  return head === undefined || property === undefined ? undefined : `${head}${link}${property.text}`;
+ };
+ 
+ /** What a symbol's body binds, gathered before its events are read. */

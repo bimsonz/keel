@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/rules.test.ts
+# kills: syntax.imports
+# why: an import written `./x.js` for a `./x.ts` file names nothing
+diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
+index 8629725..8e4c77c 100644
+--- a/packages/syntax/src/reading.ts
++++ b/packages/syntax/src/reading.ts
+@@ -83,7 +83,7 @@ const candidates = (from: string, specifier: string): readonly string[] => {
+   const swapped = TS_FOR_JS[extension];
+   return [
+     ...(extension === "" ? [] : [base]),
+-    ...(swapped === undefined ? [] : [`${base.slice(0, -extension.length)}${swapped}`]),
++    ...(swapped === undefined ? [] : []),
+     ...SUPPORTED.map((ending) => `${base}${ending}`),
+     `${base}/index.ts`,
+     `${base}/index.js`,

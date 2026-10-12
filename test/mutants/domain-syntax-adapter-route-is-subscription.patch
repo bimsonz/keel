@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/rules.test.ts
+# kills: syntax.subscriptions
+# why: a route registration is read as a subscription
+diff --git a/packages/syntax/src/model.ts b/packages/syntax/src/model.ts
+index 0590d5e..36cfca9 100644
+--- a/packages/syntax/src/model.ts
++++ b/packages/syntax/src/model.ts
+@@ -593,7 +593,7 @@ const emitCall = (context: Context, node: Node): void => {
+   if (
+     !isNew &&
+     method !== undefined &&
+-    context.registrars.has(method) &&
++    (context.registrars.has(method) || method === "get") &&
+     event !== undefined &&
+     second !== undefined
+   ) {

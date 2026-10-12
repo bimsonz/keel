@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/rules.test.ts
+# kills: syntax.stores
+# why: a static field's store is held per instance
+diff --git a/packages/syntax/src/resolve.ts b/packages/syntax/src/resolve.ts
+index cfd9cfb..5d9a5be 100644
+--- a/packages/syntax/src/resolve.ts
++++ b/packages/syntax/src/resolve.ts
+@@ -323,7 +323,7 @@ export function factsOf(
+             undefined,
+             0,
+           ),
+-          field.static ? "module" : "instance",
++          "instance",
+         );
+     for (const sym of file.symbols) {
+       if (sym.owner !== sym.name) continue;

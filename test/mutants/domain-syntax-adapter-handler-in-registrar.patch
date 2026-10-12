@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/forge-lite.test.ts packages/syntax/test/rules.test.ts
+# kills: syntax.forge-lite-facts, syntax.subscriptions
+# why: an inline handler's body is put on the symbol that registers it
+diff --git a/packages/syntax/src/model.ts b/packages/syntax/src/model.ts
+index 0590d5e..6609727 100644
+--- a/packages/syntax/src/model.ts
++++ b/packages/syntax/src/model.ts
+@@ -620,7 +620,7 @@ const emitCall = (context: Context, node: Node): void => {
+         emit(
+           {
+             ...context,
+-            sym: handler,
++            sym: context.sym,
+             levels: [{ fn: second }],
+             later: false,
+             thisOk: second.type === "arrow_function" && context.thisOk,

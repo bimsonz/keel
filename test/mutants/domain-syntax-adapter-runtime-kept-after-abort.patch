@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel --project unit apps/keel/test/pool/syntax-source.test.ts packages/syntax/test/limits.test.ts
+# kills: syntaxsource.hostile-file, syntax.memory-cap
+# why: a runtime that has aborted is kept, so every file after a hostile one is unparseable too
+diff --git a/packages/syntax/src/parser.ts b/packages/syntax/src/parser.ts
+index 56375f2..68e1c13 100644
+--- a/packages/syntax/src/parser.ts
++++ b/packages/syntax/src/parser.ts
+@@ -117,7 +117,6 @@ export async function bootParser(wasm: SyntaxWasm): Promise<SourceParser> {
+       try {
+         tree = parser.parse(text, null, { progressCallback: stop });
+       } catch {
+-        discard();
+         return "unparseable";
+       }
+       if (tree === null) {

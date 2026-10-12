@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/rules.test.ts packages/syntax/test/forge-lite.test.ts
+# kills: syntax.keys-and-expiry, syntax.forge-lite-facts
+# why: a key or a written value bound to a local is not read through it
+diff --git a/packages/syntax/src/model.ts b/packages/syntax/src/model.ts
+index 0590d5e..f08673e 100644
+--- a/packages/syntax/src/model.ts
++++ b/packages/syntax/src/model.ts
+@@ -400,7 +400,7 @@ const followed = (scope: Scope, node: Node): Node => {
+   const inits = scope.inits.get(node.text);
+   const [init] = inits ?? [];
+   return init !== undefined &&
+-    inits?.length === 1 &&
++    inits?.length === 0 &&
+     scope.model.bindings.get(node.text)?.length === 1
+     ? init
+     : node;

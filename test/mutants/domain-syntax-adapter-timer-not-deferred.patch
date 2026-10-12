@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/rules.test.ts
+# kills: syntax.deferred
+# why: a callback given to a timer is reported as running at once
+diff --git a/packages/syntax/src/model.ts b/packages/syntax/src/model.ts
+index 0590d5e..2717fd7 100644
+--- a/packages/syntax/src/model.ts
++++ b/packages/syntax/src/model.ts
+@@ -303,7 +303,7 @@ const isDeferring = (callee: Node | undefined): boolean => {
+   if (callee === undefined) return false;
+   const at = unwrap(callee);
+   const name = at.type === "member_expression" ? field(at, "property")?.text : at.text;
+-  return name !== undefined && DEFERRING.has(name);
++  return name !== undefined && DEFERRING.has(name) && false;
+ };
+ 
+ const bindParameters = (scope: Scope, fn: Node, isConstructor: boolean): void => {

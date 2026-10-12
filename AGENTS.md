@@ -37,7 +37,7 @@ The architecture rules run in `pnpm guards` and in `pnpm test` (project `arch`),
 | R2 | `application/**` imports only the domain, the application and `effect` |
 | R3 | Driving adapters never import driven adapters; they meet in `composition/` |
 | R4 | No import cycles; a context reaches another only through its `index.ts` (the kernel and the ports are open to all) |
-| R5 | `core` and `gitcore` import no `hono`, `zod`, `cloudflare:*`, `@cloudflare/*`, `agents` or MCP SDK |
+| R5 | `core`, `gitcore` and `syntax` import no `hono`, `zod`, `cloudflare:*`, `@cloudflare/*`, `agents` or MCP SDK |
 | R6 | `zod` only in generated code |
 | R7 | `cloudflare:workers` only in the DO and Workflow doorways and `composition/` |
 | R8 | Runtimes are built and run only in `composition/` and driving adapters; driving adapters never `forkDetach` or `runFork` |

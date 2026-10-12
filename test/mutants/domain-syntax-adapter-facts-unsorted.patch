@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/limits.test.ts
+# kills: syntax.deterministic
+# why: facts come out in the order they were found
+diff --git a/packages/syntax/src/resolve.ts b/packages/syntax/src/resolve.ts
+index cfd9cfb..c39c049 100644
+--- a/packages/syntax/src/resolve.ts
++++ b/packages/syntax/src/resolve.ts
+@@ -77,7 +77,6 @@ type Scope = {
+ const refKey = (ref: SymbolRef): string => `${ref.path}\n${ref.symbol}`;
+ const ordered = <T>(items: Iterable<T>, key: (item: T) => string): T[] =>
+   [...new Map([...items].map((item) => [key(item), item])).entries()]
+-    .toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+     .map(([, item]) => item);
+ 
+ /** The name is the file's own or the symbol's, so it is not the built-in of that name. */

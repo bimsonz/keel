@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/limits.test.ts
+# kills: syntax.depth-cap
+# why: a file is followed however deep it nests, until the stack gives out
+diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
+index 8629725..372ec19 100644
+--- a/packages/syntax/src/reading.ts
++++ b/packages/syntax/src/reading.ts
+@@ -135,7 +135,7 @@ export function openReading(
+ 
+   const read = (root: Node): FileModel | "syntax-error" | "unparseable" => {
+     if (root.hasError) return "syntax-error";
+-    return nestsBeyond(root, LIMITS.depth) ? "unparseable" : modelOf(root, vocabulary);
++    return nestsBeyond(root, LIMITS.depth * 1000) ? "unparseable" : modelOf(root, vocabulary);
+   };
+ 
+   return {

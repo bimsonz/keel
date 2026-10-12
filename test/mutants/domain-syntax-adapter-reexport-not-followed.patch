@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/rules.test.ts
+# kills: syntax.imports
+# why: a name a file re-exports from another is not found there
+diff --git a/packages/syntax/src/resolve.ts b/packages/syntax/src/resolve.ts
+index cfd9cfb..5029971 100644
+--- a/packages/syntax/src/resolve.ts
++++ b/packages/syntax/src/resolve.ts
+@@ -225,7 +225,7 @@ export function factsOf(
+     const own = local === undefined ? undefined : lookupTop(path, local, depth + 1);
+     if (own !== undefined) return own;
+     for (const reexport of file.reexports) {
+-      if (reexport.exported !== name) continue;
++      if (reexport.exported === name) continue;
+       const target = resolveModule(path, reexport.from);
+       return target === undefined ? undefined : exportOf(target, reexport.name, depth + 1);
+     }

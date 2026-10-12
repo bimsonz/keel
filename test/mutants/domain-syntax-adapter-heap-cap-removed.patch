@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/limits.test.ts
+# kills: syntax.memory-cap
+# why: the parser's heap may grow to 2 GB, so a hostile file is parsed at the cost of the isolate's memory
+diff --git a/packages/syntax/src/parser.ts b/packages/syntax/src/parser.ts
+index 56375f2..620591e 100644
+--- a/packages/syntax/src/parser.ts
++++ b/packages/syntax/src/parser.ts
+@@ -35,7 +35,7 @@ export interface SyntaxWasm {
+ }
+ 
+ /** The runtime's heap in 64 KiB pages: what it starts with, and the most it may ever hold. */
+-export const HEAP_PAGES = { initial: 512, maximum: 1024 };
++export const HEAP_PAGES = { initial: 512, maximum: 32768 };
+ 
+ /**
+  * How many progress calls one file may take. Source as people write it takes

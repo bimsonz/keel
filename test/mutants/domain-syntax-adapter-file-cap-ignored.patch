@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/limits.test.ts
+# kills: syntax.path-rule
+# why: a reading follows imports past 400 files
+diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
+index 8629725..d96517b 100644
+--- a/packages/syntax/src/reading.ts
++++ b/packages/syntax/src/reading.ts
+@@ -120,7 +120,7 @@ export function openReading(
+       if (kind === undefined) skipped.set(path, "absent");
+       else if (kind !== "file" || !SUPPORTED.includes(extensionOf(path)))
+         skipped.set(path, "unsupported");
+-      else if (files >= LIMITS.files) skipped.set(path, "beyond-cap");
++      else if (files >= LIMITS.files * 2) skipped.set(path, "beyond-cap");
+       else {
+         files += 1;
+         level.push(path);

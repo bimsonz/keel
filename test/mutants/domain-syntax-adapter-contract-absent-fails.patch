@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/syntax-source.test.ts
+# kills: syntaxsource.contract.absent, syntaxsource.contract.facts
+# why: a seed that is not at the commit fails the call instead of being skipped
+diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
+index 8629725..2dcc8f6 100644
+--- a/packages/syntax/src/reading.ts
++++ b/packages/syntax/src/reading.ts
+@@ -117,7 +117,7 @@ export function openReading(
+       if (seen.has(path)) continue;
+       seen.add(path);
+       const kind = /^(\/|\.\.?(\/|$))|\/\.\.?(\/|$)|^$/.test(path) ? undefined : kindOf(path);
+-      if (kind === undefined) skipped.set(path, "absent");
++      if (kind === undefined) unavailable = "too-many-seeds";
+       else if (kind !== "file" || !SUPPORTED.includes(extensionOf(path)))
+         skipped.set(path, "unsupported");
+       else if (files >= LIMITS.files) skipped.set(path, "beyond-cap");

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/limits.test.ts
+# kills: syntax.memory-cap
+# why: a call goes on however many files the parser gives up on
+diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
+index 8629725..3a18aea 100644
+--- a/packages/syntax/src/reading.ts
++++ b/packages/syntax/src/reading.ts
+@@ -164,7 +164,7 @@ export function openReading(
+       bytes += blob.length;
+       if (model === "too-slow" || model === "unparseable") {
+         failures += 1;
+-        if (failures >= LIMITS.failures) unavailable = "too-many-failures";
++        if (failures >= LIMITS.failures * 10) unavailable = "too-many-failures";
+         return done(model);
+       }
+       if (model === "syntax-error") return done(model);

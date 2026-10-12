@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/limits.test.ts packages/syntax/test/forge-lite.test.ts
+# kills: syntax.path-rule, syntax.forge-lite-derives
+# why: an import is resolved by its file name alone, beside the importing file
+diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
+index 8629725..b9dcee5 100644
+--- a/packages/syntax/src/reading.ts
++++ b/packages/syntax/src/reading.ts
+@@ -73,7 +73,7 @@ const byPath = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+ /** The files a relative specifier may name from `from`, most exact first. */
+ const candidates = (from: string, specifier: string): readonly string[] => {
+   const parts = from.split("/").slice(0, -1);
+-  for (const part of specifier.split("/")) {
++  for (const part of specifier.split("/").slice(-1)) {
+     if (part === "" || part === ".") continue;
+     if (part !== "..") parts.push(part);
+     else if (parts.pop() === undefined) return [];

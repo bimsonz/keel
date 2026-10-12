@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/forge-lite.test.ts
+# kills: syntax.forge-lite-facts
+# why: iterating a store is not a read
+diff --git a/packages/syntax/src/model.ts b/packages/syntax/src/model.ts
+index 0590d5e..90e0d2c 100644
+--- a/packages/syntax/src/model.ts
++++ b/packages/syntax/src/model.ts
+@@ -702,7 +702,7 @@ function emit(context: Context, node: Node): void {
+     }
+     case "for_in_statement": {
+       const right = field(node, "right");
+-      if (hasToken(node, "of") && right !== undefined)
++      if (hasToken(node, "in") && right !== undefined)
+         context.sym.events.push({
+           k: "iterate",
+           of: toExpr(right, context.thisOk),

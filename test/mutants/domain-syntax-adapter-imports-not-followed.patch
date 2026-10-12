@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/syntax/test/limits.test.ts packages/syntax/test/forge-lite.test.ts packages/syntax/test/rules.test.ts
+# kills: syntax.path-rule, syntax.forge-lite-derives, syntax.imports
+# why: only the seeds are read: no import is followed
+diff --git a/packages/syntax/src/reading.ts b/packages/syntax/src/reading.ts
+index 8629725..6a418bb 100644
+--- a/packages/syntax/src/reading.ts
++++ b/packages/syntax/src/reading.ts
+@@ -171,7 +171,7 @@ export function openReading(
+       models.set(path, model);
+       for (const specifier of model.specifiers) {
+         const target = resolve(path, specifier);
+-        if (target !== undefined && !seen.has(target)) next.add(target);
++        if (target !== undefined && seen.has(target)) next.add(target);
+       }
+       return done();
+     },
