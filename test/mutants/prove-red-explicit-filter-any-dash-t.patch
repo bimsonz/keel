@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.explicit-filter-kept
+# why: any `-t` inside a word counts as naming the tests, so a command whose path holds `x-t` runs unfiltered.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 3f6955d..febfecb 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -7,7 +7,7 @@ const quoted = (text: string): string => `'${text.replaceAll("'", "'\\''")}'`;
+ 
+ /** Whether a command already says which tests to run, by `-t` or `--testNamePattern`. */
+ const namesItsTests = (command: string): boolean =>
+-  /(?:^|\s)(?:-t|--testNamePattern)(?:[\s=]|$)/.test(command);
++  /-t|--testNamePattern/.test(command);
+ 
+ /** A vitest name pattern matching exactly the titles that carry one of these tags as `[tag]`. */
+ export function claimedPattern(kills: readonly string[]): string {

@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.explicit-filter-kept
+# why: a header that names its own tests gets a second -t on top, so the 386 patches that chose their tests no longer run what they wrote.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 3f6955d..fe91d91 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -20,6 +20,6 @@ export function claimedPattern(kills: readonly string[]): string {
+  * its tests, comes back as written.
+  */
+ export function filteredToClaims(command: string, kills: readonly string[]): string {
+-  if (kills.length === 0 || namesItsTests(command)) return command;
++  if (kills.length === 0) return command;
+   return `${command} -t ${quoted(claimedPattern(kills))}`;
+ }

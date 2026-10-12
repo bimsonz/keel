@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.filter-reaches-vitest
+# why: a quote inside a tag closes the shell's quoting early, so the rest of the header's tag is read as shell.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 3f6955d..2e0d804 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -3,7 +3,7 @@
+ 
+ const escaped = (text: string): string => text.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+ 
+-const quoted = (text: string): string => `'${text.replaceAll("'", "'\\''")}'`;
++const quoted = (text: string): string => `'${text}'`;
+ 
+ /** Whether a command already says which tests to run, by `-t` or `--testNamePattern`. */
+ const namesItsTests = (command: string): boolean =>

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.claims-only
+# why: a tag goes into the pattern as written, so `[a.b]` is a character class and matches nearly every title: the filter is there and filters nothing.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 3f6955d..ad334c5 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -11,7 +11,7 @@ const namesItsTests = (command: string): boolean =>
+ 
+ /** A vitest name pattern matching exactly the titles that carry one of these tags as `[tag]`. */
+ export function claimedPattern(kills: readonly string[]): string {
+-  return kills.map((tag) => escaped(`[${tag}]`)).join("|");
++  return kills.map((tag) => `[${tag}]`).join("|");
+ }
+ 
+ /**

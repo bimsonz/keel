@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.claims-only
+# why: the brackets are escaped and the dot is not, so a claim of `[a.b]` also runs a test titled `[aXb]`.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index 3f6955d..0335358 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -1,7 +1,7 @@
+ // What `scripts/prove-red.ts` adds to a mutant's command so that it runs only
+ // the tests the mutant claims to kill. Pure: the script does the running.
+ 
+-const escaped = (text: string): string => text.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
++const escaped = (text: string): string => text.replace(/[\\^$*+?()[\]{}|]/g, "\\$&");
+ 
+ const quoted = (text: string): string => `'${text.replaceAll("'", "'\\''")}'`;
+ 
