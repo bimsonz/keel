@@ -16,6 +16,7 @@ import type { ChangeDO } from "../../src/adapters/driving/do/change.ts";
 import type { WorkspacePoolDO } from "../../src/adapters/driving/do/workspace-pool.ts";
 import { decodeExit, WorkspacePoolCodecs } from "../../src/rpc/index.ts";
 import { changeUnderTest, ok } from "./change-harness.ts";
+import { followTrunk } from "./pool-harness.ts";
 import {
   BASE,
   drainAfter,
@@ -108,6 +109,8 @@ async function stockedPool(projectId: ProjectId) {
   await env.TEST_ARTIFACTS.create(mirror);
   const source = { namespace: "keel-ws-00", name: mirror };
   const pool = poolStub(projectId);
+  // createProject initializes trunk before it configures the pool; this project has none.
+  await followTrunk(projectId, source);
   await pool.configure({ source, target: 1 });
   // The refill is a deadline armed for now; the platform may run it before this line does.
   await runDurableObjectAlarm(pool);

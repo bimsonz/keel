@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.refresh-stuck
+# why: a refreshing slot is settled at once, under a pass that may still be relaying into it
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 5d3cef4..eeee78a 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -473,7 +473,7 @@ export const refreshSlots = Effect.fn("coordination/refreshSlots")(function* (pr
+   const store = yield* EntityStore;
+   const now = yield* (yield* Clock).now;
+   const stuck = slots(store).filter(
+-    (s) => s.state === "refreshing" && now - s.since > STUCK_REFRESH_MS,
++    (s) => s.state === "refreshing" && now - s.since >= 0,
+   );
+   if (stuck.length === 0 && countIn(store, "ready") === 0)
+     return {

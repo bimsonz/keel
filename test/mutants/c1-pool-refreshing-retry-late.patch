@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.refresh-exhausted-soon
+# why: a pool whose workspaces are all mid-relay tells a caller to come back in fifteen seconds, as if it had none
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 5d3cef4..385ea41 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -109,7 +109,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+     if (candidate === undefined) {
+       return yield* new PoolExhausted({
+         // One being forked or refreshed is ready within seconds.
+-        retryAfterMs: countIn(store, "forking") + countIn(store, "refreshing") > 0 ? 5_000 : 15_000,
++        retryAfterMs: countIn(store, "forking") > 0 ? 5_000 : 15_000,
+       });
+     }
+     const now = yield* (yield* Clock).now;

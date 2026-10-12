@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-refresher.test.ts
+# kills: refresher.missing
+# why: a workspace that is gone is a defect, not RepoNotFound, so the pool cannot tell it from a failure
+diff --git a/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts b/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts
+index 4ee1315..3dc0f9b 100644
+--- a/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts
++++ b/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts
+@@ -43,7 +43,7 @@ export const WorkspaceRefresherGitCore = (
+           Effect.gen(function* () {
+             if (from === to) return "unchanged" satisfies SyncOutcome;
+             // The workspace first: one that is gone costs trunk no token.
+-            const target = yield* remoteOf(workspace, "write");
++            const target = yield* remoteOf(workspace, "write").pipe(Effect.orDie);
+             const source = yield* remoteOf(trunkOf(projectId), "read").pipe(
+               Effect.catchTag("RepoNotFound", Effect.die),
+             );

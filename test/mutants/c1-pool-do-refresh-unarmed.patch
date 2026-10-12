@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts
+# kills: pool.do.refresh
+# why: a landing the pool hears arms no refresh, so its ready workspaces stay behind trunk
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index da716dd..05f9229 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -162,7 +162,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+     }
+     if (this.landed) {
+       this.landed = false;
+-      if (status.ready > 0) {
++      if (status.ready < 0) {
+         await scheduleAlarm(this.ctx.storage, {
+           kind: "deadline",
+           reason: POOL_REFRESH,

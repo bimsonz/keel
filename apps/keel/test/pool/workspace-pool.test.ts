@@ -6,16 +6,27 @@ import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "@effect/vitest";
 import { vi } from "vitest";
-import { type ChangeId, EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
+import {
+  type ChangeId,
+  CommitSha,
+  EventEnvelope,
+  makeId,
+  type ProjectId,
+} from "@keeltown/core/kernel";
 import { EventOutbox, WorkspacePool } from "@keeltown/core/ports";
 import { PORTS } from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
 import { ulid } from "ulid";
 import { WorkspacePoolRpc } from "../../src/adapters/driven/do-rpc/workspace-pool.ts";
 import { armedAlarms } from "../../src/adapters/driving/do/alarm.ts";
-import { POOL_REFILL, type WorkspacePoolDO } from "../../src/adapters/driving/do/workspace-pool.ts";
+import {
+  POOL_REFILL,
+  POOL_REFRESH,
+  type WorkspacePoolDO,
+} from "../../src/adapters/driving/do/workspace-pool.ts";
 import { artifactsLocationHint } from "../../src/composition/do.ts";
 import { drainAfter } from "./helpers.ts";
+import { followTrunk } from "./pool-harness.ts";
 import {
   decodeExit,
   EventCodecs,
@@ -68,16 +79,39 @@ const exists = (name: string) =>
  * Configures `projectId`'s pool to fork `target` workspaces from a fresh
  * mirror, runs the refill and waits until they are ready. With `freeze`, the
  * target then drops to 0, so the pool forks no more and exhaustion is exact.
+ * Answers what the pool's object follows, for a test to move trunk.
  */
 async function stock(projectId: string, target: number, freeze = false) {
   const stub = poolStub(projectId);
   const source = await mirror();
+  const followed = await followTrunk(projectId, source);
   await stub.configure({ source, target });
   // The refill is a deadline armed for now; the platform may run it before this line does.
   await runDurableObjectAlarm(stub);
   await vi.waitFor(async () => expect((await statusOf(projectId)).ready).toBe(target), WAIT);
   if (freeze) await stub.configure({ source, target: 0 });
+  return followed;
 }
+
+/** ChangeLanded for `changeId`, as the Change DO delivers it to its project's pool. */
+const landedFor = (projectId: string, changeId: string) =>
+  Schema.encodeSync(EventEnvelope)(
+    Schema.decodeUnknownSync(EventEnvelope)({
+      eventId: makeId("evt", ulid()),
+      type: "ChangeLanded",
+      entity: { kind: "change", id: changeId },
+      seq: 9,
+      at: Date.now(),
+      dedupeKey: `change:${changeId}/land/ChangeLanded#0`,
+      affected: [],
+      notified: [`pool:${projectId}`],
+      payload: { _tag: "ChangeLanded", changeId },
+    }),
+  );
+
+const commitSha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
+const refreshArmed = async (projectId: string) =>
+  (await alarmsOf(projectId)).armed.find((a) => a.reason === POOL_REFRESH);
 
 /** The Worker's env with `vars.ARTIFACTS_LOCATION_HINT` set. */
 const withHint = (hint: string): Env => Object.assign({}, env, { ARTIFACTS_LOCATION_HINT: hint });
@@ -225,19 +259,7 @@ describe("the WorkspacePool DO", () => {
     const stub = poolStub(projectId);
     const changeId = holder();
     const grant = valueOf(WorkspacePoolCodecs.grant, await stub.grant(changeId));
-    const landed = Schema.encodeSync(EventEnvelope)(
-      Schema.decodeUnknownSync(EventEnvelope)({
-        eventId: makeId("evt", ulid()),
-        type: "ChangeLanded",
-        entity: { kind: "change", id: changeId },
-        seq: 9,
-        at: Date.now(),
-        dedupeKey: `change:${changeId}/land/ChangeLanded#0`,
-        affected: [],
-        notified: [`pool:${projectId}`],
-        payload: { _tag: "ChangeLanded", changeId },
-      }),
-    );
+    const landed = landedFor(projectId, changeId);
     const first = decodeExit(EventCodecs.receive, await stub.receive([landed]));
     const again = decodeExit(EventCodecs.receive, await stub.receive([landed]));
     expect([Exit.isSuccess(first), Exit.isSuccess(again)]).toEqual([true, true]);
@@ -258,6 +280,100 @@ describe("the WorkspacePool DO", () => {
     expect(log.at(-1)?.payload).toMatchObject({ reason: "landed" });
     // Every event the pool commits, the reaction's included, carries its project.
     expect(log.map((e) => e.project)).toEqual([projectId, projectId, projectId]);
+  });
+
+  it("[pool.do.refresh] a delivered ChangeLanded arms a refresh: the ready workspace is relayed to trunk's head and granted there, a deadline covers the pass while it runs, and nothing stays armed after it", async () => {
+    const projectId = freshProject();
+    const followed = await stock(projectId, 2, true);
+    const stub = poolStub(projectId);
+    const changeId = holder();
+    const grant = valueOf(WorkspacePoolCodecs.grant, await stub.grant(changeId));
+    // Trunk lands the change: its head moves, and the pool hears of the landing.
+    const head = commitSha("c");
+    followed.head = head;
+    followed.held = true;
+    const before = Date.now();
+    await stub.receive([landedFor(projectId, changeId)]);
+    // Not awaited here: the alarm does not return while its relay is held.
+    const alarm = runDurableObjectAlarm(stub);
+    try {
+      await vi.waitFor(() => expect(followed.relays).toHaveLength(1), WAIT);
+      expect(followed.relays[0]).toMatchObject({ from: grant.baseSha, to: head });
+      expect(followed.relays[0]?.workspace).not.toBe(grant.repo.name);
+      // Mid-relay the workspace is not grantable, and a deadline stands for a pass that dies here.
+      expect(await statusOf(projectId)).toMatchObject({ ready: 0, refreshing: 1 });
+      expect((await refreshArmed(projectId))?.at).toBeGreaterThanOrEqual(before + 120_000);
+    } finally {
+      // Whatever was found, the relay is let go, so the alarm returns.
+      followed.held = false;
+      await alarm;
+    }
+    await vi.waitFor(
+      async () => expect(await statusOf(projectId)).toMatchObject({ ready: 1, refreshing: 0 }),
+      WAIT,
+    );
+    const next = valueOf(WorkspacePoolCodecs.grant, await stub.grant(holder()));
+    expect(next.baseSha).toBe(head);
+    expect(next.repo.name).toBe(followed.relays[0]?.workspace);
+    await vi.waitFor(
+      async () => expect(await alarmsOf(projectId)).toEqual({ armed: [], alarm: null }),
+      WAIT,
+    );
+    expect(followed.relays).toHaveLength(1);
+  });
+
+  it("[pool.do.refresh-after-refill] a refill from a mirror that lags trunk arms a refresh: the workspace it forked is brought to trunk's head before anyone is granted it", async () => {
+    const projectId = freshProject();
+    const followed = await stock(projectId, 1);
+    const stub = poolStub(projectId);
+    // Trunk is ahead of the mirror the pool forks from.
+    const head = commitSha("d");
+    followed.head = head;
+    const first = valueOf(WorkspacePoolCodecs.grant, await stub.grant(holder()));
+    // The grant left the pool short: its refill forks from the mirror, behind trunk.
+    await runDurableObjectAlarm(stub);
+    await vi.waitFor(async () => {
+      expect(followed.relays).toHaveLength(1);
+      expect(await statusOf(projectId)).toMatchObject({ ready: 1, refreshing: 0, forking: 0 });
+    }, WAIT);
+    expect(followed.relays[0]).toMatchObject({ from: first.baseSha, to: head });
+    await stub.configure({ source: { namespace: "keel-ws-00", name: "unused" }, target: 0 });
+    const next = valueOf(WorkspacePoolCodecs.grant, await stub.grant(holder()));
+    expect(next.baseSha).toBe(head);
+    expect(next.repo.name).toBe(followed.relays[0]?.workspace);
+  });
+
+  it("[pool.do.refresh-retry] a pass that leaves a workspace behind re-arms itself for later, not now, and is withdrawn once the workspace has followed trunk", async () => {
+    const projectId = freshProject();
+    const followed = await stock(projectId, 2, true);
+    const stub = poolStub(projectId);
+    const changeId = holder();
+    const grant = valueOf(WorkspacePoolCodecs.grant, await stub.grant(changeId));
+    followed.head = commitSha("e");
+    followed.answer = "busy";
+    const before = Date.now();
+    await stub.receive([landedFor(projectId, changeId)]);
+    await runDurableObjectAlarm(stub);
+    // The workspace stayed busy and its main is where it was: ready on its old base, with the pass due again.
+    await vi.waitFor(async () => {
+      expect(followed.relays.length).toBeGreaterThanOrEqual(1);
+      expect(await statusOf(projectId)).toMatchObject({ ready: 1, refreshing: 0 });
+      const armed = await refreshArmed(projectId);
+      expect(armed?.at).toBeGreaterThanOrEqual(before + 1_000);
+      expect(armed?.at).toBeLessThan(before + 120_000);
+    }, WAIT);
+    expect(followed.relays[0]).toMatchObject({ from: grant.baseSha });
+
+    followed.answer = "advanced";
+    await vi.waitFor(
+      async () => {
+        await runDurableObjectAlarm(stub);
+        expect(await refreshArmed(projectId)).toBeUndefined();
+      },
+      { timeout: 20_000, interval: 250 },
+    );
+    const next = valueOf(WorkspacePoolCodecs.grant, await stub.grant(holder()));
+    expect(next.baseSha).toBe(followed.head);
   });
 
   it("[pool.do.destroy] destroy gives up every workspace, its collection deadline deletes their repos, and nothing stays armed", async () => {

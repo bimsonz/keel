@@ -2,10 +2,10 @@
 # kills: pool.do.retry-later
 # why: A refill that cannot fork re-arms itself for now, so a missing mirror spins the alarm
 diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
-index ef80f26..ee81292 100644
+index da716dd..155e63d 100644
 --- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
 +++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
-@@ -125,7 +125,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+@@ -189,7 +189,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
          await scheduleAlarm(this.ctx.storage, {
            kind: "deadline",
            reason: POOL_REFILL,
@@ -13,4 +13,4 @@ index ef80f26..ee81292 100644
 +          at: Date.now(),
          });
        }
-       return;
+       if (report.ready > 0) {

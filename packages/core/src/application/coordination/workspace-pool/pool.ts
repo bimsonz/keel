@@ -26,7 +26,9 @@ import {
   Ids,
   type ObservedPush,
   type PushObservation,
+  Trunks,
   type WorkspaceGrant,
+  WorkspaceRefresher,
 } from "../../ports/index.ts";
 import { workspaceRepoName } from "./repo-names.ts";
 import {
@@ -34,10 +36,12 @@ import {
   heldBy,
   holdFor,
   isDestroyed,
+  isReady,
   oldestReady,
   type PoolSettings,
   putSettings,
   putSlot,
+  readyBehind,
   type RepoName,
   settingsOf,
   type Slot,
@@ -50,6 +54,8 @@ import {
 export const GRANT_TTL_SECONDS = 2 * 60 * 60;
 /** A slot still forking after this long belonged to a refill that died; it is collected. */
 export const STUCK_FORK_MS = 120_000;
+/** A slot still refreshing after this long belonged to a pass that died mid-relay; its main is read back. */
+export const STUCK_REFRESH_MS = 120_000;
 const MAIN = "refs/heads/main";
 const GRANT_ATTEMPTS = 64;
 
@@ -70,9 +76,11 @@ const handout = (slot: Slot) =>
  * Grants a ready workspace to `holder`, or the one it already holds: a retry
  * re-mints the token for the same workspace. The choice is re-checked inside
  * the transaction, so concurrent grants never share a workspace; the loser
- * takes the next ready one. The write token is minted after the commit and
- * never stored. Every pool commit is stamped with the pool's `project`. A
- * destroyed pool grants nothing, not even a holder's own workspace again.
+ * takes the next ready one. A workspace being refreshed is not ready: trunk
+ * is being written into it, so it is never handed out mid-relay. The write
+ * token is minted after the commit and never stored. Every pool commit is
+ * stamped with the pool's `project`. A destroyed pool grants nothing, not
+ * even a holder's own workspace again.
  */
 export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function* (
   project: ProjectId,
@@ -100,7 +108,8 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
     const candidate = oldestReady(store);
     if (candidate === undefined) {
       return yield* new PoolExhausted({
-        retryAfterMs: countIn(store, "forking") > 0 ? 5_000 : 15_000,
+        // One being forked or refreshed is ready within seconds.
+        retryAfterMs: countIn(store, "forking") + countIn(store, "refreshing") > 0 ? 5_000 : 15_000,
       });
     }
     const now = yield* (yield* Clock).now;
@@ -109,7 +118,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
       (tx) => {
         const chosen = slotOf(tx.store, candidate.id);
         if (
-          chosen?.state !== "ready" ||
+          !isReady(chosen) ||
           chosen.baseSha === undefined ||
           heldBy(tx.store, holder) !== undefined ||
           isDestroyed(tx.store)
@@ -195,7 +204,8 @@ export const observePush = Effect.fn("coordination/observePush")(function* (
  * Names come from fresh workspace ids, so a name is never reused. A slot left
  * forking by a refill that died is collected. A slot given up while its fork
  * ran (the pool was destroyed) is collected again once the fork resolves, as
- * its repo exists from then. A destroyed pool forks nothing.
+ * its repo exists from then. A slot being refreshed counts towards the
+ * target, as it is ready again within seconds. A destroyed pool forks nothing.
  */
 export const refillPool = Effect.fn("coordination/refillPool")(function* (project: ProjectId) {
   const store = yield* EntityStore;
@@ -205,7 +215,11 @@ export const refillPool = Effect.fn("coordination/refillPool")(function* (projec
   const stuck = slots(store).filter((s) => s.state === "forking" && now - s.since > STUCK_FORK_MS);
   for (const slot of stuck) yield* markCollecting(project, slot.id, "fork-abandoned");
   const source = settings.source;
-  const need = settings.target - countIn(store, "ready") - countIn(store, "forking");
+  const need =
+    settings.target -
+    countIn(store, "ready") -
+    countIn(store, "forking") -
+    countIn(store, "refreshing");
   if (source === null || need <= 0 || isDestroyed(store))
     return { started: 0, ready: 0, failed: 0, abandoned: stuck.length } satisfies RefillReport;
 
@@ -327,6 +341,184 @@ export const releaseWorkspace = Effect.fn("coordination/releaseWorkspace")(funct
 });
 
 /**
+ * What a refresh pass did. `refreshed` workspaces now stand on trunk's head;
+ * `failed` ones could not follow it and were given up for collection (the
+ * refill forks their replacements); `pending` ones are still behind trunk or
+ * not yet settled, so the pass must run again.
+ */
+export interface RefreshReport {
+  readonly refreshed: number;
+  readonly failed: number;
+  readonly pending: number;
+}
+
+/** What became of one slot in a refresh pass. `left`: it was not this pass's to touch. `unsettled`: its main could not be read. */
+type Refreshed = "advanced" | "kept" | "collected" | "left" | "unsettled";
+
+const decided = (value: Refreshed, drafts: readonly EventDraft[] = []) =>
+  Result.succeed({ value, drafts });
+
+/** A slot whose main is known again: ready at `base`, with nothing of its refresh left on it. */
+const settledAt = (slot: Slot, base: CommitSha, at: number): Slot => ({
+  id: slot.id,
+  repo: slot.repo,
+  state: "ready",
+  since: at,
+  ...(slot.remote === undefined ? {} : { remote: slot.remote }),
+  baseSha: base,
+});
+
+/**
+ * Settles a refreshing slot whose relay left no answer to trust (it was
+ * refused, it failed part-way, or its pass died): reads the workspace's main
+ * back. At the commit the relay was taking it to, or still where it was, the
+ * slot is ready there. Anywhere else, or gone, it is not a workspace the pool
+ * can vouch for, and it is collected. A read that fails leaves the slot
+ * refreshing, for a later pass.
+ */
+const settleRefresh = (project: ProjectId, id: WorkspaceId) =>
+  Effect.gen(function* () {
+    const store = yield* EntityStore;
+    const host = yield* CodeHost;
+    const slot = slotOf(store, id);
+    if (slot?.state !== "refreshing") return "left" satisfies Refreshed;
+    const read = yield* host.head(slot.repo, MAIN).pipe(
+      Effect.map((sha): CommitSha | "gone" => sha),
+      Effect.catchTags({
+        RepoNotFound: () => Effect.succeed("gone" as const),
+        RefNotFound: () => Effect.succeed("gone" as const),
+      }),
+      Effect.exit,
+    );
+    if (Exit.isFailure(read)) return "unsettled" satisfies Refreshed;
+    const main = read.value;
+    const done = yield* commit(
+      { entity: { kind: "workspace", id }, cause: `refresh-settled:${id}`, project },
+      (tx) => {
+        const current = slotOf(tx.store, id);
+        if (current?.state !== "refreshing") return decided("left");
+        if (main !== "gone" && (main === current.advancingTo || main === current.baseSha)) {
+          putSlot(tx.store, settledAt(current, main, tx.at));
+          return decided(main === current.advancingTo ? "advanced" : "kept");
+        }
+        return decided("collected", collectIn(tx, id, "expired", tx.at));
+      },
+    );
+    return done.duplicate ? ("left" satisfies Refreshed) : done.value;
+  });
+
+/**
+ * Refreshes one slot. It is claimed first (`ready` to `refreshing`, checked
+ * again inside the transaction, so one granted meanwhile is left to its
+ * holder), then trunk is relayed into its main, and only once the relay has
+ * answered is the new base recorded: `baseSha` never names a commit the
+ * workspace's main was not seen at. No event is committed, as a workspace
+ * nobody holds has nobody to tell, and `WorkspaceGranted.baseSha` announces
+ * the base when it is handed out.
+ */
+const refreshOne = (project: ProjectId, id: WorkspaceId, head: CommitSha) =>
+  Effect.gen(function* () {
+    const refresher = yield* WorkspaceRefresher;
+    const claimed = yield* commit(
+      { entity: { kind: "workspace", id }, cause: `refresh-start:${id}`, project },
+      (tx) => {
+        const current = slotOf(tx.store, id);
+        const from = current?.baseSha;
+        if (!isReady(current) || from === undefined || from === head)
+          return Result.succeed({ value: undefined, drafts: [] });
+        putSlot(tx.store, { ...current, state: "refreshing", since: tx.at, advancingTo: head });
+        return Result.succeed({ value: { repo: current.repo, from }, drafts: [] });
+      },
+    );
+    if (claimed.duplicate || claimed.value === undefined) return "left" satisfies Refreshed;
+    const { repo, from } = claimed.value;
+    const relayed = yield* refresher.advance(project, repo, from, head).pipe(
+      Effect.as("landed" as const),
+      // What lies past its base can never be relayed: a fresh fork replaces it.
+      Effect.catchTag("PackTooLarge", () => Effect.succeed("too-large" as const)),
+      Effect.exit,
+    );
+    // A refusal, a missing repo or a failure part-way says nothing of where main is: read it back.
+    if (Exit.isFailure(relayed)) return yield* settleRefresh(project, id);
+    const outcome = relayed.value;
+    const done = yield* commit(
+      { entity: { kind: "workspace", id }, cause: `refresh-end:${id}`, project },
+      (tx) => {
+        const current = slotOf(tx.store, id);
+        // Given up while its relay ran (the pool was destroyed): it stays given up.
+        if (current?.state !== "refreshing") return decided("left");
+        if (outcome === "too-large")
+          return decided("collected", collectIn(tx, id, "expired", tx.at));
+        putSlot(tx.store, settledAt(current, head, tx.at));
+        return decided("advanced");
+      },
+    );
+    return done.duplicate ? ("left" satisfies Refreshed) : done.value;
+  });
+
+/**
+ * Brings the pool's ready workspaces up to trunk's head, so the next change
+ * starts from it and not from wherever trunk stood when its workspace was
+ * forked. Trunk's head is the Trunk DO's own (`Trunks.head`). The ready
+ * workspaces behind it are refreshed one at a time, the one that has waited
+ * longest first: while one is mid-relay the others stay grantable, since a
+ * workspace behind trunk beats none. A granted workspace is never touched.
+ *
+ * A slot a dead pass left refreshing is settled first, once it has been so
+ * for `STUCK_REFRESH_MS`, by reading its main back. A pool with no ready
+ * workspace and nothing to settle does not ask trunk at all; a destroyed pool
+ * is one, as it has given every workspace up.
+ */
+export const refreshSlots = Effect.fn("coordination/refreshSlots")(function* (project: ProjectId) {
+  const store = yield* EntityStore;
+  const now = yield* (yield* Clock).now;
+  const stuck = slots(store).filter(
+    (s) => s.state === "refreshing" && now - s.since > STUCK_REFRESH_MS,
+  );
+  if (stuck.length === 0 && countIn(store, "ready") === 0)
+    return {
+      refreshed: 0,
+      failed: 0,
+      pending: countIn(store, "refreshing"),
+    } satisfies RefreshReport;
+  const head = yield* (yield* Trunks).head(project);
+  let refreshed = 0;
+  let failed = 0;
+  for (const slot of stuck) {
+    const how = yield* settleRefresh(project, slot.id);
+    if (how === "collected") failed += 1;
+    // Its relay had landed; it counts once it stands on today's head, or it is refreshed again below.
+    if (how === "advanced" && slotOf(store, slot.id)?.baseSha === head) refreshed += 1;
+  }
+  const outcomes = yield* Effect.forEach(
+    readyBehind(store, head),
+    (slot) => refreshOne(project, slot.id, head),
+    { concurrency: 1 },
+  );
+  for (const how of outcomes) {
+    if (how === "advanced") refreshed += 1;
+    if (how === "collected") failed += 1;
+  }
+  return {
+    refreshed,
+    failed,
+    pending: readyBehind(store, head).length + countIn(store, "refreshing"),
+  } satisfies RefreshReport;
+});
+
+/**
+ * How many ready workspaces are behind trunk's head. A refill forks from the
+ * project's mirror, which can lag trunk, so what it leaves ready may already
+ * want a refresh. A pool with no ready workspace does not ask trunk.
+ */
+export const countBehind = Effect.fn("coordination/countBehind")(function* (project: ProjectId) {
+  const store = yield* EntityStore;
+  if (countIn(store, "ready") === 0) return 0;
+  const head = yield* (yield* Trunks).head(project);
+  return readyBehind(store, head).length;
+});
+
+/**
  * Destroys the project's pool, for good: it forks and grants nothing from
  * here on, and every workspace it holds (ready, granted or still forking) is
  * given up for collection, which deletes its repo. A ready or granted one
@@ -442,6 +634,8 @@ export interface PoolStatus {
   readonly target: number;
   readonly ready: number;
   readonly forking: number;
+  /** Ready ones trunk has moved past, while trunk is relayed into them; not grantable until it is. */
+  readonly refreshing: number;
   readonly granted: number;
   readonly collecting: number;
   /** The project was destroyed: once `collecting` is 0, none of its workspace repos is left. */
@@ -456,6 +650,7 @@ export const poolStatus = Effect.fn("coordination/poolStatus")(function* () {
     target: settings.target,
     ready: countIn(store, "ready"),
     forking: countIn(store, "forking"),
+    refreshing: countIn(store, "refreshing"),
     granted: countIn(store, "granted"),
     collecting: countIn(store, "collecting"),
     destroyed: isDestroyed(store),

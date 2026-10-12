@@ -33,12 +33,13 @@ export const PoolConfig = Schema.Struct({
   target: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 });
 
-/** Workspaces by state. `forking` are not yet grantable; `collecting` are released and awaiting their repo's deletion. A `destroyed` pool with none collecting has no repo left. */
+/** Workspaces by state. `forking` are not yet grantable, and nor are `refreshing` ones, ready workspaces that trunk is being relayed into; `collecting` are released and awaiting their repo's deletion. A `destroyed` pool with none collecting has no repo left. */
 export const PoolStatus = Schema.Struct({
   source: Schema.NullOr(RepoRef),
   target: Schema.Int,
   ready: Schema.Int,
   forking: Schema.Int,
+  refreshing: Schema.Int,
   granted: Schema.Int,
   collecting: Schema.Int,
   destroyed: Schema.Boolean,

@@ -241,13 +241,10 @@ describe("WorkspacePool", () => {
         yield* releaseWorkspace(PROJECT, grant.workspaceId, "landed");
         yield* releaseWorkspace(PROJECT, grant.workspaceId, "landed");
         expect(yield* poolStatus()).toMatchObject({ granted: 0, collecting: 1 });
+        // Released is not yet deleted: the repo is there until the collection pass.
+        expect(yield* onHost(grant.repo)).toBe(true);
         expect(yield* collectWorkspaces(PROJECT)).toEqual({ deleted: 1, pending: 0 });
-        const host = yield* CodeHost;
-        const repo = {
-          namespace: MIRROR.namespace,
-          name: `ws-${grant.workspaceId.slice(4).toLowerCase()}`,
-        };
-        expect((yield* Effect.flip(host.info(repo)))._tag).toBe("RepoNotFound");
+        expect(yield* onHost(grant.repo)).toBe(false);
         const events = yield* eventsOf(grant.workspaceId);
         expect(events.at(-1)).toEqual({
           _tag: "WorkspaceCollected",

@@ -2,13 +2,13 @@
 # kills: pool.do.destroy
 # why: destroy gives the workspaces up but arms no collection, so their repos stay
 diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
-index f03cd79..e672bb5 100644
+index da716dd..e764238 100644
 --- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
 +++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
-@@ -117,11 +117,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
-       WorkspacePoolCodecs.destroy,
+@@ -129,11 +129,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
        Effect.andThen(destroyPool(project), poolStatus()),
      );
+     await cancelAlarm(this.ctx.storage, POOL_REFRESH);
 -    await scheduleAlarm(this.ctx.storage, {
 -      kind: "deadline",
 -      reason: POOL_COLLECT,

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts
+# kills: pool.do.refresh-retry
+# why: a pass that left a workspace behind counts as done, so nothing brings it to trunk until the next landing
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index da716dd..51e71f4 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -245,7 +245,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+       await scheduleAlarm(storage, { kind: "deadline", reason: POOL_COLLECT, at: Date.now() });
+       await this.refillIfShort();
+     }
+-    const settled = Exit.isSuccess(exit) && exit.value.pending === 0;
++    const settled = Exit.isSuccess(exit);
+     this.refreshFailures = settled ? 0 : this.refreshFailures + 1;
+     if (armedAlarms(storage).find((armed) => armed.reason === POOL_REFRESH)?.at !== fallback)
+       return;

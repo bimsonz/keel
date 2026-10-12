@@ -2,11 +2,11 @@
 # kills: pool.do.alarms
 # why: A grant never arms a refill, so the pool drains to empty
 diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
-index ef80f26..1f4eff6 100644
+index da716dd..d1cfa21 100644
 --- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
 +++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
-@@ -56,7 +56,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
-       Effect.provide(this.codeHost),
+@@ -79,7 +79,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+       Effect.provide(this.services),
      );
      const answer = await this.answer(WorkspacePoolCodecs.grant, program);
 -    await this.refillIfShort();

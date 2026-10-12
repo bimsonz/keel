@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.refresh-one-at-a-time
+# why: every workspace behind trunk is claimed and relayed at once, so none stays grantable during a pass
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 5d3cef4..c04c98f 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -493,7 +493,7 @@ export const refreshSlots = Effect.fn("coordination/refreshSlots")(function* (pr
+   const outcomes = yield* Effect.forEach(
+     readyBehind(store, head),
+     (slot) => refreshOne(project, slot.id, head),
+-    { concurrency: 1 },
++    { concurrency: "unbounded" },
+   );
+   for (const how of outcomes) {
+     if (how === "advanced") refreshed += 1;

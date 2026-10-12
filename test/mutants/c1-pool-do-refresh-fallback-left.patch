@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts
+# kills: pool.do.refresh
+# why: the deadline armed for a pass is never withdrawn, so a pool with nothing behind wakes again two minutes later
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index da716dd..a14faae 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -249,7 +249,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+     this.refreshFailures = settled ? 0 : this.refreshFailures + 1;
+     if (armedAlarms(storage).find((armed) => armed.reason === POOL_REFRESH)?.at !== fallback)
+       return;
+-    if (settled) return cancelAlarm(storage, POOL_REFRESH);
++    if (settled) return;
+     const delay = redeliveryDelay(this.refreshFailures);
+     const line = `pool ${this.project} refresh unfinished ${this.refreshFailures}x, next in ${delay} ms`;
+     const why = Exit.isFailure(exit) ? Cause.pretty(exit.cause) : JSON.stringify(exit.value);

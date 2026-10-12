@@ -17,6 +17,7 @@ import {
   type TrunkWriter,
   type Trunks,
   type WorkspaceRebaser,
+  type WorkspaceRefresher,
   type WorkspacePool,
   type LiveChanges,
 } from "@keeltown/core/ports";
@@ -37,6 +38,7 @@ import { CandidateComposerGitCore } from "../adapters/driven/gitcore/candidate-c
 import { StagingWriterGitCore } from "../adapters/driven/gitcore/staging-writer.ts";
 import { TrunkWriterGitCore } from "../adapters/driven/gitcore/trunk-writer.ts";
 import { WorkspaceRebaserGitCore } from "../adapters/driven/gitcore/workspace-rebaser.ts";
+import { WorkspaceRefresherGitCore } from "../adapters/driven/gitcore/workspace-refresher.ts";
 import { BundleStoreR2 } from "../adapters/driven/r2/bundle-store.ts";
 import { BatchVerificationWorkflow } from "../adapters/driven/workflow/batch-verification.ts";
 import { LiveChangesRpc } from "../adapters/driven/do-rpc/live-changes.ts";
@@ -108,6 +110,24 @@ export function changeServices(env: Env): Layer.Layer<ChangeServices> {
     TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
     WorkspaceRebaserGitCore().pipe(Layer.provide(host)),
     liveChangesLayer(env),
+  );
+}
+
+/** The WorkspacePool DO's driven adapters beyond the backbone. */
+export type PoolServices = CodeHost | Trunks | WorkspaceRefresher;
+
+/**
+ * The WorkspacePool DO forks, reads and deletes workspaces through the code
+ * host. To keep its ready workspaces on trunk it asks the Trunk DO for
+ * trunk's head and relays trunk into a workspace nobody holds yet: it reads
+ * trunk, and never holds a trunk write token.
+ */
+export function poolServices(env: Env): Layer.Layer<PoolServices> {
+  const host = codeHostLayer(env);
+  return Layer.mergeAll(
+    host,
+    TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
+    WorkspaceRefresherGitCore().pipe(Layer.provide(host)),
   );
 }
 

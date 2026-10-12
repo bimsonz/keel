@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.refresh-granted-untouched
+# why: a granted workspace counts as ready, so a refresh writes trunk into a main its holder is working on
+diff --git a/packages/core/src/application/coordination/workspace-pool/state.ts b/packages/core/src/application/coordination/workspace-pool/state.ts
+index 8865546..84fb29a 100644
+--- a/packages/core/src/application/coordination/workspace-pool/state.ts
++++ b/packages/core/src/application/coordination/workspace-pool/state.ts
+@@ -99,7 +99,8 @@ export const unhold = (store: Store, holder: string): void => store.remove(HOLDE
+  * one. A slot being forked or refreshed is mid-write, and a granted one is
+  * its holder's.
+  */
+-export const isReady = (slot: Slot | undefined): slot is Slot => slot?.state === "ready";
++export const isReady = (slot: Slot | undefined): slot is Slot =>
++  slot?.state === "ready" || slot?.state === "granted";
+ 
+ /** The ready slots, the one that has waited longest first. */
+ const readyInOrder = (store: Store): readonly Slot[] =>

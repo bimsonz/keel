@@ -54,6 +54,10 @@ import {
   type WorkspaceRebaserHarness,
 } from "./contracts/workspace-rebaser.ts";
 import {
+  describeWorkspaceRefresherContract,
+  type WorkspaceRefresherHarness,
+} from "./contracts/workspace-refresher.ts";
+import {
   type BatchVerdictsHarness,
   type AdmittedGuardsHarness,
   type ChangePrecheckHarness,
@@ -120,6 +124,7 @@ import type {
   Projects,
   ProjectViews,
   WorkspaceRebaser,
+  WorkspaceRefresher,
   Sessions,
   Standings,
   SyntaxSource,
@@ -192,6 +197,19 @@ function memoryWorkspaceRebaserHarness(): WorkspaceRebaserHarness {
     projectId: makeId("prj", "01KRBSRCNTRCT0000000000000"),
     trunk,
     layer: Layer.mergeAll(code.layer, codeHost.makeWorkspaceRebaserMemory(code, () => trunk).layer),
+  };
+}
+
+function memoryWorkspaceRefresherHarness(): WorkspaceRefresherHarness {
+  const code = codeHost.makeCodeHostMemory();
+  const trunk = code.fixture.scratch();
+  return {
+    projectId: makeId("prj", "01KRBSRCNTRCT0000000000000"),
+    trunk,
+    layer: Layer.mergeAll(
+      code.layer,
+      codeHost.makeWorkspaceRefresherMemory(code, () => trunk).layer,
+    ),
   };
 }
 
@@ -387,6 +405,10 @@ export const PORTS = {
     WorkspaceRebaser | CodeHost | CodeHostFixture,
     WorkspaceRebaserHarness
   >(memoryWorkspaceRebaserHarness, describeWorkspaceRebaserContract),
+  WorkspaceRefresher: harnessed<
+    WorkspaceRefresher | CodeHost | CodeHostFixture,
+    WorkspaceRefresherHarness
+  >(memoryWorkspaceRefresherHarness, describeWorkspaceRefresherContract),
   RepoServer: port(memoryRepoServer, describeRepoServerContract),
   Trunks: port(
     () => integration.makeTrunksMemory().layer,

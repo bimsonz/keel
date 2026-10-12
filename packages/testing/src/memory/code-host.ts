@@ -1,4 +1,5 @@
 import { projectRepos } from "@keeltown/core/application/integration";
+import { PushRejected } from "@keeltown/core/domain/integration";
 import { CommitSha, Instant, type ProjectId } from "@keeltown/core/kernel";
 import {
   CodeHost,
@@ -16,6 +17,7 @@ import {
   UPLOAD_PACK_ANSWER_TYPE,
   type UploadPackRequest,
   WorkspaceRebaser,
+  WorkspaceRefresher,
 } from "@keeltown/core/ports";
 import {
   compareTreeEntries,
@@ -300,6 +302,49 @@ export function makeWorkspaceRebaserMemory(
             for (const [id, o] of source.objects) target.objects.set(id, o);
             target.refs.set(KEEL_TRUNK_REF, head);
             pushed.push({ workspace, to: head });
+            return Effect.succeed("advanced");
+          }),
+      }),
+    ),
+  };
+}
+
+/**
+ * WorkspaceRefresher over a memory code host: the project's trunk objects are
+ * copied into the workspace and its main moved to `to`, as the relay would
+ * leave it. A main that is not at `from` refuses with PushRejected `stale`
+ * and nothing moves; `from` equal to `to` is `unchanged`; a missing workspace
+ * is `RepoNotFound`. `advanced` records each move in order.
+ */
+export function makeWorkspaceRefresherMemory(
+  code: Pick<ReturnType<typeof makeCodeHostMemory>, "repos">,
+  trunkOf: (projectId: ProjectId) => RepoRef = (projectId) => projectRepos(projectId).trunk,
+) {
+  const advanced: {
+    readonly workspace: RepoRef;
+    readonly from: CommitSha;
+    readonly to: CommitSha;
+  }[] = [];
+  return {
+    advanced,
+    layer: Layer.succeed(
+      WorkspaceRefresher,
+      WorkspaceRefresher.of({
+        advance: (projectId, workspace, from, to) =>
+          Effect.suspend((): Effect.Effect<SyncOutcome, RepoNotFound | PushRejected> => {
+            if (from === to) return Effect.succeed("unchanged");
+            const target = code.repos.get(repoKey(workspace));
+            if (target === undefined)
+              return Effect.fail(new RepoNotFound({ repo: plain(workspace) }));
+            if (target.refs.get(MAIN) !== from)
+              return Effect.fail(new PushRejected({ reason: "stale" }));
+            const trunk = trunkOf(projectId);
+            const source = code.repos.get(repoKey(trunk));
+            if (source?.objects.get(to)?.type !== "commit")
+              return Effect.die(new Error(`trunk ${repoKey(trunk)} does not hold ${to}`));
+            for (const [id, o] of source.objects) target.objects.set(id, o);
+            target.refs.set(MAIN, to);
+            advanced.push({ workspace, from, to });
             return Effect.succeed("advanced");
           }),
       }),

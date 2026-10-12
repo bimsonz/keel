@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.refresh-idle
+# why: a pass asks trunk for its head even when the pool holds nothing to refresh
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 5d3cef4..b945326 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -475,7 +475,7 @@ export const refreshSlots = Effect.fn("coordination/refreshSlots")(function* (pr
+   const stuck = slots(store).filter(
+     (s) => s.state === "refreshing" && now - s.since > STUCK_REFRESH_MS,
+   );
+-  if (stuck.length === 0 && countIn(store, "ready") === 0)
++  if (stuck.length === 0 && countIn(store, "ready") < 0)
+     return {
+       refreshed: 0,
+       failed: 0,

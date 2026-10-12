@@ -6,6 +6,8 @@ import type { Transaction } from "../../ports/index.ts";
  * The WorkspacePool's own state, in its Durable Object's EntityStore. A
  * workspace is `forking` from the moment its fork is started until the fork
  * resolves; only then is it `ready`, and only a ready one is ever granted.
+ * A ready one that trunk has moved past is `refreshing` while trunk is
+ * relayed into it, and ready again once its main is known.
  */
 export const RepoName = Schema.Struct({ namespace: Schema.String, name: Schema.String });
 export type RepoName = typeof RepoName.Type;
@@ -21,6 +23,7 @@ export type PoolSettings = typeof PoolSettings.Type;
 export const SlotState = Schema.Literals([
   "forking",
   "ready",
+  "refreshing",
   "granted",
   "collecting",
   "collected",
@@ -37,6 +40,8 @@ export const Slot = Schema.Struct({
   /** Stored for the holder only; never logged and never in an event (its host carries the account id). */
   remote: Schema.optionalKey(Schema.String),
   baseSha: Schema.optionalKey(CommitSha),
+  /** While refreshing: the trunk commit the relay is taking main to. `baseSha` is still where main was. */
+  advancingTo: Schema.optionalKey(CommitSha),
   /** Failed deletions of the repo so far, while collecting. */
   attempts: Schema.optionalKey(Schema.Int),
 });
@@ -89,11 +94,25 @@ export const holdFor = (store: Store, holder: string, workspaceId: WorkspaceId):
 
 export const unhold = (store: Store, holder: string): void => store.remove(HOLDER, holder);
 
-/** The ready slot that has waited longest, so the pool hands out in fork order. */
-export const oldestReady = (store: Store): Slot | undefined =>
+/**
+ * Whether the pool may hand the slot out or write to its repo: only a ready
+ * one. A slot being forked or refreshed is mid-write, and a granted one is
+ * its holder's.
+ */
+export const isReady = (slot: Slot | undefined): slot is Slot => slot?.state === "ready";
+
+/** The ready slots, the one that has waited longest first. */
+const readyInOrder = (store: Store): readonly Slot[] =>
   slots(store)
-    .filter((s) => s.state === "ready")
-    .toSorted((a, b) => a.since - b.since || (a.id < b.id ? -1 : 1))[0];
+    .filter(isReady)
+    .toSorted((a, b) => a.since - b.since || (a.id < b.id ? -1 : 1));
+
+/** The ready slot that has waited longest, so the pool hands out in fork order. */
+export const oldestReady = (store: Store): Slot | undefined => readyInOrder(store)[0];
+
+/** The ready slots whose main is not at `head`, the one that has waited longest first. */
+export const readyBehind = (store: Store, head: CommitSha): readonly Slot[] =>
+  readyInOrder(store).filter((s) => s.baseSha !== head);
 
 export const countIn = (store: Store, state: SlotState): number =>
   slots(store).filter((s) => s.state === state).length;

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts
+# kills: pool.do.refresh-after-refill
+# why: a refill never checks what it forked against trunk, so a workspace forked from a lagging mirror is granted behind trunk
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index da716dd..6206a81 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -192,7 +192,7 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+           at: Date.now() + RETRY_MS,
+         });
+       }
+-      if (report.ready > 0) {
++      if (report.ready < 0) {
+         // The mirror it forked from can lag trunk: what it left ready may already be behind.
+         const behind = await this.runtime.runPromiseExit(
+           countBehind(this.project).pipe(Effect.provide(this.services)),

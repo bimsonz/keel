@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.refresh-readback
+# why: a relay that failed is taken to have moved nothing, without reading main back
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 5d3cef4..55678c2 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -391,7 +391,7 @@ const settleRefresh = (project: ProjectId, id: WorkspaceId) =>
+       Effect.exit,
+     );
+     if (Exit.isFailure(read)) return "unsettled" satisfies Refreshed;
+-    const main = read.value;
++    const main: CommitSha | "gone" = slot.baseSha ?? read.value;
+     const done = yield* commit(
+       { entity: { kind: "workspace", id }, cause: `refresh-settled:${id}`, project },
+       (tx) => {

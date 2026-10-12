@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-refresher.test.ts
+# kills: refresher.stale
+# why: a push the workspace refused is answered as if main had moved
+diff --git a/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts b/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts
+index 4ee1315..1fe7eeb 100644
+--- a/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts
++++ b/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts
+@@ -57,7 +57,7 @@ export const WorkspaceRefresherGitCore = (
+                   : tooLarge(workspace)(cause),
+               ),
+             );
+-            if (outcome.kind === "rejected")
++            if (outcome.kind === "unchanged")
+               return yield* Effect.fail(new PushRejected({ reason: "stale" }));
+             return outcome.kind satisfies SyncOutcome;
+           }),

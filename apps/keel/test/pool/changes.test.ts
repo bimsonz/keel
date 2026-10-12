@@ -14,6 +14,7 @@ import { expect, vi } from "vitest";
 import { ChangesRpc } from "../../src/adapters/driven/do-rpc/changes.ts";
 import { changeServices } from "../../src/composition/do.ts";
 import { rewire } from "./change-harness.ts";
+import { followTrunk } from "./pool-harness.ts";
 import { decodeExit, WorkspacePoolCodecs } from "../../src/rpc/index.ts";
 
 const poolStub = (projectId: ProjectId) =>
@@ -31,7 +32,10 @@ async function stockedCaller(): Promise<AgentToken> {
   const mirror = `mirror-${ulid().toLowerCase()}`;
   await env.TEST_ARTIFACTS.create(mirror);
   const pool = poolStub(projectId);
-  await pool.configure({ source: { namespace: "keel-ws-00", name: mirror }, target: 3 });
+  const source = { namespace: "keel-ws-00", name: mirror };
+  // createProject initializes trunk before it configures the pool; this project has none.
+  await followTrunk(projectId, source);
+  await pool.configure({ source, target: 3 });
   // The refill is a deadline armed for now; the platform may run it before this line does.
   await runDurableObjectAlarm(pool);
   await vi.waitFor(async () => expect(await readyIn(projectId)).toBeGreaterThan(0), {

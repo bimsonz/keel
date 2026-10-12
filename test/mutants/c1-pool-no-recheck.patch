@@ -2,14 +2,14 @@
 # kills: pool.grant-once
 # why: The slot chosen before the transaction is not re-checked inside it, so racing grants share a workspace
 diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
-index 19f3916..7baf68a 100644
+index 5d3cef4..ae1e10e 100644
 --- a/packages/core/src/application/coordination/workspace-pool/pool.ts
 +++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
-@@ -109,7 +109,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
+@@ -118,7 +118,7 @@ export const grantWorkspace = Effect.fn("coordination/grantWorkspace")(function*
        (tx) => {
          const chosen = slotOf(tx.store, candidate.id);
          if (
--          chosen?.state !== "ready" ||
+-          !isReady(chosen) ||
 +          chosen === undefined ||
            chosen.baseSha === undefined ||
            heldBy(tx.store, holder) !== undefined ||

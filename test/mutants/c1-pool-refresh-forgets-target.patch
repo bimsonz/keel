@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.refresh-readback
+# why: where the relay was taking main is not kept, so a push that landed with its answer lost reads as a main nobody put there
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 5d3cef4..bab4295 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -426,7 +426,7 @@ const refreshOne = (project: ProjectId, id: WorkspaceId, head: CommitSha) =>
+         const from = current?.baseSha;
+         if (!isReady(current) || from === undefined || from === head)
+           return Result.succeed({ value: undefined, drafts: [] });
+-        putSlot(tx.store, { ...current, state: "refreshing", since: tx.at, advancingTo: head });
++        putSlot(tx.store, { ...current, state: "refreshing", since: tx.at });
+         return Result.succeed({ value: { repo: current.repo, from }, drafts: [] });
+       },
+     );

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-pool-refresh.test.ts
+# kills: pool.refresh-destroy-mid-relay
+# why: a relay that answers after its workspace was given up makes it ready again, in a destroyed pool
+diff --git a/packages/core/src/application/coordination/workspace-pool/pool.ts b/packages/core/src/application/coordination/workspace-pool/pool.ts
+index 5d3cef4..25e9f63 100644
+--- a/packages/core/src/application/coordination/workspace-pool/pool.ts
++++ b/packages/core/src/application/coordination/workspace-pool/pool.ts
+@@ -446,7 +446,7 @@ const refreshOne = (project: ProjectId, id: WorkspaceId, head: CommitSha) =>
+       (tx) => {
+         const current = slotOf(tx.store, id);
+         // Given up while its relay ran (the pool was destroyed): it stays given up.
+-        if (current?.state !== "refreshing") return decided("left");
++        if (current === undefined) return decided("left");
+         if (outcome === "too-large")
+           return decided("collected", collectIn(tx, id, "expired", tx.at));
+         putSlot(tx.store, settledAt(current, head, tx.at));

@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/workspace-pool.test.ts
+# kills: pool.do.refresh
+# why: no deadline stands while a pass runs, so a slot left mid-relay by an object that dies is never settled
+diff --git a/apps/keel/src/adapters/driving/do/workspace-pool.ts b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+index da716dd..0050b89 100644
+--- a/apps/keel/src/adapters/driving/do/workspace-pool.ts
++++ b/apps/keel/src/adapters/driving/do/workspace-pool.ts
+@@ -236,7 +236,6 @@ export class WorkspacePoolDO extends KeelObject implements WorkspacePoolRpc {
+   private async refresh(): Promise<void> {
+     const storage = this.ctx.storage;
+     const fallback = Date.now() + STUCK_REFRESH_MS + 1_000;
+-    await scheduleAlarm(storage, { kind: "deadline", reason: POOL_REFRESH, at: fallback });
+     const exit = await this.runtime.runPromiseExit(
+       refreshSlots(this.project).pipe(Effect.provide(this.services)),
+     );

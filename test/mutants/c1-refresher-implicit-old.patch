@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/workspace-refresher.test.ts
+# kills: refresher.cas
+# why: the push names no old value, so it overwrites whatever main holds
+diff --git a/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts b/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts
+index 4ee1315..0ab3b26 100644
+--- a/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts
++++ b/apps/keel/src/adapters/driven/gitcore/workspace-refresher.ts
+@@ -48,7 +48,7 @@ export const WorkspaceRefresherGitCore = (
+               Effect.catchTag("RepoNotFound", Effect.die),
+             );
+             const outcome = yield* Effect.tryPromise({
+-              try: () => relay(source, target, { ref: MAIN, from, to }),
++              try: () => relay(source, target, { ref: MAIN, from: null, to, haves: [from] }),
+               catch: (cause) => cause,
+             }).pipe(
+               Effect.catch((cause): Effect.Effect<never, PackTooLarge | PushRejected> =>
