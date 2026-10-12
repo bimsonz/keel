@@ -723,6 +723,80 @@
         ]
       }
     },
+    "/auth/methods": {
+      "get": {
+        "operationId": "SignIn_methods",
+        "summary": "List the sign-in methods offered",
+        "description": "Which sign-in methods are mounted, so a sign-in page offers only those.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInMethods"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ],
+        "security": [
+          {}
+        ]
+      }
+    },
     "/candidates/{candidateId}": {
       "get": {
         "operationId": "Views_getCandidate",
@@ -14875,6 +14949,27 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "SignInMethods": {
+        "type": "object",
+        "required": [
+          "emailCode",
+          "github"
+        ],
+        "properties": {
+          "emailCode": {
+            "type": "boolean",
+            "description": "One-time codes by email: offered only once the instance can send mail."
+          },
+          "github": {
+            "type": "boolean",
+            "description": "GitHub: offered only once the instance has its OAuth app."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "How a person may sign in on this instance. A passkey is always offered."
       },
       "SketchDiscarded": {
         "type": "object",

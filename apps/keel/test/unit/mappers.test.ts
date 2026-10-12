@@ -72,9 +72,12 @@ const STUBBED = [
 
 describe("stubbed operations", () => {
   it("answer exactly the declared 503 service.not_implemented, and only the listed ones do", async () => {
-    const handlers = makeHandlers(async () => {
-      throw new Error("a stub must not reach the runtime");
-    });
+    const handlers = makeHandlers(
+      async () => {
+        throw new Error("a stub must not reach the runtime");
+      },
+      { emailCode: false, github: false },
+    );
     const answers = await Promise.all(
       Object.entries(handlers).map(async ([operation, handler]) => {
         // `{}` is not valid input; an implemented handler may throw on it, which counts as not a stub.

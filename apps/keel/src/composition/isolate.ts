@@ -17,7 +17,13 @@ import {
 import { waitUntil } from "cloudflare:workers";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
-import { AUTH_BASE_PATH, makeAuth, type OtpSender } from "../adapters/driven/better-auth/auth.ts";
+import {
+  AUTH_BASE_PATH,
+  type AuthConfig,
+  makeAuth,
+  type OtpSender,
+  signInMethods,
+} from "../adapters/driven/better-auth/auth.ts";
 import { AgentDirectoryWithBootstrap } from "../adapters/driven/bootstrap/directory.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
@@ -148,20 +154,20 @@ export interface AuthOverrides {
   readonly made?: () => void;
 }
 
-/** Better Auth over the Worker's D1, with GitHub only once both of its secrets are set. */
-function identity(env: Env, overrides: AuthOverrides) {
+/** Better Auth's config over the Worker's D1, with GitHub only once both of its secrets are set. */
+function identity(env: Env, overrides: AuthOverrides): AuthConfig {
   const { GITHUB_CLIENT_ID: clientId, GITHUB_CLIENT_SECRET: clientSecret } = env as Env & {
     readonly GITHUB_CLIENT_ID?: string;
     readonly GITHUB_CLIENT_SECRET?: string;
   };
-  return makeAuth({
+  return {
     db: env.DB,
     secret: env.BETTER_AUTH_SECRET,
     host: env.KEEL_HOST,
     background: waitUntil,
     ...(overrides.sendOtp === undefined ? {} : { sendOtp: overrides.sendOtp }),
     ...(clientId && clientSecret ? { github: { clientId, clientSecret } } : {}),
-  });
+  };
 }
 
 /** The app over a given layer. `isolateFor` caches the production one per Env; pool tests build their own. */
@@ -171,7 +177,8 @@ export function makeIsolate(
   authOverrides: AuthOverrides = {},
 ): Isolate {
   const runtime = ManagedRuntime.make(layer);
-  const handlers = makeHandlers(makeRunner(runtime));
+  const authConfig = identity(env, authOverrides);
+  const handlers = makeHandlers(makeRunner(runtime), signInMethods(authConfig));
   const verify = makeVerifier(runtime);
   /**
    * Better Auth starts its initialisation (D1 included) when it is made and
@@ -183,7 +190,7 @@ export function makeIsolate(
    */
   const auth = () => {
     authOverrides.made?.();
-    return identity(env, authOverrides);
+    return makeAuth(authConfig);
   };
   const app = makeApp({
     handlers,

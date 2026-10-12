@@ -80,7 +80,7 @@ describe("the token endpoint", () => {
         makeStandingsMemory().layer.pipe(Layer.provide(directory.layer)),
       ),
     );
-    const handlers = makeHandlers(makeRunner(runtime));
+    const handlers = makeHandlers(makeRunner(runtime), { emailCode: false, github: false });
     const answer = await handlers.Auth_exchangeToken(
       { requestId: "req-1", principal: null, signal: new AbortController().signal },
       { client_id: "client", client_secret: "secret" },

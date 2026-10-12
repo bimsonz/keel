@@ -174,6 +174,11 @@ export class KeelClient {
     return this.call("whoami", {}, options);
   }
 
+  /** The sign-in methods this instance offers besides a passkey. */
+  signInMethods(options?: CallOptions): Promise<WireOutputs["SignIn_methods"]> {
+    return this.call("SignIn_methods", {}, options);
+  }
+
   /** Opens the agent's session, which becomes its current one. Retry with the same key to reach it. */
   openSession(
     request: OpenSessionRequest = {},

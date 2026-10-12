@@ -50,3 +50,23 @@ interface Auth {
     @body body: TokenRequest,
   ): TokenResponse | OAuthError | TooManyRequests | InternalError | ServiceUnavailable;
 }
+
+/** How a person may sign in on this instance. A passkey is always offered. */
+model SignInMethods {
+  /** One-time codes by email: offered only once the instance can send mail. */
+  emailCode: boolean;
+
+  /** GitHub: offered only once the instance has its OAuth app. */
+  github: boolean;
+}
+
+@tag("Auth")
+@route("/auth")
+interface SignIn {
+  /** Which sign-in methods are mounted, so a sign-in page offers only those. */
+  @summary("List the sign-in methods offered")
+  @useAuth(NoAuth)
+  @route("/methods")
+  @get
+  methods(): SignInMethods | TooManyRequests | InternalError | ServiceUnavailable;
+}

@@ -33,6 +33,7 @@ const PROPOSITION = {
  */
 const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<unknown>>> = {
   whoami: (c) => c.whoami(),
+  SignIn_methods: (c) => c.signInMethods(),
   Sessions_openSession: (c) => c.openSession({ harness: "h" }),
   declare: (c) => c.declare({ goal: "g", footprint: [], premises: [] }),
   Changes_listChanges: (c) => c.changes({ state: "working", limit: 5 }),

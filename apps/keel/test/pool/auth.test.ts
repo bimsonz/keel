@@ -1,69 +1,19 @@
 import { createExecutionContext } from "cloudflare:test";
-import { env, exports } from "cloudflare:workers";
+import { env } from "cloudflare:workers";
 import { getMigrations } from "better-auth/db/migration";
 import { describe, expect, it } from "vitest";
 import { authOptions } from "../../src/adapters/driven/better-auth/auth.ts";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
-import { type Answer, Authenticator, caller, Jar, SESSION_COOKIE } from "./auth-harness.ts";
-
-/** The codes Keel "sent", read back as an inbox would. */
-const outbox: { to: string; otp: string; type: string }[] = [];
-
-/** keel.town as deployed: no mail sender yet, so no email codes. */
-const site = caller((request) => exports.default.fetch(request));
-
-/** The same app with a mail sender, for the email-code sign-up. */
-const mailing = makeIsolate(env, isolateLayer(env), {
-  sendOtp: async (message) => {
-    outbox.push(message);
-  },
-});
-const call = caller(async (request) => mailing.app.fetch(request, env, createExecutionContext()));
-
-/** Signs a new person up and in by an email code; the user has no handle yet. */
-async function signUpByCode(email: string, via = call) {
-  const jar = new Jar();
-  const sent = await via("/email-otp/send-verification-otp", { body: { email, type: "sign-in" } });
-  answered(sent, 200);
-  const otp = outbox.findLast((m) => m.to === email)?.otp;
-  expect(otp).toMatch(/^\d{6}$/);
-  const signed = await via("/sign-in/email-otp", { body: { email, otp }, jar });
-  answered(signed, 200);
-  const session = await via("/get-session", { jar });
-  const userId: unknown = session.json.user.id;
-  if (typeof userId !== "string") throw new Error(`no user in ${session.text}`);
-  return { jar, signed, userId };
-}
-
-/** Signs up by email code and chooses a handle, which makes the personal org. */
-async function handled(email: string, handle: string) {
-  const user = await signUpByCode(email);
-  const set = await call("/update-user", { body: { username: handle }, jar: user.jar });
-  answered(set, 200);
-  return user;
-}
-
-/** Passkey-first sign-up through keel.town's own entry: the handle, then the passkey. */
-async function signUpByPasskey(handle: string) {
-  const jar = new Jar();
-  const device = new Authenticator();
-  const options = await site(
-    `/passkey/generate-register-options?context=${encodeURIComponent(handle)}`,
-    { jar },
-  );
-  answered(options, 200);
-  const registered = await site("/passkey/verify-registration", {
-    body: { response: await device.create(options.json.challenge), createSession: true },
-    jar,
-  });
-  answered(registered, 200);
-  return { jar, device, registered };
-}
-
-/** The status, with the body beside it so a failure says why. */
-function answered(answer: Answer, status: number) {
-  expect([answer.status, answer.text]).toEqual([status, expect.anything()]);
-}
+import { type Answer, caller, Jar, SESSION_COOKIE } from "./auth-harness.ts";
+import {
+  answered,
+  call,
+  handled,
+  outbox,
+  signUpByCode,
+  signUpByPasskey,
+  site,
+} from "./auth-users.ts";
 
 const tokenOf = (jar: Jar) =>
   decodeURIComponent(jar.cookies.get(SESSION_COOKIE) ?? "").split(".")[0] ?? "";
@@ -98,6 +48,24 @@ describe("Better Auth at /v1/auth", () => {
       body: { email: "nobody@example.com", type: "sign-in" },
     });
     expect(send.status).toBe(404);
+  });
+
+  it("[auth.methods] answers only the sign-in methods mounted, a passkey always being one", async () => {
+    const bare = await site("/methods");
+    answered(bare, 200);
+    expect(bare.json).toEqual({ emailCode: false, github: false });
+    expect((await call("/methods")).json).toEqual({ emailCode: true, github: false });
+    // GitHub's secrets are optional, so Env doesn't declare them.
+    const githubEnv: Env & { GITHUB_CLIENT_ID: string; GITHUB_CLIENT_SECRET: string } = {
+      ...env,
+      GITHUB_CLIENT_ID: "id",
+      GITHUB_CLIENT_SECRET: "secret",
+    };
+    const withGithub = makeIsolate(githubEnv, isolateLayer(env));
+    const viaGithub = caller(async (request) =>
+      withGithub.app.fetch(request, env, createExecutionContext()),
+    );
+    expect((await viaGithub("/methods")).json).toEqual({ emailCode: false, github: true });
   });
 
   it("[ba.cookie] keeps the session in a __Secure-, HttpOnly, SameSite=Lax cookie for the whole site", async () => {
@@ -324,11 +292,27 @@ describe("Better Auth at /v1/auth", () => {
     expect((await site("/revoke-other-sessions", { body: {}, jar })).status).toBe(200);
   });
 
-  it("[ba.rate-limit] limits each address's writes to sign-in, and not another address's", async () => {
+  it("[ba.rate-limit] asks the limiter about each write, keyed by address, and refuses what it refuses", async () => {
+    // A fixed allowance stands in for the binding's window, which a slow run could straddle.
+    const asked: string[] = [];
+    const limiter = {
+      limit: async ({ key }: { key: string }) => {
+        asked.push(key);
+        return { success: asked.filter((k) => k === key).length <= 30 };
+      },
+    };
+    const isolate = makeIsolate({ ...env, AUTH_LIMIT: limiter }, isolateLayer(env));
+    const limited = caller(async (request) =>
+      isolate.app.fetch(request, env, createExecutionContext()),
+    );
     const statuses: number[] = [];
-    for (let i = 0; i < 40; i++) statuses.push((await site("/sign-out", from("192.0.2.7"))).status);
-    expect(statuses).toContain(429);
-    expect(statuses.indexOf(429)).toBeGreaterThanOrEqual(30);
-    expect((await site("/sign-out", from("192.0.2.8"))).status).not.toBe(429);
+    for (let i = 0; i < 33; i++)
+      statuses.push((await limited("/sign-out", from("192.0.2.7"))).status);
+    expect(statuses.slice(0, 30).filter((s) => s === 429)).toEqual([]);
+    expect(statuses.slice(30)).toEqual([429, 429, 429]);
+    expect((await limited("/sign-out", from("192.0.2.8"))).status).not.toBe(429);
+    const read = await limited("/get-session", { headers: { "cf-connecting-ip": "192.0.2.7" } });
+    expect(read.status).not.toBe(429);
+    expect([...new Set(asked)]).toEqual(["auth:192.0.2.7", "auth:192.0.2.8"]);
   });
 });

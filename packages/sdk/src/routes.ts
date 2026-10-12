@@ -25,6 +25,7 @@ export type UnroutedOperation = keyof typeof UNROUTED;
  */
 export const ROUTES = {
   whoami: { method: "GET", path: "/agents/me" },
+  SignIn_methods: { method: "GET", path: "/auth/methods" },
   declare: { method: "POST", path: "/changes", headers: ["idempotency-key"] },
   change: { method: "GET", path: "/changes/{changeId}" },
   submit: { method: "POST", path: "/submissions", headers: ["idempotency-key", "keel-lease"] },

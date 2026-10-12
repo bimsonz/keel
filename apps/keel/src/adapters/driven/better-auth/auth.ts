@@ -11,6 +11,7 @@ import { defaultStatements } from "better-auth/plugins/organization/access";
 import { username } from "better-auth/plugins/username";
 import { monotonicFactory } from "ulid";
 import { nameRefusal } from "./names.ts";
+import { orgAfter, orgBefore } from "./org.ts";
 
 /** Where Better Auth answers, under Keel's API and outside its TypeSpec document. */
 export const AUTH_BASE_PATH = "/v1/auth";
@@ -140,6 +141,8 @@ export function authOptions(config: AuthConfig) {
     });
   };
 
+  const beforeOrg = orgBefore(db);
+
   const options = {
     appName: "Keel",
     database: db,
@@ -195,7 +198,9 @@ export function authOptions(config: AuthConfig) {
             code: "HANDLE_REQUIRED",
             message: "Choose a handle first: it names your personal org",
           });
+        return beforeOrg(ctx);
       }),
+      after: createAuthMiddleware(orgAfter(db)),
     },
     databaseHooks: {
       user: {
@@ -215,6 +220,17 @@ export function authOptions(config: AuthConfig) {
         ac: orgAccess,
         roles: ORG_ROLES,
         creatorRole: "owner",
+        // Keel decides an invitation's recipient itself (org.ts): a handle for a
+        // passkey-first user, whose placeholder is never verified, and a verified
+        // address for an invitation typed by email.
+        requireEmailVerificationOnInvitation: false,
+        schema: {
+          invitation: {
+            additionalFields: {
+              handle: { type: "string", required: false, input: true, index: true },
+            },
+          },
+        },
         organizationHooks: {
           beforeCreateOrganization: async ({ organization: org, user }) => {
             if (typeof org.slug !== "string") throw refuse("NAME_REFUSED", "An org needs a name");
@@ -289,6 +305,15 @@ export function refusingInvalid(send: OtpSender) {
 }
 
 export type KeelAuth = ReturnType<typeof authOptions>["auth"];
+
+/**
+ * The sign-in methods mounted besides a passkey, by the same tests that decide
+ * whether `authOptions` mounts them. It reads the config, never an instance:
+ * an instance is made per request ([ba.per-request]).
+ */
+export function signInMethods(config: AuthConfig): { emailCode: boolean; github: boolean } {
+  return { emailCode: config.sendOtp !== undefined, github: config.github !== undefined };
+}
 
 export function makeAuth(config: AuthConfig): KeelAuth {
   return authOptions(config).auth;

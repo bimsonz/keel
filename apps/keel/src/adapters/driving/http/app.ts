@@ -51,7 +51,6 @@ export function makeApp(options: AppOptions) {
   app.get("/healthz", (c) => c.json({ ok: true, service: "keel" }));
   app.get(DOCUMENT_PATH, (c) => c.json(openApiDocument));
   app.all("/mcp", (c) => options.mcp(c.req.raw));
-  registerAuth(app, options.auth);
   const deps = routeDeps(options.verify);
   registerInboxStreams(app, deps, options.streams);
 
@@ -66,5 +65,8 @@ export function makeApp(options: AppOptions) {
     return problemResponse(500, "internal.defect", c.get("requestId") ?? crypto.randomUUID());
   });
 
-  return registerRoutes(app, () => options.handlers, deps);
+  const routed = registerRoutes(app, () => options.handlers, deps);
+  // After the spec's routes, so one under /v1/auth (SignIn_methods) answers before Better Auth's catch-all.
+  registerAuth(routed, options.auth);
+  return routed;
 }

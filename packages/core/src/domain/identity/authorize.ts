@@ -58,6 +58,7 @@ const rule = <K extends ResourceKind, N extends Need>(resource: K, need: N) => (
 export const SPEC_ACTIONS = {
   Auth_exchangeToken: rule("Instance", "anyone"),
   Lattices_listLattices: rule("Instance", "anyone"),
+  SignIn_methods: rule("Instance", "anyone"),
   whoami: rule("Self", "self"),
   inbox: rule("Self", "self"),
 

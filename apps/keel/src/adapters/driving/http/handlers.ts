@@ -151,7 +151,13 @@ function confineBootstrap<H extends Operations<Caller>>(handlers: H): H {
  * the same notices ride both. Lanes replace a `notYet` with a real handler as
  * they implement each operation.
  */
-export function makeHandlers(run: Runner) {
+/** The sign-in methods mounted besides a passkey, as composition built them. */
+export interface SignInMethods {
+  readonly emailCode: boolean;
+  readonly github: boolean;
+}
+
+export function makeHandlers(run: Runner, signIn: SignInMethods) {
   /** An operator's move on an agent's standing, answered as the agent's profile. */
   const standing = (
     caller: Caller,
@@ -520,6 +526,7 @@ export function makeHandlers(run: Runner) {
         standing(caller, "Operator_revokeAgent", input, revokeAgent),
       Operator_listEscalations: notYet,
       Operator_giveRuling: notYet,
+      SignIn_methods: async () => ({ status: 200 as const, body: { ...signIn } }),
     } satisfies Operations<Caller>),
   );
 }
