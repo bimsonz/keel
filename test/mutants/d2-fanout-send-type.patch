@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/probe.test.ts -t "d22.pool.probe-waits"
+# kills: d22.pool.probe-waits
+# why: A party's move is sent under its event type, not change-<changeId>, so the waiting Probe never hears it
+diff --git a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+index d037cc9..24e164b 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+@@ -213,7 +213,7 @@ function sendToInstance(
+           const instance = await workflow.get(instanceId);
+           try {
+             await instance.sendEvent({
+-              type: `change-${event.entity.id}`,
++              type: event.type,
+               payload: encodeEnvelope(event),
+             });
+           } catch (cause) {

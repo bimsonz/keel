@@ -1,17 +1,6 @@
-import type { CommitSha } from "@keeltown/core/kernel";
-import {
-  BundleRefused,
-  BundleStore,
-  CodeHost,
-  NoopWorlds,
-  ProbeSources,
-  type RepoRef,
-  type TreeEntry,
-} from "@keeltown/core/ports";
-import type { BundleFile } from "@keeltown/runner-protocol";
+import { CodeHost, ProbeSources, type RepoRef } from "@keeltown/core/ports";
 import { structuredPatch } from "diff";
 import { Effect, Layer } from "effect";
-import { noopWorld } from "../r2/noop-world.ts";
 
 const MODE_FILE = "100644";
 const MODE_EXEC = "100755";
@@ -111,51 +100,6 @@ export const ProbeSourcesCodeHost = Layer.effect(
           );
           return diffs.filter((d) => d !== undefined).join("");
         }),
-    });
-  }),
-);
-
-/** The commit's tree as bundle files: regular files only, as CandidateBundles refuses anything else. */
-const bundleFiles = (repo: RepoRef, commit: CommitSha) =>
-  Effect.gen(function* () {
-    const host = yield* CodeHost;
-    const leaves = (yield* host.readTree(repo, commit)).filter((e: TreeEntry) => e.type !== "tree");
-    const odd = leaves.find((e) => e.type !== "blob" || !isFile(e.mode));
-    if (odd !== undefined)
-      return yield* Effect.fail(
-        new BundleRefused({
-          reason: `${odd.path} has mode ${odd.mode}: a bundle carries regular files only`,
-          path: odd.path,
-        }),
-      );
-    return yield* Effect.forEach(
-      leaves,
-      (e) =>
-        Effect.map(host.readBlob(repo, e.oid), (bytes): BundleFile => ({
-          path: e.path,
-          bytes,
-          executable: e.mode === MODE_EXEC,
-        })),
-      { concurrency: 8 },
-    );
-  });
-
-/**
- * NoopWorlds over CodeHost and BundleStore: the premise-holder's tree read
- * whole, then noopWorld applies the recipe, bundles it and stores it.
- */
-export const NoopWorldsCodeHost = Layer.effect(
-  NoopWorlds,
-  Effect.gen(function* () {
-    const host = yield* CodeHost;
-    const store = yield* BundleStore;
-    return NoopWorlds.of({
-      build: (repo, commit, recipe) =>
-        bundleFiles(repo, commit).pipe(
-          Effect.flatMap((files) => noopWorld(files)(recipe)),
-          Effect.provideService(CodeHost, host),
-          Effect.provideService(BundleStore, store),
-        ),
     });
   }),
 );

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.waits
+# why: A party with nothing submitted yet is given up on at once, never waited for
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 6d7658d..c6595fc 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -395,7 +395,7 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
+           if (answered._tag === "Gone")
+             return { _tag: "Gone", state: answered.state } satisfies PartyEnd;
+           const now = yield* steps.step(`clock ${side}${round} ${n}`, clock.now);
+-          if (now >= deadline) return { _tag: "Timeout" } satisfies PartyEnd;
++          if (now >= 0) return { _tag: "Timeout" } satisfies PartyEnd;
+           const heard = yield* steps.waitFor(
+             `change ${side}${round} ${n}`,
+             partyEventType(changeId),

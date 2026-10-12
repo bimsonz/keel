@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.admits
+# why: AB is pushed to a cand/ ref, as if it were a batch the Lane composed
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 6d7658d..d2fbb05 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -241,7 +241,6 @@ export const readProbeWorlds = (
+           staging: call.staging,
+           base: plan.AB.onto,
+           at: ab.at,
+-          ref: abRef(call.conflictId),
+           members: plan.AB.members.map((side) => ({
+             changeId: parties[side],
+             repo: plan[side].repo,

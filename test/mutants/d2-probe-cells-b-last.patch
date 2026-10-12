@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.admits
+# why: B's cells are reported after the cells that decide, so the ledger refuses them once the probe is admitted and the matrix it holds is short
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 6d7658d..05f6c8a 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -312,8 +312,7 @@ type PartyEnd =
+ 
+ /** B's cells first: B never decides, so every one of them is recorded before the cells that admit or discard. */
+ const reportOrder = (cells: readonly MatrixCell[]): readonly MatrixCell[] => [
+-  ...cells.filter((c) => c.world === "B"),
+-  ...cells.filter((c) => c.world !== "B"),
++  ...cells,
+ ];
+ 
+ /**

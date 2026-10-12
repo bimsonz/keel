@@ -9,7 +9,7 @@ export interface WorkflowStarts {
 }
 
 /** Whether the binding already holds an instance by this id; `get` throws for one it does not. */
-async function exists(workflow: WorkflowStarts, id: string): Promise<boolean> {
+export async function exists(workflow: WorkflowStarts, id: string): Promise<boolean> {
   try {
     await workflow.get(id);
     return true;

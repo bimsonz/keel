@@ -15,7 +15,11 @@ interface TreeHarness<S> {
   ) => Effect.Effect<{ readonly repo: RepoRef; readonly sha: CommitSha }>;
 }
 export type ProbeSourcesHarness = TreeHarness<ProbeSources>;
-export type NoopWorldsHarness = TreeHarness<NoopWorlds>;
+/** NoopWorlds, and a way to store a whole tree as a world bundle, as the Probe's worlds step builds A's. */
+export interface NoopWorldsHarness {
+  readonly layer: Layer.Layer<NoopWorlds>;
+  readonly world: (files: ContractTree) => Effect.Effect<ContentHash>;
+}
 
 const NOT_UTF8 = new Uint8Array([0xff, 0xfe, 0x00, 0x80]);
 const UNKNOWN = CommitSha.make("e".repeat(40));
@@ -111,33 +115,32 @@ export function describeNoopWorldsContract(adapter: string, make: () => NoopWorl
     };
 
     it.effect(
-      "[noop-worlds.built] builds one world per recipe: the same recipe the same world, another recipe another",
+      "[noop-worlds.built] builds one world per recipe from A's world: the same recipe the same world, another recipe another, none of them A's",
       () => {
         const harness = make();
         return Effect.gen(function* () {
-          const { repo, sha } = yield* harness.commit(files);
+          const a = yield* harness.world(files);
           const worlds = yield* NoopWorlds;
-          const first: ContentHash = yield* worlds.build(repo, sha, recipe);
-          expect(yield* worlds.build(repo, sha, recipe)).toBe(first);
-          expect(
-            yield* worlds.build(repo, sha, { ...recipe, replacement: "/* other */" }),
-          ).not.toBe(first);
+          const first: ContentHash = yield* worlds.build(a, recipe);
+          expect(yield* worlds.build(a, recipe)).toBe(first);
+          expect(first).not.toBe(a);
+          expect(yield* worlds.build(a, { ...recipe, replacement: "/* other */" })).not.toBe(first);
         }).pipe(Effect.provide(harness.layer));
       },
     );
 
     it.effect(
-      "[noop-worlds.refused] refuses a recipe whose file or call is not in the tree once, saying which",
+      "[noop-worlds.refused] refuses a recipe whose file or call is not in A's world once, saying which",
       () => {
         const harness = make();
         return Effect.gen(function* () {
-          const { repo, sha } = yield* harness.commit({
+          const a = yield* harness.world({
             ...files,
             "src/twice.ts": "f();\nf();\n",
             "src/logo.bin": NOT_UTF8,
           });
           const worlds = yield* NoopWorlds;
-          const refused = (r: typeof recipe) => Effect.flip(worlds.build(repo, sha, r));
+          const refused = (r: typeof recipe) => Effect.flip(worlds.build(a, r));
           expect(yield* refused({ ...recipe, path: "src/absent.ts" })).toMatchObject({
             reason: "file-absent",
             path: "src/absent.ts",

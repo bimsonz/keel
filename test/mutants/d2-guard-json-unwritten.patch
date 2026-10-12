@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/admitted-guards.test.ts
+# kills: guard-repo.admit-writes
+# why: Admission commits the probe's files but not guard.json, so the guard repo holds a probe nobody can select
+diff --git a/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts b/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
+index f8973eb..5a938d9 100644
+--- a/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
++++ b/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
+@@ -196,7 +196,6 @@ export const AdmittedGuardsCodeHost = (push: GuardPush = pushOverSmartHttp) =>
+               const written = yield* Effect.promise(() =>
+                 writeTree(
+                   new Map([
+-                    [GUARD_FILE, encoder.encode(text)],
+                     ...files.map((f): [string, Uint8Array] => [
+                       `${PROBE_DIR}/${f.path}`,
+                       encoder.encode(f.text),

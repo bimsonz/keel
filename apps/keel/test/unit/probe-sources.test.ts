@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { RepoRef } from "@keeltown/core/ports";
-import { CodeHost, NoopWorlds } from "@keeltown/core/ports";
-import { readBundle } from "@keeltown/runner-protocol";
+import { BundleStore, CodeHost, NoopWorlds } from "@keeltown/core/ports";
+import { readBundle, writeBundle } from "@keeltown/runner-protocol";
 import {
   type ContractTree,
   describeNoopWorldsContract,
@@ -12,9 +12,9 @@ import {
 import { Effect, Layer } from "effect";
 import {
   gitFileDiff,
-  NoopWorldsCodeHost,
   ProbeSourcesCodeHost,
 } from "../../src/adapters/driven/gitcore/probe-sources.ts";
+import { NoopWorldsBundles } from "../../src/adapters/driven/r2/noop-world.ts";
 
 const MAIN = "refs/heads/main";
 
@@ -34,13 +34,38 @@ const over = <S>(adapter: (host: ReturnType<typeof makeCodeHostMemory>) => Layer
   };
 };
 
-const bundles = makeBundleStoreMemory();
+const encoder = new TextEncoder();
 const sources = () => over((host) => ProbeSourcesCodeHost.pipe(Layer.provide(host.layer)));
-const noops = () =>
-  over((host) => NoopWorldsCodeHost.pipe(Layer.provide(Layer.merge(host.layer, bundles.layer))));
+
+/** NoopWorlds over an in-memory BundleStore, each world stored as the Probe's worlds step bundles it. */
+const noops = () => {
+  const bundles = makeBundleStoreMemory();
+  return {
+    bundles,
+    layer: NoopWorldsBundles.pipe(Layer.provide(bundles.layer)),
+    world: (files: ContractTree) =>
+      Effect.gen(function* () {
+        const bytes = yield* Effect.promise(() =>
+          writeBundle(
+            Object.entries(files).map(([path, file]) => ({
+              path,
+              bytes: typeof file === "string" ? encoder.encode(file) : file,
+              executable: path.endsWith(".sh"),
+            })),
+          ),
+        );
+        return yield* Effect.provide(
+          Effect.gen(function* () {
+            return yield* (yield* BundleStore).put(bytes);
+          }),
+          bundles.layer,
+        );
+      }),
+  };
+};
 
 describeProbeSourcesContract("CodeHost", sources);
-describeNoopWorldsContract("CodeHost", noops);
+describeNoopWorldsContract("BundleStore", noops);
 
 const TEN = Array.from({ length: 10 }, (_, i) => `${i + 1}`).join("\n") + "\n";
 
@@ -76,23 +101,24 @@ describe("ProbeSourcesCodeHost", () => {
   });
 });
 
-describe("NoopWorldsCodeHost", () => {
+describe("NoopWorldsBundles", () => {
   it.effect(
-    "[noop-worlds.bundle] bundles the premise-holder's whole tree with only the recipe's call replaced",
+    "[noop-worlds.bundle] bundles A's whole world with only the recipe's call replaced, every other file as it was",
     () => {
       const h = noops();
       return Effect.gen(function* () {
-        const { repo, sha } = yield* h.commit({
+        const world = yield* h.world({
           "src/routes.ts": "remove();\nstore.removeCollaborator(a, b);\n",
           "src/store.ts": "export const store = {};\n",
           "package.json": "{}",
+          "scripts/run.sh": "#!/bin/sh\n",
         });
-        const hash = yield* (yield* NoopWorlds).build(repo, sha, {
+        const hash = yield* (yield* NoopWorlds).build(world, {
           path: "src/routes.ts",
           anchor: "store.removeCollaborator(a, b);",
           replacement: "/* noop */",
         });
-        const bytes = bundles.objects.get(hash);
+        const bytes = h.bundles.objects.get(hash);
         if (bytes === undefined) throw new Error("A-noop's bundle is not in the store");
         const files = yield* Effect.promise(() => readBundle(bytes));
         const decoder = new TextDecoder();
@@ -100,7 +126,9 @@ describe("NoopWorldsCodeHost", () => {
           "src/routes.ts": "remove();\n/* noop */\n",
           "src/store.ts": "export const store = {};\n",
           "package.json": "{}",
+          "scripts/run.sh": "#!/bin/sh\n",
         });
+        expect(files.filter((f) => f.executable).map((f) => f.path)).toEqual(["scripts/run.sh"]);
       }).pipe(Effect.provide(h.layer));
     },
   );

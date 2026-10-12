@@ -4,7 +4,6 @@ import {
   CommitSha,
   ContentHash,
   type EscalationId,
-  type GuardId,
   makeId,
   type VerdictId,
 } from "@keeltown/core/kernel";
@@ -15,12 +14,12 @@ import {
 } from "@keeltown/core/domain/coordination";
 import { CandidateNotFound, ResultFenced } from "@keeltown/core/domain/integration";
 import {
+  type AdmittedGuard,
   ModelAbstained,
   type StepResult,
   type VerificationJob,
 } from "@keeltown/core/domain/verification";
 import {
-  type AdmittedGuardList,
   AdmittedGuards,
   type BatchVerdict,
   BatchVerdicts,
@@ -31,8 +30,7 @@ import {
   type DecisionResponse,
   DecisionModel,
   FlowSpecSource,
-  GuardRepo,
-  type GuardFile,
+  type GuardRefused,
   HumanGate,
   ObjectNotFound,
   type PlatformFunctionCall,
@@ -46,7 +44,12 @@ import {
   type Ruling,
   VerifierRuntime,
 } from "@keeltown/core/ports";
-import type { ProbeFile, ProbeRun } from "@keeltown/core/application/verification";
+import {
+  guardFileText,
+  type ProbeFile,
+  type ProbeRun,
+  readGuardFile,
+} from "@keeltown/core/application/verification";
 import { Effect, Layer, Result, Schema } from "effect";
 import type {
   AdmittedGuardsHarness,
@@ -172,22 +175,25 @@ export function makeFlowSpecSourceMemory(): FlowSpecSourceHarness {
   };
 }
 
-/** A deterministic 40-hex commit id per admission. */
 /**
- * Admitted guards per project, as the guard repo would list them: each
- * admitted guard as admission wrote it, and each guard whose guard.json could
- * not be admitted, with its reason.
+ * Admitted guards per project, as the guard repo holds them: each guard's
+ * guard.json as admission commits it, read back as the CodeHost adapter
+ * reads it (the proposition its tenet), and each guard whose guard.json
+ * cannot be admitted to a plan, with its reason. Each admission is a commit
+ * with a deterministic id; admitting a guard the repo already holds as
+ * written answers the head, the last admission's commit.
  */
 export function makeAdmittedGuardsMemory(): AdmittedGuardsHarness {
-  const projects = new Map<string, AdmittedGuardList>();
-  const of = (projectId: string): AdmittedGuardList =>
-    projects.get(projectId) ?? { admitted: [], refused: [] };
+  const projects = new Map<
+    string,
+    {
+      readonly admitted: readonly { readonly text: string; readonly commit: CommitSha }[];
+      readonly refused: readonly GuardRefused[];
+    }
+  >();
+  let commits = 0;
+  const of = (projectId: string) => projects.get(projectId) ?? { admitted: [], refused: [] };
   return {
-    admit: (projectId, guard) =>
-      Effect.sync(() => {
-        const list = of(projectId);
-        projects.set(projectId, { ...list, admitted: [...list.admitted, guard] });
-      }),
     plantWithoutProposition: (projectId, guardId) =>
       Effect.sync(() => {
         const list = of(projectId);
@@ -198,36 +204,45 @@ export function makeAdmittedGuardsMemory(): AdmittedGuardsHarness {
       }),
     layer: Layer.succeed(
       AdmittedGuards,
-      AdmittedGuards.of({ list: (projectId) => Effect.sync(() => of(projectId)) }),
-    ),
-  };
-}
-
-const guardCommit = (n: number): string => n.toString(16).padStart(40, "0");
-
-export function makeGuardRepoMemory() {
-  const guards = new Map<string, GuardFile[]>();
-  return {
-    guards,
-    layer: Layer.succeed(
-      GuardRepo,
-      GuardRepo.of({
-        list: (projectId) => Effect.sync(() => guards.get(projectId) ?? []),
-        admit: (projectId, guardId: GuardId, files) =>
+      AdmittedGuards.of({
+        list: (projectId) =>
           Effect.sync(() => {
-            const existing = guards.get(projectId) ?? [];
-            guards.set(projectId, [
-              ...existing,
-              ...[...files.keys()].map((path) => ({ guardId, path })),
-            ]);
-            return Schema.decodeUnknownSync(CommitSha)(
-              guardCommit(guards.get(projectId)?.length ?? 0),
-            );
+            const list = of(projectId);
+            const admitted: AdmittedGuard[] = [];
+            const refused = [...list.refused];
+            for (const { text } of list.admitted) {
+              const guardId = String(readGuardId(text));
+              const read = readGuardFile(guardId, text);
+              if (Result.isSuccess(read)) admitted.push(read.success);
+              else refused.push({ guardId, reason: read.failure });
+            }
+            return { admitted, refused };
+          }),
+        admit: (projectId, guard) =>
+          Effect.gen(function* () {
+            const list = of(projectId);
+            const text = guardFileText(guard);
+            const held = list.admitted.find((g) => readGuardId(g.text) === guard.guardId);
+            if (held !== undefined)
+              return held.text === text
+                ? (list.admitted.at(-1)?.commit ?? held.commit)
+                : yield* Effect.die(
+                    new Error(`${guard.guardId} is already admitted as another guard`),
+                  );
+            commits += 1;
+            const sha = CommitSha.make(commits.toString(16).padStart(40, "0"));
+            projects.set(projectId, {
+              ...list,
+              admitted: [...list.admitted, { text, commit: sha }],
+            });
+            return sha;
           }),
       }),
     ),
   };
 }
+
+const readGuardId = (text: string): unknown => Reflect.get(Object(JSON.parse(text)), "guardId");
 
 /** Escalations wait for `rule` to be called; `awaitRuling` resolves when it is. */
 export function makeHumanGateMemory() {

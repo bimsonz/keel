@@ -4,19 +4,27 @@ import { ContentHash } from "@keeltown/core/kernel";
 import type {
   AdmittedGuards,
   BatchVerdicts,
+  CandidateBundles,
+  CandidateComposer,
   ChangePrecheck,
   Clock,
   CodeHost,
   EvidenceStore,
   FlowSpecSource,
   Ids,
+  NoopWorlds,
   PlanStore,
   PlatformFunction,
+  ProbeChanges,
+  ProbeLedger,
   ProbeRunner,
+  ProbeSources,
   ProbeStore,
   Projects,
+  Trunks,
   VerifierRuntime,
   WorkspacePool,
+  WorldChecks,
 } from "@keeltown/core/ports";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import {
@@ -28,6 +36,15 @@ import { BatchVerdictsRpc, isLaneNamespace } from "../adapters/driven/do-rpc/bat
 import { AdmittedGuardsCodeHost } from "../adapters/driven/gitcore/admitted-guards.ts";
 import { FlowSpecSourceCodeHost } from "../adapters/driven/gitcore/flow-spec-source.ts";
 import { ChangePrecheckRpc } from "../adapters/driven/do-rpc/change-precheck.ts";
+import { ProbeChangesRpc } from "../adapters/driven/do-rpc/probe-changes.ts";
+import { ProbeLedgerRpc } from "../adapters/driven/do-rpc/probe-ledger.ts";
+import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
+import { CandidateBundlesGitCore } from "../adapters/driven/gitcore/candidate-bundles.ts";
+import { CandidateComposerGitCore } from "../adapters/driven/gitcore/candidate-composer.ts";
+import { ProbeSourcesCodeHost } from "../adapters/driven/gitcore/probe-sources.ts";
+import { BundleStoreR2 } from "../adapters/driven/r2/bundle-store.ts";
+import { NoopWorldsBundles } from "../adapters/driven/r2/noop-world.ts";
+import { WorldChecksWorkflow } from "../adapters/driven/workflow/world-checks.ts";
 import { ProbeRunnerRpc, verifierEntrypoint } from "../adapters/driven/do-rpc/probe-runner.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
@@ -40,7 +57,7 @@ import {
   PlatformFunctionWorkersAI,
   type StreamingAi,
 } from "../adapters/driven/workers-ai/platform-function.ts";
-import { artifactsLocationHint, codeHostLayer } from "./do.ts";
+import { artifactsLocationHint, artifactsObjects, codeHostLayer } from "./do.ts";
 
 /**
  * A Workflow's composition root, built from `this.env` on each `run()`. Steps
@@ -128,7 +145,7 @@ export function precheckRuntime(
       ChangePrecheckRpc(env.CHANGE),
       ProjectsRpc(project),
       code,
-      Layer.mergeAll(FlowSpecSourceCodeHost, AdmittedGuardsCodeHost).pipe(Layer.provide(code)),
+      Layer.mergeAll(FlowSpecSourceCodeHost, AdmittedGuardsCodeHost()).pipe(Layer.provide(code)),
       PlanStoreR2(env.ARCHIVE),
     ),
   );
@@ -150,5 +167,94 @@ export function probeDraftingLayer(env: {
     PlatformFunctionWorkersAI(env.AI, modelPins(env.PLATFORM_FUNCTION_PINS)),
     ProbeStoreR2(env.BUNDLES),
     ProbeRunnerRpc(verifierEntrypoint(env.VERIFIER)),
+  );
+}
+
+/** Everything the Probe program reads and writes. */
+export type ProbeServices =
+  | Clock
+  | Ids
+  | CodeHost
+  | ProbeLedger
+  | ProbeChanges
+  | Trunks
+  | AdmittedGuards
+  | CandidateBundles
+  | CandidateComposer
+  | ProbeSources
+  | NoopWorlds
+  | EvidenceStore
+  | PlatformFunction
+  | ProbeStore
+  | ProbeRunner
+  | FlowSpecSource
+  | PlanStore
+  | WorldChecks;
+
+/**
+ * The Probe Workflow's composition root, per run: the conflict's ledger on
+ * its Subject DO, each party through its Change DO, trunk's head from the
+ * Trunk DO, every world read and bundled through GitCore over the Artifacts
+ * bindings and kept in BUNDLES (A-noop built from A's bundle), cell evidence
+ * in ARCHIVE, drafting as probeDraftingLayer composes it, and an admitted
+ * guard committed to the project's guard repo.
+ */
+export function probeRuntime(env: Env): ManagedRuntime.ManagedRuntime<ProbeServices, never> {
+  const code = codeHostLayer(env);
+  const objects = artifactsObjects(env);
+  const bundles = BundleStoreR2(env.BUNDLES);
+  return ManagedRuntime.make(
+    Layer.mergeAll(
+      SystemLive,
+      code,
+      ProbeLedgerRpc((address) => env.SUBJECT.get(env.SUBJECT.idFromName(address))),
+      ProbeChangesRpc((changeId) =>
+        env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`)),
+      ).pipe(Layer.provide(code)),
+      TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
+      AdmittedGuardsCodeHost().pipe(Layer.provide(code)),
+      CandidateComposerGitCore(objects).pipe(Layer.provide(code)),
+      CandidateBundlesGitCore(objects).pipe(Layer.provide(bundles)),
+      ProbeSourcesCodeHost.pipe(Layer.provide(code)),
+      NoopWorldsBundles.pipe(Layer.provide(bundles)),
+      EvidenceStoreR2(env.ARCHIVE),
+      probeDraftingLayer(env),
+      FlowSpecSourceCodeHost.pipe(Layer.provide(code)),
+      PlanStoreR2(env.ARCHIVE),
+      WorldChecksWorkflow(env.WORLD_CHECK),
+    ),
+  );
+}
+
+/**
+ * KeelWorldCheck's composition root, per run: plans from the plan store
+ * (ARCHIVE), Tier 2 steps through the CI engine's `runner` on the world's
+ * bundle, evidence in ARCHIVE, and each check recorded to the conflict's
+ * Subject DO. `step` makes the evidence writes Workflow steps, as KeelVerify's.
+ */
+export function worldCheckRuntime(
+  env: Env,
+  engine: { readonly runner: SuiteRunner; readonly step: WorkflowStep },
+): ManagedRuntime.ManagedRuntime<
+  Clock | Ids | EvidenceStore | VerifierRuntime | PlanStore | ProbeLedger,
+  never
+> {
+  const durable: Durable = (name, effect) =>
+    Effect.promise(() =>
+      engine.step.do(name, async (): Promise<string> => Effect.runPromise(effect)),
+    ).pipe(Effect.map((stored) => Schema.decodeUnknownSync(ContentHash)(stored)));
+  const evidence = EvidenceStoreR2(env.ARCHIVE);
+  return ManagedRuntime.make(
+    Layer.mergeAll(
+      SystemLive,
+      evidence,
+      PlanStoreR2(env.ARCHIVE),
+      ProbeLedgerRpc((address) => env.SUBJECT.get(env.SUBJECT.idFromName(address))),
+      SuiteRuntimeCi({
+        runner: engine.runner,
+        durable,
+        literals: [env.CLOUDFLARE_ACCOUNT_ID].filter((l) => typeof l === "string" && l.length > 0),
+      }).pipe(Layer.provide(evidence)),
+    ),
   );
 }

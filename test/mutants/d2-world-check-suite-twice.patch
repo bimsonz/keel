@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/world-check.test.ts
+# kills: world-check.run-once
+# why: Each check runs the world's suite again, so AB's two checks start two containers for one answer
+diff --git a/packages/core/src/application/verification/world-check.ts b/packages/core/src/application/verification/world-check.ts
+index 551a9a2..8a8affa 100644
+--- a/packages/core/src/application/verification/world-check.ts
++++ b/packages/core/src/application/verification/world-check.ts
+@@ -92,7 +92,7 @@ export const worldCheckSteps = (plan: FlowPlan): readonly PlanStep[] =>
+ export const worldCheckRunSteps = (plans: readonly FlowPlan[]): readonly PlanStep[] => {
+   const steps = new Map<string, PlanStep>();
+   for (const plan of plans)
+-    for (const step of worldCheckSteps(plan)) if (!steps.has(step.id)) steps.set(step.id, step);
++    for (const step of worldCheckSteps(plan)) steps.set(`${step.id}#${steps.size}`, step);
+   return [...steps.values()];
+ };
+ 

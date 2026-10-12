@@ -5,9 +5,9 @@ import {
   type TextCodec,
 } from "@keeltown/core/application/verification";
 import type { ContentHash } from "@keeltown/core/kernel";
-import { BundleStore } from "@keeltown/core/ports";
-import { type BundleFile, writeBundle } from "@keeltown/runner-protocol";
-import { Effect, Result } from "effect";
+import { BundleStore, NoopWorlds } from "@keeltown/core/ports";
+import { type BundleFile, readBundle, writeBundle } from "@keeltown/runner-protocol";
+import { Effect, Layer, Result } from "effect";
 
 const utf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false });
 const encoder = new TextEncoder();
@@ -41,3 +41,26 @@ export const noopWorld =
       const bytes = yield* Effect.promise(() => writeBundle(tree.success));
       return yield* (yield* BundleStore).put(bytes);
     });
+
+/**
+ * NoopWorlds over BundleStore: A's world bundle, as the Probe's worlds step
+ * built it, read back whole, then noopWorld applies the recipe, bundles it
+ * and stores it. It never reads A's workspace, which landing collects while
+ * a draft may still be repairing. A world bundle not in the store is a
+ * defect: it was built for this draft.
+ */
+export const NoopWorldsBundles = Layer.effect(
+  NoopWorlds,
+  Effect.gen(function* () {
+    const store = yield* BundleStore;
+    return NoopWorlds.of({
+      build: (world, recipe) =>
+        store.get(world).pipe(
+          Effect.orDie,
+          Effect.flatMap((bytes) => Effect.promise(() => readBundle(bytes))),
+          Effect.flatMap((files) => noopWorld(files)(recipe)),
+          Effect.provideService(BundleStore, store),
+        ),
+    });
+  }),
+);

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/world-check.test.ts
+# kills: world-check.cell
+# why: A single failing step reads as n/a, so a world where the suite goes red shows no failure
+diff --git a/packages/core/src/application/verification/world-check.ts b/packages/core/src/application/verification/world-check.ts
+index d617f1f..985a68e 100644
+--- a/packages/core/src/application/verification/world-check.ts
++++ b/packages/core/src/application/verification/world-check.ts
+@@ -105,7 +105,7 @@ export const worldCheckCell = (
+     return { step, report, result: report === undefined ? undefined : coerce(plan, report) };
+   });
+   const failed = results.filter((r) => r.result?.outcome === "fail").map((r) => r.step.id);
+-  if (failed.length > 0) return { outcome: "fail", reason: `${failed.join(", ")} failed` };
++  if (failed.length > 1) return { outcome: "fail", reason: `${failed.join(", ")} failed` };
+   if (results.every((r) => r.result?.outcome === "pass")) return { outcome: "pass" };
+   const silent = results
+     .filter((r) => r.result?.outcome !== "pass")

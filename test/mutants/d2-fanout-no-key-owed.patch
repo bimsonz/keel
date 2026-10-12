@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/probe.test.ts -t "d22.pool.no-subject-key"
+# kills: d22.pool.no-subject-key
+# why: A ConflictSuspected with no subject key stays owed forever, so one older event sticks the Subject DO's outbox
+diff --git a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+index d037cc9..09a86e9 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+@@ -171,9 +171,7 @@ function startProbes(workflow: Workflow, subscriber: Subscriber, events: readonl
+     (event) => {
+       const start = probeStart(event);
+       if ("skipped" in start)
+-        return Effect.sync(() =>
+-          console.error(JSON.stringify({ ops: "fan-out", subscriber, problem: start.skipped })),
+-        );
++        return Effect.fail(failed(subscriber, start.skipped));
+       return Effect.tryPromise({
+         try: async () => {
+           try {

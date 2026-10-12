@@ -17,7 +17,12 @@ import { describeSessionsContract, type SessionsHarness } from "./contracts/sess
 import { describeOrgUsageContract, freshOrg, type OrgUsageHarness } from "./contracts/org-usage.ts";
 import { describeStandingsContract, type StandingsHarness } from "./contracts/standings.ts";
 import { describeLiveChangesContract, type LiveChangesHarness } from "./contracts/live-changes.ts";
+import {
+  describeProbeChangesContract,
+  type ProbeChangesHarness,
+} from "./contracts/probe-changes.ts";
 import { describeProbeLedgerContract, type ProbeLedgerHarness } from "./contracts/probe-ledger.ts";
+import { makeProbeChangesMemory, makeWorldChecksMemory } from "./memory/probe-changes.ts";
 import { makeLiveChangesMemory } from "./memory/live-changes.ts";
 import { makeProbeLedgerMemory } from "./memory/probe-ledger.ts";
 import {
@@ -102,6 +107,7 @@ import type {
   LiveChanges,
   Memberships,
   Orgs,
+  ProbeChanges,
   ProbeLedger,
   NoopWorlds,
   ProbeSources,
@@ -490,10 +496,11 @@ export const PORTS = {
     makeNoopWorldsMemory,
     describeNoopWorldsContract,
   ),
-  GuardRepo: port(
-    () => verification.makeGuardRepoMemory().layer,
-    pending("GuardRepo", ["list", "admit"]),
+  ProbeChanges: harnessed<ProbeChanges, ProbeChangesHarness>(
+    () => makeProbeChangesMemory(),
+    describeProbeChangesContract,
   ),
+  WorldChecks: port(() => makeWorldChecksMemory().layer, pending("WorldChecks", ["start"])),
   CandidateComposer: port(
     () => integration.makeCandidateComposerMemory().layer,
     pending("CandidateComposer", ["compose"]),

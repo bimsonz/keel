@@ -14,6 +14,8 @@ export { BoxGate } from "./adapters/driving/do/boxgate.ts";
 export { MergeBox } from "./adapters/driving/do/mergebox.ts";
 export { KeelVerify } from "./adapters/driving/workflow/keel-verify.ts";
 export { Precheck } from "./adapters/driving/workflow/precheck.ts";
+export { Probe } from "./adapters/driving/workflow/probe.ts";
+export { KeelWorldCheck } from "./adapters/driving/workflow/world-check.ts";
 export { PushObserved } from "./adapters/driving/workflow/push-observed.ts";
 
 export default {

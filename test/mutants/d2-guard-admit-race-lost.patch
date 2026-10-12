@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/admitted-guards.test.ts
+# kills: guard-repo.admit-race
+# why: A push that lost the race to another admission gives up, so two probes finishing together admit one guard
+diff --git a/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts b/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
+index f8973eb..e1078b7 100644
+--- a/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
++++ b/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
+@@ -230,7 +230,7 @@ export const AdmittedGuardsCodeHost = (push: GuardPush = pushOverSmartHttp) =>
+                 ],
+               ).pipe(Effect.provideService(CodeHost, host));
+               if (outcome.kind === "applied") return toCommitSha(oid);
+-              if (outcome.kind === "failed")
++              if (outcome.kind !== "busy")
+                 return yield* Effect.die(
+                   new Error(`the push to the guard repo failed with ${outcome.status}`),
+                 );

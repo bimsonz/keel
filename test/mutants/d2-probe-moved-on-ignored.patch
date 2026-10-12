@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.moved-on
+# why: A conflict no longer suspected is drafted again, so a decided conflict is probed twice
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 6d7658d..162a0c0 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -365,7 +365,7 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
+         step: "conflict",
+         reason: `conflict ${call.conflictId} is not on ${call.key}: ${first.reason}`,
+       } satisfies ProbeEnd;
+-    if (first.value.conflict.state !== "suspected")
++    if (first.value.conflict.state === "resolved")
+       return { outcome: "moved-on", state: first.value.conflict.state } satisfies ProbeEnd;
+     const read = partiesOf(first.value.conflict);
+     if (Result.isFailure(read)) return yield* failDraft("no-propositions", 0);

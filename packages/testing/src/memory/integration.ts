@@ -60,7 +60,7 @@ export function makeCandidateComposerMemory(options: { readonly refuse?: readonl
               treeSha,
               commitSha: commits.at(-1)?.sha ?? request.base,
               commits,
-              ref: `refs/heads/cand/${request.candidateId}`,
+              ref: request.ref ?? `refs/heads/cand/${request.candidateId}`,
               composer: "gitcore" as const,
               tier: 0 as const,
               tierReason: "path-disjoint members",

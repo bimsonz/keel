@@ -1,7 +1,6 @@
 import { Context, type Effect } from "effect";
 import type { CommitSha, ContentHash } from "../../domain/kernel/index.ts";
 import type { NoNoop, NoopRecipe } from "../verification/index.ts";
-import type { BundleRefused } from "./candidate-bundles.ts";
 import type { ObjectNotFound, RepoNotFound, RepoRef } from "./code-host.ts";
 
 /** One file of a tree, as text. */
@@ -37,18 +36,17 @@ export class ProbeSources extends Context.Service<
 >()("keel/ProbeSources") {}
 
 /**
- * Builds A-noop's world: the premise-holder's tree at
- * `commit` with the recipe applied to the one file it names, bundled and
- * stored where the VerifierDO reads world bundles. A recipe that cannot apply
- * is NoNoop, for the draft to repair.
+ * Builds A-noop's world: the premise-holder's world
+ * bundle, as its world was built, with the recipe applied to the one file it
+ * names, bundled again and stored where the VerifierDO reads world bundles.
+ * It reads A's bundle, never A's workspace, which landing collects while a
+ * draft may still be repairing. A recipe that cannot apply is NoNoop, for the
+ * draft to repair; a world bundle that is not in the store is a defect, since
+ * it was built for this draft.
  */
 export class NoopWorlds extends Context.Service<
   NoopWorlds,
   {
-    readonly build: (
-      repo: RepoRef,
-      commit: CommitSha,
-      recipe: NoopRecipe,
-    ) => Effect.Effect<ContentHash, NoNoop | BundleRefused | RepoNotFound | ObjectNotFound>;
+    readonly build: (world: ContentHash, recipe: NoopRecipe) => Effect.Effect<ContentHash, NoNoop>;
   }
 >()("keel/NoopWorlds") {}

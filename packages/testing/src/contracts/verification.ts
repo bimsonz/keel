@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
+  type GuardFile,
   type ProbeFile,
   storedPlanText,
   WORKER_APP_PACK,
@@ -262,33 +263,36 @@ export function describeProbeStoreContract(adapter: string, make: () => ProbeSto
 
 export interface AdmittedGuardsHarness {
   readonly layer: Layer.Layer<AdmittedGuards>;
-  /** Admits the guard to the project, as admission writes it to the guard repo. */
-  readonly admit: (projectId: ProjectId, guard: AdmittedGuard) => Effect.Effect<void>;
   /** Puts a guard the repo holds but cannot admit to a plan: its guard.json names no proposition. */
   readonly plantWithoutProposition: (projectId: ProjectId, guardId: string) => Effect.Effect<void>;
 }
 
-const freshGuard = (subject: string): AdmittedGuard => ({
+const freshGuard = (subject: string): GuardFile => ({
   guardId: makeId("grd", ulid()),
   probe: contentHashOf({ probe: subject }),
-  tenet: {
-    id: makeId("tnt", ulid()),
-    proposition: {
-      subject: Schema.decodeUnknownSync(SubjectKey)(subject),
-      predicate: "freshness",
-      relation: "at-most",
-      value: "per-request",
-      anchors: [{ path: "src/sessions.ts", commit: CommitSha.make("a".repeat(40)) }],
-    },
+  proposition: {
+    subject: Schema.decodeUnknownSync(SubjectKey)(subject),
+    predicate: "freshness",
+    relation: "at-most",
+    value: "per-request",
+    anchors: [{ path: "src/sessions.ts", commit: CommitSha.make("a".repeat(40)) }],
   },
 });
 
-/** What admission records of a guard, and so what a list must give back. */
-const admittedAs = (g: AdmittedGuard) => ({
+/** The probe a guard is admitted with, as the guard repo keeps it beside guard.json. */
+const PROBE_FILES: readonly ProbeFile[] = [
+  { path: ".keel/freshness.test.ts", text: "// the admitted probe\n" },
+];
+
+/** What a list gives back of an admitted guard. */
+const listedAs = (g: AdmittedGuard | GuardFile) => ({
   guardId: g.guardId,
   probe: g.probe,
-  proposition: g.tenet.proposition,
+  proposition: "tenet" in g ? g.tenet.proposition : g.proposition,
 });
+
+const byGuardId = (x: { readonly guardId: string }, y: { readonly guardId: string }) =>
+  x.guardId.localeCompare(y.guardId);
 
 export function describeAdmittedGuardsContract(adapter: string, make: () => AdmittedGuardsHarness) {
   describe(`AdmittedGuards contract: ${adapter}`, () => {
@@ -301,20 +305,42 @@ export function describeAdmittedGuardsContract(adapter: string, make: () => Admi
     });
 
     it.effect(
-      "[admitted-guards.listed] lists each admitted guard with its probe and the proposition it guards, and only the project's own",
+      "[admitted-guards.listed] lists each guard admitted, with its probe and the proposition it guards, and only the project's own",
       () => {
         const harness = make();
         return Effect.gen(function* () {
+          const guards = yield* AdmittedGuards;
           const projectId = freshId("prj");
           const [a, b] = [freshGuard("authz.sessions"), freshGuard("authz.tokens")];
-          yield* harness.admit(projectId, a);
-          yield* harness.admit(projectId, b);
-          yield* harness.admit(freshId("prj"), freshGuard("billing.invoices"));
-          const list = yield* (yield* AdmittedGuards).list(projectId);
-          expect(
-            list.admitted.map(admittedAs).toSorted((x, y) => x.guardId.localeCompare(y.guardId)),
-          ).toEqual([a, b].map(admittedAs).toSorted((x, y) => x.guardId.localeCompare(y.guardId)));
+          yield* guards.admit(projectId, a, PROBE_FILES);
+          yield* guards.admit(projectId, b, PROBE_FILES);
+          yield* guards.admit(freshId("prj"), freshGuard("billing.invoices"), PROBE_FILES);
+          const list = yield* guards.list(projectId);
+          expect(list.admitted.map(listedAs).toSorted(byGuardId)).toEqual(
+            [a, b].map(listedAs).toSorted(byGuardId),
+          );
           expect(list.refused).toEqual([]);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[admitted-guards.admit-once] admitting a guard the repo already holds as written commits nothing and answers the repo's head",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const guards = yield* AdmittedGuards;
+          const projectId = freshId("prj");
+          const [a, b] = [freshGuard("authz.sessions"), freshGuard("authz.tokens")];
+          const first = yield* guards.admit(projectId, a, PROBE_FILES);
+          expect(yield* guards.admit(projectId, a, PROBE_FILES)).toBe(first);
+          const second = yield* guards.admit(projectId, b, PROBE_FILES);
+          expect(second).not.toBe(first);
+          expect(yield* guards.admit(projectId, a, PROBE_FILES)).toBe(second);
+          expect(yield* guards.admit(projectId, b, PROBE_FILES)).toBe(second);
+          expect((yield* guards.list(projectId)).admitted.map((g) => g.guardId).toSorted()).toEqual(
+            [a.guardId, b.guardId].toSorted(),
+          );
         }).pipe(Effect.provide(harness.layer));
       },
     );
@@ -324,12 +350,13 @@ export function describeAdmittedGuardsContract(adapter: string, make: () => Admi
       () => {
         const harness = make();
         return Effect.gen(function* () {
+          const guards = yield* AdmittedGuards;
           const projectId = freshId("prj");
           const good = freshGuard("authz.sessions");
           const bad = makeId("grd", ulid());
-          yield* harness.admit(projectId, good);
+          yield* guards.admit(projectId, good, PROBE_FILES);
           yield* harness.plantWithoutProposition(projectId, bad);
-          const list = yield* (yield* AdmittedGuards).list(projectId);
+          const list = yield* guards.list(projectId);
           expect(list.admitted.map((g) => g.guardId)).toEqual([good.guardId]);
           expect(list.refused).toEqual([
             { guardId: bad, reason: expect.stringMatching(/proposition/) },

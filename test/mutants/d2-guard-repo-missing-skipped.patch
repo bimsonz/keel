@@ -2,16 +2,16 @@
 # kills: guard-repo.refusals
 # why: A guard directory with no guard.json is skipped silently, so a guard admission half-wrote never shows in the run
 diff --git a/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts b/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
-index c3e2f19..dc2b845 100644
+index f8973eb..12d404a 100644
 --- a/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
 +++ b/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
-@@ -43,7 +43,8 @@ export const AdmittedGuardsCodeHost = Layer.effect(
-           for (const dir of entries.filter((e) => e.type === "tree" && !e.path.includes("/"))) {
-             const path = `${dir.path}/${GUARD_FILE}`;
-             const file = entries.find((e) => e.path === path);
--            if (file === undefined || file.type !== "blob" || file.mode === SYMLINK) {
-+            if (file === undefined) continue;
-+            if (file.type !== "blob" || file.mode === SYMLINK) {
-               refused.push({
-                 guardId: dir.path,
-                 reason: `${path} is ${file === undefined ? "missing" : "not a plain file"}`,
+@@ -143,7 +143,8 @@ export const AdmittedGuardsCodeHost = (push: GuardPush = pushOverSmartHttp) =>
+             for (const dir of entries.filter((e) => e.type === "tree" && !e.path.includes("/"))) {
+               const path = `${dir.path}/${GUARD_FILE}`;
+               const file = entries.find((e) => e.path === path);
+-              if (file === undefined || file.type !== "blob" || file.mode === SYMLINK) {
++              if (file === undefined) continue;
++              if (file.type !== "blob" || file.mode === SYMLINK) {
+                 refused.push({
+                   guardId: dir.path,
+                   reason: `${path} is ${file === undefined ? "missing" : "not a plain file"}`,

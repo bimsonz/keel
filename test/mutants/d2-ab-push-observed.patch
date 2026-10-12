@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/probe.test.ts -t "d22.pool.ab-ref-ignored"
+# kills: d22.pool.ab-ref-ignored
+# why: Any repo's branch push is taken for a workspace push, AB's ref in staging included, though no workspace owns it
+diff --git a/apps/keel/src/adapters/driving/queue/artifacts-events.ts b/apps/keel/src/adapters/driving/queue/artifacts-events.ts
+index c4f2b58..19dfc64 100644
+--- a/apps/keel/src/adapters/driving/queue/artifacts-events.ts
++++ b/apps/keel/src/adapters/driving/queue/artifacts-events.ts
+@@ -43,7 +43,7 @@ export function translateArtifactsPush(raw: unknown): WorkspacePush | null {
+   if (DELETED.test(payload.after)) return null;
+   const owner = ownerOfRepo(source.repoName);
+   const sha = Schema.decodeUnknownOption(CommitSha)(payload.after);
+-  if (owner?.kind !== "workspace" || Option.isNone(sha)) return null;
++  if (Option.isNone(sha)) return null;
+   return {
+     projectId: owner.projectId,
+     push: { workspaceId: owner.id, ref: payload.ref, sha: sha.value },

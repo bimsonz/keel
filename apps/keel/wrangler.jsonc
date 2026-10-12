@@ -95,6 +95,8 @@
   ],
   "workflows": [
     { "name": "keel-precheck", "binding": "PRECHECK", "class_name": "Precheck" },
+    { "name": "keel-probe", "binding": "PROBE", "class_name": "Probe" },
+    { "name": "keel-world-check", "binding": "WORLD_CHECK", "class_name": "KeelWorldCheck" },
     // KeelVerify extends @cloudflare/ci's CIWorkflow, which expects this binding name.
     { "name": "keel-verify-batch", "binding": "CI_WORKFLOW", "class_name": "KeelVerify" },
     { "name": "keel-push-observed", "binding": "PUSH_OBSERVED", "class_name": "PushObserved" },

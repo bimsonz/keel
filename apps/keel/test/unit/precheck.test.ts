@@ -21,6 +21,7 @@ import {
   type WorkspaceId,
 } from "@keeltown/core/kernel";
 import {
+  AdmittedGuards,
   ChangePrecheck,
   CodeHost,
   FlowSpecSource,
@@ -83,7 +84,16 @@ function precheckWorld(
   const changes = makeChangePrecheckMemory();
   const projects = makeProjectsMemory();
   const guards = makeAdmittedGuardsMemory();
-  for (const g of options.guards ?? []) Effect.runSync(guards.admit(projectId, g));
+  for (const g of options.guards ?? [])
+    Effect.runSync(
+      Effect.gen(function* () {
+        yield* (yield* AdmittedGuards).admit(
+          projectId,
+          { guardId: g.guardId, probe: g.probe, proposition: g.tenet.proposition },
+          [],
+        );
+      }).pipe(Effect.provide(guards.layer)),
+    );
   for (const id of options.refusedGuards ?? [])
     Effect.runSync(guards.plantWithoutProposition(projectId, id));
   const plans = makePlanStoreMemory();

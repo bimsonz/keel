@@ -47,7 +47,7 @@ export function restackSpec(request: CandidateRequest): {
 } {
   const time = Math.floor(request.at / 1000);
   return {
-    ref: `refs/heads/cand/${request.candidateId}`,
+    ref: request.ref ?? `refs/heads/cand/${request.candidateId}`,
     committer: { name: "Keel", email: "keel@keel.invalid", time },
     members: request.members.map((m) => ({
       base: m.base,
@@ -97,9 +97,9 @@ const restacked = (
 /**
  * CandidateComposer at Tier 0: gitcore restacks the batch, reading staging
  * first and then each member's workspace, and pushes the candidate's ref to
- * staging as a new ref. A ref already at the composed commit is a retry and is
- * left alone; one at any other commit is a defect, since a candidate composes
- * to one SHA. A merge gitcore refuses is CompositionRefused, which MergeBox
+ * staging as a new ref (the request's `ref`, else the candidate's own). A
+ * ref already at the composed commit is a retry and is left alone; one at any
+ * other commit is a defect, since a candidate composes to one SHA. A merge gitcore refuses is CompositionRefused, which MergeBox
  * takes. The token is minted per push and the remote, which carries the
  * account id, is never put in an error or a log.
  */

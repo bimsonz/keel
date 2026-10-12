@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/world-check.test.ts -t "d22.pool.world-checks-start"
+# kills: d22.pool.world-checks-start
+# why: A retried start fails on the instance it already started, so the Probe's replayed step fails
+diff --git a/apps/keel/src/adapters/driven/workflow/world-checks.ts b/apps/keel/src/adapters/driven/workflow/world-checks.ts
+index c93f090..2aa407c 100644
+--- a/apps/keel/src/adapters/driven/workflow/world-checks.ts
++++ b/apps/keel/src/adapters/driven/workflow/world-checks.ts
+@@ -23,7 +23,7 @@ export const WorldChecksWorkflow = (workflow: WorkflowStarts) =>
+             });
+           } catch (cause) {
+             // Already started by an earlier run of the Probe's step: that is the start.
+-            if (!(await exists(workflow, instanceId))) throw cause;
++            throw cause;
+           }
+         }),
+     }),

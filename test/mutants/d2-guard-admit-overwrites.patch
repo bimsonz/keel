@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/admitted-guards.test.ts
+# kills: guard-repo.admit-once
+# why: A guard already admitted is written again as another guard, so an admitted guard can be replaced under its own id
+diff --git a/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts b/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
+index f8973eb..a121b63 100644
+--- a/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
++++ b/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
+@@ -186,6 +186,7 @@ export const AdmittedGuardsCodeHost = (push: GuardPush = pushOverSmartHttp) =>
+                     held === undefined
+                       ? undefined
+                       : utf8.decode(yield* host.readBlob(repo, held.oid));
++                  if (heldText !== undefined) return head.value;
+                   if (heldText === text) return head.value;
+                   return yield* Effect.die(
+                     new Error(`${dir} is already in the guard repo as another guard`),

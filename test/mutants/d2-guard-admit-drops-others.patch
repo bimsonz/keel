@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/admitted-guards.test.ts
+# kills: guard-repo.admit-keeps
+# why: A later admission's tree holds only its own guard, so every guard admitted before it is dropped from main
+diff --git a/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts b/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
+index f8973eb..49cc7ff 100644
+--- a/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
++++ b/apps/keel/src/adapters/driven/gitcore/admitted-guards.ts
+@@ -191,7 +191,7 @@ export const AdmittedGuardsCodeHost = (push: GuardPush = pushOverSmartHttp) =>
+                     new Error(`${dir} is already in the guard repo as another guard`),
+                   );
+                 }
+-                root.push(...top.map((e) => ({ name: e.path, mode: e.mode, oid: e.oid })));
++                void top;
+               }
+               const written = yield* Effect.promise(() =>
+                 writeTree(

@@ -147,7 +147,7 @@ export function laneServices(env: Env, projectId: () => ProjectId): Layer.Layer<
   return Layer.suspend(() => {
     const repos = projectRepos(projectId());
     const host = codeHostLayer(env);
-    const objects = ArtifactsObjects({ "keel-core": env.ARTIFACTS, "keel-ws-00": workspaces(env) });
+    const objects = artifactsObjects(env);
     const change = (changeId: ChangeId) =>
       env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`));
     const agentSession = (agentId: AgentId) =>
@@ -249,3 +249,7 @@ declare global {
 
 /** The workspaces namespace: TEST_ARTIFACTS where a test binds it, WORKSPACES everywhere else. */
 const workspaces = (env: Env): Artifacts => env.TEST_ARTIFACTS ?? env.WORKSPACES;
+
+/** gitcore's object reads over the Artifacts bindings: the core namespace and the workspaces. */
+export const artifactsObjects = (env: Env) =>
+  ArtifactsObjects({ "keel-core": env.ARTIFACTS, "keel-ws-00": workspaces(env) });

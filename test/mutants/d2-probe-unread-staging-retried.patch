@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.unreadable
+# why: A world missing from staging is read as a party that moved on and re-planned, so a harness error is never named
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 9cdefd9..bd3e6a4 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -467,7 +467,7 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
+       );
+       if (worlds._tag === "Built")
+         planned = { sides, plan: plan.success, built: worlds.built, hunks: worlds.hunks };
+-      else if (sameRepo(worlds.repo, call.staging))
++      else if (sameRepo(worlds.repo, call.staging) && round > PROBE_WORLD_ROUNDS)
+         return {
+           outcome: "unreadable",
+           world: worlds.world,

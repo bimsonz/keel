@@ -24,6 +24,12 @@ export interface CandidateRequest {
   /** BatchFormed's time: every commit's committer time, so a recompose gives the same SHAs. */
   readonly at: Instant;
   readonly members: readonly CandidateMember[];
+  /**
+   * The ref the composed tip is pushed to, when not the candidate's own
+   * `refs/heads/cand/<candidateId>`. A probe's AB world is no batch, so it
+   * never takes a `cand/` ref: it goes to `refs/heads/probe/<conflictId>/ab`.
+   */
+  readonly ref?: string | undefined;
 }
 
 /** A composed candidate: one commit per member, chained in batch order, its ref pushed to staging. */
@@ -34,7 +40,7 @@ export interface ComposedCandidate {
   readonly commitSha: CommitSha;
   /** Each member's commit, in batch order. */
   readonly commits: readonly { readonly changeId: ChangeId; readonly sha: CommitSha }[];
-  /** `refs/heads/cand/<candidateId>` in staging. */
+  /** The ref in staging the tip was pushed to: the request's `ref`, else `refs/heads/cand/<candidateId>`. */
   readonly ref: string;
   readonly composer: "gitcore" | "mergebox";
   readonly tier: Tier;

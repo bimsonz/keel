@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/probe.test.ts -t "d22.pool.probe-world-checks"
+# kills: d22.pool.probe-world-checks
+# why: A drafted conflict's world checks are never started, so no suite is ever shown green or red in its worlds
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 9cdefd9..28b18a7 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -537,7 +537,7 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
+     );
+     yield* steps.step(
+       "world checks",
+-      Effect.forEach(jobs, (job) => {
++      Effect.forEach(jobs.slice(0, 0), (job) => {
+         const id = worldCheckInstanceId(call.conflictId, job.world);
+         return Effect.as(checks.start(id, job), id);
+       }),

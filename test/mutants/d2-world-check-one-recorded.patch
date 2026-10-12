@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/world-check.test.ts -t "d22.pool.world-check-ab"
+# kills: d22.pool.world-check-ab
+# why: Only a world's first check is recorded, so AB shows A's suite and never B's
+diff --git a/apps/keel/src/adapters/driving/workflow/world-check.ts b/apps/keel/src/adapters/driving/workflow/world-check.ts
+index 8f7e20d..4dae6c7 100644
+--- a/apps/keel/src/adapters/driving/workflow/world-check.ts
++++ b/apps/keel/src/adapters/driving/workflow/world-check.ts
+@@ -96,7 +96,7 @@ export class KeelWorldCheck extends CIWorkflow<Env> {
+                 steps,
+               }),
+             );
+-      for (const { check } of job.checks) {
++      for (const { check } of job.checks.slice(0, 1)) {
+         const plan = plans.get(check) ?? Result.fail("no plan");
+         const cell: WorldCheckOutcome = Result.isSuccess(plan)
+           ? worldCheckCell(plan.success, reports)

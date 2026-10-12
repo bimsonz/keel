@@ -1,6 +1,7 @@
+import { ConflictSuspected } from "@keeltown/core/domain/verification";
 import { EventEnvelope } from "@keeltown/core/kernel";
 import { DeliveryFailed, type FanOut, PROJECTOR, type Subscriber } from "@keeltown/core/ports";
-import { Cause, Effect, Exit, Schema } from "effect";
+import { Cause, Effect, Exit, Option, Schema } from "effect";
 import { decodeExit, EventCodecs } from "../../../rpc/index.ts";
 
 /** A Durable Object's `receive`, reached by its address, which is also the object's name. */
@@ -41,6 +42,8 @@ function workflowFor(env: Env, name: string): Workflow | undefined {
   switch (name) {
     case "Precheck":
       return env.PRECHECK;
+    case "Probe":
+      return env.PROBE;
     default:
       return undefined;
   }
@@ -131,19 +134,128 @@ function startWorkflow(
 }
 
 /**
+ * The Probe a ConflictSuspected starts: one instance per conflict,
+ * `probe-<conflictId>`, so a redelivery or a second suspicion of the same
+ * conflict starts nothing new. Without the subject's key (an older event) or
+ * the project, no Probe can reach the conflict's Subject DO: the delivery is
+ * acknowledged with the reason, so it never sticks.
+ */
+export function probeStart(event: EventEnvelope):
+  | {
+      readonly id: string;
+      readonly params: {
+        readonly projectId: string;
+        readonly key: string;
+        readonly conflictId: string;
+      };
+    }
+  | { readonly skipped: string } {
+  if (event.type !== "ConflictSuspected")
+    return { skipped: `${event.eventId} is ${event.type}, not ConflictSuspected` };
+  const payload = Schema.decodeUnknownOption(ConflictSuspected)(event.payload);
+  if (Option.isNone(payload)) return { skipped: `${event.eventId} names no conflict` };
+  const { conflictId, subjectKey } = payload.value;
+  if (subjectKey === undefined || event.project === undefined)
+    return {
+      skipped: `conflict ${conflictId} (${event.eventId}) names no ${subjectKey === undefined ? "subject key" : "project"}, so no Probe can reach it`,
+    };
+  return {
+    id: `probe-${conflictId}`,
+    params: { projectId: event.project, key: subjectKey, conflictId },
+  };
+}
+
+function startProbes(workflow: Workflow, subscriber: Subscriber, events: readonly EventEnvelope[]) {
+  return Effect.forEach(
+    events,
+    (event) => {
+      const start = probeStart(event);
+      if ("skipped" in start)
+        return Effect.sync(() =>
+          console.error(JSON.stringify({ ops: "fan-out", subscriber, problem: start.skipped })),
+        );
+      return Effect.tryPromise({
+        try: async () => {
+          try {
+            await workflow.create(start);
+          } catch (cause) {
+            // Already started for this conflict: that is the delivery.
+            if (!(await exists(workflow, start.id))) throw cause;
+          }
+        },
+        catch: (cause) => failed(subscriber, cause),
+      });
+    },
+    { discard: true },
+  );
+}
+
+/** What a send to a waiting instance needs of its Workflow binding. */
+export interface InstanceEvents {
+  get(id: string): Promise<{
+    sendEvent(event: { readonly type: string; readonly payload: unknown }): Promise<void>;
+    status(): Promise<{ readonly status: string }>;
+  }>;
+}
+
+/** States in which an instance takes no more events: a send to one is acknowledged, since nothing is waiting. */
+const FINISHED: ReadonlySet<string> = new Set(["complete", "errored", "terminated"]);
+
+/**
+ * A waiting instance's subscription (`workflow:<Name>/<instanceId>`): each
+ * change event is sent to it as `change-<changeId>`, with the encoded
+ * envelope. A send that throws to an instance that has finished is
+ * acknowledged; any other throw stays owed.
+ */
+export function sendToInstance(
+  workflow: InstanceEvents,
+  instanceId: string,
+  subscriber: Subscriber,
+  events: readonly EventEnvelope[],
+) {
+  return Effect.forEach(
+    events,
+    (event) =>
+      Effect.tryPromise({
+        try: async () => {
+          const instance = await workflow.get(instanceId);
+          try {
+            await instance.sendEvent({
+              type: `change-${event.entity.id}`,
+              payload: encodeEnvelope(event),
+            });
+          } catch (cause) {
+            const { status } = await instance.status();
+            if (!FINISHED.has(status)) throw cause;
+          }
+        },
+        catch: (cause) => failed(subscriber, cause),
+      }),
+    { discard: true },
+  );
+}
+
+/**
  * The fan-out over the Worker's bindings: each address resolves to a Durable
- * Object (its `receive` RPC), a Workflow (one instance per event) or the
- * Projector. An address that resolves to nothing fails, so the event stays
+ * Object (its `receive` RPC), a Workflow (one instance per event; a Probe,
+ * one per conflict), a waiting Workflow instance (an event sent to it) or
+ * the Projector. An address that resolves to nothing fails, so the event stays
  * owed and shows in the backlog instead of being dropped.
  */
 export function FanOutRpc(env: Env): FanOut {
   return {
     deliver: (subscriber, events) => {
       if (subscriber.startsWith("workflow:")) {
-        const name = subscriber.slice("workflow:".length);
+        const address = subscriber.slice("workflow:".length);
+        const slash = address.indexOf("/");
+        const name = slash === -1 ? address : address.slice(0, slash);
         const workflow = workflowFor(env, name);
-        return workflow === undefined
-          ? Effect.fail(failed(subscriber, `no Workflow named ${name}`))
+        if (workflow === undefined)
+          return Effect.fail(failed(subscriber, `no Workflow named ${name}`));
+        if (slash !== -1)
+          return sendToInstance(workflow, address.slice(slash + 1), subscriber, events);
+        return name === "Probe"
+          ? startProbes(workflow, subscriber, events)
           : startWorkflow(workflow, name, subscriber, events);
       }
       const receive = receiverFor(env, subscriber);

@@ -3,10 +3,10 @@ import type { SubjectKey } from "../../domain/coordination/index.ts";
 import type { IdempotencyConflict } from "../../domain/identity/index.ts";
 import type { ConflictId, ContentHash, ProbeId, ProjectId } from "../../domain/kernel/index.ts";
 import type {
-  DraftFailure,
   Conflict,
   ConflictNotFound,
   ConflictStateRefused,
+  DraftFailure,
   Probe,
   ProbeNotFound,
   ProbeOutcome,

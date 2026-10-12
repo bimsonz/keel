@@ -105,32 +105,44 @@ export function makeProbeSourcesMemory() {
 }
 
 /**
- * NoopWorlds in memory: trees committed whole, and A-noop's world the tree
- * with the recipe applied, answered as the content hash of that tree. The
- * real adapter bundles it; the contract asks only what both do.
+ * NoopWorlds in memory: world bundles stored as whole trees under the
+ * content hash of the tree, and A-noop's world the tree with the recipe
+ * applied, answered as the content hash of that tree. The real adapter
+ * reads and writes bundles; the contract asks only what both do.
  */
 export function makeNoopWorldsMemory() {
-  const store = treeStore("noop-worlds");
+  const worlds = new Map<string, MemoryTree>();
+  const hashOf = (files: MemoryTree) =>
+    contentHashOf(
+      Object.entries(files)
+        .toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([path, file]) => [path, typeof file === "string" ? file : [...file]]),
+    );
   return {
-    commit: store.commit,
+    world: (files: MemoryTree) =>
+      Effect.sync(() => {
+        const hash = hashOf(files);
+        worlds.set(hash, files);
+        return hash;
+      }),
     layer: Layer.succeed(
       NoopWorlds,
       NoopWorlds.of({
-        build: (repo, commit, recipe) =>
+        build: (world, recipe) =>
           Effect.gen(function* () {
-            const files = yield* store.tree(repo, commit);
+            const files = worlds.get(world);
+            if (files === undefined)
+              return yield* Effect.die(new Error(`world bundle ${world} is not in the store`));
             const applied = noopTree(
               Object.entries(files).map(([path, file]) => ({ path, file })),
               recipe,
               MEMORY_TEXT,
             );
             if (Result.isFailure(applied)) return yield* Effect.fail(applied.failure);
-            return contentHashOf(
-              applied.success.map((e) => [
-                e.path,
-                typeof e.file === "string" ? e.file : [...e.file],
-              ]),
-            );
+            const tree = Object.fromEntries(applied.success.map((e) => [e.path, e.file]));
+            const hash = hashOf(tree);
+            worlds.set(hash, tree);
+            return hash;
           }),
       }),
     ),

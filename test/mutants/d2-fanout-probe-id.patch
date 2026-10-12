@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/probe.test.ts -t "d22.pool.fan-out-probe"
+# kills: d22.pool.fan-out-probe
+# why: A Probe is started per event, not per conflict, so a second suspicion of the same conflict drafts it twice
+diff --git a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+index d037cc9..5c3c982 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+@@ -160,7 +160,7 @@ export function probeStart(event: EventEnvelope):
+       skipped: `conflict ${conflictId} (${event.eventId}) names no ${subjectKey === undefined ? "subject key" : "project"}, so no Probe can reach it`,
+     };
+   return {
+-    id: `probe-${conflictId}`,
++    id: `probe-${event.eventId}`,
+     params: { projectId: event.project, key: subjectKey, conflictId },
+   };
+ }

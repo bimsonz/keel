@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/world-check.test.ts
+# kills: world-check.steps
+# why: A world check runs every step of the plan, guards and steps no runner can run included
+diff --git a/packages/core/src/application/verification/world-check.ts b/packages/core/src/application/verification/world-check.ts
+index 551a9a2..d91f3bd 100644
+--- a/packages/core/src/application/verification/world-check.ts
++++ b/packages/core/src/application/verification/world-check.ts
+@@ -80,7 +80,7 @@ export const worldCheckJobs = (
+  * Guard steps never run here: a probe runs only in its own matrix.
+  */
+ export const worldCheckSteps = (plan: FlowPlan): readonly PlanStep[] =>
+-  plan.steps.filter((step) => step.tier.tier === 2 && TIER2_STEP_IDS.includes(step.id));
++  plan.steps.filter((step) => step.tier.tier !== 0 || TIER2_STEP_IDS.includes(step.id));
+ 
+ /**
+  * What one world's instance runs for all its checks: each check's steps, each

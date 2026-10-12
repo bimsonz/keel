@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fan-out-probe.test.ts
+# kills: fan-out.send-finished
+# why: An event for a Probe that has finished stays owed, so every late move of a party sticks the change's outbox
+diff --git a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+index 68324b9..4693d87 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/fan-out.ts
+@@ -226,7 +226,8 @@ export function sendToInstance(
+             });
+           } catch (cause) {
+             const { status } = await instance.status();
+-            if (!FINISHED.has(status)) throw cause;
++            void status;
++            throw cause;
+           }
+         },
+         catch: (cause) => failed(subscriber, cause),
