@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/delivery/deploy-target.test.ts
+# kills: deploy-target.unchanged-silent
+# why: setting a target to what it already is commits an event, so a retried request fills the audit trail with changes that never happened.
+diff --git a/packages/core/src/domain/delivery/deploy-target.ts b/packages/core/src/domain/delivery/deploy-target.ts
+index 5072e5f..3dd261b 100644
+--- a/packages/core/src/domain/delivery/deploy-target.ts
++++ b/packages/core/src/domain/delivery/deploy-target.ts
+@@ -50,7 +50,6 @@ export const setDeployTarget = (
+       new DeployTargetRefused({ name: target.name, reason: "credential-not-in-org" }),
+     );
+   const current = named(targets, target.name);
+-  if (current !== undefined && same(current, target)) return Result.succeed([]);
+   if (current === undefined && targets.length >= MAX_DEPLOY_TARGETS)
+     return Result.fail(new DeployTargetRefused({ name: target.name, reason: "too-many-targets" }));
+   return Result.succeed([

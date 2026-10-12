@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/delivery/deploy-target.test.ts
+# kills: deploy-target.reference-only
+# why: an account id may be longer than 32 hex characters, which is the shape of a Cloudflare global API key.
+diff --git a/packages/core/src/domain/delivery/deployment.ts b/packages/core/src/domain/delivery/deployment.ts
+index 43f0752..0fd0cfb 100644
+--- a/packages/core/src/domain/delivery/deployment.ts
++++ b/packages/core/src/domain/delivery/deployment.ts
+@@ -15,7 +15,7 @@ export const DeployTargetName = Schema.String.check(
+ export type DeployTargetName = typeof DeployTargetName.Type;
+ 
+ /** A Cloudflare account's id: 32 lower-case hex characters. */
+-export const CloudflareAccountId = Schema.String.check(Schema.isPattern(/^[0-9a-f]{32}$/));
++export const CloudflareAccountId = Schema.String.check(Schema.isPattern(/^[0-9a-f]{32,}$/));
+ 
+ /**
+  * A place a project deploys to: a provider, the account there and a

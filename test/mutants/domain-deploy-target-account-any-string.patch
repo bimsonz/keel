@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/delivery/deploy-target.test.ts
+# kills: deploy-target.reference-only
+# why: the account id is any string, so a secret pasted into the wrong field is taken.
+diff --git a/packages/core/src/domain/delivery/deployment.ts b/packages/core/src/domain/delivery/deployment.ts
+index 43f0752..7e33f30 100644
+--- a/packages/core/src/domain/delivery/deployment.ts
++++ b/packages/core/src/domain/delivery/deployment.ts
+@@ -26,7 +26,7 @@ export const CloudflareAccountId = Schema.String.check(Schema.isPattern(/^[0-9a-
+ export const DeployTarget = Schema.Struct({
+   name: DeployTargetName,
+   provider: DeployProvider,
+-  accountId: CloudflareAccountId,
++  accountId: Schema.String,
+   credential: CredentialId,
+ });
+ export type DeployTarget = typeof DeployTarget.Type;

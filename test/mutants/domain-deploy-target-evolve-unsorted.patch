@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/delivery/deploy-target.test.ts
+# kills: deploy-target.set-then-resolve
+# why: the targets are kept in the order they were set, so two replays of the same events in another order store different state.
+diff --git a/packages/core/src/domain/delivery/deploy-target.ts b/packages/core/src/domain/delivery/deploy-target.ts
+index 5072e5f..1143b21 100644
+--- a/packages/core/src/domain/delivery/deploy-target.ts
++++ b/packages/core/src/domain/delivery/deploy-target.ts
+@@ -81,7 +81,7 @@ export const evolveDeployTargets = (
+   const name = event._tag === "DeployTargetSet" ? event.target.name : event.name;
+   const others = targets.filter((target) => target.name !== name);
+   const next = event._tag === "DeployTargetSet" ? [...others, event.target] : others;
+-  return next.toSorted((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
++  return next;
+ };
+ 
+ /**

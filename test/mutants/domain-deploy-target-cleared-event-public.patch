@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/event-audience.test.ts
+# kills: b12.event-audience
+# why: a public project's feed serves the removal of a deploy target to anyone.
+diff --git a/packages/core/src/application/coordination/read-scope.ts b/packages/core/src/application/coordination/read-scope.ts
+index a347c25..775a834 100644
+--- a/packages/core/src/application/coordination/read-scope.ts
++++ b/packages/core/src/application/coordination/read-scope.ts
+@@ -144,7 +144,7 @@ export const EVENT_AUDIENCE: Readonly<Record<EventType, Audience>> = {
+   SessionRedacted: "members",
+ 
+   DeployTargetSet: "members",
+-  DeployTargetCleared: "members",
++  DeployTargetCleared: "public",
+   PreviewDeployed: "public",
+   PreviewTornDown: "public",
+   DeploymentPromoted: "public",

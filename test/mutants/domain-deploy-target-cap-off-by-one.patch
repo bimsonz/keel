@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/delivery/deploy-target.test.ts
+# kills: deploy-target.cap
+# why: the cap is checked after it is passed, so a project holds one target more than it may.
+diff --git a/packages/core/src/domain/delivery/deploy-target.ts b/packages/core/src/domain/delivery/deploy-target.ts
+index 5072e5f..9314c19 100644
+--- a/packages/core/src/domain/delivery/deploy-target.ts
++++ b/packages/core/src/domain/delivery/deploy-target.ts
+@@ -51,7 +51,7 @@ export const setDeployTarget = (
+     );
+   const current = named(targets, target.name);
+   if (current !== undefined && same(current, target)) return Result.succeed([]);
+-  if (current === undefined && targets.length >= MAX_DEPLOY_TARGETS)
++  if (current === undefined && targets.length > MAX_DEPLOY_TARGETS)
+     return Result.fail(new DeployTargetRefused({ name: target.name, reason: "too-many-targets" }));
+   return Result.succeed([
+     DeployTargetSet.make({ projectId: command.projectId, target, by: command.by }),
