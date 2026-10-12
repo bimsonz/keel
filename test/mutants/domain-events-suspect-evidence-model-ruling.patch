@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: events.suspect-evidence-shape, events.suspect-evidence-of-judged
+# why: a code model's finding is held to be a ruling, so its opinion is refused and a ruling it never made is accepted: a model's guess reads as a deterministic judgement.
+diff --git a/packages/core/src/domain/verification/conflict.ts b/packages/core/src/domain/verification/conflict.ts
+index b55dc53..1627c1d 100644
+--- a/packages/core/src/domain/verification/conflict.ts
++++ b/packages/core/src/domain/verification/conflict.ts
+@@ -32,7 +32,7 @@ export type SuspectPremise = typeof SuspectPremise.Type;
+ const CLASS_OF: Readonly<Record<DerivationMethod, EvidenceClass>> = {
+   extractor: "ruling",
+   clef: "opinion",
+-  "code-model": "opinion",
++  "code-model": "ruling",
+ };
+ 
+ /**

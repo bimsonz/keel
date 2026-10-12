@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: events.suspect-evidence-shape, events.suspect-evidence-of-judged
+# why: a declared effect may have no method, the plan's first wording. A derived effect whose predicate the agent declared on an ancestor subject is judged declared and by its method at once, so fallout's own event is refused.
+diff --git a/packages/core/src/domain/verification/conflict.ts b/packages/core/src/domain/verification/conflict.ts
+index b55dc53..5b808d9 100644
+--- a/packages/core/src/domain/verification/conflict.ts
++++ b/packages/core/src/domain/verification/conflict.ts
+@@ -51,7 +51,7 @@ export const SuspectEvidence = Schema.Struct({
+     (e) =>
+       (e.method === undefined
+         ? e.declared && e.evidenceClass === "testimony"
+-        : e.evidenceClass === CLASS_OF[e.method]) ||
++        : !e.declared && e.evidenceClass === CLASS_OF[e.method]) ||
+       "an effect with no method is its agent's declared testimony; a method fixes the evidence class",
+   ),
+ );

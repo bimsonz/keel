@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: events.suspect-evidence-shape
+# why: an effect with no method need not be declared, so the event can say nobody declared it and nothing derived it: testimony from no one.
+diff --git a/packages/core/src/domain/verification/conflict.ts b/packages/core/src/domain/verification/conflict.ts
+index b55dc53..f076bf3 100644
+--- a/packages/core/src/domain/verification/conflict.ts
++++ b/packages/core/src/domain/verification/conflict.ts
+@@ -50,7 +50,7 @@ export const SuspectEvidence = Schema.Struct({
+   Schema.makeFilter(
+     (e) =>
+       (e.method === undefined
+-        ? e.declared && e.evidenceClass === "testimony"
++        ? e.evidenceClass === "testimony"
+         : e.evidenceClass === CLASS_OF[e.method]) ||
+       "an effect with no method is its agent's declared testimony; a method fixes the evidence class",
+   ),

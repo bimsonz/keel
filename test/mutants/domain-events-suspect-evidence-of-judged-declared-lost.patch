@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: events.suspect-evidence-of-judged
+# why: the evidence built from a derived effect always says undeclared, so a derived effect the agent's declared effects spoke for reads as one the agent hid.
+diff --git a/packages/core/src/domain/verification/conflict.ts b/packages/core/src/domain/verification/conflict.ts
+index b55dc53..21bb078 100644
+--- a/packages/core/src/domain/verification/conflict.ts
++++ b/packages/core/src/domain/verification/conflict.ts
+@@ -61,7 +61,7 @@ export type SuspectEvidence = typeof SuspectEvidence.Type;
+ export const suspectEvidence = (judged: JudgedEffect): SuspectEvidence =>
+   judged.method === "declared"
+     ? { declared: true, evidenceClass: "testimony" }
+-    : { declared: judged.declared, method: judged.method, evidenceClass: judged.evidenceClass };
++    : { declared: false, method: judged.method, evidenceClass: judged.evidenceClass };
+ 
+ /** The effect that contradicts the premise, and the change making it. */
+ export const SuspectEffect = Schema.Struct({

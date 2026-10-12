@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/wire.test.ts
+# kills: events.suspect-evidence-shape
+# why: a derived effect may be called an opinion whatever its method, so an extractor's ruling can be recorded as a model's guess, which never blocks.
+diff --git a/packages/core/src/domain/verification/conflict.ts b/packages/core/src/domain/verification/conflict.ts
+index b55dc53..071f88a 100644
+--- a/packages/core/src/domain/verification/conflict.ts
++++ b/packages/core/src/domain/verification/conflict.ts
+@@ -51,7 +51,7 @@ export const SuspectEvidence = Schema.Struct({
+     (e) =>
+       (e.method === undefined
+         ? e.declared && e.evidenceClass === "testimony"
+-        : e.evidenceClass === CLASS_OF[e.method]) ||
++        : e.evidenceClass === CLASS_OF[e.method] || e.evidenceClass === "opinion") ||
+       "an effect with no method is its agent's declared testimony; a method fixes the evidence class",
+   ),
+ );
