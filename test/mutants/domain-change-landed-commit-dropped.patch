@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.landed-commit
+# why: evolve forgets the commit a change landed as, so a probe cannot build a landed party's world
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 52f0a9b..d4efedf 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -900,7 +900,7 @@ export const evolveChange = (
+         : illegal(change, event);
+     case "ChangeLanded":
+       return from("integrating")
+-        ? { ...released(change, "landed"), landedCommit: event.commitSha }
++        ? released(change, "landed")
+         : illegal(change, event);
+     case "ChangeBounced":
+       if (event.declined !== undefined)
