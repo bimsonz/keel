@@ -1,5 +1,13 @@
 import { Schema } from "effect";
-import type { AgentId, OrgId, ProjectId, UserId } from "../kernel/index.ts";
+import {
+  type AgentId,
+  agentActor,
+  type Actor as EventActor,
+  type OrgId,
+  type ProjectId,
+  userActor,
+  type UserId,
+} from "../kernel/index.ts";
 import type { Scope } from "./agent.ts";
 
 /**
@@ -103,6 +111,10 @@ export type Actor =
 /** The actor's id: its agent's or its user's. */
 export const actorId = (actor: Actor): string =>
   actor._tag === "Agent" ? actor.agentId : actor.userId;
+
+/** The actor as an event's envelope names it: `agent:<id>` or `user:<id>`. */
+export const eventActorOf = (actor: Actor): EventActor =>
+  actor._tag === "Agent" ? agentActor(actor.agentId) : userActor(actor.userId);
 
 /** The instance itself: its quotas, its users, its spend. */
 export interface InstanceResource {

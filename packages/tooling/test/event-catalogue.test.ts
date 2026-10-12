@@ -3,6 +3,7 @@ import { CoordinationEvent } from "@keeltown/core/domain/coordination";
 import { DeliveryEvent } from "@keeltown/core/domain/delivery";
 import { IdentityEvent } from "@keeltown/core/domain/identity";
 import { IntegrationEvent } from "@keeltown/core/domain/integration";
+import { Actor } from "@keeltown/core/domain/kernel";
 import { MemoryEvent } from "@keeltown/core/domain/memory";
 import { VerificationEvent } from "@keeltown/core/domain/verification";
 import { Schema, SchemaRepresentation } from "effect";
@@ -440,10 +441,31 @@ describe("the event catalogue: core's Effect Schemas and the spec's KeelEvent", 
     );
     const actor = pattern("EventActor");
     expect(actor.test("agent:agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0")).toBe(true);
+    expect(actor.test("user:usr_01JZ8PT2C4E6G8J0M2N4Q6S8V0")).toBe(true);
     expect(actor.test("operator:agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0")).toBe(true);
     expect(actor.test("agent:someone")).toBe(false);
     // Core's Actor is `operator:${NonEmptyString}`: an operator always has a name.
     expect(actor.test("operator:")).toBe(false);
+    // The spec's pattern and core's Actor take the same strings: an agent or a user by its own
+    // kind of id, an operator by any name, and nothing else.
+    const isActor = Schema.is(Actor);
+    const candidates = [
+      "agent:agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
+      "user:usr_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
+      "operator:zach",
+      "operator:usr_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
+      "user:",
+      "user:someone",
+      "user:agt_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
+      "user:usr_01jz8pt2c4e6g8j0m2n4q6s8v0",
+      "user:usr_01JZ8PT2C4E6G8J0M2N4Q6S8V00",
+      "agent:usr_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
+      "usr_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
+      "org:org_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
+      "",
+    ];
+    expect(candidates.filter((candidate) => actor.test(candidate))).toEqual(candidates.slice(0, 4));
+    expect(candidates.filter((candidate) => isActor(candidate))).toEqual(candidates.slice(0, 4));
   });
 
   it("compiles core's events as Schema.toJsonSchemaDocument does, before the rewrites", () => {

@@ -7,12 +7,15 @@ import {
   Instant,
   makeId,
   type NextAction,
+  userActor,
 } from "../../../src/domain/kernel/index.ts";
 import { fc } from "../../support/fast-check.ts";
 
 const ulid = (n: number): string => String(n).padStart(26, "0");
 const AGENT = makeId("agt", ulid(1));
 const OTHER = makeId("agt", ulid(2));
+/** A user whose id has the agent's own ULID: an event they cause is not the agent's own. */
+const USER = makeId("usr", ulid(1));
 const CHANGE = makeId("chg", ulid(3));
 
 const envelope = (payload: object, actor?: EventEnvelope["actor"]): EventEnvelope => ({
@@ -141,7 +144,7 @@ describe("the inbox", () => {
     fc.assert(
       fc.property(
         fc.constantFrom("advise" as const, "annotate" as const),
-        fc.constantFrom(undefined, agentActor(AGENT), agentActor(OTHER)),
+        fc.constantFrom(undefined, agentActor(AGENT), agentActor(OTHER), userActor(USER)),
         (policy, actor) =>
           notifies(AGENT, envelope(noted(policy), actor)) ===
           (policy === "advise" && actor !== agentActor(AGENT)),

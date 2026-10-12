@@ -5,6 +5,7 @@ import {
   type Agent,
   DAILY_QUOTAS,
   DEFAULT_QUOTAS,
+  eventActorOf,
   MembershipChanged,
   type QuotaKind,
   type Quotas,
@@ -12,7 +13,7 @@ import {
   type Role,
   SPEND_QUOTAS,
 } from "../../../src/domain/identity/index.ts";
-import { Instant, makeId } from "../../../src/domain/kernel/index.ts";
+import { Actor, Instant, makeId } from "../../../src/domain/kernel/index.ts";
 import { fc } from "../../support/fast-check.ts";
 
 const ulid = (n: number): string => String(n).padStart(26, "0");
@@ -251,3 +252,25 @@ function base(n: number): Agent {
     createdAt: Instant(0),
   };
 }
+
+describe("who an event is by", () => {
+  it("[tenancy.event-actor] a granted agent is named agent:<its id> and a granted user user:<their id>, and an envelope takes both", () => {
+    const agentId = makeId("agt", ulid(7));
+    expect(eventActorOf({ _tag: "Agent", agentId })).toBe("agent:agt_00000000000000000000000007");
+    expect(eventActorOf({ _tag: "User", userId: ADA })).toBe("user:usr_00000000000000000000000001");
+
+    const isActor = Schema.is(Actor);
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 1_000_000 }), (n) => {
+        const byAgent = eventActorOf({ _tag: "Agent", agentId: makeId("agt", ulid(n)) });
+        const byUser = eventActorOf({ _tag: "User", userId: makeId("usr", ulid(n)) });
+        return (
+          isActor(byAgent) &&
+          isActor(byUser) &&
+          byAgent === `agent:agt_${ulid(n)}` &&
+          byUser === `user:usr_${ulid(n)}`
+        );
+      }),
+    );
+  });
+});

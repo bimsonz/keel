@@ -1,22 +1,29 @@
 import type { Result } from "effect";
 import { Schema } from "effect";
 import { EntityRef } from "./entity.ts";
-import { AgentId, EventId, type Instant, InstantSchema, ProjectId } from "./ids.ts";
+import { AgentId, EventId, type Instant, InstantSchema, ProjectId, UserId } from "./ids.ts";
 
 /**
- * The principal whose command an event records: an agent, or an operator by
- * name. Absent when the platform caused the event (Precheck, an alarm, a
+ * The principal whose command an event records: an agent or a user, each by
+ * id. Absent when the platform caused the event (Precheck, an alarm, a
  * reaction, the Lane landing a change). An agent is never notified of an event
  * it caused, because its own tool result already reports it.
+ *
+ * `operator:<name>` is how events named a person before users existed. The
+ * events already stored carry it, so it is still read.
  */
 export const Actor = Schema.Union([
   Schema.TemplateLiteral(["agent:", AgentId]),
+  Schema.TemplateLiteral(["user:", UserId]),
   Schema.TemplateLiteral(["operator:", Schema.NonEmptyString]),
 ]);
 export type Actor = typeof Actor.Type;
 
 /** The actor an agent's own commands commit under. */
 export const agentActor = (agentId: AgentId): Actor => `agent:${agentId}`;
+
+/** The actor a user's own commands commit under: a maintainer's withdrawal, an owner's settings. */
+export const userActor = (userId: UserId): Actor => `user:${userId}`;
 
 /**
  * The envelope every event is committed in (docs/domain/events.md). The payload

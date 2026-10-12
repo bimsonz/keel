@@ -1,14 +1,21 @@
 import { createHash } from "node:crypto";
+import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
+  Actor,
+  agentActor,
   canBlock,
   canonicalJson,
   contentHashOf,
+  EventEnvelope,
   EvidenceClass,
   globsMayOverlap,
+  Instant,
   type Json,
+  makeId,
   matchesGlob,
   sha256Hex,
+  userActor,
   weakest,
 } from "../../../src/domain/kernel/index.ts";
 import { fc } from "../../support/fast-check.ts";
@@ -163,5 +170,83 @@ describe("evidence classes", () => {
 
   it("[kernel.only-proof-or-ruling-decide] only proof and rulings can block or clear", () => {
     expect(evidenceClasses.filter(canBlock).toSorted()).toEqual(["proof", "ruling"]);
+  });
+});
+
+const ulid = (n: number): string => String(n).padStart(26, "0");
+/** Any ULID: 26 characters of Crockford's alphabet. */
+const ulidArb = fc.string({
+  unit: fc.constantFrom(..."0123456789ABCDEFGHJKMNPQRSTVWXYZ".split("")),
+  minLength: 26,
+  maxLength: 26,
+});
+const isActor = Schema.is(Actor);
+
+/** The actor an envelope carries once it has been encoded, sent as JSON and decoded. */
+const actorThroughTheWire = (actor: Actor): unknown => {
+  const sent = Schema.encodeUnknownSync(EventEnvelope)({
+    eventId: makeId("evt", ulid(4)),
+    type: "ChangeWithdrawn",
+    entity: { kind: "change", id: makeId("chg", ulid(3)) },
+    seq: 1,
+    at: Instant(1_760_000_000_000),
+    dedupeKey: "withdraw#1",
+    actor,
+    affected: [],
+    notified: [],
+    payload: {},
+  });
+  return Schema.decodeUnknownSync(EventEnvelope)(JSON.parse(JSON.stringify(sent))).actor;
+};
+
+describe("an event's actor", () => {
+  it("[kernel.actor-shape] names an agent or a user by its id, still reads an operator by name, and is nothing else", () => {
+    const agent = makeId("agt", ulid(1));
+    const user = makeId("usr", ulid(1));
+    expect(agentActor(agent)).toBe("agent:agt_00000000000000000000000001");
+    expect(userActor(user)).toBe("user:usr_00000000000000000000000001");
+
+    // An id with letters in it, so that its lower-case spelling is another string.
+    const lettered = makeId("usr", "01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+    const lawful = [
+      `agent:${agent}`,
+      `user:${user}`,
+      `user:${lettered}`,
+      "operator:ops",
+      `operator:${agent}`,
+    ];
+    expect(lawful.filter((actor) => !isActor(actor))).toEqual([]);
+
+    const unlawful = [
+      "user:",
+      "user:ada",
+      `user:${agent}`,
+      `user:${lettered.toLowerCase()}`,
+      `user:${user}0`,
+      `user: ${user}`,
+      `User:${user}`,
+      "agent:",
+      `agent:${user}`,
+      agent,
+      user,
+      `org:${makeId("org", ulid(1))}`,
+      "operator:",
+      "",
+    ];
+    expect(unlawful.filter((actor) => isActor(actor))).toEqual([]);
+
+    fc.assert(
+      fc.property(ulidArb, ulidArb, (a, u) => {
+        const byAgent = agentActor(makeId("agt", a));
+        const byUser = userActor(makeId("usr", u));
+        return (
+          isActor(byAgent) &&
+          isActor(byUser) &&
+          byAgent !== byUser &&
+          actorThroughTheWire(byAgent) === byAgent &&
+          actorThroughTheWire(byUser) === byUser
+        );
+      }),
+    );
   });
 });

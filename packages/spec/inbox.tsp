@@ -18,8 +18,11 @@ model InboxPage {
 
 model InboxEnvelope is AgentEnvelope<InboxPage>;
 
-/** The principal whose command caused an event: `agent:<agent id>` or `operator:<by>`. */
-@pattern("^(agent:agt_[0-9A-HJKMNP-TV-Z]{26}|operator:.+)$")
+/**
+ * The principal whose command caused an event: `agent:<agent id>` or `user:<user id>`. Events committed before users
+ * existed name a person as `operator:<by>`, and still read so.
+ */
+@pattern("^(agent:agt_[0-9A-HJKMNP-TV-Z]{26}|user:usr_[0-9A-HJKMNP-TV-Z]{26}|operator:.+)$")
 scalar EventActor extends string;
 
 /**
