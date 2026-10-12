@@ -2,13 +2,13 @@
 # kills: names.reserved
 # why: a reserved path in another case is accepted, so API or Login becomes a handle
 diff --git a/apps/keel/src/adapters/driven/better-auth/names.ts b/apps/keel/src/adapters/driven/better-auth/names.ts
-index 3b99ed6..de87f3c 100644
+index 11af700..d5f274d 100644
 --- a/apps/keel/src/adapters/driven/better-auth/names.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/names.ts
-@@ -45,7 +45,7 @@ export const HANDLE = /^[a-z0-9](?:-?[a-z0-9]){0,38}$/;
- 
- /** Why `name` can't be a handle or an org name, or undefined when it can. Case never matters. */
- export function nameRefusal(name: string): string | undefined {
+@@ -52,7 +52,7 @@ export function nameRefusal(
+   name: string,
+   held: ReadonlySet<string> = new Set(),
+ ): string | undefined {
 -  const lowered = name.toLowerCase();
 +  const lowered = name;
    if (RESERVED_NAMES.has(lowered))

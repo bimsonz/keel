@@ -43,12 +43,20 @@ export const INSTANCE_ORG = "keel";
 /** Lower-case letters and digits, single hyphens between them, at most 39 characters. */
 export const HANDLE = /^[a-z0-9](?:-?[a-z0-9]){0,38}$/;
 
-/** Why `name` can't be a handle or an org name, or undefined when it can. Case never matters. */
-export function nameRefusal(name: string): string | undefined {
+/**
+ * Why `name` can't be a handle or an org name, or undefined when it can. Case
+ * never matters. `held` are names this instance keeps for its claimant (its
+ * deployment's KEEL_HELD_NAMES), such as the handle its admin will sign up with.
+ */
+export function nameRefusal(
+  name: string,
+  held: ReadonlySet<string> = new Set(),
+): string | undefined {
   const lowered = name.toLowerCase();
   if (RESERVED_NAMES.has(lowered))
     return `"${name}" is reserved: keel.town serves /${lowered} itself`;
   if (lowered === INSTANCE_ORG) return `"${name}" is reserved: it is this instance's own org`;
+  if (held.has(lowered)) return `"${name}" is held for this instance's claimant`;
   if (!HANDLE.test(lowered))
     return `"${name}" must be letters, digits and single hyphens, starting and ending with a letter or digit, at most 39 characters`;
   return undefined;

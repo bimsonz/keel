@@ -12,6 +12,9 @@
   "vars": {
     // The public host this Worker answers on. scripts/deploy.ts overrides it per environment.
     "KEEL_HOST": "keel.localhost",
+    // Handles and org names held for the instance's claimant, comma-separated. scripts/deploy.ts
+    // sets them from Terraform's held_names; the claim code releases them to the claimant.
+    "KEEL_HELD_NAMES": "",
     // staging | production | test. Tests rethrow contract drift instead of answering 500.
     "KEEL_ENV": "staging",
     "BACKUP_BUCKET_NAME": "keel-staging-sandbox-backups",

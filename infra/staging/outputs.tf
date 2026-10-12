@@ -25,3 +25,8 @@ output "better_auth_secret" {
 output "keel_host" {
   value = var.host
 }
+
+# Names held for the claimant: KEEL_HELD_NAMES, comma-separated.
+output "held_names" {
+  value = join(",", var.held_names)
+}

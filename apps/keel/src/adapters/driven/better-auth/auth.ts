@@ -75,6 +75,8 @@ export interface AuthConfig {
   readonly sendOtp?: OtpSender;
   /** GitHub sign-in, only once its OAuth app exists. */
   readonly github?: { readonly clientId: string; readonly clientSecret: string };
+  /** Names held for the instance's claimant, lower-case: no one else may take them. */
+  readonly heldNames?: ReadonlySet<string>;
   /**
    * Keeps the Worker alive for work Better Auth does after answering, such as
    * sending a code (it answers alike whether or not the address exists).
@@ -110,8 +112,13 @@ function generateId({ model }: { model: string }): string {
 const refuse = (code: string, message: string) => APIError.from("BAD_REQUEST", { code, message });
 
 /** Refuses a name already used as a handle or an org slug: the two share one namespace. */
-async function claimable(db: D1Database, name: string, creator?: string): Promise<void> {
-  const refusal = nameRefusal(name);
+async function claimable(
+  db: D1Database,
+  held: ReadonlySet<string>,
+  name: string,
+  creator?: string,
+): Promise<void> {
+  const refusal = nameRefusal(name, held);
   if (refusal !== undefined) throw refuse("NAME_REFUSED", refusal);
   const lowered = name.toLowerCase();
   const holder = await db
@@ -127,6 +134,7 @@ async function claimable(db: D1Database, name: string, creator?: string): Promis
 export function authOptions(config: AuthConfig) {
   const origin = `https://${config.host}`;
   const { db } = config;
+  const held = config.heldNames ?? new Set<string>();
 
   /** Every user's personal org, made when its handle is first set, owned by it. */
   const personalOrg = async (user: { id: string; username?: string | null }) => {
@@ -184,7 +192,7 @@ export function authOptions(config: AuthConfig) {
           const name: unknown = ctx.body?.username;
           if (ctx.path === "/update-user" && typeof name === "string") {
             const session = await getSessionFromCtx(ctx);
-            await claimable(db, name, session?.user.id);
+            await claimable(db, held, name, session?.user.id);
           } else if (ctx.path === "/update-user") {
             const session = await getSessionFromCtx(ctx);
             if (session !== null && !session.user["username"])
@@ -212,7 +220,7 @@ export function authOptions(config: AuthConfig) {
       username({
         minUsernameLength: 1,
         maxUsernameLength: 39,
-        usernameValidator: (name) => nameRefusal(name) === undefined,
+        usernameValidator: (name) => nameRefusal(name, held) === undefined,
         // The handle is the personal org's slug, so it never changes.
         immutableUsername: true,
       }),
@@ -234,7 +242,7 @@ export function authOptions(config: AuthConfig) {
         organizationHooks: {
           beforeCreateOrganization: async ({ organization: org, user }) => {
             if (typeof org.slug !== "string") throw refuse("NAME_REFUSED", "An org needs a name");
-            await claimable(db, org.slug, user.id);
+            await claimable(db, held, org.slug, user.id);
             return { data: { ...org, slug: org.slug.toLowerCase() } };
           },
           beforeUpdateOrganization: async ({ organization: org }) => {
@@ -263,13 +271,13 @@ export function authOptions(config: AuthConfig) {
           resolveUser: async ({ context }) => {
             if (typeof context !== "string" || context === "")
               throw refuse("HANDLE_REQUIRED", "Choose a handle to sign up with a passkey");
-            await claimable(db, context);
+            await claimable(db, held, context);
             return { id: `usr_${ulid()}`, name: context.toLowerCase() };
           },
           afterVerification: async ({ ctx, user, context }) => {
             if ((await ctx.context.internalAdapter.findUserById(user.id)) !== null) return {};
             if (typeof context !== "string") throw refuse("HANDLE_REQUIRED", "Choose a handle");
-            await claimable(db, context);
+            await claimable(db, held, context);
             const handle = context.toLowerCase();
             const created = await ctx.context.internalAdapter.createUser(
               {

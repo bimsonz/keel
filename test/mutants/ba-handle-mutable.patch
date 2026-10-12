@@ -2,12 +2,12 @@
 # kills: ba.handle-immutable
 # why: a handle can be changed, leaving its personal org and every URL under the old name
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index e646105..60713b2 100644
+index 38f5a72..74ae1af 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -207,7 +207,7 @@ export function authOptions(config: AuthConfig) {
+@@ -222,7 +222,7 @@ export function authOptions(config: AuthConfig) {
          maxUsernameLength: 39,
-         usernameValidator: (name) => nameRefusal(name) === undefined,
+         usernameValidator: (name) => nameRefusal(name, held) === undefined,
          // The handle is the personal org's slug, so it never changes.
 -        immutableUsername: true,
 +        immutableUsername: false,

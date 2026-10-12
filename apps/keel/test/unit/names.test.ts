@@ -48,6 +48,13 @@ describe("handles and org names", () => {
     for (const name of ["keel", "Keel", "KEEL"]) expect(nameRefusal(name)).toMatch(/own org/);
   });
 
+  it("[names.held] refuses a name held for the claimant, in any case, and holds nothing by default", () => {
+    const held = new Set(["bimsonz"]);
+    for (const name of ["bimsonz", "BimsonZ"]) expect(nameRefusal(name, held)).toMatch(/held/);
+    expect(nameRefusal("bimsonz")).toBeUndefined();
+    expect(nameRefusal("bimson", held)).toBeUndefined();
+  });
+
   it("[names.handle] takes letters, digits and single inner hyphens up to 39 characters", () => {
     for (const ok of ["ada", "Ada", "keeltown", "a", "a-b", "forge-lite", "x".repeat(39), "r2d2"])
       expect(nameRefusal(ok)).toBeUndefined();

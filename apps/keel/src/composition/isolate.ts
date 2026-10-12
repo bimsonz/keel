@@ -167,6 +167,11 @@ function identity(env: Env, overrides: AuthOverrides): AuthConfig {
     background: waitUntil,
     ...(overrides.sendOtp === undefined ? {} : { sendOtp: overrides.sendOtp }),
     ...(clientId && clientSecret ? { github: { clientId, clientSecret } } : {}),
+    heldNames: new Set(
+      env.KEEL_HELD_NAMES.split(",")
+        .map((name) => name.trim().toLowerCase())
+        .filter((name) => name !== ""),
+    ),
   };
 }
 

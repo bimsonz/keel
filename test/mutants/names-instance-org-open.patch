@@ -2,14 +2,14 @@
 # kills: names.instance, ba.names
 # why: the instance's own org name is open, so a stranger who signs up as keel first takes the org Keel's projects move into
 diff --git a/apps/keel/src/adapters/driven/better-auth/names.ts b/apps/keel/src/adapters/driven/better-auth/names.ts
-index 3b99ed6..be94f00 100644
+index 11af700..627e69f 100644
 --- a/apps/keel/src/adapters/driven/better-auth/names.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/names.ts
-@@ -48,7 +48,6 @@ export function nameRefusal(name: string): string | undefined {
+@@ -55,7 +55,6 @@ export function nameRefusal(
    const lowered = name.toLowerCase();
    if (RESERVED_NAMES.has(lowered))
      return `"${name}" is reserved: keel.town serves /${lowered} itself`;
 -  if (lowered === INSTANCE_ORG) return `"${name}" is reserved: it is this instance's own org`;
+   if (held.has(lowered)) return `"${name}" is held for this instance's claimant`;
    if (!HANDLE.test(lowered))
      return `"${name}" must be letters, digits and single hyphens, starting and ending with a letter or digit, at most 39 characters`;
-   return undefined;

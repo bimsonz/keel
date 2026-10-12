@@ -188,6 +188,11 @@ function render(dir: string, outputs: ReadonlyMap<string, string>): { name: stri
   set(["vars", "KEEL_HOST"], host);
   const vars = committed["vars"];
   if (isObject(vars) && "KEEL_API_HOST" in vars) set(["vars", "KEEL_API_HOST"], host);
+  if (isObject(vars) && "KEEL_HELD_NAMES" in vars)
+    set(
+      ["vars", "KEEL_HELD_NAMES"],
+      requireOutput(outputs, "held_names", "the names held for the claimant"),
+    );
 
   const rendered = parseConfig(text, `apps/${dir}/wrangler.deploy.jsonc`);
   const pins = pinProblems(rendered);
