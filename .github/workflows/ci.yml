@@ -6,10 +6,10 @@ on:
   pull_request:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  # On main a run finishes, and only the newest push waits behind it (GitHub
-  # replaces an older pending run), so main always gets a completed verdict.
-  # Elsewhere a newer push cancels the run in progress.
+  # On main every push gets its own verdict (a group per SHA, so nothing waits or
+  # is replaced): a deploy names the exact SHA it ships, which needs that SHA's
+  # own run. Elsewhere a newer push cancels the run in progress.
+  group: ci-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
