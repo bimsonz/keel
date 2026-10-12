@@ -8,6 +8,7 @@ import type { Lattice } from "../contract/keel/index.ts";
 import type { Observation } from "../contract/observations.ts";
 import type {
   KeelCommands,
+  KeelSettings,
   KeelEventSource,
   KeelResources,
   ChangeDiff,
@@ -15,14 +16,16 @@ import type {
   VerdictReasons,
 } from "../source/types.ts";
 import type { KeelRepository } from "../source/repository.ts";
-import { Projects, projectOf } from "./projects.ts";
+import { Projects, type Visibility, projectOf } from "./projects.ts";
 import { RepositoryReader } from "./repository.ts";
 import { World } from "./world.ts";
 
 export type ConsoleSource = KeelEventSource &
   KeelResources &
   KeelRepository &
-  KeelCommands & {
+  KeelCommands &
+  // A fixture's source holds no settings: only Keel does.
+  Partial<KeelSettings> & {
     /** The question a scripted story is holding at, if the source knows of one. */
     openGate?(): { escalationId: string; t: number } | undefined;
   };
@@ -113,6 +116,18 @@ export class Player {
   /** The log's first instant. A log with nothing in it yet begins now. */
   get #epochMs(): number {
     return this.#epochAt ?? this.#now();
+  }
+
+  /**
+   * Who may read the project being shown, as Keel answered when its settings were read or replaced. It is
+   * Keel's own word and newer than what it said when the project was found; the log says what changes after.
+   */
+  readBy(visibility: Visibility): void {
+    const { project } = this.source.descriptor;
+    if (project === undefined || this.projects.named(project.name)?.visibility === visibility)
+      return;
+    this.projects.know({ id: project.id, name: project.name, visibility });
+    this.#changed();
   }
 
   #changed(): void {

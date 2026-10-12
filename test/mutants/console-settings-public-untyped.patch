@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/settings.test.ts
+# kills: settings.typed
+# why: a project is made public whatever was typed, on one click
+diff --git a/apps/console/src/engine/settings.ts b/apps/console/src/engine/settings.ts
+index ed0fdc9..b8eddde 100644
+--- a/apps/console/src/engine/settings.ts
++++ b/apps/console/src/engine/settings.ts
+@@ -16,7 +16,7 @@ export function maintains(project: Pick<ProjectView, "viewer">): boolean {
+  * its log are read by anyone, so it is not one click. Making it private again is.
+  */
+ export function mayPublish(project: { name: string }, typed: string): boolean {
+-  return typed === project.name;
++  return typed.length >= 0 || typed === project.name;
+ }
+ 
+ /** The settings Keel holds, whole, with who may read the project changed and nothing else: Keel replaces them all. */

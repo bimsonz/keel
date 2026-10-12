@@ -2,7 +2,7 @@
 
 How a person sees Keel: the projects an instance holds, and for each project its code, its changes, the conflicts between them, the few questions that need a person, and Mission Control, the live graph of a swarm of agents changing one codebase. All of it is read from Keel.
 
-A Keel holds orgs and an org holds projects, so a project's address is `/<org>/<project>`, as a repository's is on a code host. The bare address is the home: the projects Keel names to whoever is reading. A project is the frame: Code, Changes, Conflicts, Escalations, Mission Control and Insights are its tabs, every thing in it has a page and an address of its own, and each kind of thing is listed one way and shown one way.
+A Keel holds orgs and an org holds projects, so a project's address is `/<org>/<project>`, as a repository's is on a code host. The bare address is the home: the projects Keel names to whoever is reading. A project is the frame: Code, Changes, Conflicts, Escalations, Mission Control and Insights are its tabs, with Settings beside them for whoever may change them, every thing in it has a page and an address of its own, and each kind of thing is listed one way and shown one way.
 
 It reads Keel and nothing else. There is no replay in it and no recorded stand-in: what the console shows is what Keel says, and where Keel does not say something yet the console leaves that place empty and says so.
 
@@ -14,12 +14,15 @@ It is a Vite single-page app (React, Tailwind, Cloudflare's Kumo components, Rea
 |---|---|---|
 | A visitor, with no session | The projects an org has made public. The home lists them, and each one's code, its log and everything folded from the log are theirs to read | Nothing but read |
 | Someone signed in | That, and the projects of the orgs they are a member of | Answer a question in a project of an org they are a member of |
+| An owner or a maintainer of a project's org | The same, and the project's settings | Make the project public, or private again |
 
 **The console holds no credential, and has no way to Keel of its own.** The page reads `/v1` on its own origin and puts nothing on a request. Who is reading is the session cookie Keel's own sign-in set (`__Secure-keel.session_token`), which the browser sends and the page cannot read. The Worker has no secret and no binding to Keel: it answers `/healthz` and serves the page. Keel decides every read and every ruling.
 
 A project Keel does not show a reader is the same answer whether it is private or not there at all, and the page says the same of both: "There is no project `<org>/<project>` here".
 
 A question is answered with Keel's own operation (`Operator_giveRuling`), as whoever is signed in. Its options can be tapped where Keel's answer about the project names the reader a member of its org (`viewer.role`), and a refusal is shown in Keel's words, with the ways forward it gave. Beside an open question is a QR code of the question's own address and nothing more: no key and no capability. Whoever opens it on a phone signs in, and Keel decides whether they may answer.
+
+A project's settings are Keel's (`Operator_getSettings`, `Operator_putSettings`), at `/<org>/<project>/settings`. The frame offers a Settings tab where Keel named the reader an owner or a maintainer of the project's org. The page shows who may read the project and the rest of what Keel holds for it, and changes one thing: making it public waits for the project's name to be typed, since anyone then reads its code and its log, and making it private again is one click. Keel replaces a project's settings whole, and reads a setting left out as its default (verification required, the project private), so the page sends back everything Keel answered with that one field changed. What Keel answers is what the page and the frame then say. Anyone else who opens the address is shown Keel's refusal in its words.
 
 ## Accounts
 
@@ -75,6 +78,7 @@ The Code tab is read from Keel's four repository reads (`Repo_getTree`, `Repo_ge
 | `/O/P/escalations`, `/O/P/escalations/<E-n>` | The questions put to a person, and one of them. `?state=` is `open` or `closed` |
 | `/O/P/mission-control`, `/O/P/subjects/<key>` | The live graph with trunk's numbers above it, and the graph with one subject open beside it |
 | `/O/P/insights`, `/O/P/insights/funnel`, `/O/P/insights/benchmark` | Trunk's numbers, the review funnel, the benchmark |
+| `/O/P/settings` | Who may read the project, and what else Keel holds for it. A tab for an owner or a maintainer of the project's org |
 
 An org is never called one of the reserved first segments (`RESERVED` in `src/route.ts`): the pages above every project, the build's own files and `healthz`. Keel refuses each as a handle. Every other path that is not a file is the page, a path with a dot in it included.
 
@@ -140,6 +144,7 @@ It drives the pages on the fixtures the dev server serves (every tab and row a l
 - **a visitor on a public project**: the home lists it, its code is on the page before Keel has answered about the log, nothing can be tapped on a question, and the frame's way in comes back to the page;
 - **a visitor, and someone signed in who is no member, on a private project**: both are told what they are told of a project that is not there;
 - **a member**: her org's home lists the project, the frame drops down on the org and on the project, the QR code beside a question says the question's own address, and her answer reaches Keel as its own operation with no credential of the page's;
+- **an owner, on the project's settings**: the tab is offered to her and not to a visitor, making the project public waits for its whole name, Keel is sent the settings whole with that one field changed, a visitor then reads the project and is refused its settings in Keel's word, and one click makes it private again;
 - **the claim**: the code rides on the two passkey calls and on nothing else, and is in no storage and no address afterwards.
 
 The dev server goes on serving the old version of a file that a script has written, so restart it before running this after an edit.

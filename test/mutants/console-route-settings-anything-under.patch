@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/route.test.ts
+# kills: route.settings
+# why: any address under a project's settings is its settings
+diff --git a/apps/console/src/route.ts b/apps/console/src/route.ts
+index 314922d..633c73b 100644
+--- a/apps/console/src/route.ts
++++ b/apps/console/src/route.ts
+@@ -174,7 +174,7 @@ function routeOf(place: string | undefined, rest: string[], query: URLSearchPara
+       return tab === undefined || more.length > 0 ? MISSING : { at: "insights", tab };
+     }
+     case "settings":
+-      return first === undefined ? { at: "settings" } : MISSING;
++      return { at: "settings" };
+     default:
+       return MISSING;
+   }

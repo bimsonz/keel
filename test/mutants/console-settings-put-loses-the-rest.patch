@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/settings.test.ts
+# kills: settings.whole
+# why: what is sent back leaves verification out, which Keel reads as required: a control project is changed by making it public
+diff --git a/apps/console/src/engine/settings.ts b/apps/console/src/engine/settings.ts
+index ed0fdc9..7d6bb45 100644
+--- a/apps/console/src/engine/settings.ts
++++ b/apps/console/src/engine/settings.ts
+@@ -21,5 +21,9 @@ export function mayPublish(project: { name: string }, typed: string): boolean {
+ 
+ /** The settings Keel holds, whole, with who may read the project changed and nothing else: Keel replaces them all. */
+ export function readBy(settings: ProjectSettings, visibility: Visibility): ProjectSettings {
+-  return { ...settings, visibility };
++  return {
++    protectedPaths: settings.protectedPaths,
++    maxBatchSize: settings.maxBatchSize,
++    visibility,
++  };
+ }

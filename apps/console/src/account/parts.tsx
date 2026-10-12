@@ -1,6 +1,7 @@
 // What the pages above every project are made of.
 
 import { type ReactNode, useCallback, useState } from "react";
+import { KeelRefused } from "../source/types.ts";
 import { Refused } from "./account.ts";
 
 /** A handle is a user's name on this Keel, or an org's: the first segment of every address under it. */
@@ -14,7 +15,7 @@ export interface Said {
 
 export const saidOf = (error: unknown): Said => ({
   words: error instanceof Error ? error.message : "Keel could not be reached",
-  next: error instanceof Refused ? error.next : [],
+  next: error instanceof Refused || error instanceof KeelRefused ? error.next : [],
 });
 
 /** Runs one thing the reader asked for, and says so if Keel refuses it. */

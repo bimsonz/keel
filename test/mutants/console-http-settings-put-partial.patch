@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: settings.put
+# why: the page sends Keel the one setting it changed, where Keel replaces them all
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 61d27b9..046be4c 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -300,7 +300,7 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+         {
+           method: "PUT",
+           headers: { "content-type": "application/json" },
+-          body: JSON.stringify(body),
++          body: JSON.stringify({ visibility: body.visibility }),
+         },
+       );
+       if (!response.ok) throw await refusalOf(response);

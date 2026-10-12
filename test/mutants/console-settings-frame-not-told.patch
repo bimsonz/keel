@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: settings.frame
+# why: the frame goes on saying who could read the project before its settings were changed
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index 3bf6dc8..5d763cf 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -126,7 +126,6 @@ export class Player {
+     const { project } = this.source.descriptor;
+     if (project === undefined || this.projects.named(project.name)?.visibility === visibility)
+       return;
+-    this.projects.know({ id: project.id, name: project.name, visibility });
+     this.#changed();
+   }
+ 

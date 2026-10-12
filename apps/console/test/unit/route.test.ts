@@ -123,6 +123,18 @@ describe("the console's addresses", () => {
     }
   });
 
+  it("[route.settings] gives a project's settings an address of their own, with nothing under it", () => {
+    expect(parse("/acme/demo/settings", "")).toEqual({
+      org: "acme",
+      project: "demo",
+      route: { at: "settings" },
+    });
+    expect(href("acme", "demo", { at: "settings" })).toBe("/acme/demo/settings");
+    expect(parse("/acme/demo/settings/members", "").route).toEqual({ at: "missing" });
+    // The first segment of that name is the reader's own settings, and no org's.
+    expect(parse("/settings", "")).toMatchObject({ org: null, project: null });
+  });
+
   it("says an address names nothing rather than guess at it", () => {
     for (const address of [
       "/acme/demo/nowhere",

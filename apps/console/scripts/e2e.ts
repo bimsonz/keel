@@ -2225,7 +2225,8 @@ await counted(person);
 expectEqual(
   "member: a private project of her org opens, with its code and what is open",
   `${pathOf(person)} | ${await filesOn(person)} | ${(await tabsOf(person).allInnerTexts()).map(squash).join(" | ")}`,
-  `/ada/demo | src | package.json | README.md | ${OPEN_ON_TABS}`,
+  // Ada owns the project's org, so the frame offers her its settings. A visitor's frame, above, has six tabs.
+  `/ada/demo | src | package.json | README.md | ${OPEN_ON_TABS} | Settings`,
 );
 expectEqual(
   "member: the frame names the org, the project and who is reading",
@@ -2382,6 +2383,98 @@ expectEqual(
 );
 await later.close();
 
+// ── The project's settings ──
+// Keel holds them. It reads them to Ada as a member of the project's org, and lets her replace them as its owner.
+await person.goto(`${built}/ada/demo/settings`, { waitUntil: "domcontentloaded" });
+const whoReads = person.getByRole("region", { name: "Who may read this project" });
+await whoReads.waitFor();
+const readersSaid = async (): Promise<string> =>
+  squash(await whoReads.locator("p").first().innerText());
+const frameSaid = async (): Promise<string> =>
+  squash(await person.locator("header").first().innerText()).split(" Code ")[0] ?? "";
+expectEqual(
+  "settings: the page says who may read the project, as Keel holds it, under its own tab",
+  `${pathOf(person)} | ${await readersSaid()} | ${squash(await person.getByRole("navigation", { name: "Project" }).locator('[aria-current="page"]').innerText())}`,
+  "/ada/demo/settings | private Only members of ada read it. | Settings",
+);
+expectEqual(
+  "settings: and the rest of what Keel holds for it",
+  squash(
+    await person.getByRole("region", { name: "What Keel holds for this project" }).innerText(),
+  ),
+  "What Keel holds for this project Verification Required: the lane verifies each batch before it lands. Largest batch 8 changes Protected paths infra/** Only Keel changes these. A change that touches one is refused at precheck.",
+);
+const publishing = person.getByRole("button", { name: "Make public" });
+expectEqual(
+  "settings: making a project public waits for its name to be typed",
+  String(await publishing.isDisabled()),
+  "true",
+);
+await person.getByLabel(/^Type demo to make it public/).fill("dem");
+expectEqual("settings: and for the whole of it", String(await publishing.isDisabled()), "true");
+await person.getByLabel(/^Type demo to make it public/).fill("demo");
+await shot(person, "project-settings");
+await publishing.click();
+const hiding = person.getByRole("button", { name: "Make private" });
+await hiding.waitFor();
+expectEqual(
+  "settings: made public, the page and the frame say what Keel answered",
+  `${await readersSaid()} | ${await frameSaid()}`,
+  "public Anyone reads its code and its log, signed in or not. | Keel / ada / demo public Live ada",
+);
+const replaced = shut.calls.filter((call) => call.method === "PUT");
+expectEqual(
+  "Keel: the settings were replaced whole, with who may read the project changed and nothing else, and nothing of the page's on the request",
+  `${replaced.length} ${replaced[0]?.path === `/v1/projects/${shut.project.id}/settings`} ${replaced[0]?.authorization === ""} ${replaced[0]?.body}`,
+  `1 true true ${JSON.stringify({ protectedPaths: ["infra/**"], maxBatchSize: 8, verification: "required", visibility: "public" })}`,
+);
+// Someone with no session, on the same Keel: the project is now theirs to read, and its settings are not.
+const passing = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+await asDeployed(passing, { keel: shut });
+const passer = watch(await passing.newPage(), "built, a visitor once the project is public");
+await passer.goto(`${built}/ada/demo`, { waitUntil: "domcontentloaded" });
+await passer
+  .locator(".a-tree li")
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+await counted(passer);
+expectEqual(
+  "settings: a visitor now reads the project, and is offered no settings",
+  `${await filesOn(passer)} | ${await tabsOf(passer).count()} tabs`,
+  "src | package.json | README.md | 6 tabs",
+);
+await passer.goto(`${built}/ada/demo/settings`, { waitUntil: "domcontentloaded" });
+await passer.getByRole("heading", { level: 1, name: "Settings" }).waitFor();
+await passer
+  .getByRole("alert")
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "settings: a visitor who opens their address is told Keel's refusal, and is offered nothing to change",
+  `${squash(
+    await passer
+      .getByRole("alert")
+      .innerText()
+      .catch(() => "no refusal"),
+  )} | ${await passer.getByRole("main").getByRole("button").count()} buttons`,
+  "auth.required | 0 buttons",
+);
+// Private again is one click.
+await hiding.click();
+await publishing.waitFor();
+expectEqual(
+  "settings: one click makes it private again",
+  `${await readersSaid()} | ${await frameSaid()} | ${shut.calls.filter((call) => call.method === "PUT").length}`,
+  "private Only members of ada read it. | Keel / ada / demo private Live ada | 2",
+);
+expectEqual(
+  "settings: and a visitor is told of it what they are told of a project that is not there",
+  await toldAt(passer, "ada", "demo"),
+  told.none,
+);
+await passing.close();
+
 // Whatever the page asked of Keel, of its identity or of anything else, it put no credential of its own on it.
 expectEqual(
   "account: the page sent Keel no Authorization",
@@ -2389,12 +2482,13 @@ expectEqual(
   "0",
 );
 expectEqual(
-  "account: on its identity, its projects, their code and logs, and the ruling",
+  "account: on its identity, its projects, their code and logs, the ruling, and the settings",
   String(
     sentToKeel.some((request) => request.path.startsWith("/v1/auth/")) &&
       sentToKeel.some((request) => request.path === "/v1/projects") &&
       sentToKeel.some((request) => request.path === "/v1/events") &&
-      sentToKeel.some((request) => request.path.endsWith("/ruling")),
+      sentToKeel.some((request) => request.path.endsWith("/ruling")) &&
+      sentToKeel.some((request) => request.path.endsWith("/settings")),
   ),
   "true",
 );

@@ -111,7 +111,18 @@ export interface RulingCommand {
 }
 
 /**
- * The one thing the console may change, so it is its own port. Keel decides who may: the reader's own session
+ * A project's settings as Keel holds them, and replacing them. Keel reads them to a member of the project's
+ * org and lets a maintainer or an owner replace them; whoever else asks is given its refusal. Keel replaces
+ * the settings whole, so what is sent is everything it answered with what the reader changed.
+ */
+export interface KeelSettings {
+  getSettings(signal?: AbortSignal): Promise<Keel.ProjectSettings>;
+  /** Answers with the settings as Keel then holds them. */
+  putSettings(settings: Keel.ProjectSettings): Promise<Keel.ProjectSettings>;
+}
+
+/**
+ * What the console may change in a project's log, so it is its own port. Keel decides who may: the reader's own session
  * is all the console sends. A ruling is never applied optimistically: its effect arrives through the log.
  */
 export interface KeelCommands {

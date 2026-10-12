@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: settings.refused
+# why: Keel's refusal to replace a project's settings is read as the settings it then holds, so the page says a change was made
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 61d27b9..73e502a 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -303,7 +303,6 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+           body: JSON.stringify(body),
+         },
+       );
+-      if (!response.ok) throw await refusalOf(response);
+       return answered<ProjectSettings>(response);
+     },
+   };

@@ -2,8 +2,10 @@
 // way Keel does: a reader is whoever the session cookie says, or a visitor;
 // a project is found by its org and name; its events are read by cursor with
 // the cursor always given, a verdict's evidence by its id, and a member of the
-// project's org may answer its question, once. What a reader may not see is
-// answered as what is not there. Its answers are typed by Keel's own generated
+// project's org may answer its question, once. A member reads the project's
+// settings, and a maintainer or an owner replaces them, which is how the
+// project is made public or private. What a reader may not see is answered as
+// what is not there. Its answers are typed by Keel's own generated
 // wire types, but for the project, whose shape is the console's read of it
 // the read (source/types.ts). An event's payload it serves as
 // Keel's design settles it (contract/events.ts, `Ahead`). Nothing in the
@@ -16,6 +18,7 @@ import type {
   EventRecord,
   LatticeSet,
   NextAction,
+  ProjectSettings,
   ProjectView,
   RepoBlob,
   RepoCommitDiff,
@@ -115,6 +118,12 @@ function problem(status: number, code: string, nextActions: NextAction[] = []): 
   return Response.json(body, { status, headers: { "content-type": "application/problem+json" } });
 }
 
+/** Keel's refusal of someone who lacks a role, with the way forward it gives: `authorize.ts`, `lacksRole`. */
+const lacks = (role: string): Response =>
+  problem(403, "auth.forbidden", [
+    { kind: "escalate", title: `Ask ${role}: this needs that role` },
+  ]);
+
 export function createFakeKeel(
   options: {
     seed?: number;
@@ -133,7 +142,6 @@ export function createFakeKeel(
   const pageSize = options.pageSize ?? 500;
   let log = generateS1(seed);
   const repository = createMockRepository(() => log);
-  const visibility = options.visibility ?? "private";
   const escalationId = log.gates[0]?.escalationId ?? "";
   let ruled: { option: string; key: string } | undefined;
   let waiters: (() => void)[] = [];
@@ -144,9 +152,16 @@ export function createFakeKeel(
     id: created.payload.projectId,
     org: options.org ?? "acme",
     name: created.payload.name,
-    visibility,
+    visibility: options.visibility ?? "private",
     createdAt: created.at,
   };
+  /** What Keel holds for the project beside who may read it, which is the project's own `visibility`. */
+  let kept: Omit<ProjectSettings, "visibility"> = {
+    protectedPaths: ["infra/**"],
+    maxBatchSize: 8,
+    verification: "required",
+  };
+  const settings = (): ProjectSettings => ({ ...kept, visibility: project.visibility });
 
   /** The question as the log raised it: Keel's view of an escalation is that event's own fields. */
   const raised = () => log.events.find((event) => event.type === "EscalationRaised");
@@ -181,7 +196,7 @@ export function createFakeKeel(
       const reader = await readerOf(request);
       const member = reader?.role !== undefined;
       /** The project is shown to its org's members, and to anyone where it is public. To the rest it is not there. */
-      const visible = member || visibility === "public";
+      const visible = member || project.visibility === "public";
       const gone = (): Response => problem(404, "resource.not_found");
 
       const named = /^\/v1\/orgs\/([^/]+)\/projects\/([^/]+)$/.exec(url.pathname);
@@ -303,6 +318,41 @@ export function createFakeKeel(
         return view === undefined
           ? problem(404, "resource.not_found")
           : Response.json(view satisfies VerdictView);
+      }
+
+      // A project's settings are read by a member of its org and replaced, whole, by a maintainer or an owner.
+      // Someone with no session is asked for one before anything is said of the project.
+      const ofSettings = /^\/v1\/projects\/([^/]+)\/settings$/.exec(url.pathname);
+      if (ofSettings !== null && (request.method === "GET" || request.method === "PUT")) {
+        if (reader === null) return problem(401, "auth.required");
+        if (request.method === "PUT" && request.headers.get("origin") !== url.origin)
+          return problem(403, "auth.cross_site");
+        if (!visible || decodeURIComponent(ofSettings[1] ?? "") !== project.id) return gone();
+        if (!member) return lacks("a member");
+        if (request.method === "GET") return Response.json(settings());
+        if (reader.role === "member") return lacks("a maintainer or an owner");
+        const body = fields(sent);
+        const protectedPaths = body.get("protectedPaths");
+        const maxBatchSize = body.get("maxBatchSize");
+        const verification = body.get("verification");
+        const to = body.get("visibility");
+        // The settings are replaced whole: a body that leaves one of Keel's required fields out is refused.
+        if (
+          !Array.isArray(protectedPaths) ||
+          !protectedPaths.every(
+            (glob): glob is string => typeof glob === "string" && glob !== "",
+          ) ||
+          typeof maxBatchSize !== "number"
+        )
+          return problem(400, "request.invalid");
+        kept = {
+          protectedPaths,
+          maxBatchSize,
+          // Left out of a PUT, verification is required and the project is private: Keel's spec says so.
+          verification: verification === "off" ? "off" : "required",
+        };
+        project.visibility = to === "public" ? "public" : "private";
+        return Response.json(settings());
       }
 
       const ruling = /^\/v1\/escalations\/([^/]+)\/ruling$/.exec(url.pathname);

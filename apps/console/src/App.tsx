@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { type Org, createAccount, nameOf } from "./account/account.ts";
 import { openCounts } from "./engine/lists.ts";
 import { Player } from "./engine/player.ts";
+import { maintains } from "./engine/settings.ts";
 import { ConsoleProvider, usePlayer, useSelected, useWorldVersion } from "./engine/react.tsx";
 import { ChangePage } from "./pages/Change.tsx";
 import { ChangesPage } from "./pages/Changes.tsx";
@@ -14,6 +15,7 @@ import { HomePage } from "./pages/Home.tsx";
 import { InsightsPage } from "./pages/Insights.tsx";
 import { Missing } from "./pages/Missing.tsx";
 import { MissionControlPage } from "./pages/MissionControl.tsx";
+import { SettingsPage } from "./pages/Settings.tsx";
 import { type Route, TRUNK, href } from "./route.ts";
 import { hrefOf } from "./places.ts";
 import { WhereProvider, carriedParams, useAddress } from "./router.tsx";
@@ -136,7 +138,7 @@ function useReader(live: boolean): Reader | undefined {
   return reader;
 }
 
-function Page({ route, mode }: { route: Route; mode: Mode }) {
+function Page({ route, mode, project }: { route: Route; mode: Mode; project: ProjectView }) {
   switch (route.at) {
     case "code":
     case "commits":
@@ -163,6 +165,8 @@ function Page({ route, mode }: { route: Route; mode: Mode }) {
       );
     case "insights":
       return <InsightsPage tab={route.tab} />;
+    case "settings":
+      return <SettingsPage project={project} />;
     default:
       return <Missing />;
   }
@@ -186,8 +190,8 @@ function pageOf(route: Route, address: string): string {
   return address;
 }
 
-/** The places read from the project's code, which need nothing of its log. */
-const CODE: ReadonlySet<Route["at"]> = new Set(["code", "commits", "commit"]);
+/** The places that need nothing of the project's log: its code, and its settings, which Keel is asked for. */
+const UNLOGGED: ReadonlySet<Route["at"]> = new Set(["code", "commits", "commit", "settings"]);
 
 /** A project's pages, in its frame. */
 function Console({
@@ -218,7 +222,7 @@ function Console({
     note: project.visibility,
   }));
   // A page read from the log has nothing to draw until the log has been read. The code waits for none of it.
-  const waiting = !player.loaded && !CODE.has(route.at) && route.at !== "missing";
+  const waiting = !player.loaded && !UNLOGGED.has(route.at) && route.at !== "missing";
   return (
     <WhereProvider org={found.org} project={found.name} route={route}>
       <NamesProvider>
@@ -226,6 +230,8 @@ function Console({
           source={source}
           projects={projects}
           visibility={visibility}
+          // Keel holds a project's settings, so a test fixture, which is not Keel, has none to offer.
+          settings={maintains(found) && player.source.getSettings !== undefined}
           {...(reader === undefined ? {} : { reader })}
           {...(player.loaded ? { counts } : {})}
         >
@@ -234,6 +240,7 @@ function Console({
               key={pageOf(route, href(found.org, found.name, route))}
               route={route}
               mode={mode}
+              project={found}
             />
           )}
         </Frame>

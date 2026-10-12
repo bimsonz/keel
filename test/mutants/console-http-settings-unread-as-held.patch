@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: settings.read
+# why: Keel's refusal to read a project's settings is shown as its settings
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 61d27b9..ecfc51c 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -285,7 +285,6 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+         `/v1/projects/${encodeURIComponent(project.id)}/settings`,
+         signal,
+       );
+-      if (!response.ok) throw await refusalOf(response);
+       return answered<ProjectSettings>(response);
+     },
+     async putSettings(settings: ProjectSettings): Promise<ProjectSettings> {

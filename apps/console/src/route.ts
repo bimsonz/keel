@@ -11,6 +11,7 @@
 //   P/escalations                  the questions      P/escalations/<E-n>
 //   P/mission-control              the live graph     P/subjects/<key>      with that subject open
 //   P/insights[/funnel|/benchmark]
+//   P/settings                     who may read the project
 //
 // `ref` is a commit, or `trunk` for wherever trunk's head is. Nothing here
 // touches the browser: `parse` reads an address and `href` writes one.
@@ -41,6 +42,7 @@ export type Route =
   | { at: "escalation"; name: string }
   | { at: "mission-control"; subject?: string }
   | { at: "insights"; tab: InsightsTab }
+  | { at: "settings" }
   /** An address that names nothing the console has. */
   | { at: "missing" };
 
@@ -171,6 +173,8 @@ function routeOf(place: string | undefined, rest: string[], query: URLSearchPara
       const tab = among(INSIGHTS_TABS.slice(1), first);
       return tab === undefined || more.length > 0 ? MISSING : { at: "insights", tab };
     }
+    case "settings":
+      return first === undefined ? { at: "settings" } : MISSING;
     default:
       return MISSING;
   }
@@ -231,6 +235,8 @@ function pathOf(route: Route): string[] {
       return ["escalations", route.name];
     case "insights":
       return ["insights", ...(route.tab === "trunk" ? [] : [route.tab])];
+    case "settings":
+      return ["settings"];
     default:
       return [];
   }

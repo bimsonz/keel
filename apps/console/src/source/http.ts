@@ -22,7 +22,9 @@ import type {
   Inbox_listEventsInput,
   LatticeSet,
   Operator_giveRulingInput,
+  Operator_putSettingsInput,
   ProjectPage,
+  ProjectSettings,
   ProjectView,
   RepoBlob,
   RepoCommitDiff,
@@ -41,6 +43,7 @@ import {
   type KeelEventSource,
   KeelRefused,
   type KeelResources,
+  type KeelSettings,
   type Page,
   type ProbeSource,
   type ReadRequest,
@@ -55,7 +58,11 @@ export interface HttpOptions {
   fetch?: typeof fetch;
 }
 
-export type HttpSource = KeelEventSource & KeelResources & KeelRepository & KeelCommands;
+export type HttpSource = KeelEventSource &
+  KeelResources &
+  KeelRepository &
+  KeelCommands &
+  KeelSettings;
 
 const KNOWN: ReadonlySet<string> = new Set(EVENT_TYPES);
 
@@ -272,6 +279,32 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
         },
       );
       if (!response.ok) throw await refusalOf(response);
+    },
+    async getSettings(signal?: AbortSignal): Promise<ProjectSettings> {
+      const response = await read(
+        `/v1/projects/${encodeURIComponent(project.id)}/settings`,
+        signal,
+      );
+      if (!response.ok) throw await refusalOf(response);
+      return answered<ProjectSettings>(response);
+    },
+    async putSettings(settings: ProjectSettings): Promise<ProjectSettings> {
+      // The operation's whole input: the project in the path, and every setting as the body. Keel replaces
+      // them all, so none is left out.
+      const { projectId, ...body }: Operator_putSettingsInput = {
+        ...settings,
+        projectId: project.id,
+      };
+      const response = await request(
+        `${origin}/v1/projects/${encodeURIComponent(projectId)}/settings`,
+        {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      if (!response.ok) throw await refusalOf(response);
+      return answered<ProjectSettings>(response);
     },
   };
 }

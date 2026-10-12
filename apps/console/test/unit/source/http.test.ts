@@ -429,3 +429,81 @@ describe("ruling, from the page", () => {
     expect(late).toMatchObject({ status: 409, code: "escalation.state_refused" });
   });
 });
+
+describe("a project's settings, from the page", () => {
+  it("[settings.read] reads a member what Keel holds for the project, and gives anyone Keel refuses its own words", async () => {
+    const { source, fromThePage, keel } = await opened("member");
+    expect(await source.getSettings()).toEqual({
+      protectedPaths: ["infra/**"],
+      maxBatchSize: 8,
+      verification: "required",
+      visibility: "private",
+    });
+    expect(fromThePage.at(-1)?.url).toBe(`${ORIGIN}/v1/projects/${keel.project.id}/settings`);
+
+    const visitor = await opened("visitor", "public");
+    expect(await visitor.source.getSettings().catch((error: unknown) => error)).toMatchObject({
+      status: 401,
+      code: "auth.required",
+    });
+    // Someone signed in who is no member of the project's org reads a public project, and not its settings.
+    const stranger = await opened("stranger", "public");
+    const refused: unknown = await stranger.source.getSettings().catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(KeelRefused);
+    expect(refused).toMatchObject({
+      status: 403,
+      code: "auth.forbidden",
+      next: ["Ask a member: this needs that role"],
+    });
+  });
+
+  it("[settings.put] replaces the settings whole, as the maintainer signed in, and says what Keel then holds", async () => {
+    const { source, keel, fromThePage } = await opened("maintainer");
+    const held = await source.getSettings();
+    const answered = await source.putSettings({ ...held, visibility: "public" });
+    expect(answered).toEqual({ ...held, visibility: "public" });
+    expect(keel.calls.at(-1)).toMatchObject({
+      method: "PUT",
+      path: `/v1/projects/${keel.project.id}/settings`,
+      authorization: "",
+      body: JSON.stringify({ ...held, visibility: "public" }),
+    });
+    expect(
+      fromThePage.filter(
+        (request) => request.headers.has("authorization") || request.headers.has("cookie"),
+      ),
+    ).toEqual([]);
+    // Keel now shows the project to anyone.
+    expect(await source.getSettings()).toMatchObject({ visibility: "public" });
+    expect(keel.project.visibility).toBe("public");
+  });
+
+  it("[settings.frame] has the frame say who may read the project as Keel last answered, and tells the views when that changed", async () => {
+    const { player } = await opened("maintainer");
+    const heard: number[] = [];
+    player.subscribe(() => heard.push(player.version));
+    expect(player.projects.named("demo")?.visibility).toBe("private");
+    player.readBy("public");
+    expect(player.projects.named("demo")?.visibility).toBe("public");
+    expect(heard).toHaveLength(1);
+    // Told what it already holds, it tells nobody.
+    player.readBy("public");
+    expect(heard).toHaveLength(1);
+  });
+
+  it("[settings.refused] gives a member who is no maintainer Keel's refusal and its way forward, and changes nothing", async () => {
+    const { source, keel } = await opened("member");
+    const held = await source.getSettings();
+    const refused: unknown = await source
+      .putSettings({ ...held, visibility: "public" })
+      .catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(KeelRefused);
+    expect(refused).toMatchObject({
+      status: 403,
+      code: "auth.forbidden",
+      next: ["Ask a maintainer or an owner: this needs that role"],
+    });
+    expect(await source.getSettings()).toEqual(held);
+    expect(keel.project.visibility).toBe("private");
+  });
+});

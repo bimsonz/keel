@@ -6,6 +6,7 @@ import { Badge } from "@cloudflare/kumo";
 import {
   ChartBarIcon,
   CodeIcon,
+  GearIcon,
   GitDiffIcon,
   GraphIcon,
   HandPalmIcon,
@@ -28,7 +29,8 @@ export type TabId =
   | "conflicts"
   | "escalations"
   | "mission-control"
-  | "insights";
+  | "insights"
+  | "settings";
 
 const HOME: Route = { at: "code", kind: "tree", ref: TRUNK, path: "" };
 
@@ -59,6 +61,7 @@ const TABS: { id: TabId; label: string; Icon: Icon; to: Route }[] = [
     to: { at: "mission-control" },
   },
   { id: "insights", label: "Insights", Icon: ChartBarIcon, to: { at: "insights", tab: "trunk" } },
+  { id: "settings", label: "Settings", Icon: GearIcon, to: { at: "settings" } },
 ];
 
 /** The tab a place belongs to. A place that names nothing belongs to none. */
@@ -81,6 +84,8 @@ export function tabOf(route: Route): TabId | undefined {
       return "mission-control";
     case "insights":
       return "insights";
+    case "settings":
+      return "settings";
     default:
       return undefined;
   }
@@ -166,6 +171,7 @@ export function Frame({
   counts,
   projects,
   reader,
+  settings = false,
   children,
 }: {
   /** The projects this reader may go to, where Keel has named them. */
@@ -177,6 +183,8 @@ export function Frame({
   source: SourceMark;
   /** How many of each are still open. Absent where there is no project to count in. */
   counts?: OpenCounts;
+  /** Whether the project's settings are this reader's to change: the Settings tab is offered to them alone. */
+  settings?: boolean;
   children: ReactNode;
 }) {
   const { org, project, route } = useWhere();
@@ -241,7 +249,7 @@ export function Frame({
         </div>
         {counts !== undefined && (
           <nav aria-label="Project" className="a-tabs a-tabs-frame px-4">
-            {TABS.map((tab) => (
+            {TABS.filter((tab) => tab.id !== "settings" || settings).map((tab) => (
               // The tab's own page is its list. On a thing in that list, the tab is where the reader is, and not the page they are on.
               <Link
                 key={tab.id}
