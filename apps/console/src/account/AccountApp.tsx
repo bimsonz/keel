@@ -1,6 +1,7 @@
 // The pages above every project: signing up and in, the user's own settings, and approving a terminal.
 // They read nothing of Keel's log, so they stand without the console's player.
 
+import { accountsOf } from "./accounts.ts";
 import { Button, Input } from "@cloudflare/kumo";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { type Place, hrefOf, nextOf, sentFrom } from "../places.ts";
@@ -95,7 +96,7 @@ function PasskeySignUp({ account, next }: { account: Account; next: string }) {
         spellCheck={false}
         required
         value={handle}
-        description={`Your name on this Keel, and the name of your own org: ${window.location.host}/${handle === "" ? "your-handle" : handle}`}
+        description={`Your name on this Keel. Your projects live at ${window.location.host}/${handle === "" ? "your-handle" : handle}`}
         {...handleError(handle, taken)}
         onChange={(event) => {
           setTaken(false);
@@ -221,7 +222,7 @@ function SignIn({
 }) {
   const next = nextOf(window.location.search);
   const { busy, refused, ask } = useAsking();
-  // Someone who signs up by a code or with GitHub chooses a handle before anything else: it names their own org.
+  // Someone who signs up by a code or with GitHub chooses a handle before anything else: it is their name here, and where their projects live.
   const onward = creating ? hrefOf({ at: "signup" }, next) : next;
   return (
     <Card
@@ -315,7 +316,7 @@ function ChooseHandle({ account, who }: { account: Account; who: Who }) {
   return (
     <Card
       title="Choose your handle"
-      lede={`${who.email === undefined ? "You are signed in" : `You are signed in as ${who.email}`}. Your handle is your name on this Keel, and the name of your own org: your projects live under it.`}
+      lede={`${who.email === undefined ? "You are signed in" : `You are signed in as ${who.email}`}. Your handle is your name on this Keel, and your projects live under it.`}
     >
       <form className="flex flex-col gap-3" onSubmit={choose}>
         <Input
@@ -651,13 +652,9 @@ function Shell({
                 </a>
                 {orgs !== null && (
                   <Switch
-                    what="org"
+                    what="account"
                     here={org}
-                    others={orgs.map((held) => ({
-                      name: held.handle,
-                      href: hrefOf({ at: "org", org: held.handle, tab: "home" }),
-                      ...(held.name === held.handle ? {} : { note: held.name }),
-                    }))}
+                    others={accountsOf(orgs, reader.is === "user" ? reader.who : {})}
                     all={{ label: "New org", href: hrefOf({ at: "new-org" }) }}
                   />
                 )}

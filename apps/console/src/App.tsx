@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { type Org, createAccount, nameOf } from "./account/account.ts";
+import { accountsOf } from "./account/accounts.ts";
 import { openCounts } from "./engine/lists.ts";
 import { Player } from "./engine/player.ts";
 import { maintains } from "./engine/settings.ts";
@@ -17,7 +18,6 @@ import { Missing } from "./pages/Missing.tsx";
 import { MissionControlPage } from "./pages/MissionControl.tsx";
 import { SettingsPage } from "./pages/Settings.tsx";
 import { type Route, TRUNK, href } from "./route.ts";
-import { hrefOf } from "./places.ts";
 import { WhereProvider, carriedParams, useAddress } from "./router.tsx";
 import { createHttpDirectory, createHttpSource } from "./source/http.ts";
 import type { ProjectView } from "./contract/keel/index.ts";
@@ -93,10 +93,12 @@ async function readingOf(params: URLSearchParams, seed: number): Promise<Reading
 interface Reader {
   mark: ReaderMark;
   orgs: readonly Org[];
+  /** The reader's own handle, once they have chosen one: their name here, and where their projects live. */
+  handle?: string;
 }
 
 /**
- * Who is reading, for the frame's way in and its way to the reader's own orgs. Keel says, by the session the
+ * Who is reading, for the frame's way in and its way to the reader's own account and their orgs. Keel says, by the session the
  * browser holds. Undefined until it has, on a Keel that serves no accounts, and on a test fixture.
  */
 function useReader(live: boolean): Reader | undefined {
@@ -120,13 +122,10 @@ function useReader(live: boolean): Reader | undefined {
       setReader({
         mark: {
           name: nameOf(who),
-          orgs: orgs.map((org) => ({
-            name: org.handle,
-            href: hrefOf({ at: "org", org: org.handle, tab: "home" }),
-            ...(org.name === org.handle ? {} : { note: org.name }),
-          })),
+          orgs: accountsOf(orgs, who),
         },
         orgs,
+        handle: who.handle,
       });
     };
     // A Keel that serves no accounts has nobody to name: the frame then offers no way in.
@@ -426,7 +425,11 @@ export function App() {
         {route.at === "missing" || org !== null ? (
           <Missing />
         ) : (
-          <HomePage directory={reading.directory} orgs={reader?.orgs ?? []} />
+          <HomePage
+            directory={reading.directory}
+            orgs={reader?.orgs ?? []}
+            {...(reader?.handle === undefined ? {} : { handle: reader.handle })}
+          />
         )}
       </Frame>
     </WhereProvider>

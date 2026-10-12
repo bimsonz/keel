@@ -1900,6 +1900,16 @@ expectEqual(
 );
 
 await shot(person, "signup");
+expectEqual(
+  "account: signing up says nothing of an org (signup)",
+  String(
+    await person
+      .getByRole("main")
+      .getByText(/\borg\b/i)
+      .count(),
+  ),
+  "0",
+);
 // Sign up with a code sent by email. The code is read where Keel would have sent it.
 await person.getByLabel("Email").fill("ada@example.com");
 await person.getByRole("button", { name: "Send a code" }).click();
@@ -1925,6 +1935,16 @@ expectEqual(
 );
 await person.getByLabel("Handle").fill("ada");
 await shot(person, "handle");
+expectEqual(
+  "account: signing up says nothing of an org (handle)",
+  String(
+    await person
+      .getByRole("main")
+      .getByText(/\borg\b/i)
+      .count(),
+  ),
+  "0",
+);
 await person.getByRole("button", { name: "Take this handle" }).click();
 await person.getByRole("heading", { name: "Your account" }).waitFor();
 expectEqual("account: signed up, and where they were going", whereOf(person), "/settings");
@@ -2031,21 +2051,30 @@ expectEqual(
 );
 
 // ─── Orgs: an org's home, making one, its members and invitations, its settings ───
-// An org's pages name the org in their address. Ada has had an org of her own since she chose her handle.
+// A person needs no org. Ada's own handle is her account: her projects live under it, and the page never calls
+// it an org, gives it no members and no settings.
 await person.goto(`${built}/ada`, { waitUntil: "domcontentloaded" });
-await person.getByRole("heading", { level: 1, name: /^ada/ }).waitFor();
+await person.getByRole("heading", { level: 1 }).first().waitFor();
 expectEqual(
-  "orgs: the frame names the org, and who is signed in",
-  squash(await person.locator("header").first().innerText()),
-  "Keel / ada ada",
+  "account: a person's own handle is their projects, with nothing of an org on the page",
+  `${squash(await person.locator("header").first().innerText())} | ${squash(await person.locator("main header").innerText())} | ${await person.getByRole("navigation", { name: "Org" }).count()} org tabs | ${await person
+    .getByRole("main")
+    .getByText(/\borg\b/i)
+    .count()} mentions of an org`,
+  "Keel / ada ada | Your projects ada | 0 org tabs | 0 mentions of an org",
 );
-await person.goto(`${built}/orgs/ada/settings`, { waitUntil: "domcontentloaded" });
-await person.getByText("This is your own org.").waitFor();
-expectEqual(
-  "orgs: a user's own org is not offered for deleting",
-  String(await person.getByRole("button", { name: "Delete this org" }).count()),
-  "0",
-);
+for (const tab of ["members", "settings"]) {
+  // oxlint-disable-next-line no-await-in-loop -- one page after the other
+  await person.goto(`${built}/orgs/ada/${tab}`, { waitUntil: "domcontentloaded" });
+  // oxlint-disable-next-line no-await-in-loop -- as above
+  await person.getByRole("heading", { level: 1 }).waitFor();
+  expectEqual(
+    `account: a person's own account has no ${tab} page of an org's`,
+    // oxlint-disable-next-line no-await-in-loop -- as above
+    `${squash(await person.getByRole("heading", { level: 1 }).innerText())} | ${await person.getByRole("main").getByRole("button").count()} buttons | ${(await person.getByRole("main").getByRole("link").allInnerTexts()).map(squash).join(", ")}`,
+    "This is your own account | 0 buttons | Your projects, Make an org",
+  );
+}
 
 // Making one. A handle in use is refused, and said.
 await person.goto(`${built}/new/org`, { waitUntil: "domcontentloaded" });
@@ -2077,18 +2106,18 @@ await person.reload({ waitUntil: "domcontentloaded" });
 await person.getByRole("heading", { level: 1, name: /^Lovelace/ }).waitFor();
 expectEqual(
   "orgs: until Keel has listed the reader's orgs, no dropdown is offered beside the org's name",
-  String(await person.getByRole("button", { name: "Switch org" }).count()),
+  String(await person.getByRole("button", { name: "Switch account" }).count()),
   "0",
 );
 listOrgs();
 
 // Beside the org's name, the reader's other orgs, a click away: the same dropdown the project's name has.
-await person.getByRole("button", { name: "Switch org" }).click();
+await person.getByRole("button", { name: "Switch account" }).click();
 await person.getByRole("menuitem", { name: "New org" }).waitFor();
 expectEqual(
-  "orgs: the frame drops down on the org, to the reader's others and to making one",
-  (await person.getByRole("menuitem").allInnerTexts()).map(squash).toSorted().join(" | "),
-  "New org | ada | lovelace Lovelace",
+  "account: the frame drops down to the person's own handle first, marked as theirs, then their orgs, then making one",
+  (await person.getByRole("menuitem").allInnerTexts()).map(squash).join(" | "),
+  "ada you | lovelace Lovelace | New org",
 );
 await shot(person, "org-switcher");
 await person.getByRole("menuitem", { name: /^ada/ }).click();
@@ -2204,7 +2233,7 @@ await person.waitForFunction(
   () => document.querySelectorAll('ul[aria-label="Members of this org"] > li').length === 1,
 );
 await grace.goto(`${built}/lovelace`, { waitUntil: "domcontentloaded" });
-await grace.getByRole("heading", { name: "There is no org of that name here" }).waitFor();
+await grace.getByRole("heading", { name: "There is no lovelace here" }).waitFor();
 expectEqual(
   "orgs: removed, the org is to her as one that is not there",
   String(await grace.getByRole("navigation", { name: "Org" }).count()),
@@ -2272,7 +2301,7 @@ await shot(person, "org-settings");
 await deleting.click();
 await person.waitForURL(`${built}/settings`);
 await person.goto(`${built}/lovelace`, { waitUntil: "domcontentloaded" });
-await person.getByRole("heading", { name: "There is no org of that name here" }).waitFor();
+await person.getByRole("heading", { name: "There is no lovelace here" }).waitFor();
 expectEqual("orgs: deleted, it is no longer there", whereOf(person), "/lovelace");
 
 // ─── A project, to a member of its org and to someone who is not ───
@@ -2313,12 +2342,12 @@ expectEqual(
 );
 await shot(person, "switcher");
 await person.keyboard.press("Escape");
-await person.getByRole("button", { name: "Switch org" }).click();
+await person.getByRole("button", { name: "Switch account" }).click();
 await person.getByRole("menuitem", { name: "New org" }).waitFor();
 expectEqual(
   "member: and on the org, to her orgs and to making one",
-  (await person.getByRole("menuitem").allInnerTexts()).map(squash).toSorted().join(" | "),
-  "New org | ada",
+  (await person.getByRole("menuitem").allInnerTexts()).map(squash).join(" | "),
+  "ada you | New org",
 );
 await person.keyboard.press("Escape");
 
@@ -2601,6 +2630,16 @@ expectEqual(
 );
 await newcomer.getByLabel("Handle").fill("turing");
 await shot(newcomer, "signup-passkey");
+expectEqual(
+  "account: signing up says nothing of an org (signup-passkey)",
+  String(
+    await newcomer
+      .getByRole("main")
+      .getByText(/\borg\b/i)
+      .count(),
+  ),
+  "0",
+);
 await newcomer.getByRole("button", { name: "Create your account with a passkey" }).click();
 await newcomer.waitForURL(`${built}/`);
 await newcomer.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
@@ -2612,11 +2651,11 @@ expectEqual(
   "Keel turing | Your account turing | 1 | false",
 );
 await newcomer.goto(`${built}/turing`, { waitUntil: "domcontentloaded" });
-await newcomer.getByRole("heading", { level: 1, name: /^turing/ }).waitFor();
+await newcomer.getByRole("heading", { level: 1 }).first().waitFor();
 expectEqual(
-  "passkey sign-up: their own org is there, named by the handle",
-  squash(await newcomer.getByRole("heading", { level: 1 }).innerText()),
-  "turing owner",
+  "passkey sign-up: their own account is there under the handle, with no project yet, and is not called an org",
+  squash(await newcomer.getByRole("main").innerText()),
+  "Your projects turing You have no project yet.",
 );
 await newcomer.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
 await newcomer.getByRole("button", { name: "Sign out", exact: true }).click();

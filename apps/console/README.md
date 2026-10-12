@@ -33,13 +33,14 @@ Keel's users sign up and sign in through Better Auth, which Keel mounts at `/v1/
 | Address | What it is |
 |---|---|
 | `/signup?claim` | Where whoever set a Keel up makes its first account: the same page with a "Claim code" field. The code is typed, never in an address. It rides as `Keel-Claim` on the two passkey calls and on nothing else, and the page keeps it nowhere once the sign-up has ended |
-| `/signup`, `/login` | A passkey, always: a new person signs up with a handle and a passkey made on their own device, and is asked for no address. A code sent by email and GitHub are shown only where this Keel offers them; someone who signs up by one of those chooses their handle next. The handle is their name on this Keel, and the name of their own org |
+| `/signup`, `/login` | A passkey, always: a new person signs up with a handle and a passkey made on their own device, and is asked for no address. A code sent by email and GitHub are shown only where this Keel offers them; someone who signs up by one of those chooses their handle next. The handle is their name on this Keel, and their own projects live under it. Signing up says nothing of an org: a person needs none |
 | `/settings` | The user's passkeys, and signing out here or everywhere else |
 | `/device` | Approving a terminal that is running `keeltown login`, by the code it shows |
-| `/<org>` | An org's home: its projects. Anyone may open it, and a visitor is shown the public ones. `/orgs/<org>` is put right to it |
+| `/<handle>` | To the person whose handle it is: "Your projects", their own account. Keel keeps a person's namespace as an org named by the handle, and the console never presents it as one: no role, no members, no settings, and `/orgs/<own handle>/…` says it is their own account. To anyone else a handle's page lists the projects Keel names to them, and calls it neither a person nor an org until Keel says which |
+| `/<org>` | An org's home, to its members: its projects and its people. Anyone may open it, and a visitor is shown the public projects. `/orgs/<org>` is put right to it |
 | `/new/org` | Making an org: a name, and a handle that is then fixed |
 | `/orgs/<org>/members` | Members, by handle and role. Inviting by handle or by email, with a link to pass on. Changing a role, removing a member, leaving |
-| `/orgs/<org>/settings` | Renaming, and deleting once the org's handle is typed. A user's own org is never deleted |
+| `/orgs/<org>/settings` | Renaming, and deleting once the org's handle is typed |
 | `/invite/<id>` | An invitation, read only to the person it was made to, to join or to decline. Once it was answered or has lapsed, the page tells that person so, in Keel's words |
 | `/terms`, `/privacy` | The Terms of Service and the Privacy Notice, for anyone to read. The text is `docs/legal/terms.md` and `docs/legal/privacy.md`, built into the page, so these two pages ask Keel nothing. A foot on every page links both, and the sign-up page says that creating an account agrees to them |
 
@@ -48,7 +49,7 @@ Keel's users sign up and sign in through Better Auth, which Keel mounts at `/v1/
 - **The address names the org.** Every call names the org it is about. Better Auth also keeps an "active organisation" for a session, and the console neither reads it nor sets it.
 - **No page shows another person's address.** A member is shown by handle and name, and an invitation made by handle is told by the handle. Better Auth's answers carry every member's address, so `account.ts` hands on none but one a member typed into an invitation.
 - **Roles are Keel's three**: owner, maintainer and member (`src/account/roles.ts`). A maintainer does everything but delete the org and make or unmake an owner. Keel decides; a page only keeps from offering what Keel would refuse.
-- **The frame is a code host's**: `Keel / <org> / <project>`, where each name is a link and has a dropdown beside it to the others of its kind: the reader's orgs, and the org's projects (`src/views/Switch.tsx`). A visitor has a way to sign in there that comes back to the page they were on. It is offered once Keel has listed those orgs, and not before.
+- **The frame is a code host's**: `Keel / <org> / <project>`, where each name is a link and has a dropdown beside it to the others of its kind (`src/views/Switch.tsx`): "Switch account" lists the reader's own handle first, marked as theirs, then the orgs they made or joined (`src/account/accounts.ts`), and "Switch project" the owner's projects. A visitor has a way to sign in there that comes back to the page they were on. It is offered once Keel has listed those orgs, and not before.
 - **An org that is not the reader's is told as one that is not there**, and so is an invitation made to someone else, whatever has become of it.
 - **A refusal is shown in Keel's words**, and under them the ways forward Keel gave with it, where it gave any. An org's only owner who would leave is told to make another member an owner first.
 - **The page shows no way in that Keel would refuse.** It asks Keel which it offers besides a passkey (`GET /v1/auth/methods`), and a Keel that does not say offers a passkey alone.

@@ -213,7 +213,7 @@ export function Frame({
                 </a>
                 {reader?.orgs !== undefined && reader.orgs.length > 0 && (
                   <Switch
-                    what="org"
+                    what="account"
                     here={org}
                     others={reader.orgs}
                     all={{ label: "New org", href: hrefOf({ at: "new-org" }) }}

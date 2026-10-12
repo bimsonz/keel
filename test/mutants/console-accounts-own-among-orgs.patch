@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/accounts.test.ts
+# kills: accounts.own
+# why: a person's own namespace is listed among their orgs, as if a person needed one
+diff --git a/apps/console/src/account/accounts.ts b/apps/console/src/account/accounts.ts
+index d88464b..d1c419d 100644
+--- a/apps/console/src/account/accounts.ts
++++ b/apps/console/src/account/accounts.ts
+@@ -21,7 +21,7 @@ export function isOwn(org: { handle: string }, who: { handle?: string | undefine
+ 
+ /** The orgs a person made or joined: every one Keel lists for them but their own namespace. */
+ export function orgsOf(orgs: readonly Org[], who: { handle?: string | undefined }): Org[] {
+-  return orgs.filter((org) => !isOwn(org, who));
++  return orgs.filter((org) => !isOwn(org, who) || org.handle !== "");
+ }
+ 
+ /** What the frame's dropdown lists: the person's own handle first, marked as theirs, then their orgs. */

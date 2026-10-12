@@ -19,7 +19,7 @@ export interface Who {
   /** The user's address, where they have one. Someone who signed up with a passkey alone has none. */
   email?: string;
   name: string;
-  /** The name of the user's own org, once chosen. */
+  /** The user's name on this Keel, once chosen: where their own projects live. */
   handle?: string;
 }
 
@@ -340,7 +340,7 @@ export function createAccount(options: AccountOptions) {
       taken(await client.signOut());
     },
 
-    /** Whether a handle is free. It names the user's own org, so it is unique on this Keel. */
+    /** Whether a handle is free. It names the user's own namespace, so it is unique on this Keel. */
     async handleIsFree(handle: string): Promise<boolean> {
       return taken(await client.isUsernameAvailable({ username: handle })).available;
     },

@@ -1,6 +1,7 @@
 // An org's pages: its home, its members and its settings, making one, and an invitation to one. As on a code
 // host, the address names the org, and each page asks Keel about that org and no other.
 
+import { isOwn } from "./accounts.ts";
 import { Button, Input } from "@cloudflare/kumo";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
 import { type OrgTab, hrefOf } from "../places.ts";
@@ -154,7 +155,7 @@ function useProjects(directory: KeelDirectory, org: string): readonly ProjectVie
 
 function ProjectList({ projects }: { projects: readonly ProjectView[] }) {
   return (
-    <ul className="flex flex-col gap-1.5" aria-label="Projects of this org">
+    <ul className="flex flex-col gap-1.5" aria-label="Projects">
       {projects.map((project) => (
         <li key={project.id} className="flex items-center justify-between gap-3 text-sm">
           <a
@@ -436,7 +437,6 @@ function OrgSettings({
   const [name, setName] = useState(org.name);
   const [typed, setTyped] = useState("");
   const { busy, refused, ask } = useAsking();
-  const own = org.handle === who.handle;
   if (!manages(page.role))
     return (
       <section className="a-panel p-4">
@@ -477,11 +477,7 @@ function OrgSettings({
       </section>
       <section className="a-panel flex flex-col gap-3 p-4" aria-label="Delete this org">
         <h2 className="a-h">Delete this org</h2>
-        {own ? (
-          <p className="text-sm text-kumo-subtle">
-            This is your own org. It is yours for as long as your handle is, and is not deleted.
-          </p>
-        ) : page.role === "owner" ? (
+        {page.role === "owner" ? (
           <form
             className="flex items-end gap-2"
             onSubmit={(event) => {
@@ -536,11 +532,11 @@ export function OrgPublic({
   if (projects.length === 0)
     return (
       <Card
-        title="There is no org of that name here"
+        title={`There is no ${handle} here`}
         lede={
           signedIn
-            ? `Either there is no org called ${handle} on this Keel, or you are not a member of it and it has no public project.`
-            : `Either there is no org called ${handle} on this Keel, or it has no public project. Its members sign in to see the rest.`
+            ? `Either nobody and no org is called ${handle} on this Keel, or it has no project you may see.`
+            : `Either nobody and no org is called ${handle} on this Keel, or it has no public project. Whoever may see the rest signs in.`
         }
       >
         <a className="a-link" href={signedIn ? hrefOf({ at: "new-org" }) : hrefOf({ at: "login" })}>
@@ -556,6 +552,46 @@ export function OrgPublic({
       <section className="a-panel flex flex-col gap-2 p-4" aria-label="Projects">
         <h2 className="a-h">Projects</h2>
         <ProjectList projects={projects} />
+      </section>
+    </div>
+  );
+}
+
+/**
+ * A person's own namespace, to that person: their projects, under their handle. Keel keeps it as an org named
+ * by the handle, and that is how it is stored and no more: it has no members to manage and no settings of an
+ * org's, and the page never calls it one.
+ */
+function Own({ directory, who, tab }: { directory: KeelDirectory; who: Who; tab: OrgTab }) {
+  const handle = who.handle ?? "";
+  const projects = useProjects(directory, handle);
+  if (tab !== "home")
+    return (
+      <Card
+        title="This is your own account"
+        lede={`${handle} is yours alone: it has no members and is not an org. An org is for projects you work on with other people.`}
+      >
+        <a className="a-link" href={hrefOf({ at: "org", org: handle, tab: "home" })}>
+          Your projects
+        </a>
+        <a className="a-link" href={hrefOf({ at: "new-org" })}>
+          Make an org
+        </a>
+      </Card>
+    );
+  return (
+    <div className="mx-auto flex w-full max-w-[880px] flex-col gap-5 px-6 py-8">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-[22px] font-semibold text-kumo-strong">Your projects</h1>
+        <p className="a-mono text-sm text-kumo-subtle">{handle}</p>
+      </header>
+      <section className="a-panel flex flex-col gap-2 p-4" aria-label="Projects">
+        {projects !== undefined &&
+          (projects.length === 0 ? (
+            <p className="text-sm text-kumo-subtle">You have no project yet.</p>
+          ) : (
+            <ProjectList projects={projects} />
+          ))}
       </section>
     </div>
   );
@@ -579,13 +615,15 @@ export function OrgPages({
   tab: OrgTab;
 }) {
   const { held, read } = useOrg(account, handle, who);
+  // A person needs no org: their own handle is their account, and reads as that.
+  if (isOwn({ handle }, who)) return <Own directory={directory} who={who} tab={tab} />;
   if (held === undefined) return null;
   if (held === null && tab === "home")
     return <OrgPublic directory={directory} handle={handle} signedIn />;
   if (held === null)
     return (
       <Card
-        title="There is no org of that name here"
+        title={`There is no org ${handle} here`}
         lede={`Either there is no org called ${handle} on this Keel, or you are not a member of it.`}
       >
         <a className="a-link" href={hrefOf({ at: "new-org" })}>
