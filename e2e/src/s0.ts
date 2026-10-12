@@ -101,21 +101,24 @@ async function settle(submitted: Submitted): Promise<string> {
 type EventRecord = Awaited<ReturnType<KeelClient["events"]>>["items"][number];
 
 /** The end of the feed: the cursor from which this run's events are read. */
-async function feedHead(): Promise<string> {
-  let page = await observer.events({ limit: 500 });
-  while (page.items.length > 0)
-    page = await observer.events({ cursor: page.nextCursor, limit: 500 });
-  return page.nextCursor;
+/**
+ * The log's head, as the project's snapshot was taken. A reader's page is a
+ * window of the whole log, so an empty page is not its end.
+ */
+async function feedHead(projectId: string): Promise<string> {
+  return (await observer.snapshot({ project: projectId })).cursor;
 }
 
+/** Every event after `cursor`, read until a page no longer moves the cursor. */
 async function feedSince(cursor: string): Promise<EventRecord[]> {
   const events: EventRecord[] = [];
-  let page = await observer.events({ cursor, limit: 500 });
-  while (page.items.length > 0) {
+  let at = cursor;
+  for (;;) {
+    const page = await observer.events({ cursor: at, limit: 500 });
     events.push(...page.items);
-    page = await observer.events({ cursor: page.nextCursor, limit: 500 });
+    if (page.items.length === 0 && page.nextCursor === at) return events;
+    at = page.nextCursor;
   }
-  return events;
 }
 
 type Notice = Awaited<ReturnType<KeelClient["inbox"]>>["result"]["notices"][number];
@@ -204,7 +207,7 @@ async function arms(): Promise<void> {
   const project = control ? "forge-lite-control" : "forge-lite";
   const projectId = seeded.projects[project]?.id ?? "";
   const [a1, a2] = agentsOf(project);
-  const from = await feedHead();
+  const from = await feedHead(projectId);
   console.log(`S-0 run ${run} in ${project} (${projectId}) from feed position ${from}`);
 
   const landedIds: string[] = [];
