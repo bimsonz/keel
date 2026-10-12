@@ -76,7 +76,6 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
   Operator_listProjects: (c) => c.projects({ limit: 3 }),
   Orgs_getProject: (c) => c.project("keel", "forge-lite"),
   Users_me: (c) => c.me(),
-  Admin_createUser: (c) => c.createUser({ handle: "keel-run-b" }),
   Operator_getSettings: (c) => c.settings("prj_1"),
   Operator_putSettings: (c) => c.putSettings("prj_1", { protectedPaths: [], maxBatchSize: 1 }),
   Operator_enrolAgent: (c) =>

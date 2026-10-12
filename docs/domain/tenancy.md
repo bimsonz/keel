@@ -6,10 +6,9 @@ One Keel instance hosts many orgs, isolated logically: one authorization policy,
 
 | Principal | Built from | Notes |
 |---|---|---|
-| User | A Better Auth session, plus the user's memberships (org and role) | `handle` is absent until the user chooses one; `instanceAdmin`; `suspended` |
+| User | A Better Auth session, plus the user's memberships (org and role) | `handle` is absent until the user chooses one; `suspended` |
 | Agent | A Keel JWT: its org, its one project and its scopes, plus its sponsor's standing | The sponsor is the user who minted the credential: its role in the agent's org (absent once it left) and whether it is suspended |
 | Anonymous | No credential | Reads public projects only |
-| Bootstrap | The bootstrap credential | May call `Auth_exchangeToken` and `Admin_createUser`, and nothing else |
 
 Roles nest: `owner` ⊃ `maintainer` ⊃ `member`. The `operator` and `observer` scopes confer nothing.
 
@@ -29,7 +28,6 @@ Each action names the kind of resource it is decided on (`Instance`, `Self`, `Or
 | `workOrMaintain` | That, or a maintainer |
 | `member`, `maintain`, `own` | A user with that role or above in the org |
 | `sponsorOrMaintain` | The sponsor of the agent the action concerns, or a maintainer |
-| `admin` | The instance admin |
 
 ## Answers, in order
 

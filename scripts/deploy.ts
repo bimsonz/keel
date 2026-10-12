@@ -8,7 +8,6 @@
 // and wrangler's automatic provisioning is switched off, so nothing is ever
 // created behind Terraform's back (rule R13).
 import { execFileSync, spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -100,9 +99,6 @@ function parseConfig(text: string, source: string): Json {
   return config;
 }
 
-/** Outputs whose empty value means "none" (`held_names`: no names held), not "missing". */
-const MAY_BE_EMPTY: ReadonlySet<string> = new Set(["held_names"]);
-
 function terraformOutputs(): Map<string, string> {
   const run = spawnSync(
     "terraform",
@@ -116,9 +112,8 @@ function terraformOutputs(): Map<string, string> {
   if (isObject(raw)) {
     for (const [name, output] of Object.entries(raw)) {
       const value = isObject(output) ? output["value"] : undefined;
-      // An empty output is as good as missing, except a list that may hold nothing.
-      if (typeof value === "string" && (value !== "" || MAY_BE_EMPTY.has(name)))
-        outputs.set(name, value);
+      // An empty output is as good as missing.
+      if (typeof value === "string" && value !== "") outputs.set(name, value);
     }
   }
   return outputs;
@@ -168,11 +163,6 @@ function render(dir: string, outputs: ReadonlyMap<string, string>): { name: stri
   set(["vars", "KEEL_HOST"], host);
   const vars = committed["vars"];
   if (isObject(vars) && "KEEL_API_HOST" in vars) set(["vars", "KEEL_API_HOST"], host);
-  if (isObject(vars) && "KEEL_HELD_NAMES" in vars)
-    set(
-      ["vars", "KEEL_HELD_NAMES"],
-      requireOutput(outputs, "held_names", "the names held for the claimant"),
-    );
 
   const rendered = parseConfig(text, `apps/${dir}/wrangler.deploy.jsonc`);
   const pins = pinProblems(rendered);
@@ -230,16 +220,8 @@ async function signingKey(): Promise<string> {
 
 /** Secrets whose value is a Terraform output, so replacing the resource there rotates them. */
 const FROM_TERRAFORM: Readonly<Record<string, string>> = {
-  KEEL_BOOTSTRAP_SECRET: "bootstrap_secret",
   BETTER_AUTH_SECRET: "better_auth_secret",
-  KEEL_CLAIM_DIGEST: "claim_code",
 };
-
-/**
- * Secrets the Worker holds only as the lower-case hex SHA-256 of their output:
- * the claim code is presented to Keel, never kept by it.
- */
-const AS_DIGEST: ReadonlySet<string> = new Set(["KEEL_CLAIM_DIGEST"]);
 
 /** The secrets a config's `secrets.required` names. */
 function requiredSecrets(config: Json): string[] {
@@ -248,10 +230,9 @@ function requiredSecrets(config: Json): string[] {
 }
 
 /**
- * The value of every secret the config requires. CLOUDFLARE_ACCOUNT_ID,
- * KEEL_BOOTSTRAP_SECRET, BETTER_AUTH_SECRET and KEEL_CLAIM_DIGEST (Terraform's
- * outputs, so replacing one there rotates it here; the claim code as its digest)
- * are set on every deploy; KEEL_SIGNING_KEY only when the Worker lacks
+ * The value of every secret the config requires. CLOUDFLARE_ACCOUNT_ID and
+ * BETTER_AUTH_SECRET (Terraform's output, so replacing it there rotates it
+ * here) are set on every deploy; KEEL_SIGNING_KEY only when the Worker lacks
  * one, because a new key invalidates every token already issued. The console
  * requires none: it holds no credential.
  */
@@ -274,10 +255,7 @@ async function secretsFor(
     if (secret === "CLOUDFLARE_ACCOUNT_ID") {
       values[secret] = accountId();
     } else if (FROM_TERRAFORM[secret] !== undefined) {
-      const output = requireOutput(outputs, FROM_TERRAFORM[secret], secret);
-      values[secret] = AS_DIGEST.has(secret)
-        ? createHash("sha256").update(output).digest("hex")
-        : output;
+      values[secret] = requireOutput(outputs, FROM_TERRAFORM[secret], secret);
     } else if (secret === "KEEL_SIGNING_KEY") {
       if (existing.has(secret)) {
         console.log(`${name}: KEEL_SIGNING_KEY kept`);

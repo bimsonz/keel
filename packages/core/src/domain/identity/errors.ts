@@ -64,14 +64,13 @@ export class NotVisible extends Schema.TaggedError<NotVisible>()("NotVisible", {
 
 /**
  * Why a caller who sees the resource may not act on it:
- * - `user-suspended`, `org-suspended`, `sponsor-suspended`: suspended by the instance admin;
+ * - `user-suspended`, `org-suspended`, `sponsor-suspended`: suspended by whoever runs the instance;
  * - `sponsor-left`: the agent's sponsor is no longer a member of its org;
  * - `handle-required`: a user must choose a handle before anything else;
  * - `role`: the caller's role in the org is too low;
  * - `agents-only`: work is done by agents; `users-only`: governance is done by people;
  * - `foreign-project`: an agent's request on a project of its org that is not its own;
  * - `scope`: the agent's token lacks the scope;
- * - `bootstrap-confined`: the bootstrap credential may only start the instance;
  * - `private-source`: a private project forks only within its own org.
  */
 export const RefusalReason = Schema.Literals([
@@ -85,7 +84,6 @@ export const RefusalReason = Schema.Literals([
   "org-suspended",
   "foreign-project",
   "scope",
-  "bootstrap-confined",
   "private-source",
 ]);
 export type RefusalReason = typeof RefusalReason.Type;

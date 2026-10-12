@@ -8,9 +8,9 @@ export type { AgentToken };
  */
 export interface Caller {
   readonly requestId: string;
-  /** Who is asking: a user, an agent, the bootstrap credential, or anonymous. */
+  /** Who is asking: a user, an agent, or anonymous. */
   readonly principal: Principal;
-  /** The token an agent (or the bootstrap credential) presented: what the work use-cases take. */
+  /** The token an agent presented: what the work use-cases take. */
   readonly token?: AgentToken;
   /** Who a granted read sees as: set by `authorizeHandlers` on reads. */
   readonly audience?: Audience;

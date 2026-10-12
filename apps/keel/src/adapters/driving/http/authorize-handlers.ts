@@ -167,7 +167,6 @@ export const RESOLVERS: Resolvers = {
   Auth_exchangeToken: instance,
   SignIn_methods: instance,
   Lattices_listLattices: instance,
-  Admin_createUser: instance,
   whoami: self,
   inbox: self,
   Users_me: self,

@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import type { Answer, Jar } from "./auth-harness.ts";
+import { type Answer, type Jar, SESSION_COOKIE } from "./auth-harness.ts";
 import { answered, call, handled, signUpByPasskey } from "./auth-users.ts";
 
 /** An org made by `owner`, answering its id. */
@@ -22,6 +22,19 @@ const getInvitation = (jar: Jar, id: string) =>
 
 const accept = (jar: Jar, invitationId: string) =>
   call("/organization/accept-invitation", { body: { invitationId }, jar });
+
+/** The jar's session as a bearer: its token, as the cookie carries it before its signature. */
+const bearerOf = (jar: Jar) => ({
+  authorization: `Bearer ${decodeURIComponent(jar.cookies.get(SESSION_COOKIE) ?? "").split(".")[0]}`,
+});
+
+/** The ids in an answer that is a list. */
+function idsIn(answer: Answer): string[] {
+  const listed: unknown = answer.json;
+  return (Array.isArray(listed) ? listed : []).map((one: unknown) =>
+    String(Reflect.get(Object(one), "id")),
+  );
+}
 
 function refused(answer: Answer, status: number, code: string) {
   expect([answer.status, answer.json?.code, answer.text]).toEqual([
@@ -359,5 +372,68 @@ describe("orgs at /v1/auth/organization", () => {
     // The owner still makes an owner.
     answered(await setRole(uma.jar, urn, await memberIdOf(urn, "uli"), "owner"), 200);
     expect(await rolesIn(urn)).toEqual({ uma: "owner", ula: "maintainer", uli: "owner" });
+  });
+
+  it("[ba.bearer-hooks] a session sent as a bearer meets Keel's checks exactly as its cookie does", async () => {
+    const vera = await signUpByPasskey("vera");
+    const vale = await orgOf(vera.jar, "vale");
+    const vic = await signUpByPasskey("vic");
+    const vin = await signUpByPasskey("vin");
+    answered(
+      await accept(
+        vic.jar,
+        (await invite(vera.jar, vale, { handle: "vic" }, "maintainer")).json.id,
+      ),
+      200,
+    );
+
+    // Vin's own invitations, by cookie and by bearer: the same list, though its email is no verified one.
+    const waiting = await invite(vera.jar, vale, { handle: "vin" });
+    answered(waiting, 200);
+    const byCookie = await call("/organization/list-user-invitations", { jar: vin.jar });
+    const byBearer = await call("/organization/list-user-invitations", {
+      headers: bearerOf(vin.jar),
+    });
+    answered(byBearer, 200);
+    expect(idsIn(byBearer)).toEqual([waiting.json.id]);
+    expect(idsIn(byBearer)).toEqual(idsIn(byCookie));
+    answered(
+      await call("/organization/accept-invitation", {
+        body: { invitationId: waiting.json.id },
+        headers: bearerOf(vin.jar),
+      }),
+      200,
+    );
+
+    // Vic, a maintainer, is refused an owner change by bearer as by cookie.
+    const toOwner = {
+      organizationId: vale,
+      memberId: await memberIdOf(vale, "vin"),
+      role: "owner",
+    };
+    refused(
+      await call("/organization/update-member-role", { body: toOwner, headers: bearerOf(vic.jar) }),
+      403,
+      "OWNERS_ONLY",
+    );
+    refused(await setRole(vic.jar, vale, toOwner.memberId, "owner"), 403, "OWNERS_ONLY");
+
+    // An invitation by handle through a bearer finds its recipient, and a handle nobody has is refused.
+    await signUpByPasskey("vee");
+    const invited = await call("/organization/invite-member", {
+      body: { organizationId: vale, role: "member", handle: "vee" },
+      headers: bearerOf(vic.jar),
+    });
+    answered(invited, 200);
+    expect(invited.json.handle).toBe("vee");
+    refused(
+      await call("/organization/invite-member", {
+        body: { organizationId: vale, role: "member", handle: "nobody-here" },
+        headers: bearerOf(vic.jar),
+      }),
+      400,
+      "NO_SUCH_HANDLE",
+    );
+    expect(await rolesIn(vale)).toEqual({ vera: "owner", vic: "maintainer", vin: "member" });
   });
 });

@@ -56,14 +56,13 @@ export type Visibility = typeof Visibility.Type;
  * Who is asking, as the gate builds it from the request and the Memberships
  * port. `authorize` decides from this alone and never reads events.
  */
-export type Principal = UserPrincipal | AgentPrincipal | AnonymousPrincipal | BootstrapPrincipal;
+export type Principal = UserPrincipal | AgentPrincipal | AnonymousPrincipal;
 
 /** A Better Auth session. A user without a handle may only choose one. */
 export interface UserPrincipal {
   readonly _tag: "User";
   readonly userId: UserId;
   readonly handle?: Handle;
-  readonly instanceAdmin: boolean;
   readonly suspended: boolean;
   readonly memberships: readonly Membership[];
 }
@@ -93,14 +92,6 @@ export interface AnonymousPrincipal {
 }
 
 /**
- * The bootstrap credential (`bootstrap.ts`): how a new deployment gets its
- * first user. It may call exactly `BOOTSTRAP_ACTIONS`.
- */
-export interface BootstrapPrincipal {
-  readonly _tag: "Bootstrap";
-}
-
-/**
  * Who a granted command is by, as a use-case records it: the agent or the user
  * the policy already granted. It decides nothing; it names.
  */
@@ -116,7 +107,7 @@ export const actorId = (actor: Actor): string =>
 export const eventActorOf = (actor: Actor): EventActor =>
   actor._tag === "Agent" ? agentActor(actor.agentId) : userActor(actor.userId);
 
-/** The instance itself: its quotas, its users, its spend. */
+/** The instance itself: what is asked of no org, project or account, such as signing in or creating an org. */
 export interface InstanceResource {
   readonly _tag: "Instance";
 }

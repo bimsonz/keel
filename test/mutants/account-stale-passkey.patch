@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/account.test.ts
+# kills: account.sign-in
+# why: a sign-in answers the passkey it was given, its use count unchanged, so the next sign-in repeats a counter Keel has already seen
+diff --git a/scripts/lib/account.ts b/scripts/lib/account.ts
+index af11838..2173c0d 100644
+--- a/scripts/lib/account.ts
++++ b/scripts/lib/account.ts
+@@ -184,7 +184,7 @@ export async function signedIn(
+     "the sign-in",
+     await site("/passkey/verify-authentication", { jar, body: { response } }),
+   );
+-  return { site, jar, passkey: await device.saved() };
++  return { site, jar, passkey };
+ }
+ 
+ /** A new session for `handle` from its kept passkey. */

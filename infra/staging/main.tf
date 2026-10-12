@@ -80,29 +80,10 @@ resource "cloudflare_secrets_store_secret" "deploy_token" {
   }
 }
 
-# The bootstrap credential's secret: exchanged as client `keel-bootstrap` for a
-# token that may only enrol agents, so a new deployment can enrol its first
-# operator through the API. scripts/deploy.ts sets it as KEEL_BOOTSTRAP_SECRET
-# and the seed reads it from the output. Replace this resource to retire it.
-resource "random_password" "bootstrap" {
-  length  = 48
-  special = false
-}
-
 # Better Auth's secret: it signs the session cookies and encrypts what Better
 # Auth keeps sealed. scripts/deploy.ts sets it as BETTER_AUTH_SECRET. Replacing
 # it signs every user out.
 resource "random_password" "better_auth" {
   length  = 64
-  special = false
-}
-
-# The instance's one-time claim code: a passkey sign-up with a held handle that
-# presents it (header Keel-Claim) makes its user the instance admin and the
-# owner of org `keel`, once. The Worker holds only its SHA-256: scripts/deploy.ts
-# sets KEEL_CLAIM_DIGEST from this output. The claimant reads it with
-# `terraform output -raw claim_code`.
-resource "random_password" "claim_code" {
-  length  = 32
   special = false
 }

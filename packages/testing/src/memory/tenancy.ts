@@ -21,8 +21,6 @@ export interface BetterAuthUser {
   readonly id: UserId;
   /** The handle, once chosen. */
   readonly username?: string;
-  /** The admin plugin's roles, comma-separated: `admin` is the instance admin. */
-  readonly role?: string;
   readonly banned?: boolean;
   /** When the ban ends; absent, it holds until lifted. */
   readonly banExpires?: Date;
@@ -128,7 +126,6 @@ export function makeUsersMemory(rows: BetterAuthMemory = makeBetterAuthMemory())
               _tag: "User" as const,
               userId: user.id,
               ...(user.username === undefined ? {} : { handle: decodeHandle(user.username) }),
-              instanceAdmin: rolesOf(user.role).includes("admin"),
               suspended: banHolds(user.banned === true, user.banExpires, now),
               memberships: rows.membershipsOf(user.id),
             })),

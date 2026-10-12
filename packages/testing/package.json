@@ -6,7 +6,8 @@
   "license": "MIT",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./passkey": "./src/passkey.ts"
   },
   "scripts": {
     "gen": "node scripts/gen.ts",

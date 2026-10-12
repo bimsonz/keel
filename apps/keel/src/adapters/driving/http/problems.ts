@@ -40,7 +40,6 @@ const TITLES: Record<ProblemCode, string> = {
   "repo.path_not_found": "Nothing of that kind at this path",
   "agent.state_refused": "The agent's standing does not allow this",
   "project.name_taken": "The org already has a project by that name",
-  "user.handle_refused": "That handle cannot be given to a new user",
 };
 
 export interface ProblemExtras {

@@ -8,7 +8,6 @@ import {
   type AgentPrincipal,
   authorize,
   type AuthorizationRefusal,
-  BOOTSTRAP_ACTIONS,
   type ForkResource,
   type Grant,
   type MissingResource,
@@ -67,7 +66,6 @@ const userArb: fc.Arbitrary<UserPrincipal> = fc
   .record({
     userId: fc.constantFrom(...USERS),
     handled: fc.integer({ min: 1, max: 8 }).map((n) => n !== 1),
-    instanceAdmin: rare(4),
     suspended: rare(8),
     memberships: membershipsArb,
   })
@@ -98,7 +96,6 @@ const principalArb: fc.Arbitrary<Principal> = fc.oneof(
   { weight: 4, arbitrary: userArb },
   { weight: 4, arbitrary: agentArb },
   { weight: 1, arbitrary: fc.constant<Principal>({ _tag: "Anonymous" }) },
-  { weight: 1, arbitrary: fc.constant<Principal>({ _tag: "Bootstrap" }) },
 );
 
 const projectArb: fc.Arbitrary<ProjectResource> = fc
@@ -188,13 +185,12 @@ const inside = (p: Principal, org: OrgId): boolean =>
 
 const READS: ReadonlySet<Need> = new Set(["read", "readMembers"]);
 const AGENT_NEEDS: ReadonlySet<Need> = new Set(["read", "readMembers", "work", "workOrMaintain"]);
-const UNSCOPED: ReadonlySet<Need> = new Set(["anyone", "self", "user", "handle", "admin"]);
+const UNSCOPED: ReadonlySet<Need> = new Set(["anyone", "self", "user", "handle"]);
 
 const user = (over: Partial<UserPrincipal> = {}): UserPrincipal => ({
   _tag: "User",
   userId: USERS[0] ?? makeId("usr", ulid(1)),
   handle: "ada",
-  instanceAdmin: false,
   suspended: false,
   memberships: [],
   ...over,
@@ -448,15 +444,12 @@ describe("authorize", () => {
     );
     const owner = user({ memberships: [{ org: ORG_1, role: "owner" }] });
     const maintainer = user({ memberships: [{ org: ORG_1, role: "maintainer" }] });
-    const admin = user({ instanceAdmin: true });
     const mine = project(PRJ_1, "private");
     expect(outcome(authorize(owner, "ManageDeployTargets", mine))).toBe("ok:");
     expect(outcome(authorize(owner, "ManageCredentials", into(ORG_1)))).toBe("ok:");
     expect(outcome(authorize(maintainer, "ManageDeployTargets", mine))).toBe("403:role");
     expect(outcome(authorize(maintainer, "ManageCredentials", into(ORG_1)))).toBe("403:role");
     expect(outcome(authorize(owner, "ManageCredentials", into(ORG_2)))).not.toBe("ok:");
-    expect(outcome(authorize(admin, "ManageCredentials", into(ORG_1)))).not.toBe("ok:");
-    expect(outcome(authorize(admin, "ManageDeployTargets", mine))).not.toBe("ok:");
   });
 
   it("[authz.handle-first] a user without a handle may only choose one", () => {
@@ -473,19 +466,17 @@ describe("authorize", () => {
     );
   });
 
-  it("[authz.admin-not-reader] the instance admin reads nothing an ordinary user could not", () => {
-    fc.assert(
-      fc.property(userArb, requestArb, (u, { action, resource }) => {
-        if (needOf(action) === "admin") return true;
-        return (
-          outcome(decide({ ...u, instanceAdmin: true }, action, resource)) ===
-          outcome(decide({ ...u, instanceAdmin: false }, action, resource))
-        );
-      }),
-    );
-    const admin = user({ instanceAdmin: true });
-    expect(outcome(authorize(admin, "Repo_getTree", project(PRJ_1, "private")))).toBe("404");
-    expect(outcome(authorize(admin, "SuspendOrg", { _tag: "Instance" }))).toBe("ok:");
+  it("[authz.no-instance-role] nothing is decided on the instance but signing in, the lattices and making an org", () => {
+    const onInstance = Object.entries(ACTIONS)
+      .filter(([, rule]) => rule.resource === "Instance")
+      .map(([action, rule]) => `${action}: ${rule.need}`)
+      .toSorted();
+    expect(onInstance).toEqual([
+      "Auth_exchangeToken: anyone",
+      "CreateOrg: user",
+      "Lattices_listLattices: anyone",
+      "SignIn_methods: anyone",
+    ]);
   });
 
   it("[authz.suspended] a suspended user, sponsor or org is refused, and an org's insiders are told why", () => {
@@ -569,21 +560,6 @@ describe("authorize", () => {
         "nextActions" in refusal.failure &&
         refusal.failure.nextActions.length,
     ).toBe(1);
-  });
-
-  it("[authz.bootstrap-confined] the bootstrap credential may call exactly its two actions", () => {
-    fc.assert(
-      fc.property(requestArb, ({ action, resource }) => {
-        const result = outcome(decide({ _tag: "Bootstrap" }, action, resource));
-        return BOOTSTRAP_ACTIONS.has(action)
-          ? result === "ok:"
-          : result === "403:bootstrap-confined";
-      }),
-    );
-    expect([...BOOTSTRAP_ACTIONS].toSorted()).toEqual(["Admin_createUser", "Auth_exchangeToken"]);
-    expect(
-      outcome(authorize({ _tag: "Bootstrap" }, "Operator_putSettings", project(PRJ_1, "private"))),
-    ).toBe("403:bootstrap-confined");
   });
 
   it("[authz.fork] a user forks what it reads into an org it is in, and a private project only within its org", () => {

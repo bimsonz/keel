@@ -73,13 +73,7 @@ const runtime = ManagedRuntime.make(
   ),
 );
 afterAll(() => runtime.dispose());
-const handlers = makeHandlers(
-  makeRunner(runtime),
-  { emailCode: false, github: false },
-  async () => {
-    throw new Error("the repo reads make no users");
-  },
-);
+const handlers = makeHandlers(makeRunner(runtime), { emailCode: false, github: false });
 
 const settings = (visibility: "private" | "public"): ProjectSettings => ({
   protectedPaths: [],
@@ -129,7 +123,6 @@ const member = caller({
   _tag: "User",
   userId: sampleSponsorId,
   handle: "forge-member",
-  instanceAdmin: false,
   suspended: false,
   memberships: [{ org: sampleOrgId, role: "member" }],
 });

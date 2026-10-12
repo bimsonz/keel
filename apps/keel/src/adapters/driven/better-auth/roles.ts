@@ -45,7 +45,6 @@ export function decideAsRole(role: Role, action: OrgAction) {
     _tag: "User",
     userId: makeId("usr", "0".repeat(26)),
     handle: "member",
-    instanceAdmin: false,
     suspended: false,
     memberships: [{ org: SOME_ORG, role }],
   };

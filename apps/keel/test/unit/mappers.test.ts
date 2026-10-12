@@ -171,17 +171,10 @@ function grantedSurface() {
     _tag: "User",
     userId: sampleSponsorId,
     handle: "stubs-owner",
-    instanceAdmin: true,
     suspended: false,
     memberships: [{ org: sampleOrgId, role: "owner" }],
   });
-  const handlers = makeHandlers(
-    makeRunner(runtime),
-    { emailCode: false, github: false },
-    async () => {
-      throw new Error("no users are made here");
-    },
-  );
+  const handlers = makeHandlers(makeRunner(runtime), { emailCode: false, github: false });
   return { runtime, handlers, callers: [agent, owner] };
 }
 

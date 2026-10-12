@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
-import { BOOTSTRAP_CLIENT_ID } from "@keeltown/core/domain/identity";
 import { makeEnrolmentsMemory, makeProjectsMemory } from "@keeltown/testing";
 import { describe, expect, it } from "vitest";
+import { signUp } from "../../../../scripts/lib/account.ts";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
 import {
   BASE,
@@ -15,8 +15,8 @@ import {
 
 /**
  * Project bootstrap through the real HTTP doorway, gate and handler object:
- * the bootstrap credential creates users and nothing else; a member of an org
- * creates projects there and enrols agents in them. Projects and Enrolments
+ * a person signs up as any visitor does; a member of an org creates projects
+ * there and enrols agents in them. Projects and Enrolments
  * are in-memory here; projects are placed in
  * the real D1 `projects` table, and enrolments project into the real D1
  * directory, so every credential they return exchanges for a token.
@@ -95,7 +95,6 @@ async function tokenOf(clientId: string, clientSecret: string): Promise<string> 
   return (await response.json<{ access_token: string }>()).access_token;
 }
 
-const bootstrapToken = () => tokenOf(BOOTSTRAP_CLIENT_ID, env.KEEL_BOOTSTRAP_SECRET);
 const key = (what: string) => `${what}-${crypto.randomUUID()}`;
 const agentRequest = { kind: "interactive", scopes: ["agent:read", "agent:work"] };
 
@@ -107,21 +106,13 @@ const maintainer = async () =>
 const projectName = (what: string) => uniqueHandle(what);
 
 describe("project bootstrap", () => {
-  it("[a11b.bootstrap] exchanges only the deployment's bootstrap secret", async () => {
-    const good = await exchangeAs(BOOTSTRAP_CLIENT_ID, env.KEEL_BOOTSTRAP_SECRET);
-    expect(good.status).toBe(200);
-    expect(await good.json()).toMatchObject({ token_type: "Bearer" });
-    const wrong = await exchangeAs(BOOTSTRAP_CLIENT_ID, `${env.KEEL_BOOTSTRAP_SECRET}-not`);
-    expect(wrong.status).toBe(401);
-    expect(await wrong.json()).toMatchObject({ error: "invalid_client" });
-  });
-
-  it("[a11b.enrol] the bootstrap credential creates a user, who creates a project in its own org and enrols an agent there whose credential exchanges at once", async () => {
+  it("[a11b.enrol] a person who signs up by passkey creates a project in their own org and enrols an agent there whose credential exchanges at once", async () => {
     const { via } = operatorApp();
     const handle = uniqueHandle("first");
-    const created = await call(via, await bootstrapToken(), "POST", "/admin/users", { handle });
-    expect(created.status).toBe(201);
-    const user = created.body.session.token;
+    const { session } = await signUp(BASE, handle, {
+      fetcher: (request) => via(request.url, request),
+    });
+    const user = session.token;
     const project = await call(
       via,
       user,
@@ -143,7 +134,7 @@ describe("project bootstrap", () => {
     expect(agent.status).toBe(201);
     expect(agent.body.agent).toMatchObject({
       projectId: project.body.id,
-      sponsor: created.body.userId,
+      sponsor: session.userId,
     });
     // The agent's token carries the project it was enrolled in (the `prj` claim).
     const me = await call(
@@ -157,37 +148,6 @@ describe("project bootstrap", () => {
       id: agent.body.agent.id,
       projectId: project.body.id,
     });
-  });
-
-  it("[a11b.confined] refuses the bootstrap credential everything but creating users, with a next action", async () => {
-    const { via, projects } = operatorApp();
-    const bootstrap = await bootstrapToken();
-    const refused = await call(
-      via,
-      bootstrap,
-      "POST",
-      "/projects",
-      { org: "pool", name: projectName("confined"), source: SOURCE },
-      key("prj"),
-    );
-    expect(refused.status).toBe(403);
-    expect([refused.body.code, refused.body.detail]).toEqual([
-      "auth.forbidden",
-      "Refused: bootstrap-confined.",
-    ]);
-    expect(refused.body.nextActions).toEqual([
-      expect.objectContaining({ operationId: "Admin_createUser" }),
-    ]);
-    const enrol = await call(
-      via,
-      bootstrap,
-      "POST",
-      "/agents",
-      { ...agentRequest, name: "worker", projectId: "prj_01JZ8PT2C4E6G8J0M2N4Q6S8V0" },
-      key("agt"),
-    );
-    expect([enrol.status, enrol.body.detail]).toEqual([403, "Refused: bootstrap-confined."]);
-    expect(projects.projects()).toEqual([]);
   });
 
   it("[a11b.create] creates a project once per key: a retry answers the same project", async () => {

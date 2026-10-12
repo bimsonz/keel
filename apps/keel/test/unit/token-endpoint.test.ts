@@ -91,13 +91,7 @@ async function serve(seeded: Agent, clock: Layer.Layer<Clock>) {
       makeProjectOrgsMemory().layer,
     ),
   );
-  const handlers = makeHandlers(
-    makeRunner(runtime),
-    { emailCode: false, github: false },
-    async () => {
-      throw new Error("the token endpoint makes no users");
-    },
-  );
+  const handlers = makeHandlers(makeRunner(runtime), { emailCode: false, github: false });
   const answer = await handlers.Auth_exchangeToken(
     { requestId: "req-1", principal: { _tag: "Anonymous" }, signal: new AbortController().signal },
     { client_id: "client", client_secret: "secret" },

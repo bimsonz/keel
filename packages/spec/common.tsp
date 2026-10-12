@@ -112,13 +112,10 @@ alias AgentRead = OAuth2Auth<[KeelClientCredentials], ["agent:read"]>;
 
 /**
  * A user's session: the console's cookie (`__Secure-keel.session_token`, set by `/v1/auth`), or the bearer
- * `keeltown login` or `POST /v1/admin/users` hands out. Every operation decides who may call it by one policy
- * on the caller's memberships, whichever way it signed in.
+ * `keeltown login` hands out. Every operation decides who may call it by one policy on the caller's
+ * memberships, whichever way it signed in.
  */
 alias SessionAuth = BearerAuth;
-
-/** The bootstrap credential, exchanged like an agent's: it may create users and nothing else. */
-alias BootstrapAuth = OAuth2Auth<[KeelClientCredentials], []>;
 
 /** The scopes an agent's token can carry. */
 union Scope {
@@ -179,7 +176,6 @@ union ProblemCode {
   repoPathNotFound: "repo.path_not_found",
   agentStateRefused: "agent.state_refused",
   projectNameTaken: "project.name_taken",
-  userHandleRefused: "user.handle_refused",
 }
 
 /** What an agent can do next. Each one can be fed straight into the matching tool. */

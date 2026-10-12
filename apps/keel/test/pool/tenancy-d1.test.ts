@@ -16,8 +16,8 @@ const seed = (rows: BetterAuthRows) =>
     const statements = [
       ...(rows.users ?? []).map((user) =>
         env.DB.prepare(
-          `INSERT INTO "user" (id, name, email, emailVerified, createdAt, updatedAt, username, role, banned, banExpires)
-           VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO "user" (id, name, email, emailVerified, createdAt, updatedAt, username, banned, banExpires)
+           VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?)`,
         ).bind(
           user.id,
           user.username ?? "someone",
@@ -25,7 +25,6 @@ const seed = (rows: BetterAuthRows) =>
           at,
           at,
           user.username ?? null,
-          user.role ?? null,
           user.banned === undefined ? null : Number(user.banned),
           user.banExpires?.toISOString() ?? null,
         ),

@@ -42,8 +42,8 @@ export interface PublicClientOptions {
 
 /**
  * A signed-in user's client: a Better Auth session, sent as a bearer. It is
- * what `keeltown login` and `POST /v1/admin/users` hand out; the caller acts
- * as that user, through its memberships.
+ * what `keeltown login` hands out; the caller acts as that user, through its
+ * memberships.
  */
 export interface SessionClientOptions {
   readonly baseUrl: string;
@@ -542,17 +542,6 @@ export class KeelClient {
   /** The signed-in user: its handle, whether it is the instance admin, and its orgs with its role in each. */
   me(options?: CallOptions): Promise<WireOutputs["Users_me"]> {
     return this.call("Users_me", {}, options);
-  }
-
-  /**
-   * Instance admin (or the bootstrap credential): a user with a handle and its
-   * personal org, and a bearer session for it, shown once.
-   */
-  createUser(
-    user: { readonly handle: string },
-    options?: CallOptions,
-  ): Promise<WireOutputs["Admin_createUser"]> {
-    return this.call("Admin_createUser", { handle: user.handle }, options);
   }
 
   /** The projects the caller may read, each with its org and the reader's role there; pass a page's `nextCursor` for the next. */

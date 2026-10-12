@@ -15,7 +15,6 @@ export function roleNames(column: string | null): readonly string[] {
 const UserRow = Schema.Struct({
   id: UserId,
   username: Schema.NullOr(Handle),
-  role: Schema.NullOr(Schema.String),
   banned: Schema.NullOr(Schema.Number),
   banExpires: Schema.NullOr(Schema.String),
 });
@@ -48,7 +47,7 @@ export function UsersD1(db: D1Database) {
         Effect.promise(() =>
           db.batch([
             db
-              .prepare(`SELECT id, username, role, banned, banExpires FROM "user" WHERE id = ?`)
+              .prepare(`SELECT id, username, banned, banExpires FROM "user" WHERE id = ?`)
               .bind(userId),
             db
               .prepare(
@@ -71,7 +70,6 @@ export function UsersD1(db: D1Database) {
               _tag: "User" as const,
               userId: user.id,
               ...(user.username === null ? {} : { handle: user.username }),
-              instanceAdmin: roleNames(user.role).includes("admin"),
               suspended: rowBanHolds(user, now),
               memberships,
             });

@@ -92,7 +92,7 @@ function sources(dir: string): string[] {
 }
 
 describe("one policy", () => {
-  it("[authz.no-hand-checks] no doorway or use-case decides access by a scope or by the bootstrap credential itself", () => {
+  it("[authz.no-hand-checks] no doorway or use-case decides access by a scope itself", () => {
     const root = join(import.meta.dirname, "../../../..");
     const files = [
       ...sources(join(root, "apps/keel/src")),
@@ -103,19 +103,14 @@ describe("one policy", () => {
       /\.scopes\.(includes|some|every)\(/,
       /satisfies\(\s*requirements/,
       /"(operator|observer)"/,
-      /\bisBootstrap\(/,
     ];
-    // The core gate builds the Bootstrap principal; nothing else may ask.
-    const allowed = new Set(["packages/core/src/application/identity/gate.ts"]);
-    const found = files
-      .filter((file) => !allowed.has(relative(root, file)))
-      .flatMap((file) =>
-        readFileSync(file, "utf8")
-          .split("\n")
-          .flatMap((line, i) =>
-            checks.some((check) => check.test(line)) ? [`${relative(root, file)}:${i + 1}`] : [],
-          ),
-      );
+    const found = files.flatMap((file) =>
+      readFileSync(file, "utf8")
+        .split("\n")
+        .flatMap((line, i) =>
+          checks.some((check) => check.test(line)) ? [`${relative(root, file)}:${i + 1}`] : [],
+        ),
+    );
     expect(found).toEqual([]);
   });
 });

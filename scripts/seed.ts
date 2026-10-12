@@ -4,9 +4,9 @@
 //    commit, made with a fixed author and date so the same tree is the same
 //    commit. A repo already at that commit is left alone; one at any other
 //    commit stops the seed rather than being overwritten.
-// 2. The bootstrap credential (Terraform's `bootstrap_secret`) creates the
-//    seed's automation user, `keel-seed`, with its personal org of that name,
-//    and a bearer session for it, kept while it still works.
+// 2. The seed's automation user, `keel-seed`, signs up with a passkey as any
+//    visitor does, which makes its personal org of that name. Its session is
+//    kept while it still works, and its passkey signs in again after that.
 // 3. That user creates forge-lite and forge-lite-control in its org and puts
 //    each one's declared settings: verification off in the control project
 //    only (S-0's negative control); both private. The seed is staging's
@@ -35,7 +35,9 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { KeelClient, KeelProblem } from "../packages/sdk/src/index.ts";
+import type { SavedPasskey } from "../packages/testing/src/passkey.ts";
 import { root, siteHost, wrangler } from "./env.ts";
+import { AccountRefused, signIn, signUp, whoIs } from "./lib/account.ts";
 
 const environment = process.argv[2] ?? "staging";
 const agentsAt = process.argv.indexOf("--agents");
@@ -144,17 +146,6 @@ function seedFixture(): string {
   return sha;
 }
 
-function bootstrapSecret(): string {
-  const run = spawnSync(
-    "terraform",
-    [`-chdir=${join(root, "infra", environment)}`, "output", "-raw", "bootstrap_secret"],
-    { encoding: "utf8" },
-  );
-  if (run.status !== 0 || run.stdout.trim() === "")
-    throw new Error(`terraform output bootstrap_secret failed for ${environment}:\n${run.stderr}`);
-  return run.stdout.trim();
-}
-
 interface Credential {
   readonly agentId: string;
   readonly projectId: string;
@@ -212,30 +203,45 @@ function withoutRetired(seeded: Record<string, unknown>): Record<string, unknown
   return rest;
 }
 
+const isPasskey = (value: unknown): value is SavedPasskey =>
+  typeof value === "object" && value !== null && "credentialId" in value && "privateKey" in value;
+
+/** Writes the passkey beside whatever the file holds, before anything depends on it. */
+function keepPasskey(seedPasskey: SavedPasskey): void {
+  mkdirSync(join(root, ".keel"), { recursive: true, mode: 0o700 });
+  const now = existsSync(out) ? JSON.parse(readFileSync(out, "utf8")) : {};
+  writeFileSync(out, `${JSON.stringify({ ...now, seedPasskey }, null, 2)}\n`, { mode: 0o600 });
+  chmodSync(out, 0o600);
+}
+
 /**
- * The seed's user, created by the bootstrap credential, or the one an earlier
- * seed wrote while its session still works. A user whose session was lost
- * cannot be recreated under its handle: the seed stops and says so.
+ * The seed's user and the passkey that signs in to it: the session an earlier
+ * seed wrote while it still works, else a new session from the kept passkey,
+ * else a sign-up, as any visitor's. A handle that is taken with no passkey
+ * kept here cannot be signed in to: the seed stops and says so.
  */
-async function automationUser(bootstrap: KeelClient): Promise<SeedUser> {
+async function automationUser(): Promise<{ seedUser: SeedUser; seedPasskey?: SavedPasskey }> {
   const kept: unknown = earlier["seedUser"];
-  if (isSeedUser(kept)) {
-    try {
-      await new KeelClient({ baseUrl: keelUrl, session: kept.token }).me();
-      console.log(`ok   ${SEED_HANDLE}: ${kept.userId} (session kept)`);
-      return kept;
-    } catch {
-      // The session lapsed: a new user is needed, which the handle forbids.
-    }
+  const passkey: unknown = earlier["seedPasskey"];
+  const seedPasskey = isPasskey(passkey) ? passkey : undefined;
+  if (isSeedUser(kept) && (await whoIs(keelUrl, kept.token)).handle === SEED_HANDLE) {
+    console.log(`ok   ${SEED_HANDLE}: ${kept.userId} (session kept)`);
+    return { seedUser: kept, ...(seedPasskey === undefined ? {} : { seedPasskey }) };
   }
   try {
-    const made = await bootstrap.createUser({ handle: SEED_HANDLE });
-    console.log(`ok   ${SEED_HANDLE}: ${made.userId} in org ${made.org}`);
-    return { userId: made.userId, handle: made.handle, org: made.org, token: made.session.token };
+    const account =
+      seedPasskey === undefined
+        ? await signUp(keelUrl, SEED_HANDLE, { keep: keepPasskey })
+        : await signIn(keelUrl, SEED_HANDLE, seedPasskey);
+    const { userId, handle, org, token } = account.session;
+    console.log(
+      `ok   ${SEED_HANDLE}: ${userId} in org ${org} (${seedPasskey === undefined ? "signed up" : "signed in again"})`,
+    );
+    return { seedUser: { userId, handle, org, token }, seedPasskey: account.passkey };
   } catch (error) {
-    if (error instanceof KeelProblem && error.status === 409)
+    if (error instanceof AccountRefused && error.code === "NAME_TAKEN")
       throw new Error(
-        `${SEED_HANDLE} exists but this file holds no working session for it: delete the user, then seed again`,
+        `${SEED_HANDLE} exists but ${out} holds neither a working session nor its passkey`,
         { cause: error },
       );
     throw error;
@@ -282,12 +288,7 @@ const keelUrl = process.env["KEEL_URL"] ?? `https://${siteHost(environment)}`;
 
 try {
   const fixtureSha = seedFixture();
-  const bootstrap = new KeelClient({
-    baseUrl: keelUrl,
-    clientId: "keel-bootstrap",
-    clientSecret: bootstrapSecret(),
-  });
-  const seedUser = await automationUser(bootstrap);
+  const { seedUser, seedPasskey } = await automationUser();
   const asSeed = new KeelClient({ baseUrl: keelUrl, session: seedUser.token });
   const projects: Record<string, { id: string; verification: string; agents: Credential[] }> = {};
   for (const [name, declared] of Object.entries(PROJECTS)) {
@@ -322,7 +323,7 @@ try {
   mkdirSync(join(root, ".keel"), { recursive: true, mode: 0o700 });
   writeFileSync(
     out,
-    `${JSON.stringify({ ...withoutRetired(earlier), environment, keelUrl, fixture: { repo: `${CORE}/${FIXTURE}`, sha: fixtureSha }, seedUser, projects }, null, 2)}\n`,
+    `${JSON.stringify({ ...withoutRetired(earlier), environment, keelUrl, fixture: { repo: `${CORE}/${FIXTURE}`, sha: fixtureSha }, seedUser, ...(seedPasskey === undefined ? {} : { seedPasskey }), projects }, null, 2)}\n`,
     { mode: 0o600 },
   );
   chmodSync(out, 0o600);

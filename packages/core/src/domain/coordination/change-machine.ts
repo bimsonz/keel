@@ -334,7 +334,7 @@ const declinedActions = (changeId: ChangeId, reason: PushRefusedReason): readonl
         {
           kind: "escalate",
           title:
-            "The repo is at its size quota: ask an owner to free space, or the instance admin to raise the quota",
+            "The repo is at its size quota: ask an owner to free space, or whoever runs this Keel to raise the quota",
         },
         {
           kind: "call",

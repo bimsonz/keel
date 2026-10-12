@@ -1,16 +1,14 @@
 import { passkey } from "@better-auth/passkey";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
-import { admin } from "better-auth/plugins/admin";
 import { bearer } from "better-auth/plugins/bearer";
 import { deviceAuthorization } from "better-auth/plugins/device-authorization";
 import { emailOTP } from "better-auth/plugins/email-otp";
 import { organization } from "better-auth/plugins/organization";
 import { username } from "better-auth/plugins/username";
 import { monotonicFactory } from "ulid";
-import { CLAIM_HEADER, claimSpent, completeClaim, isClaimCode } from "./claim.ts";
 import { nameRefusal } from "./names.ts";
-import { orgAfter, orgBefore } from "./org.ts";
+import { orgAfter, orgBefore, type SessionOf } from "./org.ts";
 import { ORG_ROLES, orgAccess } from "./roles.ts";
 
 /** Where Better Auth answers, under Keel's API and outside its TypeSpec document. */
@@ -32,17 +30,9 @@ export const PLACEHOLDER_EMAIL_DOMAIN = "users.keel.invalid";
 /**
  * Better Auth's routes Keel does not serve. A session list answers every
  * session's token and revoking one takes it, so the console offers only "sign
- * out everywhere else". The instance admin never acts as another user.
+ * out everywhere else".
  */
-export const DISABLED_PATHS = [
-  "/list-sessions",
-  "/revoke-session",
-  "/admin/impersonate-user",
-  "/admin/stop-impersonating",
-  "/admin/set-user-password",
-  "/admin/list-user-sessions",
-  "/admin/revoke-user-session",
-] as const;
+export const DISABLED_PATHS = ["/list-sessions", "/revoke-session"] as const;
 
 /**
  * What a user without a handle may do: set it, sign out, or sign in again. The
@@ -56,6 +46,7 @@ const BEFORE_HANDLE = new Set([
   "/ok",
   "/error",
 ]);
+const BEARER = /^bearer /i;
 const SIGN_IN =
   /^\/(sign-in|email-otp|passkey\/(generate-authenticate-options|verify-authentication))(\/|$)/;
 
@@ -75,13 +66,6 @@ export interface AuthConfig {
   readonly sendOtp?: OtpSender;
   /** GitHub sign-in, only once its OAuth app exists. */
   readonly github?: { readonly clientId: string; readonly clientSecret: string };
-  /** Names held for the instance's claimant, lower-case: no one else may take them. */
-  readonly heldNames?: ReadonlySet<string>;
-  /**
-   * The lower-case hex SHA-256 of the instance's claim code (KEEL_CLAIM_DIGEST):
-   * the Worker never holds the code. Without it no claim is valid.
-   */
-  readonly claimDigest?: string;
   /**
    * Keeps the Worker alive for work Better Auth does after answering, such as
    * sending a code (it answers alike whether or not the address exists).
@@ -100,14 +84,6 @@ function generateId({ model }: { model: string }): string {
 
 const refuse = (code: string, message: string) => APIError.from("BAD_REQUEST", { code, message });
 
-/** One answer for a wrong claim code, a spent one, and a claim on a name not held. */
-const claimInvalid = () =>
-  APIError.from("FORBIDDEN", {
-    code: "CLAIM_INVALID",
-    message:
-      "That claim is not valid: the code is wrong or already spent, or the handle is not one held for the claimant",
-  });
-
 /** A sign-in provider's tokens, as every account row stores them: not at all. */
 const NO_PROVIDER_TOKENS = {
   accessToken: null,
@@ -117,9 +93,7 @@ const NO_PROVIDER_TOKENS = {
   refreshTokenExpiresAt: null,
 };
 
-const NOTHING_HELD: ReadonlySet<string> = new Set();
-
-/** Why a name can't be had: refused outright (reserved, held or malformed), or already taken. */
+/** Why a name can't be had: refused outright (reserved or malformed), or already taken. */
 export interface NameRefusal {
   readonly refused: "NAME_REFUSED" | "NAME_TAKEN";
   readonly message: string;
@@ -127,12 +101,11 @@ export interface NameRefusal {
 
 /**
  * Why `name` can't be a handle or an org's name, the two sharing one
- * namespace, or undefined when it can. A name is never refused to its own
- * holder, so a held handle, once claimed, still names its personal org.
+ * namespace, or undefined when it can. A name is never taken from its own
+ * holder, so a user's handle still names its personal org.
  */
 async function nameUnavailable(
   db: D1Database,
-  held: ReadonlySet<string>,
   name: string,
   creator?: string,
 ): Promise<NameRefusal | undefined> {
@@ -144,7 +117,7 @@ async function nameUnavailable(
     .bind(lowered)
     .first<{ holder: string }>();
   const own = holder !== null && holder.holder === creator;
-  const refusal = nameRefusal(name, own ? NOTHING_HELD : held);
+  const refusal = nameRefusal(name);
   if (refusal !== undefined) return { refused: "NAME_REFUSED", message: refusal };
   if (holder !== null && !own)
     return { refused: "NAME_TAKEN", message: `"${lowered}" is already a handle or an org's name` };
@@ -152,41 +125,14 @@ async function nameUnavailable(
 }
 
 /** Refuses a name `nameUnavailable` refuses, with its code. */
-async function claimable(
-  db: D1Database,
-  held: ReadonlySet<string>,
-  name: string,
-  creator?: string,
-): Promise<void> {
-  const unavailable = await nameUnavailable(db, held, name, creator);
+async function claimable(db: D1Database, name: string, creator?: string): Promise<void> {
+  const unavailable = await nameUnavailable(db, name, creator);
   if (unavailable !== undefined) throw refuse(unavailable.refused, unavailable.message);
 }
 
 export function authOptions(config: AuthConfig) {
   const origin = `https://${config.host}`;
   const { db } = config;
-  const held = config.heldNames ?? new Set<string>();
-
-  /**
-   * Whether a passkey sign-up for `name` claims the instance, which it does
-   * when it presents `Keel-Claim`. A held name passes only so. A code that is
-   * wrong or spent, or presented for a name not held, is CLAIM_INVALID. Either
-   * way the name must be one nobody has.
-   */
-  const claims = async (headers: Headers | undefined, name: string): Promise<boolean> => {
-    const code = headers?.get(CLAIM_HEADER) ?? null;
-    if (code === null) {
-      await claimable(db, held, name);
-      return false;
-    }
-    const valid =
-      held.has(name.toLowerCase()) &&
-      (await isClaimCode(code, config.claimDigest)) &&
-      !(await claimSpent(db));
-    if (!valid) throw claimInvalid();
-    await claimable(db, NOTHING_HELD, name);
-    return true;
-  };
 
   /** Every user's personal org, made when its handle is first set, owned by it. */
   const personalOrg = async (user: { id: string; username?: string | null }) => {
@@ -201,7 +147,21 @@ export function authOptions(config: AuthConfig) {
     });
   };
 
-  const beforeOrg = orgBefore(db);
+  /**
+   * The session a request carries, by cookie or by bearer. Better Auth hands
+   * every before-hook the request as it arrived: the bearer plugin's hook
+   * answers the session cookie for the endpoint, and no other hook sees it.
+   * So a bearer is read through the API, which applies that plugin. Reading
+   * only the cookie would take a bearer for nobody, and every check below
+   * would decide nothing for `keeltown login`'s sessions ([ba.bearer-hooks]).
+   */
+  const sessionOf: SessionOf = async (ctx) => {
+    const byCookie = await getSessionFromCtx(ctx);
+    if (byCookie !== null || !BEARER.test(ctx.headers?.get("authorization") ?? "")) return byCookie;
+    return auth.api.getSession({ headers: ctx.headers ?? new Headers() });
+  };
+
+  const beforeOrg = orgBefore(db, sessionOf);
 
   const options = {
     appName: "Keel",
@@ -243,16 +203,16 @@ export function authOptions(config: AuthConfig) {
         if (BEFORE_HANDLE.has(ctx.path) || SIGN_IN.test(ctx.path)) {
           const name: unknown = ctx.body?.username;
           if (ctx.path === "/update-user" && typeof name === "string") {
-            const session = await getSessionFromCtx(ctx);
-            await claimable(db, held, name, session?.user.id);
+            const session = await sessionOf(ctx);
+            await claimable(db, name, session?.user.id);
           } else if (ctx.path === "/update-user") {
-            const session = await getSessionFromCtx(ctx);
+            const session = await sessionOf(ctx);
             if (session !== null && !session.user["username"])
               throw refuse("HANDLE_REQUIRED", "Choose a handle first");
           }
           return;
         }
-        const session = await getSessionFromCtx(ctx);
+        const session = await sessionOf(ctx);
         if (session !== null && !session.user["username"])
           throw APIError.from("FORBIDDEN", {
             code: "HANDLE_REQUIRED",
@@ -260,7 +220,7 @@ export function authOptions(config: AuthConfig) {
           });
         return beforeOrg(ctx);
       }),
-      after: createAuthMiddleware(orgAfter(db)),
+      after: createAuthMiddleware(orgAfter(db, sessionOf)),
     },
     databaseHooks: {
       user: {
@@ -278,7 +238,7 @@ export function authOptions(config: AuthConfig) {
       username({
         minUsernameLength: 1,
         maxUsernameLength: 39,
-        usernameValidator: (name) => nameRefusal(name, held) === undefined,
+        usernameValidator: (name) => nameRefusal(name) === undefined,
         // The handle is the personal org's slug, so it never changes.
         immutableUsername: true,
       }),
@@ -296,7 +256,7 @@ export function authOptions(config: AuthConfig) {
               handle: { type: "string", required: false, input: true, index: true },
             },
           },
-          // Only the instance admin suspends an org, never through Better Auth's own routes.
+          // Whoever runs the instance suspends an org, never through Better Auth's own routes.
           organization: {
             additionalFields: {
               suspended: { type: "boolean", required: false, input: false, defaultValue: false },
@@ -306,7 +266,7 @@ export function authOptions(config: AuthConfig) {
         organizationHooks: {
           beforeCreateOrganization: async ({ organization: org, user }) => {
             if (typeof org.slug !== "string") throw refuse("NAME_REFUSED", "An org needs a name");
-            await claimable(db, held, org.slug, user.id);
+            await claimable(db, org.slug, user.id);
             return { data: { ...org, slug: org.slug.toLowerCase() } };
           },
           beforeUpdateOrganization: async ({ organization: org }) => {
@@ -319,7 +279,6 @@ export function authOptions(config: AuthConfig) {
           },
         },
       }),
-      admin(),
       deviceAuthorization({
         verificationUri: `${origin}/device`,
         validateClient: (clientId) => clientId === DEVICE_CLIENT_ID,
@@ -332,35 +291,27 @@ export function authOptions(config: AuthConfig) {
         registration: {
           // Passkey-first sign-up: the chosen handle names a user made only once the passkey verifies.
           requireSession: false,
-          resolveUser: async ({ ctx, context }) => {
+          resolveUser: async ({ context }) => {
             if (typeof context !== "string" || context === "")
               throw refuse("HANDLE_REQUIRED", "Choose a handle to sign up with a passkey");
-            await claims(ctx.headers, context);
+            await claimable(db, context);
             return { id: `usr_${ulid()}`, name: context.toLowerCase() };
           },
           afterVerification: async ({ ctx, user, context }) => {
             if ((await ctx.context.internalAdapter.findUserById(user.id)) !== null) return {};
             if (typeof context !== "string") throw refuse("HANDLE_REQUIRED", "Choose a handle");
-            const claiming = await claims(ctx.headers, context);
+            await claimable(db, context);
             const handle = context.toLowerCase();
-            // A claimant's handle is written only by the batch that makes it admin.
             const created = await ctx.context.internalAdapter.createUser(
               {
                 email: `${handle}@${PLACEHOLDER_EMAIL_DOMAIN}`,
                 emailVerified: false,
                 name: handle,
-                ...(claiming ? {} : { username: handle, displayUsername: handle }),
+                username: handle,
+                displayUsername: handle,
               },
               { method: "passkey" },
             );
-            if (claiming) {
-              if (!(await completeClaim(db, { userId: created.id, handle, newId: generateId }))) {
-                // Another claim got there first: this one never happened, and the name stays held.
-                await db.prepare(`DELETE FROM user WHERE id = ?1`).bind(created.id).run();
-                throw claimInvalid();
-              }
-              await personalOrg({ id: created.id, username: handle });
-            }
             return { userId: created.id };
           },
         },
@@ -397,68 +348,4 @@ export function signInMethods(config: AuthConfig): { emailCode: boolean; github:
 
 export function makeAuth(config: AuthConfig): KeelAuth {
   return authOptions(config).auth;
-}
-
-/** How long an automation user's session lasts. It is revocable, like any session. */
-export const AUTOMATION_SESSION_DAYS = 30;
-
-/** An automation user as `createUser` made it. */
-export interface CreatedUser {
-  readonly userId: string;
-  readonly handle: string;
-  /** The id of its personal org, named by its handle. */
-  readonly org: string;
-  /** Its session: the token is its bearer (`Authorization: Bearer <token>`). */
-  readonly session: { readonly token: string; readonly expiresAt: Date };
-}
-
-/**
- * Admin_createUser's backend: a user with `handle` (lower-cased; its email the
- * placeholder `<handle>@users.keel.invalid`, unverified), its personal org as
- * for anyone, and a Better Auth session of AUTOMATION_SESSION_DAYS for it. It
- * makes its own Better Auth, so call it inside the request it serves, as
- * `auth()` is ([ba.per-request]). A held handle is NAME_REFUSED, since only the
- * claim releases one, and a taken one NAME_TAKEN.
- */
-export async function createUser(
-  config: AuthConfig,
-  handle: string,
-): Promise<CreatedUser | NameRefusal> {
-  const { db } = config;
-  const held = config.heldNames ?? NOTHING_HELD;
-  const unavailable = await nameUnavailable(db, held, handle);
-  if (unavailable !== undefined) return unavailable;
-  const name = handle.toLowerCase();
-  const context = await authOptions(config).auth.$context;
-  let user: { id: string };
-  try {
-    user = await context.internalAdapter.createUser(
-      {
-        email: `${name}@${PLACEHOLDER_EMAIL_DOMAIN}`,
-        emailVerified: false,
-        name,
-        username: name,
-        displayUsername: name,
-      },
-      { method: "admin" },
-    );
-  } catch (error) {
-    // Someone took the name between the check and the insert.
-    const taken = await nameUnavailable(db, held, handle);
-    if (taken !== undefined) return taken;
-    throw error;
-  }
-  const org = await db
-    .prepare(`SELECT id FROM organization WHERE slug = ?1`)
-    .bind(name)
-    .first<{ id: string }>();
-  if (org === null) throw new Error(`no personal org was made for "${name}"`);
-  const expiresAt = new Date(Date.now() + AUTOMATION_SESSION_DAYS * 24 * 60 * 60 * 1000);
-  const session = await context.internalAdapter.createSession(user.id, false, { expiresAt }, true);
-  return {
-    userId: user.id,
-    handle: name,
-    org: org.id,
-    session: { token: session.token, expiresAt: new Date(session.expiresAt) },
-  };
 }

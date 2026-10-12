@@ -215,17 +215,6 @@ const readableView = (caller: Caller, projectId: ProjectId, name: string) =>
     } satisfies ProjectViewBody;
   });
 
-/** A user the instance admin (or the bootstrap credential) creates for automation, or why not. */
-export type MakeUser = (handle: string) => Promise<
-  | {
-      readonly userId: string;
-      readonly handle: string;
-      readonly org: string;
-      readonly session: { readonly token: string; readonly expiresAt: Date };
-    }
-  | { readonly refused: "NAME_REFUSED" | "NAME_TAKEN"; readonly message: string }
->;
-
 /**
  * The one handler object. The generated Hono routes and the generated MCP tools
  * both dispatch into it, so a REST call and a tool call run the same code, and
@@ -238,7 +227,7 @@ export interface SignInMethods {
   readonly github: boolean;
 }
 
-export function makeHandlers(run: Runner, signIn: SignInMethods, makeUser: MakeUser) {
+export function makeHandlers(run: Runner, signIn: SignInMethods) {
   /** An operator's move on an agent's standing, answered as the agent's profile. */
   const standing = (
     caller: Caller,
@@ -692,34 +681,11 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, makeUser: MakeU
                 body: {
                   userId: principal.userId,
                   ...(principal.handle === undefined ? {} : { handle: principal.handle }),
-                  instanceAdmin: principal.instanceAdmin,
                   orgs,
                 },
               })),
             ),
           );
-        },
-        Admin_createUser: async (caller: Caller, input: Input<"Admin_createUser">) => {
-          const made = await makeUser(input.handle);
-          if ("refused" in made)
-            return {
-              status: 409 as const,
-              body: problem(409, "user.handle_refused", caller.requestId, {
-                detail: `${made.refused}: ${made.message}`,
-              }),
-            };
-          return {
-            status: 201 as const,
-            body: {
-              userId: made.userId,
-              handle: made.handle,
-              org: made.org,
-              session: {
-                token: made.session.token,
-                expiresAt: made.session.expiresAt.toISOString(),
-              },
-            },
-          };
         },
         Operator_getSettings: (caller: Caller, input: Input<"Operator_getSettings">) => {
           const projectId = settingsProject(input.projectId);

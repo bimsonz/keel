@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.no-instance-role
+# why: an action is decided on the whole instance, so any signed-in user may take it over every org
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 8018c88..1bf64f9 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -132,6 +132,7 @@ export const NON_SPEC_ACTIONS = {
+   CloneRepo: rule("Project", "read"),
+   /** Granted when the caller reads the source and is a member of the target org. */
+   Operator_forkProject: rule("Fork", "member"),
++  SuspendOrg: rule("Instance", "user"),
+ } as const satisfies Record<string, ActionRule>;
+ 
+ export const ACTIONS = { ...SPEC_ACTIONS, ...NON_SPEC_ACTIONS } as const;

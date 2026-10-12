@@ -26,8 +26,7 @@ import type {
  *   `workOrMaintain`: that, or a maintainer's;
  * - `member`, `maintain`, `own`: that role or above in the resource's org
  *   (users only); `sponsorOrMaintain`: the sponsor of the agent concerned, or a
- *   maintainer;
- * - `admin`: the instance admin.
+ *   maintainer.
  */
 export type Need =
   | "anyone"
@@ -41,8 +40,7 @@ export type Need =
   | "member"
   | "sponsorOrMaintain"
   | "maintain"
-  | "own"
-  | "admin";
+  | "own";
 
 /** The kind of resource an action is decided on. */
 export type ResourceKind = "Instance" | "Self" | "Org" | "Project" | "Fork";
@@ -62,7 +60,6 @@ export const SPEC_ACTIONS = {
   whoami: rule("Self", "self"),
   inbox: rule("Self", "self"),
   Users_me: rule("Self", "user"),
-  Admin_createUser: rule("Instance", "admin"),
 
   Operator_listProjects: rule("Org", "read"),
   Operator_createProject: rule("Org", "member"),
@@ -135,12 +132,6 @@ export const NON_SPEC_ACTIONS = {
   CloneRepo: rule("Project", "read"),
   /** Granted when the caller reads the source and is a member of the target org. */
   Operator_forkProject: rule("Fork", "member"),
-  SuspendUser: rule("Instance", "admin"),
-  ReinstateUser: rule("Instance", "admin"),
-  SuspendOrg: rule("Instance", "admin"),
-  ReinstateOrg: rule("Instance", "admin"),
-  SetQuotas: rule("Instance", "admin"),
-  HaltSpend: rule("Instance", "admin"),
 } as const satisfies Record<string, ActionRule>;
 
 export const ACTIONS = { ...SPEC_ACTIONS, ...NON_SPEC_ACTIONS } as const;
@@ -156,15 +147,6 @@ interface ResourceOfKind {
   readonly Fork: ForkResource;
 }
 export type ResourceFor<A extends Action> = ResourceOfKind[(typeof ACTIONS)[A]["resource"]];
-
-/**
- * What the bootstrap credential may call: exchange its secret and create users.
- * Everything else is `bootstrap-confined`.
- */
-export const BOOTSTRAP_ACTIONS: ReadonlySet<Action> = new Set<Action>([
-  "Auth_exchangeToken",
-  "Admin_createUser",
-]);
 
 /** Who may see what a grant lets the caller read: everything members see, or only what is public. */
 export type Audience = "members" | "public";
@@ -251,8 +233,6 @@ export const rightsOf = (principal: Principal, resource: Resource): ReadonlySet<
       return sponsorRole(principal) === undefined ? NONE : agentRights(principal, resource);
     case "Anonymous":
       return rightsByRole(undefined, resource);
-    case "Bootstrap":
-      return NONE;
     default: {
       const unreachable: never = principal;
       return unreachable;
@@ -277,7 +257,10 @@ const unauthenticated = (): Decision =>
   Result.fail(new AuthenticationRequired({ nextActions: [SIGN_IN] }));
 
 const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
-  "user-suspended": { kind: "escalate", title: "Ask the instance admin to reinstate your account" },
+  "user-suspended": {
+    kind: "escalate",
+    title: "Ask whoever runs this Keel to reinstate your account",
+  },
   "handle-required": { kind: "call", title: "Choose a handle first", operationId: "SetHandle" },
   "agents-only": {
     kind: "call",
@@ -293,7 +276,7 @@ const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
     kind: "escalate",
     title: "Your sponsor left the org; ask a member of the org to sponsor a new credential",
   },
-  "org-suspended": { kind: "escalate", title: "Ask the instance admin to reinstate the org" },
+  "org-suspended": { kind: "escalate", title: "Ask whoever runs this Keel to reinstate the org" },
   "foreign-project": {
     kind: "escalate",
     title: "This is not your project; ask your sponsor to enrol an agent in it",
@@ -302,11 +285,6 @@ const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
     kind: "call",
     title: "Exchange your credentials for a token with the scope this needs",
     operationId: "Auth_exchangeToken",
-  },
-  "bootstrap-confined": {
-    kind: "call",
-    title: "Create the first user, then act as that user",
-    operationId: "Admin_createUser",
   },
   "private-source": {
     kind: "escalate",
@@ -317,14 +295,13 @@ const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
 const refused = (reason: Exclude<RefusalReason, "role">): Decision =>
   Result.fail(new AccessRefused({ reason, nextActions: [NEXT[reason]] }));
 
-const ROLE_NAMES: Readonly<Record<"member" | "maintain" | "own" | "admin", string>> = {
+const ROLE_NAMES: Readonly<Record<"member" | "maintain" | "own", string>> = {
   member: "a member",
   maintain: "a maintainer or an owner",
   own: "an owner",
-  admin: "the instance admin",
 };
 
-const lacksRole = (need: "member" | "maintain" | "own" | "admin"): Decision =>
+const lacksRole = (need: "member" | "maintain" | "own"): Decision =>
   Result.fail(
     new AccessRefused({
       reason: "role",
@@ -387,8 +364,6 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
     case "self":
     case "user":
       return granted();
-    case "admin":
-      return principal.instanceAdmin ? granted() : lacksRole("admin");
     case "work":
       return refused("agents-only");
     default:
@@ -470,7 +445,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
  *   `foreign-project`; one in another org is NotVisible.
  *
  * Work is agents' only, and governance users' only. An agent never exceeds its
- * sponsor. The bootstrap credential may call `BOOTSTRAP_ACTIONS` and nothing else.
+ * sponsor. No principal stands above an org's owners: there is no instance role.
  */
 export const authorize = <A extends Action>(
   principal: Principal,
@@ -479,8 +454,6 @@ export const authorize = <A extends Action>(
 ): Decision => {
   const { need } = ACTIONS[action];
   switch (principal._tag) {
-    case "Bootstrap":
-      return BOOTSTRAP_ACTIONS.has(action) ? granted() : refused("bootstrap-confined");
     case "Anonymous":
       return anonymous(need, resource);
     case "User":

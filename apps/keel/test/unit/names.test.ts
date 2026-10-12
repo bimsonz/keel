@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  INSTANCE_ORG,
-  nameRefusal,
-  RESERVED_NAMES,
-} from "../../src/adapters/driven/better-auth/names.ts";
+import { nameRefusal, RESERVED_NAMES } from "../../src/adapters/driven/better-auth/names.ts";
 
 /** The paths keel.town serves at its root (Mission Control's list, plus Better Auth's mount). */
 const SITE_PATHS = [
@@ -44,15 +40,7 @@ describe("handles and org names", () => {
   });
 
   it("[names.instance] the org holding Keel's own projects is an ordinary name: whoever signs up first may take it", () => {
-    expect(INSTANCE_ORG).toBe("keel");
     for (const name of ["keel", "Keel", "KEEL"]) expect(nameRefusal(name)).toBeUndefined();
-  });
-
-  it("[names.held] refuses a name held for the claimant, in any case, and holds nothing by default", () => {
-    const held = new Set(["bimsonz"]);
-    for (const name of ["bimsonz", "BimsonZ"]) expect(nameRefusal(name, held)).toMatch(/held/);
-    expect(nameRefusal("bimsonz")).toBeUndefined();
-    expect(nameRefusal("bimson", held)).toBeUndefined();
   });
 
   it("[names.handle] takes letters, digits and single inner hyphens up to 39 characters", () => {

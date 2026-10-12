@@ -34,13 +34,13 @@ export const OTHER_ORG = Schema.decodeSync(OrgId)("org_01M4P00000000000000000000
 export const OTHER_SPONSOR = Schema.decodeSync(UserId)("usr_01M4P00000000000000000000T");
 
 /** Better Auth's rows for a user, as its D1 adapter writes them (dates as ISO text). */
-async function insertUser(userId: string, handle: string, admin = false): Promise<void> {
+async function insertUser(userId: string, handle: string): Promise<void> {
   const at = new Date().toISOString();
   await env.DB.prepare(
-    `INSERT OR IGNORE INTO "user" (id, name, email, emailVerified, createdAt, updatedAt, username, role)
-     VALUES (?, ?, ?, 0, ?, ?, ?, ?)`,
+    `INSERT OR IGNORE INTO "user" (id, name, email, emailVerified, createdAt, updatedAt, username)
+     VALUES (?, ?, ?, 0, ?, ?, ?)`,
   )
-    .bind(userId, handle, `${handle}@users.keel.invalid`, at, at, handle, admin ? "admin" : null)
+    .bind(userId, handle, `${handle}@users.keel.invalid`, at, at, handle)
     .run();
 }
 
@@ -168,13 +168,13 @@ export interface SeededUser {
  */
 export async function seedUser(
   handle: string,
-  options: { readonly role?: Role | null; readonly org?: OrgId; readonly admin?: boolean } = {},
+  options: { readonly role?: Role | null; readonly org?: OrgId } = {},
 ): Promise<SeededUser> {
   const org = options.org ?? POOL_ORG;
   if (org === POOL_ORG) await seedOrg(POOL_ORG, "pool", POOL_SPONSOR, "pool-sponsor");
   if (org === OTHER_ORG) await seedOrg(OTHER_ORG, "elsewhere", OTHER_SPONSOR, "elsewhere-owner");
   const userId = makeId("usr", ulid());
-  await insertUser(userId, handle, options.admin === true);
+  await insertUser(userId, handle);
   const at = new Date().toISOString();
   const token = crypto.randomUUID().replaceAll("-", "");
   const role = options.role === undefined ? "member" : options.role;

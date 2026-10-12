@@ -5,7 +5,6 @@
 // repo reads and project creation run over in-memory code and projects.
 import { env } from "cloudflare:workers";
 import { projectRepos } from "@keeltown/core/application/integration";
-import { BOOTSTRAP_CLIENT_ID } from "@keeltown/core/domain/identity";
 import {
   type EventEnvelope,
   EventEnvelope as Envelope,
@@ -51,13 +50,6 @@ interface Feed {
 interface Listed {
   readonly items: readonly { readonly id: string }[];
   readonly nextCursor?: string;
-}
-
-interface MadeUser {
-  readonly userId: string;
-  readonly handle: string;
-  readonly org: string;
-  readonly session: { readonly token: string; readonly expiresAt: string };
 }
 
 /** A request through `via` (the deployed fetch handler by default), with a bearer or none; `B` is its body. */
@@ -415,21 +407,20 @@ describe("[authz.r6] a project by its org's name and its own, and who the user i
     });
   });
 
-  it("[authz.r6] GET /v1/users/me answers the user's handle, whether it is the instance admin, and its orgs with its role in each", async () => {
+  it("[authz.r6] GET /v1/users/me answers the user's handle and its orgs with its role in each", async () => {
     const user = await seedUser(uniqueHandle("me"), { role: "maintainer" });
-    const admin = await seedUser(uniqueHandle("admin-me"), { role: null, admin: true });
+    const alone = await seedUser(uniqueHandle("alone-me"), { role: null });
     expect(await call("/v1/users/me", { token: user.token })).toEqual({
       status: 200,
       body: {
         userId: user.userId,
         handle: user.handle,
-        instanceAdmin: false,
         orgs: [{ id: POOL_ORG, name: "pool", role: "maintainer" }],
       },
     });
-    expect(await call("/v1/users/me", { token: admin.token })).toEqual({
+    expect(await call("/v1/users/me", { token: alone.token })).toEqual({
       status: 200,
-      body: { userId: admin.userId, handle: admin.handle, instanceAdmin: true, orgs: [] },
+      body: { userId: alone.userId, handle: alone.handle, orgs: [] },
     });
   });
 });
@@ -483,65 +474,5 @@ describe("[authz.create-project] creating a project in an org", () => {
     // An org that does not exist reads as missing.
     const nowhere = await create(via, user.token, uniqueHandle("lost"), uniqueHandle("no-org"));
     expect([nowhere.status, nowhere.body["code"]]).toEqual([404, "resource.not_found"]);
-  });
-});
-
-/** The bootstrap credential's token: its secret exchanged as `keel-bootstrap`. */
-async function bootstrap(): Promise<string> {
-  const response = await worker(`${BASE}/v1/oauth/token`, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: BOOTSTRAP_CLIENT_ID,
-      client_secret: env.KEEL_BOOTSTRAP_SECRET,
-    }),
-  });
-  expect(response.status).toBe(200);
-  return (await response.json<{ access_token: string }>()).access_token;
-}
-
-/** POST /v1/admin/users: the user made, or the refusal. */
-const createUser = (token: string, handle: string) =>
-  call<Partial<MadeUser> & { readonly code?: string; readonly detail?: string }>(
-    "/v1/admin/users",
-    { token, method: "POST", body: { handle } },
-  );
-
-describe("[authz.admin-create-user] users made by the bootstrap credential or the instance admin", () => {
-  it("[authz.admin-create-user] the bootstrap credential creates a user whose session works as a bearer; a user who is not the admin is refused; a held or taken handle is 409", async () => {
-    const token = await bootstrap();
-    const handle = uniqueHandle("made");
-    const made = await createUser(token, handle);
-    expect(made).toEqual({
-      status: 201,
-      body: {
-        userId: expect.stringMatching(/^usr_/),
-        handle,
-        org: expect.any(String),
-        session: { token: expect.any(String), expiresAt: expect.any(String) },
-      },
-    });
-    const me = await call("/v1/users/me", { token: made.body.session?.token ?? "" });
-    expect([me.status, me.body["handle"], me.body["userId"]]).toEqual([
-      200,
-      handle,
-      made.body.userId,
-    ]);
-    expect(me.body["orgs"]).toEqual([{ id: made.body.org, name: handle, role: "owner" }]);
-
-    const plain = await createUser((await member("owner")).token, uniqueHandle("nope"));
-    expect([plain.status, plain.body.code, plain.body.detail]).toEqual([
-      403,
-      "auth.forbidden",
-      "Refused: role.",
-    ]);
-    const admin = await seedUser(uniqueHandle("admin"), { role: null, admin: true });
-    expect((await createUser(admin.token, uniqueHandle("by-admin"))).status).toBe(201);
-
-    for (const refused of [handle, "admin", "pool"]) {
-      const answer = await createUser(token, refused);
-      expect([answer.status, answer.body.code]).toEqual([409, "user.handle_refused"]);
-    }
   });
 });

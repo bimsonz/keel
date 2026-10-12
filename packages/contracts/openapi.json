@@ -56,141 +56,9 @@
     },
     {
       "name": "Users"
-    },
-    {
-      "name": "Admin"
     }
   ],
   "paths": {
-    "/admin/users": {
-      "post": {
-        "operationId": "Admin_createUser",
-        "summary": "Create a user",
-        "description": "A user with a handle and its personal org, and a bearer session for it, shown once: how automation\ngets a user. The instance admin, or the bootstrap credential, may call it. A handle already taken or\nheld answers 409.",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": "The request has succeeded and a new resource has been created as a result.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CreatedUser"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The server could not understand the request due to invalid syntax.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Access is unauthorized.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Access is forbidden.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The request conflicts with the current state of the server.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Client error",
-            "headers": {
-              "retry-after": {
-                "required": false,
-                "schema": {
-                  "type": "integer",
-                  "format": "int32"
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service unavailable.",
-            "headers": {
-              "retry-after": {
-                "required": false,
-                "schema": {
-                  "type": "integer",
-                  "format": "int32"
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Admin"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateUserRequest"
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          },
-          {
-            "OAuth2Auth": []
-          }
-        ]
-      }
-    },
     "/agents": {
       "post": {
         "operationId": "Operator_enrolAgent",
@@ -6155,7 +6023,7 @@
       "get": {
         "operationId": "Users_me",
         "summary": "Who am I, as a user?",
-        "description": "The signed-in user: its handle, whether it is the instance admin, and its orgs with its role in each.",
+        "description": "The signed-in user: its handle, and its orgs with its role in each.",
         "parameters": [],
         "responses": {
           "200": {
@@ -9414,56 +9282,6 @@
             "type": "string",
             "minLength": 1,
             "description": "The repository in Keel's core namespace that trunk is forked from. It must already hold the code."
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        }
-      },
-      "CreateUserRequest": {
-        "type": "object",
-        "required": [
-          "handle"
-        ],
-        "properties": {
-          "handle": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Handle"
-              }
-            ],
-            "description": "The new user's handle; its personal org takes the same name."
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        }
-      },
-      "CreatedUser": {
-        "type": "object",
-        "required": [
-          "userId",
-          "handle",
-          "org",
-          "session"
-        ],
-        "properties": {
-          "userId": {
-            "$ref": "#/components/schemas/UserId"
-          },
-          "handle": {
-            "$ref": "#/components/schemas/Handle"
-          },
-          "org": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/OrgId"
-              }
-            ],
-            "description": "The user's personal org, named by its handle."
-          },
-          "session": {
-            "$ref": "#/components/schemas/SessionGrant"
           }
         },
         "additionalProperties": {
@@ -14948,8 +14766,7 @@
           "repo.ref_not_found",
           "repo.path_not_found",
           "agent.state_refused",
-          "project.name_taken",
-          "user.handle_refused"
+          "project.name_taken"
         ],
         "description": "Machine-readable reason for a problem. Dotted; lanes add codes as they build."
       },
@@ -16261,26 +16078,6 @@
           "not": {}
         }
       },
-      "SessionGrant": {
-        "type": "object",
-        "required": [
-          "token",
-          "expiresAt"
-        ],
-        "properties": {
-          "token": {
-            "type": "string"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "additionalProperties": {
-          "not": {}
-        },
-        "description": "A user's bearer session, shown once: present it as `Authorization: Bearer <token>`."
-      },
       "SessionId": {
         "type": "string",
         "pattern": "^ses_[0-9A-HJKMNP-TV-Z]{26}$"
@@ -17240,7 +17037,6 @@
         "type": "object",
         "required": [
           "userId",
-          "instanceAdmin",
           "orgs"
         ],
         "properties": {
@@ -17254,10 +17050,6 @@
               }
             ],
             "description": "Absent until the user chooses one; its personal org takes the same name."
-          },
-          "instanceAdmin": {
-            "type": "boolean",
-            "description": "Whether the user is this instance's admin."
           },
           "orgs": {
             "type": "array",

@@ -5,7 +5,6 @@ import {
   AgentNotAdmitted,
   AgentNotKnown,
   type AgentToken,
-  isBootstrap,
   type Principal,
   TokenRejected,
 } from "../../domain/identity/index.ts";
@@ -18,7 +17,7 @@ export type Credential =
   | { readonly _tag: "Session"; readonly userId: UserId }
   | { readonly _tag: "None" };
 
-/** Who the gate admitted, and for an agent (or the bootstrap credential) the token it verified. */
+/** Who the gate admitted, and for an agent the token it verified. */
 export interface Admitted {
   readonly principal: Principal;
   readonly token?: AgentToken;
@@ -75,8 +74,8 @@ export type GateRefusal =
   | UserNotKnown;
 
 /**
- * Who is asking: a Keel token is an agent, or the
- * bootstrap credential; a session is a user; nothing is anonymous. An agent
+ * Who is asking: a Keel token is an agent, a
+ * session is a user, and nothing is anonymous. An agent
  * stands on its D1 row: its epoch, its org, and its sponsor's standing in that
  * org, read on every request. A token whose `org` is not its agent's current
  * one (minted before the agent was placed) is stale, and the agent exchanges
@@ -97,7 +96,6 @@ export const principalOf: (
       case "Token": {
         const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
         const agent = yield* admit(token);
-        if (isBootstrap(token)) return { principal: { _tag: "Bootstrap" }, token };
         if (agent.org === undefined || agent.sponsor === undefined)
           return yield* new AgentUnplaced({ agentId: agent.id });
         if (token.org !== agent.org) return yield* new TokenRejected({ reason: "claims" });

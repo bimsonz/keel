@@ -236,35 +236,6 @@ describe("Better Auth at /v1/auth", () => {
     expect(session.json.user.username).toBe("fixed");
   });
 
-  it("[ba.held] a name held for the claimant is refused as a handle, a passkey sign-up and an org, in any case", async () => {
-    const holding = makeIsolate({ ...env, KEEL_HELD_NAMES: "Zed, other" }, isolateLayer(env), {
-      sendOtp: async (message) => {
-        outbox.push(message);
-      },
-    });
-    const held = caller(async (request) =>
-      holding.app.fetch(request, env, createExecutionContext()),
-    );
-    const yan = await signUpByCode("yan@example.com", held);
-    const handle = await held("/update-user", { body: { username: "ZED" }, jar: yan.jar });
-    expect([handle.status, handle.json?.code]).toEqual([400, "NAME_REFUSED"]);
-    const passkey = await held("/passkey/generate-register-options?context=zed", {
-      jar: new Jar(),
-    });
-    expect([passkey.status, passkey.json?.code]).toEqual([400, "NAME_REFUSED"]);
-    answered(await held("/update-user", { body: { username: "yan" }, jar: yan.jar }), 200);
-    const org = await held("/organization/create", {
-      body: { name: "Other", slug: "other" },
-      jar: yan.jar,
-    });
-    expect([org.status, org.json?.code]).toEqual([400, "NAME_REFUSED"]);
-    // An instance that holds nothing lets anyone take the same name.
-    answered(
-      await call("/organization/create", { body: { name: "Other", slug: "other" }, jar: yan.jar }),
-      200,
-    );
-  });
-
   it("[ba.names] handles and org names are one namespace, keel.town's own paths refused in any case", async () => {
     const ada = await handled("ada@example.com", "ada");
     const bea = await signUpByCode("bea@example.com");

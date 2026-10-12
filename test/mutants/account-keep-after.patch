@@ -1,0 +1,20 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/account.test.ts
+# kills: account.sign-up
+# why: the passkey is handed over only after Keel accepted it, so a crash in between leaves an account nobody can sign in to again
+diff --git a/scripts/lib/account.ts b/scripts/lib/account.ts
+index af11838..75de1f4 100644
+--- a/scripts/lib/account.ts
++++ b/scripts/lib/account.ts
+@@ -151,11 +151,11 @@ export async function signUp(
+   const device = new Authenticator(keelUrl);
+   const response = await device.create(offered.json.challenge);
+   const passkey = await device.saved();
+-  await options.keep?.(passkey);
+   expectOk(
+     "the registration",
+     await site("/passkey/verify-registration", { jar, body: { response, createSession: true } }),
+   );
++  await options.keep?.(passkey);
+   return { session: await sessionOf(keelUrl, handle, site, jar, fetcher), passkey };
+ }
+ 

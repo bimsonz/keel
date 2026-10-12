@@ -2,11 +2,12 @@
 # kills: gate.unplaced
 # why: an agent with no org or sponsor is admitted as an anonymous caller instead of refused by name, so a pre-tenancy agent silently loses its identity
 diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
+index 393e0f4..d4e149e 100644
 --- a/packages/core/src/application/identity/gate.ts
 +++ b/packages/core/src/application/identity/gate.ts
-@@ -99,7 +99,7 @@
+@@ -97,7 +97,7 @@ export const principalOf: (
+         const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
          const agent = yield* admit(token);
-         if (isBootstrap(token)) return { principal: { _tag: "Bootstrap" }, token };
          if (agent.org === undefined || agent.sponsor === undefined)
 -          return yield* new AgentUnplaced({ agentId: agent.id });
 +          return { principal: { _tag: "Anonymous" } };

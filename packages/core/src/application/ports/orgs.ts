@@ -5,7 +5,7 @@ import type { OrgId } from "../../domain/kernel/index.ts";
 export interface OrgRecord {
   readonly org: OrgId;
   readonly name: string;
-  /** Suspended by the instance admin. */
+  /** Suspended by whoever runs the instance. */
   readonly suspended: boolean;
 }
 

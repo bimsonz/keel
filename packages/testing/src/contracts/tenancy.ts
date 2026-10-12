@@ -92,31 +92,30 @@ export function describeUsersContract(adapter: string, make: () => TenancyHarnes
     });
 
     it.effect(
-      "[ports.users-principal] answers a user's handle, whether it is the instance admin or suspended, and its memberships",
+      "[ports.users-principal] answers a user's handle, whether it is suspended, and its memberships",
       () => {
         const harness = make();
         return Effect.gen(function* () {
-          const admin = { id: userId(), username: fresh("ada"), role: "user,admin" };
-          const banned = { id: userId(), role: "user", banned: true };
-          const plain = { id: userId(), username: fresh("bo"), role: "administrator" };
+          const ada = { id: userId(), username: fresh("ada") };
+          const banned = { id: userId(), banned: true };
+          const plain = { id: userId(), username: fresh("bo") };
           const first = { id: orgId(), slug: fresh("first") };
           const second = { id: orgId(), slug: fresh("second") };
           yield* harness.seed({
-            users: [admin, banned, plain],
+            users: [ada, banned, plain],
             orgs: [first, second],
             members: [
-              { organizationId: first.id, userId: admin.id, role: "member" },
-              { organizationId: second.id, userId: admin.id, role: "owner" },
+              { organizationId: first.id, userId: ada.id, role: "member" },
+              { organizationId: second.id, userId: ada.id, role: "owner" },
               { organizationId: first.id, userId: plain.id, role: "maintainer" },
             ],
           });
           const users = yield* Users;
-          expect(yield* users.principal(admin.id)).toEqual(
+          expect(yield* users.principal(ada.id)).toEqual(
             Option.some({
               _tag: "User",
-              userId: admin.id,
-              handle: admin.username,
-              instanceAdmin: true,
+              userId: ada.id,
+              handle: ada.username,
               suspended: false,
               memberships: byOrg([
                 { org: first.id, role: "member" },
@@ -130,7 +129,6 @@ export function describeUsersContract(adapter: string, make: () => TenancyHarnes
             Option.some({
               _tag: "User",
               userId: banned.id,
-              instanceAdmin: false,
               suspended: true,
               memberships: [],
             }),
@@ -138,14 +136,12 @@ export function describeUsersContract(adapter: string, make: () => TenancyHarnes
           expect(Option.map(unnamed, (principal) => "handle" in principal)).toEqual(
             Option.some(false),
           );
-          // A role that only contains "admin" is not the admin role.
           expect(
             Option.map(yield* users.principal(plain.id), (principal) => [
-              principal.instanceAdmin,
               principal.suspended,
               principal.memberships,
             ]),
-          ).toEqual(Option.some([false, false, [{ org: first.id, role: "maintainer" }]]));
+          ).toEqual(Option.some([false, [{ org: first.id, role: "maintainer" }]]));
         }).pipe(Effect.provide(harness.layer));
       },
     );

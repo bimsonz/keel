@@ -6,11 +6,17 @@
  */
 import { strongestRole } from "@keeltown/core/domain/identity";
 import type { NextAction } from "@keeltown/core/kernel";
-import { APIError, type createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
+import { APIError, type createAuthMiddleware, type getSessionFromCtx } from "better-auth/api";
 import { Result } from "effect";
 import { decideAsRole } from "./roles.ts";
 
 type HookContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0];
+
+/**
+ * Reads the session a request carries. `auth.ts` gives the one that reads a
+ * bearer as well as the cookie: every check here takes it, never the cookie alone.
+ */
+export type SessionOf = (ctx: HookContext) => ReturnType<typeof getSessionFromCtx>;
 
 /** The roles that manage an org's members and invitations (ManageMembers needs `maintain`). */
 const MANAGERS: ReadonlySet<string> = new Set(["owner", "maintainer"]);
@@ -92,8 +98,8 @@ async function inviteTarget(ctx: HookContext, db: D1Database) {
  * Reading or answering an invitation: told only to its recipient, and in
  * words, whether it was answered or has lapsed.
  */
-async function answerable(ctx: HookContext, id: unknown) {
-  const session = await getSessionFromCtx(ctx);
+async function answerable(ctx: HookContext, sessionOf: SessionOf, id: unknown) {
+  const session = await sessionOf(ctx);
   if (session === null || typeof id !== "string") return;
   const invitation = await ctx.context.adapter.findOne<Invitation>({
     model: "invitation",
@@ -111,8 +117,8 @@ async function answerable(ctx: HookContext, id: unknown) {
  * verified email, which a passkey-first user doesn't have, so Keel answers:
  * those to the user's handle, and those to the address it verified.
  */
-async function ownInvitations(ctx: HookContext, db: D1Database) {
-  const session = await getSessionFromCtx(ctx);
+async function ownInvitations(ctx: HookContext, db: D1Database, sessionOf: SessionOf) {
+  const session = await sessionOf(ctx);
   if (session === null) return undefined;
   const { user } = session;
   const where = [
@@ -133,7 +139,7 @@ async function ownInvitations(ctx: HookContext, db: D1Database) {
       organizationName: organization?.name,
       organizationSlug: organization?.slug,
     }));
-  return ctx.json(await shown(db, mine, await readerOf(ctx, db)));
+  return ctx.json(await shown(db, mine, await readerOf(ctx, db, sessionOf)));
 }
 
 /** The roles a request or a member row names: one, a list, or comma-separated, as Better Auth reads them. */
@@ -167,8 +173,8 @@ async function targetRoles(db: D1Database, org: string, member: unknown): Promis
  * every other action, before Better Auth sees them. A caller who isn't a
  * member is left to Better Auth's own refusal.
  */
-async function ownerChange(ctx: HookContext, db: D1Database): Promise<void> {
-  const session = await getSessionFromCtx(ctx);
+async function ownerChange(ctx: HookContext, db: D1Database, sessionOf: SessionOf): Promise<void> {
+  const session = await sessionOf(ctx);
   if (session === null) return;
   const body: Record<string, unknown> = ctx.body ?? {};
   // The org Better Auth will act on: the one named, or else the session's active one.
@@ -197,22 +203,22 @@ async function ownerChange(ctx: HookContext, db: D1Database): Promise<void> {
 }
 
 /** Runs before Better Auth's org routes. */
-export function orgBefore(db: D1Database) {
+export function orgBefore(db: D1Database, sessionOf: SessionOf) {
   return async (ctx: HookContext) => {
     switch (ctx.path) {
       case "/organization/invite-member":
-        await ownerChange(ctx, db);
+        await ownerChange(ctx, db, sessionOf);
         return inviteTarget(ctx, db);
       case "/organization/update-member-role":
       case "/organization/remove-member":
-        return ownerChange(ctx, db);
+        return ownerChange(ctx, db, sessionOf);
       case "/organization/get-invitation":
-        return answerable(ctx, ctx.query?.["id"]);
+        return answerable(ctx, sessionOf, ctx.query?.["id"]);
       case "/organization/accept-invitation":
       case "/organization/reject-invitation":
-        return answerable(ctx, ctx.body?.["invitationId"]);
+        return answerable(ctx, sessionOf, ctx.body?.["invitationId"]);
       case "/organization/list-user-invitations":
-        return ownInvitations(ctx, db);
+        return ownInvitations(ctx, db, sessionOf);
       default:
         return undefined;
     }
@@ -220,7 +226,7 @@ export function orgBefore(db: D1Database) {
 }
 
 /** Rewrites every org answer for its reader, and gives the last owner a way forward. */
-export function orgAfter(db: D1Database) {
+export function orgAfter(db: D1Database, sessionOf: SessionOf) {
   return async (ctx: HookContext) => {
     if (!ctx.path.startsWith("/organization/")) return undefined;
     const returned: unknown = ctx.context.returned;
@@ -231,7 +237,7 @@ export function orgAfter(db: D1Database) {
     }
     if (typeof returned !== "object" || returned === null || returned instanceof Response)
       return undefined;
-    return ctx.json(await shown(db, returned, await readerOf(ctx, db)));
+    return ctx.json(await shown(db, returned, await readerOf(ctx, db, sessionOf)));
   };
 }
 
@@ -251,8 +257,8 @@ function lastOwner(body: Record<string, unknown> | undefined): APIError {
   });
 }
 
-async function readerOf(ctx: HookContext, db: D1Database): Promise<Reader> {
-  const session = ctx.headers === undefined ? null : await getSessionFromCtx(ctx);
+async function readerOf(ctx: HookContext, db: D1Database, sessionOf: SessionOf): Promise<Reader> {
+  const session = ctx.headers === undefined ? null : await sessionOf(ctx);
   if (session === null) return { manages: new Set() };
   const { results } = await db
     .prepare(`SELECT organizationId AS org, role FROM member WHERE userId = ?1`)

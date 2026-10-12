@@ -59,7 +59,11 @@ function refusal(answer: GateRefusal, requestId: string): Response {
       return problemResponse(403, "auth.agent_unplaced", requestId, {
         detail: `Agent ${answer.agentId} has no org or sponsor: it was enrolled before tenancy and has not been placed in an org.`,
         nextActions: [
-          { kind: "escalate", title: "Ask the instance admin to place the agent in an org" },
+          {
+            kind: "escalate",
+            title:
+              "Ask a member of the project's org to enrol a new agent: this one was never placed",
+          },
         ],
       });
     case "invalid":

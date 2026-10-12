@@ -2,10 +2,10 @@
 # kills: b11.gate-no-hop
 # why: the request gate runs whoami, so every authenticated request calls the agent's AgentSession DO
 diff --git a/packages/core/src/application/identity/gate.ts b/packages/core/src/application/identity/gate.ts
-index 3a1ef4e..cffa42e 100644
+index 393e0f4..806c9f4 100644
 --- a/packages/core/src/application/identity/gate.ts
 +++ b/packages/core/src/application/identity/gate.ts
-@@ -10,7 +10,7 @@ import {
+@@ -9,7 +9,7 @@ import {
    TokenRejected,
  } from "../../domain/identity/index.ts";
  import { AgentId, UserId } from "../../domain/kernel/index.ts";
@@ -14,11 +14,11 @@ index 3a1ef4e..cffa42e 100644
  
  /** What a request presents, as the doorway reads it: a Keel token, a user's session, or nothing. */
  export type Credential =
-@@ -97,6 +97,7 @@ export const principalOf: (
+@@ -96,6 +96,7 @@ export const principalOf: (
        case "Token": {
          const token = yield* TokenIssuer.use((issuer) => issuer.verify(credential.token));
          const agent = yield* admit(token);
 +        yield* Sessions.use((sessions) => sessions.current(agent.id));
-         if (isBootstrap(token)) return { principal: { _tag: "Bootstrap" }, token };
          if (agent.org === undefined || agent.sponsor === undefined)
            return yield* new AgentUnplaced({ agentId: agent.id });
+         if (token.org !== agent.org) return yield* new TokenRejected({ reason: "claims" });

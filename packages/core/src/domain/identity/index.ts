@@ -2,7 +2,6 @@
 export * from "./agent.ts";
 export * from "./agent-machine.ts";
 export * from "./authorize.ts";
-export * from "./bootstrap.ts";
 export * from "./errors.ts";
 export * from "./events.ts";
 export * from "./inbox.ts";

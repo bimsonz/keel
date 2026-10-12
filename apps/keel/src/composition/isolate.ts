@@ -19,12 +19,10 @@ import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
 import {
   AUTH_BASE_PATH,
   type AuthConfig,
-  createUser,
   makeAuth,
   type OtpSender,
   signInMethods,
 } from "../adapters/driven/better-auth/auth.ts";
-import { AgentDirectoryWithBootstrap } from "../adapters/driven/bootstrap/directory.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { MembershipsD1 } from "../adapters/driven/d1/memberships.ts";
 import { OrgsD1 } from "../adapters/driven/d1/orgs.ts";
@@ -66,9 +64,7 @@ export function isolateLayer(
   const project = (projectId: ProjectId) =>
     env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`));
   const projector = () => env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR));
-  const directory = AgentDirectoryWithBootstrap(env.KEEL_BOOTSTRAP_SECRET).pipe(
-    Layer.provide(AgentDirectoryD1(env.DB)),
-  );
+  const directory = AgentDirectoryD1(env.DB);
   return Layer.mergeAll(
     overrides.changes ?? ChangesRpc({ change, agentSession }),
     overrides.inbox ?? InboxRpc(agentSession),
@@ -190,12 +186,6 @@ function identity(env: Env, overrides: AuthOverrides): AuthConfig {
     background: waitUntil,
     ...(overrides.sendOtp === undefined ? {} : { sendOtp: overrides.sendOtp }),
     ...(clientId && clientSecret ? { github: { clientId, clientSecret } } : {}),
-    heldNames: new Set(
-      env.KEEL_HELD_NAMES.split(",")
-        .map((name) => name.trim().toLowerCase())
-        .filter((name) => name !== ""),
-    ),
-    claimDigest: env.KEEL_CLAIM_DIGEST,
   };
 }
 
@@ -207,9 +197,7 @@ export function makeIsolate(
 ): Isolate {
   const runtime = ManagedRuntime.make(layer);
   const authConfig = identity(env, authOverrides);
-  const handlers = makeHandlers(makeRunner(runtime), signInMethods(authConfig), (handle) =>
-    createUser(authConfig, handle),
-  );
+  const handlers = makeHandlers(makeRunner(runtime), signInMethods(authConfig));
   /**
    * Better Auth starts its initialisation (D1 included) when it is made and
    * shares that promise, and its adapter's schema check, with every later

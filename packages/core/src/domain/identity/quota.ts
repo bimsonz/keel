@@ -19,8 +19,8 @@ export type QuotaKind = typeof QuotaKind.Type;
 export type Quotas = Readonly<Record<QuotaKind, number>>;
 
 /**
- * The instance's defaults (R9): engineering defaults the instance admin
- * adjusts live with SetQuotas, each org's overrides taking precedence.
+ * The instance's defaults (R9): engineering defaults whoever runs the instance
+ * adjusts in its configuration, each org's overrides taking precedence.
  */
 export const DEFAULT_QUOTAS: Quotas = {
   projects: 10,
@@ -54,11 +54,11 @@ export interface QuotaAsk {
   readonly amount: number;
   readonly used: number;
   readonly now: Instant;
-  /** The instance's limits, as the admin set them; `DEFAULT_QUOTAS` when absent. */
+  /** The instance's limits, as its configuration sets them; `DEFAULT_QUOTAS` when absent. */
   readonly defaults?: Quotas;
   /** The org's own limits, which take precedence. */
   readonly overrides?: Partial<Quotas>;
-  /** Whether the instance admin has stopped new verification spend. */
+  /** Whether the instance's configuration has stopped new verification spend. */
   readonly halted: boolean;
 }
 
@@ -103,7 +103,7 @@ export const admitQuota = (ask: QuotaAsk): Result.Result<QuotaAdmitted, QuotaExc
         ...refusal,
         reason: "halted",
         nextActions: [
-          { kind: "escalate", title: "Verification spend is stopped; ask the instance admin" },
+          { kind: "escalate", title: "Verification spend is stopped; ask whoever runs this Keel" },
         ],
       }),
     );
@@ -120,7 +120,7 @@ export const admitQuota = (ask: QuotaAsk): Result.Result<QuotaAdmitted, QuotaExc
         retryAt === undefined
           ? {
               kind: "escalate",
-              title: `The org is at its ${ask.kind} limit (${limit}); free some, or ask the instance admin to raise it`,
+              title: `The org is at its ${ask.kind} limit (${limit}); free some, or ask whoever runs this Keel to raise it`,
             }
           : {
               kind: "wait",

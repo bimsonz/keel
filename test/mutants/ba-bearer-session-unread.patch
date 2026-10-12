@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-org.test.ts
+# kills: ba.bearer-hooks
+# why: Keel's checks read only the cookie, so a session sent as a bearer is nobody to them: it skips the owner-change check and cannot list its own invitations
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 4b30994..4df89a5 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -158,7 +158,7 @@ export function authOptions(config: AuthConfig) {
+   const sessionOf: SessionOf = async (ctx) => {
+     const byCookie = await getSessionFromCtx(ctx);
+     if (byCookie !== null || !BEARER.test(ctx.headers?.get("authorization") ?? "")) return byCookie;
+-    return auth.api.getSession({ headers: ctx.headers ?? new Headers() });
++    return byCookie;
+   };
+ 
+   const beforeOrg = orgBefore(db, sessionOf);
