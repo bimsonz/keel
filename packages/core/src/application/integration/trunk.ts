@@ -337,8 +337,8 @@ export type PushOutcome =
   | "retry"
   /** Trunk holds a head the WAL does not explain: PromotionFrozen is committed, and a person must look. */
   | "frozen"
-  /** The pack is over the receive-pack cap: nothing landed, and a retry cannot help until pushes are split. */
-  | "too-large"
+  /** The group's push was refused (its pack is over the receive-pack cap) with trunk still on the old head: PromotionDeclined is committed for each batch, and the queue moves on. */
+  | "declined"
   /** No group is open. */
   | "idle";
 
@@ -352,7 +352,9 @@ const restingAs = (trunk: Trunk | undefined): PushOutcome =>
  * the candidate's commit once, before the first push, and every retry pushes
  * that SHA with the WAL's old value. The read-back decides: the recorded SHA
  * advances trunk, the old head means push again, anything else freezes. A
- * destroyed trunk pushes nothing, even a group it had opened.
+ * pack over the receive-pack cap, with trunk still on the old head, is
+ * PushRefused: the group is declined, never left open. A destroyed trunk
+ * pushes nothing, even a group it had opened.
  */
 export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
   projectId: ProjectId,
@@ -384,7 +386,15 @@ export const pushPromotion = Effect.fn("integration/pushPromotion")(function* (
   const pushed = yield* Effect.result(writer.push(trunk.wal.old, target));
   if (Result.isFailure(pushed)) {
     const failure = pushed.failure;
-    if (failure._tag === "PackTooLarge") return "too-large" satisfies PushOutcome;
+    if (failure._tag === "PackTooLarge" && (yield* writer.head) === trunk.wal.old) {
+      // Nothing landed and no retry can help: the domain declines the group, so its change bounces and trunk stays free.
+      yield* promote(
+        projectId,
+        { _tag: "PushRefused", reason: "pack-too-large", observed: trunk.wal.old },
+        `refused:${trunk.wal.groupId}:pack-too-large`,
+      ).pipe(Effect.orDie);
+      return "declined" satisfies PushOutcome;
+    }
     if (failure._tag === "PushRejected" && failure.reason === "busy")
       return "retry" satisfies PushOutcome;
     // Stale or an unexpected head: the read-back tells a lost acknowledgement from a moved trunk.

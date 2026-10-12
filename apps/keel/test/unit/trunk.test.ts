@@ -378,6 +378,52 @@ describe("the Trunk's promotion", () => {
   );
 
   it.effect(
+    "[trunk.refused-too-large] a group whose pack is over the cap is refused, not left open: its batch is declined with the reason, trunk does not move, and the batch behind it lands",
+    () => {
+      const w = promotion();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        const big = yield* w.composed(1, base);
+        const next = yield* w.composed(2, base);
+        w.writer.weigh(big, 61 * 1024 * 1024);
+        yield* deliver(verified(1, base));
+        yield* deliver(verified(2, base));
+        expect(yield* flushTrunk(PROJECT)).toBe("promoting");
+        expect(yield* pushPromotion(PROJECT)).toBe("declined");
+        expect(w.writer.head()).toBe(base);
+        const declined = (yield* trunkLog).filter((e) => e.type === "PromotionDeclined");
+        expect(declined.map((e) => e.payload)).toMatchObject([
+          { batchId: batch(1), reason: "pack-too-large", reverify: [] },
+        ]);
+        expect((yield* typesOf).filter((t) => t === "PromotionFrozen")).toEqual([]);
+        // Nothing is left open, so the batch behind it is not held up.
+        expect(yield* flushTrunk(PROJECT)).toBe("promoting");
+        expect(yield* pushPromotion(PROJECT)).toBe("advanced");
+        expect(w.writer.head()).toBe(next);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[trunk.too-large-moved] a pack over the cap on a trunk that is no longer on the WAL's old head is not a refusal: the read-back decides, and freezes",
+    () => {
+      const w = promotion();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        const big = yield* w.composed(1, base);
+        w.writer.weigh(big, 61 * 1024 * 1024);
+        yield* deliver(verified(1, base));
+        expect(yield* flushTrunk(PROJECT)).toBe("promoting");
+        w.writer.interfere(sha("f"));
+        expect(yield* pushPromotion(PROJECT)).toBe("frozen");
+        const types = yield* typesOf;
+        expect(types).toContain("PromotionFrozen");
+        expect(types).not.toContain("PromotionDeclined");
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
     "[trunk.retry-same-sha] a push trunk did not take is pushed again with the recorded SHA, never recomposed",
     () => {
       const w = promotion();

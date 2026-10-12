@@ -11,6 +11,7 @@ import {
   CandidateBundles,
   CandidateComposer,
   Lanes,
+  PackTooLarge,
   type RepoRef,
   StagingWriter,
   type SyncOutcome,
@@ -72,6 +73,9 @@ export function makeCandidateComposerMemory(options: { readonly refuse?: readonl
 
 const repoKey = (repo: RepoRef) => `${repo.namespace}/${repo.name}`;
 
+/** The most one relayed pack may weigh, as GitCore's relay caps it. */
+const RECEIVE_PACK_CAP_BYTES = 60 * 1024 * 1024;
+
 /**
  * One head. A push from anything but the head is refused, as a fenced writer
  * must refuse it. `sync` copies the head into each target's main, which
@@ -80,6 +84,7 @@ const repoKey = (repo: RepoRef) => `${repo.namespace}/${repo.name}`;
 export function makeTrunkWriterMemory(initial: CommitSha) {
   let current = initial;
   let dropping = 0;
+  const weights = new Map<CommitSha, number>();
   const targets = new Map<string, CommitSha>();
   const pushes: { readonly from: CommitSha; readonly to: CommitSha }[] = [];
   return {
@@ -95,13 +100,26 @@ export function makeTrunkWriterMemory(initial: CommitSha) {
     drop: (n: number) => {
       dropping = n;
     },
+    /** The pack that carries `to` weighs `bytes`: over the receive-pack cap, its push is PackTooLarge and moves nothing. */
+    weigh: (to: CommitSha, bytes: number) => {
+      weights.set(to, bytes);
+    },
     layer: Layer.succeed(
       TrunkWriter,
       TrunkWriter.of({
         head: Effect.sync(() => current),
         push: (from, to) =>
-          Effect.suspend(() => {
+          Effect.suspend((): Effect.Effect<void, PackTooLarge | UnexpectedHead> => {
             pushes.push({ from, to });
+            const bytes = weights.get(to) ?? 0;
+            if (bytes > RECEIVE_PACK_CAP_BYTES)
+              return Effect.fail(
+                new PackTooLarge({
+                  repo: { namespace: "memory", name: "trunk" },
+                  bytes,
+                  limit: RECEIVE_PACK_CAP_BYTES,
+                }),
+              );
             if (from !== current)
               return Effect.fail(new UnexpectedHead({ expected: from, observed: current }));
             if (dropping > 0) {

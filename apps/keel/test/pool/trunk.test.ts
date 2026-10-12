@@ -285,6 +285,28 @@ describe("the Trunk DO's promotion", () => {
     expect(t.writer.pushes()).toEqual([{ from: moved, to: tip }]);
   });
 
+  it("[trunk.do.refused-too-large] a batch whose pack is over the cap is declined through the real object, and the batch delivered behind it lands", async () => {
+    const t = await promoting();
+    const big = await t.composed(1, t.base);
+    const tip = await t.composed(2, t.base);
+    t.writer.weigh(big, 61 * 1024 * 1024);
+    await t.stub.receive([t.verified(1, t.base)]);
+    await t.until(async () =>
+      expect((await t.log()).map((e) => e.type)).toContain("PromotionDeclined"),
+    );
+    expect(await t.status()).toMatchObject(Exit.succeed({ head: t.base }));
+    await t.stub.receive([t.verified(2, t.base)]);
+    await t.until(async () =>
+      expect(await t.status()).toEqual(Exit.succeed({ head: tip, promotion: "idle", redCount: 0 })),
+    );
+    const log = await t.log();
+    expect(log.map((e) => e.type)).not.toContain("PromotionFrozen");
+    expect(log.find((e) => e.type === "PromotionDeclined")?.payload).toMatchObject({
+      reason: "pack-too-large",
+    });
+    expect(t.writer.head()).toBe(tip);
+  });
+
   it("[destroy.resumes] a destroyed trunk deletes its project's four repos, trying a failed deletion again until none is left, and promotes nothing meanwhile", async () => {
     const t = await promoting();
     const repos = Object.values(projectRepos(t.projectId));

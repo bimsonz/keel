@@ -174,8 +174,8 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
       });
     if (outcome === "frozen")
       console.error(`trunk ${projectId} froze promotion: its head is not one the WAL explains`);
-    if (outcome === "too-large")
-      console.error(`trunk ${projectId} cannot push its open group: the pack is over the cap`);
+    if (outcome === "declined")
+      console.warn(`trunk ${projectId} declined its group: the pack is over the receive-pack cap`);
     await this.debounceIfWaiting();
   }
 
