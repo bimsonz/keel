@@ -7,6 +7,7 @@ import {
   guardOf,
   type MatrixCell,
   partiesOf,
+  planStateOf,
   type ProbeParties,
   probeWorldPlan,
   reportsOf,
@@ -121,6 +122,38 @@ describe("probe-conflict", () => {
         },
       ),
     );
+  });
+
+  it("[probe-conflict.plan-state] a change's plan is still to come exactly while its Precheck runs, and an earlier submission's plan is never this one's", () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...ChangeState.literals),
+        fc.option(fc.constant(hash(7)), { nil: undefined }),
+        (state, planHash) => {
+          const prechecking = state === "submitted" || state === "deriving";
+          expect(planStateOf({ state, planHash })).toEqual(
+            prechecking
+              ? { _tag: "Pending" }
+              : planHash === undefined
+                ? { _tag: "None", state }
+                : { _tag: "Compiled", planHash },
+          );
+        },
+      ),
+    );
+    // The live S-1 run's case: read a second after ChangeSubmitted, before Precheck compiled.
+    expect(planStateOf({ state: "submitted", planHash: undefined })).toEqual({ _tag: "Pending" });
+    // A resubmission keeps the hash of the plan before it until its own PlanCompiled.
+    expect(planStateOf({ state: "deriving", planHash: hash(7) })).toEqual({ _tag: "Pending" });
+    // A Precheck that refused left no plan, and none is coming.
+    expect(planStateOf({ state: "bounced", planHash: undefined })).toEqual({
+      _tag: "None",
+      state: "bounced",
+    });
+    expect(planStateOf({ state: "landed", planHash: hash(7) })).toEqual({
+      _tag: "Compiled",
+      planHash: hash(7),
+    });
   });
 
   it("[probe-conflict.landed-worlds] a landed side is its commit on trunk, over its first parent, and the other side composes onto it", () => {

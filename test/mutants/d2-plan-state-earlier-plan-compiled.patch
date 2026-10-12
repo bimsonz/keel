@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/probe-conflict.test.ts
+# kills: probe-conflict.plan-state
+# why: A resubmitted change still holds its earlier submission's plan hash, which is read as the plan of the submission its Precheck is still compiling
+diff --git a/packages/core/src/application/verification/probe-conflict.ts b/packages/core/src/application/verification/probe-conflict.ts
+index 8bdf23b..ca7bde3 100644
+--- a/packages/core/src/application/verification/probe-conflict.ts
++++ b/packages/core/src/application/verification/probe-conflict.ts
+@@ -109,7 +109,7 @@ export type PlanState =
+  * otherwise, so nothing waits on a subscription nobody holds.
+  */
+ export const planStateOf = (change: Pick<Change, "state" | "planHash">): PlanState => {
+-  if (PRECHECKING.has(change.state)) return { _tag: "Pending" };
++  if (PRECHECKING.has(change.state) && change.planHash === undefined) return { _tag: "Pending" };
+   return change.planHash === undefined
+     ? { _tag: "None", state: change.state }
+     : { _tag: "Compiled", planHash: change.planHash };

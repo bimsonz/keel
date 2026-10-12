@@ -84,6 +84,37 @@ export const submissionStateOf = (change: PartyChange): PartySubmission => {
   return { _tag: "Submitted", head: change.commitSha, base: change.baseSha };
 };
 
+/** States in which a change's Precheck is still to answer: it has submitted, and no plan or refusal has come of it yet. */
+const PRECHECKING: ReadonlySet<ChangeState> = new Set(["submitted", "deriving"]);
+
+/**
+ * The plan of a change's current submission, as its Change stands: compiled;
+ * still to come; or none, in the state it is in.
+ */
+export type PlanState =
+  | { readonly _tag: "Compiled"; readonly planHash: ContentHash }
+  | { readonly _tag: "Pending" }
+  | { readonly _tag: "None"; readonly state: ChangeState };
+
+/**
+ * Whether a change's current submission has its plan, read from its Change.
+ * While its Precheck runs the plan is Pending, whatever `planHash` holds: a
+ * resubmitted change keeps its earlier submission's hash until the next
+ * PlanCompiled, and that plan is not this submission's. Past Precheck, the
+ * hash it holds is the plan it was verified under; with none (a Precheck that
+ * refused, a change not yet submitted), no plan is coming.
+ *
+ * The one rule for both sides of a wait for the plan: the Change DO answers
+ * at once exactly when this is not Pending, and records the subscriber
+ * otherwise, so nothing waits on a subscription nobody holds.
+ */
+export const planStateOf = (change: Pick<Change, "state" | "planHash">): PlanState => {
+  if (PRECHECKING.has(change.state)) return { _tag: "Pending" };
+  return change.planHash === undefined
+    ? { _tag: "None", state: change.state }
+    : { _tag: "Compiled", planHash: change.planHash };
+};
+
 /** The code a draft is about: the anchors the premise and the effect name, premise first, each once. */
 export const anchorsOf = (parties: ProbeParties): readonly string[] => [
   ...new Set(

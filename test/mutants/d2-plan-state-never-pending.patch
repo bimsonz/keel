@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/probe-conflict.test.ts
+# kills: probe-conflict.plan-state
+# why: A change read a second after its ChangeSubmitted has no plan coming, so its suite check records n/a before Precheck has compiled: what the live S-1 run recorded for both parties
+diff --git a/packages/core/src/application/verification/probe-conflict.ts b/packages/core/src/application/verification/probe-conflict.ts
+index 8bdf23b..07b41ba 100644
+--- a/packages/core/src/application/verification/probe-conflict.ts
++++ b/packages/core/src/application/verification/probe-conflict.ts
+@@ -109,7 +109,6 @@ export type PlanState =
+  * otherwise, so nothing waits on a subscription nobody holds.
+  */
+ export const planStateOf = (change: Pick<Change, "state" | "planHash">): PlanState => {
+-  if (PRECHECKING.has(change.state)) return { _tag: "Pending" };
+   return change.planHash === undefined
+     ? { _tag: "None", state: change.state }
+     : { _tag: "Compiled", planHash: change.planHash };
