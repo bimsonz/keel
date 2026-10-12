@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.sweep-one-run
+# why: a command's one run is narrowed to the first mutant's claims, so every other mutant's test is left out of the report it is read from.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index b86e653..b287fcd 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -284,7 +284,7 @@ export function sweeper(given: {
+   /** The tags claimed under each command as written, in the order first claimed. */
+   const claimed = new Map<string, readonly string[]>();
+   for (const { command, kills } of given.mutants)
+-    claimed.set(command, [...new Set([...(claimed.get(command) ?? []), ...kills])]);
++    claimed.set(command, claimed.get(command) ?? kills);
+ 
+   return ({ command, kills }) => {
+     if (kills.length === 0) {

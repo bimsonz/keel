@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.arguments
+# why: --baseline-only is read and dropped, so asking for a sweep starts a full proof, which applies every patch.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index b86e653..a56e59f 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -326,7 +326,7 @@ export function argumentsOf(argv: readonly string[]): Asked | { readonly refused
+   for (let at = 0; at < argv.length; at += 1) {
+     const arg = argv[at] ?? "";
+     if (arg === "--") continue;
+-    if (arg === "--baseline-only") baselineOnly = true;
++    if (arg === "--baseline-only") baselineOnly = false;
+     else if (arg === "--unseeded") {
+       at += 1;
+       unseeded = Number(argv[at] ?? "none");

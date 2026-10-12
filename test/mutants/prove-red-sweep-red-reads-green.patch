@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.sweep, prove-red.sweep-one-run
+# why: the sweep reads no fault from a tagged mutant's baseline, so every patch whose claimed test already fails is called green: the sweep finds nothing.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index b86e653..958f464 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -295,7 +295,6 @@ export function sweeper(given: {
+     }
+     const clean = baseline(filteredToClaims(command, claimed.get(command) ?? kills), true);
+     const fault = baselineFault(clean, kills);
+-    if (fault !== null) return { verdict: "baseline-red", detail: fault };
+     const { ran, listed } = tagsIn(clean.report);
+     return { verdict: "baseline-green", note: `${ran} of ${listed} tests` };
+   };

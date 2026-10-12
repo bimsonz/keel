@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.sweep, prove-red.sweep-one-run
+# why: the sweep runs each command as written, the whole file, so a Change-machine file takes its two minutes for every command and the line no longer shows what ran.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index b86e653..938a2f2 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -293,7 +293,7 @@ export function sweeper(given: {
+         ? { verdict: "baseline-green", note: "exit 0" }
+         : { verdict: "baseline-red", detail: fault };
+     }
+-    const clean = baseline(filteredToClaims(command, claimed.get(command) ?? kills), true);
++    const clean = baseline(command, true);
+     const fault = baselineFault(clean, kills);
+     if (fault !== null) return { verdict: "baseline-red", detail: fault };
+     const { ran, listed } = tagsIn(clean.report);

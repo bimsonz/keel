@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.baseline-ran
+# why: a claimed tag counts as run when any test of the file ran, so a header's own -t that runs another test hides that the claimed one was left out.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index b86e653..c24e47e 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -136,7 +136,7 @@ function baselineFault(clean: Ran, kills: readonly string[]): string | null {
+   const { failed, seen, tested } = tagsIn(clean.report);
+   const unseen = kills.filter((tag) => !seen.has(tag));
+   if (unseen.length > 0) return `no test carries ${bracketed(unseen)} without the mutant`;
+-  const idle = kills.filter((tag) => !tested.has(tag));
++  const idle = tested.size > 0 ? [] : kills;
+   if (idle.length > 0) return `no test carrying ${bracketed(idle)} ran without the mutant`;
+   const red = kills.filter((tag) => failed.has(tag));
+   if (red.length > 0)

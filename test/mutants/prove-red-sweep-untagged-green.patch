@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.sweep, prove-red.sweep-one-run
+# why: the sweep never reads an untagged command's exit code, so a guard that is already red is called a green baseline.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index b86e653..d01120b 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -288,7 +288,7 @@ export function sweeper(given: {
+ 
+   return ({ command, kills }) => {
+     if (kills.length === 0) {
+-      const fault = exitFault(baseline(command, false), command);
++      const fault = exitFault({ ...baseline(command, false), status: 0 }, command);
+       return fault === null
+         ? { verdict: "baseline-green", note: "exit 0" }
+         : { verdict: "baseline-red", detail: fault };

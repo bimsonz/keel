@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.sweep
+# why: the sweep asks an untagged command for vitest's report, so a guard or a typecheck is handed reporter flags it does not take and exits non-zero by that alone.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index b86e653..ad75ebd 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -288,7 +288,7 @@ export function sweeper(given: {
+ 
+   return ({ command, kills }) => {
+     if (kills.length === 0) {
+-      const fault = exitFault(baseline(command, false), command);
++      const fault = exitFault(baseline(command, true), command);
+       return fault === null
+         ? { verdict: "baseline-green", note: "exit 0" }
+         : { verdict: "baseline-red", detail: fault };

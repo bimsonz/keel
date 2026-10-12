@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.arguments
+# why: --unseeded takes anything, so `--unseeded two` asks for NaN unseeded runs, which is none, and says nothing.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index b86e653..b7eb432 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -330,8 +330,6 @@ export function argumentsOf(argv: readonly string[]): Asked | { readonly refused
+     else if (arg === "--unseeded") {
+       at += 1;
+       unseeded = Number(argv[at] ?? "none");
+-      if (!Number.isInteger(unseeded) || unseeded < 0)
+-        return { refused: "--unseeded takes a whole number of runs" };
+     } else if (arg === "--dir") {
+       at += 1;
+       dir = argv[at];

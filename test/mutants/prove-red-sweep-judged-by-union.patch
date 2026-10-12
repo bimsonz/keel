@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.sweep-one-run
+# why: a mutant is judged by every tag claimed under its command, so one broken test turns every patch of its file red, also those that never claimed it.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index b86e653..48540cd 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -294,7 +294,7 @@ export function sweeper(given: {
+         : { verdict: "baseline-red", detail: fault };
+     }
+     const clean = baseline(filteredToClaims(command, claimed.get(command) ?? kills), true);
+-    const fault = baselineFault(clean, kills);
++    const fault = baselineFault(clean, claimed.get(command) ?? kills);
+     if (fault !== null) return { verdict: "baseline-red", detail: fault };
+     const { ran, listed } = tagsIn(clean.report);
+     return { verdict: "baseline-green", note: `${ran} of ${listed} tests` };

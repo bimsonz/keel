@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.baseline-ran
+# why: a tag counts as run only when the last test carrying it ran, so one skipped test beside a live one holds back a mutant that the live one kills.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index b86e653..b5f3cac 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -98,6 +98,7 @@ function tagsIn(report: unknown): Tally {
+         if (tag === undefined) continue;
+         seen.add(tag);
+         if (didRun) tested.add(tag);
++        else tested.delete(tag);
+         if (status === "failed") failed.add(tag);
+       }
+     }

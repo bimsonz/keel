@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.arguments
+# why: an option the script does not know is passed over, so a mistyped --baseline-only starts a full proof of every patch.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index b86e653..d68c66a 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -336,7 +336,7 @@ export function argumentsOf(argv: readonly string[]): Asked | { readonly refused
+       at += 1;
+       dir = argv[at];
+       if (dir === undefined) return { refused: "--dir takes a patch directory" };
+-    } else if (arg.startsWith("--")) return { refused: `unknown option ${arg}` };
++    } else if (arg.startsWith("--")) continue;
+     else filter ??= arg;
+   }
+   return { filter: filter ?? "", unseeded, dir, baselineOnly };

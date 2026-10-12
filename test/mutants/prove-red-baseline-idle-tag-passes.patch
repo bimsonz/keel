@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/prove-red.test.ts
+# kills: prove-red.baseline-ran
+# why: a claimed tag whose every test was left out passes the baseline, so a sweep calls green a patch that can never go red, and a proof applies it to learn the same.
+diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
+index b86e653..32667ff 100644
+--- a/packages/tooling/src/prove-red.ts
++++ b/packages/tooling/src/prove-red.ts
+@@ -137,7 +137,6 @@ function baselineFault(clean: Ran, kills: readonly string[]): string | null {
+   const unseen = kills.filter((tag) => !seen.has(tag));
+   if (unseen.length > 0) return `no test carries ${bracketed(unseen)} without the mutant`;
+   const idle = kills.filter((tag) => !tested.has(tag));
+-  if (idle.length > 0) return `no test carrying ${bracketed(idle)} ran without the mutant`;
+   const red = kills.filter((tag) => failed.has(tag));
+   if (red.length > 0)
+     return `${bracketed(red)} ${red.length === 1 ? "fails" : "fail"} without the mutant`;

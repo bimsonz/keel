@@ -2,13 +2,13 @@
 # kills: prove-red.baseline-shared
 # why: a run for an exit code and a run for a report share one baseline, so a tagged mutant that follows an untagged one with the same command reads a baseline with no report and is held back.
 diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
-index 660b8c4..7bdfebe 100644
+index b86e653..b3cebee 100644
 --- a/packages/tooling/src/prove-red.ts
 +++ b/packages/tooling/src/prove-red.ts
-@@ -148,7 +148,7 @@ export function prover(given: {
- 
-   /** The command with no patch applied, under the first seed: once per command and kind of run. */
-   const baseline = (command: string, reported: boolean): Ran => {
+@@ -159,7 +159,7 @@ function exitFault(clean: Ran, command: string): string | null {
+ function baselineTaker(run: (run: Run) => Ran): (command: string, reported: boolean) => Ran {
+   const baselines = new Map<string, Ran>();
+   return (command, reported) => {
 -    const key = `${reported ? "report" : "exit"} ${command}`;
 +    const key = command;
      const kept = baselines.get(key);

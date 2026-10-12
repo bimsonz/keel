@@ -2,11 +2,11 @@
 # kills: prove-red.baseline-shared
 # why: the kept baseline is never read, so every mutant runs its command with no patch again, also the hundreds that share one.
 diff --git a/packages/tooling/src/prove-red.ts b/packages/tooling/src/prove-red.ts
-index 660b8c4..47c7dad 100644
+index b86e653..9d9c6f4 100644
 --- a/packages/tooling/src/prove-red.ts
 +++ b/packages/tooling/src/prove-red.ts
-@@ -150,7 +150,6 @@ export function prover(given: {
-   const baseline = (command: string, reported: boolean): Ran => {
+@@ -161,7 +161,6 @@ function baselineTaker(run: (run: Run) => Ran): (command: string, reported: bool
+   return (command, reported) => {
      const key = `${reported ? "report" : "exit"} ${command}`;
      const kept = baselines.get(key);
 -    if (kept !== undefined) return kept;
