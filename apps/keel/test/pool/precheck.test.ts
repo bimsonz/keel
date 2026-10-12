@@ -586,6 +586,32 @@ describe("Precheck", () => {
     expect((await c.current()).state).toBe("queued");
   });
 
+  it("[d21.pool.derived-stale] stops at the derivation, deciding and compiling nothing, when the change moved on before it was committed", async () => {
+    await using workflows = await introspectWorkflow(env.PRECHECK);
+    const { c, commitSha, submit } = await pushed();
+    const derive = await kept(c, commitSha);
+    await workflows.modifyAll(async (m) => {
+      await m.mockStepResult({ name: "ancestry" }, descends(BASE));
+      await m.mockStepResult({ name: "diff" }, touched(["src/a.ts"]));
+      await m.mockStepResult({ name: "policy" }, policy([]));
+      await m.mockStepResult({ name: "flow" }, flow());
+      await m.mockStepResult({ name: "guards" }, guards());
+      await m.mockStepResult({ name: "derive" }, derive);
+      // What the Change DO answers a derivation for a revision it has left.
+      await m.mockStepResult({ name: "derived" }, { _tag: "Stale", reason: "driven by hand" });
+    });
+    await submit();
+    await vi.waitFor(async () => expect(await workflows.get()).toHaveLength(1), WAIT);
+    await (await workflows.get())[0]?.waitForStatus("complete");
+
+    // The clean submission that compiles in [d12.pool.compiled] ends here at its start: no plan, no verdict, no queue.
+    const types = (await c.log()).map((e) => e.type);
+    expect(types.at(-1)).toBe("PrecheckStarted");
+    expect(types).not.toContain("PlanCompiled");
+    expect(types).not.toContain("ChangeQueued");
+    expect(types).not.toContain("VerdictIssued");
+  });
+
   it("[c14.pool.diverged] bounces a commit off its base, naming rebase, without reading its paths", async () => {
     await using workflows = await introspectWorkflow(env.PRECHECK);
     await workflows.modifyAll(async (m) => {

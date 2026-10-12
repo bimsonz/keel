@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/precheck.test.ts
+# kills: d21.pool.derived-stale
+# why: A change that moved on before its derivation was committed is decided and compiled anyway, so a plan is stored and recorded for a revision the change has left
+diff --git a/apps/keel/src/adapters/driving/workflow/precheck.ts b/apps/keel/src/adapters/driving/workflow/precheck.ts
+index 6379ddf..c139293 100644
+--- a/apps/keel/src/adapters/driving/workflow/precheck.ts
++++ b/apps/keel/src/adapters/driving/workflow/precheck.ts
+@@ -138,7 +138,6 @@ export class Precheck extends WorkflowEntrypoint<Env, PrecheckParams> {
+         const derived = await step.do("derived", () =>
+           settle(runtime, commitDerivation(submission, kept.derivationRef)),
+         );
+-        if (derived._tag === "Stale") return derived;
+         return {
+           _tag: "Done",
+           value: { ...read, subjects: planSubjects(workspace.subjects, kept.subjects) },
