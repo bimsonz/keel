@@ -53,6 +53,39 @@ export type Role = NonNullable<ProjectView["viewer"]>["role"];
  */
 export type Reader = { role?: Role } | null;
 
+/**
+ * The events Keel reads to a project's members and to nobody else, as its read scope has them
+ * (`EVENT_AUDIENCE` in Keel's core, `read-scope.ts`): operator data (an agent's enrolment and standing, a
+ * project's settings and deploy targets), the questions put to a person and their rulings, an agent's
+ * sessions, and what happens to users and orgs. It is written beside Keel's and not imported, so when that
+ * table changes this is brought level with it. Everything else a public project's log holds is anyone's.
+ */
+export const MEMBERS_ONLY: ReadonlySet<string> = new Set([
+  "AgentEnrolled",
+  "AgentSuspended",
+  "AgentReinstated",
+  "AgentRevoked",
+  "UserSignedUp",
+  "OrgCreated",
+  "MembershipChanged",
+  "UserSuspended",
+  "UserReinstated",
+  "OrgSuspended",
+  "OrgReinstated",
+  "OrgDeleted",
+  "ProjectDeleted",
+  "ProjectSettingsChanged",
+  "EscalationRaised",
+  "EscalationWithdrawn",
+  "RulingGiven",
+  "OverruleRequested",
+  "SessionOpened",
+  "MessagesCaptured",
+  "SessionRedacted",
+  "DeployTargetSet",
+  "DeployTargetCleared",
+]);
+
 /** The cookie Keel keeps a session in. */
 export const SESSION_COOKIE = "__Secure-keel.session_token";
 
@@ -276,8 +309,11 @@ export function createFakeKeel(
           });
         }
         // A published record is the envelope Keel's contract has, and nothing of Keel's own beside it: not what caused the event.
-        const items = log.events
-          .slice(start, start + limit)
+        // A page is cut from the whole log, and a reader who is no member is then read the public part of it:
+        // the cursor moves on past what they were not shown.
+        const cut = log.events.slice(start, start + limit);
+        const items = cut
+          .filter((event) => member || !MEMBERS_ONLY.has(event.type))
           .map(
             ({
               eventId,
@@ -302,7 +338,7 @@ export function createFakeKeel(
             }),
           );
         // The cursor is always the position just after the last item, so a reader at the tail has something to wait on.
-        return Response.json({ items, nextCursor: String(start + items.length) } satisfies Omit<
+        return Response.json({ items, nextCursor: String(start + cut.length) } satisfies Omit<
           EventPage,
           "items"
         > & { items: unknown[] });

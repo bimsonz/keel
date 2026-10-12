@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/audience.test.ts
+# kills: audience.agent
+# why: an agent Keel has not named to this reader is shown as a hosted one
+diff --git a/apps/console/src/engine/audience.ts b/apps/console/src/engine/audience.ts
+index 44d412c..b96f990 100644
+--- a/apps/console/src/engine/audience.ts
++++ b/apps/console/src/engine/audience.ts
+@@ -28,6 +28,6 @@ export function shownAgent(by: AgentEntry | undefined): {
+   harness: string;
+ } {
+   return by === undefined
+-    ? { label: "Agent", class: "unnamed", harness: "" }
++    ? { label: "Agent", class: "hosted", harness: "" }
+     : { label: by.name, class: by.class, harness: by.harness };
+ }

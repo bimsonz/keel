@@ -3,7 +3,7 @@
 // before it began, how Keel did against what was planted.
 
 import { funnelOf } from "../engine/funnel.ts";
-import { useClock, useSelected } from "../engine/react.tsx";
+import { useClock, usePublicOnly, useSelected } from "../engine/react.tsx";
 import { benchmarkOf } from "../engine/benchmark.ts";
 import { trunkStatsOf } from "../engine/select.ts";
 import type { InsightsTab } from "../route.ts";
@@ -37,7 +37,8 @@ function Trunk() {
 }
 
 function ReviewFunnel() {
-  const state = useSelected(funnelOf);
+  const hidden = usePublicOnly();
+  const state = useSelected((world) => funnelOf(world, !hidden), [hidden]);
   return <Funnel state={state} />;
 }
 

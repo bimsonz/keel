@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/audience.test.ts
+# kills: audience.funnel
+# why: the stage where a person is asked is counted for a reader who is shown no questions: nought, as if nobody was asked
+diff --git a/apps/console/src/engine/funnel.ts b/apps/console/src/engine/funnel.ts
+index 1913cd4..d62c57c 100644
+--- a/apps/console/src/engine/funnel.ts
++++ b/apps/console/src/engine/funnel.ts
+@@ -102,7 +102,7 @@ export function funnelOf(world: World, people = true): FunnelState {
+   const waiting = escalations.filter((escalation) => escalation.state === "open").length;
+   rows.push({
+     stage: 5,
+-    reported: people,
++    reported: true,
+     reached: escalations.length,
+     settled: escalations.length - waiting,
+     passedOn: 0,

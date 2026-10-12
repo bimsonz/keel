@@ -2,6 +2,7 @@
 // how fast changes land, and how rarely a person is asked. One line of them
 // rides above the live graph; Insights has each with what it means.
 
+import { usePublicOnly } from "../engine/react.tsx";
 import { CheckCircleIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import type { TrunkStats } from "../engine/select.ts";
@@ -15,7 +16,8 @@ interface Stat {
   means: string;
 }
 
-function statsOf(trunk: TrunkStats): Stat[] {
+/** `hidden` is whether this reader is not shown the questions put to a person, which are then not counted. */
+function statsOf(trunk: TrunkStats, hidden: boolean): Stat[] {
   return [
     {
       label: "Trunk red",
@@ -66,12 +68,14 @@ function statsOf(trunk: TrunkStats): Stat[] {
       label: "People asked / changes landed",
       value: (
         <>
-          {count(trunk.humansAsked)}
+          {hidden ? "—" : count(trunk.humansAsked)}
           <span className="mx-1 font-normal text-kumo-subtle">/</span>
           {count(trunk.changesLanded)}
         </>
       ),
-      means: "Questions put to a person, against changes landed.",
+      means: hidden
+        ? "Questions put to a person, against changes landed. Keel shows a project's questions to its members, so they are not counted here."
+        : "Questions put to a person, against changes landed.",
     },
     ...(trunk.head === undefined
       ? []
@@ -87,9 +91,10 @@ function statsOf(trunk: TrunkStats): Stat[] {
 
 /** One line, above the live graph. */
 export function TrunkLine({ trunk }: { trunk: TrunkStats }) {
+  const hidden = usePublicOnly();
   return (
     <dl className="a-trunk-line" aria-label="Trunk">
-      {statsOf(trunk).map((stat) => (
+      {statsOf(trunk, hidden).map((stat) => (
         <div key={stat.label}>
           <dt>{stat.label}</dt>
           <dd className="a-num">{stat.value}</dd>
@@ -101,11 +106,12 @@ export function TrunkLine({ trunk }: { trunk: TrunkStats }) {
 
 /** Each number with what it means. */
 export function TrunkTable({ trunk }: { trunk: TrunkStats }) {
+  const hidden = usePublicOnly();
   return (
     <table className="a-stats">
       <caption className="sr-only">Trunk</caption>
       <tbody>
-        {statsOf(trunk).map((stat) => (
+        {statsOf(trunk, hidden).map((stat) => (
           <tr key={stat.label}>
             <th scope="row">{stat.label}</th>
             <td className="a-num">{stat.value}</td>

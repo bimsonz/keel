@@ -210,6 +210,31 @@ describe("who the page reads as", () => {
     expect(open.source.canRule?.(open.question)).toBe(false);
   });
 
+  it("[http.audience] is read the public part of a public project's log as a visitor: no question, no ruling and no agent's enrolment", async () => {
+    const visitor = await opened("visitor", "public");
+    await visitor.player.load();
+    visitor.player.seek(visitor.player.end);
+    const member = await opened("member", "public");
+    await member.player.load();
+    member.player.seek(member.player.end);
+    // The member is read all of it.
+    expect(member.player.world.escalations.size).toBe(1);
+    expect(member.player.world.agents.size).toBeGreaterThan(0);
+    // The visitor is read the changes and the conflict, which says it waits on a ruling, and nothing of the rest.
+    expect(visitor.player.world.changes.size).toBe(member.player.world.changes.size);
+    expect([...visitor.player.world.conflicts.values()].map((conflict) => conflict.state)).toEqual([
+      "escalated",
+    ]);
+    expect(visitor.player.world.escalations.size).toBe(0);
+    expect(visitor.player.world.agents.size).toBe(0);
+    expect(visitor.player.unread).toBe(0);
+    // Someone signed in who is no member of the project's org is read what a visitor is.
+    const stranger = await opened("stranger", "public");
+    await stranger.player.load();
+    stranger.player.seek(stranger.player.end);
+    expect(stranger.player.world.escalations.size).toBe(0);
+  });
+
   it("[http.org] finds a project under its own org and under no other", async () => {
     const r = reading("owner");
     expect(await r.directory.findProject("acme", "demo")).toMatchObject({ name: "demo" });

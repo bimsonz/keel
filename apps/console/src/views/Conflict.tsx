@@ -1,3 +1,4 @@
+import { usePublicOnly } from "../engine/react.tsx";
 import { BellIcon, HandPalmIcon, ShieldCheckIcon, WarningDiamondIcon } from "@phosphor-icons/react";
 import { CodeFile } from "../code/CodeDiff.tsx";
 import type { ConflictPageState, MatrixCell, Outcome, Party, Pending } from "../domain/state.ts";
@@ -404,6 +405,7 @@ export function Conflict({
 }) {
   const { conflict, probe, parties, escalation, guard, decision } = state;
   const { route } = useWhere();
+  const hidden = usePublicOnly();
   const name = route.at === "conflict" ? route.name : conflict.id;
   return (
     <Detail>
@@ -569,6 +571,14 @@ export function Conflict({
                     <span className="leading-snug text-kumo-subtle">{state.subject.gloss}</span>
                   )}
                 </Tied>
+                {escalation === undefined && hidden && conflict.state === "escalated" && (
+                  <Tied title="Escalation">
+                    <span className="leading-snug text-kumo-subtle">
+                      This conflict waits on a person's ruling. Keel shows the question to the
+                      project's members.
+                    </span>
+                  </Tied>
+                )}
                 {escalation !== undefined && (
                   <Tied title="Escalation">
                     <span className="flex flex-wrap items-center gap-2">

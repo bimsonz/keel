@@ -2,10 +2,12 @@
 // read with its answer afterwards.
 
 import { escalationNamed } from "../engine/lists.ts";
-import { usePlayer, useSelected } from "../engine/react.tsx";
+import { usePlayer, usePublicOnly, useSelected } from "../engine/react.tsx";
 import { useWhere } from "../router.tsx";
 import { Notice } from "../views/Frame.tsx";
 import { Escalation } from "../views/Escalation.tsx";
+import { Column } from "../views/List.tsx";
+import { ForMembers } from "./Escalations.tsx";
 
 /**
  * The question's own address on this console, for a phone to open. It carries where the question is and
@@ -23,7 +25,16 @@ export function EscalationPage({ name }: { name: string }) {
   // The entry is changed in place as it is ruled, so what is read of it is read again with the world.
   const state = useSelected(() => escalation?.state, [escalation]);
   const { org, to } = useWhere();
+  const hidden = usePublicOnly();
   const phoneUrl = state === "open" ? addressOf(to({ at: "escalation", name })) : undefined;
+  // Keel shows a question to the project's members. To anyone else it is not that there is none.
+  if (escalation === undefined && hidden)
+    return (
+      <Column>
+        <h1 className="sr-only">Escalation {name}</h1>
+        <ForMembers what="question" />
+      </Column>
+    );
   if (escalation === undefined) {
     return (
       <Notice title={`There is no escalation ${name} in what Keel has said so far`}>

@@ -1,6 +1,7 @@
 // What each view shows, read off the folded world. These are pure: the same
 // world and the same instant always give the same picture.
 
+import { shownAgent } from "./audience.ts";
 import type { Lattice } from "../contract/keel/index.ts";
 import type { FlowNode, StepSpec } from "../contract/provisional.ts";
 import type {
@@ -135,11 +136,7 @@ function party(
     changeId: change.id,
     label: change.label,
     goal: change.goal,
-    agent: {
-      label: by?.name ?? "Agent",
-      class: by?.class ?? "hosted",
-      harness: by?.harness ?? "",
-    },
+    agent: shownAgent(by),
     proposition,
     ...(told === undefined ? {} : { told }),
   };
@@ -566,7 +563,7 @@ function intentRowOf(world: World, change: ChangeEntry): IntentRow {
     id: change.id,
     label: change.label,
     goal: change.goal,
-    agent: { label: by?.name ?? "Agent", class: by?.class ?? "hosted", harness: by?.harness ?? "" },
+    agent: shownAgent(by),
     state: change.state,
     revision: change.revision,
     declaredAt: change.declaredAt,
@@ -643,12 +640,7 @@ export function changePageOf(
         ? {}
         : { laneLabel: change.laneId.replace("lane-", "Lane ") }),
     },
-    agent: {
-      label: by?.name ?? "Agent",
-      class: by?.class ?? "hosted",
-      harness: by?.harness ?? "",
-      model: by?.model ?? "",
-    },
+    agent: { ...shownAgent(by), model: by?.model ?? "" },
     session: { id: by?.sessionId ?? "", messages: by?.messages ?? 0 },
     intent: {
       goal: change.goal,

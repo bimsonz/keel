@@ -11,7 +11,7 @@
 // or bounced and waiting for its agent to revise it.
 
 import type { EscalationCategory } from "../contract/events.ts";
-import type { AgentClass, ChangeState, ConflictKind, ConflictState } from "../domain/state.ts";
+import type { ChangeState, ConflictKind, ConflictState, ShownClass } from "../domain/state.ts";
 import { subjectOf } from "./lanes.ts";
 import type { ChangeEntry, ConflictEntry, EscalationEntry, World } from "./world.ts";
 
@@ -67,7 +67,7 @@ export interface ChangeRow extends Named {
   goal: string;
   state: ChangeState;
   agent: string;
-  agentClass: AgentClass;
+  agentClass: ShownClass;
   /** The key of the subject it is about, when it has said or shown one. */
   subject?: string;
   declaredAt: string;
@@ -252,8 +252,9 @@ export function changesOf(
         name: names.changes.get(change.id) ?? change.id,
         goal: change.goal,
         state: change.state,
-        agent: by?.name ?? "",
-        agentClass: by?.class ?? "hosted",
+        // An agent Keel has not named to this reader is one all the same.
+        agent: by?.name ?? "an agent",
+        agentClass: by?.class ?? "unnamed",
         ...(subject === undefined ? {} : { subject }),
         declaredAt: change.declaredAt,
         unverified: change.unverified,

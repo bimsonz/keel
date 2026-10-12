@@ -2,7 +2,8 @@
 
 import { HandPalmIcon } from "@phosphor-icons/react";
 import { type EscalationFilter, PAGE, escalationsOf } from "../engine/lists.ts";
-import { useSelected } from "../engine/react.tsx";
+import { usePublicOnly, useSelected } from "../engine/react.tsx";
+import { useWhere } from "../router.tsx";
 import { CATEGORY } from "../views/Escalation.tsx";
 import { Column, EscalationMark, Filters, More, Nothing, Row, Rows } from "../views/List.tsx";
 import { ConflictLink, EscalationLink, SubjectLink } from "../views/links.tsx";
@@ -24,9 +25,32 @@ const EMPTY: Record<EscalationFilter, [string, string]> = {
   ],
 };
 
+/**
+ * What a reader is told where Keel shows them none of a project's questions: that they are its members' to
+ * read, never that there are none.
+ */
+export function ForMembers({ what }: { what: "list" | "question" }) {
+  const { org } = useWhere();
+  return (
+    <Nothing title={`Keel shows a project's questions to its members`}>
+      {what === "list"
+        ? `A question put to a person, its options and the answer given are read by the members of ${org} and by nobody else, so this page cannot say whether one is waiting. Sign in as a member of ${org} to read them and to answer.`
+        : `A question, its options and the answer given are read by the members of ${org} and by nobody else. Sign in as a member of ${org} to read this one and to answer it.`}
+    </Nothing>
+  );
+}
+
 export function EscalationsPage({ filter, shown }: { filter: EscalationFilter; shown: number }) {
   const list = useSelected((world) => escalationsOf(world, filter, shown), [filter, shown]);
+  const hidden = usePublicOnly();
   const [title, body] = EMPTY[filter];
+  if (hidden)
+    return (
+      <Column>
+        <h1 className="sr-only">Escalations</h1>
+        <ForMembers what="list" />
+      </Column>
+    );
   return (
     <Column>
       <h1 className="sr-only">Escalations</h1>

@@ -1,3 +1,4 @@
+import { publicOnly } from "./audience.ts";
 import {
   type ReactNode,
   createContext,
@@ -30,6 +31,11 @@ export function usePlayer(): Player {
   const player = useContext(PlayerContext);
   if (player === null) throw new Error("usePlayer needs a ConsoleProvider above it");
   return player;
+}
+
+/** Whether this reader is read the public part of the project's log alone (audience.ts). */
+export function usePublicOnly(): boolean {
+  return publicOnly(usePlayer().source.descriptor);
 }
 
 /** A view of the player's version that changes at most `perSecond` times a second. */

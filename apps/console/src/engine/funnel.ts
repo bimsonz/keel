@@ -51,7 +51,11 @@ const COUNTED: readonly FunnelStage[] = [0, 1, 2, 3];
 const total = (costs: readonly number[]): number =>
   Math.round(costs.reduce((sum, usd) => sum + usd, 0) * 1e9) / 1e9;
 
-export function funnelOf(world: World): FunnelState {
+/**
+ * `people` is whether this reader is shown the questions put to a person. Where they are not, the last stage
+ * is not counted: nought would say nobody was asked.
+ */
+export function funnelOf(world: World, people = true): FunnelState {
   const frame = world.funnel;
   const rows: FunnelRow[] = COUNTED.map((stage) => {
     const counted = frame?.stages.find((candidate) => candidate.stage === stage);
@@ -98,7 +102,7 @@ export function funnelOf(world: World): FunnelState {
   const waiting = escalations.filter((escalation) => escalation.state === "open").length;
   rows.push({
     stage: 5,
-    reported: true,
+    reported: people,
     reached: escalations.length,
     settled: escalations.length - waiting,
     passedOn: 0,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/audience.test.ts
+# kills: audience.public
+# why: a reader Keel names no member is taken for one, so what they were not read is shown as nothing there
+diff --git a/apps/console/src/engine/audience.ts b/apps/console/src/engine/audience.ts
+index 44d412c..048e162 100644
+--- a/apps/console/src/engine/audience.ts
++++ b/apps/console/src/engine/audience.ts
+@@ -15,7 +15,7 @@ import type { AgentEntry } from "./world.ts";
+  * the project's org, signed in or not. A test fixture's log is whole.
+  */
+ export function publicOnly(descriptor: SourceDescriptor): boolean {
+-  return descriptor.mode === "live" && descriptor.project?.viewer === undefined;
++  return descriptor.mode === "live" && descriptor.project === undefined;
+ }
+ 
+ /**

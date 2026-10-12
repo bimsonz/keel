@@ -9,7 +9,7 @@ import type { SubjectDetail } from "../engine/subject.ts";
 import { PAGE } from "../engine/lists.ts";
 import { Link } from "../router.tsx";
 import { ChangeLink, ConflictLink } from "./links.tsx";
-import { AgentMark, CLASS_WORD, clockTime } from "./parts.tsx";
+import { AgentMark, agentLine, clockTime } from "./parts.tsx";
 
 const STANDING: Record<Tone, string> = {
   person: "a person is being asked",
@@ -232,7 +232,7 @@ export function SubjectPanel({ detail }: { detail: SubjectDetail }) {
                     </span>
                     <span className="flex items-center gap-1.5 text-sm text-kumo-subtle">
                       <AgentMark agentClass={change.agentClass} size={12} />
-                      {change.agent} · {CLASS_WORD[change.agentClass]}
+                      {agentLine(change.agent, change.agentClass)}
                     </span>
                   </ChangeLink>
                 </li>

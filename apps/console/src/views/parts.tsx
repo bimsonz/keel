@@ -4,7 +4,7 @@
 import { CheckIcon, CircleNotchIcon, WarningIcon, XIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import type { EvidenceClass } from "../contract/mfp.ts";
-import type { AgentClass, EvidenceItem, Outcome, Pending, Tier } from "../domain/state.ts";
+import type { EvidenceItem, Outcome, Pending, ShownClass, Tier } from "../domain/state.ts";
 
 // ─── Outcome ────────────────────────────────────────────────────────────────
 
@@ -253,17 +253,29 @@ export function TierBadge({ tier }: { tier: Tier | null }) {
 // ─── Agent class ────────────────────────────────────────────────────────────
 
 /** The class, written out as it always is beside the mark. */
-export const CLASS_WORD: Record<AgentClass, string> = {
+export const CLASS_WORD: Record<ShownClass, string> = {
   real: "REAL",
   hosted: "HOSTED",
   synthetic: "SYNTHETIC",
+  // Keel has not said what it is, so no class is written.
+  unnamed: "",
 };
 
-/** REAL is ringed, HOSTED is a plain dot, SYNTHETIC is an open square. The class is always written out as well. */
-export function AgentMark({ agentClass, size = 14 }: { agentClass: AgentClass; size?: number }) {
+/** An agent's name and its class, as one line of a row: "Ada · REAL", or the name alone where no class is known. */
+export function agentLine(name: string, agentClass: ShownClass): string {
+  return [name, CLASS_WORD[agentClass]].filter((part) => part !== "").join(" · ");
+}
+
+/**
+ * REAL is ringed, HOSTED is a plain dot, SYNTHETIC is an open square. The class is always written out as well.
+ * An agent Keel has not named to this reader is an open dot, with no class written.
+ */
+export function AgentMark({ agentClass, size = 14 }: { agentClass: ShownClass; size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 14 14" aria-hidden>
-      {agentClass === "synthetic" ? (
+      {agentClass === "unnamed" ? (
+        <circle cx="7" cy="7" r="2.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      ) : agentClass === "synthetic" ? (
         <rect
           x="3.7"
           y="3.7"
@@ -289,11 +301,14 @@ export function AgentTag({
   harness,
 }: {
   label: string;
-  agentClass: AgentClass;
+  agentClass: ShownClass;
   harness?: string;
 }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm text-kumo-default">
+    <span
+      className="inline-flex items-center gap-1.5 text-sm text-kumo-default"
+      title={agentClass === "unnamed" ? "Keel names a project's agents to its members." : undefined}
+    >
       <AgentMark agentClass={agentClass} />
       <span className="font-medium text-kumo-strong">{label}</span>
       <span className="text-kumo-subtle">

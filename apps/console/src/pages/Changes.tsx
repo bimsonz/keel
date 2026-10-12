@@ -15,7 +15,7 @@ import {
   Rows,
 } from "../views/List.tsx";
 import { ChangeLink, ConflictLink, EscalationLink, SubjectLink } from "../views/links.tsx";
-import { AgentMark, CLASS_WORD, Unverified, dateTime } from "../views/parts.tsx";
+import { AgentMark, Unverified, agentLine, dateTime } from "../views/parts.tsx";
 
 const FILTERS: { id: ChangeFilter; label: string }[] = [
   { id: "in-flight", label: "In flight" },
@@ -83,7 +83,7 @@ export function ChangesPage({ filter, shown }: { filter: ChangeFilter; shown: nu
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <AgentMark agentClass={row.agentClass} size={12} />
-                    {row.agent} · {CLASS_WORD[row.agentClass]}
+                    {agentLine(row.agent, row.agentClass)}
                   </span>
                   {row.subject !== undefined && (
                     <SubjectLink subject={row.subject} className="a-mono a-link-quiet">

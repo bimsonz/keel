@@ -3,6 +3,7 @@
 // which stage settled each one, and what that cost. A person is the last stage,
 // and the rarest.
 
+import { usePublicOnly } from "../engine/react.tsx";
 import { ArrowDownIcon, HandPalmIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import type { EvidenceClass } from "../contract/mfp.ts";
@@ -167,7 +168,11 @@ function Stage({ row }: { row: FunnelRow }) {
             {row.reported ? count(row.settled) : NOT_COUNTED}
           </span>
           <span className="a-num text-sm text-kumo-subtle">
-            {row.reported ? share(row.settled, row.reached) : "not counted yet"}
+            {row.reported
+              ? share(row.settled, row.reached)
+              : person
+                ? "shown to members"
+                : "not counted yet"}
           </span>
         </div>
         <Split row={row} />
@@ -225,6 +230,8 @@ function Stage({ row }: { row: FunnelRow }) {
 }
 
 export function Funnel({ state }: { state: FunnelState }) {
+  // A reader who is not shown the questions put to a person is given no count of them.
+  const hidden = usePublicOnly();
   const counted = state.rows.some((row) => row.reported && row.stage === 0);
   const perThousand =
     state.usd === undefined || state.changesLanded === 0
@@ -280,10 +287,12 @@ export function Funnel({ state }: { state: FunnelState }) {
           </Tile>
           <Tile
             label="People asked"
-            value={count(state.peopleAsked)}
+            value={hidden ? NOT_COUNTED : count(state.peopleAsked)}
             waiting={state.peopleWaiting > 0}
           >
-            {`of ${count(state.changesLanded)} ${state.changesLanded === 1 ? "change" : "changes"} landed`}
+            {hidden
+              ? "Keel shows a project's questions to its members"
+              : `of ${count(state.changesLanded)} ${state.changesLanded === 1 ? "change" : "changes"} landed`}
             {state.medianAnswerMs !== undefined &&
               state.medianAnswerMs > 0 &&
               ` · answered in ${Math.round(state.medianAnswerMs / 1000)} s`}

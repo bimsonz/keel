@@ -34,6 +34,13 @@ export type Tier = 0 | 1 | 2;
  */
 export type AgentClass = "real" | "hosted" | "synthetic";
 
+/**
+ * An agent's class as a page shows it. `unnamed` is an agent Keel has not named to this reader: its enrolment
+ * is read to its project's members, so anyone else is shown that a change has an agent and not which, or of
+ * what kind.
+ */
+export type ShownClass = AgentClass | "unnamed";
+
 // The states a change and a conflict can be in are Keel's own, from its generated wire types.
 export type { ChangeState, ConflictKind, ConflictState };
 
@@ -97,7 +104,7 @@ export interface Party {
   /** The change's own name, `#n`. */
   label: string;
   goal: string;
-  agent: { label: string; class: AgentClass; harness: string };
+  agent: { label: string; class: ShownClass; harness: string };
   proposition: PartyProposition;
   /**
    * What Keel did to this side's change over the conflict, and the ways forward it gave its agent, in Keel's
@@ -259,7 +266,7 @@ export interface IntentRow {
   id: string;
   label: string;
   goal: string;
-  agent: { label: string; class: AgentClass; harness: string };
+  agent: { label: string; class: ShownClass; harness: string };
   state: ChangeState;
   revision: number;
   declaredAt: string;
@@ -291,7 +298,7 @@ export interface ChangePageState {
     submittedAt?: string;
     laneLabel?: string;
   };
-  agent: { label: string; class: AgentClass; harness: string; model: string };
+  agent: { label: string; class: ShownClass; harness: string; model: string };
   session: { id: string; messages: number };
   intent: {
     goal: string;

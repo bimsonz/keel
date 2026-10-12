@@ -49,6 +49,12 @@ const statOn = async (page: Page, label: string): Promise<string> =>
       .innerText(),
   );
 const pathOf = (page: Page): string => new URL(page.url()).pathname;
+/** A capture of a page as it stands, kept only when a folder is named for them (`SHOTS=<folder>`). */
+const shot = async (shown: Page, name: string): Promise<void> => {
+  const folder = process.env["SHOTS"];
+  if (folder !== undefined && folder !== "")
+    await shown.screenshot({ path: `${folder}/${name}.png` });
+};
 /** The frame's tabs: the places a project has. */
 const tabsOf = (page: Page) => page.getByRole("navigation", { name: "Project" }).getByRole("link");
 const qrOn = (page: Page) =>
@@ -1470,7 +1476,15 @@ async function asDeployed(context: BrowserContext, deployed: Deployed): Promise<
 
 const OPEN_ON_TABS =
   "Code | Changes 2 open | Conflicts 1 open | Escalations 1 waiting for a person | Mission Control | Insights";
+/**
+ * The tabs as someone who is no member of the project's org is shown them: Keel reads a project's questions to
+ * its members alone, so none is counted for anyone else.
+ */
+const PUBLIC_ON_TABS =
+  "Code | Changes 2 open | Conflicts 1 open | Escalations | Mission Control | Insights";
 const QUESTION_ASKED = /May permission checks be cached within a session\?/;
+/** What a reader Keel shows no questions to is told of them, where the list or one of them would be. */
+const FOR_MEMBERS = "Keel shows a project's questions to its members";
 const filesOn = async (shown: Page): Promise<string> =>
   (await shown.locator(".a-tree li").allInnerTexts()).map(squash).join(" | ");
 /** Waits until the log has been read and counted on the tabs, or for ten seconds: the check after it says which. */
@@ -1481,6 +1495,13 @@ const counted = (shown: Page): Promise<void> =>
     .waitFor({ timeout: 10_000 })
     .catch(() => undefined);
 /** What a page says where Keel shows this reader no such project, with the project's own name left out. */
+/** Waits until the log has been read and counted on the tabs of a reader who is shown no questions. */
+const countedPublic = (shown: Page): Promise<void> =>
+  shown
+    .getByRole("navigation", { name: "Project" })
+    .getByText("1 open")
+    .waitFor({ timeout: 10_000 })
+    .catch(() => undefined);
 const toldAt = async (shown: Page, org: string, name: string): Promise<string> => {
   await shown.goto(`${built}/${org}/${name}`, { waitUntil: "domcontentloaded" });
   await shown.getByRole("heading").first().waitFor();
@@ -1533,11 +1554,11 @@ expectEqual(
   "src | package.json | README.md; the log not answered",
 );
 answerTheLog();
-await counted(visitor);
+await countedPublic(visitor);
 expectEqual(
-  "visitor: what is open, counted on the tabs",
+  "visitor: what is open, counted on the tabs, and no question, which Keel reads to members",
   (await tabsOf(visitor).allInnerTexts()).map(squash).join(" | "),
-  OPEN_ON_TABS,
+  PUBLIC_ON_TABS,
 );
 expectEqual(
   "visitor: live, and says so",
@@ -1576,10 +1597,11 @@ expectEqual(
 await visitor.goto(`${built}/ada/demo/mission-control`, { waitUntil: "domcontentloaded" });
 await visitor.locator("dl.a-trunk-line").waitFor();
 expectEqual(
-  "visitor: people asked / landed",
+  "visitor: changes landed, and no count of people asked, which a visitor is not read",
   await statOn(visitor, "People asked / changes landed"),
-  "1/0",
+  "—/0",
 );
+await shot(visitor, "visitor-mission-control");
 // The control is loaded apart from the page, a moment after it. So it is waited for, and must not come.
 expectEqual(
   "built: no playback",
@@ -1601,7 +1623,7 @@ await visitor.getByRole("heading", { name: "No sealed run here" }).waitFor();
 expectEqual(
   "visitor: ?scenario= is not a way in to a fixture",
   (await tabsOf(visitor).allInnerTexts()).map(squash).join(" | "),
-  OPEN_ON_TABS,
+  PUBLIC_ON_TABS,
 );
 // The way in remembers the address it was on, whole; no link goes anywhere with a fixture's own parameters.
 expectEqual(
@@ -1644,9 +1666,9 @@ expectEqual(
   "1",
 );
 expectEqual(
-  "built: a person, being asked",
-  await stageOn(visitor, 5),
-  "1 | 0 0% 1 waiting for a person 1 waiting for a person Open the escalations |  | a person's time",
+  "visitor: the stage where a person is asked is not counted, and says whose it is to read",
+  `${await stageOn(visitor, 5)} | ${await statOn(visitor, "People asked").catch(() => "no tile")}`,
+  "— | — shown to members |  | a person's time | —",
 );
 
 // The conflict's line is drawn from the lattices the page read from Keel, and a verdict's evidence from Keel's view of it.
@@ -1696,15 +1718,65 @@ expectEqual(
 await visitor.goto(`${built}/ada/demo/nowhere`, { waitUntil: "domcontentloaded" });
 await visitor.getByRole("heading", { name: "There is nothing at this address" }).waitFor();
 
-// A question is read by anyone a public project is shown to. Answering is for a member: nothing can be tapped, and
-// the frame's way in comes back to this page.
-await visitor.goto(`${built}/ada/demo/escalations/E-1`, { waitUntil: "domcontentloaded" });
-await visitor.getByRole("heading", { level: 1, name: QUESTION_ASKED }).waitFor();
+// Keel reads a project's questions to its members and to nobody else. A visitor is told so where the list and
+// where a question would be, never that there is none; and the frame's way in comes back to the page.
+const mainSaid = async (shown: Page): Promise<string> =>
+  squash(await shown.getByRole("main").innerText()).split(" A question")[0] ?? "";
+await visitor.goto(`${built}/ada/demo/escalations`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("main").getByRole("heading").last().waitFor();
+await countedPublic(visitor);
 expectEqual(
-  "visitor: a question is read, and none of its options can be tapped",
-  `${await visitor.locator(".a-option").count()} options, ${await visitor.locator(".a-option:enabled").count()} to tap`,
-  "3 options, 0 to tap",
+  "visitor: the questions are said to be the members' to read, not that there are none",
+  `${await mainSaid(visitor)} | ${await visitor.getByText("Nothing is waiting for a person").count()} | ${await visitor.getByRole("main").getByRole("link").count()} links`,
+  `Escalations ${FOR_MEMBERS} | 0 | 0 links`,
 );
+await shot(visitor, "visitor-escalations");
+await visitor.goto(`${built}/ada/demo/changes`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("main").getByRole("link").first().waitFor();
+await shot(visitor, "visitor-changes");
+await visitor.goto(`${built}/ada/demo/changes/1`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("main").getByRole("heading").first().waitFor();
+await visitor.waitForTimeout(500);
+await shot(visitor, "visitor-change");
+// Keel names a project's agents to its members. A visitor is shown that a change has an agent, and neither
+// which nor of what kind: no class is made up for it.
+expectEqual(
+  "visitor: a change's agent is not named, and is given no class Keel did not say",
+  `${squash(
+    await visitor
+      .getByRole("complementary")
+      .getByText("Agent", { exact: true })
+      .last()
+      .innerText()
+      .catch(() => "no agent shown"),
+  )} | ${await visitor.getByText(/\b(REAL|HOSTED|SYNTHETIC)\b/).count()} classes`,
+  "Agent | 0 classes",
+);
+await visitor.goto(`${built}/ada/demo/escalations/E-1`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("main").getByRole("heading").last().waitFor();
+await countedPublic(visitor);
+expectEqual(
+  "visitor: and so is one question, with nothing of it shown and nothing to tap",
+  `${await mainSaid(visitor)} | ${await visitor.locator(".a-option").count()} options | ${await visitor.getByText(QUESTION_ASKED).count()}`,
+  `Escalation E-1 ${FOR_MEMBERS} | 0 options | 0`,
+);
+// The conflict that waits on that question says it waits on a ruling: that much is the conflict's own, and public.
+await visitor.goto(`${built}/ada/demo/conflicts/C-1`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("heading", { name: "World matrix" }).waitFor();
+expectEqual(
+  "visitor: a conflict that waits on a ruling says so, and that the question is the members'",
+  String(
+    await visitor
+      .getByText(
+        "This conflict waits on a person's ruling. Keel shows the question to the project's members.",
+      )
+      .count(),
+  ),
+  "1",
+);
+await shot(visitor, "visitor-conflict");
+await visitor.goto(`${built}/ada/demo/escalations/E-1`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("main").getByRole("heading").last().waitFor();
 const wayIn =
   (await visitor.getByRole("link", { name: "Sign in" }).first().getAttribute("href")) ?? "";
 expectEqual(
@@ -1810,12 +1882,6 @@ await devtools.send("WebAuthn.addVirtualAuthenticator", {
     automaticPresenceSimulation: true,
   },
 });
-/** A capture of a page as it stands, kept only when a folder is named for them (`SHOTS=<folder>`). */
-const shot = async (shown: Page, name: string): Promise<void> => {
-  const folder = process.env["SHOTS"];
-  if (folder !== undefined && folder !== "")
-    await shown.screenshot({ path: `${folder}/${name}.png` });
-};
 const whereOf = (shown: Page): string => {
   const url = new URL(shown.url());
   return `${url.pathname}${url.search}`;
@@ -2309,18 +2375,18 @@ expectEqual(
   await toldAt(grace, "ada", "demo"),
   told.none,
 );
-// On the Keel where the project is public she reads the question, signed in, and cannot answer it.
+// On the Keel where the project is public she is signed in and still no member: the question is not hers to read.
 const visiting = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 await visiting.addCookies(await second.cookies());
 await asDeployed(visiting, { keel: open });
 const guest = watch(await visiting.newPage(), "built, a stranger");
 await guest.goto(`${built}/ada/demo/escalations/E-1`, { waitUntil: "domcontentloaded" });
-await guest.getByRole("heading", { level: 1, name: QUESTION_ASKED }).waitFor();
-await guest.waitForTimeout(600);
+await guest.getByRole("main").getByRole("heading").last().waitFor();
+await countedPublic(guest);
 expectEqual(
-  "stranger: a public project's question is read by someone signed in who is no member, and cannot be answered",
-  `${await guest.locator(".a-option").count()} options, ${await guest.locator(".a-option:enabled").count()} to tap, ${await guest.getByRole("link", { name: "Sign in" }).count()} ways in offered`,
-  "3 options, 0 to tap, 0 ways in offered",
+  "stranger: a public project's question is its members' to read, and someone signed in who is none is told so",
+  `${squash(await guest.getByRole("main").innerText()).split(" A question")[0] ?? ""} | ${await guest.locator(".a-option").count()} options, ${await guest.getByRole("link", { name: "Sign in" }).count()} ways in offered`,
+  `Escalation E-1 ${FOR_MEMBERS} | 0 options, 0 ways in offered`,
 );
 await visiting.close();
 await second.close();
@@ -2438,7 +2504,7 @@ await passer
   .first()
   .waitFor({ timeout: 10_000 })
   .catch(() => undefined);
-await counted(passer);
+await countedPublic(passer);
 expectEqual(
   "settings: a visitor now reads the project, and is offered no settings",
   `${await filesOn(passer)} | ${await tabsOf(passer).count()} tabs`,

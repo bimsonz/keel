@@ -12,11 +12,13 @@ It is a Vite single-page app (React, Tailwind, Cloudflare's Kumo components, Rea
 
 | Who | Reads | Can |
 |---|---|---|
-| A visitor, with no session | The projects an org has made public. The home lists them, and each one's code, its log and everything folded from the log are theirs to read | Nothing but read |
-| Someone signed in | That, and the projects of the orgs they are a member of | Answer a question in a project of an org they are a member of |
+| A visitor, with no session | The projects an org has made public. The home lists them, and each one's code and the public part of its log are theirs to read: its changes, conflicts, probes, verdicts, decisions and trunk | Nothing but read |
+| Someone signed in | That, and all of the projects of the orgs they are a member of: the questions put to a person and their rulings, the agents' names and sessions, the settings | Answer a question in a project of an org they are a member of |
 | An owner or a maintainer of a project's org | The same, and the project's settings | Make the project public, or private again |
 
 **The console holds no credential, and has no way to Keel of its own.** The page reads `/v1` on its own origin and puts nothing on a request. Who is reading is the session cookie Keel's own sign-in set (`__Secure-keel.session_token`), which the browser sends and the page cannot read. The Worker has no secret and no binding to Keel: it answers `/healthz` and serves the page. Keel decides every read and every ruling.
+
+**Keel reads part of a project's log to its members alone**: the questions put to a person and their rulings, an agent's enrolment, standing and sessions, and the project's settings. Anyone else, signed in or not, is read the rest. So for that reader the console has no question and no agent's name, and cannot tell whether there is none or it was not shown. It says which (`src/engine/audience.ts`): the Escalations pages say that Keel shows a project's questions to its members, never that nothing is waiting; people asked is not counted, in trunk's numbers or in the funnel; a conflict that waits on a ruling says so, since that much is the conflict's own and public, and that the question is the members'; and a change's agent is shown as an agent with no name and no class, never as a kind nobody said it was.
 
 A project Keel does not show a reader is the same answer whether it is private or not there at all, and the page says the same of both: "There is no project `<org>/<project>` here".
 
@@ -95,7 +97,7 @@ route  →  pages  →  views  →  engine (playhead, world, projections)  →  
 - `src/engine/` is the playhead and the projections each page reads. `src/views/` draws them and never touches a transport.
 - `src/account/` is the pages above every project, on Keel's identity at `/v1/auth`.
 - `src/worker/` is the Worker: `/healthz`, and the page for everything else. `handler.ts` needs nothing of the Workers runtime but fetch, so it is tested as it is, in Node; `index.ts` is its entry.
-- `test/fixtures/` holds the scripted logs, held to Keel's catalogue and state machines, a stand-in for Keel's API that knows a reader by their session, and the real Better Auth standing in for Keel's identity. They are test code. The page reaches a scripted log only in development, through a dynamic import that is not in the build.
+- `test/fixtures/` holds the scripted logs, held to Keel's catalogue and state machines, a stand-in for Keel's API that knows a reader by their session and reads a non-member the public part of the log alone, as Keel's read scope does, and the real Better Auth standing in for Keel's identity. They are test code. The page reaches a scripted log only in development, through a dynamic import that is not in the build.
 
 `wrangler.jsonc` serves `dist` as static assets with `not_found_handling: "single-page-application"` and runs the Worker first only for `/healthz`. It has no binding but those files, and no secret.
 
@@ -141,7 +143,8 @@ pnpm --dir apps/console e2e      # in another: the real page in headless Chrome
 
 It drives the pages on the fixtures the dev server serves (every tab and row a link with an address of its own, Back returning the way one came, any page opening from its address alone, and the same pages at a phone's width with nothing off the side of the screen). Then it builds the console and drives it as it is deployed, with the real Better Auth answering `/v1/auth` and a stand-in Keel the rest of `/v1`, which knows a reader by their session:
 
-- **a visitor on a public project**: the home lists it, its code is on the page before Keel has answered about the log, nothing can be tapped on a question, and the frame's way in comes back to the page;
+- **a visitor on a public project**: the home lists it, its code is on the page before Keel has answered about the log, its questions are said to be its members' to read and none is counted or shown, a conflict that waits on a ruling says so, a change's agent has no name and no class, and the frame's way in comes back to the page;
+- **someone signed in who is no member, on a public project**: told of its questions what a visitor is;
 - **a visitor, and someone signed in who is no member, on a private project**: both are told what they are told of a project that is not there;
 - **a member**: her org's home lists the project, the frame drops down on the org and on the project, the QR code beside a question says the question's own address, and her answer reaches Keel as its own operation with no credential of the page's;
 - **an owner, on the project's settings**: the tab is offered to her and not to a visitor, making the project public waits for its whole name, Keel is sent the settings whole with that one field changed, a visitor then reads the project and is refused its settings in Keel's word, and one click makes it private again;

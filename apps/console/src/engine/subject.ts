@@ -2,7 +2,7 @@
 // guards it, what has been decided about it, and the changes and conflicts
 // on it right now. This is what Mission Control opens beside the graph when a subject is selected.
 
-import type { AgentClass, ChangeState, ConflictKind, ConflictState } from "../domain/state.ts";
+import type { ChangeState, ConflictKind, ConflictState, ShownClass } from "../domain/state.ts";
 import { type Tone, subjectOf } from "./lanes.ts";
 import type { World } from "./world.ts";
 
@@ -56,7 +56,7 @@ export interface SubjectDetail {
       goal: string;
       state: ChangeState;
       agent: string;
-      agentClass: AgentClass;
+      agentClass: ShownClass;
     }[];
   };
   tenets: number;
@@ -170,8 +170,8 @@ export function subjectDetailOf(world: World, subject: string): SubjectDetail | 
             label: change.label,
             goal: change.goal,
             state: change.state,
-            agent: by?.name ?? "",
-            agentClass: by?.class ?? "hosted",
+            agent: by?.name ?? "an agent",
+            agentClass: by?.class ?? "unnamed",
           };
         }),
     },
