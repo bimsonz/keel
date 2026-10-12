@@ -160,14 +160,19 @@ export type ChangeCommand =
       readonly inWorkspace: boolean;
     }
   | { readonly _tag: "StartPrecheck"; readonly instanceId: string }
+  /**
+   * What Precheck derived from the submitted commit, committed on its own
+   * before drift is classified: the subjects hear it whether the change then
+   * drifts or compiles. Once per Precheck pass.
+   */
+  | {
+      readonly _tag: "DeriveEffects";
+      readonly effects: readonly DerivedEffect[];
+      readonly derivationRef: string;
+    }
   | { readonly _tag: "Drift"; readonly blocking: readonly Drift[] }
   | {
       readonly _tag: "CompilePlan";
-      /** Absent until Precheck derives effects; then `EffectsDerived` is committed first. */
-      readonly derivation?: {
-        readonly effects: readonly DerivedEffect[];
-        readonly derivationRef: string;
-      };
       readonly drift: readonly Drift[];
       readonly planHash: ContentHash;
       readonly steps: number;
@@ -556,6 +561,22 @@ export const decideChange = (
           ])
         : refuse(change, command);
 
+    case "DeriveEffects":
+      // A second derivation in one pass would set the subjects against two readings of one commit.
+      return at("deriving") && change.derivationRef === undefined
+        ? Result.succeed([
+            EffectsDerived.make({
+              changeId: id,
+              revision,
+              effects: command.effects.map((effect) => ({
+                ...effect,
+                proposition: canonicalProposition(effect.proposition),
+              })),
+              derivationRef: command.derivationRef,
+            }),
+          ])
+        : refuse(change, command);
+
     case "Drift":
       return at("deriving")
         ? intoAgentOwned(
@@ -568,19 +589,6 @@ export const decideChange = (
     case "CompilePlan":
       return at("deriving")
         ? Result.succeed([
-            ...(command.derivation === undefined
-              ? []
-              : [
-                  EffectsDerived.make({
-                    changeId: id,
-                    revision,
-                    effects: command.derivation.effects.map((effect) => ({
-                      ...effect,
-                      proposition: canonicalProposition(effect.proposition),
-                    })),
-                    derivationRef: command.derivation.derivationRef,
-                  }),
-                ]),
             ...(command.drift.length === 0
               ? []
               : [DriftDetected.make({ changeId: id, revision, drift: command.drift })]),
@@ -790,7 +798,13 @@ const illegal = (state: Change | undefined, event: ChangeEvent): never => {
   );
 };
 
-type Optional = "parkReason" | "escalationId" | "batchId" | "laneId" | "predicatePolicy";
+type Optional =
+  | "parkReason"
+  | "escalationId"
+  | "batchId"
+  | "laneId"
+  | "predicatePolicy"
+  | "derivationRef";
 
 /** The change in `next`, without the fields that only hold in the state it leaves. */
 const moveTo = (change: Change, next: ChangeState, drop: readonly Optional[] = []): Change => {
@@ -870,8 +884,16 @@ export const evolveChange = (
         ? { ...change, baseSha: event.to }
         : illegal(change, event);
     case "PrecheckStarted":
-      return from("submitted") ? moveTo(change, "deriving") : illegal(change, event);
+      // A new pass derives again: the commit may differ though the revision does not.
+      return from("submitted")
+        ? moveTo(change, "deriving", ["derivationRef"])
+        : illegal(change, event);
     case "EffectsDerived":
+      return from("deriving") &&
+        event.revision === change.intent.revision &&
+        change.derivationRef === undefined
+        ? { ...change, derivationRef: event.derivationRef }
+        : illegal(change, event);
     case "DriftDetected":
       return from("deriving") ? change : illegal(change, event);
     case "ChangeDrifted":

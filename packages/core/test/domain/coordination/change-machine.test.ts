@@ -6,6 +6,7 @@ import {
   type ChangeCommand,
   ChangeEvent,
   decideChange,
+  type DerivedEffect,
   evolveChange,
   type Preflight,
   type Proposition,
@@ -47,6 +48,19 @@ const ON_TRUNK = CommitSha.make("e".repeat(40));
 /** The commits a workspace is rebased onto, and a base the change never had. */
 const REBASED = CommitSha.make("f".repeat(40));
 const NEVER_BASE = CommitSha.make("9".repeat(40));
+/** What an extractor read in the submitted commit: a ruling, anchored where it read it. */
+const DERIVED: DerivedEffect = {
+  proposition: {
+    subject: SubjectKey.make("authz.permission-evaluation"),
+    predicate: "freshness",
+    relation: "is",
+    value: "per-session",
+  },
+  anchors: [{ path: "src/authz/cache.ts", symbol: "RoleCache.get", commit: SHA }],
+  declared: false,
+  method: "extractor",
+  evidenceClass: "ruling",
+};
 const preflight: Preflight = {
   neighbours: [],
   contradictions: [],
@@ -70,6 +84,7 @@ const ALL: readonly Kind[] = [
   "Rebase",
   "Submit",
   "StartPrecheck",
+  "DeriveEffects",
   "Drift",
   "CompilePlan",
   "Queue",
@@ -93,7 +108,8 @@ const PROGRESS: Readonly<Record<Key, readonly Kind[]>> = {
   declared: ["Start"],
   working: ["Submit"],
   submitted: ["StartPrecheck"],
-  deriving: ["CompilePlan"],
+  // One pass in three records what it derived before it compiles.
+  deriving: ["CompilePlan", "CompilePlan", "DeriveEffects"],
   drifted: ["Revise"],
   verifying: ["Queue"],
   queued: ["Batch"],
@@ -291,6 +307,12 @@ const build = (
       return { _tag: "Submit", leaseId: token, commitSha: SHA, inWorkspace: step.flag };
     case "StartPrecheck":
       return { _tag: "StartPrecheck", instanceId: `precheck-${step.pick}` };
+    case "DeriveEffects":
+      return {
+        _tag: "DeriveEffects",
+        effects: step.flag ? [] : [DERIVED],
+        derivationRef: `mfp:derivation:${step.pick}`,
+      };
     case "Drift":
       return {
         _tag: "Drift",
@@ -305,7 +327,6 @@ const build = (
     case "CompilePlan":
       return {
         _tag: "CompilePlan",
-        ...(step.operator ? { derivation: { effects: [], derivationRef: "mfp:derivation" } } : {}),
         drift: step.flag
           ? []
           : [{ class: "footprint", severity: "low", detail: "outside the footprint" }],
@@ -538,6 +559,8 @@ const oracle = (
         : "refused";
     case "StartPrecheck":
       return key === "submitted" ? "deriving" : "refused";
+    case "DeriveEffects":
+      return key === "deriving" && before.derivationRef === undefined ? "deriving" : "refused";
     case "Drift":
       return key === "deriving" ? intoAgent("drifted") : "refused";
     case "CompilePlan":
@@ -675,6 +698,18 @@ const compile: ChangeCommand = {
   steps: 3,
   costEstimate: 1,
 };
+const derive: ChangeCommand = {
+  _tag: "DeriveEffects",
+  effects: [DERIVED],
+  derivationRef: "derivation-1",
+};
+const drifts: ChangeCommand = {
+  _tag: "Drift",
+  blocking: [
+    { class: "undeclared-effect", severity: "medium", detail: "undeclared proof-class effect" },
+  ],
+};
+const tagsOf = (log: readonly ChangeEvent[]): readonly string[] => log.map((e) => e._tag);
 const clear = { openProvenConflicts: [], failingGuards: [], unresolvedHighDrift: [] };
 const queue: ChangeCommand = { _tag: "Queue", laneId: "lane:default", blockers: clear };
 const BATCH = makeId("bat", ulid(4));
@@ -1738,6 +1773,113 @@ describe("the Change and Lease charts", { timeout: PROPERTY_TIMEOUT }, () => {
     ]).state;
     expect(recompiled?.state).toBe("verifying");
     expect(recompiled).not.toHaveProperty("predicatePolicy");
+  });
+
+  it("[change.derive-effects] a Precheck pass records what it derived at most once, while Deriving: one EffectsDerived alone, at the change's revision; a second is refused and commits nothing, the plan and the drift never carry one, and the next pass derives again", () => {
+    let recorded = 0;
+    let second = 0;
+    fc.assert(
+      fc.property(planArb, (plan) => {
+        // Read from the log, not the change: has this pass, since its PrecheckStarted, recorded a derivation?
+        let derived = false;
+        return run(plan).records.every((r) => {
+          const deriving = keyOf(r.before) === "deriving";
+          const tried = r.probes.every((p) => {
+            const events = Result.isSuccess(p.result) ? p.result.success : [];
+            if (p.command._tag !== "DeriveEffects")
+              return events.every((e) => e._tag !== "EffectsDerived");
+            if (!deriving || derived) {
+              if (deriving) second++;
+              return Result.isFailure(p.result);
+            }
+            const [only] = events;
+            return (
+              events.length === 1 &&
+              only?._tag === "EffectsDerived" &&
+              only.revision === r.before?.intent.revision &&
+              only.derivationRef === p.command.derivationRef &&
+              JSON.stringify(only.effects) === JSON.stringify(p.command.effects) &&
+              p.key === "deriving"
+            );
+          });
+          if (!r.threw) {
+            for (const e of eventsOf(r)) {
+              if (e._tag === "PrecheckStarted") derived = false;
+              if (e._tag === "EffectsDerived") {
+                derived = true;
+                recorded++;
+              }
+            }
+          }
+          return tried;
+        });
+      }),
+    );
+    expect(recorded).toBeGreaterThan(0);
+    expect(second).toBeGreaterThan(0);
+    const deriving = [
+      [declare, 0],
+      [start, 0],
+      [submit, 0],
+      [precheck, 0],
+    ] as const;
+    // Alone and first; then the drift is classified and the plan compiled, neither carrying a derivation.
+    const compiled = drive([
+      ...deriving,
+      [derive, 0],
+      [derive, 0],
+      [{ ...compile, drift: [{ class: "footprint", severity: "low", detail: "outside" }] }, 0],
+      [derive, 0],
+    ]);
+    expect(tagsOf(compiled.log).slice(-4)).toEqual([
+      "PrecheckStarted",
+      "EffectsDerived",
+      "DriftDetected",
+      "PlanCompiled",
+    ]);
+    expect(compiled.results.slice(-4).map(failureTag)).toEqual([
+      undefined,
+      "ChangeStateRefused",
+      undefined,
+      "ChangeStateRefused",
+    ]);
+    expect(compiled.state).toMatchObject({ state: "verifying", derivationRef: "derivation-1" });
+    // Without a derivation the plan compiles as before, and records none.
+    const plain = drive([...deriving, [compile, 0]]);
+    expect(tagsOf(plain.log).slice(-2)).toEqual(["PrecheckStarted", "PlanCompiled"]);
+    expect(plain.state).not.toHaveProperty("derivationRef");
+    // Before the pass starts there is nothing to derive from.
+    const early = drive([
+      [declare, 0],
+      [start, 0],
+      [submit, 0],
+      [derive, 0],
+    ]);
+    expect(failureTag(early.results.at(-1))).toBe("ChangeStateRefused");
+    expect(tagsOf(early.log)).not.toContain("EffectsDerived");
+    // The derivation is on the log when the drift sends the change back to its agent.
+    const drifted = drive([...deriving, [derive, 0], [drifts, 0]]);
+    expect(tagsOf(drifted.log).slice(-2)).toEqual(["EffectsDerived", "ChangeDrifted"]);
+    expect(drifted.state?.state).toBe("drifted");
+    // A bounced change resubmitted without a revision is a new pass over a new commit: it derives again.
+    const again = drive([
+      ...deriving,
+      [derive, 0],
+      [bounce, 0],
+      [submit, 0],
+      [precheck, 0],
+      [{ ...derive, derivationRef: "derivation-2" }, 0],
+    ]);
+    expect(failureTag(again.results.at(-1))).toBeUndefined();
+    expect(again.state).toMatchObject({ state: "deriving", derivationRef: "derivation-2" });
+    expect(
+      again.log.flatMap((e) =>
+        e._tag === "EffectsDerived" ? [[e.revision, e.derivationRef]] : [],
+      ),
+    ).toEqual([
+      [1, "derivation-1"],
+      [1, "derivation-2"],
+    ]);
   });
 
   it("[change.landed-commit] a change carries its commit on trunk from the moment it lands, and never before", () => {

@@ -109,6 +109,8 @@ export const Change = Schema.Struct({
   planHash: Schema.optional(ContentHash),
   /** That plan's predicate policy (PlanCompiled), applied to a proven conflict. Absent, or a predicate left out, is `advise`. */
   predicatePolicy: Schema.optional(PredicatePolicies),
+  /** The derivation its current Precheck pass recorded (EffectsDerived): at most one a pass, cleared when the next pass starts. */
+  derivationRef: Schema.optional(Schema.String),
 });
 export type Change = typeof Change.Type;
 

@@ -17,7 +17,6 @@ import {
 import {
   canonicalJson,
   CommitSha,
-  ContentHash,
   Instant,
   type Json,
   makeId,
@@ -217,12 +216,9 @@ describe("propositions entering Keel", () => {
         const compiled = decided(
           { ...working, state: "deriving" },
           {
-            _tag: "CompilePlan",
-            derivation: { effects: effects.map(derived), derivationRef: "derivation-1" },
-            drift: [],
-            planHash: ContentHash.make(`sha256:${"0".repeat(64)}`),
-            steps: 1,
-            costEstimate: 1,
+            _tag: "DeriveEffects",
+            effects: effects.map(derived),
+            derivationRef: "derivation-1",
           },
         );
         return (

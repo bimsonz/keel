@@ -121,7 +121,8 @@ stateDiagram-v2
 | Submitted | Deriving | Precheck instance created | — | `PrecheckStarted` |
 | Deriving | Bounced | Precheck: a protected or guard path is touched | — | `ChangeBounced` |
 | Deriving | Drifted | Precheck: drift needs the agent (an undeclared proof-class effect) | — | `ChangeDrifted` |
-| Deriving | Verifying | Precheck: effects derived, drift classified, plan compiled | — | `EffectsDerived`, `DriftDetected`, then `PlanCompiled` |
+| Deriving | Deriving | Precheck: the submitted commit's effects are derived | Once per Precheck pass: a second in the same pass is refused, with a read of the change. The next pass (a resubmitted commit, even at the same revision) derives again | `EffectsDerived`, alone: a fact that leaves the change Deriving, committed before the drift and the plan |
+| Deriving | Verifying | Precheck: drift classified, plan compiled | — | `DriftDetected`, then `PlanCompiled` |
 | Drifted, Bounced | Working | `revise` | Valid lease | `IntentRevised` |
 | Verifying | Queued | The plan's pre-queue steps pass | No Proven conflict is open, no guard fails, no high-severity drift is unresolved; otherwise the command is refused as blocked, with no event | `ChangeQueued`, carrying the hash of the plan the change was compiled to (as does `ChangeRequeued`) |
 | Verifying | Bounced | A conflict is proven against the change under a `block` policy, or a guard fails | — | `ChangeBounced`, naming exactly one cause: the verdict, or the conflict (a conflict bounces a change only from Deriving, Verifying or Queued) |
