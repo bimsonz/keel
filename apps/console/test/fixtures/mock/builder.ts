@@ -12,7 +12,8 @@ import type { LandedFile, Landing } from "../repo.ts";
 import { type Rng, ulidAt } from "../prng.ts";
 import { funnelFrames } from "./funnel.ts";
 import type { ScriptedEvent } from "./scripted.ts";
-import type { ChangeDiff, ProbeSource, VerdictReasons } from "../../../src/source/types.ts";
+import type { ProbeSource } from "../../../src/contract/keel/index.ts";
+import type { ChangeDiff, VerdictReasons } from "../../../src/source/types.ts";
 
 type EventInput = {
   [Type in EventType]: {

@@ -608,11 +608,23 @@ export function opening(b: ScriptBuilder, policy?: EventPredicatePolicies) {
       kind: "semantic",
       parties: [changeA, changeB],
       subjectId: subject,
+      subjectKey: SUBJECT_KEY,
       predicate: "freshness",
-      x: {
-        summary: `${NUMBER_A} relies on freshness at most per-request. ${NUMBER_B} makes it per-session.`,
-        silentRetraction: true,
+      // Keel's fallout names the two sides: the premise at stake with its holder, and the effect against it
+      // with the change that makes it, known here by the extractor that derived it.
+      premise: { holder: changeA, proposition: premiseA },
+      effect: {
+        changeId: changeB,
+        proposition: {
+          subject: SUBJECT_KEY,
+          predicate: "freshness",
+          relation: "is",
+          value: "per-session",
+          gloss: "Roles are cached for the life of the session",
+        },
+        evidence: { declared: false, method: "extractor", evidenceClass: "ruling" },
       },
+      x: { silentRetraction: true },
     },
     causation: derivedB,
   });
@@ -720,14 +732,13 @@ export function opening(b: ScriptBuilder, policy?: EventPredicatePolicies) {
       conflictId: conflict,
       attempts: 1,
       bundleHash: "sha256:7be4…c19a",
-      x: { path: "probes/authz.permission-evaluation/freshness.probe.ts" },
     },
     causation: suspected,
   });
   b.probes.set(probe, {
     probeId: probe,
-    path: "probes/authz.permission-evaluation/freshness.probe.ts",
-    source: PROBE_SOURCE,
+    bundleHash: "sha256:7be4…c19a",
+    files: [{ path: "probes/authz.permission-evaluation/freshness.probe.ts", text: PROBE_SOURCE }],
   });
   b.diffs.set(changeB, {
     changeId: changeB,
@@ -774,13 +785,15 @@ export function opening(b: ScriptBuilder, policy?: EventPredicatePolicies) {
         },
       }),
     );
-  /** One change's own suite, run in one world. `passed` is null where the suite does not apply. */
+  /**
+   * A suite run in one world. Keel runs five: the project's own on trunk, each side's own in its world, and
+   * both sides' where the two changes are composed.
+   */
   const testCell = (
     second: number,
     world: ProbeWorld,
-    of: "A" | "B",
-    passed: number | null,
-    reason = `${of}'s tests are not in this world`,
+    of: "trunk" | "A" | "B",
+    passed: number,
   ): void => {
     b.at(second).emit({
       type: "WorldCheckRan",
@@ -788,24 +801,21 @@ export function opening(b: ScriptBuilder, policy?: EventPredicatePolicies) {
       payload: {
         conflictId: conflict,
         world,
-        check: `suite:${of === "A" ? changeA : changeB}`,
+        check: `suite:${of === "trunk" ? "trunk" : of === "A" ? changeA : changeB}`,
         run: 1,
-        outcome: passed === null ? "n/a" : "pass",
-        ...(passed === null ? { reason } : { counts: { passed, failed: 0, skipped: 0 } }),
+        outcome: "pass",
+        counts: { passed, failed: 0, skipped: 0 },
       },
     });
   };
   const NO_PATH = "No revocation path in this world";
-  testCell(410, "trunk", "A", null);
-  testCell(410.4, "trunk", "B", null);
+  testCell(410, "trunk", "trunk", 24);
   probeRuns("trunk", "n/a", [411.5, 412.5, 413.5], NO_PATH);
   // The control: A's world with the revocation path taken out. A probe that still passed here would prove nothing.
   // It runs the probe alone: neither change's suite is run there, and Keel records none.
   probeRuns("A-noop", "fail", [414.6, 415, 415.4]);
   testCell(416, "A", "A", 31);
-  testCell(416.4, "A", "B", null);
   probeRuns("A", "pass", [418, 420, 422]);
-  testCell(425, "B", "A", null);
   testCell(425.4, "B", "B", 27);
   probeRuns("B", "n/a", [427, 428, 429], NO_PATH);
   testCell(433, "AB", "A", 31);

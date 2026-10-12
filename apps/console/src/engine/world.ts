@@ -3,8 +3,18 @@
 // observation, and replaying the same log gives the same world.
 
 import type { EntityRef } from "../contract/envelope.ts";
-import type { AgentKind, AnyEvent, DriftEntry } from "../contract/events.ts";
-import type { PushRefusedReason } from "../contract/keel/index.ts";
+import type { AgentKind, AnyEvent, DriftEntry, NextAction } from "../contract/events.ts";
+import type {
+  ConflictEscalated,
+  ConflictProven,
+  MatrixCheck,
+  MatrixProbeRun,
+  Move,
+  ProbeDiscard,
+  PushRefusedReason,
+  SuspectEffect,
+  SuspectPremise,
+} from "../contract/keel/index.ts";
 import type {
   DerivedEffect,
   FootprintEntry,
@@ -147,30 +157,67 @@ export interface ConflictEntry {
   state: ConflictState;
   parties: string[];
   subjectId?: string;
+  /** The subject's key, as the suspicion itself names it, or as the subject it names was minted with. */
+  subjectKey?: string;
   predicate?: Predicate;
-  summary: string;
+  /** What a page calls it, in Keel's own fields: its subject and predicate, or its `C-n` where it names no subject. */
+  title: string;
+  /** `fallout`: two changes' claims contradict. `opinion`: a decision model suspects it. Absent means fallout. */
+  origin?: "fallout" | "opinion";
+  /**
+   * The two sides, as Keel's suspicion names them: the premise at stake with the change that holds it, and the
+   * effect against it with the change that makes it. Absent where Keel named neither; nothing is worked out.
+   */
+  premise?: SuspectPremise;
+  effect?: SuspectEffect;
   silentRetraction: boolean;
   probeId?: string;
   guardId?: string;
   escalationId?: string;
+  /** Why it was put to a person. */
+  escalated?: ConflictEscalated["reason"];
   decisionId?: string;
+  /** What proved it, as ConflictProven carries it. */
+  proven?: ConflictProven["evidence"];
+  /** Why it was dismissed, in Keel's words. */
+  dismissed?: string;
+  /** The move that resolved it. */
+  move?: Move;
   costUsd?: number;
   openedAt: string;
   /** When it was resolved or dismissed, in simulated ms. */
   settledT?: number;
+  /** The same instant, as Keel's event said it. */
+  settledAt?: string;
+  /** Every run of its probe Keel has recorded, in the order they arrived. */
+  runs: ProbeRunEntry[];
+  /** Every suite run Keel has recorded in one of its worlds, in the order they arrived. */
+  checks: WorldCheckEntry[];
   timeline: TimelineEntry[];
+}
+
+/** One run of a conflict's probe in a world, as ProbeRan carries it. */
+export interface ProbeRunEntry extends MatrixProbeRun {
+  world: WorldId;
+  /** Why it did not apply, where the source says. */
+  reason?: string;
+}
+
+/** One run of a suite in a world of a conflict's matrix, as WorldCheckRan carries it. */
+export interface WorldCheckEntry extends MatrixCheck {
+  world: WorldId;
 }
 
 export interface ProbeEntry {
   id: string;
   label: string;
   conflictId: string;
-  attempts: number;
-  bundleHash: string;
-  path: string;
-  state: "calibrating" | "admitted" | "discarded";
-  runs: Record<WorldId, Outcome[]>;
-  reasons: Partial<Record<WorldId, string>>;
+  /** How many drafts it took, and the bundle its source is in. Absent on a probe none of whose drafts was kept. */
+  attempts?: number;
+  bundleHash?: string;
+  state: "calibrating" | "admitted" | "discarded" | "retired";
+  /** Why it was discarded, in ProbeDiscarded's words. */
+  discarded?: ProbeDiscard;
   /** What its runs have cost so far. Absent until Keel records a cost for one. */
   costUsd?: number;
 }
@@ -211,6 +258,8 @@ export interface GuardEntry {
   conflictId: string;
   state: "admitted" | "retired";
   admittedAt: string;
+  /** The discriminating runs that admitted it. */
+  runs: number;
 }
 
 export interface VerdictEntry {
@@ -264,21 +313,21 @@ const CLASS_OF: Record<Exclude<AgentKind, "human">, AgentClass> = {
   synthetic: "synthetic",
 };
 
-const NO_RUNS = (): Record<WorldId, Outcome[]> => ({
-  trunk: [],
-  "A-noop": [],
-  A: [],
-  B: [],
-  AB: [],
-});
+/** The worlds of a conflict's matrix, in the order Keel shows them: trunk, the control, each side, both. */
+export const MATRIX_WORLDS = [
+  "trunk",
+  "A-noop",
+  "A",
+  "B",
+  "AB",
+] as const satisfies readonly WorldId[];
 
-/** One suite's latest run in one world: a cell of the world matrix outside the probe's column. */
-export interface SuiteRun {
-  outcome: Outcome;
-  passed?: number;
-  total?: number;
-  reason?: string;
-  at: string;
+/** A probe's outcomes in one world of its conflict's matrix, in run order. */
+export function outcomesIn(conflict: ConflictEntry | undefined, world: WorldId): Outcome[] {
+  return (conflict?.runs ?? [])
+    .filter((run) => run.world === world)
+    .toSorted((a, b) => a.run - b.run)
+    .map((run) => run.outcome);
 }
 
 function short(id: string): string {
@@ -300,8 +349,14 @@ export class World {
   readonly batches = new Map<string, BatchEntry>();
   /** Session id to agent id. */
   readonly sessions = new Map<string, string>();
-  /** The suites' cells of the world matrix, keyed `conflictId/world/suite:<changeId>`. The latest run stands. */
-  readonly suites = new Map<string, SuiteRun>();
+  /**
+   * What Keel last told a change about a conflict, keyed `conflictId/changeId`: a bounce that cites it, or a note
+   * of it. Kept beside the conflict, as Keel keeps it: the change's event and the conflict's come in no fixed order.
+   */
+  readonly told = new Map<
+    string,
+    { how: "bounced" | "noted"; nextActions: NextAction[]; at: string }
+  >();
   /** The latest status of each step, keyed `subject/stepId`. */
   readonly steps = new Map<string, StepObservation>();
   /** The latest counters only the platform knows. */
@@ -605,6 +660,12 @@ export class World {
             ...(declined === undefined ? {} : { declined: declined.reason }),
             next: (nextActions ?? []).map((action) => action.title),
           };
+          if (conflictId !== undefined)
+            this.told.set(`${conflictId}/${change.id}`, {
+              how: "bounced",
+              nextActions: nextActions ?? [],
+              at: event.at,
+            });
           // A bounce on a conflict ties the change to it, whether or not the change was one of its two sides.
           if (conflictId !== undefined && !change.conflictIds.includes(conflictId))
             change.conflictIds.push(conflictId);
@@ -648,6 +709,11 @@ export class World {
           at: event.at,
           next: (nextActions ?? []).map((action) => action.title),
         });
+        this.told.set(`${conflictId}/${change.id}`, {
+          how: "noted",
+          nextActions: nextActions ?? [],
+          at: event.at,
+        });
         this.#note(conflictId, event, t, `Noted against ${change.label}`, `policy: ${policy}`);
         break;
       }
@@ -684,50 +750,66 @@ export class World {
       }
       case "ConflictSuspected": {
         const parties = event.payload.parties;
+        const label = event.label ?? `C·${short(event.payload.conflictId)}`;
+        // An event older than the field names its subject by id alone; the key is then the minted subject's.
+        const subjectKey =
+          event.payload.subjectKey ?? this.subjects.get(event.payload.subjectId ?? "")?.key;
         this.conflicts.set(event.payload.conflictId, {
           id: event.payload.conflictId,
-          label: event.label ?? `C·${short(event.payload.conflictId)}`,
+          label,
           kind: event.payload.kind,
           state: "suspected",
           parties,
           ...(event.payload.subjectId === undefined ? {} : { subjectId: event.payload.subjectId }),
+          ...(subjectKey === undefined ? {} : { subjectKey }),
           ...(event.payload.predicate === undefined ? {} : { predicate: event.payload.predicate }),
-          summary: event.payload.x?.summary ?? "",
+          title:
+            subjectKey === undefined
+              ? `Conflict ${label}`
+              : event.payload.predicate === undefined
+                ? subjectKey
+                : `${subjectKey} · ${event.payload.predicate}`,
+          ...(event.payload.origin === undefined ? {} : { origin: event.payload.origin }),
+          // The two sides are Keel's to name. Where its suspicion names none, the console holds none.
+          ...(event.payload.premise === undefined ? {} : { premise: event.payload.premise }),
+          ...(event.payload.effect === undefined ? {} : { effect: event.payload.effect }),
           silentRetraction: event.payload.x?.silentRetraction ?? false,
           openedAt: event.at,
+          runs: [],
+          checks: [],
           timeline: [],
         });
         for (const party of parties)
           this.changes.get(party)?.conflictIds.push(event.payload.conflictId);
-        // The story of a conflict starts before it opens: with the submission that caused it.
-        const cause = parties
-          .map((party) => this.changes.get(party))
-          .findLast((change) => change?.submittedAt !== undefined);
+        // The story of a conflict starts before it opens: with the submission whose effect Keel set against a
+        // premise. Which change that is, and what its effect is, are the suspicion's own words.
+        const { effect } = event.payload;
+        const cause = effect === undefined ? undefined : this.changes.get(effect.changeId);
         const conflict = this.conflicts.get(event.payload.conflictId);
-        if (cause !== undefined && conflict !== undefined) {
-          const subjectKey = this.subjects.get(event.payload.subjectId ?? "")?.key;
-          const effect =
-            cause.effects.find(
-              (candidate) =>
-                candidate.proposition.subject === subjectKey &&
-                candidate.proposition.predicate === event.payload.predicate,
-            ) ?? cause.effects[0];
-          conflict.timeline.push({
-            t: cause.submittedT ?? t,
-            at: cause.submittedAt ?? event.at,
-            type: "ChangeSubmitted",
-            title: `${cause.label} submits`,
-            detail: `commit ${cause.commit ?? ""}`,
-          });
-          if (effect !== undefined) {
+        if (cause !== undefined && effect !== undefined && conflict !== undefined) {
+          if (cause.submittedAt !== undefined)
             conflict.timeline.push({
-              t,
-              at: event.at,
-              type: "EffectsDerived",
-              title: `Keel derives: ${effect.proposition.predicate} ${effect.proposition.relation} ${String(effect.proposition.value)}`,
-              detail: effect.declared ? "Declared by the agent" : `${cause.label} declared nothing`,
+              t: cause.submittedT ?? t,
+              at: cause.submittedAt,
+              type: "ChangeSubmitted",
+              title: `${cause.label} submits`,
+              ...(cause.commit === undefined ? {} : { detail: `commit ${cause.commit}` }),
             });
-          }
+          const held = `${effect.proposition.predicate} ${effect.proposition.relation} ${String(effect.proposition.value)}`;
+          conflict.timeline.push({
+            t,
+            at: event.at,
+            type: "ConflictSuspected",
+            title:
+              effect.evidence === undefined
+                ? `${cause.label}'s effect: ${held}`
+                : effect.evidence.declared
+                  ? `${cause.label} declares: ${held}`
+                  : `Keel derives: ${held}`,
+            ...(effect.evidence === undefined || effect.evidence.declared
+              ? {}
+              : { detail: `${cause.label} did not declare it` }),
+          });
           if (conflict.silentRetraction) {
             conflict.timeline.push({
               t,
@@ -755,10 +837,7 @@ export class World {
           conflictId: event.payload.conflictId,
           attempts: event.payload.attempts,
           bundleHash: event.payload.bundleHash,
-          path: event.payload.x?.path ?? "",
           state: "calibrating",
-          runs: NO_RUNS(),
-          reasons: {},
         });
         const conflict = this.conflicts.get(event.payload.conflictId);
         if (conflict !== undefined) {
@@ -770,18 +849,25 @@ export class World {
           event,
           t,
           `Probe ${label} drafted`,
-          `Attempt ${event.payload.attempts} of 3`,
+          `Draft ${event.payload.attempts}`,
         );
         break;
       }
       case "ProbeRan": {
         const probe = this.probes.get(event.payload.probeId);
-        if (probe === undefined) break;
+        const ran = this.conflicts.get(event.payload.conflictId);
+        if (probe === undefined || ran === undefined) break;
         const world = event.payload.world;
-        probe.runs[world][event.payload.run - 1] = event.payload.outcome;
+        ran.runs.push({
+          world,
+          run: event.payload.run,
+          outcome: event.payload.outcome,
+          resultRef: event.payload.resultRef,
+          at: event.at,
+          ...(event.payload.x?.reason === undefined ? {} : { reason: event.payload.x.reason }),
+        });
         const usd = event.payload.x?.cost?.usd;
         if (usd !== undefined) probe.costUsd = (probe.costUsd ?? 0) + usd;
-        if (event.payload.x?.reason !== undefined) probe.reasons[world] = event.payload.x.reason;
         const name = world === "AB" ? "A+B" : world;
         // The deciding world is told run by run; the others once all three are in.
         if (world === "AB") {
@@ -802,30 +888,46 @@ export class World {
         break;
       }
       case "WorldCheckRan": {
-        const { counts } = event.payload;
-        this.suites.set(
-          `${event.payload.conflictId}/${event.payload.world}/${event.payload.check}`,
-          {
-            outcome: event.payload.outcome,
-            ...(counts === undefined
-              ? {}
-              : { passed: counts.passed, total: counts.passed + counts.failed + counts.skipped }),
-            ...(event.payload.reason === undefined ? {} : { reason: event.payload.reason }),
-            at: event.at,
-          },
-        );
+        const { counts, reason } = event.payload;
+        this.conflicts.get(event.payload.conflictId)?.checks.push({
+          world: event.payload.world,
+          check: event.payload.check,
+          run: event.payload.run,
+          outcome: event.payload.outcome,
+          ...(counts === undefined ? {} : { counts }),
+          ...(reason === undefined ? {} : { reason }),
+          at: event.at,
+        });
         break;
       }
       case "ProbeDiscarded": {
-        const probe = this.probes.get(event.payload.probeId);
-        if (probe === undefined) break;
+        // A probe none of whose drafts was kept is discarded without ever having been drafted: Keel names its
+        // conflict on the event, and it is a probe of that conflict all the same.
+        const conflictId =
+          this.probes.get(event.payload.probeId)?.conflictId ?? event.payload.conflictId;
+        if (conflictId === undefined) break;
+        const probe: ProbeEntry = this.probes.get(event.payload.probeId) ?? {
+          id: event.payload.probeId,
+          label: event.label ?? `P·${short(event.payload.probeId)}`,
+          conflictId,
+          state: "discarded",
+        };
+        this.probes.set(probe.id, probe);
         probe.state = "discarded";
+        probe.discarded = {
+          reason: event.payload.reason,
+          ...(event.payload.detail === undefined ? {} : { detail: event.payload.detail }),
+        };
+        const of = this.conflicts.get(conflictId);
+        if (of !== undefined && of.probeId === undefined) of.probeId = probe.id;
         this.#note(
-          probe.conflictId,
+          conflictId,
           event,
           t,
           `Probe ${probe.label} discarded`,
-          event.payload.reason,
+          event.payload.detail === undefined
+            ? event.payload.reason
+            : `${event.payload.reason}: ${event.payload.detail}`,
         );
         break;
       }
@@ -838,6 +940,7 @@ export class World {
           conflictId: event.payload.conflictId,
           state: "admitted",
           admittedAt: event.at,
+          runs: event.payload.runs,
         });
         const probe = this.probes.get(event.payload.probeId);
         if (probe !== undefined) probe.state = "admitted";
@@ -852,7 +955,7 @@ export class World {
           event,
           t,
           `Guard ${label} admitted`,
-          `${probe?.label ?? "The probe"} discriminates, three runs out of three`,
+          `${probe?.label ?? "The probe"} discriminates, in ${event.payload.runs} ${event.payload.runs === 1 ? "run" : "runs"}`,
         );
         break;
       }
@@ -873,6 +976,8 @@ export class World {
         const guard = this.guards.get(event.payload.guardId);
         if (guard === undefined) break;
         guard.state = "retired";
+        const retired = this.probes.get(guard.probeId);
+        if (retired !== undefined) retired.state = "retired";
         this.#note(
           guard.conflictId,
           event,
@@ -886,6 +991,7 @@ export class World {
         const conflict = this.conflicts.get(event.payload.conflictId);
         if (conflict === undefined) break;
         conflict.state = "proven";
+        conflict.proven = event.payload.evidence;
         if (event.payload.x?.cost?.usd !== undefined) conflict.costUsd = event.payload.x.cost.usd;
         this.#note(conflict.id, event, t, `Conflict ${conflict.label} is proven`);
         break;
@@ -895,13 +1001,15 @@ export class World {
         if (conflict === undefined) break;
         conflict.state = "dismissed";
         conflict.settledT = t;
+        conflict.settledAt = event.at;
+        conflict.dismissed = event.payload.evidence;
         if (event.payload.x?.cost?.usd !== undefined) conflict.costUsd = event.payload.x.cost.usd;
         this.#note(
           conflict.id,
           event,
           t,
           `Conflict ${conflict.label} dismissed`,
-          "The probe gave the same answer in every world",
+          event.payload.evidence,
         );
         break;
       }
@@ -910,6 +1018,7 @@ export class World {
         if (conflict === undefined) break;
         conflict.state = "escalated";
         conflict.escalationId = event.payload.escalationId;
+        conflict.escalated = event.payload.reason;
         const escalation = this.escalations.get(event.payload.escalationId);
         this.#note(
           conflict.id,
@@ -925,6 +1034,8 @@ export class World {
         if (conflict === undefined) break;
         conflict.state = "resolved";
         conflict.settledT = t;
+        conflict.settledAt = event.at;
+        conflict.move = event.payload.move;
         if (event.payload.decisionId !== undefined) conflict.decisionId = event.payload.decisionId;
         break;
       }

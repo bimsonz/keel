@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/conflict.test.ts
+# kills: conflict.no-sides
+# why: a conflict Keel suspected without naming a premise and an effect has no page
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index a9322ab..5afccc0 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -407,7 +407,9 @@ export function conflictPageOf(
+   resources: Resources,
+ ): ConflictPageState | null {
+   const detail = conflictDetailOf(world, conflictId);
+-  return detail === null ? null : conflictPageFrom(detail, world, resources);
++  return detail === null || detail.sides === undefined
++    ? null
++    : conflictPageFrom(detail, world, resources);
+ }
+ 
+ function leaves(node: FlowNode, worlds?: WorldId[]): { step: StepSpec; worlds?: WorldId[] }[] {

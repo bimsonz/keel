@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/engine.test.ts
+# kills: conflict.records
+# why: an effect Keel derived is listed as its agent's own declared claim
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index a9322ab..24a5cf7 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -234,9 +234,7 @@ function recordsOf(
+       items.push({
+         class: evidence.evidenceClass,
+         summary: `${parties.B.label} makes: ${said(parties.B.proposition, predicate)}`,
+-        by: evidence.declared
+-          ? "Declared by its agent"
+-          : (HOW_KNOWN[evidence.method ?? ""] ?? "Derived by Keel"),
++        by: "Declared by its agent",
+         ref: `chg:${parties.B.changeId}`,
+         at: detail.openedAt,
+       });

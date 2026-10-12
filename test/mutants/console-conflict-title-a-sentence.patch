@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/conflict.test.ts
+# kills: conflict.sides
+# why: a conflict is called by a sentence of the console's own, where its title is Keel's subject and predicate
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index a9322ab..b63e905 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -319,7 +319,7 @@ export function conflictPageFrom(
+           ? `Conflict ${detail.label}`
+           : detail.predicate === undefined
+             ? detail.subject
+-            : `${detail.subject} · ${detail.predicate}`,
++            : `A disagreement about ${detail.subject}`,
+       ...(detail.predicate === undefined ? {} : { predicate: detail.predicate }),
+       ...(detail.origin === undefined ? {} : { origin: detail.origin }),
+       ...(detail.proven === undefined

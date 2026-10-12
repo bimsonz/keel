@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/engine.test.ts
+# kills: matrix.record
+# why: the first run Keel has not recorded is said to be running, which Keel never says
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index a9322ab..035b5c6 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -173,7 +173,10 @@ function matrixOf(world: World, detail: ConflictDetail): ConflictPageState["matr
+           ...(check.reason === undefined ? {} : { reason: check.reason }),
+         })),
+         // What is not in yet is not said to be running: Keel records a run when it has ended, and nothing before.
+-        runs: Array.from({ length: most }, (_, index) => ran.get(index + 1) ?? "pending"),
++        runs: Array.from(
++          { length: most },
++          (_, index) => ran.get(index + 1) ?? (index === ran.size ? "running" : "pending"),
++        ),
+         ...(reason?.reason === undefined ? {} : { reason: reason.reason }),
+         ...(row.world === "A-noop" ? { control: true } : {}),
+       };

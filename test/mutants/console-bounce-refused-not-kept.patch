@@ -2,14 +2,14 @@
 # kills: change.bounce-refused
 # why: the refusal Keel names as a bounce's cause is dropped, so the page cannot say the push was refused
 diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
-index 3502bc5..38241bf 100644
+index a9a609b..ba9b278 100644
 --- a/apps/console/src/engine/world.ts
 +++ b/apps/console/src/engine/world.ts
-@@ -602,7 +602,6 @@ export class World {
+@@ -657,7 +657,6 @@ export class World {
              at: event.at,
              ...(verdictId === undefined ? {} : { verdictId }),
              ...(conflictId === undefined ? {} : { conflictId }),
 -            ...(declined === undefined ? {} : { declined: declined.reason }),
              next: (nextActions ?? []).map((action) => action.title),
            };
-           // A bounce on a conflict ties the change to it, whether or not the change was one of its two sides.
+           if (conflictId !== undefined)

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/conflict.test.ts
+# kills: conflict.sides
+# why: the side that holds the premise is taken to be the first party, where Keel's suspicion names another
+diff --git a/apps/console/src/engine/conflict.ts b/apps/console/src/engine/conflict.ts
+index d88d27c..1cb4a76 100644
+--- a/apps/console/src/engine/conflict.ts
++++ b/apps/console/src/engine/conflict.ts
+@@ -54,7 +54,7 @@ function sidesOf(world: World, conflict: ConflictEntry): ConflictDetail["sides"]
+   };
+   return {
+     holder: {
+-      changeId: premise.holder,
++      changeId: conflict.parties[0] ?? premise.holder,
+       role: "premise",
+       proposition: premise.proposition,
+       ...toldTo(premise.holder),

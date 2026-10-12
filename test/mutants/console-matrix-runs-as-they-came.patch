@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/conflict.test.ts
+# kills: conflict.matrix
+# why: a probe's runs are listed in the order their events arrived, where Keel lists them in run order
+diff --git a/apps/console/src/engine/conflict.ts b/apps/console/src/engine/conflict.ts
+index d88d27c..67c4693 100644
+--- a/apps/console/src/engine/conflict.ts
++++ b/apps/console/src/engine/conflict.ts
+@@ -28,7 +28,6 @@ export function matrixOf(conflict: ConflictEntry): MatrixWorld[] {
+       world,
+       probe: conflict.runs
+         .filter((run) => run.world === world)
+-        .toSorted((a, b) => a.run - b.run)
+         .map(({ run, outcome, resultRef, at }) => ({ run, outcome, resultRef, at })),
+       checks: [...latest.values()]
+         .toSorted((a, b) => a.check.localeCompare(b.check))

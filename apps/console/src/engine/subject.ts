@@ -151,7 +151,7 @@ export function subjectDetailOf(world: World, subject: string): SubjectDetail | 
         label: conflict.label,
         kind: conflict.kind,
         state: conflict.state,
-        summary: conflict.summary,
+        summary: conflict.title,
         openedAt: conflict.openedAt,
       }))
       .toReversed(),

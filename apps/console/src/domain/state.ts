@@ -11,7 +11,14 @@ import type {
   Relation,
   VerdictOutcome,
 } from "../contract/mfp.ts";
-import type { ChangeState, ConflictKind, ConflictState, Drift } from "../contract/keel/index.ts";
+import type {
+  ChangeState,
+  ConflictKind,
+  ConflictState,
+  Drift,
+  ProbeDiscard,
+  SuspectEvidence,
+} from "../contract/keel/index.ts";
 import type { FlowNode } from "../contract/provisional.ts";
 
 // ─── Shared vocabulary ──────────────────────────────────────────────────────
@@ -87,14 +94,11 @@ export interface PartyProposition {
   relation: Relation;
   value: string;
   gloss: string;
-  /** Declared by the agent, or derived by Keel from the diff. */
-  origin: "declared" | "derived";
-  /** For a derived effect: how, and with what probability if a model said so. */
-  derivation?: {
-    method: "extractor" | "clef" | "code-model";
-    evidenceClass: EvidenceClass;
-    p?: number;
-  }[];
+  /**
+   * On the effect's side, how Keel knows the effect, as its fallout judged it: the agent's own declared claim,
+   * or what Keel derived and by which method. Absent on the premise's side, and where Keel's suspicion did not say.
+   */
+  evidence?: SuspectEvidence;
 }
 
 export interface Party {
@@ -103,6 +107,7 @@ export interface Party {
   changeId: string;
   /** The change's own name, `#n`. */
   label: string;
+  /** What the change set out to do. Empty where the log read so far does not hold the change. */
   goal: string;
   agent: { label: string; class: ShownClass; harness: string };
   proposition: PartyProposition;
@@ -113,38 +118,39 @@ export interface Party {
   told?: { how: "noted" | "bounced"; next: string[] };
 }
 
-export type TestCell = {
-  kind: "tests";
-  outcome: Outcome | Pending;
+/** A suite's latest run in one world of the matrix, as Keel recorded it. */
+export interface MatrixSuite {
+  /** Keel's name for the check: `suite:trunk`, or `suite:<changeId>`. */
+  check: string;
+  /** Whose suite it is, in a few words: trunk's, or a side's with its change's name. */
+  label: string;
+  outcome: Outcome;
   passed?: number;
   total?: number;
-  /** Why the check does not apply, for `n/a`. */
+  /** Why the suite did not apply, for `n/a`. */
   reason?: string;
-};
+}
 
-export type ProbeCell = {
-  kind: "probe";
-  /** Three runs, in order. */
-  runs: [Outcome | Pending, Outcome | Pending, Outcome | Pending];
+/** One world of the matrix, with what Keel has recorded there. Nothing recorded is nothing drawn. */
+export interface MatrixRow {
+  id: World;
+  label: string;
+  gloss: string;
+  /** The suites Keel ran in this world. It runs trunk's on trunk, each side's own in its world, and both in A+B. */
+  suites: MatrixSuite[];
+  /** The probe's runs here, in run order; a run Keel has not recorded is `pending`. Empty where no probe was drafted. */
+  runs: (Outcome | Pending)[];
   reason?: string;
   /** True in the control world, where failing is what a working probe does. */
   control?: boolean;
-};
-
-/** A check Keel does not run in a world: nothing is drawn there. The control world runs the probe alone. */
-export type NoCell = { kind: "none" };
-
-export type MatrixCell = TestCell | ProbeCell | NoCell;
-
-export interface MatrixCheck {
-  id: "tests-a" | "tests-b" | "probe";
-  label: string;
 }
 
 export interface WorldMatrix {
-  worlds: { id: World; label: string; gloss: string }[];
-  checks: MatrixCheck[];
-  cells: Record<World, Record<MatrixCheck["id"], MatrixCell>>;
+  /** The probe's name, where one was drafted. */
+  probe?: string;
+  /** Whether the probe's runs are still coming in. */
+  calibrating: boolean;
+  rows: MatrixRow[];
 }
 
 export interface TimelineItem {
@@ -165,39 +171,64 @@ export interface ConflictPageState {
     state: ConflictState;
     silentRetraction: boolean;
     openedAt: string;
-    /** What the two sides hold, in a line. */
-    summary: string;
+    /** What a page calls it, in Keel's own fields: its subject and predicate, or its `C-n`. */
+    title: string;
+    predicate?: Predicate;
+    /** `opinion` where a decision model suspected it; fallout otherwise, and where Keel does not say. */
+    origin?: "fallout" | "opinion";
+    /** What proved it, in a few of Keel's words. */
+    proven?: string;
+    /** Why Keel dismissed it, in its words. */
+    dismissed?: string;
+    /** The move that resolved it. */
+    move?: string;
     /** What settling it has cost so far, where Keel has said. */
     costUsd?: number;
   };
-  /** The question it was put to a person as, if it was. */
+  /** The question it was put to a person as, if it was, where Keel reads this reader the question. */
   escalation?: {
     id: string;
     label: string;
     question: string;
     state: "open" | "ruled" | "withdrawn";
   };
+  /** Why it was put to a person, as ConflictEscalated says: its class is a person's to judge, or no probe could prove it. */
+  escalated?: "human-class" | "unprovable";
   /** What it left behind once proven: the probe, admitted as a guard. */
-  guard?: { label: string; state: "admitted" | "retired" };
+  guard?: { label: string; state: "admitted" | "retired"; runs: number };
   /** What a person decided of it. */
   decision?: { label: string; chosen: string };
-  subject: { key: string; gloss: string };
+  /** The subject it is on. Absent where Keel's suspicion names none. */
+  subject?: { key: string; gloss: string };
   lattice: Lattice;
-  parties: { A: Party; B: Party };
+  /** The two sides, as Keel named them. Absent where its suspicion named no premise and effect. */
+  parties?: { A: Party; B: Party };
+  /**
+   * Every party Keel named, by its name: all the page has of a conflict with no sides. A party that is no
+   * change is a tenet trunk already holds, and has no page of its own.
+   */
+  named: { changeId?: string; label: string }[];
   matrix: WorldMatrix;
   /**
    * What came of it: each side that Keel judged again once the conflict was settled, and how. Keel runs nothing
    * in the matrix's worlds after that, so this, and not the matrix, is where a revised change is seen to pass.
    */
   after: { changeId: string; label: string; revision: number; outcome: string; summary: string }[];
-  probe: {
+  /** Its probe, where Keel drafted one or discarded one it could not draft. */
+  probe?: {
     id: string;
     label: string;
-    attempt: number;
-    bundleHash: string;
-    state: "calibrating" | "admitted" | "discarded";
-    path: string;
-    source: string;
+    /** How many drafts it took. Absent on a probe none of whose drafts was kept. */
+    attempts?: number;
+    bundleHash?: string;
+    state: "calibrating" | "admitted" | "discarded" | "retired";
+    /** Why it was discarded, in Keel's words. */
+    discarded?: ProbeDiscard;
+    /**
+     * Its source, file by file, as Keel serves it. `unread` until Keel has answered, `refused` where it would
+     * not; no files where the probe has no bundle, or its bundle is no longer kept.
+     */
+    source: "unread" | "refused" | { path: string; text: string }[];
   };
   evidence: EvidenceItem[];
   timeline: TimelineItem[];

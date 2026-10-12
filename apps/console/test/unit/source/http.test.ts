@@ -156,9 +156,10 @@ type Who = Role | "stranger" | "visitor";
  * to its own origin, and says which page a request that changes something came from. What the page's own code
  * put on a request is kept apart, in `fromThePage`.
  */
-function reading(who: Who, visibility: "public" | "private" = "private") {
+function reading(who: Who, visibility: "public" | "private" = "private", ahead = 0) {
   const keel = createFakeKeel({
     visibility,
+    ahead,
     sessions: { owner: "owner", maintainer: "maintainer", member: "member", stranger: "stranger" },
   });
   const fromThePage: Request[] = [];
@@ -180,8 +181,8 @@ function reading(who: Who, visibility: "public" | "private" = "private") {
 }
 
 /** The project as `who` is shown it, with a playhead on it. */
-async function opened(who: Who, visibility: "public" | "private" = "private") {
-  const r = reading(who, visibility);
+async function opened(who: Who, visibility: "public" | "private" = "private", ahead = 0) {
+  const r = reading(who, visibility, ahead);
   const found = await r.directory.findProject("acme", "demo");
   if (found === null) throw new Error("Keel showed this reader no such project");
   const source = createHttpSource(found, { fetch: r.serve });
@@ -370,6 +371,86 @@ describe("Keel's read models, from the page", () => {
       predicate: "freshness",
       values: ["per-call", "per-request", "per-session", "static"],
       standing: "ranked",
+    });
+  });
+
+  it("[http.empty-pages] reads a project whose entries lie behind other projects' in the instance's log: an empty page whose cursor moved is not the log's end", async () => {
+    // 1,200 entries of other projects come first. Keel answers each stretch of them with no items and a cursor
+    // that has moved on, as keel.town does for every project but the first.
+    const { player, keel } = await opened("visitor", "public", 1200);
+    await player.load();
+    player.seek(player.end);
+    expect(player.world.changes.size).toBe(2);
+    expect(player.world.conflicts.size).toBe(1);
+    const asked = keel.calls.filter((call) => call.path === "/v1/events").map((call) => call.query);
+    expect(asked.slice(0, 4).map((query) => new URLSearchParams(query).get("cursor"))).toEqual([
+      null,
+      "500",
+      "1000",
+      "1200",
+    ]);
+    // Reading what is already there waits for nothing.
+    expect(asked.filter((query) => query.includes("wait="))).toEqual([]);
+  });
+
+  it("[probe.source] reads a probe's source from Keel when its conflict is looked at, file by file, with nothing of the page's own on the request", async () => {
+    const { player, keel, found, fromThePage } = await opened("visitor", "public");
+    await player.load();
+    player.seek(player.end);
+    const conflict = [...player.world.conflicts.keys()][0] ?? "";
+    const probe = (): NonNullable<ReturnType<typeof conflictPageOf>>["probe"] =>
+      conflictPageOf(player.world, conflict, player)?.probe;
+    // Nothing is asked for until someone looks, and the page says it has not been read.
+    expect(keel.calls.filter((call) => call.path.startsWith("/v1/probes/"))).toEqual([]);
+    expect(probe()).toMatchObject({ label: "P-1", source: "unread" });
+
+    player.wantProbe(probe()?.id ?? "");
+    player.wantProbe(probe()?.id ?? "");
+    await settled();
+    expect(probe()?.source).toEqual([
+      {
+        path: "probes/authz.permission-evaluation/freshness.probe.ts",
+        text: expect.stringContaining("probe("),
+      },
+    ]);
+    // Asked once, by Keel's own operation: the probe in the path and its project beside it.
+    expect(
+      keel.calls
+        .filter((call) => call.path.startsWith("/v1/probes/"))
+        .map((call) => [call.method, call.path, call.query, call.authorization]),
+    ).toEqual([["GET", `/v1/probes/${probe()?.id ?? ""}/source`, `project=${found.id}`, ""]]);
+    expect(
+      fromThePage.filter(
+        (asked) => asked.headers.has("authorization") || asked.headers.has("cookie"),
+      ),
+    ).toEqual([]);
+  });
+
+  it("[probe.refused] says Keel did not give a probe's source where it refuses, and shows none", async () => {
+    const r = reading("visitor", "public");
+    const found = await r.directory.findProject("acme", "demo");
+    if (found === null) throw new Error("Keel showed this reader no such project");
+    const source = createHttpSource(found, {
+      fetch: (input, init) =>
+        addressOf(input).pathname.startsWith("/v1/probes/")
+          ? Promise.resolve(
+              Response.json(
+                { code: "resource.not_found", title: "No such resource" },
+                { status: 404 },
+              ),
+            )
+          : r.serve(input, init),
+    });
+    const player = new Player(source);
+    await player.load();
+    player.seek(player.end);
+    const conflict = [...player.world.conflicts.keys()][0] ?? "";
+    player.wantProbe(conflictPageOf(player.world, conflict, player)?.probe?.id ?? "");
+    await settled();
+    expect(conflictPageOf(player.world, conflict, player)?.probe?.source).toBe("refused");
+    await expect(source.getProbeSource("prb_none")).rejects.toMatchObject({
+      name: "KeelRefused",
+      status: 404,
     });
   });
 

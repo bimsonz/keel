@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/lanes.test.ts
+# kills: lanes.probe-record
+# why: Mission Control's probe says the first run Keel has not recorded is running
+diff --git a/apps/console/src/engine/lanes.ts b/apps/console/src/engine/lanes.ts
+index e874e89..d1b82d0 100644
+--- a/apps/console/src/engine/lanes.ts
++++ b/apps/console/src/engine/lanes.ts
+@@ -562,7 +562,10 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
+         // one before, so none is said to be running.
+         const runs = WORLDS.map((id): [WorldId, (Outcome | Pending)[]] => {
+           const ran = outcomesIn(conflict, id);
+-          return [id, [0, 1, 2].map((index) => ran[index] ?? "pending")];
++          return [
++            id,
++            [0, 1, 2].map((index) => ran[index] ?? (index === ran.length ? "running" : "pending")),
++          ];
+         });
+         last = `probe:${probe.id}`;
+         nodes.push({

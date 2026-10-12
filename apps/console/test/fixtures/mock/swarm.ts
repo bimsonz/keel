@@ -601,11 +601,28 @@ export function generateSwarm(seed: number, options: SwarmOptions = {}): Generat
         kind: "semantic",
         parties: [partner.id, live.id],
         subjectId: subject.id,
+        subjectKey: subject.key,
         predicate: subject.predicate,
-        x: {
-          summary: `One change relies on ${subject.predicate} at most ${holds}; the other makes it ${makes}`,
-          silentRetraction: true,
+        premise: {
+          holder: partner.id,
+          proposition: {
+            subject: subject.key,
+            predicate: subject.predicate,
+            relation: "at-most",
+            value: holds,
+          },
         },
+        effect: {
+          changeId: live.id,
+          proposition: {
+            subject: subject.key,
+            predicate: subject.predicate,
+            relation: "is",
+            value: makes,
+          },
+          evidence: { declared: false, method: "extractor", evidenceClass: "ruling" },
+        },
+        x: { silentRetraction: true },
       },
       label,
       causation: derived,
@@ -622,7 +639,6 @@ export function generateSwarm(seed: number, options: SwarmOptions = {}): Generat
         conflictId: conflict,
         attempts: 1,
         bundleHash: `sha256:${hex(rng, 4)}…${hex(rng, 4)}`,
-        x: { path: `probes/${subject.key}/${subject.predicate}.probe.ts` },
       },
       causation: suspected,
     });

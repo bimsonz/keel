@@ -30,7 +30,14 @@ import type {
   World as WorldId,
 } from "../domain/state.ts";
 import { sidesOf } from "./sides.ts";
-import type { ChangeEntry, ConflictEntry, EscalationEntry, SubjectEntry, World } from "./world.ts";
+import {
+  type ChangeEntry,
+  type ConflictEntry,
+  type EscalationEntry,
+  outcomesIn,
+  type SubjectEntry,
+  type World,
+} from "./world.ts";
 
 export type Tone = "plain" | "suspected" | "proven" | "person" | "pass";
 
@@ -93,7 +100,7 @@ export type GraphNode = { id: string } & (
       kind: "probe";
       conflictId: string;
       label: string;
-      state: "calibrating" | "admitted" | "discarded";
+      state: "calibrating" | "admitted" | "discarded" | "retired";
       /** Three runs per world, in the order they arrive. */
       runs: [WorldId, (Outcome | Pending)[]][];
     }
@@ -542,7 +549,7 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
         label: conflict.label,
         conflictKind: conflict.kind,
         state: conflict.state,
-        summary: conflict.summary,
+        summary: conflict.title,
         ...(conflict.costUsd === undefined ? {} : { costUsd: conflict.costUsd }),
       });
       edge(subjectNode, conflictNode, { tone: conflictTone });
@@ -551,18 +558,12 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
       // What came of a conflict follows from its probe, where it has one.
       let last = conflictNode;
       if (probe !== undefined) {
-        // The first run not yet in is the one running; the rest are still to come.
-        let reached = probe.state !== "calibrating";
-        const runs = WORLDS.map((id): [WorldId, (Outcome | Pending)[]] => [
-          id,
-          [0, 1, 2].map((index) => {
-            const outcome = probe.runs[id][index];
-            if (outcome !== undefined) return outcome;
-            if (reached) return "pending";
-            reached = true;
-            return "running";
-          }),
-        ]);
+        // A run Keel has not recorded is still to come. It records a run once it has ended and says nothing of
+        // one before, so none is said to be running.
+        const runs = WORLDS.map((id): [WorldId, (Outcome | Pending)[]] => {
+          const ran = outcomesIn(conflict, id);
+          return [id, [0, 1, 2].map((index) => ran[index] ?? "pending")];
+        });
         last = `probe:${probe.id}`;
         nodes.push({
           id: last,

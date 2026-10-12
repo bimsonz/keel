@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Lattice } from "../../../src/contract/keel/index.ts";
-import type { MatrixCell } from "../../../src/domain/state.ts";
+import type { ConflictPageState, MatrixRow, World as WorldId } from "../../../src/domain/state.ts";
 import { createMockSource } from "../../fixtures/mock/MockSource.ts";
 import type { Player } from "../../../src/engine/player.ts";
 import {
@@ -35,10 +35,19 @@ function never(): never {
   throw new Error("expected a value");
 }
 
-function outcomes(cell: MatrixCell | undefined): string[] {
-  if (cell === undefined) return [];
-  if (cell.kind === "none") return [];
-  return cell.kind === "probe" ? [...cell.runs] : [cell.outcome];
+/** One world of the matrix, by Keel's name for it. */
+function row(state: ConflictPageState | null, id: WorldId): MatrixRow {
+  return state?.matrix.rows.find((world) => world.id === id) ?? never();
+}
+
+/** The suites Keel recorded in a world: whose each is, how it came out, and its count. */
+function suites(state: ConflictPageState | null, id: WorldId): unknown[] {
+  return row(state, id).suites.map((suite) => [
+    suite.label,
+    suite.outcome,
+    suite.passed,
+    suite.total,
+  ]);
 }
 
 describe("the console's picture of scenario 1", () => {
@@ -55,26 +64,28 @@ describe("the console's picture of scenario 1", () => {
       state: "probing",
       silentRetraction: true,
     });
-    expect(outcomes(state?.matrix.cells.trunk.probe)).toEqual(["n/a", "n/a", "n/a"]);
-    expect(outcomes(state?.matrix.cells.A.probe)).toEqual(["pass", "pass", "pass"]);
-    expect(outcomes(state?.matrix.cells.B.probe)).toEqual(["n/a", "n/a", "n/a"]);
-    expect(outcomes(state?.matrix.cells.AB["tests-a"])).toEqual(["pass"]);
-    expect(outcomes(state?.matrix.cells.AB.probe)).toEqual(["fail", "fail", "running"]);
+    expect(row(state, "trunk").runs).toEqual(["n/a", "n/a", "n/a"]);
+    expect(row(state, "A").runs).toEqual(["pass", "pass", "pass"]);
+    expect(row(state, "B").runs).toEqual(["n/a", "n/a", "n/a"]);
+    expect(suites(state, "AB")).toContainEqual(["A's suite · #2", "pass", 31, 31]);
+    // The third run where the two are composed is not in. Keel says nothing of a run before it has ended, so
+    // the page says it is still to come and not that it is running.
+    expect(row(state, "AB").runs).toEqual(["fail", "fail", "pending"]);
+    expect(state?.matrix).toMatchObject({ probe: "P-1", calibrating: true });
   });
 
-  it("[matrix.control] has a control row, where the probe must fail and no suite is run or waited for", async () => {
-    // The baseline is in and the control's probe has not run yet: that probe is what is running, and not a suite
-    // Keel never runs there.
+  it("[matrix.control] has a control row, where the probe must fail and no suite is run", async () => {
+    // The baseline is in and the control's probe has not run yet.
     const before = conflictPage(await playerAt(414.2));
-    expect(before?.matrix.cells.trunk.probe).toMatchObject({ runs: ["n/a", "n/a", "n/a"] });
-    expect(before?.matrix.cells["A-noop"]).toEqual({
-      "tests-a": { kind: "none" },
-      "tests-b": { kind: "none" },
-      probe: { kind: "probe", runs: ["running", "pending", "pending"], control: true },
+    expect(row(before, "trunk").runs).toEqual(["n/a", "n/a", "n/a"]);
+    expect(row(before, "A-noop")).toMatchObject({
+      suites: [],
+      runs: ["pending", "pending", "pending"],
+      control: true,
     });
 
     const state = conflictPage(await playerAt(443));
-    expect(state?.matrix.worlds.map((world) => world.id)).toEqual([
+    expect(state?.matrix.rows.map((world) => world.id)).toEqual([
       "trunk",
       "A-noop",
       "A",
@@ -82,34 +93,31 @@ describe("the console's picture of scenario 1", () => {
       "AB",
     ]);
     // A's world with what A relies on removed: a probe that passed here would prove nothing.
-    expect(state?.matrix.cells["A-noop"].probe).toMatchObject({
-      kind: "probe",
+    expect(row(state, "A-noop")).toMatchObject({
+      suites: [],
       runs: ["fail", "fail", "fail"],
       control: true,
     });
-    expect(state?.matrix.cells.AB.probe).not.toHaveProperty("control");
-    expect(state?.matrix.cells["A-noop"]["tests-a"]).toEqual({ kind: "none" });
-    expect(state?.matrix.cells["A-noop"]["tests-b"]).toEqual({ kind: "none" });
-    // Each change's own suite, by the change it belongs to.
-    expect(state?.matrix.cells.A["tests-a"]).toMatchObject({
-      outcome: "pass",
-      passed: 31,
-      total: 31,
-    });
-    expect(state?.matrix.cells.A["tests-b"]).toMatchObject({
-      outcome: "n/a",
-      reason: "B's tests are not in this world",
-    });
-    expect(state?.matrix.cells.B["tests-b"]).toMatchObject({
-      outcome: "pass",
-      passed: 27,
-      total: 27,
-    });
-    expect(state?.matrix.cells.AB["tests-b"]).toMatchObject({
-      outcome: "pass",
-      passed: 27,
-      total: 27,
-    });
+    expect(row(state, "AB")).not.toHaveProperty("control");
+  });
+
+  it("[matrix.five] draws the five suite runs Keel makes, each in its world, and no cell for one it does not make", async () => {
+    const state = conflictPage(await playerAt(443));
+    // Trunk's own suite on trunk, each side's own in its world, and both where the two are composed.
+    expect(suites(state, "trunk")).toEqual([["Trunk's suite", "pass", 24, 24]]);
+    expect(suites(state, "A-noop")).toEqual([]);
+    expect(suites(state, "A")).toEqual([["A's suite · #2", "pass", 31, 31]]);
+    expect(suites(state, "B")).toEqual([["B's suite · #1", "pass", 27, 27]]);
+    const composed = suites(state, "AB");
+    expect(composed).toHaveLength(2);
+    expect(composed).toEqual(
+      expect.arrayContaining([
+        ["A's suite · #2", "pass", 31, 31],
+        ["B's suite · #1", "pass", 27, 27],
+      ]),
+    );
+    // Before a suite has run in a world there is nothing in its place: none is said to be waited for.
+    expect(suites(conflictPage(await playerAt(414.2)), "A")).toEqual([]);
   });
 
   it("says what an effect contradicts from the conflict Keel opened, and stops saying it once that is settled", async () => {
@@ -125,12 +133,12 @@ describe("the console's picture of scenario 1", () => {
     const a = [...during.world.changes.values()].find((change) => change.label === "#2");
     expect(contradictionsOf(during.world, a?.id ?? "")).toEqual([]);
     expect(
-      contradictionsOf(during.world, b?.id ?? "").map(({ conflict, sides }) => [
+      contradictionsOf(during.world, b?.id ?? "").map(({ conflict, premise }) => [
         conflict.label,
-        sides.holder.label,
-        sides.other.label,
+        during.world.changes.get(premise.holder)?.label,
+        `${premise.proposition.relation} ${String(premise.proposition.value)}`,
       ]),
-    ).toEqual([["C-1", "#2", "#1"]]);
+    ).toEqual([["C-1", "#2", "at-most per-request"]]);
     expect(
       changePageOf(during.world, a?.id ?? "", during)?.derived.filter(
         (effect) => effect.against !== undefined,
@@ -146,19 +154,15 @@ describe("the console's picture of scenario 1", () => {
 
   it("names the worlds A and B as Keel does, and says beside each which change it is", async () => {
     const state = conflictPage(await playerAt(443));
-    expect(state?.matrix.worlds.map((world) => [world.label, world.gloss])).toEqual([
+    expect(state?.matrix.rows.map((world) => [world.label, world.gloss])).toEqual([
       ["trunk", "Neither change"],
       ["A-noop", "#2, with what it relies on removed"],
       ["A", "#2 alone"],
       ["B", "#1 alone"],
       ["A+B", "#2 and #1, composed"],
     ]);
-    expect(state?.matrix.checks.map((check) => check.label)).toEqual([
-      "A's tests",
-      "B's tests",
-      "Probe P-1",
-    ]);
-    expect([state?.parties.A.label, state?.parties.B.label]).toEqual(["#2", "#1"]);
+    expect(state?.matrix.probe).toBe("P-1");
+    expect([state?.parties?.A.label, state?.parties?.B.label]).toEqual(["#2", "#1"]);
   });
 
   it("reads an agent's class from its kind, and its harness from its session", async () => {
@@ -252,23 +256,20 @@ describe("the console's picture of scenario 1", () => {
     expect(bare.trunk.advances).toBe(1144);
   });
 
-  it("marks only the next cell as running, and the rest as still to come", async () => {
+  it("[matrix.record] marks a run Keel has not recorded as still to come, and none as running", async () => {
     const state = conflictPage(await playerAt(419));
-    expect(outcomes(state?.matrix.cells.A.probe)).toEqual(["pass", "running", "pending"]);
-    expect(outcomes(state?.matrix.cells.B["tests-a"])).toEqual(["pending"]);
-    expect(outcomes(state?.matrix.cells.AB.probe)).toEqual(["pending", "pending", "pending"]);
+    expect(row(state, "A").runs).toEqual(["pass", "pending", "pending"]);
+    expect(row(state, "B")).toMatchObject({ suites: [], runs: ["pending", "pending", "pending"] });
+    expect(row(state, "AB").runs).toEqual(["pending", "pending", "pending"]);
+    expect(state?.matrix.rows.flatMap((world) => world.runs)).not.toContain("running");
   });
 
   it("never reports n/a as a pass, in any cell at any instant", async () => {
     // In B's world the probe's precondition is absent throughout. On trunk it is absent until A lands.
     const always = await Promise.all([412, 420, 430, 447, 700].map((second) => playerAt(second)));
     const beforeLanding = always.slice(0, 4);
-    const seenInB = always.flatMap((player) =>
-      outcomes(conflictPage(player)?.matrix.cells.B.probe),
-    );
-    const seenOnTrunk = beforeLanding.flatMap((player) =>
-      outcomes(conflictPage(player)?.matrix.cells.trunk.probe),
-    );
+    const seenInB = always.flatMap((player) => row(conflictPage(player), "B").runs);
+    const seenOnTrunk = beforeLanding.flatMap((player) => row(conflictPage(player), "trunk").runs);
     expect(seenInB).toContain("n/a");
     expect(seenInB).not.toContain("pass");
     expect(seenOnTrunk).toContain("n/a");
@@ -283,23 +284,20 @@ describe("the console's picture of scenario 1", () => {
       values: ["per-call", "per-request", "per-session", "static"],
       standing: "ranked",
     });
-    expect(state?.parties.A.proposition).toMatchObject({
+    expect(state?.parties?.A.proposition).toEqual({
       role: "premise",
       relation: "at-most",
       value: "per-request",
-      origin: "declared",
+      gloss: "requirePermission re-reads roles on every request",
     });
-    expect(state?.parties.B.proposition).toMatchObject({
+    // How the effect is known is what Keel's suspicion said of it: derived, by an extractor, which is a ruling.
+    expect(state?.parties?.B.proposition).toEqual({
       role: "effect",
       relation: "is",
       value: "per-session",
-      origin: "derived",
+      gloss: "Roles are cached for the life of the session",
+      evidence: { declared: false, method: "extractor", evidenceClass: "ruling" },
     });
-    // Each derivation says its own class: an extractor's reading of the code is a ruling, Clef's is an opinion.
-    expect(state?.parties.B.proposition.derivation).toEqual([
-      { method: "extractor", evidenceClass: "ruling" },
-      { method: "clef", evidenceClass: "opinion", p: 0.93 },
-    ]);
   });
 
   it("draws no line where Keel's lattice does not rank the two values, or has not been read", async () => {
@@ -319,10 +317,6 @@ describe("the console's picture of scenario 1", () => {
       values: [],
       standing: "unknown",
     });
-    const comparison = (lattices: Map<string, Lattice>) =>
-      withLattices(lattices)?.evidence.find((item) => item.by.startsWith("Lattice comparison"));
-    expect(comparison(new Map())).toMatchObject({ class: "ruling" });
-    expect(comparison(new Map())?.detail).toBeUndefined();
     // A lattice in which a session and a request sit on different branches: both are its values, and neither is above the other.
     const freshness = player.lattices.get("freshness");
     const forked: Lattice = {
@@ -338,10 +332,32 @@ describe("the console's picture of scenario 1", () => {
       values: [],
       standing: "unranked",
     });
-    // As Keel has it, the lattice rules, and says how.
-    expect(comparison(player.lattices)?.detail).toBe(
-      "Deterministic: per-call < per-request < per-session < static.",
+  });
+
+  it("[conflict.records] lists, before a person is asked, Keel's records of the conflict and no reasoning of the console's", async () => {
+    // Suspected, with nothing run yet: what each side holds, as Keel's suspicion said it, and how the effect is known.
+    const suspected = conflictPage(await playerAt(400));
+    expect(suspected?.evidence.map((item) => [item.class, item.summary, item.by])).toEqual([
+      ["testimony", "#2 relies on: freshness at most per-request", "Declared by its agent"],
+      ["ruling", "#1 makes: freshness is per-session", "Derived by Keel · extractor"],
+    ]);
+    // With the composed world in: the probe's runs there and each suite's count, as Keel recorded them.
+    const probing = conflictPage(await playerAt(443));
+    expect(
+      probing?.evidence
+        .slice(2)
+        .map((item) => `${item.class}: ${item.summary}`)
+        .toSorted(),
+    ).toEqual([
+      "proof: A's suite · #2 in A+B: pass, 31 of 31 tests",
+      "proof: B's suite · #1 in A+B: pass, 27 of 27 tests",
+      "proof: Probe P-1 in A+B: fail, fail",
+    ]);
+    // Nothing the console worked out for itself: no comparison on the lattice, no reading of what the suites missed.
+    const words = (probing?.evidence ?? []).map(
+      (item) => `${item.summary} ${item.by} ${item.detail ?? ""}`,
     );
+    expect(words.filter((line) => /lattice|notices|is not|deterministic/i.test(line))).toEqual([]);
   });
 
   it("holds at the question until someone rules, then follows their ruling", async () => {
@@ -385,18 +401,18 @@ describe("the console's picture of scenario 1", () => {
       humansAsked: 1,
     });
     // The matrix stays the probe's record: Keel runs nothing in its worlds once the conflict is settled.
-    expect(outcomes(conflictPage(player)?.matrix.cells.AB.probe)).toEqual(["fail", "fail", "fail"]);
+    expect(row(conflictPage(player), "AB").runs).toEqual(["fail", "fail", "fail"]);
     // What came of it is the revised change's own verdict.
     expect(conflictPage(player)?.after).toEqual([
       {
-        changeId: conflictPage(player)?.parties.A.changeId,
+        changeId: conflictPage(player)?.parties?.A.changeId,
         label: "#2",
         revision: 1,
         outcome: "land",
         summary: "Verified: nothing it could have broken is broken",
       },
       {
-        changeId: conflictPage(player)?.parties.B.changeId,
+        changeId: conflictPage(player)?.parties?.B.changeId,
         label: "#1",
         revision: 2,
         outcome: "land",
@@ -473,7 +489,8 @@ describe("the project the console is showing", () => {
 describe("what a conflict's page ties it to", () => {
   it("is its question while a person is being asked, and what it left once it is settled", async () => {
     const held = conflictPage(await playerAt(9999, "live"));
-    expect(held?.conflict.summary).toMatch(/\S/);
+    // Its title is Keel's own fields: the subject it is on, and the predicate.
+    expect(held?.conflict.title).toBe("authz.permission-evaluation · freshness");
     expect(held?.escalation).toMatchObject({
       label: "E-1",
       state: "open",

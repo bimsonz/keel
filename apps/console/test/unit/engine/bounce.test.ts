@@ -167,6 +167,10 @@ describe("a conflict, once settled", () => {
       ["#1", 2, "land"],
     ]);
     // Keel ran nothing in the matrix's worlds after the conflict was settled, so the proof stands in it.
-    expect(page()?.matrix.cells.AB.probe).toMatchObject({ runs: ["fail", "fail", "fail"] });
+    expect(page()?.matrix.rows.find((row) => row.id === "AB")?.runs).toEqual([
+      "fail",
+      "fail",
+      "fail",
+    ]);
   });
 });

@@ -11,6 +11,7 @@ import {
 } from "../../../src/engine/lanes.ts";
 import { openCounts } from "../../../src/engine/lists.ts";
 import { World } from "../../../src/engine/world.ts";
+import { declareChange, foldedLog, openingOf, premiseOn } from "./script.ts";
 import { showing } from "../showing.ts";
 
 // A test here replays the whole swarm. On a busy machine that takes longer than the default five seconds.
@@ -98,7 +99,7 @@ describe("Mission Control's lanes follow what is happening", () => {
     expect(lanes.lanes[0]).toMatchObject({ conflicts: 1, subject: { tone: "suspected" } });
   });
 
-  it("carries the world matrix inside the probe, filling run by run", async () => {
+  it("[lanes.probe-record] carries the world matrix inside the probe, filling run by run, and says no run is running", async () => {
     const probe = nodesOf(await lanesAt("s1", 443)).find((node) => node.kind === "probe");
     expect(probe).toMatchObject({ label: "P-1", state: "calibrating" });
     expect(probe?.kind === "probe" ? probe.runs : []).toEqual([
@@ -107,7 +108,8 @@ describe("Mission Control's lanes follow what is happening", () => {
       ["A-noop", ["fail", "fail", "fail"]],
       ["A", ["pass", "pass", "pass"]],
       ["B", ["n/a", "n/a", "n/a"]],
-      ["AB", ["fail", "fail", "running"]],
+      // The third run is not in. Keel says nothing of a run before it has ended, so none is said to be running.
+      ["AB", ["fail", "fail", "pending"]],
     ]);
   });
 
@@ -505,61 +507,6 @@ describe("Mission Control at the scale of a swarm", () => {
   });
 });
 
-type Premise = { subject: string; predicate: "bound"; relation: "at-most"; value: string };
-const premiseOn = (subject: string, value = "tight"): Premise => ({
-  subject,
-  predicate: "bound",
-  relation: "at-most",
-  value,
-});
-
-/** A log's opening: its agents, and a subject minted for each key. */
-function openingOf(
-  seed: number,
-  agents: [string, "hosted" | "synthetic" | "interactive"][],
-  keys: string[],
-): ScriptBuilder {
-  const b = new ScriptBuilder("2026-10-13T16:00:00.000Z", createRng(seed));
-  b.at(0);
-  for (const [agentId, kind] of agents)
-    b.emit({
-      type: "AgentEnrolled",
-      entity: { kind: "agent", id: agentId },
-      payload: { agentId, projectId: "prj_1", name: agentId, kind, scopes: ["agent:work"] },
-    });
-  for (const key of keys)
-    b.emit({
-      type: "SubjectMinted",
-      entity: { kind: "subject", id: `sub_${key}` },
-      payload: { subjectId: `sub_${key}`, key, anchors: [], gloss: "", mintedBy: "agent" },
-    });
-  return b;
-}
-
-function declareChange(b: ScriptBuilder, id: string, agentId: string, premises: Premise[]): void {
-  b.after(1).emit({
-    type: "IntentDeclared",
-    entity: { kind: "change", id },
-    payload: {
-      changeId: id,
-      agentId,
-      origin: "agent",
-      revision: 1,
-      goal: id,
-      footprint: [],
-      premises,
-      leaseId: "l",
-    },
-  });
-}
-
-function foldedLog(b: ScriptBuilder): World {
-  const world = new World();
-  const log = b.build();
-  log.events.forEach((event, index) => world.apply(event, log.eventTimes[index] ?? 0));
-  return world;
-}
-
 const referencesIn = (lanes: Lanes, key: string): Extract<GraphNode, { kind: "reference" }>[] =>
   (lanes.lanes.find((lane) => lane.key === key)?.nodes ?? []).flatMap((node) =>
     node.kind === "reference" ? [node] : [],
@@ -596,7 +543,8 @@ describe("a change that touches more than one subject", () => {
         derivationRef: "mfp:derivation:chg_1:1",
       },
     });
-    // Keel suspects a conflict on `b` between the two: the one whose own lane is `a` is the side that alters.
+    // Keel suspects a conflict on `b` between the two, and names its sides: the one whose own lane is `a` makes
+    // the effect, against the premise the other holds.
     b.after(1).emit({
       type: "ConflictSuspected",
       entity: { kind: "conflict", id: "cfl_1" },
@@ -605,7 +553,10 @@ describe("a change that touches more than one subject", () => {
         kind: "semantic",
         parties: ["chg_2", "chg_1"],
         subjectId: "sub_b",
+        subjectKey: "b",
         predicate: "bound",
+        premise: { holder: "chg_2", proposition: premiseOn("b") },
+        effect: { changeId: "chg_1", proposition: premiseOn("b", "loose") },
       },
     });
     const lanes = lanesOf(foldedLog(b), 60_000);

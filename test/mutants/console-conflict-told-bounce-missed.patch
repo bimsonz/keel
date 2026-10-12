@@ -1,16 +1,20 @@
 # expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/same.test.ts
 # kills: conflict.told
 # why: a side bounced on the conflict is not said to be, and the ways forward Keel gave it are not shown
-diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index 979e132..3e421b2 100644
---- a/apps/console/src/engine/select.ts
-+++ b/apps/console/src/engine/select.ts
-@@ -150,8 +150,6 @@ function party(
-  * or on the note of it. An annotation tells no one, so it gives nothing here.
-  */
- function toldOf(change: ChangeEntry, conflict: ConflictEntry): Party["told"] {
--  if (change.bounce?.conflictId === conflict.id && change.bounce.next.length > 0)
--    return { how: "bounced", next: change.bounce.next };
-   const note = change.noted.findLast((noted) => noted.conflictId === conflict.id);
-   return note === undefined || note.next.length === 0
-     ? undefined
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index a9a609b..87d7eac 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -660,12 +660,6 @@ export class World {
+             ...(declined === undefined ? {} : { declined: declined.reason }),
+             next: (nextActions ?? []).map((action) => action.title),
+           };
+-          if (conflictId !== undefined)
+-            this.told.set(`${conflictId}/${change.id}`, {
+-              how: "bounced",
+-              nextActions: nextActions ?? [],
+-              at: event.at,
+-            });
+           // A bounce on a conflict ties the change to it, whether or not the change was one of its two sides.
+           if (conflictId !== undefined && !change.conflictIds.includes(conflictId))
+             change.conflictIds.push(conflictId);

@@ -66,6 +66,18 @@ The Code tab is read from Keel's four repository reads (`Repo_getTree`, `Repo_ge
 - **The code does not wait for the log.** Keel finds a project by its org and name (`Orgs_getProject`) and answers with its id. The code is asked for at once, at the project's `main`, and drawn when it comes; the log is read behind it. When the log says trunk is at the commit Keel read `main` at, what was read stands and nothing is read twice.
 - One thing the page can show is not Keel's to give yet, and is shown only on a test fixture: the reasons beside a file's lines (`src/contract/provisional.ts`). Keel serves no clone address yet, and the page shows none.
 
+## A conflict
+
+A conflict's page is drawn from Keel's own shape for one, `ConflictDetail`: what `GET /v1/conflicts/{id}` answers. The console folds that shape from the project's log (`src/engine/conflict.ts`), out of the events Keel folds it from, so the page fills as a probe runs.
+
+- **The two sides are Keel's to name.** Its suspicion carries the premise at stake with the change that holds it, and the effect against it with the change that makes it, and says how the effect is known: declared by its agent, or derived and by which method. The console works none of it out. A conflict Keel suspected without them, such as a change against a tenet trunk already holds, has a page that names its parties and says Keel named no two sides.
+- **The matrix is Keel's record.** Five worlds, and in each the probe's runs and the suites Keel ran there: trunk's own on trunk, each side's own in its world, and both where the two are composed. Keel records a run when it has ended and runs the worlds in no fixed order, so a run it has not recorded is still to come and nothing is said to be running.
+- **It is called by Keel's own fields**: its subject and predicate, or its `C-n` where Keel named no subject. How it was proven, why it was dismissed, the move that resolved it and why a probe was discarded are each in Keel's word.
+- **Before a person is asked, the Evidence tab lists Keel's records of it**: what each side holds, how the effect is known, the probe's runs and each suite's count where the two are composed. No row is reasoned by the console. Once a person is asked, the list is the question's own evidence.
+- **A probe's source is Keel's** (`Probes_getProbeSource`), read when its tab is opened and drawn file by file. A probe none of whose drafts compiled has none, and the page says so.
+
+`node scripts/level.ts <origin> <org> <project>` sets the console's fold of a public project's log beside Keel's own read of each of its conflicts, and says where the two differ. It reads only, as a visitor.
+
 ## Addresses
 
 `src/route.ts` is the whole table. `O` is an org's handle and `P` a project's name in it.
@@ -85,7 +97,7 @@ The Code tab is read from Keel's four repository reads (`Repo_getTree`, `Repo_ge
 
 An org is never called one of the reserved first segments (`RESERVED` in `src/route.ts`): the pages above every project, the build's own files and `healthz`. Keel refuses each as a handle. Every other path that is not a file is the page, a path with a dot in it included.
 
-A project's log is asked for by the project's id, and the page folds only the events that name that project (`src/engine/projects.ts`), so one project's advances and questions are never counted in another's. An entry of Keel's log that the console cannot fold is left out and counted beside "Live", so one such entry never stops the rest from being shown.
+A project's log is asked for by the project's id, and the page folds only the events that name that project (`src/engine/projects.ts`), so one project's advances and questions are never counted in another's. Keel's log is the whole instance's: a page is its next stretch with the project's entries picked out, so a stretch that holds none of them is an empty page whose cursor has moved on. The console reads on until the cursor stops moving, and takes no empty page for the log's end. An entry of Keel's log that the console cannot fold is left out and counted beside "Live", so one such entry never stops the rest from being shown.
 
 ## How it is put together
 
@@ -142,9 +154,9 @@ pnpm --dir apps/console dev      # in one terminal
 pnpm --dir apps/console e2e      # in another: the real page in headless Chrome
 ```
 
-It drives the pages on the fixtures the dev server serves (every tab and row a link with an address of its own, Back returning the way one came, any page opening from its address alone, and the same pages at a phone's width with nothing off the side of the screen). Then it builds the console and drives it as it is deployed, with the real Better Auth answering `/v1/auth` and a stand-in Keel the rest of `/v1`, which knows a reader by their session:
+It drives the pages on the fixtures the dev server serves (every tab and row a link with an address of its own, Back returning the way one came, any page opening from its address alone, a conflict's matrix with the five suites Keel runs and no cell waiting on one it does not, a conflict with no sides, a probe's source, and the same pages at a phone's width with nothing off the side of the screen). Then it builds the console and drives it as it is deployed, with the real Better Auth answering `/v1/auth` and a stand-in Keel the rest of `/v1`, which knows a reader by their session:
 
-- **a visitor on a public project**: the home lists it, its code is on the page before Keel has answered about the log, its questions are said to be its members' to read and none is counted or shown, a conflict that waits on a ruling says so, a change's agent has no name and no class, and the frame's way in comes back to the page;
+- **a visitor on a public project**, whose entries lie behind 1,200 of other projects' in the stand-in's log: the home lists it, its code is on the page before Keel has answered about the log, the log is read past the other projects' entries without waiting, its questions are said to be its members' to read and none is counted or shown, a conflict that waits on a ruling says so, a probe's source is read from Keel when its tab is opened, a change's agent has no name and no class, and the frame's way in comes back to the page;
 - **someone signed in who is no member, on a public project**: told of its questions what a visitor is;
 - **a visitor, and someone signed in who is no member, on a private project**: both are told what they are told of a project that is not there;
 - **a member**: her org's home lists the project, the frame drops down on the org and on the project, the QR code beside a question says the question's own address, and her answer reaches Keel as its own operation with no credential of the page's;

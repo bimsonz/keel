@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/conflict.test.ts apps/console/test/unit/engine/lanes.test.ts
+# kills: conflict.sides, lanes.touched
+# why: the change Keel names as making the effect is taken for the one that holds the premise
+diff --git a/apps/console/src/engine/sides.ts b/apps/console/src/engine/sides.ts
+index b773d6b..e4ba5d5 100644
+--- a/apps/console/src/engine/sides.ts
++++ b/apps/console/src/engine/sides.ts
+@@ -18,8 +18,8 @@ const SETTLED: ReadonlySet<string> = new Set(["resolved", "dismissed"]);
+ /** The two changes Keel named, where it named both and the log holds both. */
+ export function sidesOf(world: World, conflict: ConflictEntry): Sides | null {
+   if (conflict.premise === undefined || conflict.effect === undefined) return null;
+-  const holder = world.changes.get(conflict.premise.holder);
+-  const other = world.changes.get(conflict.effect.changeId);
++  const holder = world.changes.get(conflict.effect.changeId);
++  const other = world.changes.get(conflict.premise.holder);
+   return holder === undefined || other === undefined ? null : { holder, other };
+ }
+ 

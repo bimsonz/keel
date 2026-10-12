@@ -4,7 +4,7 @@
 // continuation to the log.
 
 import type { AnyEvent } from "../../../src/contract/events.ts";
-import type { ProjectView } from "../../../src/contract/keel/index.ts";
+import type { ProbeSource, ProjectView } from "../../../src/contract/keel/index.ts";
 import type { Observation } from "../../../src/contract/observations.ts";
 import { Projects } from "../../../src/engine/projects.ts";
 import type {
@@ -14,7 +14,6 @@ import type {
   KeelEventSource,
   KeelResources,
   Page,
-  ProbeSource,
   VerdictReasons,
   ReadRequest,
   RulingCommand,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/conflict.test.ts
+# kills: probe.discarded
+# why: a probe Keel discarded without keeping a draft is left out, so its conflict's page says nothing of why no probe ran
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index a9a609b..92f1cc7 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -905,7 +905,7 @@ export class World {
+         // conflict on the event, and it is a probe of that conflict all the same.
+         const conflictId =
+           this.probes.get(event.payload.probeId)?.conflictId ?? event.payload.conflictId;
+-        if (conflictId === undefined) break;
++        if (conflictId === undefined || !this.probes.has(event.payload.probeId)) break;
+         const probe: ProbeEntry = this.probes.get(event.payload.probeId) ?? {
+           id: event.payload.probeId,
+           label: event.label ?? `P·${short(event.payload.probeId)}`,

@@ -2,15 +2,15 @@
 # kills: change.bounce-verdict, proven.block
 # why: the ways forward Keel gave a bounced change's agent are not kept, so the page lists none
 diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
-index 3502bc5..a941eda 100644
+index a9a609b..0840594 100644
 --- a/apps/console/src/engine/world.ts
 +++ b/apps/console/src/engine/world.ts
-@@ -603,7 +603,7 @@ export class World {
+@@ -658,7 +658,7 @@ export class World {
              ...(verdictId === undefined ? {} : { verdictId }),
              ...(conflictId === undefined ? {} : { conflictId }),
              ...(declined === undefined ? {} : { declined: declined.reason }),
 -            next: (nextActions ?? []).map((action) => action.title),
 +            next: [],
            };
-           // A bounce on a conflict ties the change to it, whether or not the change was one of its two sides.
-           if (conflictId !== undefined && !change.conflictIds.includes(conflictId))
+           if (conflictId !== undefined)
+             this.told.set(`${conflictId}/${change.id}`, {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/conflict.test.ts
+# kills: conflict.matrix
+# why: a suite run again in a world is shown by its first run, where Keel shows its latest
+diff --git a/apps/console/src/engine/conflict.ts b/apps/console/src/engine/conflict.ts
+index d88d27c..cc6f351 100644
+--- a/apps/console/src/engine/conflict.ts
++++ b/apps/console/src/engine/conflict.ts
+@@ -22,7 +22,7 @@ export function matrixOf(conflict: ConflictEntry): MatrixWorld[] {
+     for (const check of conflict.checks) {
+       if (check.world !== world) continue;
+       const standing = latest.get(check.check);
+-      if (standing === undefined || check.run > standing.run) latest.set(check.check, check);
++      if (standing === undefined || check.run < standing.run) latest.set(check.check, check);
+     }
+     return {
+       world,

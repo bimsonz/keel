@@ -1,7 +1,8 @@
 // One conflict.
 
+import { useEffect } from "react";
 import { conflictNamed } from "../engine/lists.ts";
-import { useSelected } from "../engine/react.tsx";
+import { usePlayer, useSelected } from "../engine/react.tsx";
 import { conflictPageOf } from "../engine/select.ts";
 import type { ConflictTab } from "../route.ts";
 import type { Mode } from "../theme/mode.ts";
@@ -14,6 +15,12 @@ export function ConflictPage({ name, tab, mode }: { name: string; tab: ConflictT
     (world, resources) => (id === undefined ? null : conflictPageOf(world, id, resources)),
     [id],
   );
+  // The probe's source is read from Keel when someone looks at it, once Keel has named the probe.
+  const player = usePlayer();
+  const probeId = tab === "probe" ? state?.probe?.id : undefined;
+  useEffect(() => {
+    if (probeId !== undefined) player.wantProbe(probeId);
+  }, [player, probeId]);
   if (id === undefined) {
     return (
       <Notice title={`There is no conflict ${name} in what Keel has said so far`}>
@@ -21,12 +28,7 @@ export function ConflictPage({ name, tab, mode }: { name: string; tab: ConflictT
       </Notice>
     );
   }
-  // A conflict is drawn as two changes on one subject. Until Keel has named both sides there is nothing to set against what.
-  if (state === null)
-    return (
-      <Notice title={`Conflict ${name} is not drawn yet`}>
-        Keel has opened it, and has not yet said which two changes disagree, or about which subject.
-      </Notice>
-    );
+  // Every conflict Keel names has a page. The address was resolved a moment before the page was read.
+  if (state === null) return null;
   return <Conflict state={state} mode={mode} tab={tab} />;
 }

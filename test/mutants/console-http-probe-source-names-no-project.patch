@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/source/http.test.ts
+# kills: probe.source
+# why: a probe's source is asked for without the project it is a probe of
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 0b2784f..c5c8477 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -245,7 +245,6 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+       // The operation's own input: the probe in the path, and the project it is a probe of.
+       const { probeId: id, ...query }: Probes_getProbeSourceInput = {
+         probeId,
+-        project: project.id,
+       };
+       const response = await read(
+         `/v1/probes/${encodeURIComponent(id)}/source${queryOf({ ...query })}`,

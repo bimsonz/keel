@@ -56,10 +56,8 @@ export interface ProvisionalFields {
   IntentDeclared: { alternativeOf?: string };
   /** B8: what a sketch is an attempt at. */
   SketchOpened: { goal: string };
-  /** One line on what the sides hold. */
-  ConflictSuspected: { summary: string; silentRetraction?: boolean };
-  /** D3: where its source lives. */
-  ProbeDrafted: { path: string };
+  /** Whether the effect was one its agent did not declare, against a premise still live. */
+  ConflictSuspected: { silentRetraction?: boolean };
   /** B4: what the run cost, and why it did not apply when the outcome is n/a. */
   ProbeRan: { cost?: Cost; reason?: string };
   /** B4: Keel records no cost yet, so there may be none. */

@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/engine.test.ts
+# kills: matrix.five
+# why: trunk's own suite, which Keel runs on trunk, is left out of the matrix
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index a9322ab..6f80316 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -160,7 +160,9 @@ function matrixOf(world: World, detail: ConflictDetail): ConflictPageState["matr
+         id: row.world,
+         label: row.world === "AB" ? "A+B" : row.world,
+         gloss: gloss[row.world],
+-        suites: row.checks.map((check) => ({
++        suites: row.checks
++          .filter((check) => check.check !== "suite:trunk")
++          .map((check) => ({
+           check: check.check,
+           label: suiteLabel(world, check.check, sides),
+           outcome: check.outcome,

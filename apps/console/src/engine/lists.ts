@@ -84,7 +84,7 @@ export interface ConflictRow extends Named {
   subject?: string;
   openedAt: string;
   parties: Named[];
-  probe?: { label: string; state: "calibrating" | "admitted" | "discarded" };
+  probe?: { label: string; state: "calibrating" | "admitted" | "discarded" | "retired" };
   escalation?: Named & { open: boolean };
   guard?: { label: string };
   decision?: { label: string };
@@ -286,8 +286,7 @@ export function conflictsOf(
     filter,
     shown,
     (conflict): ConflictRow => {
-      const subject =
-        conflict.subjectId === undefined ? undefined : world.subjects.get(conflict.subjectId)?.key;
+      const subject = conflict.subjectKey;
       const probe = conflict.probeId === undefined ? undefined : world.probes.get(conflict.probeId);
       const guard = conflict.guardId === undefined ? undefined : world.guards.get(conflict.guardId);
       const decision =
@@ -297,7 +296,7 @@ export function conflictsOf(
         id: conflict.id,
         label: conflict.label,
         name: names.conflicts.get(conflict.id) ?? conflict.id,
-        summary: conflict.summary,
+        summary: conflict.title,
         state: conflict.state,
         kind: conflict.kind,
         ...(subject === undefined ? {} : { subject }),

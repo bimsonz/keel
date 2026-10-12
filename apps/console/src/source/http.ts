@@ -11,8 +11,8 @@
 // give it.
 //
 // What the API does not offer yet is absent here too, honestly: there are no
-// observations, and diffs and probe sources are refused (QUESTIONS.md, B and
-// D). The console's views show their empty states for those.
+// observations, and a change's diff is refused (QUESTIONS.md, B and D). The
+// console's views show their empty states for those.
 
 import { EVENT_TYPES } from "../contract/envelope.ts";
 import type { AnyEvent } from "../contract/events.ts";
@@ -26,6 +26,8 @@ import type {
   ProjectPage,
   ProjectSettings,
   ProjectView,
+  Probes_getProbeSourceInput,
+  ProbeSource,
   RepoBlob,
   RepoCommitDiff,
   RepoCommitPage,
@@ -45,7 +47,6 @@ import {
   type KeelResources,
   type KeelSettings,
   type Page,
-  type ProbeSource,
   type ReadRequest,
   type RulingCommand,
   type SourceDescriptor,
@@ -240,8 +241,19 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
       repo<RepoCommitDiff>(projectId, `/commits/${encodeURIComponent(sha)}`, signal),
     getDiff: (changeId: string): Promise<ChangeDiff> =>
       Promise.reject(new Error(`the API has no diff endpoint yet (${changeId})`)),
-    getProbeSource: (probeId: string): Promise<ProbeSource> =>
-      Promise.reject(new Error(`the API has no probe-source endpoint yet (${probeId})`)),
+    async getProbeSource(probeId: string, signal?: AbortSignal): Promise<ProbeSource> {
+      // The operation's own input: the probe in the path, and the project it is a probe of.
+      const { probeId: id, ...query }: Probes_getProbeSourceInput = {
+        probeId,
+        project: project.id,
+      };
+      const response = await read(
+        `/v1/probes/${encodeURIComponent(id)}/source${queryOf({ ...query })}`,
+        signal,
+      );
+      if (!response.ok) throw await refusalOf(response);
+      return answered<ProbeSource>(response);
+    },
     async getLattices(signal?: AbortSignal): Promise<LatticeSet> {
       const response = await read("/v1/lattices", signal);
       if (!response.ok) throw new Error(`reading lattices failed: ${response.status}`);

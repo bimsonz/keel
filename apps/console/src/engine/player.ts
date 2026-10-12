@@ -4,7 +4,7 @@
 // tail. The story never runs past a question nobody has answered.
 
 import type { AnyEvent } from "../contract/events.ts";
-import type { Lattice } from "../contract/keel/index.ts";
+import type { Lattice, ProbeSource } from "../contract/keel/index.ts";
 import type { Observation } from "../contract/observations.ts";
 import type {
   KeelCommands,
@@ -12,7 +12,6 @@ import type {
   KeelEventSource,
   KeelResources,
   ChangeDiff,
-  ProbeSource,
   VerdictReasons,
 } from "../source/types.ts";
 import type { KeelRepository } from "../source/repository.ts";
@@ -234,6 +233,7 @@ export class Player {
           waitSec: 25,
           signal,
         });
+        const movedOn = page.nextCursor !== this.#eventCursor;
         this.#append(page.items);
         this.#eventCursor = page.nextCursor;
         if (page.items.length > 0) {
@@ -244,6 +244,8 @@ export class Player {
           this.#changed();
           continue;
         }
+        // A stretch of the log that held nothing of this project's: the next is read at once.
+        if (movedOn) continue;
       } catch {
         // The stream dropped. Wait, then pick up from the same cursor: nothing is lost.
       }
@@ -254,25 +256,34 @@ export class Player {
     }
   }
 
+  /**
+   * Reads the log to its end. Keel's log is the whole instance's, and a page of it is the next stretch with
+   * this project's entries picked out: a stretch that holds none is an empty page whose cursor has still moved
+   * on. So an empty page is not the end. The end is the page whose cursor has not moved.
+   */
   async #drain(): Promise<void> {
-    const events = await this.source.readEvents(
-      this.#eventCursor === undefined ? {} : { cursor: this.#eventCursor },
-    );
-    this.#append(events.items);
-    this.#eventCursor = events.nextCursor;
-    const observations = await this.source.readObservations(
-      this.#observationCursor === undefined ? {} : { cursor: this.#observationCursor },
-    );
-    for (const observation of observations.items) {
-      const at = Math.max(
-        Date.parse(observation.at) - this.#epochMs,
-        this.#observationTimes.at(-1) ?? 0,
+    for (;;) {
+      const from = this.#eventCursor;
+      // oxlint-disable-next-line no-await-in-loop -- a page names the next one
+      const events = await this.source.readEvents(from === undefined ? {} : { cursor: from });
+      this.#append(events.items);
+      this.#eventCursor = events.nextCursor;
+      // oxlint-disable-next-line no-await-in-loop -- as above
+      const observations = await this.source.readObservations(
+        this.#observationCursor === undefined ? {} : { cursor: this.#observationCursor },
       );
-      this.#observations.push(observation);
-      this.#observationTimes.push(at);
+      for (const observation of observations.items) {
+        const at = Math.max(
+          Date.parse(observation.at) - this.#epochMs,
+          this.#observationTimes.at(-1) ?? 0,
+        );
+        this.#observations.push(observation);
+        this.#observationTimes.push(at);
+      }
+      this.#observationCursor = observations.nextCursor;
+      const movedOn = events.nextCursor !== (from ?? "");
+      if (events.items.length === 0 && observations.items.length === 0 && !movedOn) return;
     }
-    this.#observationCursor = observations.nextCursor;
-    if (events.items.length > 0 || observations.items.length > 0) await this.#drain();
   }
 
   /** Fold everything stamped at or before `t` that is not folded yet, in time order. */
@@ -295,19 +306,19 @@ export class Player {
       }
       moved = true;
     }
-    if (moved) this.#fetchResources();
     return moved;
   }
 
-  /** Sources and diffs are fetched once, when the world first mentions them. */
-  #fetchResources(): void {
-    for (const probe of this.world.probes.values()) {
-      if (this.#requested.has(probe.id)) continue;
-      this.#requested.add(probe.id);
-      void this.#fetch(async () => {
-        this.probes.set(probe.id, await this.source.getProbeSource(probe.id));
-      });
-    }
+  /** Read a probe's source from Keel, once. Called when its conflict's page is opened: a swarm has hundreds. */
+  wantProbe(probeId: string): void {
+    if (!this.world.probes.has(probeId) || this.#requested.has(probeId)) return;
+    this.#requested.add(probeId);
+    void this.#fetch(
+      async () => {
+        this.probes.set(probeId, await this.source.getProbeSource(probeId));
+      },
+      () => this.refused.add(probeId),
+    );
   }
 
   /** Fetch a change's diff, once. Called when its page is opened: a swarm has thousands. */

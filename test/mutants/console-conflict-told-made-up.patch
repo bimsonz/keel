@@ -2,15 +2,15 @@
 # kills: conflict.told
 # why: where Keel told a side's agent nothing about a conflict, the console says something of its own
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index 979e132..c85bdb4 100644
+index a9322ab..d412971 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -154,7 +154,7 @@ function toldOf(change: ChangeEntry, conflict: ConflictEntry): Party["told"] {
-     return { how: "bounced", next: change.bounce.next };
-   const note = change.noted.findLast((noted) => noted.conflictId === conflict.id);
-   return note === undefined || note.next.length === 0
--    ? undefined
-+    ? { how: "noted", next: [`Read conflict ${conflict.label}`] }
-     : { how: "noted", next: note.next };
+@@ -115,7 +115,7 @@ function party(world: World, side: ConflictSide, letter: "A" | "B"): Party {
+     },
+     // An annotation tells no one, so a telling with no way forward in it gives nothing here.
+     ...(told === undefined || told.nextActions.length === 0
+-      ? {}
++      ? { told: { how: "noted", next: ["Read the conflict"] } }
+       : { told: { how: told.how, next: told.nextActions.map((action) => action.title) } }),
+   };
  }
- 

@@ -255,9 +255,7 @@ export function Escalation({
                     {conflict.state === "escalated" ? "proven" : conflict.state}
                   </span>
                 </span>
-                {conflict.summary !== "" && (
-                  <span className="leading-snug">{conflict.summary}</span>
-                )}
+                <span className="leading-snug">{conflict.title}</span>
               </Tied>
             )}
             {tied.length > 0 && (

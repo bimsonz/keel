@@ -2,14 +2,14 @@
 # kills: conflict.after
 # why: a verdict given before a conflict was settled is shown as what came of it
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index 3890d1c..04717ea 100644
+index a9322ab..a11a107 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -403,7 +403,6 @@ export function conflictPageOf(
-     after: [pair.holder, pair.other].flatMap((side) => {
-       const judged = world.verdicts.get(side.verdictIds.at(-1) ?? "");
-       if (conflict.settledT === undefined || judged === undefined) return [];
--      if (judged.issuedT < conflict.settledT) return [];
-       return [
-         {
-           changeId: side.id,
+@@ -365,7 +365,6 @@ export function conflictPageFrom(
+         const side = world.changes.get(changeId);
+         const judged = world.verdicts.get(side?.verdictIds.at(-1) ?? "");
+         if (side === undefined || settledT === undefined || judged === undefined) return [];
+-        if (judged.issuedT < settledT) return [];
+         return [
+           {
+             changeId: side.id,

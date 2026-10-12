@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/engine.test.ts
+# kills: matrix.control
+# why: the control world's row is not marked as the control, so a probe that fails there, as it must, reads as one that decides
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index a9322ab..bfc4189 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -175,7 +175,6 @@ function matrixOf(world: World, detail: ConflictDetail): ConflictPageState["matr
+         // What is not in yet is not said to be running: Keel records a run when it has ended, and nothing before.
+         runs: Array.from({ length: most }, (_, index) => ran.get(index + 1) ?? "pending"),
+         ...(reason?.reason === undefined ? {} : { reason: reason.reason }),
+-        ...(row.world === "A-noop" ? { control: true } : {}),
+       };
+     }),
+   };

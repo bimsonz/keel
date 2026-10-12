@@ -254,9 +254,19 @@ await page.locator(".a-list-title a").first().click();
 await page.getByRole("heading", { name: "World matrix" }).waitFor();
 expectEqual("conflict: named in its address", pathOf(page), "/acme/demo/conflicts/C-1");
 expectEqual(
-  "conflict: called by what the two sides hold, and by Keel's label",
+  "conflict: called by Keel's own fields, its subject and predicate, and by Keel's label",
   squash(await page.getByRole("heading", { level: 1 }).innerText()),
-  "#2 relies on freshness at most per-request. #1 makes it per-session. C-1",
+  "authz.permission-evaluation · freshness C-1",
+);
+// How the effect is known is what Keel's suspicion said of it, and each side is the change Keel named.
+expectEqual(
+  "conflict: side B's effect is known as Keel said, derived by an extractor",
+  squash(await page.getByRole("region", { name: "The two sides" }).innerText()).includes(
+    "Keel derived it, by an extractor",
+  )
+    ? "said"
+    : "not said",
+  "said",
 );
 // The two sides are A and B, as Keel names the worlds, and each says which change it is.
 expectEqual(
@@ -303,6 +313,22 @@ expectEqual(
       .count(),
   ),
   "3",
+);
+// Keel runs five suites in a conflict's matrix: trunk's own on trunk, each side's own in its world, and both
+// where the two are composed. Each is in its world, and no cell waits on a run Keel never makes.
+expectEqual(
+  "conflict: the matrix holds the five suites Keel runs, each in its world",
+  (
+    await page
+      .locator(".a-matrix tbody tr")
+      .evaluateAll((rows) =>
+        rows.map(
+          (row) =>
+            `${row.getAttribute("data-world") ?? ""}:${[...row.querySelectorAll("[data-check]")].map((suite) => (suite.getAttribute("data-check") ?? "").replace(/^suite:chg_.+$/, "suite:change")).join("+")}`,
+        ),
+      )
+  ).join(" "),
+  "trunk:suite:trunk A-noop: A:suite:change B:suite:change AB:suite:change+suite:change",
 );
 // What it is tied to is beside it, each a link.
 expectEqual(
@@ -459,6 +485,60 @@ expectEqual(
   "change: what is noted links to the conflict",
   pathOf(page),
   "/acme/demo/conflicts/C-1",
+);
+// While the probe is still running, a run Keel has not recorded is still to come, and none is said to be
+// running: Keel says nothing of a run before it has ended. Two runs are in where the changes are composed.
+await page.goto(at("/conflicts/C-1", "scenario=s1&t=443&play=0"), { waitUntil: "networkidle" });
+await page.getByRole("heading", { name: "World matrix" }).waitFor();
+const composed = page.locator('.a-matrix tr[data-world="AB"]');
+expectEqual(
+  "conflict: a run Keel has not recorded is still to come, and none is said to be running",
+  `${await composed.locator('[data-outcome="fail"]').count()} in, ${await composed.locator('[data-outcome="pending"]').count()} to come, ${await page.locator('.a-matrix [data-outcome="running"]').count()} running`,
+  "2 in, 1 to come, 0 running",
+);
+// A probe's source is on its own tab, file by file, under the path Keel keeps it at.
+await page.goto(at("/conflicts/C-1/probe", "scenario=s1&t=443&play=0"), {
+  waitUntil: "networkidle",
+});
+await page.getByRole("region", { name: "Probe P-1" }).waitFor();
+await page
+  .getByText("probes/authz.permission-evaluation/freshness.probe.ts")
+  .first()
+  .waitFor({ timeout: 5_000 })
+  .catch(() => undefined);
+expectEqual(
+  "conflict: its probe's source, file by file",
+  String(
+    await page
+      .getByRole("region", { name: "Probe P-1" })
+      .getByText("probes/authz.permission-evaluation/freshness.probe.ts")
+      .count(),
+  ),
+  "1",
+);
+// A conflict Keel suspected without naming a premise and an effect has a page all the same: its parties, how
+// it was proven, and that Keel named no two sides. Scenario 2's is a change against a tenet on trunk.
+await page.goto(at("/conflicts/C-2", "scenario=s2&t=200&play=0"), { waitUntil: "networkidle" });
+// Whether it has a page is the thing looked for: the heading is given a moment, and what is there is compared.
+await page
+  .getByRole("heading", { level: 1 })
+  .waitFor({ timeout: 5_000 })
+  .catch(() => undefined);
+expectEqual(
+  "conflict: one with no sides has a page, which says Keel named none",
+  [
+    squash(
+      await page
+        .getByRole("heading", { level: 1 })
+        .innerText({ timeout: 1_000 })
+        .catch(() => "no page"),
+    ),
+    String(await page.getByText("Keel named no premise and no effect for this conflict.").count()),
+    String(await page.getByText("a tenet on trunk").count()),
+    String(await page.getByText("Proven by a guard").count()),
+    String(await page.getByRole("heading", { name: "World matrix" }).count()),
+  ].join(" | "),
+  "authz.permission-evaluation · freshness C-2 | 1 | 1 | 1 | 0",
 );
 await page.goto(at("/conflicts/C-1", "scenario=s3&t=495&play=0"), { waitUntil: "networkidle" });
 await page.locator(".a-timeline").waitFor();
@@ -1410,8 +1490,11 @@ const readerOf = async (request: Request): Promise<Reader> => {
 };
 
 // Two Keels, alike but for who may read the project: on one its org has made it public, on the other it has not.
-const open = createFakeKeel({ org: ORG, visibility: "public", readerOf });
-const shut = createFakeKeel({ org: ORG, visibility: "private", readerOf });
+// On each, 1,200 entries of other projects lie ahead of this one's in the instance's log, as they do for every
+// project of a Keel but its first: a stretch of them is an empty page whose cursor has moved on.
+const AHEAD = 1200;
+const open = createFakeKeel({ org: ORG, visibility: "public", readerOf, ahead: AHEAD });
+const shut = createFakeKeel({ org: ORG, visibility: "private", readerOf, ahead: AHEAD });
 
 /** What the page sent to /v1, as the browser sent it. */
 interface Sent {
@@ -1680,6 +1763,40 @@ expectEqual(
   (await visitor.locator("[data-lattice-value]").allInnerTexts()).join(" < "),
   "per-call < per-request < per-session < static",
 );
+// The log is read to its end before the page waits for anything new: a stretch of it that holds none of the
+// project's entries is read past at once, and is never taken for the end.
+expectEqual(
+  "built: the log is read past other projects' entries without waiting",
+  String(
+    open.calls.filter((call) => {
+      const asked = new URLSearchParams(call.query);
+      return (
+        call.path === "/v1/events" &&
+        Number(asked.get("cursor") ?? "0") < AHEAD &&
+        asked.has("wait")
+      );
+    }).length,
+  ),
+  "0",
+);
+// The probe's source is read from Keel when its conflict is looked at, and drawn file by file.
+await visitor.goto(`${built}/ada/demo/conflicts/C-1/probe`, { waitUntil: "domcontentloaded" });
+await visitor.getByRole("region", { name: "Probe P-1" }).waitFor();
+await visitor
+  .getByText("probes/authz.permission-evaluation/freshness.probe.ts")
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "built: a probe's source, read from Keel by its own operation",
+  String(
+    open.calls.filter(
+      (call) =>
+        /^\/v1\/probes\/[^/]+\/source$/.test(call.path) && call.query.startsWith("project="),
+    ).length,
+  ),
+  "1",
+);
 await visitor.goto(`${built}/ada/demo/changes/1/verification`, { waitUntil: "domcontentloaded" });
 await visitor
   .getByText("Probe P-1 fails in A+B, three runs out of three")
@@ -1813,6 +1930,7 @@ expectEqual(
       open.calls.map((call) =>
         call.path
           .replace(/\/v1\/verdicts\/.+/, "/v1/verdicts/{id}")
+          .replace(/\/v1\/probes\/[^/]+\/source$/, "/v1/probes/{id}/source")
           .replace(/\/v1\/orgs\/[^/]+\/projects\/[^/]+$/, "/v1/orgs/{org}/projects/{name}")
           .replace(/\/v1\/projects\/[^/]+\//, "/v1/projects/{id}/"),
       ),
@@ -1820,7 +1938,7 @@ expectEqual(
   ]
     .toSorted()
     .join(" "),
-  "/v1/events /v1/lattices /v1/orgs/{org}/projects/{name} /v1/projects /v1/projects/{id}/repo/blob /v1/projects/{id}/repo/commits /v1/projects/{id}/repo/tree /v1/verdicts/{id}",
+  "/v1/events /v1/lattices /v1/orgs/{org}/projects/{name} /v1/probes/{id}/source /v1/projects /v1/projects/{id}/repo/blob /v1/projects/{id}/repo/commits /v1/projects/{id}/repo/tree /v1/verdicts/{id}",
 );
 // The page put nothing of its own on anything it asked: no token, no key. A visitor's browser holds no session.
 expectEqual(
@@ -2512,6 +2630,13 @@ await shot(person, "project-settings");
 await publishing.click();
 const hiding = person.getByRole("button", { name: "Make private" });
 await hiding.waitFor();
+// The frame is redrawn a moment after the page. It is given that moment, and whatever it then says is compared.
+await person
+  .locator("header")
+  .first()
+  .getByText("public", { exact: true })
+  .waitFor({ timeout: 2_000 })
+  .catch(() => undefined);
 expectEqual(
   "settings: made public, the page and the frame say what Keel answered",
   `${await readersSaid()} | ${await frameSaid()}`,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/drain.test.ts apps/console/test/unit/source/http.test.ts
+# kills: player.drain, http.empty-pages
+# why: the log is taken to have ended at a page that holds none of the project's entries, though its cursor moved on
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index f5a8742..d1a9ea0 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -282,7 +282,7 @@ export class Player {
+       }
+       this.#observationCursor = observations.nextCursor;
+       const movedOn = events.nextCursor !== (from ?? "");
+-      if (events.items.length === 0 && observations.items.length === 0 && !movedOn) return;
++      if (events.items.length === 0 && observations.items.length === 0) return;
+     }
+   }
+ 

@@ -2,7 +2,8 @@
 // world and the same instant always give the same picture.
 
 import { shownAgent } from "./audience.ts";
-import type { Lattice } from "../contract/keel/index.ts";
+import type { ConflictDetail, ConflictSide, Lattice, ProbeSource } from "../contract/keel/index.ts";
+import type { Predicate } from "../contract/mfp.ts";
 import type { FlowNode, StepSpec } from "../contract/provisional.ts";
 import type {
   AlternativeRow,
@@ -10,22 +11,20 @@ import type {
   IntentRow,
   DiffAnnotation,
   EvidenceItem,
-  MatrixCell,
-  MatrixCheck,
-  Outcome,
+  MatrixRow,
   Party,
-  Pending,
   PlanStep,
   StepOutcome,
   ConflictPageState,
   TimelineItem,
   World as WorldId,
 } from "../domain/state.ts";
-import type { ChangeDiff, ProbeSource, VerdictReasons } from "../source/types.ts";
+import type { ChangeDiff, VerdictReasons } from "../source/types.ts";
 import { readable } from "./evidence.ts";
 import { chainThrough, valueIdOf } from "./lattice.ts";
-import { contradictionsOf, sidesOf } from "./sides.ts";
-import type { ChangeEntry, ConflictEntry, EscalationEntry, ProbeEntry, World } from "./world.ts";
+import { conflictDetailOf } from "./conflict.ts";
+import { contradictionsOf } from "./sides.ts";
+import { type ChangeEntry, type EscalationEntry, outcomesIn, type World } from "./world.ts";
 
 /** What the console has fetched from Keel's read models, on demand, beside the log. */
 export interface Resources {
@@ -93,294 +92,242 @@ export function choicesOf(escalation: EscalationEntry): {
   };
 }
 
-function party(
-  world: World,
-  change: ChangeEntry,
-  role: "holder" | "other",
-  conflict: ConflictEntry,
-  subjectKey: string,
-): Party {
-  const by = world.agents.get(change.agentId);
-  const premise = change.premises.find(
-    (p) => p.subject === subjectKey && p.predicate === conflict.predicate,
-  );
-  const effects = change.effects.filter(
-    (e) => e.proposition.subject === subjectKey && e.proposition.predicate === conflict.predicate,
-  );
-  // Where an extractor and Clef both derived it, the extractor's is the fact.
-  const effect = effects.find((e) => e.method === "extractor") ?? effects[0];
-  const proposition: Party["proposition"] =
-    role === "holder" && premise !== undefined
-      ? {
-          role: "premise",
-          relation: premise.relation,
-          value: String(premise.value),
-          gloss: premise.gloss ?? "",
-          origin: "declared",
-        }
-      : {
-          role: "effect",
-          relation: effect?.proposition.relation ?? "is",
-          value: String(effect?.proposition.value ?? "unknown"),
-          gloss: effect?.proposition.gloss ?? "",
-          origin: effect?.declared === true ? "declared" : "derived",
-          derivation: effects.map((e) => ({
-            method: e.method,
-            evidenceClass: e.evidenceClass,
-            ...(e.method === "extractor" || e.p === undefined ? {} : { p: e.p }),
-          })),
-        };
-  const told = toldOf(change, conflict);
+/** A change's name where the log holds it, and the end of its id where it does not. */
+const nameOf = (world: World, changeId: string): string =>
+  world.changes.get(changeId)?.label ?? changeId.slice(-4);
+
+/** One side of a conflict, as Keel named it, with what the log says of its change. */
+function party(world: World, side: ConflictSide, letter: "A" | "B"): Party {
+  const change = world.changes.get(side.changeId);
+  const { proposition, told } = side;
   return {
-    world: role === "holder" ? "A" : "B",
-    changeId: change.id,
-    label: change.label,
-    goal: change.goal,
-    agent: shownAgent(by),
-    proposition,
-    ...(told === undefined ? {} : { told }),
+    world: letter,
+    changeId: side.changeId,
+    label: nameOf(world, side.changeId),
+    goal: change?.goal ?? "",
+    agent: shownAgent(change === undefined ? undefined : world.agents.get(change.agentId)),
+    proposition: {
+      role: side.role,
+      relation: proposition.relation,
+      value: String(proposition.value),
+      gloss: proposition.gloss ?? "",
+      ...(side.evidence === undefined ? {} : { evidence: side.evidence }),
+    },
+    // An annotation tells no one, so a telling with no way forward in it gives nothing here.
+    ...(told === undefined || told.nextActions.length === 0
+      ? {}
+      : { told: { how: told.how, next: told.nextActions.map((action) => action.title) } }),
   };
 }
 
-/**
- * What Keel told a change's agent about one conflict: the ways forward on the bounce that cites the conflict,
- * or on the note of it. An annotation tells no one, so it gives nothing here.
- */
-function toldOf(change: ChangeEntry, conflict: ConflictEntry): Party["told"] {
-  if (change.bounce?.conflictId === conflict.id && change.bounce.next.length > 0)
-    return { how: "bounced", next: change.bounce.next };
-  const note = change.noted.findLast((noted) => noted.conflictId === conflict.id);
-  return note === undefined || note.next.length === 0
-    ? undefined
-    : { how: "noted", next: note.next };
+/** Whose suite a check of the matrix is, in a few words. Keel names it `suite:trunk` or `suite:<changeId>`. */
+function suiteLabel(world: World, check: string, sides: ConflictDetail["sides"]): string {
+  const of = check.replace(/^suite:/, "");
+  if (of === "trunk") return "Trunk's suite";
+  if (of === sides?.holder.changeId) return `A's suite · ${nameOf(world, of)}`;
+  if (of === sides?.other.changeId) return `B's suite · ${nameOf(world, of)}`;
+  return `${nameOf(world, of)}'s suite`;
 }
 
-function matrixOf(
-  world: World,
-  conflict: ConflictEntry,
-  probe: ProbeEntry | undefined,
-  holder: ChangeEntry,
-  other: ChangeEntry,
-): ConflictPageState["matrix"] {
+/** Keel runs a probe three times in a world, and a mark stands for each run while they are still coming in. */
+const PROBE_RUNS = 3;
+
+function matrixOf(world: World, detail: ConflictDetail): ConflictPageState["matrix"] {
+  const { sides, probe } = detail;
   // The worlds are Keel's own names for the two sides of a conflict: A holds the premise, B alters what it
   // relies on. Which change each is, by its number, is said beside every world.
-  const checks: MatrixCheck[] = [
-    { id: "tests-a", label: "A's tests" },
-    { id: "tests-b", label: "B's tests" },
-    { id: "probe", label: probe === undefined ? "Probe" : `Probe ${probe.label}` },
+  const [a, b] = [
+    sides === undefined ? "the premise's side" : nameOf(world, sides.holder.changeId),
+    sides === undefined ? "the effect's side" : nameOf(world, sides.other.changeId),
   ];
-  // The first thing not yet in is what is running now; everything after it is still to come.
-  let reached = !(probe !== undefined && probe.state === "calibrating");
-  const next = (): Pending => {
-    if (reached) return "pending";
-    reached = true;
-    return "running";
+  const gloss: Record<WorldId, string> = {
+    trunk: "Neither change",
+    "A-noop": `${a}, with what it relies on removed`,
+    A: `${a} alone`,
+    B: `${b} alone`,
+    AB: `${a} and ${b}, composed`,
   };
-  const cellsFor = (id: WorldId): Record<MatrixCheck["id"], MatrixCell> => {
-    // Each change's own suite, run in this world.
-    const tests = (change: ChangeEntry): MatrixCell => {
-      const seen = world.suites.get(`${conflict.id}/${id}/suite:${change.id}`);
-      // The control world runs the probe alone: no suite is waited for there, and none is said to be running.
-      if (seen === undefined)
-        return id === "A-noop" ? { kind: "none" } : { kind: "tests", outcome: next() };
-      return {
-        kind: "tests",
-        outcome: seen.outcome,
-        ...(seen.passed === undefined ? {} : { passed: seen.passed }),
-        ...(seen.total === undefined ? {} : { total: seen.total }),
-        ...(seen.reason === undefined ? {} : { reason: seen.reason }),
-      };
-    };
-    const a = tests(holder);
-    const b = tests(other);
-    // The matrix is the probe's own record. Keel runs nothing in these worlds once the conflict is settled.
-    const ran: Outcome[] = probe?.runs[id] ?? [];
-    const runs: [Outcome | Pending, Outcome | Pending, Outcome | Pending] = [
-      ran[0] ?? next(),
-      ran[1] ?? next(),
-      ran[2] ?? next(),
-    ];
-    const reason = probe?.reasons[id];
-    return {
-      "tests-a": a,
-      "tests-b": b,
-      probe: {
-        kind: "probe",
-        runs,
-        ...(reason === undefined ? {} : { reason }),
-        ...(id === "A-noop" ? { control: true } : {}),
-      },
-    };
-  };
-  // In this order: it is the order the cells arrive in.
-  const cells = {
-    trunk: cellsFor("trunk"),
-    "A-noop": cellsFor("A-noop"),
-    A: cellsFor("A"),
-    B: cellsFor("B"),
-    AB: cellsFor("AB"),
-  };
+  const reasons = world.conflicts.get(detail.id)?.runs ?? [];
   return {
-    worlds: [
-      { id: "trunk", label: "trunk", gloss: "Neither change" },
-      { id: "A-noop", label: "A-noop", gloss: `${holder.label}, with what it relies on removed` },
-      { id: "A", label: "A", gloss: `${holder.label} alone` },
-      { id: "B", label: "B", gloss: `${other.label} alone` },
-      { id: "AB", label: "A+B", gloss: `${holder.label} and ${other.label}, composed` },
-    ],
-    checks,
-    cells,
+    ...(probe?.label === undefined ? {} : { probe: probe.label }),
+    calibrating: probe?.state === "calibrating",
+    rows: detail.matrix.map((row): MatrixRow => {
+      // A run Keel recorded twice, for a probe it drafted again, stands as its latest.
+      const ran = new Map(row.probe.map((run) => [run.run, run.outcome]));
+      const most = Math.max(probe === undefined ? 0 : PROBE_RUNS, ...ran.keys());
+      const reason = reasons.findLast((run) => run.world === row.world && run.reason !== undefined);
+      return {
+        id: row.world,
+        label: row.world === "AB" ? "A+B" : row.world,
+        gloss: gloss[row.world],
+        suites: row.checks.map((check) => ({
+          check: check.check,
+          label: suiteLabel(world, check.check, sides),
+          outcome: check.outcome,
+          ...(check.counts === undefined
+            ? {}
+            : {
+                passed: check.counts.passed,
+                total: check.counts.passed + check.counts.failed + check.counts.skipped,
+              }),
+          ...(check.reason === undefined ? {} : { reason: check.reason }),
+        })),
+        // What is not in yet is not said to be running: Keel records a run when it has ended, and nothing before.
+        runs: Array.from({ length: most }, (_, index) => ran.get(index + 1) ?? "pending"),
+        ...(reason?.reason === undefined ? {} : { reason: reason.reason }),
+        ...(row.world === "A-noop" ? { control: true } : {}),
+      };
+    }),
   };
 }
 
-const TIMES = ["once", "twice", "three runs out of three"];
-
-/** Evidence as it stands before anyone is asked: built from what has happened so far. */
 /** Where a conflict's two sides sit on Keel's lattice for its predicate. */
 function latticeOf(
   resources: Resources,
-  conflict: ConflictEntry,
-  a: Party,
-  b: Party,
+  predicate: Predicate | undefined,
+  parties: ConflictPageState["parties"],
 ): ConflictPageState["lattice"] {
-  const predicate = conflict.predicate ?? "invariant";
-  const lattice = resources.lattices.get(predicate);
-  const [premise, effect] = [a.proposition.value, b.proposition.value];
-  if (lattice === undefined || lattice.covers.length === 0)
-    return { predicate, values: [], standing: "unknown" };
+  const named = predicate ?? "invariant";
+  const lattice = resources.lattices.get(named);
+  if (parties === undefined || lattice === undefined || lattice.covers.length === 0)
+    return { predicate: named, values: [], standing: "unknown" };
+  const [premise, effect] = [parties.A.proposition.value, parties.B.proposition.value];
   const chain = chainThrough(lattice, [premise, effect]);
-  if (chain !== null) return { predicate, values: chain, standing: "ranked" };
+  if (chain !== null) return { predicate: named, values: chain, standing: "ranked" };
   // Both are values of this lattice, and it puts neither above the other.
   const known =
     valueIdOf(lattice, premise) !== undefined && valueIdOf(lattice, effect) !== undefined;
-  return { predicate, values: [], standing: known ? "unranked" : "unknown" };
+  return { predicate: named, values: [], standing: known ? "unranked" : "unknown" };
 }
 
-function evidenceSoFar(
+const said = (proposition: Party["proposition"], predicate: string): string =>
+  `${predicate} ${proposition.relation.replace("-", " ")} ${proposition.value}`;
+
+const HOW_KNOWN: Record<string, string> = {
+  extractor: "Derived by Keel · extractor",
+  clef: "Derived by Keel · Clef",
+  "code-model": "Derived by Keel · code model",
+};
+
+/**
+ * What bears on a conflict before anyone is asked: Keel's records of it, each restated as the record has it
+ * and none reasoned from. What each side holds, how the effect is known, and what ran where both changes are
+ * composed. Once a person is asked, the question's own evidence stands in its place.
+ */
+function recordsOf(
   world: World,
-  conflict: ConflictEntry,
-  probe: ProbeEntry | undefined,
-  holder: ChangeEntry,
-  other: ChangeEntry,
-  subjectKey: string,
-  line: readonly string[],
+  detail: ConflictDetail,
+  parties: ConflictPageState["parties"],
 ): EvidenceItem[] {
   const items: EvidenceItem[] = [];
-  const fails = probe?.runs.AB.filter((outcome) => outcome === "fail").length ?? 0;
-  if (probe !== undefined && fails > 0) {
-    items.push({
-      class: "proof",
-      summary: `Probe ${probe.label} fails in A+B, ${TIMES[fails - 1] ?? ""}${fails < 3 ? " so far" : ""}`,
-      by: "World matrix · Tier 1 isolate",
-      ref: `prb:${probe.id}/AB`,
-      at: conflict.openedAt,
-    });
-  }
-  const onSubject = other.effects.filter(
-    (e) => e.proposition.subject === subjectKey && e.proposition.predicate === conflict.predicate,
-  );
-  for (const effect of onSubject) {
-    if (effect.method === "extractor") {
-      items.push({
-        class: effect.evidenceClass,
-        summary: `Extractor: ${effect.proposition.gloss ?? `${effect.proposition.predicate} ${effect.proposition.relation} ${String(effect.proposition.value)}`}`,
-        by: "Effect derivation · extractor",
-        ref: `${effect.anchors[0]?.path ?? ""}#${effect.anchors[0]?.symbol ?? ""}`,
-        at: conflict.openedAt,
-      });
-    }
-  }
-  const premise = holder.premises.find(
-    (p) => p.subject === subjectKey && p.predicate === conflict.predicate,
-  );
-  // The lattice rules only on a derived fact. An opinion of Clef's is weighed, not ruled on.
-  const contradicting = onSubject.find((e) => e.method === "extractor");
-  if (premise !== undefined && contradicting !== undefined) {
-    items.push({
-      class: "ruling",
-      summary: `${String(contradicting.proposition.value)} is not ${premise.relation.replace("-", " ")} ${String(premise.value)}`,
-      by: `Lattice comparison · ${conflict.predicate ?? ""}`,
-      ref: `lattice:${conflict.predicate ?? ""}`,
-      at: conflict.openedAt,
-      ...(line.length === 0 ? {} : { detail: `Deterministic: ${line.join(" < ")}.` }),
-    });
-  }
-  const testsA = world.suites.get(`${conflict.id}/AB/suite:${holder.id}`);
-  const testsB = world.suites.get(`${conflict.id}/AB/suite:${other.id}`);
-  if (testsA?.outcome === "pass" && testsB?.outcome === "pass") {
-    items.push({
-      class: "proof",
-      summary: `A's tests (${testsA.total ?? 0}) and B's tests (${testsB.total ?? 0}) all pass in A+B`,
-      by: "World matrix · Tier 1 isolate",
-      ref: `cnd:${conflict.id}/AB/tests`,
-      at: testsB.at,
-      detail: "Nothing either change wrote notices the disagreement.",
-    });
-  }
-  const vague = other.premises.find((p) => p.subject === subjectKey);
-  if (vague?.gloss !== undefined) {
+  const predicate = detail.predicate ?? "";
+  if (parties !== undefined) {
     items.push({
       class: "testimony",
-      summary: `${other.label}: “${vague.gloss}.”`,
-      by: `${world.agents.get(other.agentId)?.name ?? "Agent"} · intent, revision 1`,
-      ref: `chg:${other.id}`,
-      at: other.declaredAt,
+      summary: `${parties.A.label} relies on: ${said(parties.A.proposition, predicate)}`,
+      by: "Declared by its agent",
+      ref: `chg:${parties.A.changeId}`,
+      at: detail.openedAt,
     });
-  }
-  for (const effect of onSubject) {
-    if (effect.method === "clef") {
+    const { evidence } = parties.B.proposition;
+    if (evidence !== undefined)
       items.push({
-        class: "opinion",
-        summary: `Clef: ${(effect.proposition.gloss ?? "").replace(/^./, (c) => c.toLowerCase())}, p = ${effect.p}`,
-        by: "Effect derivation · Clef",
-        ref: `drv:${other.id}/clef`,
-        at: conflict.openedAt,
+        class: evidence.evidenceClass,
+        summary: `${parties.B.label} makes: ${said(parties.B.proposition, predicate)}`,
+        by: evidence.declared
+          ? "Declared by its agent"
+          : (HOW_KNOWN[evidence.method ?? ""] ?? "Derived by Keel"),
+        ref: `chg:${parties.B.changeId}`,
+        at: detail.openedAt,
       });
-    }
   }
+  const composed = detail.matrix.find((row) => row.world === "AB");
+  const last = composed?.probe.at(-1);
+  if (composed !== undefined && last !== undefined)
+    items.push({
+      class: "proof",
+      summary: `Probe ${detail.probe?.label ?? ""} in A+B: ${composed.probe.map((run) => run.outcome).join(", ")}`,
+      by: "World matrix",
+      ref: last.resultRef,
+      at: last.at,
+    });
+  for (const check of composed?.checks ?? [])
+    items.push({
+      class: "proof",
+      summary: `${suiteLabel(world, check.check, detail.sides)} in A+B: ${check.outcome}${
+        check.counts === undefined
+          ? ""
+          : `, ${check.counts.passed} of ${check.counts.passed + check.counts.failed + check.counts.skipped} tests`
+      }`,
+      by: "World matrix",
+      ref: `cfl:${detail.id}/AB/${check.check}`,
+      at: check.at,
+    });
   return items;
 }
 
-export function conflictPageOf(
+const PROVEN_BY: Record<string, string> = {
+  probe: "its probe",
+  guard: "a guard",
+  "merge-refused": "a refused merge",
+  interaction: "an interaction in a batch",
+};
+
+/**
+ * A conflict's page, drawn from Keel's own shape for one: the console's fold of the log, or Keel's read of
+ * it. The log read so far adds what that shape has no place for: each change's name and goal, the question
+ * a person was asked, and what came of each side afterwards. Every conflict Keel names has a page.
+ */
+export function conflictPageFrom(
+  detail: ConflictDetail,
   world: World,
-  conflictId: string,
   resources: Resources,
-): ConflictPageState | null {
-  const conflict = world.conflicts.get(conflictId);
+): ConflictPageState {
+  const conflict = world.conflicts.get(detail.id);
   const subject =
-    conflict?.subjectId === undefined ? undefined : world.subjects.get(conflict.subjectId);
-  if (conflict === undefined || subject === undefined || conflict.predicate === undefined)
-    return null;
-  const pair = sidesOf(world, conflict);
-  if (pair === null) return null;
-  const probe = conflict.probeId === undefined ? undefined : world.probes.get(conflict.probeId);
+    detail.subject === undefined
+      ? undefined
+      : [...world.subjects.values()].find((minted) => minted.key === detail.subject);
   const escalation =
-    conflict.escalationId === undefined ? undefined : world.escalations.get(conflict.escalationId);
-  const guard = conflict.guardId === undefined ? undefined : world.guards.get(conflict.guardId);
+    detail.escalation === undefined ? undefined : world.escalations.get(detail.escalation.id);
   const decision =
-    conflict.decisionId === undefined ? undefined : world.decisions.get(conflict.decisionId);
-  const timeline: TimelineItem[] = conflict.timeline.map((entry, index, all) => ({
+    detail.decision === undefined ? undefined : world.decisions.get(detail.decision.id);
+  const parties =
+    detail.sides === undefined
+      ? undefined
+      : { A: party(world, detail.sides.holder, "A"), B: party(world, detail.sides.other, "B") };
+  const timeline: TimelineItem[] = (conflict?.timeline ?? []).map((entry, index, all) => ({
     at: entry.at,
     type: entry.type,
     title: entry.title,
     ...(entry.detail === undefined ? {} : { detail: entry.detail }),
     ...(index === all.length - 1 ? { now: true } : {}),
   }));
-  const parties = {
-    A: party(world, pair.holder, "holder", conflict, subject.key),
-    B: party(world, pair.other, "other", conflict, subject.key),
-  };
-  const lattice = latticeOf(resources, conflict, parties.A, parties.B);
+  const settledT = conflict?.settledT;
+  const { probe, guard } = detail;
+  const source = probe === undefined ? undefined : resources.probes.get(probe.id);
   return {
     conflict: {
-      id: conflict.id,
-      label: conflict.label,
-      kind: conflict.kind,
-      state: conflict.state,
-      silentRetraction: conflict.silentRetraction,
-      openedAt: conflict.openedAt,
-      summary: conflict.summary,
-      ...(conflict.costUsd === undefined ? {} : { costUsd: conflict.costUsd }),
+      id: detail.id,
+      label: detail.label,
+      kind: detail.kind,
+      state: detail.state,
+      silentRetraction: conflict?.silentRetraction ?? false,
+      openedAt: detail.openedAt,
+      title:
+        detail.subject === undefined
+          ? `Conflict ${detail.label}`
+          : detail.predicate === undefined
+            ? detail.subject
+            : `${detail.subject} · ${detail.predicate}`,
+      ...(detail.predicate === undefined ? {} : { predicate: detail.predicate }),
+      ...(detail.origin === undefined ? {} : { origin: detail.origin }),
+      ...(detail.proven === undefined
+        ? {}
+        : { proven: PROVEN_BY[detail.proven._tag] ?? detail.proven._tag }),
+      ...(detail.dismissed === undefined ? {} : { dismissed: detail.dismissed }),
+      ...(detail.move === undefined ? {} : { move: detail.move }),
+      ...(conflict?.costUsd === undefined ? {} : { costUsd: conflict.costUsd }),
     },
     ...(escalation === undefined
       ? {}
@@ -392,51 +339,75 @@ export function conflictPageOf(
             state: escalation.state,
           },
         }),
-    ...(guard === undefined ? {} : { guard: { label: guard.label, state: guard.state } }),
+    ...(detail.escalation?.reason === undefined ? {} : { escalated: detail.escalation.reason }),
+    ...(guard === undefined
+      ? {}
+      : {
+          guard: { label: guard.label ?? guard.id.slice(-4), state: guard.state, runs: guard.runs },
+        }),
     ...(decision === undefined
       ? {}
       : { decision: { label: decision.label, chosen: decision.chosen } }),
-    subject: { key: subject.key, gloss: subject.gloss },
-    lattice,
-    parties,
-    matrix: matrixOf(world, conflict, probe, pair.holder, pair.other),
-    after: [pair.holder, pair.other].flatMap((side) => {
-      const judged = world.verdicts.get(side.verdictIds.at(-1) ?? "");
-      if (conflict.settledT === undefined || judged === undefined) return [];
-      if (judged.issuedT < conflict.settledT) return [];
-      return [
-        {
-          changeId: side.id,
-          label: side.label,
-          revision: side.verdictRevision ?? side.revision,
-          outcome: judged.outcome,
-          summary: judged.summary,
-        },
-      ];
-    }),
-    probe: {
-      id: probe?.id ?? "",
-      label: probe?.label ?? "",
-      attempt: probe?.attempts ?? 0,
-      bundleHash: probe?.bundleHash ?? "",
-      state: probe?.state ?? "calibrating",
-      path: probe?.path ?? "",
-      source: probe === undefined ? "" : (resources.probes.get(probe.id)?.source ?? ""),
-    },
-    evidence:
-      escalation === undefined
-        ? evidenceSoFar(
-            world,
-            conflict,
-            probe,
-            pair.holder,
-            pair.other,
-            subject.key,
-            lattice.values,
-          )
-        : escalation.evidence,
+    ...(detail.subject === undefined
+      ? {}
+      : { subject: { key: detail.subject, gloss: subject?.gloss ?? "" } }),
+    lattice: latticeOf(resources, detail.predicate, parties),
+    ...(parties === undefined ? {} : { parties }),
+    // A party is a change, or a tenet trunk already holds: a change can conflict with what is settled.
+    named: detail.parties.map((id) =>
+      id.startsWith("chg_")
+        ? { changeId: id, label: nameOf(world, id) }
+        : { label: "a tenet on trunk" },
+    ),
+    matrix: matrixOf(world, detail),
+    after: (detail.sides === undefined ? [] : [detail.sides.holder, detail.sides.other]).flatMap(
+      ({ changeId }) => {
+        const side = world.changes.get(changeId);
+        const judged = world.verdicts.get(side?.verdictIds.at(-1) ?? "");
+        if (side === undefined || settledT === undefined || judged === undefined) return [];
+        if (judged.issuedT < settledT) return [];
+        return [
+          {
+            changeId: side.id,
+            label: side.label,
+            revision: side.verdictRevision ?? side.revision,
+            outcome: judged.outcome,
+            summary: judged.summary,
+          },
+        ];
+      },
+    ),
+    ...(probe === undefined
+      ? {}
+      : {
+          probe: {
+            id: probe.id,
+            label: probe.label ?? probe.id.slice(-4),
+            state: probe.state,
+            ...(probe.attempts === undefined ? {} : { attempts: probe.attempts }),
+            ...(probe.bundleHash === undefined ? {} : { bundleHash: probe.bundleHash }),
+            ...(probe.discarded === undefined ? {} : { discarded: probe.discarded }),
+            source:
+              source === undefined
+                ? resources.refused.has(probe.id)
+                  ? "refused"
+                  : "unread"
+                : source.files,
+          },
+        }),
+    evidence: escalation === undefined ? recordsOf(world, detail, parties) : escalation.evidence,
     timeline,
   };
+}
+
+/** The page of a conflict the log has named, from the console's own fold of it. */
+export function conflictPageOf(
+  world: World,
+  conflictId: string,
+  resources: Resources,
+): ConflictPageState | null {
+  const detail = conflictDetailOf(world, conflictId);
+  return detail === null ? null : conflictPageFrom(detail, world, resources);
 }
 
 function leaves(node: FlowNode, worlds?: WorldId[]): { step: StepSpec; worlds?: WorldId[] }[] {
@@ -468,12 +439,9 @@ function planSteps(world: World, change: ChangeEntry): PlanStep[] {
       seen === undefined ? "pending" : (STEP_OUTCOME[seen.status] ?? "pending");
     // The probe and the ruling are told by events, not by step observations.
     if (step.kind === "probe" && step.id === "probe" && probe !== undefined) {
-      const decided = probe.runs.AB.length === 3;
-      outcome = !decided
-        ? "running"
-        : probe.runs.AB.every((run) => run === "fail")
-          ? "fail"
-          : "pass";
+      const composed = outcomesIn(conflict, "AB");
+      outcome =
+        composed.length < 3 ? "running" : composed.every((run) => run === "fail") ? "fail" : "pass";
     } else if (step.kind === "probe" && step.id === "guard") {
       // Keel's own fact comes first: a guard that failed in this revision's plan has failed, whatever else is
       // known. Keel says nothing of a guard that held, so otherwise the step's own observation stands.
@@ -651,17 +619,15 @@ export function changePageOf(
     derived: change.effects.map((effect) => {
       // What an effect contradicts is not in the derivation: it is the conflict Keel opened over it.
       const against = contradictionsOf(world, change.id).find(
-        ({ conflict: open, subjectKey }) =>
-          effect.proposition.subject === subjectKey &&
-          effect.proposition.predicate === open.predicate,
+        ({ premise: held }) =>
+          effect.proposition.subject === held.proposition.subject &&
+          effect.proposition.predicate === held.proposition.predicate,
       );
-      const premise = against?.sides.holder.premises.find(
-        (p) => p.subject === against.subjectKey && p.predicate === against.conflict.predicate,
-      );
-      if (against === undefined || premise === undefined) return effect;
+      if (against === undefined) return effect;
+      const { proposition: premise, holder } = against.premise;
       return {
         ...effect,
-        against: `${against.sides.holder.label}'s premise: ${premise.predicate} ${premise.relation.replace("-", " ")} ${String(premise.value)}`,
+        against: `${nameOf(world, holder)}'s premise: ${premise.predicate} ${premise.relation.replace("-", " ")} ${String(premise.value)}`,
       };
     }),
     drift: change.drift,
@@ -687,7 +653,7 @@ export function changePageOf(
             state: conflict.state,
             // A change can also conflict with what trunk already holds.
             with: withLabel.filter((label) => label !== "").join(", ") || "a tenet on trunk",
-            summary: conflict.summary,
+            summary: conflict.title,
           },
         }),
     ...(sameIntent === undefined ? {} : { sameIntent }),

@@ -18,6 +18,7 @@ import type {
   EventRecord,
   LatticeSet,
   NextAction,
+  ProbeSource,
   ProjectSettings,
   ProjectView,
   RepoBlob,
@@ -169,10 +170,17 @@ export function createFakeKeel(
     sessions?: Record<string, Role | "stranger">;
     /** Says who a request is from, in place of `sessions`: for a test that has real sessions to ask about. */
     readerOf?: (request: Request) => Reader | Promise<Reader>;
+    /**
+     * How many entries of other projects the instance's log holds ahead of this project's first. Keel's log is
+     * the whole instance's: a page is its next stretch with the project's entries picked out, so a stretch
+     * that holds none is an empty page whose cursor has moved on.
+     */
+    ahead?: number;
   } = {},
 ): FakeKeel {
   const seed = options.seed ?? 42;
   const pageSize = options.pageSize ?? 500;
+  const ahead = options.ahead ?? 0;
   let log = generateS1(seed);
   const repository = createMockRepository(() => log);
   const escalationId = log.gates[0]?.escalationId ?? "";
@@ -295,8 +303,12 @@ export function createFakeKeel(
         if (asked === null && reader === null) return problem(400, "request.invalid");
         if (asked !== null && (asked !== project.id || !visible)) return gone();
         if (asked === null && !member) return Response.json({ items: [], nextCursor: "0" });
-        const start = Number(url.searchParams.get("cursor") ?? "0") || 0;
+        const from = Number(url.searchParams.get("cursor") ?? "0") || 0;
         const limit = Math.min(Number(url.searchParams.get("limit") ?? "500") || 500, pageSize);
+        // A stretch of the instance's log that is all other projects' is an empty page, and the cursor moves on.
+        if (from < ahead)
+          return Response.json({ items: [], nextCursor: String(Math.min(from + limit, ahead)) });
+        const start = from - ahead;
         const wait = Number(url.searchParams.get("wait") ?? "0") || 0;
         if (start >= log.events.length && wait > 0) {
           // Nothing new: hold the request until the log grows or the wait runs out.
@@ -338,10 +350,21 @@ export function createFakeKeel(
             }),
           );
         // The cursor is always the position just after the last item, so a reader at the tail has something to wait on.
-        return Response.json({ items, nextCursor: String(start + cut.length) } satisfies Omit<
-          EventPage,
-          "items"
-        > & { items: unknown[] });
+        return Response.json({
+          items,
+          nextCursor: String(ahead + start + cut.length),
+        } satisfies Omit<EventPage, "items"> & { items: unknown[] });
+      }
+
+      // A probe's source is read by whoever its project is shown to, file by file, from the bundle its draft
+      // was kept under. A probe of another project, and one nobody drafted, are the same answer.
+      const probeSource = /^\/v1\/probes\/([^/]+)\/source$/.exec(url.pathname);
+      if (probeSource !== null && request.method === "GET") {
+        const asked = url.searchParams.get("project");
+        if (asked === null && reader === null) return problem(400, "request.invalid");
+        if (!visible || (asked !== null && asked !== project.id)) return gone();
+        const source = log.probes.get(decodeURIComponent(probeSource[1] ?? ""));
+        return source === undefined ? gone() : Response.json(source satisfies ProbeSource);
       }
 
       if (url.pathname === "/v1/lattices" && request.method === "GET")

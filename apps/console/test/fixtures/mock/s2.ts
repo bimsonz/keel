@@ -474,8 +474,8 @@ export function generateS2(seed: number): GeneratedLog {
       kind: "precedent",
       parties: tenetId === undefined ? [changeH] : [changeH, tenetId],
       subjectId: p.subject,
+      subjectKey: SUBJECT_KEY,
       predicate: "freshness",
-      x: { summary: `${NUMBER_H} removes what guard G-1 protects, against Decision D-1` },
     },
     causation: derivedH,
   });
