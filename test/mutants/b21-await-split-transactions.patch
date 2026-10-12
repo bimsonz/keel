@@ -1,20 +1,20 @@
-# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/await-submission.test.ts
-# kills: b21.await-one-transaction
-# why: the read and the subscribe are separate transactions, so a submission between them is missed
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/await-submission.test.ts apps/keel/test/unit/await-plan.test.ts
+# kills: b21.await-one-transaction, b21.await-plan-one-transaction
+# why: the read and the subscribe are separate transactions, so a submission or a plan committed between them is missed
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 55d13c3..a8190f8 100644
+index 0cea15a..4b8af12 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -540,9 +540,12 @@ export const awaitSubmission: (
+@@ -562,9 +562,12 @@ const awaitChange = (
+       const projectId = heldWorkspace(store, changeId)?.projectId;
        if (projectId === undefined) return { _tag: "unprojected" } as const;
-       if (submissionStateOf(change)._tag !== "Unsubmitted")
-         return { _tag: "read", read: { change, projectId } } as const;
--      outbox.subscribe(subscriber, AWAIT_SUBMISSION_HEARS, changeRef(changeId), { once: true });
+       if (answered(change)) return { _tag: "read", read: { change, projectId } } as const;
+-      outbox.subscribe(subscriber, hears, changeRef(changeId), { once: true });
        return { _tag: "waiting" } as const;
      });
 +    if (found._tag === "waiting")
 +      store.transaction(() =>
-+        outbox.subscribe(subscriber, AWAIT_SUBMISSION_HEARS, changeRef(changeId), { once: true }),
++        outbox.subscribe(subscriber, hears, changeRef(changeId), { once: true }),
 +      );
      if (found._tag === "missing") return yield* notFound(changeId);
      if (found._tag === "unprojected")

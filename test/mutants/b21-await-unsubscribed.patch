@@ -1,15 +1,15 @@
-# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/await-submission.test.ts
-# kills: b21.await-submission
-# why: a waiting Probe is never told when the change submits
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/await-submission.test.ts apps/keel/test/pool/await-plan.test.ts
+# kills: b21.await-submission, b21.await-plan
+# why: a waiting Workflow instance is never told when the change submits or its plan compiles
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 55d13c3..78599a3 100644
+index 0cea15a..53f8da1 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -540,7 +540,6 @@ export const awaitSubmission: (
+@@ -562,7 +562,6 @@ const awaitChange = (
+       const projectId = heldWorkspace(store, changeId)?.projectId;
        if (projectId === undefined) return { _tag: "unprojected" } as const;
-       if (submissionStateOf(change)._tag !== "Unsubmitted")
-         return { _tag: "read", read: { change, projectId } } as const;
--      outbox.subscribe(subscriber, AWAIT_SUBMISSION_HEARS, changeRef(changeId), { once: true });
+       if (answered(change)) return { _tag: "read", read: { change, projectId } } as const;
+-      outbox.subscribe(subscriber, hears, changeRef(changeId), { once: true });
        return { _tag: "waiting" } as const;
      });
      if (found._tag === "missing") return yield* notFound(changeId);

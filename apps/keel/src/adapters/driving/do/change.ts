@@ -1,6 +1,7 @@
 import {
   abandon,
   adopt,
+  awaitPlan,
   awaitSubmission,
   CHANGE_WORKSPACE,
   changeRead,
@@ -33,6 +34,7 @@ import {
 import {
   AbandonCommand,
   AdoptCommand,
+  AwaitPlanCommand,
   AwaitSubmissionCommand,
   ChangeCodecs,
   type ChangeRpc,
@@ -142,6 +144,14 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
       Effect.flatMap(({ subscriber }) => awaitSubmission(changeId, subscriber)),
     );
     return this.answer(ChangeCodecs.awaitSubmission, program);
+  }
+
+  async awaitPlan(command: typeof AwaitPlanCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(AwaitPlanCommand, command).pipe(
+      Effect.flatMap(({ subscriber }) => awaitPlan(changeId, subscriber)),
+    );
+    return this.answer(ChangeCodecs.awaitPlan, program);
   }
 
   async submit(command: typeof SubmitCommand.Encoded) {

@@ -111,6 +111,10 @@ export const AwaitSubmissionCommand = Schema.Struct({
 });
 export type AwaitSubmissionCommand = typeof AwaitSubmissionCommand.Type;
 
+/** A Workflow instance to tell, once, of the event that ends the change's Precheck: `workflow:<Name>/<instanceId>`. */
+export const AwaitPlanCommand = AwaitSubmissionCommand;
+export type AwaitPlanCommand = typeof AwaitPlanCommand.Type;
+
 /** Who may withdraw a change: the holder of its lease, or an operator (a parked change, say). */
 export const WithdrawAuthority = Schema.Union([
   Schema.TaggedStruct("Lease", { leaseId: LeaseId }),
@@ -241,15 +245,16 @@ const Mutation = Schema.Union([
   IdempotencyConflict,
 ]);
 
+/** A wait's answer: the change with its project, or `waiting` with the subscriber recorded. */
+const AwaitedChange = Schema.Union([
+  Schema.Struct({ change: Change, projectId: ProjectId }),
+  Schema.Struct({ waiting: Schema.Literal(true) }),
+]);
+
 export const ChangeCodecs = {
   get: exitCodec(Schema.Struct({ change: Change, projectId: ProjectId }), ChangeNotFound),
-  awaitSubmission: exitCodec(
-    Schema.Union([
-      Schema.Struct({ change: Change, projectId: ProjectId }),
-      Schema.Struct({ waiting: Schema.Literal(true) }),
-    ]),
-    ChangeNotFound,
-  ),
+  awaitSubmission: exitCodec(AwaitedChange, ChangeNotFound),
+  awaitPlan: exitCodec(AwaitedChange, ChangeNotFound),
   declare: exitCodec(
     Schema.Struct({ change: Change, preflight: Preflight, grant: WorkspaceGrant }),
     Schema.Union([ChangeStateRefused, PoolExhausted, SketchNotFound, IdempotencyConflict]),
@@ -344,6 +349,14 @@ export interface ChangeRpc extends EventReceiverRpc {
    * ChangeSubmitted, ChangeWithdrawn or ChangeSuperseded.
    */
   awaitSubmission(command: typeof AwaitSubmissionCommand.Encoded): Promise<ExitJson>;
+  /**
+   * For KeelWorldCheck: the change and its project unless its Precheck is
+   * still to answer (it is submitted or deriving); then `{waiting: true}`,
+   * with the subscriber subscribed once, in the same transaction, to its
+   * next PlanCompiled, ChangeDrifted, ChangeBounced, ChangeWithdrawn or
+   * ChangeSuperseded.
+   */
+  awaitPlan(command: typeof AwaitPlanCommand.Encoded): Promise<ExitJson>;
   /** The change's workspace, base and project, for Precheck's diff. ChangeStateRefused when it holds no workspace. */
   workspace(): Promise<ExitJson>;
   precheckStarted(command: typeof PrecheckStartedCommand.Encoded): Promise<ExitJson>;

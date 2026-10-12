@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/await-plan.test.ts
+# kills: b21.await-plan
+# why: the Change DO answers awaitPlan with the submission's wait: a change that submitted reads as answered while its Precheck runs
+diff --git a/apps/keel/src/adapters/driving/do/change.ts b/apps/keel/src/adapters/driving/do/change.ts
+index d7b1bb2..be97418 100644
+--- a/apps/keel/src/adapters/driving/do/change.ts
++++ b/apps/keel/src/adapters/driving/do/change.ts
+@@ -149,7 +149,7 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
+   async awaitPlan(command: typeof AwaitPlanCommand.Encoded) {
+     const changeId = this.changeId;
+     const program = decoded(AwaitPlanCommand, command).pipe(
+-      Effect.flatMap(({ subscriber }) => awaitPlan(changeId, subscriber)),
++      Effect.flatMap(({ subscriber }) => awaitSubmission(changeId, subscriber)),
+     );
+     return this.answer(ChangeCodecs.awaitPlan, program);
+   }

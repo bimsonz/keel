@@ -1,16 +1,16 @@
-# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/await-submission.test.ts
-# kills: b21.await-submission
-# why: the Probe's subscription outlives its first event and hears every later submission
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/await-submission.test.ts apps/keel/test/pool/await-plan.test.ts
+# kills: b21.await-submission, b21.await-plan
+# why: a waiter's subscription outlives its first event and hears every later one on the change
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 55d13c3..c3840b6 100644
+index 0cea15a..120c213 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -540,7 +540,7 @@ export const awaitSubmission: (
+@@ -562,7 +562,7 @@ const awaitChange = (
+       const projectId = heldWorkspace(store, changeId)?.projectId;
        if (projectId === undefined) return { _tag: "unprojected" } as const;
-       if (submissionStateOf(change)._tag !== "Unsubmitted")
-         return { _tag: "read", read: { change, projectId } } as const;
--      outbox.subscribe(subscriber, AWAIT_SUBMISSION_HEARS, changeRef(changeId), { once: true });
-+      outbox.subscribe(subscriber, AWAIT_SUBMISSION_HEARS, changeRef(changeId));
+       if (answered(change)) return { _tag: "read", read: { change, projectId } } as const;
+-      outbox.subscribe(subscriber, hears, changeRef(changeId), { once: true });
++      outbox.subscribe(subscriber, hears, changeRef(changeId));
        return { _tag: "waiting" } as const;
      });
      if (found._tag === "missing") return yield* notFound(changeId);

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/await-plan.test.ts
+# kills: b21.await-plan
+# why: PrecheckStarted spends the waiter's one event, so the plan that follows tells nobody
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 0cea15a..c6cb362 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -529,6 +529,7 @@ export const AWAIT_SUBMISSION_HEARS = [
+  * not here: they would spend the waiter's one event before the plan.
+  */
+ export const AWAIT_PLAN_HEARS = [
++  "PrecheckStarted",
+   "PlanCompiled",
+   "ChangeDrifted",
+   "ChangeBounced",

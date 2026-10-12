@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/await-plan.test.ts
+# kills: b21.await-plan-agrees
+# why: a change no plan is coming for (not submitted, bounced, ended) leaves KeelWorldCheck waiting for an event that never comes
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 0cea15a..bb83f04 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -608,7 +608,7 @@ export const awaitPlan: (
+   awaitChange(
+     changeId,
+     subscriber,
+-    (change) => planStateOf(change)._tag !== "Pending",
++    (change) => planStateOf(change)._tag === "Compiled",
+     AWAIT_PLAN_HEARS,
+   ),
+ );

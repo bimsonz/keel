@@ -85,7 +85,7 @@ import {
   type WorkspaceGrant,
   WorkspaceRebaser,
 } from "../ports/index.ts";
-import { submissionStateOf } from "../verification/index.ts";
+import { planStateOf, submissionStateOf } from "../verification/index.ts";
 import { subjectIdOf } from "./hashed-id.ts";
 import { blockersOf, hearConflict, partyConflictOf, policyFor } from "./party-conflicts.ts";
 import { preflightFor } from "./preflight.ts";
@@ -523,25 +523,37 @@ export const AWAIT_SUBMISSION_HEARS = [
   "ChangeSuperseded",
 ] as const;
 
-/** `awaitSubmission`'s answer when there is nothing to read yet: the subscriber will be told. */
-export interface AwaitingSubmission {
+/**
+ * What a waiter on a change's plan hears, once: whichever event ends its
+ * Precheck. PrecheckStarted and EffectsDerived leave it running, so they are
+ * not here: they would spend the waiter's one event before the plan.
+ */
+export const AWAIT_PLAN_HEARS = [
+  "PlanCompiled",
+  "ChangeDrifted",
+  "ChangeBounced",
+  "ChangeWithdrawn",
+  "ChangeSuperseded",
+] as const;
+
+/** A wait's answer when there is nothing to read yet: the subscriber will be told. */
+export interface Awaiting {
   readonly waiting: true;
 }
 
 /**
- * The change with its project when `submissionStateOf` reads anything but
- * Unsubmitted from it: a current submission, its landing, or its end.
- * Otherwise `waiting`, with `subscriber` subscribed once, in the same
- * transaction as the read, to the change's next ChangeSubmitted,
- * ChangeWithdrawn or ChangeSuperseded: whatever commits after this read
- * notifies it, so nothing falls between a read and a subscribe. The Probe
- * reads the answer with the same rule, so it never waits unsubscribed.
+ * The change with its project once `answered` reads it as settled. Otherwise
+ * `waiting`, with `subscriber` subscribed once, in the same transaction as
+ * the read, to the change's next event among `hears`: whatever commits after
+ * this read notifies it, so nothing falls between a read and a subscribe.
  */
-export const awaitSubmission: (
+const awaitChange = (
   changeId: ChangeId,
   subscriber: Subscriber,
-) => Effect.Effect<ChangeRead | AwaitingSubmission, ChangeNotFound, EntityStore | EventOutbox> =
-  Effect.fn("coordination/awaitSubmission")(function* (changeId: ChangeId, subscriber: Subscriber) {
+  answered: (change: Change) => boolean,
+  hears: readonly string[],
+): Effect.Effect<ChangeRead | Awaiting, ChangeNotFound, EntityStore | EventOutbox> =>
+  Effect.gen(function* () {
     const store = yield* EntityStore;
     const outbox = yield* EventOutbox;
     const found = store.transaction(() => {
@@ -549,9 +561,8 @@ export const awaitSubmission: (
       if (change === undefined) return { _tag: "missing" } as const;
       const projectId = heldWorkspace(store, changeId)?.projectId;
       if (projectId === undefined) return { _tag: "unprojected" } as const;
-      if (submissionStateOf(change)._tag !== "Unsubmitted")
-        return { _tag: "read", read: { change, projectId } } as const;
-      outbox.subscribe(subscriber, AWAIT_SUBMISSION_HEARS, changeRef(changeId), { once: true });
+      if (answered(change)) return { _tag: "read", read: { change, projectId } } as const;
+      outbox.subscribe(subscriber, hears, changeRef(changeId), { once: true });
       return { _tag: "waiting" } as const;
     });
     if (found._tag === "missing") return yield* notFound(changeId);
@@ -559,6 +570,48 @@ export const awaitSubmission: (
       return yield* Effect.die(`${changeId} has no project recorded`);
     return found._tag === "read" ? found.read : ({ waiting: true } as const);
   });
+
+/**
+ * The change with its project when `submissionStateOf` reads anything but
+ * Unsubmitted from it: a current submission, its landing, or its end.
+ * Otherwise `waiting`, with `subscriber` told once of its next
+ * ChangeSubmitted, ChangeWithdrawn or ChangeSuperseded. The Probe reads the
+ * answer with the same rule, so it never waits unsubscribed.
+ */
+export const awaitSubmission: (
+  changeId: ChangeId,
+  subscriber: Subscriber,
+) => Effect.Effect<ChangeRead | Awaiting, ChangeNotFound, EntityStore | EventOutbox> = Effect.fn(
+  "coordination/awaitSubmission",
+)((changeId: ChangeId, subscriber: Subscriber) =>
+  awaitChange(
+    changeId,
+    subscriber,
+    (change) => submissionStateOf(change)._tag !== "Unsubmitted",
+    AWAIT_SUBMISSION_HEARS,
+  ),
+);
+
+/**
+ * The change with its project when `planStateOf` reads anything but Pending
+ * from it: its current submission's plan, or a state no plan is coming in.
+ * Otherwise `waiting`, with `subscriber` told once of the event that ends its
+ * Precheck (`AWAIT_PLAN_HEARS`). KeelWorldCheck reads the answer with the
+ * same rule, so it never waits unsubscribed.
+ */
+export const awaitPlan: (
+  changeId: ChangeId,
+  subscriber: Subscriber,
+) => Effect.Effect<ChangeRead | Awaiting, ChangeNotFound, EntityStore | EventOutbox> = Effect.fn(
+  "coordination/awaitPlan",
+)((changeId: ChangeId, subscriber: Subscriber) =>
+  awaitChange(
+    changeId,
+    subscriber,
+    (change) => planStateOf(change)._tag !== "Pending",
+    AWAIT_PLAN_HEARS,
+  ),
+);
 
 /**
  * The remedy still owed on a change, from its log: its latest ChangeBounced
