@@ -6,7 +6,6 @@
 //
 // FC_NUM_RUNS sets the number of cases (300 by default) and FC_SEED pins them.
 
-import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,7 +13,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { enc, toHex } from "../src/bytes.ts";
 import { diffLines, type Hunk, Unsure } from "../src/histogram.ts";
 import { mergeText, type TextRefusal } from "../src/merge-text.ts";
-import { GIT_ENV, oracleGit } from "./git-harness.ts";
+import { gitSync, oracleGit } from "./git-harness.ts";
 import { fc, PROPERTY_TIMEOUT } from "./support/fast-check.ts";
 import { changelogArb, threeWayArb } from "./text-gen.ts";
 
@@ -38,11 +37,9 @@ function gitMergeFile(
   writeFileSync(join(dir, "base"), base);
   writeFileSync(join(dir, "ours"), ours);
   writeFileSync(join(dir, "theirs"), theirs);
-  const r = spawnSync(
-    "git",
-    ["merge-file", "-p", "--diff-algorithm=histogram", "ours", "base", "theirs"],
-    { cwd: dir, env: GIT_ENV },
-  );
+  const r = gitSync(["merge-file", "-p", "--diff-algorithm=histogram", "ours", "base", "theirs"], {
+    cwd: dir,
+  });
   rmSync(dir, { recursive: true, force: true });
   if (r.status === null || r.status < 0 || r.status > 127)
     throw new Error(`git merge-file failed (${r.status}): ${r.stderr.toString()}`);

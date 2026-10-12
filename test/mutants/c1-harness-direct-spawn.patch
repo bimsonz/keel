@@ -1,0 +1,24 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/git-harness.test.ts
+# kills: harness.one-door
+# why: a test spawns git itself again, past the harness and its timeout
+diff --git a/packages/gitcore/test/fetch.test.ts b/packages/gitcore/test/fetch.test.ts
+index 7899fc7..d1ad969 100644
+--- a/packages/gitcore/test/fetch.test.ts
++++ b/packages/gitcore/test/fetch.test.ts
+@@ -2,6 +2,7 @@
+ // on a source bare repo, and pushes to `git receive-pack --stateless-rpc` on a
+ // target, as Keel's sync copies trunk into staging and the mirror.
+ 
++import { spawnSync } from "node:child_process";
+ import { afterAll, describe, expect, it } from "vitest";
+ import { dec } from "../src/bytes.ts";
+ import { PackTooLarge, relay, uploadPack } from "../src/fetch.ts";
+@@ -41,7 +42,7 @@ function commitFile(dir: string, path: string, content: string, parent?: string)
+ }
+ 
+ const headOf = (dir: string): string | null => {
+-  const run = gitSync(["rev-parse", "--verify", "-q", MAIN], { cwd: dir });
++  const run = spawnSync("git", ["rev-parse", "--verify", "-q", MAIN], { cwd: dir });
+   return run.status === 0 ? run.stdout.toString().trim() : null;
+ };
+ 

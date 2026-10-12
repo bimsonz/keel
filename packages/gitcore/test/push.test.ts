@@ -2,7 +2,6 @@
 // --stateless-rpc` on a local bare repo, which checks each update's old id
 // the way a smart-HTTP server does.
 
-import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -11,7 +10,7 @@ import { encodeCommit, encodeTree, type GitObject, hashObject } from "../src/obj
 import { writePack } from "../src/pack-write.ts";
 import { BUSY, FLUSH, type GitRemote, pkt, receivePack } from "../src/push.ts";
 import { PROPERTY_TIMEOUT } from "./support/fast-check.ts";
-import { GIT_ENV, tempRepo } from "./git-harness.ts";
+import { gitSync, tempRepo } from "./git-harness.ts";
 
 const repo = tempRepo();
 afterAll(() => repo.cleanup());
@@ -19,10 +18,7 @@ afterAll(() => repo.cleanup());
 /** A fetch that answers receive-pack requests from the bare repo, as a smart-HTTP server would. */
 const localGit: typeof fetch = async (_url, init) => {
   const body = new Uint8Array(await new Response(init?.body).arrayBuffer());
-  const run = spawnSync("git", ["receive-pack", "--stateless-rpc", repo.dir], {
-    env: GIT_ENV,
-    input: body,
-  });
+  const run = gitSync(["receive-pack", "--stateless-rpc", repo.dir], { input: body });
   if (run.status !== 0) return new Response(run.stderr, { status: 500 });
   return new Response(new Uint8Array(run.stdout), { status: 200 });
 };
@@ -54,10 +50,7 @@ async function commit(
 }
 
 const refOf = (ref: string) => {
-  const run = spawnSync("git", ["rev-parse", "--verify", "-q", ref], {
-    cwd: repo.dir,
-    env: GIT_ENV,
-  });
+  const run = gitSync(["rev-parse", "--verify", "-q", ref], { cwd: repo.dir });
   return run.status === 0 ? run.stdout.toString().trim() : null;
 };
 
@@ -66,7 +59,7 @@ describe("receive-pack push", { timeout: PROPERTY_TIMEOUT }, () => {
     const { objects } = await commit("packed\n");
     const path = join(repo.dir, "check.pack");
     writeFileSync(path, await writePack(objects));
-    const run = spawnSync("git", ["index-pack", "--strict", path], { cwd: repo.dir, env: GIT_ENV });
+    const run = gitSync(["index-pack", "--strict", path], { cwd: repo.dir });
     expect(run.stderr.toString()).toBe("");
     expect(run.stdout.toString().trim()).toMatch(/^[0-9a-f]{40}$/);
   });

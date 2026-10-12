@@ -6,7 +6,6 @@
 //
 // FC_NUM_RUNS sets the number of batches (50 by default) and FC_SEED pins them.
 
-import { spawnSync } from "node:child_process";
 import { afterAll, describe, expect, it } from "vitest";
 import { ZERO_OID } from "../src/bytes.ts";
 import { FallbackReader, MemberRefused, type RestackMember, restack } from "../src/compose.ts";
@@ -20,8 +19,8 @@ import {
   type CommitPlan,
   fastImport,
   git,
-  GIT_ENV,
   gitMergeTree,
+  gitSync,
   smartHttp,
   oracleGit,
   tempRepo,
@@ -81,8 +80,7 @@ async function pushTo(
   );
 }
 
-const run = (dir: string, args: string[]) =>
-  spawnSync("git", args, { cwd: dir, env: GIT_ENV, maxBuffer: 1 << 28 });
+const run = (dir: string, args: string[]) => gitSync(args, { cwd: dir });
 
 /** Every object `tip` reaches that the repo lacks, as rev-list prints them. */
 const missing = (dir: string, tip: string) =>

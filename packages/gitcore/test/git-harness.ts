@@ -2,12 +2,7 @@
 // --batch` object reader for gitcore, and a fast-import writer for generated
 // histories.
 
-import {
-  type ChildProcessWithoutNullStreams,
-  execFileSync,
-  spawn,
-  spawnSync,
-} from "node:child_process";
+import { type ChildProcessWithoutNullStreams, spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,8 +21,69 @@ export const GIT_ENV = {
   GIT_COMMITTER_DATE: "1700000000 +0000",
 };
 
+/** No synchronous git call may outlast this: a hung child fails its case instead of holding a worker. */
+export const GIT_TIMEOUT_MS = 120_000;
+
+/** A git child that outlived its timeout and was killed by the harness: a failed case, never a crash of git's. */
+export class GitTimedOut extends Error {
+  constructor(
+    readonly subcommand: string,
+    readonly timeoutMs: number,
+  ) {
+    super(`git ${subcommand} timed out after ${timeoutMs} ms and was killed`);
+    this.name = "GitTimedOut";
+  }
+}
+
+export interface GitSyncOptions {
+  readonly cwd?: string | undefined;
+  readonly input?: string | Uint8Array | undefined;
+  readonly maxBuffer?: number | undefined;
+  readonly timeoutMs?: number | undefined;
+}
+
+/** The subcommand of a git command line, past its `-c key=value` pairs and flags. */
+const subcommandOf = (args: readonly string[]): string => {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] ?? "";
+    if (arg === "-c") i++;
+    else if (!arg.startsWith("-")) return arg;
+  }
+  return args.join(" ");
+};
+
+/**
+ * The one door to a synchronous git child, for every test here. The child is
+ * killed at its timeout and the call throws GitTimedOut; any other failure to
+ * run it (git missing, more output than `maxBuffer`) throws too. What comes
+ * back is a git that ran to its own end: an exit status, or the signal it
+ * died on by itself.
+ */
+export function gitSync(args: string[], opts: GitSyncOptions = {}) {
+  const timeoutMs = opts.timeoutMs ?? GIT_TIMEOUT_MS;
+  const run = spawnSync("git", args, {
+    cwd: opts.cwd,
+    env: GIT_ENV,
+    input: opts.input,
+    maxBuffer: opts.maxBuffer ?? 1 << 28,
+    timeout: timeoutMs,
+    killSignal: "SIGKILL",
+  });
+  if (run.error !== undefined) {
+    if ("code" in run.error && run.error.code === "ETIMEDOUT")
+      throw new GitTimedOut(subcommandOf(args), timeoutMs);
+    throw run.error;
+  }
+  return run;
+}
+
 export function git(cwd: string, args: string[], input?: string | Uint8Array): string {
-  return execFileSync("git", args, { cwd, env: GIT_ENV, input, maxBuffer: 1 << 28 }).toString();
+  const run = gitSync(args, { cwd, input });
+  if (run.status !== 0)
+    throw new Error(
+      `git ${args.join(" ")} failed (${run.status ?? run.signal}): ${run.stderr.toString()}`,
+    );
+  return run.stdout.toString();
 }
 
 /** The gits GitCore's merges are proven against: 2.50.1 (histogram as through 2.53) and 2.55.0 (2.54 on re-diffs groups compaction moved). */
@@ -41,7 +97,7 @@ export interface OracleGit {
 
 /** Reads `git --version` once and refuses a git the differentials were never proven against. */
 export function oracleGit(): OracleGit {
-  const version = execFileSync("git", ["--version"], { env: GIT_ENV }).toString().trim();
+  const version = git(process.cwd(), ["--version"]).trim();
   const [major = 0, minor = 0] = (/(\d+)\.(\d+)/.exec(version) ?? []).slice(1).map(Number);
   const at = major * 1000 + minor;
   const { from, to } = ORACLE_RANGE;
@@ -78,8 +134,7 @@ export function smartHttp(repos: Readonly<Record<string, string>>) {
     if (dir === undefined || service === undefined)
       return new Response("no such repo", { status: 404 });
     const body = new Uint8Array(await new Response(init?.body).arrayBuffer());
-    const run = spawnSync("git", [service.slice("git-".length), "--stateless-rpc", dir], {
-      env: GIT_ENV,
+    const run = gitSync([service.slice("git-".length), "--stateless-rpc", dir], {
       input: body,
       maxBuffer: 1 << 30,
     });
@@ -204,9 +259,8 @@ export function fastImport(dir: string, commits: CommitPlan[]): Map<number, stri
     w("\n");
   }
   const marksFile = join(dir, `marks-${process.pid}-${Math.random().toString(36).slice(2)}`);
-  const r = spawnSync("git", ["fast-import", "--quiet", "--force", `--export-marks=${marksFile}`], {
+  const r = gitSync(["fast-import", "--quiet", "--force", `--export-marks=${marksFile}`], {
     cwd: dir,
-    env: GIT_ENV,
     input: Buffer.concat(chunks),
   });
   if (r.status !== 0) throw new Error(`fast-import failed: ${r.stderr.toString()}`);
@@ -244,11 +298,8 @@ export function gitMergeTree(
   mergeBase?: string,
 ): GitMerge {
   const base = mergeBase === undefined ? [] : [`--merge-base=${mergeBase}`];
-  const r = spawnSync("git", ["merge-tree", "--write-tree", ...base, ours, theirs], {
-    cwd: dir,
-    env: GIT_ENV,
-  });
-  if (r.error === undefined && r.status === null && r.signal !== null)
+  const r = gitSync(["merge-tree", "--write-tree", ...base, ours, theirs], { cwd: dir });
+  if (r.status === null && r.signal !== null)
     return { outcome: "crashed", signal: r.signal, stderr: r.stderr.toString() };
   if (r.status !== 0 && r.status !== 1)
     throw new Error(`merge-tree failed (${r.status}): ${r.stderr.toString()}`);

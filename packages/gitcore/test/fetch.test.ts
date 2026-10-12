@@ -2,12 +2,11 @@
 // on a source bare repo, and pushes to `git receive-pack --stateless-rpc` on a
 // target, as Keel's sync copies trunk into staging and the mirror.
 
-import { spawnSync } from "node:child_process";
 import { afterAll, describe, expect, it } from "vitest";
 import { dec } from "../src/bytes.ts";
 import { PackTooLarge, relay, uploadPack } from "../src/fetch.ts";
 import type { GitRemote } from "../src/push.ts";
-import { git, GIT_ENV, smartHttp, tempRepo } from "./git-harness.ts";
+import { git, gitSync, smartHttp, tempRepo } from "./git-harness.ts";
 import { PROPERTY_TIMEOUT } from "./support/fast-check.ts";
 
 const repos = { source: tempRepo(), target: tempRepo() };
@@ -42,13 +41,13 @@ function commitFile(dir: string, path: string, content: string, parent?: string)
 }
 
 const headOf = (dir: string): string | null => {
-  const run = spawnSync("git", ["rev-parse", "--verify", "-q", MAIN], { cwd: dir, env: GIT_ENV });
+  const run = gitSync(["rev-parse", "--verify", "-q", MAIN], { cwd: dir });
   return run.status === 0 ? run.stdout.toString().trim() : null;
 };
 
 /** The target holds every object the commit reaches, not just the ref. */
 const connected = (dir: string, sha: string) =>
-  spawnSync("git", ["rev-list", "--objects", "--missing=print", sha], { cwd: dir, env: GIT_ENV })
+  gitSync(["rev-list", "--objects", "--missing=print", sha], { cwd: dir })
     .stdout.toString()
     .split("\n")
     .filter((line) => line.startsWith("?"));

@@ -4,11 +4,10 @@
 //
 // FC_NUM_RUNS sets the number of histories (300 by default) and FC_SEED pins them.
 
-import { spawnSync } from "node:child_process";
 import { afterAll, describe, expect, it } from "vitest";
 import { diffTrees, type TreeChange } from "../src/diff.ts";
 import { historyArb, sides } from "./gen.ts";
-import { CatFileReader, fastImport, GIT_ENV, tempRepo } from "./git-harness.ts";
+import { CatFileReader, fastImport, gitSync, tempRepo } from "./git-harness.ts";
 import { fc } from "./support/fast-check.ts";
 
 /** Each history spawns git a few times: a second per case, so a machine at load ~230 still finishes 300 cases. */
@@ -31,9 +30,8 @@ const STATUS: Record<string, TreeChange["change"]> = {
 
 /** `git diff-tree -r -z` output as rows: ":<old mode> <new mode> <old id> <new id> <status>\0<path>\0" per change. */
 function gitDiff(oldTree: string, newTree: string): TreeChange[] {
-  const run = spawnSync("git", ["diff-tree", "-r", "-z", "--no-renames", oldTree, newTree], {
+  const run = gitSync(["diff-tree", "-r", "-z", "--no-renames", oldTree, newTree], {
     cwd: repo.dir,
-    env: GIT_ENV,
   });
   if (run.status !== 0)
     throw new Error(`git diff-tree failed (${run.status}): ${run.stderr.toString()}`);
@@ -68,7 +66,7 @@ const canonical = (rows: readonly TreeChange[]) =>
 
 describe("diffTrees against git diff-tree -r", () => {
   it("has a git binary to compare against", () => {
-    const version = spawnSync("git", ["--version"], { env: GIT_ENV });
+    const version = gitSync(["--version"]);
     expect(version.status).toBe(0);
     expect(version.stdout.toString()).toMatch(/^git version \d+\.\d+/);
   });

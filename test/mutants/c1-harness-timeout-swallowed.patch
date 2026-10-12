@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/git-harness.test.ts
+# kills: harness.timeout
+# why: a child killed at its timeout is handed back like one that ran: no status and a signal, the shape of a git crash
+diff --git a/packages/gitcore/test/git-harness.ts b/packages/gitcore/test/git-harness.ts
+index ebe42f5..59d9c02 100644
+--- a/packages/gitcore/test/git-harness.ts
++++ b/packages/gitcore/test/git-harness.ts
+@@ -71,7 +71,7 @@ export function gitSync(args: string[], opts: GitSyncOptions = {}) {
+   });
+   if (run.error !== undefined) {
+     if ("code" in run.error && run.error.code === "ETIMEDOUT")
+-      throw new GitTimedOut(subcommandOf(args), timeoutMs);
++      return run;
+     throw run.error;
+   }
+   return run;

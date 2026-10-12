@@ -6,14 +6,13 @@
 //
 // FC_NUM_RUNS sets the number of histories (50 by default) and FC_SEED pins them.
 
-import { spawnSync } from "node:child_process";
 import { afterAll, describe, expect, it } from "vitest";
 import { encodeCommit, hashObject } from "../src/objects.ts";
 import { writePack } from "../src/pack-write.ts";
 import { receivePack } from "../src/push.ts";
 import { objectsBetween } from "../src/transfer.ts";
 import { historyArb, planCase } from "./gen.ts";
-import { CatFileReader, fastImport, git, GIT_ENV, smartHttp, tempRepo } from "./git-harness.ts";
+import { CatFileReader, fastImport, git, gitSync, smartHttp, tempRepo } from "./git-harness.ts";
 import { fc, PROPERTY_TIMEOUT } from "./support/fast-check.ts";
 
 const RUNS = Number(process.env["FC_NUM_RUNS"] ?? 50);
@@ -67,9 +66,8 @@ describe("objectsBetween", { timeout: PROPERTY_TIMEOUT }, () => {
               await writePack([...objects, { type: "commit", body }]),
             );
             expect(outcome).toEqual({ kind: "applied" });
-            const missing = spawnSync("git", ["rev-list", "--objects", "--missing=print", commit], {
+            const missing = gitSync(["rev-list", "--objects", "--missing=print", commit], {
               cwd: target.dir,
-              env: GIT_ENV,
             })
               .stdout.toString()
               .split("\n")

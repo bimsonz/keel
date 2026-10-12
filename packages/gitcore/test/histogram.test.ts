@@ -10,14 +10,13 @@
 //
 // FC_NUM_RUNS sets the number of pairs (300 by default) and FC_SEED pins them.
 
-import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { enc } from "../src/bytes.ts";
 import { diffLines, type Hunk, type Reach, type ReachingHunk, Unsure } from "../src/histogram.ts";
-import { GIT_ENV, oracleGit } from "./git-harness.ts";
+import { gitSync, oracleGit } from "./git-harness.ts";
 import { fc, PROPERTY_TIMEOUT } from "./support/fast-check.ts";
 import { pairArb } from "./text-gen.ts";
 
@@ -39,10 +38,9 @@ function gitHunks(a: Uint8Array, b: Uint8Array): Hunk[] {
   mkdirSync(dir);
   writeFileSync(join(dir, "a"), a);
   writeFileSync(join(dir, "b"), b);
-  const r = spawnSync(
-    "git",
+  const r = gitSync(
     ["diff", "--no-index", "--no-renames", "--histogram", "--no-indent-heuristic", "-U0", "a", "b"],
-    { cwd: dir, env: GIT_ENV },
+    { cwd: dir },
   );
   rmSync(dir, { recursive: true, force: true });
   if (r.status !== 0 && r.status !== 1)

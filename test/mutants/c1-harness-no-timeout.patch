@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/gitcore/test/git-harness.test.ts
+# kills: harness.timeout
+# why: the git child is given no timeout: a hung git holds its worker until someone kills it
+diff --git a/packages/gitcore/test/git-harness.ts b/packages/gitcore/test/git-harness.ts
+index ebe42f5..32b09d7 100644
+--- a/packages/gitcore/test/git-harness.ts
++++ b/packages/gitcore/test/git-harness.ts
+@@ -66,7 +66,6 @@ export function gitSync(args: string[], opts: GitSyncOptions = {}) {
+     env: GIT_ENV,
+     input: opts.input,
+     maxBuffer: opts.maxBuffer ?? 1 << 28,
+-    timeout: timeoutMs,
+     killSignal: "SIGKILL",
+   });
+   if (run.error !== undefined) {
