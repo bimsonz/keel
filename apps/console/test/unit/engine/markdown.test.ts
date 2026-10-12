@@ -101,4 +101,33 @@ describe("reading a README", () => {
     expect(blocks[1]?.kind === "quote" && text(blocks[1].of)).toBe("said once and again");
     expect(blocks[3]).toMatchObject({ kind: "heading", level: 6 });
   });
+
+  it("[markdown.table] reads a table as its head and its rows, cell by cell", () => {
+    const blocks = markdown(
+      "Before.\n\n| Data | Kept until |\n|---|:--|\n| Sessions, with **IP address** | You sign out |\n| Sign-in codes |\n| One | two | three |\n\nAfter.",
+    );
+    expect(blocks.map((block) => block.kind)).toEqual(["paragraph", "table", "paragraph"]);
+    const table = blocks[1];
+    // Every row is as wide as the head: a short one is filled out, and what runs past the head is left off.
+    expect(
+      table?.kind === "table" && [table.head.map(text), table.rows.map((row) => row.map(text))],
+    ).toEqual([
+      ["Data", "Kept until"],
+      [
+        ["Sessions, with IP address", "You sign out"],
+        ["Sign-in codes", ""],
+        ["One", "two"],
+      ],
+    ]);
+    // A cell is read as any other text is.
+    expect(table?.kind === "table" && table.rows[0]?.[0]?.map((part) => part.kind)).toEqual([
+      "text",
+      "strong",
+    ]);
+  });
+
+  it("[markdown.table-rule] reads lines with bars as a table only where the rule under the head says it is one", () => {
+    expect(markdown("| a | b |\n| c | d |").map((block) => block.kind)).toEqual(["paragraph"]);
+    expect(markdown("| a | b |\n|---|---|").map((block) => block.kind)).toEqual(["table"]);
+  });
 });

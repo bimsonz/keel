@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/markdown.test.ts
+# kills: markdown.table-rule
+# why: any line that opens with a bar starts a table, with or without the rule under its head
+diff --git a/apps/console/src/engine/markdown.ts b/apps/console/src/engine/markdown.ts
+index d340d48..a6ccec8 100644
+--- a/apps/console/src/engine/markdown.ts
++++ b/apps/console/src/engine/markdown.ts
+@@ -110,7 +110,7 @@ export function markdown(source: string): Block[] {
+       continue;
+     }
+     // Lines of bars are a table only where the line under the first says so.
+-    if (ROW.test(line) && UNDER.test(lines[i + 1] ?? "")) {
++    if (ROW.test(line)) {
+       flush();
+       const head = cells(line);
+       const rows: string[][] = [];

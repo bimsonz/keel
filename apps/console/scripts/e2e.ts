@@ -7,6 +7,8 @@
 // process and answers the page's requests; behind it stands a stand-in for Keel.
 //
 //   node scripts/e2e.ts
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { type BrowserContext, type Page, chromium } from "playwright";
 import { build, preview } from "vite";
 import { type Identity, createIdentity } from "../test/fixtures/identity/standIn.ts";
@@ -2125,6 +2127,25 @@ expectEqual(
   "/orgs/lovelace Lovelace owner",
 );
 
+// The dropdown is offered once Keel has said which orgs the reader is in, and not before: opened sooner, it would
+// be a menu without them. Keel's answer is held back here to see that.
+let listOrgs = (): void => {};
+const listHeld = new Promise<void>((resolve) => {
+  listOrgs = resolve;
+});
+await person.route("**/v1/auth/organization/list", async (route) => {
+  await listHeld;
+  await route.fallback();
+});
+await person.reload({ waitUntil: "domcontentloaded" });
+await person.getByRole("heading", { level: 1, name: /^Lovelace/ }).waitFor();
+expectEqual(
+  "orgs: until Keel has listed the reader's orgs, no dropdown is offered beside the org's name",
+  String(await person.getByRole("button", { name: "Switch org" }).count()),
+  "0",
+);
+listOrgs();
+
 // Beside the org's name, the reader's other orgs, a click away: the same dropdown the project's name has.
 await person.getByRole("button", { name: "Switch org" }).click();
 await person.getByRole("menuitem", { name: "New org" }).waitFor();
@@ -2159,7 +2180,7 @@ await grace.waitForURL(`${built}/`);
 await person.goto(`${built}/orgs/lovelace/members`, { waitUntil: "domcontentloaded" });
 await person.getByLabel("Invite by handle").fill("nobody-here");
 await person.getByRole("button", { name: "Invite", exact: true }).click();
-await person.getByText("Nobody on this Keel has that handle").waitFor();
+await person.getByText('No one has the handle "nobody-here"').waitFor();
 await person.getByLabel("Invite by handle").fill("grace");
 await person.getByLabel("Role for the invitation").selectOption("maintainer");
 await person.getByRole("button", { name: "Invite", exact: true }).click();
@@ -2365,6 +2386,94 @@ expectEqual(
   "0",
 );
 await early.close();
+
+// ── The terms and the privacy notice ──
+// Anyone's to read, signed in or not. The text is the repository's own, built into the page: reading it asks
+// Keel nothing, and loads nothing from anywhere else.
+const readers = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+await withIdentity(readers, identity);
+const reading = watch(await readers.newPage(), "legal, a visitor");
+const fetched: string[] = [];
+reading.on("request", (request) => fetched.push(request.url()));
+const footOf = async (shown: Page): Promise<string> =>
+  (
+    await shown
+      .locator("footer a")
+      .evaluateAll((anchors) => anchors.map((anchor) => anchor.getAttribute("href")))
+  ).join(" ");
+for (const [which, title] of [
+  ["terms", "Terms of Service"],
+  ["privacy", "Privacy Notice"],
+] as const) {
+  const lines = readFileSync(
+    join(import.meta.dirname, "../../../docs/legal", `${which}.md`),
+    "utf8",
+  ).split("\n");
+  const sections = lines.filter((line) => line.startsWith("## ")).length;
+  // A table's lines, but for the rule under its head.
+  const rows = lines.filter((line) => line.startsWith("|") && !/^[|:\- ]+$/.test(line)).length;
+  fetched.length = 0;
+  await reading.goto(`${built}/${which}`, { waitUntil: "domcontentloaded" });
+  await reading
+    .locator("article h1")
+    .waitFor({ timeout: 10_000 })
+    .catch(() => {});
+  // Long enough for anything the page meant to ask for to have been asked for.
+  await reading.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
+  expectEqual(
+    `legal: /${which} is the whole document: its title, the day it was last changed, every section and every row of the file`,
+    `${squash((await reading.locator("article h1").allInnerTexts()).join(" "))} | ${squash((await reading.locator("article h1 + p").allInnerTexts()).join(" "))} | ${await reading.locator("article h2").count()} sections | ${await reading.locator("article tr").count()} rows`,
+    `${title} | ${lines.find((line) => line.startsWith("Last updated: ")) ?? ""} | ${sections} sections | ${rows} rows`,
+  );
+  expectEqual(
+    `legal: reading /${which} asks Keel nothing, and loads nothing from anywhere else`,
+    fetched
+      .filter(
+        (url) => !url.startsWith(`${built}/`) || /^\/(?:v1|api)\//.test(new URL(url).pathname),
+      )
+      .join(" "),
+    "",
+  );
+  expectEqual(
+    `legal: /${which} has the foot every page has`,
+    await footOf(reading),
+    "/terms /privacy",
+  );
+}
+await reading.goto(`${built}/signup`, { waitUntil: "domcontentloaded" });
+await reading.getByRole("heading", { name: "Create your account" }).waitFor();
+expectEqual(
+  "legal: the sign-up page says what creating an account agrees to, and links both documents",
+  `${squash((await reading.locator("[data-agreement]").allInnerTexts()).join(" "))} | ${(await reading.locator("[data-agreement] a").evaluateAll((anchors) => anchors.map((anchor) => anchor.getAttribute("href")))).join(" ")}`,
+  "By creating an account you agree to the Terms of Service and the Privacy Notice. | /terms /privacy",
+);
+expectEqual("legal: an account's page has the foot", await footOf(reading), "/terms /privacy");
+await reading.goto(`${built}/login`, { waitUntil: "domcontentloaded" });
+await reading.getByRole("heading", { name: "Sign in to Keel" }).waitFor();
+expectEqual(
+  "legal: signing in creates nothing, and its page says nothing of agreeing",
+  String(await reading.locator("[data-agreement]").count()),
+  "0",
+);
+// A project's page goes on listening to Keel, so the network there is never idle.
+await reading.goto(`${built}/demo`, { waitUntil: "domcontentloaded" });
+await reading
+  .locator("footer a")
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => {});
+expectEqual("legal: a project's page has the foot", await footOf(reading), "/terms /privacy");
+await reading
+  .locator("footer a", { hasText: "Privacy Notice" })
+  .click({ timeout: 5000 })
+  .catch(() => {});
+await reading.waitForURL("**/privacy", { timeout: 5000 }).catch(() => {});
+expectEqual(
+  "legal: and from there the foot leads to the document",
+  `${whereOf(reading)} ${squash((await reading.locator("article h1").allInnerTexts()).join(" "))}`,
+  "/privacy Privacy Notice",
+);
+await readers.close();
 
 await browser.close();
 await new Promise<void>((resolve) => {

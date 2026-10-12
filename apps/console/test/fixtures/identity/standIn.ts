@@ -58,6 +58,10 @@ export interface IdentityOptions {
 /** A passkey-first user has no address, so Better Auth is given one that can never receive mail (RFC 6761). */
 const PLACEHOLDER = "users.keel.invalid";
 
+/** A refusal as Keel words one: a 400 with a code and a sentence a person can read. */
+const refuse = (code: string, message: string): APIError =>
+  new APIError("BAD_REQUEST", { code, message });
+
 export function createIdentity(origin: string, options: IdentityOptions = {}): Identity {
   const emailCodes = options.emailCodes ?? true;
   const outbox: Sent[] = [];
@@ -75,16 +79,26 @@ export function createIdentity(origin: string, options: IdentityOptions = {}): I
         if (ctx.path !== "/organization/invite-member") return undefined;
         // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the body as it arrived, not yet checked
         const body = ctx.body as { handle?: unknown; email?: unknown };
-        if (typeof body.handle !== "string" || body.email !== undefined) return undefined;
+        // As Keel does it, in Keel's own words: an invitation names exactly one of a handle or an address, an
+        // address that can receive no mail is refused, and a handle stands for its user.
+        const toHandle = typeof body.handle === "string" && body.handle !== "";
+        const toEmail = typeof body.email === "string" && body.email !== "";
+        if (toHandle === toEmail)
+          throw refuse("INVITE_TARGET", "Invite by exactly one of a handle or an email address");
+        if (toEmail) {
+          if (/\.invalid$/i.test(String(body.email).trim()))
+            throw refuse(
+              "EMAIL_UNDELIVERABLE",
+              "That address can't receive mail, so no one could accept",
+            );
+          return undefined;
+        }
         const invited = await ctx.context.adapter.findOne<{ email: string }>({
           model: "user",
-          where: [{ field: "username", value: body.handle }],
+          where: [{ field: "username", value: String(body.handle).toLowerCase() }],
         });
         if (invited === null)
-          throw new APIError("BAD_REQUEST", {
-            code: "HANDLE_NOT_FOUND",
-            message: "Nobody on this Keel has that handle",
-          });
+          throw refuse("NO_SUCH_HANDLE", `No one has the handle "${String(body.handle)}"`);
         return { context: { ...ctx, body: { ...body, email: invited.email } } };
       }),
       // Keel's member answers carry each member's handle, which is how a code host shows a person. Their

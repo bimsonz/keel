@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/legal.test.ts
+# kills: legal.address
+# why: any address under /terms or /privacy is read as the document
+diff --git a/apps/console/src/legal/legal.ts b/apps/console/src/legal/legal.ts
+index 4da3052..b521573 100644
+--- a/apps/console/src/legal/legal.ts
++++ b/apps/console/src/legal/legal.ts
+@@ -11,5 +11,5 @@ export const LEGAL: Record<Legal, { title: string; href: string }> = {
+ /** The document an address is for: `/terms` or `/privacy`, and nothing under either. */
+ export function legalOf(pathname: string): Legal | null {
+   const [first, second] = pathname.split("/").filter((segment) => segment !== "");
+-  return second === undefined && (first === "terms" || first === "privacy") ? first : null;
++  return first === "terms" || first === "privacy" ? first : null;
+ }

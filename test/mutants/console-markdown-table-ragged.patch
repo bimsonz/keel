@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/markdown.test.ts
+# kills: markdown.table
+# why: a table's row has as many cells as its own line has, not as many as the head
+diff --git a/apps/console/src/engine/markdown.ts b/apps/console/src/engine/markdown.ts
+index d340d48..120579e 100644
+--- a/apps/console/src/engine/markdown.ts
++++ b/apps/console/src/engine/markdown.ts
+@@ -115,7 +115,7 @@ export function markdown(source: string): Block[] {
+       const head = cells(line);
+       const rows: string[][] = [];
+       for (i += 2; i < lines.length && ROW.test(lines[i] ?? ""); i += 1)
+-        rows.push(head.map((_, column) => cells(lines[i] ?? "")[column] ?? ""));
++        rows.push(cells(lines[i] ?? ""));
+       i -= 1;
+       blocks.push({
+         kind: "table",

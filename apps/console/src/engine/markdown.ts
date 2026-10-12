@@ -1,6 +1,6 @@
 // Reads Markdown into blocks, for a README. It reads what a README is made
-// of: headings, paragraphs, lists, quotes, rules, fenced code, and inline
-// code, emphasis and links. Anything else is text, and so is any HTML in the
+// of: headings, paragraphs, lists, quotes, rules, fenced code, tables, and
+// inline code, emphasis and links. Anything else is text, and so is any HTML in the
 // source: it is shown as it was written, never run.
 
 export type Inline =
@@ -16,6 +16,8 @@ export type Block =
   | { kind: "code"; language: string; text: string }
   | { kind: "list"; ordered: boolean; items: Inline[][] }
   | { kind: "quote"; of: Inline[] }
+  /** Every row has as many cells as the head. */
+  | { kind: "table"; head: Inline[][]; rows: Inline[][][] }
   | { kind: "rule" };
 
 // Code first: nothing inside backticks is read as anything else. An address may hold one pair of brackets of its own.
@@ -59,6 +61,15 @@ function level(hashes: string): 1 | 2 | 3 | 4 | 5 | 6 {
   return depth === 1 || depth === 2 || depth === 3 || depth === 4 || depth === 5 ? depth : 6;
 }
 
+/** A table's line: it opens with a bar. The rule under a table's head: bars, dashes and colons, and nothing else. */
+const ROW = /^\s*\|/;
+const UNDER = /^\s*\|\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/;
+
+function cells(line: string): string[] {
+  const inner = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  return inner.split("|").map((cell) => cell.trim());
+}
+
 export function markdown(source: string): Block[] {
   const lines = source.replaceAll("\r\n", "\n").split("\n");
   const blocks: Block[] = [];
@@ -96,6 +107,21 @@ export function markdown(source: string): Block[] {
     if (RULE.test(line)) {
       flush();
       blocks.push({ kind: "rule" });
+      continue;
+    }
+    // Lines of bars are a table only where the line under the first says so.
+    if (ROW.test(line) && UNDER.test(lines[i + 1] ?? "")) {
+      flush();
+      const head = cells(line);
+      const rows: string[][] = [];
+      for (i += 2; i < lines.length && ROW.test(lines[i] ?? ""); i += 1)
+        rows.push(head.map((_, column) => cells(lines[i] ?? "")[column] ?? ""));
+      i -= 1;
+      blocks.push({
+        kind: "table",
+        head: head.map((cell) => inline(cell)),
+        rows: rows.map((row) => row.map((cell) => inline(cell))),
+      });
       continue;
     }
     const item = ITEM.exec(line);

@@ -44,6 +44,34 @@ function block(piece: Block, key: number): ReactNode {
     }
     case "quote":
       return <blockquote key={key}>{spans(piece.of)}</blockquote>;
+    case "table":
+      return (
+        <div key={key} className="a-prose-table">
+          <table>
+            <thead>
+              <tr>
+                {piece.head.map((cell, column) => (
+                  // oxlint-disable-next-line react/no-array-index-key -- a cell is known by its place in the row
+                  <th key={column} scope="col">
+                    {spans(cell)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {piece.rows.map((row, at) => (
+                // oxlint-disable-next-line react/no-array-index-key -- a row is known by its place in the table
+                <tr key={at}>
+                  {row.map((cell, column) => (
+                    // oxlint-disable-next-line react/no-array-index-key -- a cell is known by its place in the row
+                    <td key={column}>{spans(cell)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
     default:
       return <hr key={key} />;
   }

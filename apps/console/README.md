@@ -34,13 +34,14 @@ Keel's users sign up and sign in through Better Auth, which Keel mounts at `/v1/
 | `/orgs/<org>/members` | Members, by handle and role. Inviting by handle or by email, with a link to pass on. Changing a role, removing a member, leaving |
 | `/orgs/<org>/settings` | Renaming, and deleting once the org's handle is typed. A user's own org is never deleted |
 | `/invite/<id>` | An invitation, read only to the person it was made to, to join or to decline |
+| `/terms`, `/privacy` | The Terms of Service and the Privacy Notice, for anyone to read. The text is `docs/legal/terms.md` and `docs/legal/privacy.md`, built into the page, so these two pages ask Keel nothing. A foot on every page links both, and the sign-up page says that creating an account agrees to them |
 
 - **The session is an HttpOnly cookie**, which the page cannot read. Better Auth's answers also carry the session's token in their body, so one module (`src/account/account.ts`) is the only code that sees an answer, and it hands on nothing but the user's id, email, name and handle.
 - **The page puts no credential on a request.** A visitor's request carries none.
 - **The address names the org.** Every call names the org it is about. Better Auth also keeps an "active organisation" for a session, and the console neither reads it nor sets it.
 - **No page shows another person's address.** A member is shown by handle and name, and an invitation made by handle is told by the handle. Better Auth's answers carry every member's address, so `account.ts` hands on none but one a member typed into an invitation.
 - **Roles are Keel's three**: owner, maintainer and member (`src/account/roles.ts`). A maintainer does everything but delete the org and make or unmake an owner. Keel decides; a page only keeps from offering what Keel would refuse.
-- **The frame is a code host's**: `Keel / <org>`, where the name is a link and has a dropdown beside it to the reader's other orgs, the same one a project's name has (`src/views/Switch.tsx`).
+- **The frame is a code host's**: `Keel / <org>`, where the name is a link and has a dropdown beside it to the reader's other orgs, the same one a project's name has (`src/views/Switch.tsx`). It is offered once Keel has listed those orgs, and not before.
 - **An org that is not the reader's is told as one that is not there**, and so is an invitation made to someone else.
 - **The page shows no way in that Keel would refuse.** It asks Keel which it offers besides a passkey (`GET /v1/auth/methods`), and a Keel that does not say offers a passkey alone.
 - **A user who signed up with a passkey has no address.** Keel keeps one for them in a domain that can never receive mail, and `account.ts` hands no such address to a page.

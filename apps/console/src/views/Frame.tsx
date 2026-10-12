@@ -16,6 +16,7 @@ import type { ReactNode } from "react";
 import { PAGE } from "../engine/lists.ts";
 import { type Route, TRUNK } from "../route.ts";
 import { Link, useWhere } from "../router.tsx";
+import { Footer } from "./Footer.tsx";
 import { type Sibling, Switch } from "./Switch.tsx";
 
 export type { Sibling } from "./Switch.tsx";
@@ -212,6 +213,7 @@ export function Frame({
         )}
       </header>
       <main className="relative min-h-0 flex-1">{children}</main>
+      <Footer />
     </div>
   );
 }

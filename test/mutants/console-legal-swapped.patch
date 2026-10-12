@@ -1,0 +1,13 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/legal.test.ts
+# kills: legal.dated, legal.read
+# why: each address shows the other document
+diff --git a/apps/console/src/legal/documents.ts b/apps/console/src/legal/documents.ts
+index ec90684..e234fca 100644
+--- a/apps/console/src/legal/documents.ts
++++ b/apps/console/src/legal/documents.ts
+@@ -5,4 +5,4 @@ import privacy from "../../../../docs/legal/privacy.md?raw";
+ import terms from "../../../../docs/legal/terms.md?raw";
+ import type { Legal } from "./legal.ts";
+ 
+-export const TEXT: Record<Legal, string> = { terms, privacy };
++export const TEXT: Record<Legal, string> = { terms: privacy, privacy: terms };

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/legal.test.ts
+# kills: legal.dated
+# why: the notice's text changes, and the day it was last changed stays as it was
+diff --git a/docs/legal/privacy.md b/docs/legal/privacy.md
+index 74102ad..4919925 100644
+--- a/docs/legal/privacy.md
++++ b/docs/legal/privacy.md
+@@ -76,7 +76,7 @@ Cloudflare handles each request in its data centre nearest to you, so your data
+ | Invitations | Accepted, declined, cancelled or expired |
+ | Projects, repositories, activity logs, agents | The project, or the org that owns it, is deleted |
+ | Sandbox backups made during verification | 1 day |
+-| Cloudflare's request and error logs | 7 days |
++| Cloudflare's request and error logs | 70 days |
+ | Database recovery copies | Up to 30 days after a record is deleted |
+ 
+ The activity log can't be edited after the fact. If you delete your account, entries about what you did in other people's orgs stay part of those orgs' history. We rely on those orgs' legitimate interest in an accurate record for this.

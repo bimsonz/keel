@@ -16,6 +16,8 @@ import {
   createAccount,
   nameOf,
 } from "./account.ts";
+import { LEGAL } from "../legal/legal.ts";
+import { Footer } from "../views/Footer.tsx";
 import { Invite, NewOrg, OrgPages } from "./OrgPages.tsx";
 import { Card, HANDLE, Refusal, go, useAsking } from "./parts.tsx";
 // oxlint-disable-next-line import/no-unassigned-import -- a stylesheet
@@ -247,6 +249,19 @@ function SignIn({
           </div>
           <EmailCode account={account} creating={creating} onward={onward} />
         </>
+      )}
+      {creating && (
+        <p className="text-sm text-kumo-subtle" data-agreement>
+          By creating an account you agree to the{" "}
+          <a className="a-link" href={LEGAL.terms.href}>
+            {LEGAL.terms.title}
+          </a>{" "}
+          and the{" "}
+          <a className="a-link" href={LEGAL.privacy.href}>
+            {LEGAL.privacy.title}
+          </a>
+          .
+        </p>
       )}
       <p className="text-sm text-kumo-subtle">
         {creating ? "Already have an account? " : "New to Keel? "}
@@ -541,9 +556,12 @@ function Device({ account, who, userCode }: { account: Account; who: Who; userCo
   );
 }
 
-/** The orgs the reader is in, for the frame's dropdown. Asked for only where the frame names an org. */
-function useOrgs(account: Account, wanted: boolean): Org[] {
-  const [orgs, setOrgs] = useState<Org[]>([]);
+/**
+ * The orgs the reader is in, for the frame's dropdown: null until Keel has said which. Asked for only where
+ * the frame names an org.
+ */
+function useOrgs(account: Account, wanted: boolean): Org[] | null {
+  const [orgs, setOrgs] = useState<Org[] | null>(null);
   useEffect(() => {
     if (!wanted) return undefined;
     let here = true;
@@ -586,7 +604,8 @@ function Shell({
   reader: Reader;
   /** The org the address names, where it names one. */
   org?: string | undefined;
-  orgs: Org[];
+  /** Null until Keel has listed them: a dropdown opened before that would be a menu without the reader's orgs. */
+  orgs: Org[] | null;
   children: ReactNode;
 }) {
   return (
@@ -609,16 +628,18 @@ function Shell({
                 >
                   {org}
                 </a>
-                <Switch
-                  what="org"
-                  here={org}
-                  others={orgs.map((held) => ({
-                    name: held.handle,
-                    href: hrefOf({ at: "org", org: held.handle, tab: "home" }),
-                    ...(held.name === held.handle ? {} : { note: held.name }),
-                  }))}
-                  all={{ label: "New org", href: hrefOf({ at: "new-org" }) }}
-                />
+                {orgs !== null && (
+                  <Switch
+                    what="org"
+                    here={org}
+                    others={orgs.map((held) => ({
+                      name: held.handle,
+                      href: hrefOf({ at: "org", org: held.handle, tab: "home" }),
+                      ...(held.name === held.handle ? {} : { note: held.name }),
+                    }))}
+                    all={{ label: "New org", href: hrefOf({ at: "new-org" }) }}
+                  />
+                )}
               </>
             )}
           </div>
@@ -633,6 +654,7 @@ function Shell({
         </div>
       </header>
       <main className="flex-1">{children}</main>
+      <Footer />
     </div>
   );
 }

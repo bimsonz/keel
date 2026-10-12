@@ -1087,6 +1087,31 @@
   border-top: 1px solid var(--color-kumo-hairline);
 }
 
+/* A table scrolls sideways inside its own box where the page is narrower than it. */
+:root .a-prose-table {
+  overflow-x: auto;
+}
+
+:root .a-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+:root .a-prose th,
+:root .a-prose td {
+  padding: 8px 12px;
+  border: 1px solid var(--color-kumo-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+:root .a-prose th {
+  font-weight: 600;
+  color: var(--text-color-kumo-strong);
+  background: var(--color-kumo-elevated);
+}
+
 /* What a file's own header says of it, at the right. */
 :root .a-file-meta {
   display: inline-flex;

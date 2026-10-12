@@ -75,6 +75,27 @@ describe("an org, to its members", () => {
     });
   });
 
+  it("[orgs.refusals] is told why an invitation is refused in Keel's own words, and by its code", async () => {
+    const { ada, org } = await lovelace();
+    const refused = async (invitee: { handle: string } | { email: string }): Promise<string> => {
+      try {
+        await ada.account.invite(org, invitee, "member");
+        return "invited";
+      } catch (error) {
+        return error instanceof Refused ? `${error.code}: ${error.message}` : String(error);
+      }
+    };
+    expect(await refused({ handle: "Nobody" })).toBe(
+      'NO_SUCH_HANDLE: No one has the handle "Nobody"',
+    );
+    // A person who signed up with a passkey has an address that can never receive mail: nobody is invited at one.
+    expect(await refused({ email: "someone@users.keel.invalid" })).toBe(
+      "EMAIL_UNDELIVERABLE: That address can't receive mail, so no one could accept",
+    );
+    // A handle is read as Keel keeps it, in lower case.
+    expect(await refused({ handle: "Grace" })).toBe("invited");
+  });
+
   it("[orgs.invite] invites a user by handle, and the invitation is theirs alone to read and to accept", async () => {
     const { identity, ada, grace, org } = await lovelace();
     const invitation = await ada.account.invite(org, { handle: "grace" }, "maintainer");
