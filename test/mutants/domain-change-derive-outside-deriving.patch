@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.derive-effects, change.transitions
+# why: Effects are recorded in any state: a derivation lands on a change no Precheck pass is reading
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 2edb39a..63bacd7 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -563,7 +563,7 @@ export const decideChange = (
+ 
+     case "DeriveEffects":
+       // A second derivation in one pass would set the subjects against two readings of one commit.
+-      return at("deriving") && change.derivationRef === undefined
++      return change.derivationRef === undefined
+         ? Result.succeed([
+             EffectsDerived.make({
+               changeId: id,

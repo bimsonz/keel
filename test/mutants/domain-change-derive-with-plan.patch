@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.derive-effects
+# why: The plan's commit carries an EffectsDerived of its own when the pass recorded none, so the derivation no longer stands alone ahead of the drift and the plan
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 2edb39a..f098088 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -589,6 +589,9 @@ export const decideChange = (
+     case "CompilePlan":
+       return at("deriving")
+         ? Result.succeed([
++            ...(change.derivationRef === undefined
++              ? [EffectsDerived.make({ changeId: id, revision, effects: [], derivationRef: "none" })]
++              : []),
+             ...(command.drift.length === 0
+               ? []
+               : [DriftDetected.make({ changeId: id, revision, drift: command.drift })]),

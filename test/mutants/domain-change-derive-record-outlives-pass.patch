@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.derive-effects
+# why: The record survives into the next pass, so a bounced change resubmitted with new code at the same revision can never have that commit's effects recorded
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 2edb39a..82809ea 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -886,7 +886,7 @@ export const evolveChange = (
+     case "PrecheckStarted":
+       // A new pass derives again: the commit may differ though the revision does not.
+       return from("submitted")
+-        ? moveTo(change, "deriving", ["derivationRef"])
++        ? moveTo(change, "deriving")
+         : illegal(change, event);
+     case "EffectsDerived":
+       return from("deriving") &&

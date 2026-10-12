@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/change-machine.test.ts
+# kills: change.derive-effects
+# why: The fold forgets that the pass derived, so a second derivation is taken in the same pass
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 2edb39a..ac14fae 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -892,7 +892,7 @@ export const evolveChange = (
+       return from("deriving") &&
+         event.revision === change.intent.revision &&
+         change.derivationRef === undefined
+-        ? { ...change, derivationRef: event.derivationRef }
++        ? change
+         : illegal(change, event);
+     case "DriftDetected":
+       return from("deriving") ? change : illegal(change, event);

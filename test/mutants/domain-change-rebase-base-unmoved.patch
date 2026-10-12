@@ -2,10 +2,10 @@
 # kills: change.rebase-moves-base, change.submit-after-rebase
 # why: a rebase commits ChangeRebased but the fold leaves the base where it was, so the next submission is judged against the old base
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 9c8f6f6..622ddf9 100644
+index 2edb39a..48d3019 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -720,7 +720,7 @@ export const evolveChange = (
+@@ -881,7 +881,7 @@ export const evolveChange = (
          : illegal(change, event);
      case "ChangeRebased":
        return from("working", "bounced") && event.from === change.baseSha
@@ -13,4 +13,4 @@ index 9c8f6f6..622ddf9 100644
 +        ? change
          : illegal(change, event);
      case "PrecheckStarted":
-       return from("submitted") ? moveTo(change, "deriving") : illegal(change, event);
+       // A new pass derives again: the commit may differ though the revision does not.
