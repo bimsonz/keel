@@ -15,13 +15,14 @@ import {
   TrunkView,
   type ViewSnapshot,
 } from "../ports/index.ts";
+import { foldConflictViews, foldsConflict } from "./conflict-views.ts";
 import { FEED, feedCursor } from "./feed.ts";
 
 /**
  * The Projector's read models beside the feed: each change folded by the
  * domain's own `evolveChange`, a summary of it per project, and each project's
- * trunk. Folded in the receipt's transaction, so they hold exactly the events
- * the feed holds up to its head.
+ * trunk (its conflicts are `conflict-views.ts`). Folded in the receipt's
+ * transaction, so they hold exactly the events the feed holds up to its head.
  */
 export const VIEWS = {
   /** The change as its events leave it, by change id. */
@@ -110,10 +111,12 @@ function foldTrunk(store: Store, event: EventEnvelope): string | undefined {
  * receipt never fails, so nothing is owed for ever.
  */
 export function foldViews(store: Store, event: EventEnvelope): string | undefined {
-  if (event.entity.kind === "change") return foldChange(store, event);
+  // A change's bounce over a conflict, or a conflict noted on it, is also what the conflict's view shows its party was told.
+  const conflict = foldsConflict(event) ? foldConflictViews(store, event) : undefined;
+  if (event.entity.kind === "change") return foldChange(store, event) ?? conflict;
   if (event.type === "TrunkInitialized" || event.type === "TrunkAdvanced")
     return foldTrunk(store, event);
-  return undefined;
+  return conflict;
 }
 
 const summariesOf = (store: Store, project: ProjectId): ChangeSummary[] =>

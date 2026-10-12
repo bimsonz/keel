@@ -1,6 +1,8 @@
 import {
+  conflictRecord,
   foldViews,
   listChanges,
+  listConflicts,
   recordFeed,
   viewSnapshot,
 } from "@keeltown/core/application/memory";
@@ -16,7 +18,7 @@ import { makeEntityStoreMemory } from "./storage.ts";
  */
 export function makeProjectViewsMemory() {
   const store = makeEntityStoreMemory();
-  const provided = <A>(effect: Effect.Effect<A, never, EntityStore>) =>
+  const provided = <A, E>(effect: Effect.Effect<A, E, EntityStore>) =>
     Effect.provide(effect, store.layer);
   /** What a read model skipped, as the DO would log it. */
   const skipped: string[] = [];
@@ -37,6 +39,8 @@ export function makeProjectViewsMemory() {
       ProjectViews.of({
         changes: (read) => provided(listChanges(read)),
         snapshot: (project) => provided(viewSnapshot(project)),
+        conflicts: (read) => provided(listConflicts(read)),
+        conflict: (project, conflictId) => provided(conflictRecord(project, conflictId)),
       }),
     ),
   };

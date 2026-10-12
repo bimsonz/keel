@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.conflict-endings
+# why: a resolved conflict carries no time it settled
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index 12d96eb..5b511a0 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -221,7 +221,6 @@ function step(
+       return {
+         ...before,
+         conflict: evolveConflict(before.conflict, { at, payload: event }),
+-        settledAt: at,
+       };
+     default: {
+       const unreachable: never = event;

@@ -9,6 +9,8 @@ import {
   putSettings,
   readChange,
   readChangeList,
+  readConflict,
+  readConflictList,
   readEvents,
   readInbox,
   readSnapshot,
@@ -39,7 +41,7 @@ import {
   GrantableScope,
   type ProjectResource,
 } from "@keeltown/core/domain/identity";
-import { ProjectId as ProjectIdSchema, type ProjectId } from "@keeltown/core/kernel";
+import { ConflictId, ProjectId as ProjectIdSchema, type ProjectId } from "@keeltown/core/kernel";
 import { Orgs, ProjectOrgs, type Projects } from "@keeltown/core/ports";
 import { Effect, Option, Result, Schema } from "effect";
 import type { Operations } from "../../../generated/http/app.gen.ts";
@@ -69,7 +71,15 @@ import {
   standingOk,
 } from "./operator.ts";
 import { eventsInput, eventsOk } from "./events.ts";
-import { changeListInput, changesOk, snapshotOk } from "./views.ts";
+import {
+  changeListInput,
+  changesOk,
+  conflictListInput,
+  conflictNotFound,
+  conflictOk,
+  conflictsOk,
+  snapshotOk,
+} from "./views.ts";
 import { piggyback } from "./piggyback.ts";
 import {
   blobOk,
@@ -442,8 +452,24 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, makeUser: MakeU
             ),
           );
         },
-        Conflicts_listConflicts: notYet,
-        Conflicts_getConflict: notYet,
+        Conflicts_listConflicts: (caller: Caller, input: Input<"Conflicts_listConflicts">) => {
+          const decoded = conflictListInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          return run(
+            caller,
+            readConflictList(scopeOf(caller), decoded.success).pipe(Effect.map(conflictsOk)),
+          );
+        },
+        Conflicts_getConflict: (caller: Caller, input: Input<"Conflicts_getConflict">) =>
+          run(
+            caller,
+            readConflict(scopeOf(caller), ConflictId.make(input.conflictId)).pipe(
+              Effect.match({
+                onSuccess: conflictOk,
+                onFailure: (e) => conflictNotFound(caller, e),
+              }),
+            ),
+          ),
         resolve: notYet,
         why: notYet,
         Memory_listDecisions: notYet,

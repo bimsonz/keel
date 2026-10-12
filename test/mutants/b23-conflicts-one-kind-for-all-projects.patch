@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: b23.conflict-views
+# why: every project's conflicts are kept together, so a project lists and serves another's
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index 12d96eb..8ba2b21 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -47,7 +47,7 @@ import { FEED } from "./feed.ts";
+  */
+ export const CONFLICT_VIEWS = {
+   /** The conflict as its events leave it, by conflict id. */
+-  conflict: (project: ProjectId) => `conflict-view:${project}`,
++  conflict: (_project: ProjectId) => "conflict-view",
+   /** The conflict a probe is of, by probe id: a discarded probe's event may not name it. */
+   probe: (project: ProjectId) => `conflict-probe:${project}`,
+   /** The conflict a guard came from, by guard id: GuardRetired names only the guard. */

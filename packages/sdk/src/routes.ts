@@ -91,9 +91,9 @@ export const ROUTES = {
   Conflicts_listConflicts: {
     method: "GET",
     path: "/conflicts",
-    query: ["changeId", "state", "cursor", "limit"],
+    query: ["project", "open", "changeId", "state", "cursor", "limit"],
   },
-  Conflicts_getConflict: { method: "GET", path: "/conflicts/{conflictId}" },
+  Conflicts_getConflict: { method: "GET", path: "/conflicts/{conflictId}", query: ["project"] },
   resolve: {
     method: "POST",
     path: "/conflicts/{conflictId}/resolution",

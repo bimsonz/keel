@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.conflict-endings
+# why: GuardRetired names only its guard, and with no guard index the view never learns the guard was retired
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index 12d96eb..bf2b4c8 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -253,8 +253,6 @@ function foldConflict(store: Store, event: EventEnvelope): string | undefined {
+   store.put(CONFLICT_VIEWS.conflict(project), conflictId, asStored(encodeFolded(folded)));
+   if (payload._tag === "ProbeDrafted" || payload._tag === "ProbeDiscarded")
+     store.put(CONFLICT_VIEWS.probe(project), payload.probeId, conflictId);
+-  if (payload._tag === "GuardAdmitted")
+-    store.put(CONFLICT_VIEWS.guard(project), payload.guardId, conflictId);
+   return undefined;
+ }
+ 

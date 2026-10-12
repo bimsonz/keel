@@ -286,7 +286,7 @@ const rulingOf = (change: Change): NextAction => ({
 });
 
 /** The domain's next actions as the API declares them, absent fields left out. */
-const apiActions = (actions: readonly DomainNextAction[]): NextAction[] =>
+export const apiActions = (actions: readonly DomainNextAction[]): NextAction[] =>
   actions.map(({ operationId, args, ...action }) => ({
     ...action,
     ...(operationId === undefined ? {} : { operationId }),

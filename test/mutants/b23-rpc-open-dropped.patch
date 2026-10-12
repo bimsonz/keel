@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/conflicts-read.test.ts
+# kills: b23.conflicts-read
+# why: the isolate's adapter drops the open filter on its way to the Projector, so open=false lists open conflicts
+diff --git a/apps/keel/src/adapters/driven/do-rpc/project-views.ts b/apps/keel/src/adapters/driven/do-rpc/project-views.ts
+index 0c779fa..2177845 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/project-views.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/project-views.ts
+@@ -41,7 +41,6 @@ export function ProjectViewsRpc(projector: () => ProjectViewsStub): Layer.Layer<
+         callObject(ProjectorCodecs.conflicts, () =>
+           projector().conflicts({
+             project,
+-            ...(open === undefined ? {} : { open }),
+             ...(state === undefined ? {} : { state }),
+             ...(changeId === undefined ? {} : { changeId }),
+             ...(cursor === undefined ? {} : { cursor }),

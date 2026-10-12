@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.conflict-fold
+# why: a suite run is kept without its counts, which only the event carries
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index 12d96eb..9b54665 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -170,7 +170,6 @@ function step(
+         check: event.check,
+         run: event.run,
+         outcome: event.outcome,
+-        ...(event.counts === undefined ? {} : { counts: event.counts }),
+         ...(event.reason === undefined ? {} : { reason: event.reason }),
+         at,
+       };

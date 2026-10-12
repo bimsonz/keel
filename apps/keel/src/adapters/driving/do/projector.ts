@@ -1,6 +1,8 @@
 import {
+  conflictRecord,
   foldViews,
   listChanges,
+  listConflicts,
   readFeed,
   recordFeed,
   viewSnapshot,
@@ -12,6 +14,8 @@ import { Effect, Schema } from "effect";
 import { type ProjectorServices, projectorServices } from "../../../composition/do.ts";
 import {
   ChangesRead,
+  ConflictRead,
+  ConflictsRead,
   ProjectorCodecs,
   ProjectorRead,
   type ProjectorRpc,
@@ -91,5 +95,21 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
       Effect.flatMap(({ project }) => viewSnapshot(project)),
     );
     return this.answer(ProjectorCodecs.snapshot, program);
+  }
+
+  async conflicts(request: typeof ConflictsRead.Encoded) {
+    const program = Schema.decodeUnknownEffect(ConflictsRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(listConflicts),
+    );
+    return this.answer(ProjectorCodecs.conflicts, program);
+  }
+
+  async conflict(request: typeof ConflictRead.Encoded) {
+    const program = Schema.decodeUnknownEffect(ConflictRead)(request).pipe(
+      Effect.orDie,
+      Effect.flatMap(({ project, conflictId }) => conflictRecord(project, conflictId)),
+    );
+    return this.answer(ProjectorCodecs.conflict, program);
   }
 }

@@ -325,9 +325,16 @@ export class KeelClient {
     );
   }
 
-  /** Conflicts, optionally about one change or in one state; pass a page's `nextCursor` for the next. */
+  /**
+   * A project's conflicts, newest first, with how many are open and settled:
+   * the token's own project unless `project` names another (required without
+   * a token). Optionally only the open or only the settled ones, about one
+   * change, or in one state; pass a page's `nextCursor` for the next.
+   */
   conflicts(
     options: CallOptions & {
+      readonly project?: string;
+      readonly open?: boolean;
       readonly changeId?: string;
       readonly state?: ConflictState;
       readonly cursor?: string;
@@ -337,6 +344,8 @@ export class KeelClient {
     return this.call(
       "Conflicts_listConflicts",
       {
+        project: options.project,
+        open: options.open,
         changeId: options.changeId,
         state: options.state,
         cursor: options.cursor,
@@ -346,11 +355,12 @@ export class KeelClient {
     );
   }
 
+  /** One conflict of a project, with its sides, probe, world matrix and guard: the token's own project unless `project` names another. */
   conflict(
     conflictId: string,
-    options?: CallOptions,
+    options: CallOptions & { readonly project?: string } = {},
   ): Promise<WireOutputs["Conflicts_getConflict"]> {
-    return this.call("Conflicts_getConflict", { conflictId }, options);
+    return this.call("Conflicts_getConflict", { conflictId, project: options.project }, options);
   }
 
   /** Resolves a conflict by a move, under the lease of the change named in the resolution. */
@@ -685,7 +695,7 @@ export class KeelClient {
   }
 }
 
-/** A path, query or header value: the contract makes them strings and numbers only. */
+/** A path, query or header value: the contract makes them strings, numbers and booleans only. */
 function scalar(value: unknown): string {
   return typeof value === "string" ? value : JSON.stringify(value);
 }

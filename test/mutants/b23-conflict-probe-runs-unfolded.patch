@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.conflict-fold
+# why: a probe run is listed but never folded into the probe, so the probe is never admitted or discarded in the view
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index 12d96eb..ecb5901 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -160,7 +160,6 @@ function step(
+       return {
+         ...before,
+         conflict: evolveConflict(before.conflict, { at, payload: event }),
+-        probe: evolveProbe(before.probe, { at, payload: event }),
+         runs: [...before.runs, run],
+       };
+     }

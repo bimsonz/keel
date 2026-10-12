@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.conflict-totals
+# why: the totals count only what the page holds, so the tabs' counts change with the filter and the page
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index 12d96eb..6351303 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -370,7 +370,8 @@ export const listConflicts: (
+     );
+     const items = matching.slice(0, limit);
+     const last = items.at(-1);
+-    const totals = { open, settled: counted.length - open };
++    const shown = items.filter((record) => isOpenConflict(record.conflict.state)).length;
++    const totals = { open: open - open + shown, settled: items.length - shown };
+     return matching.length > limit && last !== undefined
+       ? { items, nextCursor: last.number, totals }
+       : { items, totals };

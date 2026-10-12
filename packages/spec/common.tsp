@@ -164,6 +164,7 @@ union ProblemCode {
   serviceNotImplemented: "service.not_implemented",
   internalDefect: "internal.defect",
   changeNotFound: "change.not_found",
+  conflictNotFound: "conflict.not_found",
   changeLeaseStale: "change.lease_stale",
   changeLeaseNotLapsed: "change.lease_not_lapsed",
   changeStateRefused: "change.state_refused",

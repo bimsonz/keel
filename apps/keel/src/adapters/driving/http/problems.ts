@@ -25,6 +25,7 @@ const TITLES: Record<ProblemCode, string> = {
   "service.not_implemented": "This operation is part of the contract but not implemented yet",
   "internal.defect": "Keel hit a defect while serving this request",
   "change.not_found": "No such change",
+  "conflict.not_found": "No such conflict",
   "change.lease_stale": "The lease is not the change's active lease",
   "change.lease_not_lapsed": "The change's lease has not lapsed, so it cannot be adopted yet",
   "change.state_refused": "The change's state does not allow this",

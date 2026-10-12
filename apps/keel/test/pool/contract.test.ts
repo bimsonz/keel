@@ -44,7 +44,7 @@ describe("the published contract, through the Worker's fetch handler", () => {
   it("answers a stubbed operation with the declared 503 service.not_implemented", async () => {
     const seeded = await seedAgent();
     const response = await exports.default.fetch(
-      `${BASE}/v1/conflicts/cfl_01JZ8PT2C4E6G8J0M2N4Q6S8V0`,
+      `${BASE}/v1/verdicts/vrd_01JZ8PT2C4E6G8J0M2N4Q6S8V0`,
       {
         headers: { authorization: `Bearer ${await tokenFor(seeded)}` },
       },

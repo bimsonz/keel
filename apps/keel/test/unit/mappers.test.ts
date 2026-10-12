@@ -90,8 +90,6 @@ const STUBBED = [
   "sketch",
   "Workspaces_refreshWorkspaceToken",
   "Workspaces_releaseWorkspace",
-  "Conflicts_listConflicts",
-  "Conflicts_getConflict",
   "resolve",
   "why",
   "Memory_listDecisions",

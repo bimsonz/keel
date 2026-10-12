@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.conflict-list
+# why: the open filter is ignored, so the Open and Settled tabs show the same conflicts
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index 12d96eb..cd78d01 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -364,7 +364,6 @@ export const listConflicts: (
+     const open = counted.filter((record) => isOpenConflict(record.conflict.state)).length;
+     const matching = counted.filter(
+       (record) =>
+-        (read.open === undefined || isOpenConflict(record.conflict.state) === read.open) &&
+         (read.state === undefined || record.conflict.state === read.state) &&
+         (below === undefined || record.number < below),
+     );

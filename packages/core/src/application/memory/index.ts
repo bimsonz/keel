@@ -46,4 +46,5 @@ export const giveRuling: (
   stub("memory/giveRuling");
 
 export * from "./change-views.ts";
+export * from "./conflict-views.ts";
 export * from "./feed.ts";

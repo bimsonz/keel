@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.conflict-told
+# why: what a party was told first is never replaced by what it was told later
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index 12d96eb..181f924 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -276,6 +276,11 @@ function foldTold(store: Store, event: EventEnvelope): string | undefined {
+     nextActions: payload.nextActions ?? [],
+     at: event.at,
+   };
++  if (
++    store.get(CONFLICT_VIEWS.told(project), `${payload.conflictId}/${payload.changeId}`) !==
++    undefined
++  )
++    return undefined;
+   store.put(
+     CONFLICT_VIEWS.told(project),
+     `${payload.conflictId}/${payload.changeId}`,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.conflict-list
+# why: the list answers the oldest conflict first
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index 12d96eb..e338f3a 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -360,7 +360,7 @@ export const listConflicts: (
+       .list(CONFLICT_VIEWS.conflict(read.project))
+       .map(({ value }) => recordOf(store, read.project, decodeFolded(value)))
+       .filter((record) => changeId === undefined || partyTo(record, changeId))
+-      .toSorted((a, b) => b.number - a.number);
++      .toSorted((a, b) => a.number - b.number);
+     const open = counted.filter((record) => isOpenConflict(record.conflict.state)).length;
+     const matching = counted.filter(
+       (record) =>

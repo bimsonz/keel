@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.conflict-matrix
+# why: a world with nothing recorded yet is left out, so the matrix has no pending cell to show
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index 12d96eb..944d775 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -415,7 +415,7 @@ export const matrixOf = (record: ConflictRecord): readonly MatrixWorld[] =>
+       probe: record.runs.filter((run) => run.world === world).toSorted((a, b) => a.run - b.run),
+       checks: [...latest.values()].toSorted((a, b) => a.check.localeCompare(b.check)),
+     };
+-  });
++  }).filter((row) => row.probe.length + row.checks.length > 0);
+ 
+ /** One side of a conflict as Keel knows it: the change, what it holds on the contested subject, and what it was told. */
+ export interface ConflictSide {

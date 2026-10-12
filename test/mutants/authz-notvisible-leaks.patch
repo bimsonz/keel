@@ -2,14 +2,15 @@
 # kills: authz.public-private-missing
 # why: what the caller may not see answers 403 rather than the operation's own 404, so a private project's existence leaks to anyone who asks
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index f2b7817..ad4e68b 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-@@ -259,7 +259,7 @@
-     case "NotVisible":
-       return CHANGE_KEYED.has(action)
-         ? changeNotFound({ requestId }, { changeId: String(Object(input).changeId) })
--        : { status: 404, body: problem(404, "resource.not_found", requestId) };
-+        : { status: 403, body: problem(403, "auth.forbidden", requestId) };
+@@ -262,7 +262,7 @@ export function refusalResult(
+         return changeNotFound({ requestId }, { changeId: String(Object(input).changeId) });
+       if (action === "Conflicts_getConflict")
+         return conflictNotFound({ requestId }, { conflictId: String(Object(input).conflictId) });
+-      return { status: 404, body: problem(404, "resource.not_found", requestId) };
++      return { status: 403, body: problem(403, "auth.forbidden", requestId) };
      default: {
        const unmapped: never = refusal;
        return unmapped;

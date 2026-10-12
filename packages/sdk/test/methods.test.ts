@@ -111,7 +111,15 @@ const QUERY: Readonly<Record<QueriedOperation, (client: KeelClient) => Promise<u
   Changes_listChanges: (c) =>
     c.changes({ state: "working", project: "prj_1", cursor: "c1", limit: 5 }),
   Conflicts_listConflicts: (c) =>
-    c.conflicts({ changeId: "chg_1", state: "proven", cursor: "c1", limit: 5 }),
+    c.conflicts({
+      project: "prj_1",
+      open: false,
+      changeId: "chg_1",
+      state: "proven",
+      cursor: "c1",
+      limit: 5,
+    }),
+  Conflicts_getConflict: (c) => c.conflict("cfl_1", { project: "prj_1" }),
   why: (c) => c.why({ path: "src/a.ts", line: 3, subject: "authz.permissions" }),
   Memory_listDecisions: (c) =>
     c.decisions({ subject: "authz.permissions", cursor: "c1", limit: 5 }),

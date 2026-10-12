@@ -18,12 +18,22 @@ import type {
   InboxPage,
   AgentToken,
 } from "../../domain/identity/index.ts";
-import { ChangeId, type LeaseId, type ProjectId, type UserId } from "../../domain/kernel/index.ts";
+import {
+  ChangeId,
+  type ConflictId,
+  type LeaseId,
+  type ProjectId,
+  type UserId,
+} from "../../domain/kernel/index.ts";
+import type { ConflictNotFound } from "../../domain/verification/index.ts";
 import {
   type ChangeListPage,
   type ChangeListRead,
   type ChangeRead,
   Changes,
+  type ConflictListPage,
+  type ConflictListRead,
+  type ConflictRecord,
   EventFeed,
   type EventFeedEntry,
   type EventFeedPage,
@@ -273,6 +283,24 @@ export const readChange: (
   changeId: ChangeId,
 ) => Effect.Effect<ChangeRead, ChangeNotFound, Changes> = (changeId) =>
   Changes.use((changes) => changes.get(changeId));
+
+/** A project's conflicts from the Projector's read model, newest `C-n` first. */
+export const readConflictList: (
+  scope: ProjectScope,
+  read: Omit<ConflictListRead, "project">,
+) => Effect.Effect<ConflictListPage, never, ProjectViews> = (scope, read) =>
+  ProjectViews.use((views) => views.conflicts({ ...read, project: scope.project }));
+
+/**
+ * One conflict of the project the doorway authorised the read on. A conflict
+ * of another project is ConflictNotFound here, as one that does not exist: the
+ * caller named the conflict, and the project it was read in is not its own.
+ */
+export const readConflict: (
+  scope: ProjectScope,
+  conflictId: ConflictId,
+) => Effect.Effect<ConflictRecord, ConflictNotFound, ProjectViews> = (scope, conflictId) =>
+  ProjectViews.use((views) => views.conflict(scope.project, conflictId));
 
 /** A project's changes and trunk at the feed's head, with the cursor to fold forward from. */
 export const readSnapshot: (

@@ -2491,12 +2491,32 @@
       "get": {
         "operationId": "Conflicts_listConflicts",
         "summary": "List conflicts",
-        "description": "Conflicts, optionally only those involving one change.",
+        "description": "A project's conflicts, newest first, with how many are open and settled.\nAn agent reads its own project unless it names another; anyone else names\none. Without a token only a public project is read, and a private or\nunknown one is the same 404.",
         "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            },
+            "explode": false
+          },
+          {
+            "name": "open",
+            "in": "query",
+            "required": false,
+            "description": "Only open conflicts, or only settled ones (dismissed or resolved).",
+            "schema": {
+              "type": "boolean"
+            },
+            "explode": false
+          },
           {
             "name": "changeId",
             "in": "query",
             "required": false,
+            "description": "Only the conflicts this change is a party to.",
             "schema": {
               "$ref": "#/components/schemas/ChangeId"
             },
@@ -2525,120 +2545,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConflictPage"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The server could not understand the request due to invalid syntax.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Access is unauthorized.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Access is forbidden.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Client error",
-            "headers": {
-              "retry-after": {
-                "required": false,
-                "schema": {
-                  "type": "integer",
-                  "format": "int32"
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Server error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service unavailable.",
-            "headers": {
-              "retry-after": {
-                "required": false,
-                "schema": {
-                  "type": "integer",
-                  "format": "int32"
-                }
-              }
-            },
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "Conflicts"
-        ],
-        "security": [
-          {
-            "OAuth2Auth": [
-              "agent:read"
-            ]
-          },
-          {
-            "BearerAuth": []
-          }
-        ]
-      }
-    },
-    "/conflicts/{conflictId}": {
-      "get": {
-        "operationId": "Conflicts_getConflict",
-        "summary": "Get a conflict",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ConflictPath"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The request has succeeded.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConflictView"
                 }
               }
             }
@@ -2736,6 +2642,142 @@
           "Conflicts"
         ],
         "security": [
+          {},
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/conflicts/{conflictId}": {
+      "get": {
+        "operationId": "Conflicts_getConflict",
+        "summary": "Get a conflict",
+        "description": "One conflict of a project. An agent's own project unless `project` names\nanother. A conflict the caller may not read is the 404 of an unknown one.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ConflictPath"
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ProjectId"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The server could not understand the request due to invalid syntax.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access is unauthorized.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Conflicts"
+        ],
+        "security": [
+          {},
           {
             "OAuth2Auth": [
               "agent:read"
@@ -8259,6 +8301,131 @@
         "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$",
         "description": "A git object id: 40 hexadecimal characters (SHA-1) or 64 (SHA-256)."
       },
+      "ConflictDecisionRef": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/DecisionId"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The decision that resolved a conflict (`D-n`)."
+      },
+      "ConflictDetail": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "state",
+          "parties",
+          "openedAt",
+          "label",
+          "matrix"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ConflictId"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ConflictKind"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ConflictState"
+          },
+          "parties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectKey"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "label": {
+            "type": "string",
+            "description": "Keel's short name for the conflict in its project, `C-n`. It never changes once given."
+          },
+          "predicate": {
+            "$ref": "#/components/schemas/MFP.Predicate"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "fallout",
+              "opinion"
+            ],
+            "description": "`fallout`: two changes' declared or derived claims contradict. `opinion`: a decision model suspects it."
+          },
+          "settledAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was dismissed or resolved."
+          },
+          "proven": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ConflictProof"
+              }
+            ],
+            "description": "How it was proven."
+          },
+          "dismissed": {
+            "type": "string",
+            "description": "Why it was dismissed."
+          },
+          "sides": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ConflictSides"
+              }
+            ],
+            "description": "Absent when the suspicion named no premise and effect."
+          },
+          "matrix": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatrixWorld"
+            },
+            "description": "Always the five worlds, in the order trunk, A-noop, A, B, AB."
+          },
+          "probe": {
+            "$ref": "#/components/schemas/ConflictProbe"
+          },
+          "guard": {
+            "$ref": "#/components/schemas/ConflictGuard"
+          },
+          "escalation": {
+            "$ref": "#/components/schemas/ConflictEscalation"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/ConflictDecisionRef"
+          },
+          "move": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Move"
+              }
+            ],
+            "description": "The move that resolved it."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One conflict: its two sides, its probe, its world matrix and its guard, as\nKeel folded them from the conflict's own events. States and outcomes are the\nevents' words. What Keel has no record of is absent."
+      },
       "ConflictDismissed": {
         "type": "object",
         "required": [
@@ -8316,6 +8483,115 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "ConflictEscalation": {
+        "type": "object",
+        "required": [
+          "id",
+          "open"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/EscalationId"
+          },
+          "label": {
+            "type": "string"
+          },
+          "open": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "human-class",
+              "unprovable"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        }
+      },
+      "ConflictEscalationRef": {
+        "type": "object",
+        "required": [
+          "id",
+          "open"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/EscalationId"
+          },
+          "label": {
+            "type": "string"
+          },
+          "open": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The escalation a conflict was raised to a person with (`E-n`); `open` until the conflict is resolved."
+      },
+      "ConflictGuard": {
+        "type": "object",
+        "required": [
+          "id",
+          "state",
+          "admittedAt",
+          "probeId",
+          "runs"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/GuardId"
+          },
+          "label": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "admitted",
+              "retired"
+            ]
+          },
+          "admittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "probeId": {
+            "$ref": "#/components/schemas/ProbeId"
+          },
+          "runs": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The discriminating runs that admitted it."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The guard a conflict's probe became, and whether a decision has retired it."
+      },
+      "ConflictGuardRef": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/GuardId"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The guard a conflict's probe became (`G-n`)."
       },
       "ConflictId": {
         "type": "string",
@@ -8383,23 +8659,111 @@
       "ConflictPage": {
         "type": "object",
         "required": [
-          "items"
+          "items",
+          "totals"
         ],
         "properties": {
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ConflictView"
+              "$ref": "#/components/schemas/ConflictRow"
             }
           },
           "nextCursor": {
             "type": "string",
             "description": "Absent on the last page."
+          },
+          "totals": {
+            "$ref": "#/components/schemas/ConflictTotals"
           }
         },
         "additionalProperties": {
           "not": {}
         }
+      },
+      "ConflictProbe": {
+        "type": "object",
+        "required": [
+          "id",
+          "state"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ProbeId"
+          },
+          "label": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ProbeState"
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bundleHash": {
+            "$ref": "#/components/schemas/ContentHash"
+          },
+          "discarded": {
+            "$ref": "#/components/schemas/ProbeDiscard"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A conflict's probe: how many drafts it took, the bundle its source is in, and why it was discarded if it was."
+      },
+      "ConflictProbeRef": {
+        "type": "object",
+        "required": [
+          "id",
+          "state"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ProbeId"
+          },
+          "label": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ProbeState"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The probe drafted for a conflict, by its id and the short name Keel gave it in the project (`P-n`)."
+      },
+      "ConflictProof": {
+        "type": "object",
+        "required": [
+          "_tag"
+        ],
+        "properties": {
+          "_tag": {
+            "type": "string",
+            "enum": [
+              "probe",
+              "guard",
+              "merge-refused",
+              "interaction"
+            ]
+          },
+          "probeId": {
+            "$ref": "#/components/schemas/ProbeId"
+          },
+          "guardId": {
+            "$ref": "#/components/schemas/GuardId"
+          },
+          "batchId": {
+            "$ref": "#/components/schemas/BatchId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "What proved a conflict, as ConflictProven carries it."
       },
       "ConflictProven": {
         "type": "object",
@@ -8539,6 +8903,114 @@
           "not": {}
         }
       },
+      "ConflictRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "state",
+          "parties",
+          "openedAt",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ConflictId"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ConflictKind"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ConflictState"
+          },
+          "parties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectKey"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "label": {
+            "type": "string",
+            "description": "Keel's short name for the conflict in its project, `C-n`. It never changes once given."
+          },
+          "predicate": {
+            "$ref": "#/components/schemas/MFP.Predicate"
+          },
+          "probe": {
+            "$ref": "#/components/schemas/ConflictProbeRef"
+          },
+          "guard": {
+            "$ref": "#/components/schemas/ConflictGuardRef"
+          },
+          "escalation": {
+            "$ref": "#/components/schemas/ConflictEscalationRef"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/ConflictDecisionRef"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One conflict in a project's list."
+      },
+      "ConflictSide": {
+        "type": "object",
+        "required": [
+          "changeId",
+          "role",
+          "proposition"
+        ],
+        "properties": {
+          "changeId": {
+            "$ref": "#/components/schemas/ChangeId"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "premise",
+              "effect"
+            ],
+            "description": "`premise`: the change relies on the proposition. `effect`: its code makes it so."
+          },
+          "proposition": {
+            "$ref": "#/components/schemas/EventProposition"
+          },
+          "told": {
+            "$ref": "#/components/schemas/ConflictTold"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One side of a conflict as Keel knows it: the change, and what it holds on the contested subject."
+      },
+      "ConflictSides": {
+        "type": "object",
+        "required": [
+          "holder",
+          "other"
+        ],
+        "properties": {
+          "holder": {
+            "$ref": "#/components/schemas/ConflictSide"
+          },
+          "other": {
+            "$ref": "#/components/schemas/ConflictSide"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "`holder` relies on the premise and is world A of the matrix; `other` makes the effect against it and is world B."
+      },
       "ConflictState": {
         "type": "string",
         "enum": [
@@ -8619,6 +9091,58 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "ConflictTold": {
+        "type": "object",
+        "required": [
+          "how",
+          "nextActions",
+          "at"
+        ],
+        "properties": {
+          "how": {
+            "type": "string",
+            "enum": [
+              "bounced",
+              "noted"
+            ]
+          },
+          "nextActions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NextAction"
+            }
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "What Keel told a party about a conflict: its change was bounced over it, or the conflict was noted on it."
+      },
+      "ConflictTotals": {
+        "type": "object",
+        "required": [
+          "open",
+          "settled"
+        ],
+        "properties": {
+          "open": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "settled": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "How many conflicts the list holds open and settled (dismissed or resolved), whatever the page and its filters show."
       },
       "ConflictView": {
         "type": "object",
@@ -12882,6 +13406,111 @@
         },
         "description": "The fields every record carries."
       },
+      "MatrixCheck": {
+        "type": "object",
+        "required": [
+          "check",
+          "run",
+          "outcome",
+          "at"
+        ],
+        "properties": {
+          "check": {
+            "type": "string"
+          },
+          "run": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/MatrixOutcome"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/WorldCheckCounts"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the suite did not apply, for `n/a`."
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A suite's latest run in a world: `suite:trunk`, or `suite:<changeId>` for a side's own."
+      },
+      "MatrixOutcome": {
+        "type": "string",
+        "enum": [
+          "pass",
+          "fail",
+          "n/a"
+        ],
+        "description": "A probe's or a suite's answer in one world. `n/a`: it did not apply there; it is never a pass."
+      },
+      "MatrixProbeRun": {
+        "type": "object",
+        "required": [
+          "run",
+          "outcome",
+          "resultRef",
+          "at"
+        ],
+        "properties": {
+          "run": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/MatrixOutcome"
+          },
+          "resultRef": {
+            "type": "string",
+            "description": "Where the run's result is kept."
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One run of the conflict's probe in a world."
+      },
+      "MatrixWorld": {
+        "type": "object",
+        "required": [
+          "world",
+          "probe",
+          "checks"
+        ],
+        "properties": {
+          "world": {
+            "$ref": "#/components/schemas/World"
+          },
+          "probe": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatrixProbeRun"
+            },
+            "description": "The probe's runs, in run order."
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MatrixCheck"
+            }
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "One world of a conflict's matrix, with what Keel has recorded there: nothing yet is two empty lists."
+      },
       "MemberCommit": {
         "type": "object",
         "required": [
@@ -13905,6 +14534,40 @@
           "not": {}
         }
       },
+      "ProbeDiscard": {
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "enum": [
+              "non-discriminating",
+              "unstable",
+              "draft-failed"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "enum": [
+              "schema",
+              "truncated",
+              "abstained",
+              "repairs-exhausted",
+              "incomplete",
+              "no-propositions",
+              "no-submission",
+              "party-gone",
+              "worlds-unbuildable"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "Why a probe was discarded, in ProbeDiscarded's words; `detail` says why its drafts failed."
+      },
       "ProbeDiscarded": {
         "type": "object",
         "required": [
@@ -14041,6 +14704,16 @@
           "not": {}
         }
       },
+      "ProbeState": {
+        "type": "string",
+        "enum": [
+          "calibrating",
+          "admitted",
+          "discarded",
+          "retired"
+        ],
+        "description": "A probe's standing: calibrating in the world matrix, admitted as a guard, discarded, or retired with its guard."
+      },
       "ProblemCode": {
         "type": "string",
         "enum": [
@@ -14059,6 +14732,7 @@
           "service.not_implemented",
           "internal.defect",
           "change.not_found",
+          "conflict.not_found",
           "change.lease_stale",
           "change.lease_not_lapsed",
           "change.state_refused",

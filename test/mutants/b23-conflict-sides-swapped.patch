@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.conflict-sides
+# why: the change making the effect is named as the premise's holder, so the page shows the two worlds the wrong way round
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index 12d96eb..71d4ec0 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -441,7 +441,7 @@ export const sidesOf = (
+   };
+   return {
+     holder: {
+-      changeId: premise.holder,
++      changeId: effect.changeId,
+       role: "premise",
+       proposition: premise.proposition,
+       ...toldTo(premise.holder),

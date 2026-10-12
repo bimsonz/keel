@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.conflict-fold
+# why: the probe is served without the P-n the feed gave it
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index 12d96eb..124a33d 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -317,7 +317,7 @@ function recordOf(store: Store, project: ProjectId, folded: ConflictFolded): Con
+   const label = labelOf(store, project, "C-", conflict.id) ?? "C-0";
+   const labels = {
+     conflict: label,
+-    probe: labelOf(store, project, "P-", probe?.id),
++    probe: labelOf(store, project, "P-", undefined),
+     guard: labelOf(store, project, "G-", guard?.id),
+     escalation: labelOf(store, project, "E-", conflict.escalationId),
+     decision: labelOf(store, project, "D-", conflict.decisionId),

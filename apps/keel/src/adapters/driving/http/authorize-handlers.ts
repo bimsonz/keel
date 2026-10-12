@@ -18,6 +18,7 @@ import type { Operations } from "../../../generated/http/app.gen.ts";
 import type { Caller } from "./caller.ts";
 import { problem, type ProblemBody } from "./problems.ts";
 import type { Runner } from "./run.ts";
+import { conflictNotFound } from "./views.ts";
 import { changeNotFound } from "./work-loop.ts";
 
 /** The operations the spec publishes: each is an action the policy decides. */
@@ -193,8 +194,8 @@ export const RESOLVERS: Resolvers = {
   Views_listLanes: ownProject,
   Views_getCandidate: ownProject,
   Views_getVerdict: ownProject,
-  Conflicts_listConflicts: ownProject,
-  Conflicts_getConflict: ownProject,
+  Conflicts_listConflicts: (input, caller) => projectOrOwn(input.project, caller),
+  Conflicts_getConflict: (input, caller) => projectOrOwn(input.project, caller),
   Memory_listDecisions: ownProject,
   Memory_getDecision: ownProject,
   why: ownProject,
@@ -257,9 +258,11 @@ export function refusalResult(
         }),
       };
     case "NotVisible":
-      return CHANGE_KEYED.has(action)
-        ? changeNotFound({ requestId }, { changeId: String(Object(input).changeId) })
-        : { status: 404, body: problem(404, "resource.not_found", requestId) };
+      if (CHANGE_KEYED.has(action))
+        return changeNotFound({ requestId }, { changeId: String(Object(input).changeId) });
+      if (action === "Conflicts_getConflict")
+        return conflictNotFound({ requestId }, { conflictId: String(Object(input).conflictId) });
+      return { status: 404, body: problem(404, "resource.not_found", requestId) };
     default: {
       const unmapped: never = refusal;
       return unmapped;

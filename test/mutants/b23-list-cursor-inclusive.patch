@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.conflict-list
+# why: a page begins with the conflict the last one ended on, so it is listed twice
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index 12d96eb..c78c142 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -366,7 +366,7 @@ export const listConflicts: (
+       (record) =>
+         (read.open === undefined || isOpenConflict(record.conflict.state) === read.open) &&
+         (read.state === undefined || record.conflict.state === read.state) &&
+-        (below === undefined || record.number < below),
++        (below === undefined || record.number <= below),
+     );
+     const items = matching.slice(0, limit);
+     const last = items.at(-1);

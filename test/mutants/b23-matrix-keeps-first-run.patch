@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.conflict-matrix
+# why: a suite run again in a world is shown by its first run, not its latest
+diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
+index 12d96eb..8292f7f 100644
+--- a/packages/core/src/application/memory/conflict-views.ts
++++ b/packages/core/src/application/memory/conflict-views.ts
+@@ -408,7 +408,7 @@ export const matrixOf = (record: ConflictRecord): readonly MatrixWorld[] =>
+     for (const check of record.checks) {
+       if (check.world !== world) continue;
+       const standing = latest.get(check.check);
+-      if (standing === undefined || check.run > standing.run) latest.set(check.check, check);
++      if (standing === undefined || check.run < standing.run) latest.set(check.check, check);
+     }
+     return {
+       world,
