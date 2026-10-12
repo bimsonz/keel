@@ -1,5 +1,5 @@
 # expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/authorize-handlers.test.ts -t authz.total
-# kills: authz.total, authz.users-only
+# kills: authz.total
 # why: one operation (putting a project's settings) reaches its handler without the policy, so an agent or an outsider governs a project
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
