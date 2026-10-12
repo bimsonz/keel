@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { projectFiles } from "archunit";
+import { clearGraphCache, projectFiles } from "archunit";
 import type { Violation } from "../guard.ts";
 
 function field(value: unknown, key: string): unknown {
@@ -23,6 +23,17 @@ function describe(violation: unknown): { file: string; message: string } {
   if (typeof source === "string")
     return { file: source, message: `depends on ${typeof target === "string" ? target : "?"}` };
   return { file: ".", message: JSON.stringify(violation).slice(0, 300) };
+}
+
+/**
+ * Starts a check on freshly built graphs. ArchUnitTS keeps one dependency graph
+ * per tsconfig for the life of the process, and building one (a TypeScript
+ * program over the tsconfig and everything it imports) is most of a rule's
+ * cost. A check calls this once, first, so its own passes share a graph per
+ * tsconfig while no check reads a graph built before it started.
+ */
+export function freshGraphs(): void {
+  clearGraphCache();
 }
 
 function baseOf(tsconfig: string): string {
@@ -50,7 +61,7 @@ export async function archFileCount(
       seen += 1;
       return true;
     }, "counted")
-    .check({ allowEmptyTests: true, clearCache: true });
+    .check({ allowEmptyTests: true });
   return seen;
 }
 
@@ -69,7 +80,7 @@ export async function forbidDependency(
     .shouldNot()
     .dependOnFiles()
     .inFolder(to)
-    .check({ allowEmptyTests: true, clearCache: true });
+    .check({ allowEmptyTests: true });
   return found.map((violation) => {
     const { file, message } = describe(violation);
     return { rule, file: `${baseOf(tsconfig)}${file}`, message: `[archunit] ${message}` };
@@ -89,7 +100,7 @@ export async function forbidCycles(
     .inFolder(folder)
     .should()
     .haveNoCycles()
-    .check({ allowEmptyTests: true, clearCache: true });
+    .check({ allowEmptyTests: true });
   return found.map((violation) => {
     const { file, message } = describe(violation);
     return { rule, file: `${baseOf(tsconfig)}${file}`, message: `[archunit] cycle: ${message}` };

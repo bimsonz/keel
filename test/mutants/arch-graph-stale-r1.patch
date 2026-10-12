@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts -t "arch.graph-fresh. R1"
+# kills: arch.graph-fresh
+# why: R1 reads the graph its last run built, so a file changed since is judged as it was
+diff --git a/packages/tooling/src/arch/layers.ts b/packages/tooling/src/arch/layers.ts
+index 59fdb97..3324db3 100644
+--- a/packages/tooling/src/arch/layers.ts
++++ b/packages/tooling/src/arch/layers.ts
+@@ -49,7 +49,6 @@ async function archSawEverything(
+ 
+ /** R1: the domain imports only the domain, and only the allowlisted names from `effect`. */
+ export async function checkR1(root: string, options: GuardOptions = {}): Promise<GuardResult> {
+-  freshGraphs();
+   const files = scanFiles(
+     root,
+     sourcesUnder(root, [DOMAIN]).filter((p) => !isTest(p)),

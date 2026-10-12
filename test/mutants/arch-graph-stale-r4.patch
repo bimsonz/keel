@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts -t "arch.graph-fresh. R4"
+# kills: arch.graph-fresh
+# why: R4 reads the graph its last run built, so a file changed since is judged as it was
+diff --git a/packages/tooling/src/arch/layers.ts b/packages/tooling/src/arch/layers.ts
+index 59fdb97..e3662a7 100644
+--- a/packages/tooling/src/arch/layers.ts
++++ b/packages/tooling/src/arch/layers.ts
+@@ -191,7 +191,6 @@ const CONTEXT = /^packages\/core\/src\/(domain|application)\/([^/]+)\//;
+ 
+ /** R4: no import cycles, and one context reaches another only through its index.ts. The kernel is open to all. */
+ export async function checkR4(root: string, options: GuardOptions = {}): Promise<GuardResult> {
+-  freshGraphs();
+   const files = scanFiles(
+     root,
+     sourcesUnder(root, [`${CORE}/src`]).filter((p) => !isTest(p)),

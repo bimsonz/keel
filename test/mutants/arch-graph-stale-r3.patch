@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts -t "arch.graph-fresh. R3"
+# kills: arch.graph-fresh
+# why: R3 reads the graph its last run built, so a file changed since is judged as it was
+diff --git a/packages/tooling/src/arch/layers.ts b/packages/tooling/src/arch/layers.ts
+index 59fdb97..612ce20 100644
+--- a/packages/tooling/src/arch/layers.ts
++++ b/packages/tooling/src/arch/layers.ts
+@@ -135,7 +135,6 @@ export function checkR2(root: string, options: GuardOptions = {}): GuardResult {
+ 
+ /** R3: driving adapters never import driven adapters; the two meet only in composition. */
+ export async function checkR3(root: string, options: GuardOptions = {}): Promise<GuardResult> {
+-  freshGraphs();
+   const violations: Violation[] = [];
+   const scanned: string[] = [];
+   for (const app of APPS) {

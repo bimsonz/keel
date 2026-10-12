@@ -1,5 +1,5 @@
 import { type GuardOptions, type GuardResult, type Violation, withVacuityCheck } from "../guard.ts";
-import { archFileCount, forbidCycles, forbidDependency } from "./archunit.ts";
+import { archFileCount, forbidCycles, forbidDependency, freshGraphs } from "./archunit.ts";
 import { resolveRelative } from "./imports.ts";
 import { isTest, scanFiles, sourcesUnder } from "./scan.ts";
 
@@ -49,6 +49,7 @@ async function archSawEverything(
 
 /** R1: the domain imports only the domain, and only the allowlisted names from `effect`. */
 export async function checkR1(root: string, options: GuardOptions = {}): Promise<GuardResult> {
+  freshGraphs();
   const files = scanFiles(
     root,
     sourcesUnder(root, [DOMAIN]).filter((p) => !isTest(p)),
@@ -134,6 +135,7 @@ export function checkR2(root: string, options: GuardOptions = {}): GuardResult {
 
 /** R3: driving adapters never import driven adapters; the two meet only in composition. */
 export async function checkR3(root: string, options: GuardOptions = {}): Promise<GuardResult> {
+  freshGraphs();
   const violations: Violation[] = [];
   const scanned: string[] = [];
   for (const app of APPS) {
@@ -189,6 +191,7 @@ const CONTEXT = /^packages\/core\/src\/(domain|application)\/([^/]+)\//;
 
 /** R4: no import cycles, and one context reaches another only through its index.ts. The kernel is open to all. */
 export async function checkR4(root: string, options: GuardOptions = {}): Promise<GuardResult> {
+  freshGraphs();
   const files = scanFiles(
     root,
     sourcesUnder(root, [`${CORE}/src`]).filter((p) => !isTest(p)),

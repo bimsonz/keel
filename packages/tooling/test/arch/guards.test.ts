@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -82,13 +82,26 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
   R15: [/imports @keeltown\/core\/ports/, /imports \.\.\/adapters\/driven\/system\.ts/],
 };
 
+/**
+ * The real-tree pass of an ArchUnitTS check builds a TypeScript program over the
+ * whole repo: R3's takes ~11 s alone on an idle machine, but 70–110 s while every
+ * lane gates at once (load 90–160), past the project's 60 s. Its budget is set
+ * for that load, not for an idle runner; the canary and file count still prove
+ * that it read the tree.
+ */
+const REAL_TREE_TIMEOUT = 600_000;
+
 describe.each(allChecks.map((check) => [check.name, check] as const))("%s", (name, check) => {
-  it("passes on the real tree, having read enough files and the canary", async () => {
-    const result = await check.run(root);
-    expect(result.violations).toEqual([]);
-    expect(result.canarySeen).toBe(true);
-    expect(result.filesScanned).toBeGreaterThan(0);
-  });
+  it(
+    "passes on the real tree, having read enough files and the canary",
+    { timeout: REAL_TREE_TIMEOUT },
+    async () => {
+      const result = await check.run(root);
+      expect(result.violations).toEqual([]);
+      expect(result.canarySeen).toBe(true);
+      expect(result.filesScanned).toBeGreaterThan(0);
+    },
+  );
 
   it("goes red on its control fixture, for the reasons it exists", async () => {
     const result = await check.run(join(root, "test/controls", name), {
@@ -112,3 +125,32 @@ describe.each(allChecks.map((check) => [check.name, check] as const))("%s", (nam
 it("every check has its expected control reasons written down", () => {
   expect(allChecks.map((c) => c.name).toSorted()).toEqual(Object.keys(EXPECTED).toSorted());
 });
+
+/** Every source file under `dir`, recursively. */
+function sources(dir: string): string[] {
+  return readdirSync(dir, { recursive: true, encoding: "utf8" })
+    .filter((path) => path.endsWith(".ts"))
+    .map((path) => join(dir, path));
+}
+
+const ARCHUNIT_RULES = allChecks.filter((check) => ["R1", "R3", "R4"].includes(check.name));
+
+describe.each(ARCHUNIT_RULES.map((check) => [check.name, check] as const))(
+  "[arch.graph-fresh] %s",
+  (name, check) => {
+    it("reads the tree again on its next run, not the graph its last run built", async () => {
+      const tree = mkdtempSync(join(tmpdir(), "keel-guard-fresh-"));
+      try {
+        cpSync(join(root, "test/controls", name), tree, { recursive: true });
+        const options = { skip: [], vacuity: { minFiles: 1, canary: check.controlCanary } };
+        const before = (await check.run(tree, options)).violations.map((v) => v.message);
+        expect(before).toContainEqual(expect.stringMatching(/^\[archunit\]/));
+
+        for (const file of sources(tree)) writeFileSync(file, "export {};\n");
+        expect((await check.run(tree, options)).violations).toEqual([]);
+      } finally {
+        rmSync(tree, { recursive: true, force: true });
+      }
+    });
+  },
+);
