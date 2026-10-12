@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fallout.test.ts
+# kills: b21.premise-suspected
+# why: a suspicion names no change it affects, so the holder's agent is never told
+diff --git a/packages/core/src/application/coordination/subject-fallout.ts b/packages/core/src/application/coordination/subject-fallout.ts
+index a852587..d7e3ab5 100644
+--- a/packages/core/src/application/coordination/subject-fallout.ts
++++ b/packages/core/src/application/coordination/subject-fallout.ts
+@@ -169,7 +169,6 @@ export function judgeFallout(
+         });
+         drafts.push({
+           payload: payloadOf(Schema.encodeSync(PremiseSuspected)(suspected)),
+-          affected: [changeRef(pair.premise.holder)],
+         });
+       }
+     }

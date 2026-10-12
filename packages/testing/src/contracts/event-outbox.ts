@@ -51,6 +51,11 @@ const change = (): EntityRef => ({
 });
 const cause = () => `cause-${randomUlid()}`;
 
+/** A change's event of `tag`, on the change itself. */
+const changeEvent = (tag: string, entity: EntityRef): EventDraft => ({
+  entity,
+  payload: { _tag: tag, changeId: entity.id },
+});
 const started = (entity: EntityRef, revision: number, type = "PrecheckStarted"): EventDraft => ({
   payload: { _tag: type, changeId: entity.id, revision, instanceId: `instance-${revision}` },
 });
@@ -452,6 +457,57 @@ export function describeEventOutboxContract(adapter: string, harness: () => Outb
           yield* flush(h);
           expect(ids(h.fanOut.deliveredTo(member))).toEqual(
             ids([ours, own].filter((e) => e !== undefined)),
+          );
+        }),
+    );
+
+    it.effect(
+      "[outbox.once] a one-shot subscriber is owed the first event that notifies it, in the append that commits it, and nothing after",
+      () =>
+        Effect.gen(function* () {
+          const h = harness();
+          const [mine, other] = [change(), change()];
+          const probe = "workflow:Probe/probe-1";
+          const steady = `change:${mine.id}`;
+          const outcome = yield* h.run(
+            Effect.gen(function* () {
+              const outbox = yield* EventOutbox;
+              outbox.subscribe(probe, ["ChangeSubmitted", "ChangeWithdrawn"], mine, { once: true });
+              outbox.subscribe(steady, ["ChangeSubmitted", "ChangeWithdrawn"], mine);
+              const unrelated = yield* commit({ entity: other, cause: cause() }, () =>
+                Result.succeed({ drafts: [changeEvent("ChangeSubmitted", other)], value: null }),
+              );
+              const first = yield* commit({ entity: mine, cause: cause() }, () =>
+                Result.succeed({
+                  drafts: [
+                    changeEvent("ChangeSubmitted", mine),
+                    changeEvent("ChangeWithdrawn", mine),
+                  ],
+                  value: null,
+                }),
+              );
+              const later = yield* commit({ entity: mine, cause: cause() }, () =>
+                Result.succeed({ drafts: [changeEvent("ChangeSubmitted", mine)], value: null }),
+              );
+              return {
+                unrelated,
+                first,
+                later,
+                after: outbox.subscribers("ChangeSubmitted", { entity: mine, affected: [] }),
+              };
+            }),
+          );
+          // Out of its scope, it is not notified, so it is not spent.
+          expect(outcome.unrelated.events[0]?.notified).not.toContain(probe);
+          const [submitted, withdrawn] = outcome.first.events;
+          expect(submitted?.notified).toContain(probe);
+          expect(withdrawn?.notified).not.toContain(probe);
+          expect(withdrawn?.notified).toContain(steady);
+          expect(outcome.later.events[0]?.notified).not.toContain(probe);
+          expect(outcome.after).toEqual([steady]);
+          yield* flush(h);
+          expect(ids(h.fanOut.deliveredTo(probe))).toEqual(
+            ids([submitted].filter((e) => e !== undefined)),
           );
         }),
     );

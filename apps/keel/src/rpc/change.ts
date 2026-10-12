@@ -103,6 +103,12 @@ export type RelyCommand = typeof RelyCommand.Type;
 export const NearbyCommand = Schema.Struct({ projectId: ProjectId });
 export type NearbyCommand = typeof NearbyCommand.Type;
 
+/** A Workflow instance to tell, once, of the change's next submission or end: `workflow:<Name>/<instanceId>`. */
+export const AwaitSubmissionCommand = Schema.Struct({
+  subscriber: Schema.String.check(Schema.isPattern(/^workflow:[A-Za-z]+\/\S+$/)),
+});
+export type AwaitSubmissionCommand = typeof AwaitSubmissionCommand.Type;
+
 /** Who may withdraw a change: the holder of its lease, or an operator (a parked change, say). */
 export const WithdrawAuthority = Schema.Union([
   Schema.TaggedStruct("Lease", { leaseId: LeaseId }),
@@ -218,6 +224,13 @@ const Mutation = Schema.Union([
 
 export const ChangeCodecs = {
   get: exitCodec(Schema.Struct({ change: Change, projectId: ProjectId }), ChangeNotFound),
+  awaitSubmission: exitCodec(
+    Schema.Union([
+      Schema.Struct({ change: Change, projectId: ProjectId }),
+      Schema.Struct({ waiting: Schema.Literal(true) }),
+    ]),
+    ChangeNotFound,
+  ),
   declare: exitCodec(
     Schema.Struct({ change: Change, preflight: Preflight, grant: WorkspaceGrant }),
     Schema.Union([ChangeStateRefused, PoolExhausted, SketchNotFound, IdempotencyConflict]),
@@ -304,6 +317,13 @@ export interface ChangeRpc extends EventReceiverRpc {
    * `waitMs` (0–30,000). An in-DO waiter with a setTimeout deadline; no polling.
    */
   submission(waitMs: number): Promise<ExitJson>;
+  /**
+   * For a Probe Workflow: the change and its project when it is terminal or
+   * holds a current submission; otherwise `{waiting: true}`, with the
+   * subscriber subscribed once, in the same transaction, to its next
+   * ChangeSubmitted, ChangeWithdrawn or ChangeSuperseded.
+   */
+  awaitSubmission(command: typeof AwaitSubmissionCommand.Encoded): Promise<ExitJson>;
   /** The change's workspace, base and project, for Precheck's diff. ChangeStateRefused when it holds no workspace. */
   workspace(): Promise<ExitJson>;
   precheckStarted(command: typeof PrecheckStartedCommand.Encoded): Promise<ExitJson>;

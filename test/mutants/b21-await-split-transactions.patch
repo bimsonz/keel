@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/await-submission.test.ts
+# kills: b21.await-one-transaction
+# why: the read and the subscribe are separate transactions, so a submission between them is missed
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 55d13c3..a8190f8 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -540,9 +540,12 @@ export const awaitSubmission: (
+       if (projectId === undefined) return { _tag: "unprojected" } as const;
+       if (submissionStateOf(change)._tag !== "Unsubmitted")
+         return { _tag: "read", read: { change, projectId } } as const;
+-      outbox.subscribe(subscriber, AWAIT_SUBMISSION_HEARS, changeRef(changeId), { once: true });
+       return { _tag: "waiting" } as const;
+     });
++    if (found._tag === "waiting")
++      store.transaction(() =>
++        outbox.subscribe(subscriber, AWAIT_SUBMISSION_HEARS, changeRef(changeId), { once: true }),
++      );
+     if (found._tag === "missing") return yield* notFound(changeId);
+     if (found._tag === "unprojected")
+       return yield* Effect.die(`${changeId} has no project recorded`);

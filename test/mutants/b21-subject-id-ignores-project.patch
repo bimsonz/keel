@@ -2,12 +2,12 @@
 # kills: b21.subject-id
 # why: the subject id hashes the key alone, so one key in two projects is one subject
 diff --git a/packages/core/src/application/coordination/subject.ts b/packages/core/src/application/coordination/subject.ts
-index 1dd8d9a..3918514 100644
+index 9763313..9e978b7 100644
 --- a/packages/core/src/application/coordination/subject.ts
 +++ b/packages/core/src/application/coordination/subject.ts
-@@ -47,7 +47,7 @@ export function hashedIdBody(text: string): string {
- }
- 
+@@ -36,7 +36,7 @@ type Store = (typeof EntityStore)["Service"];
+  * subjects.
+  */
  export function subjectIdOf(projectId: ProjectId, key: SubjectKey): SubjectId {
 -  return SubjectId.make(`sub_${hashedIdBody(`${projectId}\n${key}`)}`);
 +  return SubjectId.make(`sub_${hashedIdBody(`${key}`)}`);

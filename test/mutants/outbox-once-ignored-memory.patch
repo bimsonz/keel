@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t outbox.once
+# kills: outbox.once
+# why: a one-shot subscriber stays subscribed after its first event, in memory
+diff --git a/packages/testing/src/memory/event-outbox.ts b/packages/testing/src/memory/event-outbox.ts
+index 805decc..5d3be79 100644
+--- a/packages/testing/src/memory/event-outbox.ts
++++ b/packages/testing/src/memory/event-outbox.ts
+@@ -181,7 +181,6 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
+         }
+       }
+       if (head !== undefined) store.put(DELIVERY_HEAD.kind, DELIVERY_HEAD.id, head);
+-      for (const subscriber of notifying.spent) dropSubscriber(subscriber);
+       return envelopes;
+     },
+     committed: (entity, cause) => {

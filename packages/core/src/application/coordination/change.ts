@@ -73,6 +73,7 @@ import {
   LiveChanges,
   type Remedy,
   type Stored,
+  type Subscriber,
   type SubmissionStatus,
   type Transaction,
   type Transition,
@@ -83,6 +84,7 @@ import {
   type WorkspaceGrant,
   WorkspaceRebaser,
 } from "../ports/index.ts";
+import { submissionStateOf } from "../verification/index.ts";
 import { blockersOf, hearConflict, partyConflictOf, policyFor } from "./party-conflicts.ts";
 import { preflightFor } from "./preflight.ts";
 
@@ -159,7 +161,12 @@ export const LIVE_INDEX_HEARS = [
 ] as const;
 
 /** What a Subject DO hears of each change relying on or affecting its key, or a key beneath it. */
-export const SUBJECT_HEARS = ["IntentDeclared", "IntentRevised", ...CHANGE_ENDS] as const;
+export const SUBJECT_HEARS = [
+  "IntentDeclared",
+  "IntentRevised",
+  "ChangeAdopted",
+  ...CHANGE_ENDS,
+] as const;
 
 /** A project's Subject DO for a key. */
 export const subjectAddress = (projectId: ProjectId, key: SubjectKey): string =>
@@ -497,6 +504,50 @@ export const changeRead: (
     return { change, projectId };
   },
 );
+
+/** What a waiter on a change's submission hears, once: its next submission, or its end before one. */
+export const AWAIT_SUBMISSION_HEARS = [
+  "ChangeSubmitted",
+  "ChangeWithdrawn",
+  "ChangeSuperseded",
+] as const;
+
+/** `awaitSubmission`'s answer when there is nothing to read yet: the subscriber will be told. */
+export interface AwaitingSubmission {
+  readonly waiting: true;
+}
+
+/**
+ * The change with its project when `submissionStateOf` reads anything but
+ * Unsubmitted from it: a current submission, its landing, or its end.
+ * Otherwise `waiting`, with `subscriber` subscribed once, in the same
+ * transaction as the read, to the change's next ChangeSubmitted,
+ * ChangeWithdrawn or ChangeSuperseded: whatever commits after this read
+ * notifies it, so nothing falls between a read and a subscribe. The Probe
+ * reads the answer with the same rule, so it never waits unsubscribed.
+ */
+export const awaitSubmission: (
+  changeId: ChangeId,
+  subscriber: Subscriber,
+) => Effect.Effect<ChangeRead | AwaitingSubmission, ChangeNotFound, EntityStore | EventOutbox> =
+  Effect.fn("coordination/awaitSubmission")(function* (changeId: ChangeId, subscriber: Subscriber) {
+    const store = yield* EntityStore;
+    const outbox = yield* EventOutbox;
+    const found = store.transaction(() => {
+      const change = storedChange(store, changeId);
+      if (change === undefined) return { _tag: "missing" } as const;
+      const projectId = heldWorkspace(store, changeId)?.projectId;
+      if (projectId === undefined) return { _tag: "unprojected" } as const;
+      if (submissionStateOf(change)._tag !== "Unsubmitted")
+        return { _tag: "read", read: { change, projectId } } as const;
+      outbox.subscribe(subscriber, AWAIT_SUBMISSION_HEARS, changeRef(changeId), { once: true });
+      return { _tag: "waiting" } as const;
+    });
+    if (found._tag === "missing") return yield* notFound(changeId);
+    if (found._tag === "unprojected")
+      return yield* Effect.die(`${changeId} has no project recorded`);
+    return found._tag === "read" ? found.read : ({ waiting: true } as const);
+  });
 
 /**
  * The remedy still owed on a change, from its log: its latest ChangeBounced

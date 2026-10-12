@@ -187,7 +187,7 @@ export function describeProbeLedgerContract(
     );
 
     it.effect(
-      "[b21.world-check] a party's suite check is recorded only while the conflict probes, once, and an n/a without a reason is refused",
+      "[b21.world-check] a party's suite check is refused before the conflict's probe is drafted and recorded after it, once, and an n/a without a reason is refused",
       () => {
         const harness = makeHarness();
         const { at, conflictId, holder, suspect } = conflictOn();
@@ -244,12 +244,12 @@ export function describeProbeLedgerContract(
           const failed = yield* ledger.probeDraftFailed(at, {
             conflictId,
             attempts: 3,
-            reason: "repairs-exhausted",
+            reason: "worlds-unbuildable",
           });
           const again = yield* ledger.probeDraftFailed(at, {
             conflictId,
             attempts: 3,
-            reason: "repairs-exhausted",
+            reason: "worlds-unbuildable",
           });
           const late = yield* Effect.flip(
             ledger.probeDrafted(at, { conflictId, attempts: 1, bundleHash: BUNDLE }),
@@ -265,9 +265,13 @@ export function describeProbeLedgerContract(
           expect(again).toEqual(failed);
           expect(late._tag).toBe("ProbeStateRefused");
           expect(yield* ledger.conflict(at, conflictId)).toEqual(failed);
-          expect(types(yield* harness.log(at, { kind: "probe", id: probeId }))).toEqual([
-            "ProbeDiscarded",
-          ]);
+          const discarded = yield* harness.log(at, { kind: "probe", id: probeId });
+          expect(types(discarded)).toEqual(["ProbeDiscarded"]);
+          // The reason drafting failed rides the event, on the domain's list.
+          expect(discarded[0]?.payload).toMatchObject({
+            reason: "draft-failed",
+            detail: "worlds-unbuildable",
+          });
         }).pipe(Effect.provide(harness.layer));
       },
     );

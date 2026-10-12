@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t b21.draft-failed
+# kills: b21.draft-failed
+# why: a probe whose drafts failed is discarded without saying why
+diff --git a/packages/core/src/application/coordination/probe-ledger.ts b/packages/core/src/application/coordination/probe-ledger.ts
+index b3a3192..62fc648 100644
+--- a/packages/core/src/application/coordination/probe-ledger.ts
++++ b/packages/core/src/application/coordination/probe-ledger.ts
+@@ -259,7 +259,7 @@ export const probeDraftFailed = Effect.fn("coordination/probeDraftFailed")(funct
+     {
+       _tag: "Probe",
+       probeId,
+-      command: { _tag: "DraftFailed", conflictId: failed.conflictId, detail: failed.reason },
++      command: { _tag: "DraftFailed", conflictId: failed.conflictId },
+     },
+   );
+   return yield* conflictView(failed.conflictId);

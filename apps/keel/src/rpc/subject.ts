@@ -1,5 +1,6 @@
 import { IdempotencyConflict } from "@keeltown/core/domain/identity";
 import {
+  DraftFailure,
   Conflict,
   ConflictNotFound,
   ConflictStateRefused,
@@ -33,7 +34,7 @@ export const ProbeDraftedCommand = Schema.Struct({
 export const ProbeDraftFailedCommand = Schema.Struct({
   conflictId: ConflictId,
   attempts: Schema.Int,
-  reason: Schema.Literals(["abstained", "incomplete", "repairs-exhausted"]),
+  reason: DraftFailure,
 });
 
 /** One world-matrix cell of the conflict's probe (core's `ProbeCell`). */

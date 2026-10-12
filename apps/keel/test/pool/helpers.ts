@@ -173,3 +173,13 @@ export async function drainRegistered(): Promise<void> {
   toDrain.clear();
   for (const stub of stubs) await drainOutbox(stub);
 }
+
+/**
+ * Drops what `stub` owes `subscriber`. The fan-out routes no Probe Workflow
+ * yet, so a delivery to one stays owed and its object's
+ * outbox would never go quiet.
+ */
+export const forgetOwed = (stub: DurableObjectStub, subscriber: string) =>
+  runInDurableObject(stub, (_instance: unknown, state) => {
+    state.storage.sql.exec("DELETE FROM keel_deliveries WHERE subscriber = ?", subscriber);
+  });

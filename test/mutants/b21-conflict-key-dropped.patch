@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fallout.test.ts
+# kills: b21.conflict-subject-key
+# why: a conflict opened by fallout does not name its subject's key, so the fan-out cannot address the Probe to the subject that hosts it
+diff --git a/packages/core/src/application/coordination/subject-fallout.ts b/packages/core/src/application/coordination/subject-fallout.ts
+index 511377a..a852587 100644
+--- a/packages/core/src/application/coordination/subject-fallout.ts
++++ b/packages/core/src/application/coordination/subject-fallout.ts
+@@ -149,7 +149,6 @@ export function judgeFallout(
+           kind: "semantic",
+           parties: [pair.premise.holder, pair.effect.changeId],
+           subjectId: subject.id,
+-          subjectKey: subject.key,
+           predicate: pair.premise.proposition.predicate,
+           origin: "fallout",
+           premise: pair.premise,

@@ -49,7 +49,9 @@ export function subjectOf(name: string | undefined): {
 export class SubjectDO extends KeelObject {
   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
     const { projectId, key } = subjectOf(this.ctx.id.name);
-    return hearSubject(tx.store, projectId, key, event);
+    const { problems, ...reaction } = hearSubject(tx, projectId, key, event);
+    for (const problem of problems ?? []) console.error(`${this.ctx.id.name}: ${problem}`);
+    return reaction;
   }
 
   async conflict(conflictId: string) {

@@ -3,6 +3,7 @@ import type { SubjectKey } from "../../domain/coordination/index.ts";
 import type { IdempotencyConflict } from "../../domain/identity/index.ts";
 import type { ConflictId, ContentHash, ProbeId, ProjectId } from "../../domain/kernel/index.ts";
 import type {
+  DraftFailure,
   Conflict,
   ConflictNotFound,
   ConflictStateRefused,
@@ -32,12 +33,10 @@ export interface DraftedProbe {
   readonly bundleHash: ContentHash;
 }
 
-/** Why no probe was admitted to calibrate: the drafting ended without one. */
-export type DraftFailure = "abstained" | "incomplete" | "repairs-exhausted";
-
 export interface FailedDraft {
   readonly conflictId: ConflictId;
   readonly attempts: number;
+  /** Why the drafting ended without a probe to calibrate, as ProbeDiscarded carries it. */
   readonly reason: DraftFailure;
 }
 

@@ -13,6 +13,7 @@ import {
   isInScope,
   type PriorCommit,
   scopeOf,
+  spendingOnce,
   type Stored,
   type Subscriber,
 } from "@keeltown/core/ports";
@@ -21,6 +22,8 @@ import { makeEntityStoreMemory } from "./storage.ts";
 
 const EVENT = "keel:event";
 const SUBSCRIPTION = "keel:subscription";
+/** One-shot subscribers, by subscriber: the append that first notifies one drops its subscriptions. */
+const ONCE = "keel:subscription-once";
 const DELIVERY = "keel:delivery";
 const DELIVERY_HEAD = { kind: "keel:delivery-head", id: "self" } as const;
 const RECEIVED = "keel:received";
@@ -114,6 +117,14 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
       ),
     ].toSorted();
 
+  /** Drops every subscription `subscriber` holds, scoped, unscoped and one-shot. */
+  const dropSubscriber = (subscriber: Subscriber): void => {
+    for (const row of store.list(SUBSCRIPTION))
+      if (Schema.decodeUnknownSync(StoredSubscription)(row.value).subscriber === subscriber)
+        store.remove(SUBSCRIPTION, row.id);
+    store.remove(ONCE, subscriber);
+  };
+
   /** The entity's last seq, or 0 before its first event. */
   const previous = (entity: EntityRef) => eventsOf(entity).at(-1)?.envelope.seq ?? 0;
 
@@ -126,13 +137,14 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
 
   return EventOutbox.of({
     append: (spec, at, drafts) => {
+      const notifying = spendingOnce(subscribers, new Set(store.list(ONCE).map((row) => row.id)));
       const envelopes = envelopesFor(
         spec,
         at,
         previous,
         drafts,
         () => makeId("evt", ulidOf((minted += 1))),
-        subscribers,
+        notifying.subscribers,
       );
       const taken = new Set(
         store
@@ -169,6 +181,7 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
         }
       }
       if (head !== undefined) store.put(DELIVERY_HEAD.kind, DELIVERY_HEAD.id, head);
+      for (const subscriber of notifying.spent) dropSubscriber(subscriber);
       return envelopes;
     },
     committed: (entity, cause) => {
@@ -179,7 +192,8 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
       return first.fingerprint === null ? prior : { ...prior, fingerprint: first.fingerprint };
     },
     log: (entity) => eventsOf(entity).map((row) => row.envelope),
-    subscribe: (subscriber, types, scope) => {
+    subscribe: (subscriber, types, scope, options) => {
+      if (options?.once === true) store.put(ONCE, subscriber, true);
       for (const type of types === EVERY_TYPE ? [EVERY_TYPE] : types) {
         const scoped = scope === undefined ? {} : { scope: scopeOf(scope) };
         store.put(
@@ -190,6 +204,8 @@ function outboxOver(store: (typeof EntityStore)["Service"]): (typeof EventOutbox
       }
     },
     unsubscribe: (subscriber, types, scope) => {
+      if (scope === undefined && (types === undefined || types === EVERY_TYPE))
+        store.remove(ONCE, subscriber);
       for (const row of store.list(SUBSCRIPTION)) {
         const subscription = Schema.decodeUnknownSync(StoredSubscription)(row.value);
         if (subscription.subscriber !== subscriber) continue;

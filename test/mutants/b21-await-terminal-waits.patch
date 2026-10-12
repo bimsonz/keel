@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/await-submission.test.ts
+# kills: b21.await-submission
+# why: a change withdrawn before it submitted leaves its Probe waiting for an event that never comes
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 55d13c3..da3fb9f 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -538,7 +538,7 @@ export const awaitSubmission: (
+       if (change === undefined) return { _tag: "missing" } as const;
+       const projectId = heldWorkspace(store, changeId)?.projectId;
+       if (projectId === undefined) return { _tag: "unprojected" } as const;
+-      if (submissionStateOf(change)._tag !== "Unsubmitted")
++      if (submissionStateOf(change)._tag === "Submitted")
+         return { _tag: "read", read: { change, projectId } } as const;
+       outbox.subscribe(subscriber, AWAIT_SUBMISSION_HEARS, changeRef(changeId), { once: true });
+       return { _tag: "waiting" } as const;

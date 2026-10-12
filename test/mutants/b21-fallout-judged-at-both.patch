@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fallout.test.ts
+# kills: b21.fallout-proximity
+# why: a pair is judged at every subject that holds both sides, so one dispute opens once at each of them
+diff --git a/packages/core/src/application/coordination/subject-fallout.ts b/packages/core/src/application/coordination/subject-fallout.ts
+index 511377a..0ed5860 100644
+--- a/packages/core/src/application/coordination/subject-fallout.ts
++++ b/packages/core/src/application/coordination/subject-fallout.ts
+@@ -52,9 +52,10 @@ export const judgedHere = (
+   premiseSubject: SubjectKey,
+   effectSubject: SubjectKey,
+ ): boolean =>
+-  isAncestorOrSelf(premiseSubject, effectSubject)
+-    ? premiseSubject === key
+-    : isAncestorOrSelf(effectSubject, premiseSubject) && effectSubject === key;
++  isAncestorOrSelf(key, premiseSubject) &&
++  isAncestorOrSelf(key, effectSubject) &&
++  (isAncestorOrSelf(premiseSubject, effectSubject) ||
++    isAncestorOrSelf(effectSubject, premiseSubject));
+ 
+ /** The propositions `now` holds that `was` did not. */
+ const fresh = (now: readonly Proposition[], was: readonly Proposition[]) =>

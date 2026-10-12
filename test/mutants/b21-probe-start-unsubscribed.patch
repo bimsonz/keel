@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/fallout.test.ts
+# kills: b21.probe-start
+# why: a conflict opens but nothing starts its Probe
+diff --git a/packages/core/src/application/coordination/subject-fallout.ts b/packages/core/src/application/coordination/subject-fallout.ts
+index a852587..49956ee 100644
+--- a/packages/core/src/application/coordination/subject-fallout.ts
++++ b/packages/core/src/application/coordination/subject-fallout.ts
+@@ -158,7 +158,6 @@ export function judgeFallout(
+           problems.push(`fallout could not open ${conflictId}: ${opened.failure._tag}`);
+           continue;
+         }
+-        tx.outbox.subscribe(PROBE_WORKFLOW, ["ConflictSuspected"]);
+         drafts.push(...opened.success);
+       } else if (outcome._tag === "suspect") {
+         const suspected = PremiseSuspected.make({

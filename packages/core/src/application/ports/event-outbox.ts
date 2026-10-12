@@ -125,6 +125,7 @@ export class EventOutbox extends Context.Service<
       subscriber: Subscriber,
       types: readonly string[] | typeof EVERY_TYPE,
       scope?: EntityRef,
+      options?: SubscribeOptions,
     ) => void;
     /**
      * Stops owing `subscriber` these types, scoped or not; every type when omitted.
@@ -206,6 +207,39 @@ export function dedupeKeyOf(
   ordinal: number,
 ): string {
   return `${entity.kind}:${entity.id}/${cause}/${type}#${ordinal}`;
+}
+
+/**
+ * How a subscription is held. A `once` subscriber is owed the first event
+ * that notifies it and nothing after: the append that notifies it drops
+ * every subscription it holds, in the same transaction.
+ */
+export interface SubscribeOptions {
+  readonly once?: boolean;
+}
+
+/**
+ * The subscribers one append notifies, event by event, with each one-shot
+ * subscriber notified once: the first event that names it spends it, and
+ * the events after it in the same append skip it. `spent` is what the
+ * adapter then unsubscribes.
+ */
+export function spendingOnce(
+  subscribers: (type: string, about: EventAbout) => readonly Subscriber[],
+  once: ReadonlySet<Subscriber>,
+): {
+  readonly subscribers: (type: string, about: EventAbout) => readonly Subscriber[];
+  readonly spent: ReadonlySet<Subscriber>;
+} {
+  const spent = new Set<Subscriber>();
+  return {
+    subscribers: (type, about) => {
+      const found = subscribers(type, about).filter((subscriber) => !spent.has(subscriber));
+      for (const subscriber of found) if (once.has(subscriber)) spent.add(subscriber);
+      return found;
+    },
+    spent,
+  };
 }
 
 /**

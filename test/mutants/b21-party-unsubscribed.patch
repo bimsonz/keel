@@ -2,14 +2,14 @@
 # kills: b21.party-hears
 # why: opening a conflict never subscribes its parties' Change DOs, so they never hear it
 diff --git a/packages/core/src/application/coordination/probe-ledger.ts b/packages/core/src/application/coordination/probe-ledger.ts
-index 875df71..5e5719c 100644
+index b755e45..18bf411 100644
 --- a/packages/core/src/application/coordination/probe-ledger.ts
 +++ b/packages/core/src/application/coordination/probe-ledger.ts
-@@ -315,7 +315,6 @@ export const suspectConflict = Effect.fn("coordination/suspectConflict")(functio
-       }
-       if (conflict !== undefined) {
-         tx.store.put(CONFLICT, conflictId, asStored(encodeConflict(conflict)));
--        subscribeParties(tx.outbox, conflict.parties);
-       }
-       return Result.succeed({ drafts, value: undefined });
-     },
+@@ -353,7 +353,6 @@ export function suspectDrafts(
+   }
+   if (conflict !== undefined) {
+     tx.store.put(CONFLICT, conflictId, asStored(encodeConflict(conflict)));
+-    subscribeParties(tx.outbox, conflict.parties);
+   }
+   return Result.succeed(drafts);
+ }

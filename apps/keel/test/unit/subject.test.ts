@@ -14,7 +14,6 @@ import { type ChangeId, CommitSha, idPattern, makeId, ProjectId } from "@keeltow
 import { EventOutbox } from "@keeltown/core/ports";
 import {
   makeCodeHostMemory,
-  makeEntityStoreMemory,
   makeEventOutboxMemory,
   makeIdsMemory,
   makeLiveChangesMemory,
@@ -90,6 +89,12 @@ const subjectsHearing = (changeId: ChangeId) =>
       .toSorted(),
   );
 
+/** A Subject DO's store and outbox, in memory: what its reaction runs over. */
+const subjectObject = () => {
+  const memory = makeEventOutboxMemory();
+  return { store: memory.store.service, outbox: memory.service };
+};
+
 describe("[b21.subject-id] a subject's id derives from its project and key", () => {
   it("[b21.subject-id] is a well-formed sub_ id, the same for the same pair, and differs by project and by key", () => {
     const other = Schema.decodeUnknownSync(ProjectId)(`prj_${ulidOf(99)}`);
@@ -164,8 +169,8 @@ describe("[b21.relying-subscribes] relying on a subject subscribes it and its an
     "[b21.relying-subscribes] the premise's own subject mints once and relies each new premise; an ancestor mints and only keeps it",
     () =>
       Effect.gen(function* () {
-        const leaf = makeEntityStoreMemory().service;
-        const root = makeEntityStoreMemory().service;
+        const leaf = subjectObject();
+        const root = subjectObject();
         const hear = (changeId: ChangeId) =>
           Effect.map(logOf(changeId), (log) =>
             log.map((event) => ({
@@ -218,7 +223,7 @@ describe("[b21.relying-subscribes] relying on a subject subscribes it and its an
             },
           ],
         });
-        expect(root.get(SUBJECT_HELD, A)).toMatchObject({ premises: [{ subject: LEAF }] });
+        expect(root.store.get(SUBJECT_HELD, A)).toMatchObject({ premises: [{ subject: LEAF }] });
 
         // B relies on the same subject: no second mint, its own PremiseRelied.
         const b = changeObject();
@@ -252,7 +257,9 @@ describe("[b21.relying-subscribes] relying on a subject subscribes it and its an
             },
           },
         ]);
-        expect(leaf.get(SUBJECT_HELD, A)).toMatchObject({ premises: [{ predicate: "bound" }] });
+        expect(leaf.store.get(SUBJECT_HELD, A)).toMatchObject({
+          premises: [{ predicate: "bound" }],
+        });
 
         // A revision that leaves the premise held relies nothing again.
         const held = (yield* logOf(A).pipe(Effect.provide(a))).length;
@@ -279,8 +286,8 @@ describe("[b21.relying-subscribes] relying on a subject subscribes it and its an
           type: "ChangeWithdrawn",
           payload: { _tag: "ChangeWithdrawn", changeId: A, by: "agent" },
         });
-        expect(leaf.get(SUBJECT_HELD, A)).toBeUndefined();
-        expect(leaf.get(SUBJECT_HELD, B)).toBeDefined();
+        expect(leaf.store.get(SUBJECT_HELD, A)).toBeUndefined();
+        expect(leaf.store.get(SUBJECT_HELD, B)).toBeDefined();
       }),
   );
 });

@@ -116,6 +116,7 @@ export * from "./preflight.ts";
 export * from "./probe-ledger.ts";
 export * from "./read-scope.ts";
 export * from "./subject.ts";
+export * from "./subject-fallout.ts";
 
 /** The WorkspacePool use-cases. */
 export * from "./workspace-pool/index.ts";

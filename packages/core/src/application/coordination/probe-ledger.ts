@@ -3,6 +3,7 @@ import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import {
   type ConflictId,
   type EntityRef,
+  type Instant,
   ProbeId,
   type ProjectId,
 } from "../../domain/kernel/index.ts";
@@ -11,6 +12,7 @@ import {
   type ConflictCommand,
   ConflictEvent,
   ConflictNotFound,
+  type ConflictRejection,
   decideConflict,
   decideProbe,
   evolveConflict,
@@ -33,7 +35,7 @@ import {
   type WorldCheckCell,
 } from "../ports/index.ts";
 import { affectingParties, PARTY_HEARS, subscribeParties } from "./party-conflicts.ts";
-import { hashedIdBody } from "./subject.ts";
+import { hashedIdBody } from "./hashed-id.ts";
 
 type Store = Transaction["store"];
 
@@ -236,12 +238,12 @@ export const probeDrafted = Effect.fn("coordination/probeDrafted")(function* (
 });
 
 /**
- * The drafting ended without a probe to calibrate (it abstained, or its
- * draft stayed incomplete, or its repairs ran out): the probe begins and ends
- * discarded as draft-failed, so the conflict never waits on a draft that will
- * not come. Once per conflict, as `probeDrafted`. The reason is kept only in
- * the fingerprint until the domain's ProbeDiscarded carries it. The conflict
- * stays open: settling an unprovable probe needs an escalation.
+ * The Probe Workflow's drafting ended without a probe to calibrate (it abstained, its
+ * draft stayed incomplete, its repairs ran out, its worlds could not be
+ * built, …): the probe begins and ends discarded as draft-failed, its
+ * ProbeDiscarded carrying the reason as `detail`, so the conflict never waits
+ * on a draft that will not come. Once per conflict, as `probeDrafted`. The
+ * conflict stays open: settling an unprovable probe needs an escalation.
  */
 export const probeDraftFailed = Effect.fn("coordination/probeDraftFailed")(function* (
   projectId: ProjectId,
@@ -254,7 +256,11 @@ export const probeDraftFailed = Effect.fn("coordination/probeDraftFailed")(funct
     probeRef(probeId),
     `probe-draft-failed:${failed.conflictId}`,
     `${failed.reason}/${failed.attempts}`,
-    { _tag: "Probe", probeId, command: { _tag: "DraftFailed", conflictId: failed.conflictId } },
+    {
+      _tag: "Probe",
+      probeId,
+      command: { _tag: "DraftFailed", conflictId: failed.conflictId, detail: failed.reason },
+    },
   );
   return yield* conflictView(failed.conflictId);
 });
@@ -295,8 +301,9 @@ export const probeCellRan = Effect.fn("coordination/probeCellRan")(function* (
 });
 
 /**
- * One check of a party's suite in one world while the conflict is probing:
- * WorldCheckRan. Idempotent per (conflict, world, check, run) by the machine,
+ * One check of a party's suite in one world: WorldCheckRan. The conflict
+ * machine says when one is accepted, never before the conflict's probe is
+ * drafted. Idempotent per (conflict, world, check, run) by the machine,
  * which refuses a changed answer (`cell-recorded`) and a malformed cell.
  */
 export const worldCheckRan = Effect.fn("coordination/worldCheckRan")(function* (
@@ -326,10 +333,37 @@ export const worldCheckRan = Effect.fn("coordination/worldCheckRan")(function* (
 });
 
 /**
- * Opens a conflict on this subject: ConflictSuspected, and each party's Change
- * DO is subscribed to the conflict's moves. Fallout calls it; until then
- * only the ledger's test harnesses do.
+ * What opening a conflict commits, inside the caller's transaction: the
+ * conflict's ConflictSuspected on `conflict:<cid>`, its row, and each party's
+ * Change DO subscribed to its moves. A suspicion the domain refuses commits
+ * nothing and answers the refusal. The Subject DO's fallout calls it from its
+ * reaction, so it reads no clock: `at` is the caller's.
  */
+export function suspectDrafts(
+  tx: Pick<Transaction, "store" | "outbox">,
+  at: Instant,
+  conflictId: ConflictId,
+  suspect: Extract<ConflictCommand, { _tag: "Suspect" }>,
+): Result.Result<readonly EventDraft[], ConflictRejection> {
+  const decided = decideConflict(storedConflict(tx.store, conflictId), suspect, {
+    now: at,
+    conflictId,
+  });
+  if (Result.isFailure(decided)) return Result.fail(decided.failure);
+  let conflict: Conflict | undefined;
+  const drafts: EventDraft[] = [];
+  for (const payload of decided.success) {
+    conflict = evolveConflict(conflict, { at, payload });
+    drafts.push({ ...ledgerDraft(payload, conflict), entity: conflictRef(conflictId) });
+  }
+  if (conflict !== undefined) {
+    tx.store.put(CONFLICT, conflictId, asStored(encodeConflict(conflict)));
+    subscribeParties(tx.outbox, conflict.parties);
+  }
+  return Result.succeed(drafts);
+}
+
+/** Opens a conflict on this subject in a commit of its own, as the ledger's harnesses do. */
 export const suspectConflict = Effect.fn("coordination/suspectConflict")(function* (
   projectId: ProjectId,
   conflictId: ConflictId,
@@ -337,24 +371,11 @@ export const suspectConflict = Effect.fn("coordination/suspectConflict")(functio
 ) {
   yield* commit(
     { entity: conflictRef(conflictId), cause: `suspect:${conflictId}`, project: projectId },
-    (tx) => {
-      const decided = decideConflict(storedConflict(tx.store, conflictId), suspect, {
-        now: tx.at,
-        conflictId,
-      });
-      if (Result.isFailure(decided)) return Result.fail(decided.failure);
-      let conflict: Conflict | undefined;
-      const drafts: EventDraft[] = [];
-      for (const payload of decided.success) {
-        conflict = evolveConflict(conflict, { at: tx.at, payload });
-        drafts.push(ledgerDraft(payload, conflict));
-      }
-      if (conflict !== undefined) {
-        tx.store.put(CONFLICT, conflictId, asStored(encodeConflict(conflict)));
-        subscribeParties(tx.outbox, conflict.parties);
-      }
-      return Result.succeed({ drafts, value: undefined });
-    },
+    (tx) =>
+      Result.map(suspectDrafts(tx, tx.at, conflictId, suspect), (drafts) => ({
+        drafts,
+        value: undefined,
+      })),
   );
   return yield* conflictView(conflictId);
 });

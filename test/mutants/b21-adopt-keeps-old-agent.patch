@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/fallout.test.ts
+# kills: b21.premise-suspected
+# why: after an adopt the subject still tells the agent that let the lease lapse, never the adopter
+diff --git a/packages/core/src/application/coordination/subject.ts b/packages/core/src/application/coordination/subject.ts
+index 9763313..875b70b 100644
+--- a/packages/core/src/application/coordination/subject.ts
++++ b/packages/core/src/application/coordination/subject.ts
+@@ -218,7 +218,7 @@ function heldBy(tx: Pick<Transaction, "store" | "outbox">, changeId: ChangeId, a
+ /** An adopt moves the change's subscription from the agent that let it lapse to the adopter. */
+ function adopted(tx: Pick<Transaction, "store" | "outbox">, changeId: ChangeId, agentId: AgentId) {
+   const previous = holderAgent(tx.store, changeId);
+-  if (previous === undefined || previous === agentId) return;
++  if (previous !== undefined || previous === agentId) return;
+   tx.outbox.unsubscribe(`agent:${previous}`, HOLDER_HEARS, changeRef(changeId));
+   heldBy(tx, changeId, agentId);
+ }

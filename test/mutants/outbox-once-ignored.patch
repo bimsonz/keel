@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/outbox.test.ts -t outbox.once
+# kills: outbox.once
+# why: a one-shot subscriber stays subscribed after its first event, on the Durable Object
+diff --git a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
+index 6cc5036..b65d202 100644
+--- a/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
++++ b/apps/keel/src/adapters/driven/do-storage/event-outbox.ts
+@@ -150,7 +150,6 @@ export function EventOutboxSql(storage: DurableObjectStorage) {
+             );
+           }
+         }
+-        for (const subscriber of notifying.spent) dropSubscriber(subscriber);
+         return envelopes;
+       },
+       committed: (entity, cause) => {

@@ -1,6 +1,7 @@
 import {
   abandon,
   adopt,
+  awaitSubmission,
   CHANGE_WORKSPACE,
   changeRead,
   changeWorkspace,
@@ -31,6 +32,7 @@ import {
 import {
   AbandonCommand,
   AdoptCommand,
+  AwaitSubmissionCommand,
   ChangeCodecs,
   type ChangeRpc,
   DeclareCommand,
@@ -130,6 +132,14 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
       Effect.flatMap((reading) => nearby(changeId, reading)),
     );
     return this.answer(ChangeCodecs.nearby, program);
+  }
+
+  async awaitSubmission(command: typeof AwaitSubmissionCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(AwaitSubmissionCommand, command).pipe(
+      Effect.flatMap(({ subscriber }) => awaitSubmission(changeId, subscriber)),
+    );
+    return this.answer(ChangeCodecs.awaitSubmission, program);
   }
 
   async submit(command: typeof SubmitCommand.Encoded) {

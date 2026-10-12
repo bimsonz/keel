@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import {
+  ChangeAdopted,
   type Intent,
   IntentDeclared,
   IntentRevised,
@@ -12,19 +13,21 @@ import {
   SubjectMinted,
 } from "../../domain/coordination/index.ts";
 import {
-  type ChangeId,
+  AgentId,
+  ChangeId,
   type EntityRef,
   type EventEnvelope,
   type ProjectId,
-  sha256Hex,
   SubjectId,
 } from "../../domain/kernel/index.ts";
-import type { EntityStore, EventDraft, Stored } from "../ports/index.ts";
+import type { EntityStore, EventDraft, Stored, Transaction } from "../ports/index.ts";
 import { CHANGE_ENDS } from "./change.ts";
+import { hashedIdBody } from "./hashed-id.ts";
+import { falloutPairs, judgeFallout } from "./subject-fallout.ts";
+
+export { hashedIdBody } from "./hashed-id.ts";
 
 type Store = (typeof EntityStore)["Service"];
-
-const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 /**
  * A subject's id, derived from its project and key: `sub_` and the first 130
@@ -32,20 +35,6 @@ const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
  * subject without asking a registry, and the same key in two projects is two
  * subjects.
  */
-/** The 26 Crockford characters of the first 130 bits of `text`'s sha256: an id's body, the same for the same text. */
-export function hashedIdBody(text: string): string {
-  const bits = Array.from(sha256Hex(text).split(""), (digit) =>
-    Number.parseInt(digit, 16).toString(2).padStart(4, "0"),
-  )
-    .join("")
-    .slice(0, 130);
-  const chars = Array.from(
-    { length: 26 },
-    (_, i) => CROCKFORD[Number.parseInt(bits.slice(i * 5, i * 5 + 5), 2)] ?? "0",
-  );
-  return chars.join("");
-}
-
 export function subjectIdOf(projectId: ProjectId, key: SubjectKey): SubjectId {
   return SubjectId.make(`sub_${hashedIdBody(`${projectId}\n${key}`)}`);
 }
@@ -57,6 +46,11 @@ export function subjectIdOf(projectId: ProjectId, key: SubjectKey): SubjectId {
 export const SUBJECT_HELD = "subject-held";
 /** The subject's own record, written with its SubjectMinted: a subject is minted once. */
 export const SUBJECT_MINTED = "subject-minted";
+/** Each held change's agent, who hears the change's PremiseSuspected: by change id. */
+export const HOLDER_AGENT = "holder-agent";
+
+/** What a change's agent hears from a subject, on its subscription scoped to that change. */
+export const HOLDER_HEARS = ["PremiseSuspected"] as const;
 
 const Held = Schema.Struct({
   premises: Schema.Array(Proposition),
@@ -70,14 +64,19 @@ const payloadOf = (encoded: unknown): EventDraft["payload"] => JSON.parse(JSON.s
 
 const NOTHING: Held = { premises: [], declaredEffects: [] };
 
-/** What the subject commits on hearing a change: on its own entity, in its project. */
-export type SubjectReaction =
+/**
+ * What the subject commits on hearing a change: on its own entity, in its
+ * project (a conflict it opens goes on the conflict's), and the problems
+ * fallout met, for the object to log.
+ */
+export type SubjectReaction = (
   | {
       readonly entity: EntityRef;
       readonly drafts: readonly EventDraft[];
       readonly project: ProjectId;
     }
-  | { readonly drafts: readonly [] };
+  | { readonly drafts: readonly [] }
+) & { readonly problems?: readonly string[] };
 
 /** The propositions at or under `key`: what this subject holds of an intent. */
 const under = (key: SubjectKey, intent: Pick<Intent, "premises" | "declaredEffects">): Held => ({
@@ -109,13 +108,18 @@ const asIntent = (held: Held): Intent => ({
  * PremiseRelied; an ancestor keeps a descendant's premise without relying it.
  */
 export function hearSubject(
-  store: Store,
+  tx: Pick<Transaction, "store" | "outbox">,
   projectId: ProjectId,
   key: SubjectKey,
   event: EventEnvelope,
 ): SubjectReaction {
+  const { store } = tx;
   if (event.entity.kind !== "change") return { drafts: [] };
-  const changeId = event.entity.id;
+  const changeId = Schema.decodeUnknownSync(ChangeId)(event.entity.id);
+  if (event.type === "ChangeAdopted") {
+    adopted(tx, changeId, Schema.decodeUnknownSync(ChangeAdopted)(event.payload).agentId);
+    return { drafts: [] };
+  }
   const stored = store.get(SUBJECT_HELD, changeId);
   const before = stored === undefined ? NOTHING : decodeHeld(stored);
   let after: Held;
@@ -125,17 +129,28 @@ export function hearSubject(
       const declared = Schema.decodeUnknownSync(IntentDeclared)(event.payload);
       after = under(key, declared);
       relier = declared.changeId;
+      heldBy(tx, changeId, declared.agentId);
       break;
     }
     case "IntentRevised": {
       const revised = Schema.decodeUnknownSync(IntentRevised)(event.payload);
       after = under(key, reviseIntent(asIntent(before), revised));
       relier = revised.changeId;
+      const actor = event.actor?.startsWith("agent:")
+        ? event.actor.slice("agent:".length)
+        : undefined;
+      if (store.get(HOLDER_AGENT, changeId) === undefined && actor !== undefined)
+        heldBy(tx, changeId, Schema.decodeUnknownSync(AgentId)(actor));
       break;
     }
     default:
-      if ((CHANGE_ENDS as readonly string[]).includes(event.type))
+      if ((CHANGE_ENDS as readonly string[]).includes(event.type)) {
         store.remove(SUBJECT_HELD, changeId);
+        const agent = holderAgent(store, changeId);
+        if (agent !== undefined)
+          tx.outbox.unsubscribe(`agent:${agent}`, HOLDER_HEARS, changeRef(changeId));
+        store.remove(HOLDER_AGENT, changeId);
+      }
       return { drafts: [] };
   }
   if (after.premises.length === 0 && after.declaredEffects.length === 0)
@@ -163,7 +178,47 @@ export function hearSubject(
     const relied = PremiseRelied.make({ subjectId, changeId: relier, premise });
     drafts.push({ payload: payloadOf(Schema.encodeSync(PremiseRelied)(relied)) });
   }
+  const others = store
+    .list(SUBJECT_HELD)
+    .filter((row) => row.id !== changeId)
+    .map((row) => ({
+      changeId: Schema.decodeUnknownSync(ChangeId)(row.id),
+      ...decodeHeld(row.value),
+    }));
+  const judged = judgeFallout(
+    tx,
+    event.at,
+    { projectId, key, id: subjectId },
+    falloutPairs(
+      key,
+      { changeId, before: { changeId, ...before }, after: { changeId, ...after } },
+      others,
+    ),
+  );
+  drafts.push(...judged.drafts);
+  const problems = judged.problems.length === 0 ? {} : { problems: judged.problems };
   return drafts.length === 0
-    ? { drafts: [] }
-    : { entity: { kind: "subject", id: subjectId }, drafts, project: projectId };
+    ? { drafts: [], ...problems }
+    : { entity: { kind: "subject", id: subjectId }, drafts, project: projectId, ...problems };
+}
+
+const changeRef = (changeId: ChangeId): EntityRef => ({ kind: "change", id: changeId });
+
+const holderAgent = (store: Store, changeId: ChangeId): AgentId | undefined => {
+  const stored = store.get(HOLDER_AGENT, changeId);
+  return stored === undefined ? undefined : Schema.decodeUnknownSync(AgentId)(stored);
+};
+
+/** Keeps the change's agent and subscribes it to what the subject tells about the change. */
+function heldBy(tx: Pick<Transaction, "store" | "outbox">, changeId: ChangeId, agentId: AgentId) {
+  tx.store.put(HOLDER_AGENT, changeId, agentId);
+  tx.outbox.subscribe(`agent:${agentId}`, HOLDER_HEARS, changeRef(changeId));
+}
+
+/** An adopt moves the change's subscription from the agent that let it lapse to the adopter. */
+function adopted(tx: Pick<Transaction, "store" | "outbox">, changeId: ChangeId, agentId: AgentId) {
+  const previous = holderAgent(tx.store, changeId);
+  if (previous === undefined || previous === agentId) return;
+  tx.outbox.unsubscribe(`agent:${previous}`, HOLDER_HEARS, changeRef(changeId));
+  heldBy(tx, changeId, agentId);
 }
