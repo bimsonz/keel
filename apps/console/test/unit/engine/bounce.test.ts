@@ -54,7 +54,11 @@ describe("a conflict proven against a change", () => {
     );
     const page = changePageOf(player.world, changeId, player);
     expect(page?.change.state).toBe("bounced");
-    expect(page?.bounce?.conflict).toEqual({ id: conflictId, label: "C-1" });
+    expect(page?.bounce?.conflict).toEqual({
+      id: conflictId,
+      label: "C-1",
+      predicate: "freshness",
+    });
     expect(page?.conflict).toMatchObject({ id: conflictId, label: "C-1" });
     expect(page?.verdict).toBeUndefined();
   });
@@ -69,8 +73,41 @@ describe("a conflict proven against a change", () => {
     player.seek((log.eventTimes[at] ?? 0) + 50);
     const page = changePageOf(player.world, first.payload.changeId, player);
     expect(page?.change.state).toBe("bounced");
-    expect(page?.bounce).toEqual({ at: first.at });
+    expect(page?.bounce).toEqual({
+      at: first.at,
+      next: first.payload.nextActions?.map((action) => action.title),
+    });
+    expect(page?.bounce?.next.length).toBeGreaterThan(0);
     expect(page?.verdict?.id).toBe(first.payload.verdictId);
+  });
+
+  it("[change.bounce-refused] says a change's batch was refused its push, and shows no earlier verdict as the cause", async () => {
+    const { player, changeId } = await proven();
+    then(player, (b) => {
+      b.at(1).emit({
+        type: "VerdictIssued",
+        entity: { kind: "verdict", id: "vrd_3" },
+        payload: { verdictId: "vrd_3", subject: changeId, outcome: "land", evidence: [] },
+      });
+      b.at(2).emit({
+        type: "ChangeBounced",
+        entity: { kind: "change", id: changeId },
+        payload: {
+          changeId,
+          declined: { batchId: "bat_3", reason: "repo-bytes-quota" },
+          reasons: ["The repo is at its size quota."],
+          nextActions: [{ kind: "call", title: "Submit the change again once there is room" }],
+        },
+      });
+    });
+    const page = changePageOf(player.world, changeId, player);
+    expect(page?.change.state).toBe("bounced");
+    expect(page?.bounce).toEqual({
+      at: page?.bounce?.at,
+      refused: "repo-bytes-quota",
+      next: ["Submit the change again once there is room"],
+    });
+    expect(page?.verdict).toBeUndefined();
   });
 
   it("[change.noted] shows a conflict Keel noted against a change and let it go on, with the policy that let it", async () => {
@@ -89,6 +126,7 @@ describe("a conflict proven against a change", () => {
         predicate: "freshness",
         policy: "advise",
         at: page?.noted[0]?.at,
+        next: [],
       },
     ]);
     // It is not a bounce, and the change stands as it stood.

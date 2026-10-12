@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/conformance.test.ts
+# kills: conformance.note-policy
+# why: the fixtures' check lets a note carry a policy the change's plan did not compile
+diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
+index 0914ee9..8454ae5 100644
+--- a/apps/console/test/fixtures/mock/conformance.ts
++++ b/apps/console/test/fixtures/mock/conformance.ts
+@@ -407,7 +407,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
+       case "ConflictNoted": {
+         const { changeId, conflictId, policy, evidenceRef, nextActions } = event.payload;
+         for (const wrong of againstProof(changeId, conflictId)) problems.push(`${where}: ${wrong}`);
+-        if (policyOn(changeId, conflictId) !== policy)
++        if (policy !== "advise" && policy !== "annotate")
+           problems.push(
+             `${where}: noted as ${policy}, and the change's plan says ${policyOn(changeId, conflictId)}`,
+           );

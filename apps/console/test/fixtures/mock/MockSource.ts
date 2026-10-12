@@ -20,14 +20,26 @@ import type {
 import { LATTICES } from "../lattices.ts";
 import type { KeelRepository } from "../../../src/source/repository.ts";
 import type { Gate, GeneratedLog } from "./builder.ts";
+import { generateS3, generateS4 } from "./proven.ts";
 import { createMockRepository } from "./repository.ts";
 import { type S1Ruling, generateS1 } from "./s1.ts";
 import { generateS2 } from "./s2.ts";
 import { generateSwarm } from "./swarm.ts";
 
+/**
+ * `s1` is the two-agent conflict and `s2` its sequel nine days on. `s3` and `s4` are the same conflict in a
+ * project that asks nobody: proven, and then noted on both changes (`s3`) or bouncing both (`s4`). `swarm` is
+ * hundreds of hosted agents.
+ */
+export const SCENARIOS = ["s1", "s2", "s3", "s4", "swarm"] as const;
+export type Scenario = (typeof SCENARIOS)[number];
+
+export function isScenario(value: string): value is Scenario {
+  return SCENARIOS.some((scenario) => scenario === value);
+}
+
 export interface MockOptions {
-  /** `s1` is the two-agent conflict, `s2` its sequel nine days on, `swarm` hundreds of hosted agents. */
-  scenario: "s1" | "s2" | "swarm";
+  scenario: Scenario;
   seed: number;
   /** For the swarm: how many hosted agents, and for how many simulated seconds they keep starting changes. */
   agents?: number;
@@ -55,6 +67,8 @@ function generate(options: MockOptions, ruling: string | undefined): GeneratedLo
     });
   }
   if (options.scenario === "s2") return generateS2(options.seed);
+  if (options.scenario === "s3") return generateS3(options.seed);
+  if (options.scenario === "s4") return generateS4(options.seed);
   if (ruling === undefined || ruling === "live") return generateS1(options.seed);
   if (!isS1Ruling(ruling)) throw new Error(`scenario s1 has no ruling "${ruling}"`);
   return generateS1(options.seed, ruling);

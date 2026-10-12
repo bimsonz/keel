@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/conformance.test.ts
+# kills: conformance.note-evidence
+# why: the fixtures' check lets a note leave out the proof's evidence
+diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
+index 0914ee9..27e1ec7 100644
+--- a/apps/console/test/fixtures/mock/conformance.ts
++++ b/apps/console/test/fixtures/mock/conformance.ts
+@@ -413,7 +413,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
+           );
+         const proof = proofs.get(conflictId);
+         const expected = proof?._tag === "probe" ? `probe:${proof.probeId}` : undefined;
+-        if (evidenceRef !== expected)
++        if (evidenceRef !== undefined && evidenceRef !== expected)
+           problems.push(
+             `${where}: its evidence is ${evidenceRef ?? "none"}, and the proof's is ${expected ?? "none"}`,
+           );

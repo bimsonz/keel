@@ -368,6 +368,93 @@ expectEqual(
   "true",
 );
 
+// A proof, and what it does to a change. Where the changes' plans block on the conflict's predicate, both
+// bounce on the conflict itself: Keel issues no verdict for that, and the page shows none.
+const WAYS_FORWARD =
+  "Read the conflict and the proof against the change | Revise the change's intent around the conflict | Resolve the conflict with a move";
+const standing = page.getByRole("region", { name: "Verdict" });
+await page.goto(at("/changes/1", "scenario=s4&t=460&play=0"), { waitUntil: "networkidle" });
+await standing.getByRole("heading", { level: 2 }).waitFor();
+expectEqual(
+  "change: bounced on a proven conflict, it says which, and shows no verdict",
+  `${squash(await standing.getByRole("heading", { level: 2 }).innerText())} | ${await standing.getByText(/^Issued/).count()}`,
+  "Bounced on conflict C-1 | 0",
+);
+expectEqual(
+  "change: it says why: its plan blocks on the conflict's predicate",
+  squash(await standing.locator("p").first().innerText()),
+  "Keel proved conflict C-1 against this change, and its plan blocks on freshness. It bounced on the conflict itself: no verdict was issued.",
+);
+expectEqual(
+  "change: the ways forward Keel gave its agent, in Keel's words",
+  (
+    await standing
+      .getByRole("list", { name: "Ways forward Keel gave its agent" })
+      .getByRole("listitem")
+      .allInnerTexts()
+  )
+    .map(squash)
+    .join(" | "),
+  WAYS_FORWARD,
+);
+// A link that is not there is a failed check below, by its name, and not a wait that runs out.
+const follow = async (link: ReturnType<Page["locator"]>, arrived: string): Promise<void> => {
+  if ((await link.count()) === 0) return;
+  await link.click();
+  await page.locator(arrived).first().waitFor();
+};
+await follow(standing.getByRole("link", { name: "conflict C-1" }), "table.a-matrix");
+expectEqual(
+  "change: the bounce links to its conflict, which stays proven",
+  `${pathOf(page)} ${squash(
+    await page
+      .locator(".a-chip", { hasText: /^proven$/ })
+      .first()
+      .innerText(),
+  )}`,
+  "/demo/conflicts/C-1 proven",
+);
+await page.goto(at("/changes?state=bounced", "scenario=s4&t=460&play=0"), {
+  waitUntil: "networkidle",
+});
+await page.getByRole("list", { name: "Changes, newest first" }).waitFor();
+expectEqual(
+  "changes: both sides of a conflict their plans block on are bounced",
+  (await page.locator(".a-list > li b.a-mono").allInnerTexts()).join(" "),
+  "#2 #1",
+);
+
+// Where the plans say nothing of the predicate, Keel notes the conflict on both changes and holds neither.
+await page.goto(at("/changes/1", "scenario=s3&t=495&play=0"), { waitUntil: "networkidle" });
+const noted = page.locator("section", { has: page.getByRole("heading", { name: "Noted" }) }).last();
+const notedText = async (): Promise<string> =>
+  (await noted.count()) === 0 ? "nothing noted" : squash(await noted.innerText());
+await standing.getByRole("heading", { level: 2 }).waitFor();
+expectEqual(
+  "change: a conflict noted against it did not hold it, and it landed",
+  `${squash(await standing.getByRole("heading", { level: 2 }).innerText())} | ${await notedText()}`,
+  "Landed on trunk | Noted C-1 advise on freshness Proven against this change, which went on: its plan does not block on that predicate. Keel told its agent, and held nothing.",
+);
+await follow(noted.getByRole("link", { name: "C-1" }), ".a-timeline");
+expectEqual("change: what is noted links to the conflict", pathOf(page), "/demo/conflicts/C-1");
+await page.goto(at("/conflicts/C-1", "scenario=s3&t=495&play=0"), { waitUntil: "networkidle" });
+await page.locator(".a-timeline").waitFor();
+expectEqual(
+  "conflict: what happened says it was noted against each side, under which policy, by which event",
+  (await page.locator(".a-timeline > li", { hasText: "Noted against" }).allInnerTexts())
+    .map(squash)
+    .map((line) => line.replace(/^[\d:]+ /, ""))
+    .join(" | "),
+  "Noted against #1 policy: advise ConflictNoted | Noted against #2 policy: advise ConflictNoted",
+);
+await page.goto(at("/changes/2", "scenario=s3&t=495&play=0"), { waitUntil: "networkidle" });
+await standing.getByRole("heading", { level: 2 }).waitFor();
+expectEqual(
+  "change: the other side is noted too, and is still being verified",
+  `${squash(await standing.getByRole("heading", { level: 2 }).innerText())} | ${String((await notedText()).startsWith("Noted C-1 advise on freshness"))}`,
+  "No verdict yet | true",
+);
+
 // The changes are listed, each under one filter.
 await page.goto(at("/changes?state=landed", "scenario=s1&t=700&play=0"), {
   waitUntil: "networkidle",

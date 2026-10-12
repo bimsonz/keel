@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/proven.test.ts
+# kills: proven.advise
+# why: what Keel told an advised change's agent is not kept, so an advised change reads as one nobody was told about
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 1e199e0..98ac2e7 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -613,7 +613,7 @@ export class World {
+           predicate,
+           policy,
+           at: event.at,
+-          next: (nextActions ?? []).map((action) => action.title),
++          next: [],
+         });
+         this.#note(conflictId, event, t, `Noted against ${change.label}`, `policy: ${policy}`);
+         break;

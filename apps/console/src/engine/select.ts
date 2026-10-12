@@ -565,9 +565,10 @@ export function changePageOf(
   const by = world.agents.get(change.agentId);
   const bounce = change.state === "bounced" ? change.bounce : undefined;
   const cause = world.conflicts.get(bounce?.conflictId ?? "");
-  // A change bounced on a conflict was given no verdict for it: an earlier one is not this bounce's.
+  // A change bounced on a conflict, or on its batch's refused push, was given no verdict for that: an earlier
+  // one is not this bounce's.
   const verdict =
-    bounce?.conflictId === undefined
+    bounce?.conflictId === undefined && bounce?.declined === undefined
       ? world.verdicts.get(change.verdictIds.at(-1) ?? "")
       : undefined;
   const conflict = cause ?? world.conflicts.get(change.conflictIds.at(-1) ?? "");
@@ -658,7 +659,17 @@ export function changePageOf(
       : {
           bounce: {
             at: bounce.at,
-            ...(cause === undefined ? {} : { conflict: { id: cause.id, label: cause.label } }),
+            ...(cause === undefined
+              ? {}
+              : {
+                  conflict: {
+                    id: cause.id,
+                    label: cause.label,
+                    ...(cause.predicate === undefined ? {} : { predicate: cause.predicate }),
+                  },
+                }),
+            ...(bounce.declined === undefined ? {} : { refused: bounce.declined }),
+            next: bounce.next,
           },
         }),
     noted: change.noted.flatMap((note) => {
@@ -671,6 +682,7 @@ export function changePageOf(
               predicate: note.predicate,
               policy: note.policy,
               at: note.at,
+              next: note.next,
             },
           ];
     }),

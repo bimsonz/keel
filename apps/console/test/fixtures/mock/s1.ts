@@ -15,6 +15,7 @@
 
 import type { EntityRef } from "../../../src/contract/envelope.ts";
 import type { AnyEvent, DriftEntry, ProbeWorld } from "../../../src/contract/events.ts";
+import type { EventPredicatePolicies } from "../../../src/contract/keel/index.ts";
 import type { DerivedEffect, Proposition } from "../../../src/contract/mfp.ts";
 import type { EscalationOption } from "../../../src/contract/events.ts";
 import type { EvidenceLine, FlowNode, StepSpec } from "../../../src/contract/provisional.ts";
@@ -202,8 +203,11 @@ export function planForB(guard: { label: string; decision: string } | null): Flo
   return { op: "seq", of: steps };
 }
 
-/** Everything up to the question. Identical for every ruling, so a live session and a deep link share it. */
-export function prelude(b: ScriptBuilder) {
+/**
+ * Everything up to the proof: both changes submitted, and the conflict between them probed and proven. With
+ * `policy`, each change's plan compiles that predicate policy, which is what Keel applies to a proof.
+ */
+export function opening(b: ScriptBuilder, policy?: EventPredicatePolicies) {
   const project = b.at(0).id("prj");
   b.project = project;
   // The Trunk DO is its own entity, named for its project, with its own seq.
@@ -616,6 +620,7 @@ export function prelude(b: ScriptBuilder) {
       planHash: "plan:3f9a…d27e",
       steps: planForB(null),
       costEstimate: 0.006,
+      ...(policy === undefined ? {} : { predicatePolicy: policy }),
     },
   });
   stepRun(397.2, precheckB, changeB, "typecheck", 1, 2.1, "passed");
@@ -694,6 +699,7 @@ export function prelude(b: ScriptBuilder) {
         ],
       },
       costEstimate: 0.002,
+      ...(policy === undefined ? {} : { predicatePolicy: policy }),
     },
   });
 
@@ -822,6 +828,36 @@ export function prelude(b: ScriptBuilder) {
     },
   });
 
+  return {
+    project,
+    trunkRef,
+    operator,
+    subject,
+    head0,
+    agentA,
+    agentB,
+    sessionB,
+    changeA,
+    changeB,
+    workspaceA,
+    workspaceB,
+    conflict,
+    conflictRef,
+    probe,
+    guard,
+    probeRef,
+    proven,
+    stepRun,
+  };
+}
+
+export type Opening = ReturnType<typeof opening>;
+
+/** Everything up to the question. Identical for every ruling, so a live session and a deep link share it. */
+export function prelude(b: ScriptBuilder) {
+  const o = opening(b);
+  const { changeA, changeB, conflict, conflictRef, probe, proven, sessionB } = o;
+
   const evidence: EvidenceLine[] = [
     {
       class: "proof",
@@ -933,28 +969,7 @@ export function prelude(b: ScriptBuilder) {
     "invalidate",
   );
 
-  return {
-    project,
-    trunkRef,
-    operator,
-    subject,
-    head0,
-    agentA,
-    agentB,
-    changeA,
-    changeB,
-    workspaceA,
-    workspaceB,
-    conflict,
-    conflictRef,
-    probe,
-    guard,
-    probeRef,
-    escalation,
-    escalationRef,
-    evidence,
-    stepRun,
-  };
+  return { ...o, escalation, escalationRef, evidence };
 }
 
 export type Prelude = ReturnType<typeof prelude>;
@@ -962,7 +977,7 @@ export type Prelude = ReturnType<typeof prelude>;
 /** One change through its lane and onto trunk: batch, candidate, verification, advance, landing. */
 export function land(
   b: ScriptBuilder,
-  p: Prelude,
+  p: Pick<Opening, "project" | "trunkRef" | "stepRun">,
   input: {
     at: number;
     change: string;
@@ -1134,7 +1149,7 @@ export function land(
   });
 }
 
-const HEAD_1 = "9c41e7a05b6d2f38c1e4a7b90d2f6e83a5c1b7d4";
+export const HEAD_1 = "9c41e7a05b6d2f38c1e4a7b90d2f6e83a5c1b7d4";
 export const HEAD_2 = "2e7f0b91d4c6a385e09b1f7c3d5a8e6204b9c1f7";
 
 function ruled(

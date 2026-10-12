@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/conformance.test.ts
+# kills: conformance.bounce-declined
+# why: the fixtures' check lets a change bounce on a declined batch when it was never in one
+diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
+index 0914ee9..4e0849b 100644
+--- a/apps/console/test/fixtures/mock/conformance.ts
++++ b/apps/console/test/fixtures/mock/conformance.ts
+@@ -269,7 +269,7 @@ function rulesFor(event: AnyEvent): Rule[] {
+         return [change(["deriving", "verifying", "queued"], "bounced")];
+       return event.payload.declined === undefined
+         ? RULES.ChangeBounced
+-        : [change(["integrating"], "bounced")];
++        : RULES.ChangeBounced;
+     default:
+       return RULES[event.type];
+   }

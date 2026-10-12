@@ -4,6 +4,7 @@
 
 import type { EntityRef } from "../contract/envelope.ts";
 import type { AgentKind, AnyEvent, DriftEntry } from "../contract/events.ts";
+import type { PushRefusedReason } from "../contract/keel/index.ts";
 import type {
   DerivedEffect,
   FootprintEntry,
@@ -92,10 +93,28 @@ export interface ChangeEntry {
   conflictIds: string[];
   /** Each time a guard failed in this change's own plan: Keel's fact, with the revision it was at. */
   guardFailures: { guardId: string; revision: number; at: string }[];
-  /** Its latest bounce, and the one thing Keel named as its cause: a verdict, or a conflict proven against it. */
-  bounce?: { at: string; verdictId?: string; conflictId?: string };
-  /** Conflicts Keel proved against it and did not stop it for: the project's policy for the predicate was not to block. */
-  noted: { conflictId: string; predicate: Predicate; policy: "advise" | "annotate"; at: string }[];
+  /**
+   * Its latest bounce, and the one thing Keel named as its cause: a verdict, a conflict proven against it, or
+   * its batch's push being refused. `next` is the ways forward Keel gave its agent, in Keel's words.
+   */
+  bounce?: {
+    at: string;
+    verdictId?: string;
+    conflictId?: string;
+    declined?: PushRefusedReason;
+    next: string[];
+  };
+  /**
+   * Conflicts Keel proved against it and did not stop it for: its plan's policy for the predicate was not to
+   * block. `next` is what Keel told its agent it could do, which it does only when the policy is to advise.
+   */
+  noted: {
+    conflictId: string;
+    predicate: Predicate;
+    policy: "advise" | "annotate";
+    at: string;
+    next: string[];
+  }[];
   /** Decisions surfaced to it, each dated, and the stance it went on to take. */
   precedents: {
     decisionId: string;
@@ -564,11 +583,13 @@ export class World {
       case "ChangeBounced": {
         const change = this.#change(event.payload.changeId, "bounced");
         if (change !== undefined) {
-          const { verdictId, conflictId } = event.payload;
+          const { verdictId, conflictId, declined, nextActions } = event.payload;
           change.bounce = {
             at: event.at,
             ...(verdictId === undefined ? {} : { verdictId }),
             ...(conflictId === undefined ? {} : { conflictId }),
+            ...(declined === undefined ? {} : { declined: declined.reason }),
+            next: (nextActions ?? []).map((action) => action.title),
           };
           // A bounce on a conflict ties the change to it, whether or not the change was one of its two sides.
           if (conflictId !== undefined && !change.conflictIds.includes(conflictId))
@@ -586,8 +607,14 @@ export class World {
       case "ConflictNoted": {
         const change = this.changes.get(event.payload.changeId);
         if (change === undefined) break;
-        const { conflictId, predicate, policy } = event.payload;
-        change.noted.push({ conflictId, predicate, policy, at: event.at });
+        const { conflictId, predicate, policy, nextActions } = event.payload;
+        change.noted.push({
+          conflictId,
+          predicate,
+          policy,
+          at: event.at,
+          next: (nextActions ?? []).map((action) => action.title),
+        });
         this.#note(conflictId, event, t, `Noted against ${change.label}`, `policy: ${policy}`);
         break;
       }

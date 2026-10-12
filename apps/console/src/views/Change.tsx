@@ -139,6 +139,12 @@ function renderNote(annotation: DiffAnnotation): ReactNode {
   return <Note annotation={annotation} />;
 }
 
+/** Why Artifacts would not take a push, as a clause. */
+const REFUSED = {
+  "pack-too-large": "this change's pack is too large to push",
+  "repo-bytes-quota": "the repository is at its size quota",
+} as const;
+
 const OUTCOME_WORD = {
   land: "Land",
   bounce: "Bounced",
@@ -155,6 +161,7 @@ function standing(state: ChangePageState): string {
   if (escalation?.state === "open") return `Parked: waiting for a ruling on ${escalation.label}`;
   if (state.bounce?.conflict !== undefined)
     return `Bounced on conflict ${state.bounce.conflict.label}`;
+  if (state.bounce?.refused !== undefined) return "Bounced: its push was refused";
   if (verdict === undefined) return "No verdict yet";
   if (verdict.outcome === "land") return "Verified: cleared to land";
   return OUTCOME_WORD[verdict.outcome];
@@ -260,9 +267,12 @@ export function Change({
                       <ConflictLink id={state.bounce.conflict.id} className="a-link">
                         conflict {state.bounce.conflict.label}
                       </ConflictLink>{" "}
-                      against this change, and this project blocks a change on a proven conflict. It
-                      bounced on the conflict, not on a verdict.
+                      against this change, and its plan blocks on{" "}
+                      {state.bounce.conflict.predicate ?? "that conflict's predicate"}. It bounced
+                      on the conflict itself: no verdict was issued.
                     </>
+                  ) : state.bounce?.refused !== undefined ? (
+                    `Its batch was verified, and the push to trunk was refused: ${REFUSED[state.bounce.refused]}. Nothing landed, and no verdict was issued for the bounce.`
                   ) : verdict === undefined ? (
                     `The change is ${change.state}. Keel has not issued a verdict yet.`
                   ) : (
@@ -279,6 +289,19 @@ export function Change({
                       </>
                     )}
                   </p>
+                )}
+                {state.bounce !== undefined && state.bounce.next.length > 0 && (
+                  <div className="mt-2 border-t border-kumo-line pt-3 text-base text-kumo-default">
+                    <p className="text-sm text-kumo-subtle">Keel told its agent how to go on:</p>
+                    <ul
+                      className="mt-1 list-disc pl-5"
+                      aria-label="Ways forward Keel gave its agent"
+                    >
+                      {state.bounce.next.map((title) => (
+                        <li key={title}>{title}</li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
                 {escalation !== undefined && waiting && (
                   <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-kumo-line pt-3">
@@ -537,8 +560,11 @@ export function Change({
                     </span>
                   ))}
                   <span className="leading-snug">
-                    Proven against this change, which went on: the project does not block on{" "}
-                    {state.noted.length === 1 ? "that predicate" : "those predicates"}.
+                    Proven against this change, which went on: its plan does not block on{" "}
+                    {state.noted.length === 1 ? "that predicate" : "those predicates"}.{" "}
+                    {state.noted.some((note) => note.next.length > 0)
+                      ? "Keel told its agent, and held nothing."
+                      : "Nobody was told."}
                   </span>
                 </Tied>
               )}

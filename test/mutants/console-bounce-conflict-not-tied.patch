@@ -1,15 +1,15 @@
-# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/bounce.test.ts
-# kills: change.bounce-conflict
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/bounce.test.ts apps/console/test/unit/fixtures/mock/proven.test.ts
+# kills: change.bounce-conflict, proven.block
 # why: a bounce on a proven conflict is not tied to the conflict Keel names, so the page reads it as a verdict's
 diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
-index 8819f82..8045c19 100644
+index 1e199e0..2d776b8 100644
 --- a/apps/console/src/engine/world.ts
 +++ b/apps/console/src/engine/world.ts
-@@ -583,7 +583,6 @@ export class World {
+@@ -587,7 +587,6 @@ export class World {
            change.bounce = {
              at: event.at,
              ...(verdictId === undefined ? {} : { verdictId }),
 -            ...(conflictId === undefined ? {} : { conflictId }),
+             ...(declined === undefined ? {} : { declined: declined.reason }),
+             next: (nextActions ?? []).map((action) => action.title),
            };
-           // A bounce on a conflict ties the change to it, whether or not the change was one of its two sides.
-           if (conflictId !== undefined && !change.conflictIds.includes(conflictId))

@@ -290,16 +290,26 @@ export interface ChangePageState {
   };
   conflict?: { id: string; label: string; state: ConflictState; with: string; summary: string };
   /**
-   * While it stands bounced: the conflict it bounced on, where Keel named one. A project that blocks on a proven
-   * conflict bounces the change on the conflict itself, and no verdict is issued for that.
+   * While it stands bounced: what Keel named as the cause, where that is not a verdict. A change whose plan
+   * blocks on a predicate bounces on a conflict proven on it, and one whose batch Artifacts refused to take
+   * bounces on that refusal; no verdict is issued for either. `next` is the ways forward Keel gave its agent.
    */
-  bounce?: { at: string; conflict?: { id: string; label: string } };
-  /** Conflicts Keel proved against it and let it go on from: the project advises or annotates on that predicate. */
+  bounce?: {
+    at: string;
+    conflict?: { id: string; label: string; predicate?: string };
+    refused?: "pack-too-large" | "repo-bytes-quota";
+    next: string[];
+  };
+  /**
+   * Conflicts Keel proved against it and let it go on from: its plan advises or annotates on that predicate.
+   * `next` is what Keel told its agent it could do. An annotation tells no one, so it has none.
+   */
   noted: {
     conflict: { id: string; label: string };
     predicate: string;
     policy: "advise" | "annotate";
     at: string;
+    next: string[];
   }[];
   escalation?: {
     id: string;

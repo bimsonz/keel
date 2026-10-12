@@ -4,6 +4,8 @@ import type { ProbeOutcome, ProbeWorld } from "../../../../src/contract/events.t
 import { createRng } from "../../../fixtures/prng.ts";
 import { ScriptBuilder } from "../../../fixtures/mock/builder.ts";
 import { admission, checkLog } from "../../../fixtures/mock/conformance.ts";
+import { generateS3, generateS4 } from "../../../fixtures/mock/proven.ts";
+import type { ScriptedEvent } from "../../../fixtures/mock/scripted.ts";
 
 type Cells = [ProbeWorld, number, ProbeOutcome][];
 
@@ -349,5 +351,129 @@ describe("the check the fixtures are held to", () => {
     expect(failing({}, change)).toContain(
       "#19 GuardFailed: it is a fact of a change or of a batch, one and not both",
     );
+  });
+});
+
+/** The problems the check finds in a story once `rewrite` has changed it into one Keel could not have told. */
+function told(
+  generate: (seed: number) => { events: ScriptedEvent[] },
+  rewrite: (events: ScriptedEvent[]) => void,
+): string[] {
+  const events = structuredClone(generate(42).events);
+  rewrite(events);
+  // Only what the problem is: where in the log it was found is not what these checks are about.
+  return checkLog(events).map((problem) => problem.replace(/^#\d+ /, ""));
+}
+
+const bounces = (events: ScriptedEvent[]) =>
+  events.filter((event) => event.type === "ChangeBounced");
+const notes = (events: ScriptedEvent[]) => events.filter((event) => event.type === "ConflictNoted");
+
+describe("what a proof does to a change, held to Keel's rule", () => {
+  it("[conformance.bounce-cause] refuses a bounce that names two causes, or a verdict nobody issued", () => {
+    expect(
+      told(generateS4, (events) => {
+        const [first] = bounces(events);
+        if (first !== undefined) first.payload.verdictId = "vrd_never";
+      }),
+    ).toEqual([
+      "ChangeBounced: a bounce names exactly one cause: its verdict, its conflict or its declined batch",
+      "ChangeBounced: verdict vrd_never was not issued",
+    ]);
+  });
+
+  it("[conformance.bounce-blocks] refuses a bounce on a conflict when the change's plan does not block on its predicate", () => {
+    expect(
+      told(generateS4, (events) => {
+        for (const event of events)
+          if (event.type === "PlanCompiled") delete event.payload.predicatePolicy;
+      }),
+    ).toEqual([
+      "ChangeBounced: the change's plan does not block on the conflict's predicate (advise)",
+      "ChangeBounced: the change's plan does not block on the conflict's predicate (advise)",
+    ]);
+    // A plan that blocks on another predicate does not block on this one.
+    expect(
+      told(generateS4, (events) => {
+        for (const event of events)
+          if (event.type === "PlanCompiled") event.payload.predicatePolicy = { ordering: "block" };
+      }),
+    ).toHaveLength(2);
+  });
+
+  it("[conformance.bounce-proven] refuses a bounce on a conflict that was not proven, or that the change is no side of", () => {
+    // The proof is taken out of the log: both bounces now cite a conflict nobody proved.
+    expect(
+      told(generateS4, (events) => {
+        events.splice(
+          events.findIndex((event) => event.type === "ConflictProven"),
+          1,
+        );
+      }).filter((problem) => problem.endsWith("was not proven")),
+    ).toHaveLength(2);
+    // The first bounce is said of a conflict that change has no part in.
+    const [first] = bounces(generateS4(42).events);
+    expect(
+      told(generateS4, (events) => {
+        const [bounce] = bounces(events);
+        if (bounce !== undefined) bounce.payload.conflictId = "cfl_another";
+      }),
+    ).toEqual([
+      "ChangeBounced: cfl_another was not proven",
+      `ChangeBounced: ${first?.payload.changeId} is not one of cfl_another's sides`,
+      "ChangeBounced: the change's plan does not block on the conflict's predicate (advise)",
+    ]);
+  });
+
+  it("[conformance.bounce-declined] takes a bounce on a declined batch only from a change that is in a batch", () => {
+    expect(
+      told(generateS4, (events) => {
+        const [first] = bounces(events);
+        if (first === undefined) return;
+        delete first.payload.conflictId;
+        first.payload.declined = { batchId: "bat_1", reason: "pack-too-large" };
+      }),
+    ).toEqual([
+      expect.stringMatching(
+        /^ChangeBounced: change:chg_\w+ is verifying, which this event cannot follow$/,
+      ),
+    ]);
+  });
+
+  it("[conformance.note-policy] refuses a note whose policy is not the one the change's plan compiled", () => {
+    expect(
+      told(generateS3, (events) => {
+        const [first] = notes(events);
+        if (first !== undefined) first.payload.policy = "annotate";
+      }),
+    ).toEqual([
+      "ConflictNoted: noted as annotate, and the change's plan says advise",
+      "ConflictNoted: only an advised change is told its ways forward",
+    ]);
+    // The same notes under plans that block: Keel would have bounced both.
+    expect(
+      told(generateS3, (events) => {
+        for (const event of events)
+          if (event.type === "PlanCompiled") event.payload.predicatePolicy = { freshness: "block" };
+      }),
+    ).toEqual([
+      "ConflictNoted: noted as advise, and the change's plan says block",
+      "ConflictNoted: noted as advise, and the change's plan says block",
+    ]);
+  });
+
+  it("[conformance.note-evidence] holds a note to the proof's own evidence, and to telling an advised change its ways forward", () => {
+    const proven = generateS3(42).events.find((event) => event.type === "ConflictProven");
+    const probe = proven?.payload.evidence._tag === "probe" ? proven.payload.evidence.probeId : "";
+    expect(
+      told(generateS3, (events) => {
+        const [first, second] = notes(events);
+        if (first !== undefined) delete first.payload.evidenceRef;
+        if (second !== undefined) delete second.payload.nextActions;
+      }),
+    ).toEqual([
+      `ConflictNoted: its evidence is none, and the proof's is probe:${probe}`,
+      "ConflictNoted: only an advised change is told its ways forward",
+    ]);
   });
 });

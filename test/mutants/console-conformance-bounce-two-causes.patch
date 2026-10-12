@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/conformance.test.ts
+# kills: conformance.bounce-cause
+# why: the fixtures' check takes a bounce that names two causes, which Keel's schema refuses
+diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
+index 0914ee9..cee59f6 100644
+--- a/apps/console/test/fixtures/mock/conformance.ts
++++ b/apps/console/test/fixtures/mock/conformance.ts
+@@ -390,7 +390,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
+         break;
+       case "ChangeBounced": {
+         const { changeId, verdictId, conflictId, declined } = event.payload;
+-        if ([verdictId, conflictId, declined].filter((cause) => cause !== undefined).length !== 1)
++        if ([verdictId, conflictId, declined].filter((cause) => cause !== undefined).length === 0)
+           problems.push(
+             `${where}: a bounce names exactly one cause: its verdict, its conflict or its declined batch`,
+           );

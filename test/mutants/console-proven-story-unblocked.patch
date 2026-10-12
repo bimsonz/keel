@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/proven.test.ts
+# kills: proven.conforms
+# why: scenario 4 bounces both changes under plans that do not block, a story Keel could not tell
+diff --git a/apps/console/test/fixtures/mock/proven.ts b/apps/console/test/fixtures/mock/proven.ts
+index 05e0603..14d53ab 100644
+--- a/apps/console/test/fixtures/mock/proven.ts
++++ b/apps/console/test/fixtures/mock/proven.ts
+@@ -90,7 +90,7 @@ export function generateS3(seed: number): GeneratedLog {
+ 
+ export function generateS4(seed: number): GeneratedLog {
+   const b = new ScriptBuilder(S1_EPOCH, createRng(seed).fork("s4"));
+-  const o = opening(b, { freshness: "block" });
++  const o = opening(b);
+   for (const [second, change] of heard(o)) {
+     b.at(second).emit({
+       type: "ChangeBounced",

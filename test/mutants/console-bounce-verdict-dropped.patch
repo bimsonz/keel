@@ -2,14 +2,14 @@
 # kills: change.bounce-verdict
 # why: a change bounced on its verdict is shown with no verdict, as one bounced on a conflict is
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index e8c8889..a2d9584 100644
+index 86cff89..0d25e60 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -562,7 +562,7 @@ export function changePageOf(
-   const cause = world.conflicts.get(bounce?.conflictId ?? "");
-   // A change bounced on a conflict was given no verdict for it: an earlier one is not this bounce's.
+@@ -568,7 +568,7 @@ export function changePageOf(
+   // A change bounced on a conflict, or on its batch's refused push, was given no verdict for that: an earlier
+   // one is not this bounce's.
    const verdict =
--    bounce?.conflictId === undefined
+-    bounce?.conflictId === undefined && bounce?.declined === undefined
 +    bounce === undefined
        ? world.verdicts.get(change.verdictIds.at(-1) ?? "")
        : undefined;

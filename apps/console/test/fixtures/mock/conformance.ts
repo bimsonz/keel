@@ -14,6 +14,7 @@ import type {
   ProbeOutcome,
   ProbeWorld,
 } from "../../../src/contract/events.ts";
+import type { EventPredicatePolicies, Predicate } from "../../../src/contract/keel/index.ts";
 import type { ScriptedEvent } from "./scripted.ts";
 
 interface Rule {
@@ -86,7 +87,8 @@ const RULES: Record<EventType, Rule[]> = {
   ChangeBatched: [change(["queued"], "integrating")],
   ChangeRequeued: [change(["integrating"], "queued")],
   ChangeLanded: [change(["integrating"], "landed")],
-  ChangeBounced: [change(["deriving", "verifying", "integrating", "parked"], "bounced")],
+  // By its verdict. By a conflict: only before it is in a batch. By a declined batch: only from in it. See `rulesFor`.
+  ChangeBounced: [change(["deriving", "verifying", "queued", "integrating", "parked"], "bounced")],
   ConflictNoted: [change([...WITHDRAWABLE, "integrating"])],
   AlternativeDeclared: [{ kind: "project", idField: "projectId", from: ["created"] }],
   AlternativeLanded: [{ kind: "project", idField: "projectId", from: ["created"] }],
@@ -262,6 +264,12 @@ function rulesFor(event: AnyEvent): Rule[] {
       return event.payload.decisionId === undefined
         ? RULES.ConflictResolved
         : conflict(["proven", "escalated"], "resolved");
+    case "ChangeBounced":
+      if (event.payload.conflictId !== undefined)
+        return [change(["deriving", "verifying", "queued"], "bounced")];
+      return event.payload.declined === undefined
+        ? RULES.ChangeBounced
+        : [change(["integrating"], "bounced")];
     default:
       return RULES[event.type];
   }
@@ -324,6 +332,23 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
   const guards = new Map<string, string>();
   const cells = new Map<string, Cell[]>();
   const kinds = new Map<string, ConflictKind>();
+  /** What Keel applies a proof by: each conflict's sides and predicate, how it was proven, and each change's latest plan. */
+  const sides = new Map<string, { parties: readonly string[]; predicate?: Predicate }>();
+  const proofs = new Map<string, ConflictProof>();
+  const policies = new Map<string, EventPredicatePolicies>();
+  /** Every way a proof's mark on a change (a bounce or a note) disagrees with the conflict it names. */
+  const againstProof = (changeId: string, conflictId: string): string[] => {
+    const wrong: string[] = [];
+    if (!proofs.has(conflictId)) wrong.push(`${conflictId} was not proven`);
+    if (sides.get(conflictId)?.parties.includes(changeId) !== true)
+      wrong.push(`${changeId} is not one of ${conflictId}'s sides`);
+    return wrong;
+  };
+  /** The policy a change applies to a proof on a conflict: its latest plan's for the predicate, and `advise` when silent. */
+  const policyOn = (changeId: string, conflictId: string): string => {
+    const predicate = sides.get(conflictId)?.predicate;
+    return (predicate === undefined ? undefined : policies.get(changeId)?.[predicate]) ?? "advise";
+  };
   /** The entity a rule is about: its field's value, or for a guard the probe admitted under that name. */
   const subjectOf = (rule: Rule, payload: object): string | undefined => {
     const named = field(payload, rule.idField);
@@ -353,7 +378,49 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
     switch (event.type) {
       case "ConflictSuspected":
         kinds.set(event.payload.conflictId, event.payload.kind);
+        sides.set(event.payload.conflictId, {
+          parties: event.payload.parties,
+          ...(event.payload.predicate === undefined ? {} : { predicate: event.payload.predicate }),
+        });
         break;
+      case "PlanCompiled":
+        // The latest plan's policy replaces the last one's, and a plan that says nothing leaves none.
+        if (event.payload.predicatePolicy === undefined) policies.delete(event.payload.changeId);
+        else policies.set(event.payload.changeId, event.payload.predicatePolicy);
+        break;
+      case "ChangeBounced": {
+        const { changeId, verdictId, conflictId, declined } = event.payload;
+        if ([verdictId, conflictId, declined].filter((cause) => cause !== undefined).length !== 1)
+          problems.push(
+            `${where}: a bounce names exactly one cause: its verdict, its conflict or its declined batch`,
+          );
+        if (verdictId !== undefined && states.get(`verdict:${verdictId}`) !== "issued")
+          problems.push(`${where}: verdict ${verdictId} was not issued`);
+        if (conflictId === undefined) break;
+        for (const wrong of againstProof(changeId, conflictId)) problems.push(`${where}: ${wrong}`);
+        if (policyOn(changeId, conflictId) !== "block")
+          problems.push(
+            `${where}: the change's plan does not block on the conflict's predicate (${policyOn(changeId, conflictId)})`,
+          );
+        break;
+      }
+      case "ConflictNoted": {
+        const { changeId, conflictId, policy, evidenceRef, nextActions } = event.payload;
+        for (const wrong of againstProof(changeId, conflictId)) problems.push(`${where}: ${wrong}`);
+        if (policyOn(changeId, conflictId) !== policy)
+          problems.push(
+            `${where}: noted as ${policy}, and the change's plan says ${policyOn(changeId, conflictId)}`,
+          );
+        const proof = proofs.get(conflictId);
+        const expected = proof?._tag === "probe" ? `probe:${proof.probeId}` : undefined;
+        if (evidenceRef !== expected)
+          problems.push(
+            `${where}: its evidence is ${evidenceRef ?? "none"}, and the proof's is ${expected ?? "none"}`,
+          );
+        if ((nextActions !== undefined) !== (policy === "advise"))
+          problems.push(`${where}: only an advised change is told its ways forward`);
+        break;
+      }
       case "ProbeRan": {
         const known = cells.get(event.payload.probeId) ?? [];
         const decided = admission(known);
@@ -392,6 +459,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
       }
       case "ConflictProven": {
         const proof = event.payload.evidence;
+        proofs.set(event.payload.conflictId, proof);
         if (proof._tag === "probe") {
           if (states.get(`probe:${proof.probeId}`) !== "admitted")
             problems.push(`${where}: its probe was not admitted`);

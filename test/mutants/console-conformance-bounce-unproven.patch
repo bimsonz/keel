@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/conformance.test.ts
+# kills: conformance.bounce-proven
+# why: the fixtures' check lets a change be bounced or noted for a conflict nobody proved
+diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
+index 0914ee9..52e66ad 100644
+--- a/apps/console/test/fixtures/mock/conformance.ts
++++ b/apps/console/test/fixtures/mock/conformance.ts
+@@ -339,7 +339,6 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
+   /** Every way a proof's mark on a change (a bounce or a note) disagrees with the conflict it names. */
+   const againstProof = (changeId: string, conflictId: string): string[] => {
+     const wrong: string[] = [];
+-    if (!proofs.has(conflictId)) wrong.push(`${conflictId} was not proven`);
+     if (sides.get(conflictId)?.parties.includes(changeId) !== true)
+       wrong.push(`${changeId} is not one of ${conflictId}'s sides`);
+     return wrong;
