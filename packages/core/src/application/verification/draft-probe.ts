@@ -4,6 +4,7 @@ import type { ContentHash } from "../../domain/kernel/index.ts";
 import {
   ADMISSION_RUNS,
   admit,
+  type FlowWorld,
   type ModelAbstained,
   type World,
 } from "../../domain/verification/index.ts";
@@ -15,7 +16,13 @@ import {
 } from "../ports/index.ts";
 import type { ProbeTemplate } from "./probe-templates/template.ts";
 import { type MatrixCell, type MatrixHarnessError, runMatrix } from "./run-matrix.ts";
-import { MATRIX_WORLDS } from "./world-matrix.ts";
+import {
+  describeNoNoop,
+  MATRIX_WORLDS,
+  type NoNoop,
+  type NoopRecipe,
+  noopPlaced,
+} from "./world-matrix.ts";
 
 /**
  * Repairs after the first draft (spike S26): at most 1 + DRAFT_REPAIRS model
@@ -155,22 +162,26 @@ const identicalFailure = (cells: readonly MatrixCell[]): string | undefined => {
 
 /**
  * Drafts a probe from a template (spike S26): the model fills the template's
- * slots, Keel renders and stores the probe, and the world matrix runs it
- * ADMISSION_RUNS times. A reply that fails the template's check, a harness
- * error, or a failure identical in every world is repaired, at most
- * DRAFT_REPAIRS times, from deterministic text only: never from the model's
- * own rationale. An admitted probe ends it; any other matrix result is
- * discarded as admission judged it, and an abstaining model ends it too.
- * A runner that cannot run at all fails, for the caller to retry.
+ * slots, the slots name A-noop's recipe, Keel builds A-noop with `aNoop` (A's
+ * tree with that call made a no-op), renders and stores the probe, and the
+ * world matrix runs it ADMISSION_RUNS times. A reply that fails the
+ * template's check, a recipe that is not on a line A adds or does not occur
+ * exactly once in A's file, a harness error, or a failure identical in every
+ * world is repaired, at most DRAFT_REPAIRS times, from deterministic text
+ * only: never from the model's own rationale. An admitted probe ends it; any
+ * other matrix result is discarded as admission judged it, a template with no
+ * recipe is incomplete, and an abstaining model ends it too. A runner that
+ * cannot run at all fails, for the caller to retry.
  */
-export const draftProbe = <S>(
+export const draftProbe = <S, R>(
   template: ProbeTemplate<S>,
   context: DraftContext,
-  worlds: Readonly<Record<World, ContentHash>>,
+  worlds: Readonly<Record<FlowWorld, ContentHash>>,
+  aNoop: (recipe: NoopRecipe) => Effect.Effect<ContentHash, NoNoop, R>,
 ): Effect.Effect<
   DraftOutcome,
   ProbeRunnerUnavailable,
-  PlatformFunction | ProbeStore | ProbeRunner
+  PlatformFunction | ProbeStore | ProbeRunner | R
 > =>
   Effect.gen(function* () {
     const model = yield* PlatformFunction;
@@ -205,8 +216,30 @@ export const draftProbe = <S>(
         feedback.push(`attempt ${attempt}: slots: ${slots.failure}`);
         continue;
       }
+      const recipe = template.noop?.(slots.success);
+      if (recipe === undefined)
+        return {
+          _tag: "Discarded",
+          reason: "incomplete",
+          attempts: attempt,
+          feedback: [...feedback, `template ${template.id} gives no A-noop recipe`],
+        } satisfies DraftOutcome;
+      const placed = noopPlaced(context.hunks.A, recipe);
+      if (Result.isFailure(placed)) {
+        feedback.push(`attempt ${attempt}: noop: ${placed.failure}`);
+        continue;
+      }
+      const noop = yield* Effect.result(aNoop(recipe));
+      if (Result.isFailure(noop)) {
+        feedback.push(`attempt ${attempt}: noop: ${describeNoNoop(noop.failure)}`);
+        continue;
+      }
       const probe = yield* store.put(template.render(slots.success));
-      const { cells, harnessErrors } = yield* runMatrix(probe, worlds, ADMISSION_RUNS);
+      const { cells, harnessErrors } = yield* runMatrix(
+        probe,
+        { ...worlds, "A-noop": noop.success },
+        ADMISSION_RUNS,
+      );
       if (harnessErrors.length > 0) {
         feedback.push(...harnessFeedback(attempt, harnessErrors));
         continue;

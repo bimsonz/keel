@@ -7,8 +7,12 @@ import {
   FRESHNESS_SCHEMA,
   FRESHNESS_TEMPLATE,
   type FreshnessSlots,
+  freshnessNoop,
   MATRIX_WORLDS,
+  type NoNoop,
+  type NoopRecipe,
   type ProbeRun,
+  type ProbeTemplate,
 } from "../../../src/application/verification/index.ts";
 import {
   PlatformFunction,
@@ -20,6 +24,7 @@ import {
 import { Proposition } from "../../../src/domain/coordination/index.ts";
 import { ContentHash } from "../../../src/domain/kernel/index.ts";
 import {
+  type FlowWorld,
   ModelAbstained,
   type ProbeOutcome,
   type World,
@@ -28,13 +33,18 @@ import { fc } from "../../support/fast-check.ts";
 
 const hash = (n: number) =>
   Schema.decodeUnknownSync(ContentHash)(`sha256:${String(n).padStart(64, "0")}`);
-const WORLDS: Readonly<Record<World, ContentHash>> = {
+const WORLDS: Readonly<Record<FlowWorld, ContentHash>> = {
   trunk: hash(10),
   A: hash(11),
   B: hash(12),
   AB: hash(13),
-  "A-noop": hash(14),
 };
+/** The A-noop world the default builder answers with. */
+const A_NOOP = hash(14);
+
+/** A's revoke, as S-1's a.patch adds it: what the slots name for A-noop. */
+const REVOKE_PATH = "src/routes/collaborators.ts";
+const REVOKE_CALL = "store.removeCollaborator(repo.id, target.id, actor.id, clock.now());";
 
 const proposition = (value: string) =>
   Schema.decodeUnknownSync(Proposition)({
@@ -53,7 +63,16 @@ const CONTEXT: DraftContext = {
     { path: "src/authz/require-permission.ts", text: "export const requirePermission = () => {};" },
   ],
   hunks: {
-    A: "+ app.delete('/repos/:owner/:repo/collaborators/:username')",
+    A: [
+      `diff --git a/${REVOKE_PATH} b/${REVOKE_PATH}`,
+      `--- a/${REVOKE_PATH}`,
+      `+++ b/${REVOKE_PATH}`,
+      "@@ -1,2 +1,4 @@",
+      " const existing = 1;",
+      "+app.delete('/repos/:owner/:repo/collaborators/:username', async (c) => {",
+      `+  ${REVOKE_CALL}`,
+      "+});",
+    ].join("\n"),
     B: "+ const cache = new Map();",
   },
 };
@@ -99,6 +118,7 @@ const good = (rationale = "revoked mid-session"): FreshnessSlots => ({
     body: "",
     expectedStatus: 403,
   },
+  noop: { path: REVOKE_PATH, call: REVOKE_CALL },
   rationale,
 });
 /** Slots the template refuses, with the text it refuses them with. */
@@ -132,7 +152,13 @@ type Matrix = (attempt: number, world: World, run: number) => ProbeRun;
  * draftProbe's world: a scripted model, a store that numbers each probe put
  * by attempt, and a runner that answers by that attempt.
  */
-function drafting(script: Script, matrix: Matrix) {
+function drafting(
+  script: Script,
+  matrix: Matrix,
+  aNoop: (recipe: NoopRecipe) => Effect.Effect<ContentHash, NoNoop> = () => Effect.succeed(A_NOOP),
+  template: ProbeTemplate<FreshnessSlots> = FRESHNESS_TEMPLATE,
+) {
+  const recipes: NoopRecipe[] = [];
   const calls: PlatformFunctionCall[] = [];
   const requests: ProbeRunRequest[] = [];
   const attemptOf = new Map<string, number>();
@@ -175,9 +201,16 @@ function drafting(script: Script, matrix: Matrix) {
     ),
   );
   const run = () =>
-    Effect.runPromise(draftProbe(FRESHNESS_TEMPLATE, CONTEXT, WORLDS).pipe(Effect.provide(layer)));
+    Effect.runPromise(
+      draftProbe(template, CONTEXT, WORLDS, (recipe) =>
+        Effect.suspend(() => {
+          recipes.push(recipe);
+          return aNoop(recipe);
+        }),
+      ).pipe(Effect.provide(layer)),
+    );
   const promptOf = (n: number) => String(calls[n - 1]?.input["prompt"]);
-  return { calls, requests, run, promptOf };
+  return { calls, requests, recipes, run, promptOf };
 }
 
 describe("draftProbe: template first, repaired from deterministic text only", () => {
@@ -337,6 +370,71 @@ describe("draftProbe: template first, repaired from deterministic text only", ()
     expect(await d.run()).toMatchObject({ _tag: "Admitted", attempts: 2 });
     expect(d.promptOf(2)).toContain("non-discriminating");
     expect(d.promptOf(2)).not.toContain(marker);
+  });
+
+  it("[draft.noop-from-slots] builds A-noop from the recipe the slots name, and runs the probe there", async () => {
+    const d = drafting(
+      () => good(),
+      (_, world) => discriminates(world),
+    );
+    expect(await d.run()).toMatchObject({ _tag: "Admitted", attempts: 1 });
+    expect(d.recipes).toEqual([freshnessNoop({ path: REVOKE_PATH, call: REVOKE_CALL })]);
+    expect(d.requests.filter((r) => r.world === "A-noop").map((r) => r.worldBundle)).toEqual([
+      A_NOOP,
+      A_NOOP,
+      A_NOOP,
+    ]);
+  });
+
+  it("[draft.noop-outside-hunk] repairs a recipe that is not on a line A adds, and never builds or runs it", async () => {
+    const elsewhere = { ...good(), noop: { path: REVOKE_PATH, call: "const existing = 1;" } };
+    const absent = { ...good(), noop: { path: "src/app.ts", call: REVOKE_CALL } };
+    const d = drafting(
+      (n) => (n === 1 ? elsewhere : n === 2 ? absent : good()),
+      (_, world) => discriminates(world),
+    );
+    expect(await d.run()).toMatchObject({ _tag: "Admitted", attempts: 3 });
+    expect(d.promptOf(3)).toContain(
+      `- attempt 1: noop: the call is not on a line A adds to ${REVOKE_PATH}`,
+    );
+    expect(d.promptOf(3)).toContain("- attempt 2: noop: src/app.ts is not in A's diff");
+    expect(d.recipes).toHaveLength(1);
+    expect(new Set(d.requests.map((r) => r.probe))).toEqual(new Set([hash(1001)]));
+  });
+
+  it("[draft.noop-outside-hunk] repairs a recipe whose call is not once in A's file, saying how often it is", async () => {
+    const d = drafting(
+      () => good(),
+      (_, world) => discriminates(world),
+      (recipe) =>
+        Effect.fail({ reason: "anchor-ambiguous", path: recipe.path, count: 2 } satisfies NoNoop),
+    );
+    expect(await d.run()).toMatchObject({ _tag: "Discarded", reason: "repairs-exhausted" });
+    expect(d.promptOf(2)).toContain(
+      `- attempt 1: noop: the call occurs 2 times in ${REVOKE_PATH} in A's tree, not once`,
+    );
+    expect(d.requests).toEqual([]);
+  });
+
+  it("[draft.noop-missing-incomplete] a template with no A-noop recipe is incomplete: nothing runs, no repair", async () => {
+    const { id, fn, schema, instructions, validate, render } = FRESHNESS_TEMPLATE;
+    const noRecipe: ProbeTemplate<FreshnessSlots> = {
+      id,
+      fn,
+      schema,
+      instructions,
+      validate,
+      render,
+    };
+    const d = drafting(
+      () => good(),
+      (_, world) => discriminates(world),
+      undefined,
+      noRecipe,
+    );
+    expect(await d.run()).toMatchObject({ _tag: "Discarded", reason: "incomplete", attempts: 1 });
+    expect(d.calls).toHaveLength(1);
+    expect(d.requests).toEqual([]);
   });
 
   it("[draft.prompt] carries the disagreement, the rules with A-noop, both hunks, every source file and the template", async () => {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/draft-probe.test.ts packages/core/test/application/verification/world-matrix.test.ts -t "draft.noop-outside-hunk|noop.placed"
+# kills: draft.noop-outside-hunk, noop.placed
+# why: A recipe is accepted wherever its call is, so A-noop can break code A never wrote and a probe passes admission without testing A's premise
+diff --git a/packages/core/src/application/verification/world-matrix.ts b/packages/core/src/application/verification/world-matrix.ts
+index 2a560b4..de706f2 100644
+--- a/packages/core/src/application/verification/world-matrix.ts
++++ b/packages/core/src/application/verification/world-matrix.ts
+@@ -75,7 +75,7 @@ export const addedLines = (diff: string, path: string): readonly string[] | unde
+ export const noopPlaced = (diffA: string, recipe: NoopRecipe): Result.Result<void, string> => {
+   const added = addedLines(diffA, recipe.path);
+   if (added === undefined) return Result.fail(`${recipe.path} is not in A's diff`);
+-  return added.some((line) => line.includes(recipe.anchor))
++  return added.length >= 0
+     ? Result.void
+     : Result.fail(`the call is not on a line A adds to ${recipe.path}`);
+ };

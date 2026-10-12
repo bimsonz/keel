@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/draft-probe.test.ts packages/core/test/application/verification/world-matrix.test.ts -t "draft.noop-from-slots"
+# kills: draft.noop-from-slots
+# why: The matrix runs A's own world as A-noop, so the do-nothing mutant the slots name is never built and a probe that ignores the revoke can still fail there for another reason
+diff --git a/packages/core/src/application/verification/draft-probe.ts b/packages/core/src/application/verification/draft-probe.ts
+index 449e21a..666888f 100644
+--- a/packages/core/src/application/verification/draft-probe.ts
++++ b/packages/core/src/application/verification/draft-probe.ts
+@@ -237,7 +237,7 @@ export const draftProbe = <S, R>(
+       const probe = yield* store.put(template.render(slots.success));
+       const { cells, harnessErrors } = yield* runMatrix(
+         probe,
+-        { ...worlds, "A-noop": noop.success },
++        { ...worlds, "A-noop": worlds.A },
+         ADMISSION_RUNS,
+       );
+       if (harnessErrors.length > 0) {

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/draft-probe.test.ts packages/core/test/application/verification/world-matrix.test.ts -t "draft.noop-missing-incomplete"
+# kills: draft.noop-missing-incomplete
+# why: A template with no A-noop recipe is drafted and repaired as though its recipe were wrong, spending model calls on a probe that can never be admitted
+diff --git a/packages/core/src/application/verification/draft-probe.ts b/packages/core/src/application/verification/draft-probe.ts
+index 449e21a..f72dbbf 100644
+--- a/packages/core/src/application/verification/draft-probe.ts
++++ b/packages/core/src/application/verification/draft-probe.ts
+@@ -216,7 +216,7 @@ export const draftProbe = <S, R>(
+         feedback.push(`attempt ${attempt}: slots: ${slots.failure}`);
+         continue;
+       }
+-      const recipe = template.noop?.(slots.success);
++      const recipe = template.noop?.(slots.success) ?? { path: "", anchor: "", replacement: "" };
+       if (recipe === undefined)
+         return {
+           _tag: "Discarded",

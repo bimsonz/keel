@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-matrix.test.ts
+# kills: world-matrix.cell-evidence
+# why: A cell's evidence leaves out its observations, so the resultRef a ProbeRan cites does not hold what the probe saw
+diff --git a/packages/core/src/application/verification/run-matrix.ts b/packages/core/src/application/verification/run-matrix.ts
+index b8d6b6c..4c07a18 100644
+--- a/packages/core/src/application/verification/run-matrix.ts
++++ b/packages/core/src/application/verification/run-matrix.ts
+@@ -19,7 +19,7 @@ export const cellEvidence = (cell: MatrixCell): Json => ({
+   run: cell.run,
+   outcome: cell.outcome,
+   reason: cell.reason,
+-  observations: [...cell.observations],
++  observations: [],
+ });
+ 
+ /** Stores a cell's evidence and answers its hash, the `resultRef` the cell's ProbeRan cites. */

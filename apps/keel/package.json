@@ -23,6 +23,7 @@
     "@keeltown/runner-protocol": "workspace:*",
     "@modelcontextprotocol/server": "catalog:",
     "better-auth": "catalog:",
+    "diff": "catalog:",
     "effect": "catalog:",
     "hono": "catalog:",
     "jose": "catalog:",

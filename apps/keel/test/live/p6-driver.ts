@@ -5,16 +5,19 @@
 // event says served it; the adapter reads the same stream, unchanged.
 //
 //   HEAD|PUT /r2/<key>   the bundle bucket, for the harness's world bundles
-//   POST /draft          {pins, context, worlds} → {outcome, served, ms}
+//   POST /draft          {pins, context, worlds, a} → {outcome, served, ms}; A-noop is built
+//                        per draft from A's files (`a`) and the recipe the slots name
 import {
   type DraftContext,
   draftProbe,
   FRESHNESS_TEMPLATE,
 } from "@keeltown/core/application/verification";
 import { Proposition } from "@keeltown/core/domain/coordination";
-import { World } from "@keeltown/core/domain/verification";
+import { FlowWorld } from "@keeltown/core/domain/verification";
 import { ContentHash } from "@keeltown/core/kernel";
 import { Effect, Schema } from "effect";
+import { BundleStoreR2 } from "../../src/adapters/driven/r2/bundle-store.ts";
+import { noopWorld } from "../../src/adapters/driven/r2/noop-world.ts";
 import type { StreamingAi } from "../../src/adapters/driven/workers-ai/platform-function.ts";
 import { probeDraftingLayer } from "../../src/composition/workflow.ts";
 
@@ -33,7 +36,15 @@ const DraftRequest = Schema.Struct({
     source: Schema.Array(Schema.Struct({ path: Schema.String, text: Schema.String })),
     hunks: Schema.Struct({ A: Schema.String, B: Schema.String }),
   }),
-  worlds: Schema.Record(World, ContentHash),
+  worlds: Schema.Record(FlowWorld, ContentHash),
+  /** A's files, base64: what A-noop is built from. */
+  a: Schema.Array(
+    Schema.Struct({
+      path: Schema.String,
+      base64: Schema.String,
+      executable: Schema.optional(Schema.Boolean),
+    }),
+  ),
 });
 
 /** Every `model` a server-sent event in `stream` names, read to its end. */
@@ -70,9 +81,17 @@ async function draft(request: Request, env: DriverEnv): Promise<Response> {
   const body = Schema.decodeUnknownSync(DraftRequest)(await request.json());
   const served: Promise<string[]>[] = [];
   const context: DraftContext = body.context;
+  const a = body.a.map((f) => ({
+    path: f.path,
+    bytes: Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0)),
+    ...(f.executable === true ? { executable: true } : {}),
+  }));
+  const aNoop = noopWorld(a);
   const started = Date.now();
   const outcome = await Effect.runPromise(
-    draftProbe(FRESHNESS_TEMPLATE, context, body.worlds).pipe(
+    draftProbe(FRESHNESS_TEMPLATE, context, body.worlds, (recipe) =>
+      aNoop(recipe).pipe(Effect.provide(BundleStoreR2(env.BUNDLES))),
+    ).pipe(
       Effect.provide(
         probeDraftingLayer({
           AI: recording(env.AI, served),

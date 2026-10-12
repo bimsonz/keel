@@ -50,6 +50,7 @@ catalog:
   "@modelcontextprotocol/server": 2.3.1
   jose: 6.2.12
   ulid: 3.0.2
+  diff: 9.0.0
   isomorphic-git: 1.43.3
 
   # API first

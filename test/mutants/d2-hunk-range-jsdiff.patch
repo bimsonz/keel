@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe-sources.test.ts
+# kills: probe-sources.git-format
+# why: An empty side keeps jsdiff's start instead of git's, so an added file's hunk header is not what git writes
+diff --git a/apps/keel/src/adapters/driven/gitcore/probe-sources.ts b/apps/keel/src/adapters/driven/gitcore/probe-sources.ts
+index 82774f2..60490d4 100644
+--- a/apps/keel/src/adapters/driven/gitcore/probe-sources.ts
++++ b/apps/keel/src/adapters/driven/gitcore/probe-sources.ts
+@@ -33,7 +33,7 @@ const isFile = (mode: string | undefined) => mode === MODE_FILE || mode === MODE
+  * 1, and an empty side starting at the line before it (jsdiff gives the next).
+  */
+ const range = (start: number, count: number) =>
+-  count === 1 ? `${start}` : `${count === 0 ? start - 1 : start},${count}`;
++  count === 1 ? `${start}` : `${start},${count}`;
+ 
+ /**
+  * One file's change as `git diff` writes it (no index line), from its text

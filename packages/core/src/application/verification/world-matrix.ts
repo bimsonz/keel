@@ -35,6 +35,51 @@ export const applyNoop = (text: string, recipe: NoopRecipe): Result.Result<strin
   return Result.succeed(text.replace(recipe.anchor, () => recipe.replacement));
 };
 
+/** A NoNoop as a repair is told it: deterministic text naming the file. */
+export const describeNoNoop = (n: NoNoop): string =>
+  n.reason === "no-recipe"
+    ? "the template gives no A-noop recipe"
+    : n.reason === "file-absent"
+      ? `${n.path} is not a text file in A's tree`
+      : n.reason === "anchor-absent"
+        ? `the call does not occur in ${n.path} in A's tree`
+        : `the call occurs ${n.count} times in ${n.path} in A's tree, not once`;
+
+/**
+ * The lines a unified diff (as `git diff` writes it) adds to `path`, in
+ * order, without their `+`; undefined when the diff does not touch the path.
+ */
+export const addedLines = (diff: string, path: string): readonly string[] | undefined => {
+  let inHunk = false;
+  let current: string | undefined;
+  let touched = false;
+  const added: string[] = [];
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("diff --git ")) {
+      inHunk = false;
+      current = undefined;
+    } else if (!inHunk && line.startsWith("+++ ")) {
+      current = line.slice(4).replace(/^b\//, "").trimEnd();
+      if (current === path) touched = true;
+    } else if (line.startsWith("@@")) inHunk = true;
+    else if (inHunk && current === path && line.startsWith("+")) added.push(line.slice(1));
+  }
+  return touched ? added : undefined;
+};
+
+/**
+ * Whether a recipe neutralises A's own work: its file is in A's diff and its
+ * anchor is on a line A adds. A recipe anywhere else would make A-noop break
+ * something A did not write, which proves nothing about A's premise.
+ */
+export const noopPlaced = (diffA: string, recipe: NoopRecipe): Result.Result<void, string> => {
+  const added = addedLines(diffA, recipe.path);
+  if (added === undefined) return Result.fail(`${recipe.path} is not in A's diff`);
+  return added.some((line) => line.includes(recipe.anchor))
+    ? Result.void
+    : Result.fail(`the call is not on a line A adds to ${recipe.path}`);
+};
+
 /**
  * How the caller's files carry text. Core decodes nothing itself: the
  * adapter says how to read a file as text (undefined when it is not UTF-8)
@@ -58,12 +103,20 @@ export const buildWorlds = <F>(
   codec: TextCodec<F>,
 ): Result.Result<Readonly<Record<World, readonly F[]>>, NoNoop> => {
   if (recipe === undefined) return Result.fail({ reason: "no-recipe" });
-  const target = trees.A.find((f) => codec.path(f) === recipe.path);
+  return Result.map(noopTree(trees.A, recipe, codec), (noop) => ({ ...trees, "A-noop": noop }));
+};
+
+/** A-noop's tree: A's, with the recipe applied to the one file it names, every other file as it was. */
+export const noopTree = <F>(
+  a: readonly F[],
+  recipe: NoopRecipe,
+  codec: TextCodec<F>,
+): Result.Result<readonly F[], NoNoop> => {
+  const target = a.find((f) => codec.path(f) === recipe.path);
   const text = target === undefined ? undefined : codec.text(target);
   if (target === undefined || text === undefined)
     return Result.fail({ reason: "file-absent", path: recipe.path });
-  const changed = applyNoop(text, recipe);
-  if (Result.isFailure(changed)) return Result.fail(changed.failure);
-  const noop = trees.A.map((f) => (f === target ? codec.withText(f, changed.success) : f));
-  return Result.succeed({ ...trees, "A-noop": noop });
+  return Result.map(applyNoop(text, recipe), (changed) =>
+    a.map((f) => (f === target ? codec.withText(f, changed) : f)),
+  );
 };

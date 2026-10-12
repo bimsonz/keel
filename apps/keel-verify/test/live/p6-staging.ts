@@ -14,10 +14,12 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { MATRIX_WORLDS } from "@keeltown/core/application/verification";
 import { type BundleFile, depsNeed, sha256Hex, writeBundle } from "@keeltown/runner-protocol";
 import { unstable_readConfig, unstable_startWorker } from "wrangler";
 import { FIXTURE, s1Worlds } from "./s1-worlds.ts";
+
+/** The worlds the harness uploads; A-noop is built per draft. */
+const FLOW_WORLDS = ["trunk", "A", "B", "AB"] as const;
 
 const REPO = join(import.meta.dirname, "../../../..");
 const KEEL = join(REPO, "apps/keel");
@@ -111,9 +113,15 @@ try {
     throw new Error(
       `no deps/${need.sha256}: run deps-bundle.ts fixtures/forge-lite --upload first`,
     );
+  // A-noop is the driver's to build, per draft, from the recipe the slots name: it gets A's files.
   const worlds: Record<string, string> = {};
-  // oxlint-disable-next-line no-await-in-loop -- five uploads, each skipped when the bucket has it
-  for (const world of MATRIX_WORLDS) worlds[world] = await put(built[world]);
+  // oxlint-disable-next-line no-await-in-loop -- four uploads, each skipped when the bucket has it
+  for (const world of FLOW_WORLDS) worlds[world] = await put(built[world]);
+  const a = built.A.map((f) => ({
+    path: f.path,
+    base64: Buffer.from(f.bytes).toString("base64"),
+    ...(f.executable === true ? { executable: true } : {}),
+  }));
   console.log(JSON.stringify({ commit, pins, keelVerifyBefore: before, worlds }));
 
   const results: { outcome: string; attempts: number; ms: number }[] = [];
@@ -121,7 +129,7 @@ try {
     // oxlint-disable-next-line no-await-in-loop -- one draft after another, as the series is specified
     const response = await call("/draft", {
       method: "POST",
-      body: JSON.stringify({ pins, context, worlds }),
+      body: JSON.stringify({ pins, context, worlds, a }),
     });
     // oxlint-disable-next-line no-await-in-loop -- the draft's own answer
     const body: unknown = await response.json();

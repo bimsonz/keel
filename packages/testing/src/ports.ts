@@ -19,6 +19,13 @@ import { describeLiveChangesContract, type LiveChangesHarness } from "./contract
 import { describeProbeLedgerContract, type ProbeLedgerHarness } from "./contracts/probe-ledger.ts";
 import { makeLiveChangesMemory } from "./memory/live-changes.ts";
 import { makeProbeLedgerMemory } from "./memory/probe-ledger.ts";
+import {
+  describeNoopWorldsContract,
+  describeProbeSourcesContract,
+  type NoopWorldsHarness,
+  type ProbeSourcesHarness,
+} from "./contracts/probe-sources.ts";
+import { makeNoopWorldsMemory, makeProbeSourcesMemory } from "./memory/probe-sources.ts";
 import { makeSessionsMemory } from "./memory/sessions.ts";
 import { makeStandingsMemory } from "./memory/standings.ts";
 import { describeEventFeedContract, type EventFeedHarness } from "./contracts/event-feed.ts";
@@ -83,6 +90,8 @@ import type {
   Inbox,
   LiveChanges,
   ProbeLedger,
+  NoopWorlds,
+  ProbeSources,
   Notifier,
   Projects,
   ProjectViews,
@@ -411,6 +420,14 @@ export const PORTS = {
   AdmittedGuards: harnessed<AdmittedGuards, AdmittedGuardsHarness>(
     verification.makeAdmittedGuardsMemory,
     describeAdmittedGuardsContract,
+  ),
+  ProbeSources: harnessed<ProbeSources, ProbeSourcesHarness>(
+    makeProbeSourcesMemory,
+    describeProbeSourcesContract,
+  ),
+  NoopWorlds: harnessed<NoopWorlds, NoopWorldsHarness>(
+    makeNoopWorldsMemory,
+    describeNoopWorldsContract,
   ),
   GuardRepo: port(
     () => verification.makeGuardRepoMemory().layer,

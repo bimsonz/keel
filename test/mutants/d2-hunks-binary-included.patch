@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe-sources.test.ts
+# kills: probe-sources.hunks
+# why: A file that is not UTF-8 is diffed as text, so the hunks carry garbage the model reads as code
+diff --git a/apps/keel/src/adapters/driven/gitcore/probe-sources.ts b/apps/keel/src/adapters/driven/gitcore/probe-sources.ts
+index 82774f2..75a2dfe 100644
+--- a/apps/keel/src/adapters/driven/gitcore/probe-sources.ts
++++ b/apps/keel/src/adapters/driven/gitcore/probe-sources.ts
+@@ -103,7 +103,7 @@ export const ProbeSourcesCodeHost = Layer.effect(
+                 const binary =
+                   (isFile(row.oldMode) && before === undefined) ||
+                   (isFile(row.newMode) && after === undefined);
+-                return binary || (before === undefined && after === undefined)
++                return before === undefined && after === undefined
+                   ? undefined
+                   : gitFileDiff(row.path, before, after);
+               }),

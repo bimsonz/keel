@@ -8,6 +8,14 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 
 ### Added
 
+- Ports `ProbeSources` and `NoopWorlds` (new, unwired), the Probe Workflow's reads:
+  - `ProbeSources.source(repo, commit) → SourceFile[]`: every UTF-8 file under `src/`, whole, in path order;
+  - `ProbeSources.hunks(repo, base, head) → string`: the change as `git diff` writes it, byte for byte. `diff` 9.0.0 (jsdiff) formats it in apps/keel;
+  - `NoopWorlds.build(repo, commit, recipe) → ContentHash`, failing `NoNoop | BundleRefused | RepoNotFound | ObjectNotFound`: the A-noop world's bundle.
+
+  Both have memory adapters, adapters over `CodeHost` and shared contracts.
+- `MatrixCell.observations`. `cellEvidence(cell)` and `storeCell(cell) → ContentHash` put a cell's world, run, outcome, reason and observations to `EvidenceStore`, and the hash is the `resultRef` its ProbeRan cites.
+- The freshness template is `freshness/2`, with a `noop {path, call}` slot (`ProbeTemplate.noop?`). `draftProbe(template, context, worlds, aNoop)` builds the A-noop world from that recipe for each draft, and it ends `incomplete` when the template gives no recipe.
 - A change reacts to a conflict proven against it under its latest plan's predicate policy:
   - `block`, while it is deriving, verifying or queued: ChangeBounced citing the conflict. Already integrating, it lands, since its batch formed past its blockers.
   - `advise` and `annotate` (and no plan yet, which reads as advise): ConflictNoted, with `evidenceRef: probe:<probeId>`. An annotation notifies no one.

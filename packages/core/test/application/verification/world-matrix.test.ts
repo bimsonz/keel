@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
+  addedLines,
   applyNoop,
   buildWorlds,
   FRESHNESS_SCHEMA,
@@ -10,6 +11,7 @@ import {
   freshnessNoop,
   MATRIX_WORLDS,
   type NoopRecipe,
+  noopPlaced,
   renderFreshness,
   type TextCodec,
   validateSlots,
@@ -151,7 +153,37 @@ const S1: FreshnessSlots = {
     expectedStatus: 403,
   },
   rationale: "bob's admin role is revoked mid-session",
+  noop: {
+    path: "src/routes/collaborators.ts",
+    call: "store.removeCollaborator(repo.id, target.id, actor.id, clock.now());",
+  },
 };
+
+describe("A-noop's recipe, placed on A's own work", () => {
+  const patch = readFileSync(
+    join(import.meta.dirname, "../../../../../fixtures/forge-lite/scenarios/s1/a.patch"),
+    "utf8",
+  );
+
+  it("[noop.placed] accepts S-1's revoke call: on a line A adds to the file A changes", () => {
+    expect(Result.isSuccess(noopPlaced(patch, recipe()))).toBe(true);
+    expect(addedLines(patch, "src/routes/collaborators.ts")).toContain(`    ${ANCHOR}`);
+  });
+
+  it("[noop.placed] refuses a call A does not add, or a file A does not change, saying which", () => {
+    const context = patch
+      .split("\n")
+      .find((l) => l.startsWith(" ") && l.trim().length > 3)
+      ?.trim();
+    if (context === undefined) throw new Error("a.patch has a context line");
+    expect(noopPlaced(patch, recipe(context))).toEqual(
+      Result.fail("the call is not on a line A adds to src/routes/collaborators.ts"),
+    );
+    expect(noopPlaced(patch, { ...recipe(), path: "src/app.ts" })).toEqual(
+      Result.fail("src/app.ts is not in A's diff"),
+    );
+  });
+});
 
 describe("the freshness template", () => {
   it("[freshness.slots] accepts well-formed slots and names exactly what is wrong otherwise", () => {
@@ -172,6 +204,12 @@ describe("the freshness template", () => {
     );
     expect(wrong({ callAgain: { ...S1.callAgain, expectedStatus: 99 } })).toEqual(
       Result.fail("callAgain.expectedStatus must be an HTTP status"),
+    );
+    expect(wrong({ noop: undefined })).toEqual(
+      Result.fail("noop.path must be the repo-relative path of a file in A's diff"),
+    );
+    expect(wrong({ noop: { ...S1.noop, call: "a();\nb();" } })).toEqual(
+      Result.fail("noop.call must be one statement as written on one line"),
     );
     expect(validateSlots([])).toEqual(Result.fail("the reply is not a JSON object"));
   });

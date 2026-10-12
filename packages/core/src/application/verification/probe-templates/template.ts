@@ -1,4 +1,5 @@
 import type { Result } from "effect";
+import type { NoopRecipe } from "../world-matrix.ts";
 
 /** A probe file Keel renders: its path under `.keel/`, and its text. */
 export interface ProbeFile {
@@ -22,4 +23,10 @@ export interface ProbeTemplate<S> {
   readonly instructions: string;
   readonly validate: (reply: unknown) => Result.Result<S, string>;
   readonly render: (slots: S) => readonly ProbeFile[];
+  /**
+   * How the slots build A-noop from A's tree. A
+   * template without one can never have a probe admitted: its matrix is
+   * never complete, so the conflict escalates as unprovable.
+   */
+  readonly noop?: (slots: S) => NoopRecipe;
 }

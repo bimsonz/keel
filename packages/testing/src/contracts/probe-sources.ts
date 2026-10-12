@@ -1,0 +1,161 @@
+import { describe, expect, it } from "@effect/vitest";
+import { addedLines } from "@keeltown/core/application/verification";
+import { CommitSha, type ContentHash } from "@keeltown/core/kernel";
+import { NoopWorlds, ProbeSources, type RepoRef } from "@keeltown/core/ports";
+import { Effect, Exit, type Layer } from "effect";
+
+/** A commit's whole tree: text, or bytes that are not UTF-8. */
+export type ContractTree = Readonly<Record<string, string | Uint8Array>>;
+
+/** A port and a way to commit a whole tree to the one repo it reads. */
+interface TreeHarness<S> {
+  readonly layer: Layer.Layer<S>;
+  readonly commit: (
+    files: ContractTree,
+  ) => Effect.Effect<{ readonly repo: RepoRef; readonly sha: CommitSha }>;
+}
+export type ProbeSourcesHarness = TreeHarness<ProbeSources>;
+export type NoopWorldsHarness = TreeHarness<NoopWorlds>;
+
+const NOT_UTF8 = new Uint8Array([0xff, 0xfe, 0x00, 0x80]);
+const UNKNOWN = CommitSha.make("e".repeat(40));
+
+export function describeProbeSourcesContract(adapter: string, make: () => ProbeSourcesHarness) {
+  describe(`ProbeSources contract: ${adapter}`, () => {
+    it.effect(
+      "[probe-sources.src] reads every UTF-8 file under src/, whole and in path order, and nothing else",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const { repo, sha } = yield* harness.commit({
+            "src/b.ts": "export const b = 2;\n",
+            "src/a/x.ts": "export const x = 1;\n",
+            "src/logo.bin": NOT_UTF8,
+            "srcx/y.ts": "y\n",
+            "README.md": "# r\n",
+            "test/a.test.ts": "t\n",
+          });
+          expect(yield* (yield* ProbeSources).source(repo, sha)).toEqual([
+            { path: "src/a/x.ts", text: "export const x = 1;\n" },
+            { path: "src/b.ts", text: "export const b = 2;\n" },
+          ]);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[probe-sources.hunks] writes each changed text file as git does, adding the head's lines",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const base = yield* harness.commit({
+            "src/a.ts": "one\ntwo\nthree\n",
+            "src/gone.ts": "gone\n",
+            "src/same.ts": "same\n",
+            "src/logo.bin": NOT_UTF8,
+            "src/flip.txt": "text for now\n",
+          });
+          const head = yield* harness.commit({
+            "src/a.ts": "one\ntwo\nthree\nfour\n",
+            "src/new.ts": "new\n",
+            "src/same.ts": "same\n",
+            "src/logo.bin": new Uint8Array([0xff, 0xfe, 0x01]),
+            "src/flip.txt": NOT_UTF8,
+          });
+          const hunks = yield* (yield* ProbeSources).hunks(base.repo, base.sha, head.sha);
+          expect(addedLines(hunks, "src/a.ts")).toContain("four");
+          expect(addedLines(hunks, "src/a.ts")).not.toContain("");
+          expect(addedLines(hunks, "src/new.ts")).toEqual(["new"]);
+          expect(addedLines(hunks, "src/gone.ts")).toBeUndefined();
+          expect(hunks).toContain(
+            "diff --git a/src/gone.ts b/src/gone.ts\n--- a/src/gone.ts\n+++ /dev/null\n",
+          );
+          expect(hunks).toContain(
+            "diff --git a/src/new.ts b/src/new.ts\n--- /dev/null\n+++ b/src/new.ts\n",
+          );
+          expect(hunks).toContain("-gone");
+          expect(hunks).not.toContain("same.ts");
+          expect(hunks).not.toContain("logo.bin");
+          // A file that stops being text is not diffed as if it had been deleted.
+          expect(hunks).not.toContain("flip.txt");
+          expect(yield* (yield* ProbeSources).hunks(base.repo, base.sha, base.sha)).toBe("");
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[probe-sources.missing] fails, never answers empty, for a commit the repo does not hold",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const { repo, sha } = yield* harness.commit({ "src/a.ts": "a\n" });
+          const sources = yield* ProbeSources;
+          expect(Exit.isFailure(yield* Effect.exit(sources.source(repo, UNKNOWN)))).toBe(true);
+          expect(Exit.isFailure(yield* Effect.exit(sources.hunks(repo, sha, UNKNOWN)))).toBe(true);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+  });
+}
+
+export function describeNoopWorldsContract(adapter: string, make: () => NoopWorldsHarness) {
+  describe(`NoopWorlds contract: ${adapter}`, () => {
+    const files = {
+      "src/routes.ts": "app.delete(path, async (c) => {\n  store.removeCollaborator(a, b);\n});\n",
+      "src/store.ts": "export const store = {};\n",
+    };
+    const recipe = {
+      path: "src/routes.ts",
+      anchor: "store.removeCollaborator(a, b);",
+      replacement: "/* noop */",
+    };
+
+    it.effect(
+      "[noop-worlds.built] builds one world per recipe: the same recipe the same world, another recipe another",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const { repo, sha } = yield* harness.commit(files);
+          const worlds = yield* NoopWorlds;
+          const first: ContentHash = yield* worlds.build(repo, sha, recipe);
+          expect(yield* worlds.build(repo, sha, recipe)).toBe(first);
+          expect(
+            yield* worlds.build(repo, sha, { ...recipe, replacement: "/* other */" }),
+          ).not.toBe(first);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[noop-worlds.refused] refuses a recipe whose file or call is not in the tree once, saying which",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const { repo, sha } = yield* harness.commit({
+            ...files,
+            "src/twice.ts": "f();\nf();\n",
+            "src/logo.bin": NOT_UTF8,
+          });
+          const worlds = yield* NoopWorlds;
+          const refused = (r: typeof recipe) => Effect.flip(worlds.build(repo, sha, r));
+          expect(yield* refused({ ...recipe, path: "src/absent.ts" })).toMatchObject({
+            reason: "file-absent",
+            path: "src/absent.ts",
+          });
+          expect(yield* refused({ ...recipe, path: "src/logo.bin" })).toMatchObject({
+            reason: "file-absent",
+          });
+          expect(yield* refused({ ...recipe, anchor: "store.addCollaborator" })).toMatchObject({
+            reason: "anchor-absent",
+          });
+          expect(yield* refused({ ...recipe, path: "src/twice.ts", anchor: "f();" })).toMatchObject(
+            {
+              reason: "anchor-ambiguous",
+              count: 2,
+            },
+          );
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+  });
+}

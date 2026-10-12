@@ -33,7 +33,7 @@ import { type BundleFile, depsNeed, sha256Hex, writeBundle } from "@keeltown/run
 import { Exit, Schema } from "effect";
 import { unstable_startWorker } from "wrangler";
 import { decodeExit, ProbeRunRequest, VerifierCodecs } from "../../src/rpc/index.ts";
-import { S26, s1Worlds } from "./s1-worlds.ts";
+import { RECIPE, S26, s1Worlds } from "./s1-worlds.ts";
 
 /** S-1's slots for the freshness template, as scenarios/s1/probe.test.ts makes its calls: bob's admin role is revoked mid-session. */
 const S1: FreshnessSlots = {
@@ -76,6 +76,7 @@ const S1: FreshnessSlots = {
     body: "",
     expectedStatus: 403,
   },
+  noop: { path: RECIPE.path, call: RECIPE.anchor },
   rationale: "bob's admin role is revoked mid-session",
 };
 

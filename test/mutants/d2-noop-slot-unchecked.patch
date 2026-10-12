@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/draft-probe.test.ts packages/core/test/application/verification/world-matrix.test.ts -t "freshness.slots"
+# kills: freshness.slots
+# why: The template accepts slots that name no A-noop recipe, so a reply without one reaches the matrix instead of being repaired with the template's own text
+diff --git a/packages/core/src/application/verification/probe-templates/freshness.ts b/packages/core/src/application/verification/probe-templates/freshness.ts
+index c993c7e..9127186 100644
+--- a/packages/core/src/application/verification/probe-templates/freshness.ts
++++ b/packages/core/src/application/verification/probe-templates/freshness.ts
+@@ -160,8 +160,7 @@ export const validateSlots = (value: unknown): Result.Result<FreshnessSlots, str
+   const noop = get(value, "noop");
+   const noopPath = get(noop, "path");
+   const noopCall = get(noop, "call");
+-  if (typeof noopPath !== "string" || noopPath === "" || noopPath.startsWith("/"))
+-    return Result.fail("noop.path must be the repo-relative path of a file in A's diff");
++
+   if (typeof noopCall !== "string" || noopCall.trim() === "" || noopCall.includes("\n"))
+     return Result.fail("noop.call must be one statement as written on one line");
+   const rationale = get(value, "rationale");

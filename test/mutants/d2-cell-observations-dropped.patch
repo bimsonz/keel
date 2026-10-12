@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/application/verification/run-matrix.test.ts
+# kills: world-matrix.cells-as-reported
+# why: A cell drops what the probe observed, so its evidence cannot show why it passed or failed
+diff --git a/packages/core/src/application/verification/run-matrix.ts b/packages/core/src/application/verification/run-matrix.ts
+index b8d6b6c..de370ab 100644
+--- a/packages/core/src/application/verification/run-matrix.ts
++++ b/packages/core/src/application/verification/run-matrix.ts
+@@ -65,7 +65,7 @@ export const runMatrix = Effect.fn("verification/runMatrix")(function* (
+           run,
+           outcome: answer.outcome,
+           reason: answer.reason,
+-          observations: answer.observations,
++          observations: [],
+         });
+       else harnessErrors.push({ world, run, reason: answer.reason });
+     }

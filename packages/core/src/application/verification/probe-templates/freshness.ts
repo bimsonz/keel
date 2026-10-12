@@ -30,6 +30,12 @@ export interface FreshnessSlots {
   readonly call: FreshnessStep;
   readonly revoke: FreshnessStep;
   readonly callAgain: FreshnessStep;
+  /**
+   * The one statement in A's hunks that enforces the premise (the revoke's
+   * own call), as written on one added line of the file at `path`: A-noop is
+   * A with it made a statement that does nothing.
+   */
+  readonly noop: { readonly path: string; readonly call: string };
   readonly rationale: string;
 }
 
@@ -56,9 +62,23 @@ export const FRESHNESS_SCHEMA = {
     call: stepSchema,
     revoke: stepSchema,
     callAgain: stepSchema,
+    noop: {
+      type: "object",
+      description:
+        "The statement in change A's hunks that enforces the premise, which A-noop makes do nothing.",
+      properties: {
+        path: { type: "string", description: "The file in A's diff that holds it, repo-relative." },
+        call: {
+          type: "string",
+          description: "The statement exactly as written on one added line.",
+        },
+      },
+      required: ["path", "call"],
+      additionalProperties: false,
+    },
     rationale: { type: "string" },
   },
-  required: ["owner", "subject", "setup", "call", "revoke", "callAgain", "rationale"],
+  required: ["owner", "subject", "setup", "call", "revoke", "callAgain", "noop", "rationale"],
   additionalProperties: false,
 } as const;
 
@@ -137,6 +157,13 @@ export const validateSlots = (value: unknown): Result.Result<FreshnessSlots, str
   if (call.success.actor !== "subject" || callAgain.success.actor !== "subject")
     return Result.fail("call and callAgain must be made by the subject");
   if (revoke.success.actor !== "owner") return Result.fail("revoke must be made by the owner");
+  const noop = get(value, "noop");
+  const noopPath = get(noop, "path");
+  const noopCall = get(noop, "call");
+  if (typeof noopPath !== "string" || noopPath === "" || noopPath.startsWith("/"))
+    return Result.fail("noop.path must be the repo-relative path of a file in A's diff");
+  if (typeof noopCall !== "string" || noopCall.trim() === "" || noopCall.includes("\n"))
+    return Result.fail("noop.call must be one statement as written on one line");
   const rationale = get(value, "rationale");
   if (typeof rationale !== "string") return Result.fail("rationale must be a string");
   return Result.succeed({
@@ -146,6 +173,7 @@ export const validateSlots = (value: unknown): Result.Result<FreshnessSlots, str
     call: call.success,
     revoke: revoke.success,
     callAgain: callAgain.success,
+    noop: { path: noopPath, call: noopCall },
     rationale,
   });
 };
@@ -230,7 +258,12 @@ Do not write a probe file. A fixed template renders it from slots you fill. The 
 Each step is \`{"actor","method","path","body","expectedStatus"}\`; \`body\` is JSON text, or "" for none. Choose the
 steps so the probe passes in A and fails in A+B, and so it would fail if the revoke did nothing.
 
-Reply with one JSON object: \`{"owner","subject","setup":[...],"call":{...},"revoke":{...},"callAgain":{...},"rationale"}\`.`;
+\`noop\` names the one statement in change A's hunks that enforces the premise, usually the call that does the
+revoking: \`{"path","call"}\`, with \`path\` the file in A's diff and \`call\` the statement exactly as written on one
+added line (for example \`store.removeCollaborator(repo.id, target.id, actor.id, clock.now());\`). Keel builds the world
+A-noop by replacing it with a statement that does nothing; the probe must fail there, or it never tested the revoke.
+
+Reply with one JSON object: \`{"owner","subject","setup":[...],"call":{...},"revoke":{...},"callAgain":{...},"noop":{...},"rationale"}\`.`;
 
 /**
  * Freshness's A-noop recipe: the revoke call A's premise anchors on, at
@@ -249,10 +282,11 @@ export const freshnessNoop = (anchor: {
 
 /** The freshness template, as draftProbe fills it: one probe file, `.keel/freshness.test.ts`. */
 export const FRESHNESS_TEMPLATE: ProbeTemplate<FreshnessSlots> = {
-  id: "freshness/1",
+  id: "freshness/2",
   fn: "keel.probe.freshness",
   schema: FRESHNESS_SCHEMA,
   instructions: FRESHNESS_PROMPT,
   validate: validateSlots,
   render: (slots) => [{ path: ".keel/freshness.test.ts", text: renderFreshness(slots) }],
+  noop: (slots) => freshnessNoop(slots.noop),
 };

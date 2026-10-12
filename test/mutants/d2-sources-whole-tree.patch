@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe-sources.test.ts
+# kills: probe-sources.src
+# why: The draft is given the whole tree, tests and fixtures included, instead of the project's src/ the spec names
+diff --git a/apps/keel/src/adapters/driven/gitcore/probe-sources.ts b/apps/keel/src/adapters/driven/gitcore/probe-sources.ts
+index 82774f2..4867804 100644
+--- a/apps/keel/src/adapters/driven/gitcore/probe-sources.ts
++++ b/apps/keel/src/adapters/driven/gitcore/probe-sources.ts
+@@ -76,7 +76,7 @@ export const ProbeSourcesCodeHost = Layer.effect(
+       source: (repo, commit) =>
+         Effect.gen(function* () {
+           const entries = (yield* host.readTree(repo, commit)).filter(
+-            (e) => e.type === "blob" && isFile(e.mode) && e.path.startsWith("src/"),
++            (e) => e.type === "blob" && isFile(e.mode),
+           );
+           const files = yield* Effect.forEach(
+             entries,

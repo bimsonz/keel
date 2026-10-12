@@ -2,12 +2,19 @@ import { Effect, Layer, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
   MATRIX_WORLDS,
+  type MatrixCell,
   type ProbeRun,
   runMatrix,
+  storeCell,
 } from "../../../src/application/verification/index.ts";
-import { ContentHash } from "../../../src/domain/kernel/index.ts";
+import { ContentHash, contentHashOf, type Json } from "../../../src/domain/kernel/index.ts";
 import { admit, type ProbeOutcome, type World } from "../../../src/domain/verification/index.ts";
-import { ProbeRunner, type ProbeRunRequest } from "../../../src/application/ports/index.ts";
+import {
+  EvidenceMissing,
+  EvidenceStore,
+  ProbeRunner,
+  type ProbeRunRequest,
+} from "../../../src/application/ports/index.ts";
 import { fc } from "../../support/fast-check.ts";
 
 const hash = (n: number) =>
@@ -22,11 +29,11 @@ const BUNDLES: Readonly<Record<World, ContentHash>> = {
 };
 
 type Answer = ProbeOutcome | "harness";
-const ran = (outcome: ProbeOutcome): ProbeRun => ({
+const ran = (outcome: ProbeOutcome, world: World, run: number): ProbeRun => ({
   _tag: "ran",
   outcome,
   reason: outcome,
-  observations: [],
+  observations: [`${world}@${run}`],
 });
 
 /** Runs the matrix on a runner that answers `answer(world, run)`, recording every request. */
@@ -45,7 +52,7 @@ const matrix = (answer: (world: World, run: number) => Answer) => {
                 reason: `broken in ${request.world}`,
                 observations: [],
               }
-            : ran(a);
+            : ran(a, request.world, request.run);
         }),
     }),
   );
@@ -103,8 +110,10 @@ describe("running a probe across the world matrix", () => {
           const expected = [1, 2, 3].flatMap((run) =>
             MATRIX_WORLDS.flatMap((world) => {
               const a = at(world, run);
-              // Each cell keeps the reason its probe gave (here, the outcome's name).
-              return a === "harness" ? [] : [{ world, run, outcome: a, reason: a }];
+              // Each cell keeps the reason its probe gave (here, the outcome's name) and what it observed.
+              return a === "harness"
+                ? []
+                : [{ world, run, outcome: a, reason: a, observations: [`${world}@${run}`] }];
             }),
           );
           expect(cells).toEqual(expected);
@@ -113,5 +122,39 @@ describe("running a probe across the world matrix", () => {
       ),
       { numRuns: 100 },
     );
+  });
+
+  it("[world-matrix.cell-evidence] stores each cell as its evidence, and the hash it answers reads back the cell", async () => {
+    const stored = new Map<ContentHash, Json>();
+    const evidence = Layer.succeed(
+      EvidenceStore,
+      EvidenceStore.of({
+        put: (document) =>
+          Effect.sync(() => {
+            const ref = contentHashOf(document);
+            stored.set(ref, document);
+            return ref;
+          }),
+        get: (ref) => {
+          const document = stored.get(ref);
+          return document === undefined
+            ? Effect.fail(new EvidenceMissing({ hash: ref }))
+            : Effect.succeed(document);
+        },
+      }),
+    );
+    const cell: MatrixCell = {
+      world: "A-noop",
+      run: 2,
+      outcome: "fail",
+      reason: "the session outlived its revoke",
+      observations: ["revoke 204", "GET /me 200"],
+    };
+    const ref = await Effect.runPromise(storeCell(cell).pipe(Effect.provide(evidence)));
+    expect(stored.get(ref)).toEqual(cell);
+    const other = await Effect.runPromise(
+      storeCell({ ...cell, run: 3 }).pipe(Effect.provide(evidence)),
+    );
+    expect(other).not.toBe(ref);
   });
 });
