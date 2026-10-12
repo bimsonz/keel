@@ -17,20 +17,28 @@
 // gitignored, so `pnpm gen` runs after applying it and again after reverting
 // it, and no later mutant runs against its generated output.
 //
+// Before a patch is applied, its command runs once with no patch, under
+// FC_SEED 42: the baseline. A claimed tag that fails there, or has no test, or
+// a run that leaves no report, is reported `BASELINE RED` and the patch is
+// never applied: a test that fails by itself proves nothing about the mutant.
+// An untagged patch's command must exit 0 there. Patches that share a command
+// share one baseline run.
+//
 // Apply, run, revert: the tree is restored even when a step throws. Exit 1 if
-// any mutant survived.
+// any mutant survived or met a red baseline. The rules themselves are in
+// packages/tooling/src/prove-red.ts, where a test can reach them: this script
+// refuses a dirty tree, so it cannot run under its own mutants.
 //
 // Usage: node scripts/prove-red.ts [name-filter] [--unseeded N] [--dir <patch dir>]
 //   --unseeded N   unseeded runs per tagged patch (default 2)
-//   --dir          another patch directory (the runner's own control lives in
-//                  test/controls/prove-red and must report a survivor)
+//   --dir          another patch directory (the runner's own controls live in
+//                  test/controls/prove-red: one must be reported a survivor,
+//                  the other BASELINE RED)
 import { execSync, spawnSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { filteredToClaims } from "../packages/tooling/src/prove-red.ts";
-
-const SEEDS = [42, 1337, 20_261_014] as const;
+import { prover, type Ran, type Run } from "../packages/tooling/src/prove-red.ts";
 
 const root = execSync("git rev-parse --show-toplevel", { encoding: "utf8" }).trim();
 
@@ -85,154 +93,81 @@ function regenerate(): void {
   execSync("pnpm gen", { cwd: root, stdio: "ignore" });
 }
 
-interface Tally {
-  readonly failed: Set<string>;
-  readonly seen: Set<string>;
-  /** Tests that ran, of the tests the report lists: a name filter leaves the rest skipped. */
-  readonly ran: number;
-  readonly listed: number;
-}
-
-/** Each `[tag]` in a test's full name, with whether that test failed, and how many tests ran. */
-function tagsIn(report: unknown): Tally {
-  const failed = new Set<string>();
-  const seen = new Set<string>();
-  let ran = 0;
-  let listed = 0;
-  const files: unknown = Reflect.get(Object(report), "testResults");
-  for (const file of Array.isArray(files) ? files : []) {
-    const assertions: unknown = Reflect.get(Object(file), "assertionResults");
-    for (const assertion of Array.isArray(assertions) ? assertions : []) {
-      const name = String(Reflect.get(Object(assertion), "fullName") ?? "");
-      const status = Reflect.get(Object(assertion), "status");
-      listed += 1;
-      if (status === "passed" || status === "failed") ran += 1;
-      for (const [, tag] of name.matchAll(/\[([\w.-]+)\]/g)) {
-        if (tag === undefined) continue;
-        seen.add(tag);
-        if (status === "failed") failed.add(tag);
-      }
+/** One run of a command in the tree as it stands. A report nobody wrote reads as none. */
+function run(scratch: string, index: number, { command, seed, reported }: Run): Ran {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  if (seed === undefined) delete env["FC_SEED"];
+  else env["FC_SEED"] = String(seed);
+  const report = join(scratch, `${index}.json`);
+  const result = spawnSync(
+    reported ? `${command} --reporter=json --outputFile=${JSON.stringify(report)}` : command,
+    { cwd: root, shell: true, encoding: "utf8", env },
+  );
+  let parsed: unknown;
+  if (reported) {
+    try {
+      parsed = JSON.parse(readFileSync(report, "utf8"));
+    } catch {
+      parsed = undefined;
     }
   }
-  return { failed, seen, ran, listed };
-}
-
-function excerpt(output: string): string {
-  return output
-    .split("\n")
-    .filter((line) => /×|FAIL|error TS|AssertionError|Error:|Tests |expected/.test(line))
-    .slice(0, 6)
-    .map((line) => `       ${line.trim()}`)
-    .join("\n");
-}
-
-interface Outcome {
-  /** Why the mutant survived, or null when every claimed tag failed in every run. */
-  readonly survived: string | null;
-  /** How many tests the last run read ran, as "2 of 15 tests". */
-  readonly tests: string;
-}
-
-/** Runs a tagged patch's command once per seed and per unseeded run. */
-function killsEveryTag(command: string, kills: readonly string[]): Outcome {
-  const scratch = mkdtempSync(join(tmpdir(), "prove-red-"));
-  try {
-    let tests = "no tests";
-    const runs = [
-      ...SEEDS.map((seed) => ({ label: `seed ${seed}`, seed: String(seed) })),
-      ...Array.from({ length: unseeded }, (_, i) => ({
-        label: `unseeded run ${i + 1}`,
-        seed: undefined,
-      })),
-    ];
-    for (const [index, run] of runs.entries()) {
-      const report = join(scratch, `${index}.json`);
-      const env: NodeJS.ProcessEnv = { ...process.env, FC_SEED: run.seed };
-      if (run.seed === undefined) delete env["FC_SEED"];
-      const result = spawnSync(
-        `${command} --reporter=json --outputFile=${JSON.stringify(report)}`,
-        { cwd: root, shell: true, encoding: "utf8", env },
-      );
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(readFileSync(report, "utf8"));
-      } catch {
-        return {
-          survived: `${run.label}: no JSON report (exit ${result.status}); the suite did not run\n${excerpt(`${result.stdout}${result.stderr}`)}`,
-          tests,
-        };
-      }
-      const { failed, seen, ran, listed } = tagsIn(parsed);
-      tests = `${ran} of ${listed} tests`;
-      const unseen = kills.filter((tag) => !seen.has(tag));
-      if (unseen.length > 0)
-        return {
-          survived: `${run.label}: no test carries ${unseen.map((t) => `[${t}]`).join(", ")}`,
-          tests,
-        };
-      const green = kills.filter((tag) => !failed.has(tag));
-      if (green.length > 0)
-        return {
-          survived: `${run.label}: ${green.map((t) => `[${t}]`).join(", ")} stayed green`,
-          tests,
-        };
-    }
-    return { survived: null, tests };
-  } finally {
-    rmSync(scratch, { recursive: true, force: true });
-  }
+  return { status: result.status, report: parsed, output: `${result.stdout}${result.stderr}` };
 }
 
 const survivors: string[] = [];
-for (const name of patches) {
-  const path = join(dir, name);
-  const { command, kills, regen } = headerOf(path);
-  if (command === undefined) {
-    console.log(`SKIP ${name}: first line must be "# expect-red: <command>"`);
-    survivors.push(name);
-    continue;
-  }
-  if (spawnSync("git", ["apply", "--check", path], { cwd: root }).status !== 0) {
-    console.log(`STALE ${name}: no longer applies to the code it mutates; regenerate it`);
-    survivors.push(name);
-    continue;
-  }
-  execSync(`git apply ${JSON.stringify(path)}`, { cwd: root });
-  try {
-    if (regen) regenerate();
-    const started = Date.now();
-    if (kills.length > 0) {
-      const { survived, tests } = killsEveryTag(filteredToClaims(command, kills), kills);
-      const seconds = ((Date.now() - started) / 1000).toFixed(1);
-      if (survived === null) {
-        console.log(
-          `red ${name} (${seconds}s, ${tests}): ${kills.map((t) => `[${t}]`).join(", ")} failed under seeds ${SEEDS.join(", ")} and ${unseeded} unseeded run(s)`,
-        );
-      } else {
-        survivors.push(name);
-        console.log(`SURVIVED ${name} (${seconds}s, ${tests}): ${survived}`);
-      }
-    } else {
-      const run = spawnSync(command, { cwd: root, shell: true, encoding: "utf8" });
-      const seconds = ((Date.now() - started) / 1000).toFixed(1);
-      if (run.status === 0) {
-        survivors.push(name);
-        console.log(`SURVIVED ${name} (${seconds}s): \`${command}\` stayed green`);
-      } else {
-        console.log(
-          `red ${name} (${seconds}s, exit ${run.status}): \`${command}\`\n${excerpt(`${run.stdout}${run.stderr}`)}`,
-        );
-      }
+const baselineRed: string[] = [];
+const scratch = mkdtempSync(join(tmpdir(), "prove-red-"));
+try {
+  let runs = 0;
+  const prove = prover({ run: (asked) => run(scratch, runs++, asked), unseeded });
+  for (const name of patches) {
+    const path = join(dir, name);
+    const { command, kills, regen } = headerOf(path);
+    if (command === undefined) {
+      console.log(`SKIP ${name}: first line must be "# expect-red: <command>"`);
+      survivors.push(name);
+      continue;
     }
-  } finally {
-    execSync(`git apply -R ${JSON.stringify(path)}`, { cwd: root });
-    if (regen) regenerate();
+    if (spawnSync("git", ["apply", "--check", path], { cwd: root }).status !== 0) {
+      console.log(`STALE ${name}: no longer applies to the code it mutates; regenerate it`);
+      survivors.push(name);
+      continue;
+    }
+    const mutated = <T>(body: () => T): T => {
+      execSync(`git apply ${JSON.stringify(path)}`, { cwd: root });
+      try {
+        if (regen) regenerate();
+        return body();
+      } finally {
+        execSync(`git apply -R ${JSON.stringify(path)}`, { cwd: root });
+        if (regen) regenerate();
+      }
+    };
+    const started = Date.now();
+    const { verdict, note, detail } = prove({ command, kills, mutated });
+    const seconds = ((Date.now() - started) / 1000).toFixed(1);
+    if (verdict === "baseline-red") {
+      baselineRed.push(name);
+      console.log(`BASELINE RED ${name}: ${detail}`);
+      continue;
+    }
+    if (verdict === "survived") survivors.push(name);
+    const timing = note === "" ? `${seconds}s` : `${seconds}s, ${note}`;
+    console.log(`${verdict === "red" ? "red" : "SURVIVED"} ${name} (${timing}): ${detail}`);
   }
+} finally {
+  rmSync(scratch, { recursive: true, force: true });
 }
 
+const unproven = survivors.length + baselineRed.length;
 console.log(
-  survivors.length === 0
+  unproven === 0
     ? `\nall ${patches.length} mutants went red`
-    : `\nsurvivors: ${survivors.join(", ")}`,
+    : [
+        ...(survivors.length === 0 ? [] : [`\nsurvivors: ${survivors.join(", ")}`]),
+        ...(baselineRed.length === 0
+          ? []
+          : [`\nbaseline red, so nothing proved: ${baselineRed.join(", ")}`]),
+      ].join(""),
 );
-process.exit(survivors.length === 0 ? 0 : 1);
+process.exit(unproven === 0 ? 0 : 1);

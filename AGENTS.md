@@ -113,9 +113,10 @@ A check counts only after it has been seen **red**. Every rule and guard has a c
 Seeded wrong implementations live in `test/mutants/*.patch`. Line 1 is `# expect-red: <command>`; a property-test mutant adds `# kills: tag-a, tag-b`, naming tests whose titles carry `[tag-a]`. `pnpm prove:red [filter] [--unseeded N]` applies each patch, runs it and reverts it:
 - a tagged patch runs under `FC_SEED` 42, 1337 and 20261014 plus N unseeded runs (default 2), with vitest's JSON reporter, and is red only if **every claimed tag** fails in **every** run. An exit code is not enough: one tag failing can hide another that passes;
 - a tagged patch runs only the tests that carry a claimed tag: the runner adds `-t '\[tag-a\]|\[tag-b\]'` unless the command already has a `-t`, and each result line says how many tests ran (`2 of 15 tests`);
-- an untagged patch is red when its command exits non-zero.
+- an untagged patch is red when its command exits non-zero;
+- before a patch is applied, its command runs once with no patch, under `FC_SEED` 42: the baseline. A claimed tag that fails there, a claimed tag no test carries, or a run that leaves no report is reported `BASELINE RED <patch>: [tag] fails without the mutant`. That patch is never applied and counts with the survivors: a test that fails by itself says nothing about the mutant. An untagged patch's command must exit 0 there. Patches that share a command share one baseline run.
 
-The runner's own control is `node scripts/prove-red.ts --dir test/controls/prove-red`, which must report its two-tag patch as a survivor. Generate a patch with `git diff -- <paths>` so it carries nothing else, and regenerate it when it reports `STALE`. When code was only reformatted, `node scripts/rebase-mutants.ts <ref before the format>` rebuilds the stale patches mechanically.
+The runner's own controls are `node scripts/prove-red.ts --dir test/controls/prove-red`, which must report its two-tag patch as a survivor and `red-without-mutant.patch`, whose command fails with no patch applied, as `BASELINE RED`. Generate a patch with `git diff -- <paths>` so it carries nothing else, and regenerate it when it reports `STALE`. When code was only reformatted, `node scripts/rebase-mutants.ts <ref before the format>` rebuilds the stale patches mechanically.
 
 ## Git
 
