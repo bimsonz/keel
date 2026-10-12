@@ -1,0 +1,25 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-org.test.ts -t ba.invite-accept
+# kills: ba.invite-accept
+# why: list-user-invitations lists invitations to an address its holder never verified
+diff --git a/apps/keel/src/adapters/driven/better-auth/org.ts b/apps/keel/src/adapters/driven/better-auth/org.ts
+index d6c965d..38d9424 100644
+--- a/apps/keel/src/adapters/driven/better-auth/org.ts
++++ b/apps/keel/src/adapters/driven/better-auth/org.ts
+@@ -114,7 +114,7 @@ async function ownInvitations(ctx: HookContext, db: D1Database) {
+   const { user } = session;
+   const where = [
+     ...(typeof user.username === "string" ? [{ field: "handle", value: user.username }] : []),
+-    ...(user.emailVerified ? [{ field: "email", value: user.email.toLowerCase() }] : []),
++    { field: "email", value: user.email.toLowerCase() },
+   ];
+   const found = new Map<string, Invitation & { organization?: { name: string; slug: string } }>();
+   for (const clause of where) {
+@@ -124,7 +124,7 @@ async function ownInvitations(ctx: HookContext, db: D1Database) {
+     for (const row of rows) found.set(row.id, row);
+   }
+   const mine = [...found.values()]
+-    .filter((invitation) => isRecipient(invitation, user) && pendingNow(invitation))
++    .filter((invitation) => pendingNow(invitation))
+     .map(({ organization, ...invitation }) => ({
+       ...invitation,
+       organizationName: organization?.name,

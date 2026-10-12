@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-org.test.ts -t ba.invite-handle
+# kills: ba.invite-handle
+# why: an invitation naming both a handle and an email, or neither, is not refused for it
+diff --git a/apps/keel/src/adapters/driven/better-auth/org.ts b/apps/keel/src/adapters/driven/better-auth/org.ts
+index d6c965d..2875ebe 100644
+--- a/apps/keel/src/adapters/driven/better-auth/org.ts
++++ b/apps/keel/src/adapters/driven/better-auth/org.ts
+@@ -67,8 +67,6 @@ async function inviteTarget(ctx: HookContext, db: D1Database) {
+   const { handle, email } = body;
+   const toHandle = typeof handle === "string" && handle !== "";
+   const toEmail = typeof email === "string" && email !== "";
+-  if (toHandle === toEmail)
+-    throw refuse("INVITE_TARGET", "Invite by exactly one of a handle or an email address");
+   if (toEmail) {
+     if (/\.invalid$/i.test(email.trim()))
+       throw refuse(

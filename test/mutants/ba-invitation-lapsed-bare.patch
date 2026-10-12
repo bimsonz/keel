@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-org.test.ts -t ba.invitation-answered
+# kills: ba.invitation-answered
+# why: a lapsed invitation is left to Better Auth, which doesn't say it lapsed
+diff --git a/apps/keel/src/adapters/driven/better-auth/org.ts b/apps/keel/src/adapters/driven/better-auth/org.ts
+index d6c965d..c5298fc 100644
+--- a/apps/keel/src/adapters/driven/better-auth/org.ts
++++ b/apps/keel/src/adapters/driven/better-auth/org.ts
+@@ -99,8 +99,6 @@ async function answerable(ctx: HookContext, id: unknown) {
+   if (invitation === null || !isRecipient(invitation, session.user)) throw NOT_FOUND();
+   if (invitation.status !== "pending")
+     throw refuse("INVITATION_ANSWERED", `This invitation was already ${invitation.status}`);
+-  if (!pendingNow(invitation))
+-    throw refuse("INVITATION_LAPSED", "This invitation has lapsed; ask the org for a new one");
+ }
+ 
+ /**

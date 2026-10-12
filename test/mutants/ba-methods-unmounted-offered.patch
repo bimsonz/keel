@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts -t auth.methods
+# kills: auth.methods
+# why: email codes are offered while no sender is mounted
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 9090f34..ac9bce8 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -312,7 +312,7 @@ export type KeelAuth = ReturnType<typeof authOptions>["auth"];
+  * an instance is made per request ([ba.per-request]).
+  */
+ export function signInMethods(config: AuthConfig): { emailCode: boolean; github: boolean } {
+-  return { emailCode: config.sendOtp !== undefined, github: config.github !== undefined };
++  return { emailCode: true, github: config.github !== undefined };
+ }
+ 
+ export function makeAuth(config: AuthConfig): KeelAuth {

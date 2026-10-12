@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-org.test.ts -t ba.invite-accept
+# kills: ba.invite-accept
+# why: an invitation by handle reaches only a user with a verified email, so a passkey-first user never gets it
+diff --git a/apps/keel/src/adapters/driven/better-auth/org.ts b/apps/keel/src/adapters/driven/better-auth/org.ts
+index d6c965d..ca43599 100644
+--- a/apps/keel/src/adapters/driven/better-auth/org.ts
++++ b/apps/keel/src/adapters/driven/better-auth/org.ts
+@@ -55,7 +55,7 @@ const byHandle = (invitation: { readonly handle?: unknown }): invitation is { ha
+  */
+ const isRecipient = (invitation: Invitation, user: SessionUser): boolean =>
+   byHandle(invitation)
+-    ? user.username === invitation.handle
++    ? user.emailVerified && user.username === invitation.handle
+     : user.emailVerified && invitation.email.toLowerCase() === user.email.toLowerCase();
+ 
+ const pendingNow = (invitation: Invitation): boolean =>

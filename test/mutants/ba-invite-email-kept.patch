@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-org.test.ts -t ba.invite-handle
+# kills: ba.invite-handle
+# why: an invitation by handle keeps the invitee's address, shown to whoever manages the org
+diff --git a/apps/keel/src/adapters/driven/better-auth/org.ts b/apps/keel/src/adapters/driven/better-auth/org.ts
+index d6c965d..35a064a 100644
+--- a/apps/keel/src/adapters/driven/better-auth/org.ts
++++ b/apps/keel/src/adapters/driven/better-auth/org.ts
+@@ -273,7 +273,7 @@ export function forReader(
+   }
+   if (isInvitation(value)) {
+     const shows =
+-      !byHandle(value) &&
++      byHandle(value) ||
+       (reader.manages.has(value.organizationId) || reader.email === value.email.toLowerCase());
+     if (!shows) delete out["email"];
+     if ("inviterEmail" in out) {

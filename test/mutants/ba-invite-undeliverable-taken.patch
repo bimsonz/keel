@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-org.test.ts -t ba.invite-handle
+# kills: ba.invite-handle
+# why: an invitation to an address ending .invalid is taken, though no one could ever accept it
+diff --git a/apps/keel/src/adapters/driven/better-auth/org.ts b/apps/keel/src/adapters/driven/better-auth/org.ts
+index d6c965d..dbb1d18 100644
+--- a/apps/keel/src/adapters/driven/better-auth/org.ts
++++ b/apps/keel/src/adapters/driven/better-auth/org.ts
+@@ -70,11 +70,6 @@ async function inviteTarget(ctx: HookContext, db: D1Database) {
+   if (toHandle === toEmail)
+     throw refuse("INVITE_TARGET", "Invite by exactly one of a handle or an email address");
+   if (toEmail) {
+-    if (/\.invalid$/i.test(email.trim()))
+-      throw refuse(
+-        "EMAIL_UNDELIVERABLE",
+-        "That address can't receive mail, so no one could accept",
+-      );
+     return undefined;
+   }
+   const user = await db

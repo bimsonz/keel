@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-org.test.ts -t ba.member-privacy
+# kills: ba.member-privacy
+# why: a member's user keeps its email for every reader
+diff --git a/apps/keel/src/adapters/driven/better-auth/org.ts b/apps/keel/src/adapters/driven/better-auth/org.ts
+index d6c965d..49b6ed1 100644
+--- a/apps/keel/src/adapters/driven/better-auth/org.ts
++++ b/apps/keel/src/adapters/driven/better-auth/org.ts
+@@ -268,7 +268,7 @@ export function forReader(
+     out["user"] = {
+       ...user,
+       username: handles.get(id) ?? null,
+-      ...(id === reader.userId ? { email } : {}),
++      email,
+     };
+   }
+   if (isInvitation(value)) {

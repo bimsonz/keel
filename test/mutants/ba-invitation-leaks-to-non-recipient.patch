@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-org.test.ts -t ba.invitation-answered
+# kills: ba.invitation-answered
+# why: someone else's invitation is read, and answered, as if it were the caller's
+diff --git a/apps/keel/src/adapters/driven/better-auth/org.ts b/apps/keel/src/adapters/driven/better-auth/org.ts
+index d6c965d..621d131 100644
+--- a/apps/keel/src/adapters/driven/better-auth/org.ts
++++ b/apps/keel/src/adapters/driven/better-auth/org.ts
+@@ -96,7 +96,7 @@ async function answerable(ctx: HookContext, id: unknown) {
+     model: "invitation",
+     where: [{ field: "id", value: id }],
+   });
+-  if (invitation === null || !isRecipient(invitation, session.user)) throw NOT_FOUND();
++  if (invitation === null) throw NOT_FOUND();
+   if (invitation.status !== "pending")
+     throw refuse("INVITATION_ANSWERED", `This invitation was already ${invitation.status}`);
+   if (!pendingNow(invitation))
