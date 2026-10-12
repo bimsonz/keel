@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/lane.test.ts -t "lane.do.destroy"
+# kills: lane.do.destroy
+# why: Destroy leaves the lane's step and re-offer armed, so a destroyed Lane DO still wakes on them
+diff --git a/apps/keel/src/adapters/driving/do/lane.ts b/apps/keel/src/adapters/driving/do/lane.ts
+index 4c53d70..a3799ee 100644
+--- a/apps/keel/src/adapters/driving/do/lane.ts
++++ b/apps/keel/src/adapters/driving/do/lane.ts
+@@ -72,8 +72,6 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
+ 
+   async destroy(by: string) {
+     const answer = await this.answer(LaneCodecs.destroy, destroyLane(this.laneId, by));
+-    await cancelAlarm(this.ctx.storage, LANE_STEP);
+-    await cancelAlarm(this.ctx.storage, LANE_REOFFER);
+     return answer;
+   }
+ 

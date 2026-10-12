@@ -28,6 +28,7 @@ export type RecordVerdictCommand = typeof RecordVerdictCommand.Type;
 export const LaneCodecs = {
   batch: exitCodec(Batch, CandidateNotFound),
   recordVerdict: exitCodec(Schema.Void, Schema.Union([ResultFenced, CandidateNotFound])),
+  destroy: exitCodec(Schema.Void, Schema.Never),
 };
 
 /**
@@ -38,4 +39,12 @@ export const LaneCodecs = {
 export interface LaneRpc {
   batch(batchId: string): Promise<ExitJson>;
   recordVerdict(command: typeof RecordVerdictCommand.Encoded): Promise<ExitJson>;
+  /**
+   * Stops the lane for good, when its project is deleted: it drops its queue
+   * and its batch in flight and cancels its deadlines, so it forms no batch
+   * and re-offers none to trunk, and from here on it hears no event and takes
+   * no verdict (CandidateNotFound). Idempotent. The caller commits
+   * ProjectDeleted first, as for `TrunkRpc.destroy`.
+   */
+  destroy(by: string): Promise<ExitJson>;
 }

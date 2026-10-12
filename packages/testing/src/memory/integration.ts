@@ -10,6 +10,7 @@ import {
   BundleRefused,
   CandidateBundles,
   CandidateComposer,
+  Lanes,
   type RepoRef,
   StagingWriter,
   type SyncOutcome,
@@ -221,6 +222,24 @@ export function makeTrunksMemory(
           Effect.sync(() => {
             if (!destroyed.has(projectId)) destroyed.set(projectId, by);
             options.journal?.push(`destroy trunk ${projectId}`);
+          }),
+      }),
+    ),
+  };
+}
+
+/** Who destroyed each project's lanes. `journal` records each call in order beside other adapters'. */
+export function makeLanesMemory(options: { readonly journal?: string[] } = {}) {
+  const destroyed = new Map<ProjectId, string>();
+  return {
+    destroyed,
+    layer: Layer.succeed(
+      Lanes,
+      Lanes.of({
+        destroy: (projectId, by) =>
+          Effect.sync(() => {
+            if (!destroyed.has(projectId)) destroyed.set(projectId, by);
+            options.journal?.push(`destroy lanes ${projectId}`);
           }),
       }),
     ),

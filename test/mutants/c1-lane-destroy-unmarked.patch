@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.destroy"
+# kills: lane.destroy, lane.destroy-hears-nothing, lane.destroy-verdict
+# why: Destroy empties the lane but leaves no mark, so the next delivery or verdict starts it again
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index d80fa12..79998bb 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -956,7 +956,6 @@ export const destroyLane = Effect.fn("integration/destroyLane")(function* (
+   yield* commit(
+     { entity: { kind: "project", id: projectId }, cause: `destroy:${laneId}`, project: projectId },
+     (tx) => {
+-      tx.store.put(DESTROYED, laneId, { by, at: tx.at });
+       if (laneOf(tx.store, laneId) !== undefined) putLane(tx.store, emptyLane(laneId));
+       return Result.succeed({ value: undefined, drafts: [] });
+     },

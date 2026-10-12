@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.destroy"
+# kills: lane.destroy-hears-nothing
+# why: A destroyed lane still takes a late ChangeQueued into its queue, and forms a batch for a deleted project
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index d80fa12..859a635 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -253,7 +253,6 @@ const decodeEnded = Schema.decodeUnknownSync(
+  * when the lane changed.
+  */
+ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope): boolean => {
+-  if (laneDestroyed(tx.store, laneId)) return false;
+   const lane = laneOf(tx.store, laneId) ?? emptyLane(laneId);
+   const next = ((): Lane | undefined => {
+     switch (event.type) {

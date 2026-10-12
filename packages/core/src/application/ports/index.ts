@@ -30,6 +30,7 @@ export * from "./guard-repo.ts";
 export * from "./human-gate.ts";
 export * from "./ids.ts";
 export * from "./inbox.ts";
+export * from "./lanes.ts";
 export * from "./live-changes.ts";
 export * from "./memberships.ts";
 export * from "./probe-ledger.ts";

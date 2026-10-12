@@ -6,6 +6,8 @@ import { describe, expect, it } from "@effect/vitest";
 import {
   batchOf,
   bundleBlame,
+  destroyLane,
+  laneDestroyed,
   laneHeard,
   laneOf,
   laneStep,
@@ -823,6 +825,74 @@ describe("the Lane", () => {
         yield* laneStep(LANE);
         expect(yield* reofferDue(LANE)).toBeUndefined();
         expect(yield* reofferVerified(LANE)).toBeUndefined();
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.destroy] a destroyed lane drops its queue and its batch in flight: it forms nothing and re-offers nothing, however often it is destroyed",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        yield* queue(w, change(2));
+        const first = yield* toVerifying(w);
+        yield* recordVerdict(
+          LANE,
+          verdict(first.batchId, first.candidateId, first.instanceId, "land"),
+        );
+        // Trunk has not answered: the green batch is due a re-offer, and change 2 waits behind it.
+        expect(yield* reofferDue(LANE)).toBeDefined();
+        expect(laneDestroyed(yield* EntityStore, LANE)).toBe(false);
+        const before = (yield* committed).map((e) => e.type);
+        yield* destroyLane(LANE, "operator");
+        yield* destroyLane(LANE, "operator again");
+        expect(laneDestroyed(yield* EntityStore, LANE)).toBe(true);
+        expect(yield* reofferDue(LANE)).toBeUndefined();
+        expect(yield* reofferVerified(LANE)).toBeUndefined();
+        expect(yield* laneStep(LANE)).toBe("idle");
+        const lane = laneOf(yield* EntityStore, LANE);
+        expect(lane?.queue).toEqual([]);
+        expect(lane?.active).toBeUndefined();
+        expect((yield* committed).map((e) => e.type)).toEqual(before);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.destroy-hears-nothing] a destroyed lane takes no change into its queue and notes no trunk advance, so it never forms again",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        const base = yield* w.seeded;
+        // A lane that has held nothing yet is destroyed all the same.
+        yield* destroyLane(LANE, "operator");
+        expect(yield* queue(w, change(1))).toBe(false);
+        expect(yield* advance(base, sha("e"), [])).toBe(false);
+        expect(yield* laneStep(LANE)).toBe("idle");
+        expect(laneOf(yield* EntityStore, LANE)?.queue ?? []).toEqual([]);
+        expect(yield* payloads("BatchFormed")).toEqual([]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[lane.destroy-verdict] a destroyed lane takes no verdict: KeelVerify's result for the batch it dropped is CandidateNotFound and commits nothing",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        const { batchId, candidateId, instanceId } = yield* toVerifying(w);
+        yield* destroyLane(LANE, "operator");
+        const before = (yield* committed).map((e) => e.type);
+        const refused = yield* Effect.flip(
+          recordVerdict(LANE, verdict(batchId, candidateId, instanceId, "land")),
+        );
+        expect(refused).toMatchObject({ _tag: "CandidateNotFound", candidateId });
+        expect((yield* committed).map((e) => e.type)).toEqual(before);
+        expect(yield* heardBy(`trunk:${PROJECT}`)).toEqual([]);
       }).pipe(Effect.provide(w.layer));
     },
   );

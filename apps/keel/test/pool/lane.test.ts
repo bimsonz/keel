@@ -11,6 +11,7 @@ import {
   CodeHost,
   EntityStore,
   EventOutbox,
+  Lanes,
   type VerificationJob,
 } from "@keeltown/core/ports";
 import {
@@ -29,6 +30,7 @@ import { describe, expect, it, vi } from "vitest";
 import { LANE_REOFFER, LANE_STEP, type LaneDO } from "../../src/adapters/driving/do/lane.ts";
 import type { TrunkDO } from "../../src/adapters/driving/do/trunk.ts";
 import { armedAlarms, scheduleAlarm } from "../../src/adapters/driving/do/alarm.ts";
+import { LanesRpc } from "../../src/adapters/driven/do-rpc/lanes.ts";
 import { backbone, type LaneServices } from "../../src/composition/do.ts";
 import { drainAfter, drainOutbox } from "./helpers.ts";
 import { decodeExit, EventCodecs, LaneCodecs } from "../../src/rpc/index.ts";
@@ -265,6 +267,62 @@ describe("the Lane DO", () => {
       },
       { timeout: 20_000, interval: 50 },
     );
+    await drainOutbox(stub);
+  });
+
+  it("[lane.do.destroy] a destroyed Lane cancels its deadlines, re-offers its green batch no more and forms nothing, through the Lanes adapter", async () => {
+    const { stub, laneId, projectId, verification, writer, pushCandidate } = await lane();
+    await stub.receive([queued(laneId, 1)]);
+    await runDurableObjectAlarm(stub);
+    await vi.waitFor(() => expect(verification.started.size).toBe(1), { timeout: 10_000 });
+    const [[instanceId, job] = []] = [...verification.started.entries()];
+    if (instanceId === undefined || job === undefined) throw new Error("KeelVerify never started");
+    // Trunk never takes the green batch (its delivery is lost), so the lane owes it a re-offer.
+    await runInDurableObject(stub, (_instance: LaneDO, state) =>
+      ManagedRuntime.make(backbone(state.storage)).runPromise(
+        Effect.map(EventOutbox, (outbox) => outbox.unsubscribe(`trunk:${projectId}`)),
+      ),
+    );
+    const tip = await pushCandidate(job.candidateId);
+    expect(
+      decodeExit(LaneCodecs.recordVerdict, await stub.recordVerdict(landing(job, instanceId))),
+    ).toEqual(Exit.void);
+    const laneDeadlines = () =>
+      runInDurableObject(stub, (_instance: LaneDO, state) =>
+        armedAlarms(state.storage)
+          .map((a) => a.reason)
+          .filter((reason) => reason === LANE_STEP || reason === LANE_REOFFER),
+      );
+    await vi.waitFor(async () => expect(await laneDeadlines()).toEqual([LANE_REOFFER]), {
+      timeout: 10_000,
+    });
+    // A step backing off a failure is armed too.
+    await runInDurableObject(stub, (_instance: LaneDO, state) =>
+      scheduleAlarm(state.storage, {
+        kind: "debounce",
+        reason: LANE_STEP,
+        at: Date.now() + 60_000,
+      }),
+    );
+    const destroy = Effect.flatMap(Lanes, (lanes) => lanes.destroy(projectId, "operator"));
+    await Effect.runPromise(destroy.pipe(Effect.provide(LanesRpc(env.LANE))));
+    expect(await laneDeadlines()).toEqual([]);
+    await Effect.runPromise(destroy.pipe(Effect.provide(LanesRpc(env.LANE))));
+    // The re-offer's time comes all the same, and a change is queued late: nothing reaches trunk, nothing forms.
+    await runInDurableObject(stub, (_instance: LaneDO, state) =>
+      scheduleAlarm(state.storage, { kind: "deadline", reason: LANE_REOFFER, at: Date.now() }),
+    );
+    await runDurableObjectAlarm(stub);
+    await stub.receive([queued(laneId, 2)]);
+    await runDurableObjectAlarm(stub);
+    await vi.waitFor(async () => expect(await laneDeadlines()).toEqual([]), { timeout: 10_000 });
+    expect(writer.head()).not.toBe(tip);
+    expect(verification.started.size).toBe(1);
+    expect(
+      Exit.isFailure(
+        decodeExit(LaneCodecs.recordVerdict, await stub.recordVerdict(landing(job, instanceId))),
+      ),
+    ).toBe(true);
     await drainOutbox(stub);
   });
 

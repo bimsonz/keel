@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.destroy"
+# kills: lane.destroy-verdict
+# why: A destroyed lane still records a verdict for the batch it dropped, committing BatchVerified for a deleted project
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index d80fa12..610cef5 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -1100,7 +1100,7 @@ export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
+   verdict: BatchVerdict,
+ ) {
+   const store = yield* EntityStore;
+-  const found = laneDestroyed(store, laneId) ? undefined : batchOf(store, verdict.fence.batchId);
++  const found = batchOf(store, verdict.fence.batchId);
+   const batch =
+     found !== undefined && found.candidateId === verdict.candidateId
+       ? found

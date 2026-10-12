@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/lane.test.ts -t "lane.destroy"
+# kills: lane.destroy
+# why: A destroyed lane keeps its queue and its batch in flight, so it still re-offers its green batch to the destroyed trunk
+diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
+index d80fa12..f8719e7 100644
+--- a/packages/core/src/application/integration/lane.ts
++++ b/packages/core/src/application/integration/lane.ts
+@@ -957,7 +957,6 @@ export const destroyLane = Effect.fn("integration/destroyLane")(function* (
+     { entity: { kind: "project", id: projectId }, cause: `destroy:${laneId}`, project: projectId },
+     (tx) => {
+       tx.store.put(DESTROYED, laneId, { by, at: tx.at });
+-      if (laneOf(tx.store, laneId) !== undefined) putLane(tx.store, emptyLane(laneId));
+       return Result.succeed({ value: undefined, drafts: [] });
+     },
+   );

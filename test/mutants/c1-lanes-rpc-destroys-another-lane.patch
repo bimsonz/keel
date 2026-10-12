@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/lane.test.ts -t "lane.do.destroy"
+# kills: lane.do.destroy
+# why: The Lanes adapter addresses a lane the project does not have, so the project's own lane is never destroyed
+diff --git a/apps/keel/src/adapters/driven/do-rpc/lanes.ts b/apps/keel/src/adapters/driven/do-rpc/lanes.ts
+index 9e4f49f..71aa8e1 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/lanes.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/lanes.ts
+@@ -28,7 +28,7 @@ export function LanesRpc(
+         callObject(LaneCodecs.destroy, () =>
+           lanes
+             .get(
+-              lanes.idFromName(mainLane(projectId)),
++              lanes.idFromName(`lane:${projectId}:other`),
+               locationHint === undefined ? undefined : { locationHint },
+             )
+             .destroy(by),

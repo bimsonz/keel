@@ -364,6 +364,7 @@ export const PORTS = {
     () => integration.makeTrunksMemory().layer,
     pending("Trunks", ["initialize", "sync"]),
   ),
+  Lanes: port(() => integration.makeLanesMemory().layer, pending("Lanes", ["destroy"])),
   SubjectRegistry: port(
     () => coordination.makeSubjectRegistryMemory().layer,
     pending("SubjectRegistry", ["byKey", "byAnchor", "mint"]),

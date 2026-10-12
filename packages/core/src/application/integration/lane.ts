@@ -60,6 +60,8 @@ import { projectRepos } from "./project-repos.ts";
 /** The EntityStore kinds the Lane keeps: its queue and batch in flight, and each batch as its events fold. */
 const LANE = "lane";
 const BATCH = "batch";
+/** The EntityStore kind marking a lane destroyed, keyed by its id. */
+const DESTROYED = "lane-destroyed";
 const MAIN = "refs/heads/main";
 
 /** What a member change hears of its own batches: the Form commit subscribes it, scoped to `change:<id>`. */
@@ -162,6 +164,10 @@ const emptyLane = (laneId: string): Lane => ({
   infra: [],
 });
 
+/** Whether the lane was destroyed: it then hears no event, forms no batch and takes no verdict. */
+export const laneDestroyed = (store: Store, laneId: string): boolean =>
+  store.get(DESTROYED, laneId) !== undefined;
+
 /** The plan a queued change was queued with, if its event named one. */
 const planOf = (lane: Lane, changeId: ChangeId): ContentHash | undefined =>
   lane.plans?.find((p) => p.changeId === changeId)?.planHash;
@@ -243,9 +249,11 @@ const decodeEnded = Schema.decodeUnknownSync(
  * flight finishes its batch),
  * TrunkAdvanced is noted for staging to follow and names trunk's head, and a
  * PromotionDeclined of the batch in flight marks it to be invalidated. State
- * only: the step commits the events. True when the lane changed.
+ * only: the step commits the events. A destroyed lane hears nothing. True
+ * when the lane changed.
  */
 export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope): boolean => {
+  if (laneDestroyed(tx.store, laneId)) return false;
   const lane = laneOf(tx.store, laneId) ?? emptyLane(laneId);
   const next = ((): Lane | undefined => {
     switch (event.type) {
@@ -934,6 +942,27 @@ export const reofferVerified = Effect.fn("integration/reofferVerified")(function
   } satisfies Reoffer;
 });
 
+/**
+ * Stops the lane for good, when its project is deleted: its queue, its batch
+ * in flight and the advances it had still to follow are dropped, so no batch
+ * forms and none is re-offered to trunk, and from here on it hears no event
+ * and takes no verdict. `by` is who asked. Destroying again is a no-op.
+ */
+export const destroyLane = Effect.fn("integration/destroyLane")(function* (
+  laneId: string,
+  by: string,
+) {
+  const projectId = laneProject(laneId);
+  yield* commit(
+    { entity: { kind: "project", id: projectId }, cause: `destroy:${laneId}`, project: projectId },
+    (tx) => {
+      tx.store.put(DESTROYED, laneId, { by, at: tx.at });
+      if (laneOf(tx.store, laneId) !== undefined) putLane(tx.store, emptyLane(laneId));
+      return Result.succeed({ value: undefined, drafts: [] });
+    },
+  );
+});
+
 /** Where a lane stands after a step: nothing to do, or waiting on a verdict, trunk, or the domain. */
 export type LaneStep = "idle" | "waiting";
 
@@ -1063,13 +1092,15 @@ const issuedFor = (verdict: BatchVerdict, batch: Batch, lane: Lane): Issued => {
  * Candidate machine, fenced on `(batchId, attempt, chainEpoch)`. Idempotent
  * by the instance (cause `<instanceId>:recordVerdict`). A result for another
  * attempt or epoch is ResultFenced, which is terminal; the third consecutive
- * infra failure of a change bounces it, and is logged at error level.
+ * infra failure of a change bounces it, and is logged at error level. A
+ * destroyed lane holds no candidate: its verdict is CandidateNotFound.
  */
 export const recordVerdict = Effect.fn("integration/recordVerdict")(function* (
   laneId: string,
   verdict: BatchVerdict,
 ) {
-  const found = batchOf(yield* EntityStore, verdict.fence.batchId);
+  const store = yield* EntityStore;
+  const found = laneDestroyed(store, laneId) ? undefined : batchOf(store, verdict.fence.batchId);
   const batch =
     found !== undefined && found.candidateId === verdict.candidateId
       ? found

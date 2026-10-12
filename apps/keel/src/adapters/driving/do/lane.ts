@@ -1,4 +1,5 @@
 import {
+  destroyLane,
   laneHeard,
   laneProject,
   laneStep,
@@ -37,7 +38,9 @@ const laneIdOf = (name: string | undefined): string => {
  * follows. A step that fails (a defect: a binding or a member's DO was
  * unreachable) is retried 1 s·2ⁿ up to 60 s, as deliveries are (ADR 0009).
  * While a green batch has no answer from trunk, `lane reoffer` hands trunk
- * its BatchVerified again (30 s after it, then every 60 s).
+ * its BatchVerified again (30 s after it, then every 60 s). Once destroyed
+ * it holds nothing and no deadline of its own, hears nothing and takes no
+ * verdict.
  * Repo-touching: callers place it with the deployment's `locationHint`.
  */
 export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<LaneRpc> {
@@ -64,6 +67,13 @@ export class LaneDO extends KeelObjectWith<LaneServices> implements Partial<Lane
     );
     const answer = await this.answer(LaneCodecs.recordVerdict, program);
     await this.step(Date.now());
+    return answer;
+  }
+
+  async destroy(by: string) {
+    const answer = await this.answer(LaneCodecs.destroy, destroyLane(this.laneId, by));
+    await cancelAlarm(this.ctx.storage, LANE_STEP);
+    await cancelAlarm(this.ctx.storage, LANE_REOFFER);
     return answer;
   }
 
