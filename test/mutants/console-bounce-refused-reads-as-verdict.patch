@@ -2,10 +2,10 @@
 # kills: change.bounce-refused
 # why: a change bounced because its push was refused is shown under the verdict that had cleared it to land
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index 86cff89..965022a 100644
+index 979e132..1a88dd1 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -568,7 +568,7 @@ export function changePageOf(
+@@ -612,7 +612,7 @@ export function changePageOf(
    // A change bounced on a conflict, or on its batch's refused push, was given no verdict for that: an earlier
    // one is not this bounce's.
    const verdict =

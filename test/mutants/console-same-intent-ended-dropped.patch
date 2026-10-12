@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/same.test.ts
+# kills: same.told
+# why: an alternative that has landed or been withdrawn is taken off the list, though Keel named it
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 979e132..3560c0a 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -585,7 +585,7 @@ function intentRowOf(world: World, change: ChangeEntry): IntentRow {
+ function sameIntentOf(world: World, change: ChangeEntry): ChangePageState["sameIntent"] {
+   const others = change.alternatives.flatMap((told): AlternativeRow[] => {
+     const other = world.changes.get(told.changeId);
+-    return other === undefined
++    return other === undefined || other.state === "landed" || other.state === "withdrawn"
+       ? []
+       : [
+           {

@@ -2,10 +2,10 @@
 # kills: change.noted, proven.advise
 # why: a conflict Keel noted against a change is not kept, so the change's page says nothing of it
 diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
-index 1e199e0..00f5ac1 100644
+index 3502bc5..871664a 100644
 --- a/apps/console/src/engine/world.ts
 +++ b/apps/console/src/engine/world.ts
-@@ -608,13 +608,6 @@ export class World {
+@@ -641,13 +641,6 @@ export class World {
          const change = this.changes.get(event.payload.changeId);
          if (change === undefined) break;
          const { conflictId, predicate, policy, nextActions } = event.payload;

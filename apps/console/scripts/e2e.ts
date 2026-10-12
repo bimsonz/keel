@@ -455,6 +455,117 @@ expectEqual(
   "No verdict yet | true",
 );
 
+// What Keel told each side of a conflict is said in Keel's words, where one of its events told them anything.
+const toldOn = async (fixture: string): Promise<string> => {
+  await page.goto(at("/conflicts/C-1", fixture), { waitUntil: "networkidle" });
+  await page.locator("table.a-matrix").waitFor();
+  return (
+    await page
+      .getByText(/^Keel (bounced it on this conflict|noted this against it)/)
+      .allInnerTexts()
+  )
+    .map(squash)
+    .join(" | ");
+};
+const KEELS_WAYS =
+  "Read the conflict and the proof against the change · Revise the change's intent around the conflict · Resolve the conflict with a move";
+expectEqual(
+  "conflict: each side bounced on it is said to be, with the ways forward Keel gave its agent",
+  await toldOn("scenario=s4&t=460&play=0"),
+  `Keel bounced it on this conflict, and told its agent: ${KEELS_WAYS} | Keel bounced it on this conflict, and told its agent: ${KEELS_WAYS}`,
+);
+expectEqual(
+  "conflict: each side it was noted against is said to be, with the ways forward Keel gave",
+  await toldOn("scenario=s3&t=495&play=0"),
+  `Keel noted this against it, and told its agent: ${KEELS_WAYS} | Keel noted this against it, and told its agent: ${KEELS_WAYS}`,
+);
+expectEqual(
+  "conflict: where Keel told a side nothing, the page says nothing for it",
+  `${await toldOn("scenario=s1&t=470&ruling=live&play=0")}${await page.getByText(/Notice:/).count()}`,
+  "0",
+);
+
+// The same intent. Three agents declared the same effect; Keel shows them to each other and picks none.
+await page.goto(at("/changes/2", "scenario=s5&t=160&play=0"), { waitUntil: "networkidle" });
+await standing.getByRole("heading", { level: 2 }).waitFor();
+const same = page
+  .locator("section", { has: page.getByRole("heading", { name: "Same intent" }) })
+  .last();
+const sameText = async (): Promise<string> =>
+  (await same.count()) === 0 ? "no alternatives shown" : squash(await same.innerText());
+expectEqual(
+  "change: the others Keel told it have its intent, each as it stands now, in Keel's order",
+  await sameText(),
+  "Same intent #1 landed “Rate-limit the collaborators API” #3 working “Throttle the collaborators endpoints” Declared to do the same thing as this change. Keel shows them to each other and picks none. Set them side by side",
+);
+expectEqual(
+  "change: they have a place of their own, counted on its tab",
+  (
+    await page
+      .getByRole("navigation", { name: "Change" })
+      .getByRole("link", { name: /Alternatives/ })
+      .allInnerTexts()
+  )
+    .map(squash)
+    .join(""),
+  "Alternatives 2",
+);
+await follow(same.getByRole("link", { name: "Set them side by side" }), "table");
+const compared = page.getByRole("table", { name: "This change and its alternatives" });
+const rowsOf = async (): Promise<string> =>
+  (await compared.locator("tbody tr").allInnerTexts()).map(squash).join(" | ");
+expectEqual(
+  "alternatives: this change and the others side by side, by state, verdict and conflicts, never ranked",
+  `${pathOf(page)} | ${await rowsOf()}`,
+  "/demo/changes/2/alternatives | #2 this change “Add a rate limit to collaborator routes” hosted-112 HOSTED withdrawn none yet 0 09:30:24, revision 1 | #1 “Rate-limit the collaborators API” hosted-041 HOSTED landed Land, on 1 piece of evidence 0 09:30:10, revision 1 | #3 “Throttle the collaborators endpoints” hosted-207 HOSTED working none yet 0 09:30:41, revision 1",
+);
+expectEqual(
+  "alternatives: the claim they share is given whole, with its unit and its scope",
+  (
+    await page
+      .getByRole("list", { name: "What each of them declares" })
+      .getByRole("listitem")
+      .allInnerTexts()
+  )
+    .map(squash)
+    .join(" | "),
+  "api.collaborators/bound at most 100 requests/minute, per caller",
+);
+expectEqual(
+  "alternatives: what Keel told this change's agent of each, in Keel's words",
+  (
+    await page
+      .getByRole("list", { name: "What Keel told this change's agent" })
+      .locator("> li")
+      .allInnerTexts()
+  )
+    .map(squash)
+    .join(" | "),
+  "#1 has the same intent, and landed. Read the other change: its intent, its state and its evidence Read what is near your change, the other change included Rebase your change onto trunk as it is now Withdraw your change | #3 was declared with the same intent. Read the other change: its intent, its state and its evidence Read what is near your change, the other change included Rebase your change onto trunk as it is now Withdraw your change",
+);
+await follow(compared.getByRole("link", { name: "#1" }), 'section[aria-label="Verdict"]');
+expectEqual("alternatives: each one is a link to that change", pathOf(page), "/demo/changes/1");
+await page.goto(at("/changes/1/alternatives", "scenario=s5&t=160&play=0"), {
+  waitUntil: "networkidle",
+});
+await page.getByRole("navigation", { name: "Change" }).waitFor();
+expectEqual(
+  "alternatives: the change declared first lists the ones Keel told it of afterwards",
+  (await compared.locator("tbody tr b.a-mono, tbody tr a.a-mono").allInnerTexts()).join(" "),
+  "#1 #2 #3",
+);
+// Another limit on the same subject is another claim: that change has no alternatives, and no tab for them.
+await page.goto(at("/changes/4", "scenario=s5&t=160&play=0"), { waitUntil: "networkidle" });
+await standing.getByRole("heading", { level: 2 }).waitFor();
+expectEqual(
+  "change: one that shares a subject and not the claim is shown no alternatives",
+  `${await sameText()} | ${await page
+    .getByRole("navigation", { name: "Change" })
+    .getByRole("link", { name: /Alternatives/ })
+    .count()}`,
+  "no alternatives shown | 0",
+);
+
 // The changes are listed, each under one filter.
 await page.goto(at("/changes?state=landed", "scenario=s1&t=700&play=0"), {
   waitUntil: "networkidle",

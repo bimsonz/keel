@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/same.test.ts
+# kills: same.told
+# why: Keel's notice that another change has this one's intent is not kept, so a change declared first never shows its alternatives
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 3502bc5..f8a3e1d 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -631,7 +631,6 @@ export class World {
+         let entry = change.alternatives.find((known) => known.changeId === other);
+         if (entry === undefined) {
+           entry = { changeId: other, next: [] };
+-          change.alternatives.push(entry);
+         }
+         entry.next = event.payload.nextActions.map((action) => action.title);
+         if (event.type === "AlternativeLanded") entry.landed = { at: event.at };

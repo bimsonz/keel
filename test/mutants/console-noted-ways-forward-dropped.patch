@@ -2,10 +2,10 @@
 # kills: proven.advise
 # why: what Keel told an advised change's agent is not kept, so an advised change reads as one nobody was told about
 diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
-index 1e199e0..98ac2e7 100644
+index 3502bc5..1e88af9 100644
 --- a/apps/console/src/engine/world.ts
 +++ b/apps/console/src/engine/world.ts
-@@ -613,7 +613,7 @@ export class World {
+@@ -646,7 +646,7 @@ export class World {
            predicate,
            policy,
            at: event.at,

@@ -4,7 +4,9 @@
 import type { Lattice } from "../contract/keel/index.ts";
 import type { FlowNode, StepSpec } from "../contract/provisional.ts";
 import type {
+  AlternativeRow,
   ChangePageState,
+  IntentRow,
   DiffAnnotation,
   EvidenceItem,
   MatrixCell,
@@ -127,6 +129,7 @@ function party(
             ...(e.method === "extractor" || e.p === undefined ? {} : { p: e.p }),
           })),
         };
+  const told = toldOf(change, conflict);
   return {
     world: role === "holder" ? "A" : "B",
     changeId: change.id,
@@ -138,21 +141,21 @@ function party(
       harness: by?.harness ?? "",
     },
     proposition,
-    notice:
-      role === "holder"
-        ? {
-            title: "A change alters a subject you rely on",
-            nextActions: ["Wait for the probe", `Read conflict ${conflict.label}`],
-          }
-        : {
-            title: "Your change alters something you did not declare",
-            nextActions: [
-              "Declare the effect",
-              "Revise the change",
-              `Read conflict ${conflict.label}`,
-            ],
-          },
+    ...(told === undefined ? {} : { told }),
   };
+}
+
+/**
+ * What Keel told a change's agent about one conflict: the ways forward on the bounce that cites the conflict,
+ * or on the note of it. An annotation tells no one, so it gives nothing here.
+ */
+function toldOf(change: ChangeEntry, conflict: ConflictEntry): Party["told"] {
+  if (change.bounce?.conflictId === conflict.id && change.bounce.next.length > 0)
+    return { how: "bounced", next: change.bounce.next };
+  const note = change.noted.findLast((noted) => noted.conflictId === conflict.id);
+  return note === undefined || note.next.length === 0
+    ? undefined
+    : { how: "noted", next: note.next };
 }
 
 function matrixOf(
@@ -555,6 +558,46 @@ function annotationsOf(world: World, change: ChangeEntry, diff: ChangeDiff): Dif
   return notes;
 }
 
+/** One change among several with the same intent, as it stands now. */
+function intentRowOf(world: World, change: ChangeEntry): IntentRow {
+  const by = world.agents.get(change.agentId);
+  const verdict = world.verdicts.get(change.verdictIds.at(-1) ?? "");
+  return {
+    id: change.id,
+    label: change.label,
+    goal: change.goal,
+    agent: { label: by?.name ?? "Agent", class: by?.class ?? "hosted", harness: by?.harness ?? "" },
+    state: change.state,
+    revision: change.revision,
+    declaredAt: change.declaredAt,
+    ...(verdict === undefined
+      ? {}
+      : { verdict: { outcome: verdict.outcome, evidence: verdict.evidence.length } }),
+    conflicts: change.conflictIds.length,
+  };
+}
+
+/**
+ * The changes Keel told this one have its intent, each as it stands now, in the order Keel named them. One that
+ * has since landed or been withdrawn stays: Keel named it, and its state says what became of it. Nothing here
+ * orders them by anything else.
+ */
+function sameIntentOf(world: World, change: ChangeEntry): ChangePageState["sameIntent"] {
+  const others = change.alternatives.flatMap((told): AlternativeRow[] => {
+    const other = world.changes.get(told.changeId);
+    return other === undefined
+      ? []
+      : [
+          {
+            ...intentRowOf(world, other),
+            ...(told.landed === undefined ? {} : { landed: told.landed }),
+            next: told.next,
+          },
+        ];
+  });
+  return others.length === 0 ? undefined : { self: intentRowOf(world, change), others };
+}
+
 export function changePageOf(
   world: World,
   changeId: string,
@@ -562,6 +605,7 @@ export function changePageOf(
 ): ChangePageState | null {
   const change = world.changes.get(changeId);
   if (change === undefined) return null;
+  const sameIntent = sameIntentOf(world, change);
   const by = world.agents.get(change.agentId);
   const bounce = change.state === "bounced" ? change.bounce : undefined;
   const cause = world.conflicts.get(bounce?.conflictId ?? "");
@@ -654,6 +698,7 @@ export function changePageOf(
             summary: conflict.summary,
           },
         }),
+    ...(sameIntent === undefined ? {} : { sameIntent }),
     ...(bounce === undefined
       ? {}
       : {

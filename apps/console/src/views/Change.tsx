@@ -9,14 +9,14 @@ import {
 import type { ReactNode } from "react";
 import { CodeDiff } from "../code/CodeDiff.tsx";
 import type { DerivedEffect, Proposition } from "../contract/mfp.ts";
-import type { ChangePageState, DiffAnnotation, PlanStep } from "../domain/state.ts";
+import type { ChangePageState, DiffAnnotation, IntentRow, PlanStep } from "../domain/state.ts";
 import type { ChangeTab } from "../route.ts";
 import { useWhere } from "../router.tsx";
 import type { Mode } from "../theme/mode.ts";
 import { Detail, Head, Split, SubTabs, Tied } from "./Detail.tsx";
 import { CHANGE_TONE, CONFLICT_TONE } from "./List.tsx";
 import { PlanGraph } from "./PlanGraph.tsx";
-import { ConflictLink, EscalationLink, SubjectLink } from "./links.tsx";
+import { ChangeLink, ConflictLink, EscalationLink, SubjectLink } from "./links.tsx";
 import {
   AgentTag,
   ClassTag,
@@ -46,7 +46,26 @@ function PropositionLine({ proposition }: { proposition: Proposition }) {
       <span className="font-semibold">
         {proposition.predicate} {RELATION_WORD[proposition.relation] ?? proposition.relation}{" "}
         {String(proposition.value)}
+        {proposition.unit !== undefined && ` ${proposition.unit}`}
       </span>
+    </p>
+  );
+}
+
+/** A claim in full: what makes two declared effects the same one. A bound's unit and the scope are part of it. */
+function ClaimLine({ proposition }: { proposition: Proposition }) {
+  return (
+    <p className="text-base leading-snug text-kumo-strong">
+      <span className="a-mono text-kumo-default">{proposition.subject}</span>
+      <span className="mx-1.5 text-kumo-inactive">/</span>
+      <span className="font-semibold">
+        {proposition.predicate} {RELATION_WORD[proposition.relation] ?? proposition.relation}{" "}
+        {String(proposition.value)}
+        {proposition.unit !== undefined && ` ${proposition.unit}`}
+      </span>
+      {proposition.scope !== undefined && (
+        <span className="text-kumo-subtle">, {proposition.scope}</span>
+      )}
     </p>
   );
 }
@@ -153,6 +172,63 @@ const OUTCOME_WORD = {
   supersede: "Superseded",
 } as const;
 
+/** One change among those with the same intent: a row of the table that sets them side by side. */
+function IntentRowLine({ row, self }: { row: IntentRow; self: boolean }) {
+  return (
+    <Table.Row data-self={self}>
+      <Table.Cell>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="flex items-center gap-2">
+            {self ? (
+              <b className="a-mono font-semibold text-kumo-strong">{row.label}</b>
+            ) : (
+              <ChangeLink id={row.id} className="a-mono a-link font-semibold">
+                {row.label}
+              </ChangeLink>
+            )}
+            {self && (
+              <span className="a-chip" data-tone="quiet">
+                this change
+              </span>
+            )}
+          </span>
+          <span className="truncate text-sm text-kumo-subtle">“{row.goal}”</span>
+        </span>
+      </Table.Cell>
+      <Table.Cell>
+        <AgentTag
+          label={row.agent.label}
+          agentClass={row.agent.class}
+          harness={row.agent.harness}
+        />
+      </Table.Cell>
+      <Table.Cell>
+        <span className="a-chip" data-tone={CHANGE_TONE[row.state] ?? "quiet"}>
+          {row.state}
+        </span>
+      </Table.Cell>
+      <Table.Cell>
+        {row.verdict === undefined ? (
+          <span className="text-kumo-subtle">none yet</span>
+        ) : (
+          <>
+            {OUTCOME_WORD[row.verdict.outcome]}
+            <span className="text-kumo-subtle">
+              , on {row.verdict.evidence} {row.verdict.evidence === 1 ? "piece" : "pieces"} of
+              evidence
+            </span>
+          </>
+        )}
+      </Table.Cell>
+      <Table.Cell className="a-num">{row.conflicts}</Table.Cell>
+      <Table.Cell>
+        <time className="a-num">{clockTime(row.declaredAt)}</time>
+        <span className="text-kumo-subtle">, revision {row.revision}</span>
+      </Table.Cell>
+    </Table.Row>
+  );
+}
+
 /** The one line that says where the change stands. */
 function standing(state: ChangePageState): string {
   const { change, verdict, escalation } = state;
@@ -242,6 +318,17 @@ export function Change({
             to: { at: "change", name, tab: "files" },
             ...(diff.state === "read" ? { count: diff.files.length } : {}),
           },
+          // A place of its own only when Keel has named some.
+          ...(state.sameIntent === undefined
+            ? []
+            : [
+                {
+                  id: "alternatives" as const,
+                  label: "Alternatives",
+                  to: { at: "change" as const, name, tab: "alternatives" as const },
+                  count: state.sameIntent.others.length,
+                },
+              ]),
         ]}
       />
 
@@ -568,6 +655,28 @@ export function Change({
                   </span>
                 </Tied>
               )}
+              {state.sameIntent !== undefined && (
+                <Tied title="Same intent">
+                  {state.sameIntent.others.map((other) => (
+                    <span key={other.id} className="flex min-w-0 flex-wrap items-center gap-2">
+                      <ChangeLink id={other.id} className="a-mono a-link font-semibold">
+                        {other.label}
+                      </ChangeLink>
+                      <span className="a-chip" data-tone={CHANGE_TONE[other.state] ?? "quiet"}>
+                        {other.state}
+                      </span>
+                      <span className="min-w-0 truncate text-kumo-subtle">“{other.goal}”</span>
+                    </span>
+                  ))}
+                  <span className="leading-snug">
+                    Declared to do the same thing as this change. Keel shows them to each other and
+                    picks none.{" "}
+                    <ChangeLink id={change.id} tab="alternatives" className="a-link">
+                      Set them side by side
+                    </ChangeLink>
+                  </span>
+                </Tied>
+              )}
               {escalation !== undefined && (
                 <Tied title="Escalation">
                   <span className="flex flex-wrap items-center gap-2">
@@ -611,6 +720,90 @@ export function Change({
           }
         />
       )}
+
+      {tab === "alternatives" &&
+        (state.sameIntent === undefined ? (
+          <Panel title="Alternatives">
+            <p className="text-base text-kumo-default">
+              Keel has named no other change with this one's intent.
+            </p>
+          </Panel>
+        ) : (
+          <>
+            <Panel
+              title="The same intent"
+              aside="in the order Keel named them, never ranked"
+              bodyClassName=""
+            >
+              <div className="flex flex-col gap-2 border-b border-kumo-line px-4 py-3.5">
+                <p className="text-base text-kumo-default">
+                  Each of these changes declared the same{" "}
+                  {intent.declaredEffects.length === 1 ? "effect" : "effects"}, so Keel shows them
+                  to each other. It does not rank them and does not pick one: each is verified on
+                  its own.
+                </p>
+                <ul aria-label="What each of them declares" className="flex flex-col gap-1">
+                  {intent.declaredEffects.map((effect) => (
+                    <li key={effect.subject + effect.predicate + String(effect.value)}>
+                      <ClaimLine proposition={effect} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <Table layout="fixed" aria-label="This change and its alternatives">
+                <colgroup>
+                  <col />
+                  <col style={{ width: 190 }} />
+                  <col style={{ width: 120 }} />
+                  <col style={{ width: 250 }} />
+                  <col style={{ width: 96 }} />
+                  <col style={{ width: 190 }} />
+                </colgroup>
+                <Table.Header>
+                  <Table.Row>
+                    <Table.Head>Change</Table.Head>
+                    <Table.Head>Agent</Table.Head>
+                    <Table.Head>State</Table.Head>
+                    <Table.Head>Verdict</Table.Head>
+                    <Table.Head>Conflicts</Table.Head>
+                    <Table.Head>Declared</Table.Head>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  <IntentRowLine row={state.sameIntent.self} self />
+                  {state.sameIntent.others.map((other) => (
+                    <IntentRowLine key={other.id} row={other} self={false} />
+                  ))}
+                </Table.Body>
+              </Table>
+            </Panel>
+            {state.sameIntent.others.some((other) => other.next.length > 0) && (
+              <Panel title="What Keel told this change's agent" aside="in Keel's words">
+                <ul className="flex flex-col gap-3" aria-label="What Keel told this change's agent">
+                  {state.sameIntent.others
+                    .filter((other) => other.next.length > 0)
+                    .map((other) => (
+                      <li key={other.id} className="flex flex-col gap-1 text-base">
+                        <p className="text-kumo-strong">
+                          <ChangeLink id={other.id} className="a-mono a-link font-semibold">
+                            {other.label}
+                          </ChangeLink>{" "}
+                          {other.landed === undefined
+                            ? "was declared with the same intent."
+                            : "has the same intent, and landed."}
+                        </p>
+                        <ul className="list-disc pl-5 text-kumo-default">
+                          {other.next.map((title) => (
+                            <li key={title}>{title}</li>
+                          ))}
+                        </ul>
+                      </li>
+                    ))}
+                </ul>
+              </Panel>
+            )}
+          </>
+        ))}
 
       {tab === "verification" && (
         <>

@@ -2,10 +2,10 @@
 # kills: change.bounce-conflict, proven.block
 # why: a bounce on a proven conflict is not tied to the conflict Keel names, so the page reads it as a verdict's
 diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
-index 1e199e0..2d776b8 100644
+index 3502bc5..7da6bb9 100644
 --- a/apps/console/src/engine/world.ts
 +++ b/apps/console/src/engine/world.ts
-@@ -587,7 +587,6 @@ export class World {
+@@ -601,7 +601,6 @@ export class World {
            change.bounce = {
              at: event.at,
              ...(verdictId === undefined ? {} : { verdictId }),

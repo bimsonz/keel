@@ -5,7 +5,7 @@
 //   /P                              the code at trunk's head
 //   /P/tree/<ref>/<path>            a directory        /P/blob/<ref>/<path>   a file
 //   /P/commits[/<ref>]              history            /P/commit/<sha>        one commit
-//   /P/changes                      the changes        /P/changes/<n>[/verification|/files]
+//   /P/changes                      the changes        /P/changes/<n>[/verification|/files|/alternatives]
 //   /P/conflicts                    the conflicts      /P/conflicts/<C-n>[/probe|/evidence]
 //   /P/escalations                  the questions      /P/escalations/<E-n>
 //   /P/mission-control              the live graph     /P/subjects/<key>      with that subject open
@@ -24,7 +24,7 @@ import {
   PAGE,
 } from "./engine/lists.ts";
 
-export type ChangeTab = "overview" | "verification" | "files";
+export type ChangeTab = "overview" | "verification" | "files" | "alternatives";
 export type ConflictTab = "overview" | "probe" | "evidence";
 export type InsightsTab = "trunk" | "funnel" | "benchmark";
 
@@ -82,7 +82,7 @@ export const RESERVED = [
 const HOME: Route = { at: "code", kind: "tree", ref: TRUNK, path: "" };
 const MISSING: Route = { at: "missing" };
 
-const CHANGE_TABS: readonly ChangeTab[] = ["overview", "verification", "files"];
+const CHANGE_TABS: readonly ChangeTab[] = ["overview", "verification", "files", "alternatives"];
 const CONFLICT_TABS: readonly ConflictTab[] = ["overview", "probe", "evidence"];
 const INSIGHTS_TABS: readonly InsightsTab[] = ["trunk", "funnel", "benchmark"];
 

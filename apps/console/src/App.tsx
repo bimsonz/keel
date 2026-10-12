@@ -308,7 +308,7 @@ export function App() {
       <Notice title="The console could not reach Keel">
         {failure.message}. Check that Keel is up and that this console's Worker can reach it.
         {import.meta.env.DEV
-          ? " In development there is no Keel behind this page; the test fixtures are at ?scenario=s1, s2, s3, s4 or swarm."
+          ? " In development there is no Keel behind this page; the test fixtures are at ?scenario=s1, s2, s3, s4, s5 or swarm."
           : ""}
       </Notice>
     );

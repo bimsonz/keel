@@ -115,6 +115,13 @@ export interface ChangeEntry {
     at: string;
     next: string[];
   }[];
+  /**
+   * The changes Keel has told this one have its intent, in the order Keel named them: at its latest preflight,
+   * and by a notice since. Keel shows alternatives to each other and never ranks them, and nor does this list.
+   * `landed` is Keel telling this change that one of them landed. `next` is the ways forward Keel gave this
+   * change's agent about that one, in Keel's words.
+   */
+  alternatives: { changeId: string; landed?: { at: string }; next: string[] }[];
   /** Decisions surfaced to it, each dated, and the stance it went on to take. */
   precedents: {
     decisionId: string;
@@ -438,6 +445,7 @@ export class World {
           conflictIds: [],
           guardFailures: [],
           noted: [],
+          alternatives: [],
           precedents: [],
         });
         break;
@@ -445,6 +453,12 @@ export class World {
       case "PreflightIssued": {
         const change = this.#change(event.payload.changeId);
         if (change === undefined) break;
+        // A preflight is Keel's whole word, at that revision, on who has this intent: it replaces the last one's
+        // list, and keeps what Keel has since said of a change that is still on it.
+        const told = change.alternatives;
+        change.alternatives = (event.payload.alternatives ?? []).map(
+          (changeId) => told.find((known) => known.changeId === changeId) ?? { changeId, next: [] },
+        );
         for (const precedent of event.payload.precedents) {
           if (change.precedents.some((known) => known.decisionId === precedent.decisionId))
             continue;
@@ -602,6 +616,25 @@ export class World {
             event.payload.nextActions?.[0]?.title,
           );
         }
+        break;
+      }
+      case "AlternativeDeclared":
+      case "AlternativeLanded": {
+        // A notice to one change's agent, committed on the project. It is folded onto the change it was sent
+        // to and never onto the other: Keel tells each side itself.
+        const change = this.changes.get(event.payload.changeId);
+        if (change === undefined) break;
+        const other =
+          event.type === "AlternativeDeclared"
+            ? event.payload.alternativeId
+            : event.payload.landedChangeId;
+        let entry = change.alternatives.find((known) => known.changeId === other);
+        if (entry === undefined) {
+          entry = { changeId: other, next: [] };
+          change.alternatives.push(entry);
+        }
+        entry.next = event.payload.nextActions.map((action) => action.title);
+        if (event.type === "AlternativeLanded") entry.landed = { at: event.at };
         break;
       }
       case "ConflictNoted": {

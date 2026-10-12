@@ -203,6 +203,43 @@ export function planForB(guard: { label: string; decision: string } | null): Flo
   return { op: "seq", of: steps };
 }
 
+/** Records one step of a run as Keel's step observations: running, then how it ended. */
+export function stepRunOn(b: ScriptBuilder) {
+  return (
+    at: number,
+    instanceId: string,
+    subjectId: string,
+    stepId: string,
+    tier: 0 | 1 | 2 | null,
+    seconds: number,
+    status: "passed" | "failed" | "annotated",
+    usd?: number,
+  ): void => {
+    const sandboxId = tier === 1 ? `iso-${stepId}-${Math.round(at)}` : undefined;
+    b.at(at).observe({
+      kind: "step",
+      instanceId,
+      subject: subjectId,
+      stepId,
+      status: "running",
+      tier,
+      attempt: 1,
+      ...(sandboxId === undefined ? {} : { sandboxId }),
+    });
+    b.at(at + seconds).observe({
+      kind: "step",
+      instanceId,
+      subject: subjectId,
+      stepId,
+      status,
+      tier,
+      attempt: 1,
+      ...(sandboxId === undefined ? {} : { sandboxId }),
+      cost: { ms: Math.round(seconds * 1000), ...(usd === undefined ? {} : { usd }) },
+    });
+  };
+}
+
 /**
  * Everything up to the proof: both changes submitted, and the conflict between them probed and proven. With
  * `policy`, each change's plan compiles that predicate policy, which is what Keel applies to a proof.
@@ -501,39 +538,7 @@ export function opening(b: ScriptBuilder, policy?: EventPredicatePolicies) {
     payload: { changeId: changeB, revision: 1, instanceId: precheckB },
     causation: submittedB,
   });
-  const stepRun = (
-    at: number,
-    instanceId: string,
-    subjectId: string,
-    stepId: string,
-    tier: 0 | 1 | 2 | null,
-    seconds: number,
-    status: "passed" | "failed" | "annotated",
-    usd?: number,
-  ): void => {
-    const sandboxId = tier === 1 ? `iso-${stepId}-${Math.round(at)}` : undefined;
-    b.at(at).observe({
-      kind: "step",
-      instanceId,
-      subject: subjectId,
-      stepId,
-      status: "running",
-      tier,
-      attempt: 1,
-      ...(sandboxId === undefined ? {} : { sandboxId }),
-    });
-    b.at(at + seconds).observe({
-      kind: "step",
-      instanceId,
-      subject: subjectId,
-      stepId,
-      status,
-      tier,
-      attempt: 1,
-      ...(sandboxId === undefined ? {} : { sandboxId }),
-      cost: { ms: Math.round(seconds * 1000), ...(usd === undefined ? {} : { usd }) },
-    });
-  };
+  const stepRun = stepRunOn(b);
   stepRun(391.1, precheckB, changeB, "diff", 0, 0.1, "passed");
   stepRun(391.3, precheckB, changeB, "protected", 0, 0.1, "passed");
   stepRun(391.6, precheckB, changeB, "extract", 1, 1.8, "passed");

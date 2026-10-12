@@ -2,10 +2,10 @@
 # kills: conformance.note-policy
 # why: the fixtures' check lets a note carry a policy the change's plan did not compile
 diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
-index 0914ee9..8454ae5 100644
+index 5ae2ce0..4e38876 100644
 --- a/apps/console/test/fixtures/mock/conformance.ts
 +++ b/apps/console/test/fixtures/mock/conformance.ts
-@@ -407,7 +407,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
+@@ -480,7 +480,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
        case "ConflictNoted": {
          const { changeId, conflictId, policy, evidenceRef, nextActions } = event.payload;
          for (const wrong of againstProof(changeId, conflictId)) problems.push(`${where}: ${wrong}`);

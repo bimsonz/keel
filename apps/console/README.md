@@ -65,7 +65,7 @@ The Code tab is read from Keel's four repository reads (`Repo_getTree`, `Repo_ge
 | `/` | The instance: its projects, each with who may read it |
 | `/P`, `/P/tree/<ref>/<path>`, `/P/blob/<ref>/<path>` | The code. `ref` is a commit, or `trunk` for wherever trunk's head is |
 | `/P/commits`, `/P/commit/<sha>` | Trunk's history, and one commit's diff |
-| `/P/changes`, `/P/changes/<n>`, `…/verification`, `…/files` | The changes, and one change with its parts. `?state=` is `in-flight`, `parked`, `bounced`, `landed` or `not-landed` |
+| `/P/changes`, `/P/changes/<n>`, `…/verification`, `…/files`, `…/alternatives` | The changes, and one change with its parts. `?state=` is `in-flight`, `parked`, `bounced`, `landed` or `not-landed`. `…/alternatives` sets the change beside the others Keel told it have its intent, in Keel's order and never ranked |
 | `/P/conflicts`, `/P/conflicts/<C-n>`, `…/probe`, `…/evidence` | The conflicts, and one conflict. `?state=` is `open` or `settled` |
 | `/P/escalations`, `/P/escalations/<E-n>` | The questions put to a person, and one of them. `?state=` is `open` or `closed` |
 | `/P/mission-control`, `/P/subjects/<key>` | The live graph with trunk's numbers above it, and the graph with one subject open beside it |
@@ -107,6 +107,7 @@ With nothing else in the address, the page reads Keel through its Worker at `/ap
 | `/demo/changes/1205?scenario=s2&t=3:20&play=0` | Nine days on: a careless change bounces on guard G-1, citing decision D-1 |
 | `/demo/changes/1?scenario=s3&t=8:15&play=0` | Scenario 1's conflict where the changes' plans say nothing of its predicate: Keel notes it on both and holds neither, and #1 lands as written |
 | `/demo/changes/1?scenario=s4&t=7:40&play=0` | The same conflict where the plans block on its predicate: both changes bounce on the conflict itself, with no verdict |
+| `/demo/changes/2/alternatives?scenario=s5&t=2:40&play=0` | Three agents with the same intent, shown to each other: one landed, one withdrew, one is still working |
 
 ## Checks
 

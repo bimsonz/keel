@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/same.test.ts
+# kills: same.order
+# why: the alternatives are put in an order of the console's own, the earliest declared first, and not the one Keel named them in
+diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
+index 979e132..37c2868 100644
+--- a/apps/console/src/engine/select.ts
++++ b/apps/console/src/engine/select.ts
+@@ -583,7 +583,8 @@ function intentRowOf(world: World, change: ChangeEntry): IntentRow {
+  * orders them by anything else.
+  */
+ function sameIntentOf(world: World, change: ChangeEntry): ChangePageState["sameIntent"] {
+-  const others = change.alternatives.flatMap((told): AlternativeRow[] => {
++  const ranked = change.alternatives.toSorted((a, b) => a.changeId.localeCompare(b.changeId));
++  const others = ranked.flatMap((told): AlternativeRow[] => {
+     const other = world.changes.get(told.changeId);
+     return other === undefined
+       ? []

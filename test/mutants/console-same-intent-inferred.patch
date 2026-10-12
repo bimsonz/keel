@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/same.test.ts
+# kills: same.not-inferred
+# why: a change is shown an alternative Keel never told it of, inferred from the other change's preflight
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 3502bc5..63480b8 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -456,6 +456,11 @@ export class World {
+         // A preflight is Keel's whole word, at that revision, on who has this intent: it replaces the last one's
+         // list, and keeps what Keel has since said of a change that is still on it.
+         const told = change.alternatives;
++        for (const id of event.payload.alternatives ?? []) {
++          const mirrored = this.changes.get(id);
++          if (mirrored?.alternatives.every((known) => known.changeId !== change.id) === true)
++            mirrored.alternatives.push({ changeId: change.id, next: [] });
++        }
+         change.alternatives = (event.payload.alternatives ?? []).map(
+           (changeId) => told.find((known) => known.changeId === changeId) ?? { changeId, next: [] },
+         );

@@ -99,7 +99,11 @@ export interface Party {
   goal: string;
   agent: { label: string; class: AgentClass; harness: string };
   proposition: PartyProposition;
-  notice: { title: string; nextActions: string[] };
+  /**
+   * What Keel did to this side's change over the conflict, and the ways forward it gave its agent, in Keel's
+   * words. Present only where one of Keel's events told the agent something: nothing is said for it otherwise.
+   */
+  told?: { how: "noted" | "bounced"; next: string[] };
 }
 
 export type TestCell = {
@@ -250,6 +254,29 @@ export interface DiffFile {
   after: string | null;
 }
 
+/** One change among several with the same intent, as it stands now: what a reader sets side by side. */
+export interface IntentRow {
+  id: string;
+  label: string;
+  goal: string;
+  agent: { label: string; class: AgentClass; harness: string };
+  state: ChangeState;
+  revision: number;
+  declaredAt: string;
+  /** Its latest verdict, where Keel has issued one, and how many pieces of evidence it cites. */
+  verdict?: { outcome: VerdictOutcome; evidence: number };
+  /** How many conflicts Keel has tied to it. */
+  conflicts: number;
+}
+
+/** An alternative, as Keel told this change of it. */
+export interface AlternativeRow extends IntentRow {
+  /** Keel told this change's agent that the alternative landed. */
+  landed?: { at: string };
+  /** The ways forward Keel gave this change's agent about it, in Keel's words. */
+  next: string[];
+}
+
 export interface ChangePageState {
   change: {
     /** True where the project has verification switched off: its verdict or its landing was not verified. */
@@ -289,6 +316,11 @@ export interface ChangePageState {
     evidence: EvidenceItem[];
   };
   conflict?: { id: string; label: string; state: ConflictState; with: string; summary: string };
+  /**
+   * Present when Keel has told this change that others have its intent: their declared effects make the same
+   * claims. `others` is in the order Keel named them. Keel never ranks them or picks one, and nor does this.
+   */
+  sameIntent?: { self: IntentRow; others: AlternativeRow[] };
   /**
    * While it stands bounced: what Keel named as the cause, where that is not a verdict. A change whose plan
    * blocks on a predicate bounces on a conflict proven on it, and one whose batch Artifacts refused to take

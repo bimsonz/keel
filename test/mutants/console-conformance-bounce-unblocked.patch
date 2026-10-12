@@ -2,10 +2,10 @@
 # kills: conformance.bounce-blocks
 # why: the fixtures' check lets a change bounce on a conflict its plan does not block on
 diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
-index 0914ee9..1e4d22c 100644
+index 5ae2ce0..1b5af77 100644
 --- a/apps/console/test/fixtures/mock/conformance.ts
 +++ b/apps/console/test/fixtures/mock/conformance.ts
-@@ -398,7 +398,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
+@@ -471,7 +471,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
            problems.push(`${where}: verdict ${verdictId} was not issued`);
          if (conflictId === undefined) break;
          for (const wrong of againstProof(changeId, conflictId)) problems.push(`${where}: ${wrong}`);

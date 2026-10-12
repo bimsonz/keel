@@ -107,12 +107,16 @@ function PartyCard({
         </span>
         <span className="min-w-0 truncate text-sm text-kumo-subtle">“{party.goal}”</span>
       </div>
-      <p className="flex min-w-0 items-center gap-1.5 text-sm text-kumo-subtle">
-        <BellIcon size={14} className="shrink-0" />
-        <span className="truncate">
-          Notice: {party.notice.title}. Next: {party.notice.nextActions.join(" · ")}
-        </span>
-      </p>
+      {party.told !== undefined && (
+        <p className="flex min-w-0 items-center gap-1.5 text-sm text-kumo-subtle">
+          <BellIcon size={14} className="shrink-0" />
+          <span className="truncate" title={party.told.next.join(" · ")}>
+            Keel{" "}
+            {party.told.how === "bounced" ? "bounced it on this conflict" : "noted this against it"}
+            , and told its agent: {party.told.next.join(" · ")}
+          </span>
+        </p>
+      )}
     </div>
   );
 }

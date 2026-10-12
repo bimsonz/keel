@@ -2,10 +2,10 @@
 # kills: change.bounce-verdict
 # why: a change bounced on its verdict is shown with no verdict, as one bounced on a conflict is
 diff --git a/apps/console/src/engine/select.ts b/apps/console/src/engine/select.ts
-index 86cff89..0d25e60 100644
+index 979e132..5109327 100644
 --- a/apps/console/src/engine/select.ts
 +++ b/apps/console/src/engine/select.ts
-@@ -568,7 +568,7 @@ export function changePageOf(
+@@ -612,7 +612,7 @@ export function changePageOf(
    // A change bounced on a conflict, or on its batch's refused push, was given no verdict for that: an earlier
    // one is not this bounce's.
    const verdict =

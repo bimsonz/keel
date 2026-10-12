@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/conformance.test.ts
+# kills: conformance.alternative-live
+# why: the fixtures' check lets Keel name a withdrawn change as one still being attempted
+diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
+index 5ae2ce0..99b26e3 100644
+--- a/apps/console/test/fixtures/mock/conformance.ts
++++ b/apps/console/test/fixtures/mock/conformance.ts
+@@ -354,7 +354,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
+   const ENDED: ReadonlySet<string> = new Set(["landed", "withdrawn", "superseded"]);
+   const live = (changeId: string): boolean => {
+     const state = states.get(`change:${changeId}`);
+-    return state !== undefined && !ENDED.has(state);
++    return state !== undefined;
+   };
+   /**
+    * Every way two changes are not alternatives, as Keel means it: one change, or declared effects that do not

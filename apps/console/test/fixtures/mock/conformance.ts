@@ -349,6 +349,25 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
     const predicate = sides.get(conflictId)?.predicate;
     return (predicate === undefined ? undefined : policies.get(changeId)?.[predicate]) ?? "advise";
   };
+  /** What each change says it will do, as the set of claims its declared effects make. */
+  const claims = new Map<string, string>();
+  const ENDED: ReadonlySet<string> = new Set(["landed", "withdrawn", "superseded"]);
+  const live = (changeId: string): boolean => {
+    const state = states.get(`change:${changeId}`);
+    return state !== undefined && !ENDED.has(state);
+  };
+  /**
+   * Every way two changes are not alternatives, as Keel means it: one change, or declared effects that do not
+   * make the same claims, as non-empty sets. Keel also reads an ordering named from either end as one claim,
+   * which this check does not.
+   */
+  const notAlternatives = (changeId: string, other: string): string[] => {
+    if (changeId === other) return [`${changeId} is not an alternative to itself`];
+    const mine = claims.get(changeId) ?? "";
+    return mine !== "" && mine === claims.get(other)
+      ? []
+      : [`${other} does not have the same intent as ${changeId}`];
+  };
   /** The entity a rule is about: its field's value, or for a guard the probe admitted under that name. */
   const subjectOf = (rule: Rule, payload: object): string | undefined => {
     const named = field(payload, rule.idField);
@@ -383,6 +402,60 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
           ...(event.payload.predicate === undefined ? {} : { predicate: event.payload.predicate }),
         });
         break;
+      case "IntentDeclared":
+      case "IntentRevised":
+        if (event.payload.declaredEffects !== undefined)
+          claims.set(
+            event.payload.changeId,
+            [
+              ...new Set(
+                event.payload.declaredEffects.map((effect) =>
+                  JSON.stringify([
+                    effect.subject,
+                    effect.predicate,
+                    effect.relation,
+                    effect.value,
+                    effect.unit ?? null,
+                    effect.scope ?? null,
+                  ]),
+                ),
+              ),
+            ]
+              .toSorted()
+              .join("\n"),
+          );
+        break;
+      case "PreflightIssued": {
+        const { changeId, alternatives } = event.payload;
+        if (alternatives === undefined) break;
+        // Keel copies them onto the preflight only when there are some.
+        if (alternatives.length === 0)
+          problems.push(`${where}: it lists no alternatives, and says so`);
+        for (const other of alternatives) {
+          for (const wrong of notAlternatives(changeId, other)) problems.push(`${where}: ${wrong}`);
+          if (!live(other)) problems.push(`${where}: ${other} is not a live change`);
+        }
+        break;
+      }
+      case "AlternativeDeclared": {
+        const { changeId, alternativeId, nextActions } = event.payload;
+        for (const wrong of notAlternatives(changeId, alternativeId))
+          problems.push(`${where}: ${wrong}`);
+        for (const id of [changeId, alternativeId])
+          if (!live(id)) problems.push(`${where}: ${id} is not a live change`);
+        if (nextActions.length === 0) problems.push(`${where}: it names no way forward`);
+        break;
+      }
+      case "AlternativeLanded": {
+        const { changeId, landedChangeId, nextActions } = event.payload;
+        for (const wrong of notAlternatives(changeId, landedChangeId))
+          problems.push(`${where}: ${wrong}`);
+        if (states.get(`change:${landedChangeId}`) !== "landed")
+          problems.push(`${where}: ${landedChangeId} has not landed`);
+        if (!live(changeId)) problems.push(`${where}: ${changeId} is not a live change`);
+        if (nextActions.length === 0) problems.push(`${where}: it names no way forward`);
+        break;
+      }
       case "PlanCompiled":
         // The latest plan's policy replaces the last one's, and a plan that says nothing leaves none.
         if (event.payload.predicatePolicy === undefined) policies.delete(event.payload.changeId);

@@ -2,10 +2,10 @@
 # kills: conformance.note-evidence
 # why: the fixtures' check lets a note leave out the proof's evidence
 diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
-index 0914ee9..27e1ec7 100644
+index 5ae2ce0..c093446 100644
 --- a/apps/console/test/fixtures/mock/conformance.ts
 +++ b/apps/console/test/fixtures/mock/conformance.ts
-@@ -413,7 +413,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
+@@ -486,7 +486,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
            );
          const proof = proofs.get(conflictId);
          const expected = proof?._tag === "probe" ? `probe:${proof.probeId}` : undefined;

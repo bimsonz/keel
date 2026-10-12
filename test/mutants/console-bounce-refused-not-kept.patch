@@ -2,10 +2,10 @@
 # kills: change.bounce-refused
 # why: the refusal Keel names as a bounce's cause is dropped, so the page cannot say the push was refused
 diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
-index 1e199e0..b74ec82 100644
+index 3502bc5..38241bf 100644
 --- a/apps/console/src/engine/world.ts
 +++ b/apps/console/src/engine/world.ts
-@@ -588,7 +588,6 @@ export class World {
+@@ -602,7 +602,6 @@ export class World {
              at: event.at,
              ...(verdictId === undefined ? {} : { verdictId }),
              ...(conflictId === undefined ? {} : { conflictId }),

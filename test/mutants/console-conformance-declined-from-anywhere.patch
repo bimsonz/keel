@@ -2,7 +2,7 @@
 # kills: conformance.bounce-declined
 # why: the fixtures' check lets a change bounce on a declined batch when it was never in one
 diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
-index 0914ee9..4e0849b 100644
+index 5ae2ce0..24fe1c4 100644
 --- a/apps/console/test/fixtures/mock/conformance.ts
 +++ b/apps/console/test/fixtures/mock/conformance.ts
 @@ -269,7 +269,7 @@ function rulesFor(event: AnyEvent): Rule[] {

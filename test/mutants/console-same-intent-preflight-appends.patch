@@ -1,0 +1,23 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/same.test.ts
+# kills: same.preflight-replaces
+# why: a later preflight adds to the list and never takes from it, so a change revised away from an intent keeps its old alternatives
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 3502bc5..75f8acd 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -456,9 +456,12 @@ export class World {
+         // A preflight is Keel's whole word, at that revision, on who has this intent: it replaces the last one's
+         // list, and keeps what Keel has since said of a change that is still on it.
+         const told = change.alternatives;
+-        change.alternatives = (event.payload.alternatives ?? []).map(
+-          (changeId) => told.find((known) => known.changeId === changeId) ?? { changeId, next: [] },
+-        );
++        change.alternatives = [
++          ...told,
++          ...(event.payload.alternatives ?? [])
++            .filter((changeId) => told.every((known) => known.changeId !== changeId))
++            .map((changeId) => ({ changeId, next: [] })),
++        ];
+         for (const precedent of event.payload.precedents) {
+           if (change.precedents.some((known) => known.decisionId === precedent.decisionId))
+             continue;

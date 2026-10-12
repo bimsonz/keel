@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/conformance.test.ts
+# kills: conformance.alternative-intent
+# why: the fixtures' check lets Keel name as an alternative a change that declared other claims
+diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
+index 5ae2ce0..96f1cd3 100644
+--- a/apps/console/test/fixtures/mock/conformance.ts
++++ b/apps/console/test/fixtures/mock/conformance.ts
+@@ -364,7 +364,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
+   const notAlternatives = (changeId: string, other: string): string[] => {
+     if (changeId === other) return [`${changeId} is not an alternative to itself`];
+     const mine = claims.get(changeId) ?? "";
+-    return mine !== "" && mine === claims.get(other)
++    return mine !== "" && claims.has(other)
+       ? []
+       : [`${other} does not have the same intent as ${changeId}`];
+   };

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/fixtures/mock/same.test.ts
+# kills: same.landed
+# why: Keel's word that an alternative landed is not kept, so the page cannot say which one Keel told the change of
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 3502bc5..da9e8ff 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -634,7 +634,6 @@ export class World {
+           change.alternatives.push(entry);
+         }
+         entry.next = event.payload.nextActions.map((action) => action.title);
+-        if (event.type === "AlternativeLanded") entry.landed = { at: event.at };
+         break;
+       }
+       case "ConflictNoted": {

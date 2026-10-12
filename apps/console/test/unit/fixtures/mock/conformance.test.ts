@@ -5,6 +5,7 @@ import { createRng } from "../../../fixtures/prng.ts";
 import { ScriptBuilder } from "../../../fixtures/mock/builder.ts";
 import { admission, checkLog } from "../../../fixtures/mock/conformance.ts";
 import { generateS3, generateS4 } from "../../../fixtures/mock/proven.ts";
+import { generateS5 } from "../../../fixtures/mock/same.ts";
 import type { ScriptedEvent } from "../../../fixtures/mock/scripted.ts";
 
 type Cells = [ProbeWorld, number, ProbeOutcome][];
@@ -475,5 +476,81 @@ describe("what a proof does to a change, held to Keel's rule", () => {
       `ConflictNoted: its evidence is none, and the proof's is probe:${probe}`,
       "ConflictNoted: only an advised change is told its ways forward",
     ]);
+  });
+});
+
+/** The id of the change a story declared under `label`. */
+const declaredAs = (events: ScriptedEvent[], label: string): string =>
+  events.find((event) => event.type === "IntentDeclared" && event.label === label)?.entity.id ?? "";
+
+describe("changes with the same intent, held to Keel's rule", () => {
+  it("[conformance.alternative-intent] refuses a notice or a preflight naming a change whose declared effects make other claims", () => {
+    // #4 declares another limit on the same subject: a neighbour, and no one's alternative.
+    const four = declaredAs(generateS5(42).events, "#4");
+    const one = declaredAs(generateS5(42).events, "#1");
+    expect(
+      told(generateS5, (events) => {
+        const notice = events.find((event) => event.type === "AlternativeDeclared");
+        if (notice !== undefined) notice.payload.alternativeId = four;
+      }),
+    ).toEqual([
+      `AlternativeDeclared: ${four} does not have the same intent as ${one}`,
+      // And #4 had not been declared when that notice was sent.
+      `AlternativeDeclared: ${four} is not a live change`,
+    ]);
+    expect(
+      told(generateS5, (events) => {
+        const preflight = events.find(
+          (event) => event.type === "PreflightIssued" && event.payload.changeId === four,
+        );
+        if (preflight?.type === "PreflightIssued") preflight.payload.alternatives = [one, four];
+      }),
+    ).toEqual([
+      `PreflightIssued: ${one} does not have the same intent as ${four}`,
+      `PreflightIssued: ${four} is not an alternative to itself`,
+    ]);
+  });
+
+  it("[conformance.alternative-landed] refuses word of a landing for a change that has not landed, and a list of none", () => {
+    const three = declaredAs(generateS5(42).events, "#3");
+    expect(
+      told(generateS5, (events) => {
+        const notice = events.find(
+          (event) => event.type === "AlternativeLanded" && event.payload.changeId !== three,
+        );
+        if (notice?.type === "AlternativeLanded") notice.payload.landedChangeId = three;
+      }),
+    ).toEqual([`AlternativeLanded: ${three} has not landed`]);
+    expect(
+      told(generateS5, (events) => {
+        const preflight = events.find((event) => event.type === "PreflightIssued");
+        if (preflight !== undefined) preflight.payload.alternatives = [];
+      }),
+    ).toEqual(["PreflightIssued: it lists no alternatives, and says so"]);
+  });
+
+  it("[conformance.alternative-live] refuses naming a change that has ended as one still being attempted", () => {
+    const two = declaredAs(generateS5(42).events, "#2");
+    const three = declaredAs(generateS5(42).events, "#3");
+    // Keel tells #3 that #2 was declared, after #2 was withdrawn.
+    expect(
+      told(generateS5, (events) => {
+        const landed = events.findLast((event) => event.type === "AlternativeLanded");
+        if (landed?.type !== "AlternativeLanded") return;
+        events.push({
+          ...landed,
+          type: "AlternativeDeclared",
+          eventId: "evt_zzzzzzzzzzzzzzzzzzzzzzzzzz",
+          seq: landed.seq + 1,
+          payload: {
+            _tag: "AlternativeDeclared",
+            projectId: landed.payload.projectId,
+            changeId: three,
+            alternativeId: two,
+            nextActions: landed.payload.nextActions,
+          },
+        });
+      }),
+    ).toEqual([`AlternativeDeclared: ${two} is not a live change`]);
   });
 });

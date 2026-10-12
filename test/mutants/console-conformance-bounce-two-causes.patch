@@ -2,10 +2,10 @@
 # kills: conformance.bounce-cause
 # why: the fixtures' check takes a bounce that names two causes, which Keel's schema refuses
 diff --git a/apps/console/test/fixtures/mock/conformance.ts b/apps/console/test/fixtures/mock/conformance.ts
-index 0914ee9..cee59f6 100644
+index 5ae2ce0..1ec8e1e 100644
 --- a/apps/console/test/fixtures/mock/conformance.ts
 +++ b/apps/console/test/fixtures/mock/conformance.ts
-@@ -390,7 +390,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
+@@ -463,7 +463,7 @@ export function checkLog(events: readonly ScriptedEvent[]): string[] {
          break;
        case "ChangeBounced": {
          const { changeId, verdictId, conflictId, declined } = event.payload;
