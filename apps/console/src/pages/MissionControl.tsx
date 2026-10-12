@@ -4,7 +4,7 @@
 import { Suspense, lazy, useCallback, useState } from "react";
 import type { AgentClass } from "../domain/state.ts";
 import { LANES, lanesOf } from "../engine/lanes.ts";
-import { usePlayer, useSelected } from "../engine/react.tsx";
+import { useClock, usePlayer, useSelected } from "../engine/react.tsx";
 import { trunkStatsOf } from "../engine/select.ts";
 import { subjectDetailOf } from "../engine/subject.ts";
 import type { Mode } from "../theme/mode.ts";
@@ -26,6 +26,9 @@ export function MissionControlPage({ subject, mode }: { subject?: string; mode: 
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const [shown, setShown] = useState(LANES);
+  // What has finished leaves its lane a little after it did, and a rate is over the last minute: both turn on
+  // the time as well as on the log, so they are read again every two seconds of it, whether or not Keel wrote.
+  const clock = useClock(0.5);
   // A subject open beside the graph has its lane shown and open in it, however far down it comes.
   const lanes = useSelected(
     (world, { t }) =>
@@ -35,9 +38,9 @@ export function MissionControlPage({ subject, mode }: { subject?: string; mode: 
         shown,
         ...(subject === undefined ? {} : { pinned: subject }),
       }),
-    [opened, closed, shown, subject],
+    [opened, closed, shown, subject, clock],
   );
-  const trunk = useSelected((world, { t }) => trunkStatsOf(world, t));
+  const trunk = useSelected((world, { t }) => trunkStatsOf(world, t), [clock]);
   const detail = useSelected(
     (world) => (subject === undefined ? null : subjectDetailOf(world, subject)),
     [subject],

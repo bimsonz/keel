@@ -49,7 +49,7 @@ function statsOf(trunk: TrunkStats): Stat[] {
     {
       label: "Landed per minute",
       value: count(trunk.landedPerMinute),
-      means: "Changes that landed in the minute up to the latest event Keel has published.",
+      means: "Changes that landed in the last minute.",
     },
     {
       label: "p50 time-to-land",

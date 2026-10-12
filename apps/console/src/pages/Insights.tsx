@@ -3,7 +3,7 @@
 // before it began, how Keel did against what was planted.
 
 import { funnelOf } from "../engine/funnel.ts";
-import { useSelected } from "../engine/react.tsx";
+import { useClock, useSelected } from "../engine/react.tsx";
 import { benchmarkOf } from "../engine/benchmark.ts";
 import { trunkStatsOf } from "../engine/select.ts";
 import type { InsightsTab } from "../route.ts";
@@ -20,7 +20,9 @@ const PAGES: { id: InsightsTab; label: string }[] = [
 ];
 
 function Trunk() {
-  const trunk = useSelected((world, { t }) => trunkStatsOf(world, t));
+  // A rate is over the last minute, so it is read again as the minute moves on, whether or not Keel wrote.
+  const clock = useClock(0.5);
+  const trunk = useSelected((world, { t }) => trunkStatsOf(world, t), [clock]);
   return (
     <Column>
       <header>

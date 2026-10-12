@@ -1785,6 +1785,36 @@ expectEqual(
   "1",
 );
 
+// A live console's clock is the wall clock. Keel writes nothing more from here, and the page still moves on:
+// a second after the log's last entry one change has landed in the last minute, and a minute later none has.
+const logEnded = Date.parse(keel.events().at(-1)?.at ?? "");
+const later = watch(await presenter.context().newPage(), "presenter, as time passes");
+await later.clock.install({ time: new Date(logEnded + 1_000) });
+await later.goto(`${built}/demo/mission-control#presenter=${encodeURIComponent(PRESENTER)}`, {
+  waitUntil: "domcontentloaded",
+});
+await later.locator("dl.a-trunk-line").waitFor({ timeout: 10_000 });
+const landedLately = async (): Promise<string> => statOn(later, "Landed per minute");
+/** Reads the rate until it is `wanted`, or for three seconds: a rate that never moves is a failed check, by name. */
+const settlesAt = async (wanted: string): Promise<string> => {
+  for (let tries = 0; tries < 30 && (await landedLately()) !== wanted; tries += 1)
+    // oxlint-disable-next-line no-await-in-loop -- waiting on the page's own clock
+    await later.clock.runFor(100);
+  return landedLately();
+};
+expectEqual(
+  "live: just after the log's last entry, the landing in the minute before it is counted",
+  await settlesAt("1"),
+  "1",
+);
+await later.clock.fastForward(61_000);
+expectEqual(
+  "live: a minute on with nothing new from Keel, nothing has landed in the last minute",
+  await settlesAt("0"),
+  "0",
+);
+await later.close();
+
 // ─────────────────────────────────────────────────────────────────────────────
 // The pages above every project: signing up and in, the user's settings, approving a terminal
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/clock.test.ts
+# kills: clock.live
+# why: a live console's now is the instant of Keel's last entry, so nothing that finished is seen to have until Keel writes again
+diff --git a/apps/console/src/engine/player.ts b/apps/console/src/engine/player.ts
+index c9f0075..c2d1fcb 100644
+--- a/apps/console/src/engine/player.ts
++++ b/apps/console/src/engine/player.ts
+@@ -351,7 +351,7 @@ export class Player {
+     // while ago is seen to have. It is never behind the log's own end, whatever this machine's clock says.
+     // A replay advances at its own rate.
+     this.t = this.live
+-      ? Math.max(this.end, this.#now() - this.#epochMs)
++      ? this.end
+       : Math.min(this.t + elapsedMs * this.rate, this.horizon);
+     if (this.t === before) return false;
+     // Views re-read only when the world moved; the clock's readers hear every tick.

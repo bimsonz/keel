@@ -26,7 +26,7 @@ import type {
   World as WorldId,
 } from "../domain/state.ts";
 import { sidesOf } from "./sides.ts";
-import type { ChangeEntry, ConflictEntry, SubjectEntry, World } from "./world.ts";
+import type { ChangeEntry, ConflictEntry, EscalationEntry, SubjectEntry, World } from "./world.ts";
 
 export type Tone = "plain" | "suspected" | "proven" | "person" | "pass";
 
@@ -257,8 +257,17 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
     if (key !== undefined) bySubject.set(key, [...(bySubject.get(key) ?? []), change]);
   }
   const real = (change: ChangeEntry): boolean => world.agents.get(change.agentId)?.class === "real";
+  // A question Keel has put to a person about a change itself, with no conflict between it and the answer.
+  const asked = new Map<string, EscalationEntry[]>();
+  for (const escalation of world.escalations.values()) {
+    if (escalation.about.kind !== "change") continue;
+    asked.set(escalation.about.id, [...(asked.get(escalation.about.id) ?? []), escalation]);
+  }
+  const waiting = (change: ChangeEntry): boolean =>
+    (asked.get(change.id) ?? []).some((escalation) => escalation.state === "open");
   const notable = (change: ChangeEntry): boolean =>
     drawAll ||
+    waiting(change) ||
     contested.has(change.id) ||
     change.state === "parked" ||
     change.state === "bounced" ||
@@ -275,13 +284,15 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
         here,
         open,
         changes,
-        rank: open.some((conflict) => conflict.state === "escalated")
-          ? 0
-          : here.length > 0
-            ? 1
-            : changes.some(real)
-              ? 2
-              : 3,
+        // A person is asked about a conflict here, or about one of the changes here.
+        rank:
+          open.some((conflict) => conflict.state === "escalated") || changes.some(waiting)
+            ? 0
+            : here.length > 0
+              ? 1
+              : changes.some(real)
+                ? 2
+                : 3,
         since: Math.min(...here.map((conflict) => Date.parse(conflict.openedAt))),
       };
     })
@@ -347,6 +358,27 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
         tone: "plain",
       });
     }
+    // A question about the change itself hangs from the change: while it is open, it is what a person is asked.
+    for (const escalation of asked.get(change.id) ?? []) {
+      const escalationNode = `escalation:${escalation.id}`;
+      nodes.push({
+        id: escalationNode,
+        kind: "escalation",
+        escalationId: escalation.id,
+        label: escalation.label,
+        question: escalation.question,
+        standing:
+          escalation.options.find((option) => option.id === escalation.default)?.label ??
+          escalation.default,
+        state: escalation.state,
+      });
+      edges.push({
+        id: `${changeNode}>${escalationNode}`,
+        from: changeNode,
+        to: escalationNode,
+        tone: escalation.state === "open" ? "person" : "plain",
+      });
+    }
     return changeNode;
   };
 
@@ -356,15 +388,16 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
     const guards = subject.guardIds
       .flatMap((id) => world.guards.get(id) ?? [])
       .filter((guard) => guard.state === "admitted");
-    const tone: Tone = open.some((c) => c.state === "escalated")
-      ? "person"
-      : open.some((c) => c.state === "proven")
-        ? "proven"
-        : open.length > 0
-          ? "suspected"
-          : guards.length > 0
-            ? "pass"
-            : "plain";
+    const tone: Tone =
+      open.some((c) => c.state === "escalated") || changes.some(waiting)
+        ? "person"
+        : open.some((c) => c.state === "proven")
+          ? "proven"
+          : open.length > 0
+            ? "suspected"
+            : guards.length > 0
+              ? "pass"
+              : "plain";
     const subjectNode = `subject:${subject.id}`;
     const drawnSubject: Lane["subject"] = {
       id: subjectNode,
@@ -556,7 +589,9 @@ export function lanesOf(world: World, now: number, options: LaneOptions = {}): L
       const edges: GraphEdge[] = [];
       // Opened by a reader, a swarm's lane draws every change in it: none of them has a subject to be counted beside.
       for (const change of drawn.length > 0 ? drawn : loose) draw(change, nodes, edges);
-      lanes.push({ ...summary, open: true, nodes, edges });
+      // Where a person is asked about one of them, this lane comes first, as a subject's would.
+      if (loose.some(waiting)) lanes.unshift({ ...summary, open: true, nodes, edges });
+      else lanes.push({ ...summary, open: true, nodes, edges });
     } else lanes.push({ ...summary, open: false, nodes: [], edges: [] });
   }
 

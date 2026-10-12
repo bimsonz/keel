@@ -67,8 +67,12 @@ export class Player {
   #timeListeners = new Set<Listener>();
   #requested = new Set<string>();
 
-  constructor(source: ConsoleSource) {
+  /** The wall clock, in ms since 1970. A live console's "now" is read from it; a test gives its own. */
+  readonly #now: () => number;
+
+  constructor(source: ConsoleSource, now: () => number = Date.now) {
     this.source = source;
+    this.#now = now;
     this.#epochMs = Date.parse(source.descriptor.epoch);
     // The repository is read for the project the address names. Its id is the one the log gave it; a reader
     // the log is closed to has only the name.
@@ -343,8 +347,12 @@ export class Player {
   tick(elapsedMs: number): boolean {
     if (!this.playing) return false;
     const before = this.t;
-    // Live, playing means keeping up with the tail. A replay advances at its own rate.
-    this.t = this.live ? this.end : Math.min(this.t + elapsedMs * this.rate, this.horizon);
+    // Live, playing means now: the wall clock, which goes on when Keel's log is quiet, so what finished a
+    // while ago is seen to have. It is never behind the log's own end, whatever this machine's clock says.
+    // A replay advances at its own rate.
+    this.t = this.live
+      ? Math.max(this.end, this.#now() - this.#epochMs)
+      : Math.min(this.t + elapsedMs * this.rate, this.horizon);
     if (this.t === before) return false;
     // Views re-read only when the world moved; the clock's readers hear every tick.
     if (this.#reveal() || this.t === this.horizon) this.#changed();

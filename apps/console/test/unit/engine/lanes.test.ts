@@ -56,6 +56,9 @@ const holds = (lanes: Lanes): string[] =>
     node.kind === "change" && node.holds !== undefined ? [node.holds.text] : [],
   );
 
+/** The lanes' subjects, in the order Mission Control gives them a minute in. */
+const order = (world: World): string[] => lanesOf(world, 60_000).lanes.map((lane) => lane.key);
+
 describe("Mission Control's lanes follow what is happening", () => {
   it("has no lane before anyone declares", async () => {
     expect((await lanesAt("s1", 20)).lanes).toEqual([]);
@@ -327,6 +330,129 @@ describe("Mission Control at the scale of a swarm", () => {
     expect(lanesOf(bare, 10_000).lanes.map((lane) => [lane.key, lane.changes])).toEqual([
       [NO_SUBJECT, 2],
     ]);
+  });
+
+  it("[lanes.asked-of-change] puts first the lane of a change a person is asked about, and hangs the question from the change", () => {
+    const b = new ScriptBuilder("2026-10-13T16:00:00.000Z", createRng(5));
+    b.at(0).emit({
+      type: "AgentEnrolled",
+      entity: { kind: "agent", id: "agt_1" },
+      payload: {
+        agentId: "agt_1",
+        projectId: "prj_1",
+        name: "agent",
+        kind: "hosted",
+        scopes: ["agent:work"],
+      },
+    });
+    for (const [id, key] of [
+      ["sub_a", "s.a"],
+      ["sub_b", "s.b"],
+    ] as const)
+      b.emit({
+        type: "SubjectMinted",
+        entity: { kind: "subject", id },
+        payload: { subjectId: id, key, anchors: [], gloss: "", mintedBy: "scan" },
+      });
+    const declare = (id: string, subject: string | null): void => {
+      b.after(1).emit({
+        type: "IntentDeclared",
+        entity: { kind: "change", id },
+        payload: {
+          changeId: id,
+          agentId: "agt_1",
+          origin: "agent",
+          revision: 1,
+          goal: id,
+          footprint: [],
+          premises:
+            subject === null
+              ? []
+              : [{ subject, predicate: "bound", relation: "at-most", value: "tight" }],
+          leaseId: "l",
+        },
+      });
+    };
+    declare("chg_a", "s.a");
+    declare("chg_b", "s.b");
+    declare("chg_loose", null);
+    // A conflict is suspected on s.a: contested, and nobody is asked.
+    b.after(1).emit({
+      type: "ConflictSuspected",
+      entity: { kind: "conflict", id: "cfl_1" },
+      payload: {
+        conflictId: "cfl_1",
+        kind: "semantic",
+        parties: ["chg_a"],
+        subjectId: "sub_a",
+        predicate: "bound",
+      },
+    });
+    const ask = (id: string, about: string): void => {
+      b.after(1).emit({
+        type: "EscalationRaised",
+        entity: { kind: "escalation", id },
+        payload: {
+          escalationId: id,
+          question: `May ${about} go on?`,
+          options: [
+            { id: "yes", label: "It may", consequence: "" },
+            { id: "hold", label: "It waits", consequence: "" },
+          ],
+          about: { kind: "change", id: about },
+          category: "permission-semantics",
+          evidence: [],
+          precedents: [],
+          default: "hold",
+        },
+      });
+    };
+    const folded = (events: number): World => {
+      const world = new World();
+      const log = b.build();
+      log.events
+        .slice(0, events)
+        .forEach((event, index) => world.apply(event, log.eventTimes[index] ?? 0));
+      return world;
+    };
+    const before = b.build().events.length;
+    // Nobody is asked yet: the contested subject first, the busy one after it, and last the lane of no subject.
+    expect(order(folded(before))).toEqual(["s.a", "s.b", NO_SUBJECT]);
+
+    // Keel asks a person about the change on s.b itself. No conflict stands between the two.
+    ask("esc_1", "chg_b");
+    const asked = lanesOf(folded(before + 1), 60_000);
+    expect(asked.lanes.map((lane) => lane.key)).toEqual(["s.b", "s.a", NO_SUBJECT]);
+    const [first] = asked.lanes;
+    expect(first?.subject?.tone).toBe("person");
+    expect(
+      first?.nodes.flatMap((node) =>
+        node.kind === "escalation" ? [[node.question, node.standing, node.state]] : [],
+      ),
+    ).toEqual([["May chg_b go on?", "It waits", "open"]]);
+    expect(
+      first?.edges.flatMap((edge) =>
+        edge.to === "escalation:esc_1" ? [`${edge.from} > ${edge.to} ${edge.tone}`] : [],
+      ),
+    ).toEqual(["change:chg_b > escalation:esc_1 person"]);
+
+    // And about the change that is on no subject: its lane comes first of all.
+    ask("esc_2", "chg_loose");
+    expect(order(folded(before + 2))).toEqual([NO_SUBJECT, "s.b", "s.a"]);
+
+    // Answered, the question stays on its change and no longer puts the lane first.
+    b.after(1).emit({
+      type: "RulingGiven",
+      entity: { kind: "escalation", id: "esc_1" },
+      payload: { escalationId: "esc_1", option: "yes", by: "usr_1", rationale: "" },
+    });
+    const ruled = lanesOf(folded(before + 3), 60_000);
+    expect(ruled.lanes.map((lane) => lane.key)).toEqual([NO_SUBJECT, "s.a", "s.b"]);
+    expect(
+      ruled.lanes
+        .at(-1)
+        ?.edges.flatMap((edge) => (edge.to === "escalation:esc_1" ? [edge.tone] : [])),
+    ).toEqual(["plain"]);
   });
 
   it("always shows the lane of the subject a reader has open, however far down it comes", async () => {
