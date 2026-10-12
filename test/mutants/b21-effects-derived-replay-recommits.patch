@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/effects-derived.test.ts
+# kills: b21.effects-derived
+# why: a replayed derive step is not recognised as the one already recorded, so it is decided again and refused
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index dbee8ba..0c6ecfc 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1232,7 +1232,7 @@ export const effectsDerived: (
+     const recorded = yield* precheckCommand(
+       changeId,
+       "effectsDerived",
+-      derived,
++      { ...derived, instanceId: `${derived.instanceId}/${Math.random()}` },
+       [{ _tag: "DeriveEffects", effects, derivationRef: derived.derivationRef }],
+       {
+         affected:

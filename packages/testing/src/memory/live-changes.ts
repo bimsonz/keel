@@ -1,4 +1,4 @@
-import { hearLiveChange, liveChanges } from "@keeltown/core/application/coordination";
+import { hearLiveChange, liveAnchors, liveChanges } from "@keeltown/core/application/coordination";
 import type { EventEnvelope, ProjectId } from "@keeltown/core/kernel";
 import { type EventDraft, LiveChanges } from "@keeltown/core/ports";
 import { Effect, Layer } from "effect";
@@ -27,6 +27,8 @@ export function makeLiveChangesMemory() {
         hearLiveChange({ store: store.service, outbox }, projectId, event),
       );
     },
+    /** Where the project's live changes anchor their subjects, as the Project DO answers `liveAnchors`. */
+    anchorsOf: (projectId: ProjectId) => liveAnchors(indexOf(projectId).store.service),
     /** The project's index outbox: who it would tell, as the Project DO's own subscriptions. */
     outboxOf: (projectId: ProjectId) => indexOf(projectId).service,
     layer: Layer.succeed(

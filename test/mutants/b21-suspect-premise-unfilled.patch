@@ -2,13 +2,13 @@
 # kills: b21.fallout-race
 # why: the suspicion carries neither the premise nor the effect, so the Probe has nothing to draft from
 diff --git a/packages/core/src/application/coordination/subject-fallout.ts b/packages/core/src/application/coordination/subject-fallout.ts
-index 511377a..a00afb9 100644
+index 11a7b27..e036821 100644
 --- a/packages/core/src/application/coordination/subject-fallout.ts
 +++ b/packages/core/src/application/coordination/subject-fallout.ts
-@@ -152,8 +152,6 @@ export function judgeFallout(
+@@ -191,8 +191,6 @@ export function judgeFallout(
            subjectKey: subject.key,
            predicate: pair.premise.proposition.predicate,
-           origin: "fallout",
+           origin: pair.judged.evidenceClass === "opinion" ? "opinion" : "fallout",
 -          premise: pair.premise,
 -          effect: pair.effect,
          });

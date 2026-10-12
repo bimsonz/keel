@@ -1,15 +1,18 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
   conflictIdOf,
-  type FalloutPair,
   falloutPairs,
   hearSubject,
   HOLDER_HEARS,
   PROBE_WORKFLOW,
+  subjectIdOf,
   subjectKeysOf,
 } from "@keeltown/core/application/coordination";
 import {
+  claimKey,
   declaredEffect,
+  type DerivedEffect,
+  EffectsDerived,
   fallout,
   IntentDeclared,
   IntentRevised,
@@ -20,6 +23,7 @@ import {
 import {
   type AgentId,
   type ChangeId,
+  CommitSha,
   type EventEnvelope,
   Instant,
   makeId,
@@ -113,6 +117,60 @@ const revisedEnvelope = (
   ),
 });
 
+const HEAD = Schema.decodeUnknownSync(CommitSha)("c".repeat(40));
+
+/**
+ * An effect as Precheck derives it: an extractor's ruling unless it is clef's
+ * opinion, anchored in the head commit, which no declared proposition here is.
+ */
+const derivedEffect = (p: {
+  subject: SubjectKey;
+  value: "per-request" | "per-session";
+  method?: "extractor" | "clef";
+}): DerivedEffect => {
+  const anchors = [{ path: `src/${p.subject}.ts`, symbol: "read", commit: HEAD }];
+  const found = {
+    proposition: {
+      ...proposition({ subject: p.subject, relation: "is", value: p.value }),
+      anchors,
+    },
+    anchors,
+    declared: false,
+  };
+  return p.method === "clef"
+    ? { ...found, method: "clef", evidenceClass: "opinion", p: 0.8 }
+    : { ...found, method: "extractor", evidenceClass: "ruling" };
+};
+
+/** A change's EffectsDerived at `seq` on its log, as its Change DO commits it. */
+const derivedEnvelope = (
+  i: number,
+  seq: number,
+  effects: readonly DerivedEffect[],
+  revision = 1,
+): EventEnvelope => ({
+  eventId: makeId("evt", ulidOf(600 + i * 20 + seq)),
+  type: "EffectsDerived",
+  entity: { kind: "change", id: changeOf(i) },
+  seq,
+  at: Instant(Date.UTC(2026, 9, 12)),
+  dedupeKey: `derive-${i}-${seq}`,
+  affected: [],
+  notified: [],
+  payload: Schema.encodeSync(EffectsDerived)(
+    EffectsDerived.make({
+      changeId: changeOf(i),
+      revision,
+      effects,
+      derivationRef: `derivation-${i}-${seq}`,
+    }),
+  ),
+});
+
+/** The subjects that hear a change's derivation of these effects: each effect's, and its ancestors. */
+const derivedKeys = (effects: readonly DerivedEffect[]) =>
+  subjectKeysOf({ premises: [], declaredEffects: effects.map((effect) => effect.proposition) });
+
 /** One Subject DO per key, in memory, each hearing what the fan-out would deliver it. */
 function subjects() {
   const objects = new Map<SubjectKey, ReturnType<typeof makeEventOutboxMemory>>();
@@ -171,13 +229,12 @@ const owed = (intents: readonly Intent[]): readonly string[] =>
                   [],
                 ).some((outcome) => outcome._tag === "conflict"),
               )
-              .map((effect) => {
-                const pair: FalloutPair = {
+              .map((effect) =>
+                conflictIdOf(sampleProjectId, {
                   premise: { holder: changeOf(h), proposition: premise },
                   effect: { changeId: changeOf(c), proposition: effect },
-                };
-                return conflictIdOf(sampleProjectId, pair);
-              }),
+                }),
+              ),
           ),
     ),
   );
@@ -223,6 +280,7 @@ const heldBy = (i: number, intent: Intent) => ({
   changeId: changeOf(i),
   premises: intent.premises,
   declaredEffects: intent.effects,
+  derived: [],
 });
 
 /** The suspicions and conflicts among what subjects committed: what fallout tells anyone. */
@@ -375,5 +433,311 @@ describe("[b21.fallout-proximity] fallout opens a conflict only where the domain
     expect(other).toEqual(one);
     for (const s of [premiseFirst, effectFirst])
       expect(s.objectAt(leaf).service.subscribers("ConflictSuspected")).toContain(PROBE_WORKFLOW);
+  });
+});
+
+/** Each conflict that opened, with its origin. */
+const openedAs = (heard: readonly { draft: { payload: { _tag: string } } }[]) =>
+  heard
+    .filter(({ draft }) => draft.payload._tag === "ConflictSuspected")
+    .map(
+      ({ draft }) =>
+        `${String(Reflect.get(draft.payload, "conflictId"))} ${String(Reflect.get(draft.payload, "origin"))}`,
+    );
+
+/** A change's story: its intent, and what each of its Precheck passes derived, in the order of its log. */
+type Story = { readonly intent: Intent; readonly passes: readonly (readonly DerivedEffect[])[] };
+/** Where on the change's log pass `k` recorded its derivation. */
+const seqOfPass = (k: number) => 5 + 4 * k;
+
+const arbitraryDerived = fc
+  .record({
+    subject: fc.constantFrom(...KEYS),
+    value: fc.constantFrom("per-request" as const, "per-session" as const),
+    method: fc.constantFrom("extractor" as const, "clef" as const),
+  })
+  .map(derivedEffect);
+const arbitraryStory: fc.Arbitrary<Story> = fc.record({
+  intent: arbitraryIntent,
+  passes: fc.array(fc.array(arbitraryDerived, { maxLength: 2 }), { maxLength: 2 }),
+});
+
+describe("[b21.fallout-derived] a derived effect is judged like a declared one", () => {
+  it("[b21.fallout-derived] any declares and derivations heard in any order: exactly the conflicts owed by what was held together, each once, a claim declared and derived one conflict", () => {
+    fc.assert(
+      fc.property(
+        fc.array(arbitraryStory, { minLength: 2, maxLength: 3 }),
+        fc.func(fc.nat()),
+        (stories, order) => {
+          const s = subjects();
+          const events = stories.flatMap((story, i) => [
+            { i, pass: -1 },
+            ...story.passes.map((_, pass) => ({ i, pass })),
+          ]);
+          const sequence = events
+            .map((_, n) => n)
+            .toSorted((a, b) => (order(a) % 7) - (order(b) % 7) || a - b)
+            .flatMap((n) => events[n] ?? []);
+          // What every change holds, as one timeline: a premise and an effect held together are judged.
+          const held = stories.map(() => ({ declared: false, pass: -1 }));
+          const owedAs = new Map<string, string>();
+          const heard = sequence.flatMap(({ i, pass }) => {
+            const story = stories[i];
+            const now = held[i];
+            if (story === undefined || now === undefined) return [];
+            let committed: ReturnType<typeof s.declare>;
+            if (pass < 0) {
+              now.declared = true;
+              committed = s.declare(
+                declaredEnvelope(i, story.intent.premises, story.intent.effects),
+              );
+            } else {
+              now.pass = Math.max(now.pass, pass);
+              // Every subject the change had subscribed by then hears it: its intent's, and each derivation's so far.
+              const keys = new Set([
+                ...subjectKeysOf({
+                  premises: story.intent.premises,
+                  declaredEffects: story.intent.effects,
+                }),
+                ...story.passes.slice(0, pass + 1).flatMap(derivedKeys),
+              ]);
+              committed = s.deliver(
+                [...keys],
+                derivedEnvelope(i, seqOfPass(pass), story.passes[pass] ?? []),
+              );
+            }
+            stories.forEach((holder, h) => {
+              if (held[h]?.declared !== true) return;
+              stories.forEach((other, c) => {
+                const theirs = held[c];
+                if (c === h || theirs === undefined) return;
+                const declared = theirs.declared ? other.intent.effects : [];
+                const derived = other.passes[theirs.pass] ?? [];
+                for (const premise of holder.intent.premises)
+                  for (const effect of [...declared, ...derived.map((d) => d.proposition)]) {
+                    const related =
+                      isAncestorOrSelf(premise.subject, effect.subject) ||
+                      isAncestorOrSelf(effect.subject, premise.subject);
+                    const conflicts = fallout(
+                      changeOf(c),
+                      declaredEffect(effect),
+                      [{ holder: changeOf(h), proposition: premise }],
+                      [],
+                    ).some((outcome) => outcome._tag === "conflict");
+                    if (!related || !conflicts) continue;
+                    const conflictId = conflictIdOf(sampleProjectId, {
+                      premise: { holder: changeOf(h), proposition: premise },
+                      effect: { changeId: changeOf(c), proposition: effect },
+                    });
+                    if (owedAs.has(conflictId)) continue;
+                    // The agent's own claim, or a ruling, opens as fallout; only a model's opinion alone as opinion.
+                    const claim = claimKey(effect);
+                    const firm =
+                      declared.some((p) => claimKey(p) === claim) ||
+                      derived.some(
+                        (d) => d.evidenceClass !== "opinion" && claimKey(d.proposition) === claim,
+                      );
+                    owedAs.set(conflictId, firm ? "fallout" : "opinion");
+                  }
+              });
+            });
+            return committed;
+          });
+          expect(openedAs(heard).toSorted()).toEqual(
+            [...owedAs].map(([conflictId, origin]) => `${conflictId} ${origin}`).toSorted(),
+          );
+        },
+      ),
+    );
+  });
+
+  const leaf = key("authz.permission-evaluation");
+  const relied = proposition({ subject: leaf, relation: "at-most", value: "per-request" });
+
+  it("[b21.fallout-derived] [b21.derived-mint] a subject the intent never named hears the derivation: it is minted from the effect and opens the conflict with the premise it holds", () => {
+    const s = subjects();
+    const session = key("authz.session");
+    s.declare(
+      declaredEnvelope(
+        0,
+        [proposition({ subject: session, relation: "at-most", value: "per-request" })],
+        [],
+      ),
+    );
+    // Change 1 names billing only; what its code does to the session's cache is derived.
+    s.declare(
+      declaredEnvelope(
+        1,
+        [],
+        [proposition({ subject: key("billing"), relation: "is", value: "per-request" })],
+      ),
+    );
+    // Compatible with the premise above it, so it opens nothing; it only gets its subject minted.
+    const cache = derivedEffect({
+      subject: key("authz.session.cache"),
+      value: "per-request",
+      method: "clef",
+    });
+    const stale = derivedEffect({ subject: session, value: "per-session" });
+    const heard = s.deliver(derivedKeys([cache, stale]), derivedEnvelope(1, 5, [cache, stale]));
+    expect(heard.filter(({ draft }) => draft.payload._tag === "SubjectMinted")).toMatchObject([
+      {
+        at: key("authz.session.cache"),
+        draft: {
+          payload: {
+            subjectId: subjectIdOf(sampleProjectId, key("authz.session.cache")),
+            anchors: cache.anchors,
+            mintedBy: "clef",
+          },
+        },
+      },
+    ]);
+    expect(heard.filter(({ draft }) => draft.payload._tag === "ConflictSuspected")).toMatchObject([
+      {
+        at: session,
+        draft: {
+          payload: {
+            parties: [changeOf(0), changeOf(1)],
+            subjectKey: session,
+            origin: "fallout",
+            premise: { holder: changeOf(0) },
+            effect: { changeId: changeOf(1), proposition: { anchors: stale.anchors } },
+          },
+        },
+      },
+    ]);
+    expect(s.objectAt(session).service.subscribers("ConflictSuspected")).toContain(PROBE_WORKFLOW);
+  });
+
+  it("[b21.fallout-derived] the premise second: a premise declared after the derivation meets the derived effect", () => {
+    const s = subjects();
+    const effect = derivedEffect({ subject: leaf, value: "per-session" });
+    s.deliver(derivedKeys([effect]), derivedEnvelope(1, 5, [effect]));
+    expect(opened(s.declare(declaredEnvelope(0, [relied], [])))).toEqual([
+      conflictIdOf(sampleProjectId, {
+        premise: { holder: changeOf(0), proposition: relied },
+        effect: { changeId: changeOf(1), proposition: effect.proposition },
+      }),
+    ]);
+  });
+
+  it("[b21.fallout-derived] [b21.derivation-order] an earlier derivation arriving late is ignored: what the later one dropped is not judged", () => {
+    const s = subjects();
+    s.declare(declaredEnvelope(0, [relied], []));
+    const dropped = derivedEffect({ subject: leaf, value: "per-session" });
+    const keys = derivedKeys([dropped]);
+    // The later pass derived nothing at the leaf, and it arrived first.
+    const later = s.deliver(keys, derivedEnvelope(1, 9, []));
+    const late = s.deliver(keys, derivedEnvelope(1, 5, [dropped]));
+    expect(told([...later, ...late])).toEqual([]);
+  });
+
+  it("[b21.fallout-derived] [b21.derivation-order] two passes at one revision: the second's effects replace the first's", () => {
+    const s = subjects();
+    const session = key("authz.session");
+    const first = derivedEffect({ subject: leaf, value: "per-session" });
+    const second = derivedEffect({ subject: session, value: "per-session" });
+    // A bounced change resubmitted with new code keeps its revision: both passes are revision 1.
+    s.deliver(derivedKeys([first]), derivedEnvelope(1, 5, [first], 1));
+    s.deliver(derivedKeys([first, second]), derivedEnvelope(1, 9, [second], 1));
+    const onFirst = s.declare(declaredEnvelope(0, [relied], []));
+    const onSecond = s.declare(
+      declaredEnvelope(
+        2,
+        [proposition({ subject: session, relation: "at-most", value: "per-request" })],
+        [],
+      ),
+    );
+    expect(opened(onFirst)).toEqual([]);
+    expect(opened(onSecond)).toHaveLength(1);
+  });
+
+  it("[b21.fallout-derived] a claim both declared and derived is one pair: the derivation of what the agent declared opens nothing more", () => {
+    const s = subjects();
+    const declared = proposition({ subject: leaf, relation: "is", value: "per-session" });
+    s.declare(declaredEnvelope(0, [relied], []));
+    const first = s.declare(declaredEnvelope(1, [], [declared]));
+    const same = derivedEffect({ subject: leaf, value: "per-session" });
+    const again = s.deliver(derivedKeys([same]), derivedEnvelope(1, 5, [same]));
+    expect(opened(first)).toHaveLength(1);
+    expect(told(again)).toEqual([]);
+  });
+});
+
+describe("[b21.pair-identity] a pair is the claims it sets against each other, and how firmly the premise is held", () => {
+  const leaf = key("authz.permission-evaluation");
+  const effect = proposition({ subject: leaf, relation: "is", value: "per-session" });
+  const keys = [leaf, key("authz")];
+
+  it("[b21.pair-identity] a premise relied on again with new anchors is the same pair: no second conflict for one disagreement", () => {
+    const s = subjects();
+    const premise = proposition({ subject: leaf, relation: "at-most", value: "per-request" });
+    const anchored = {
+      ...premise,
+      anchors: [{ path: "src/authz/evaluate.ts", symbol: "evaluate", commit: HEAD }],
+    };
+    s.declare(declaredEnvelope(0, [premise], []));
+    const first = s.declare(declaredEnvelope(1, [], [effect]));
+    const again = s.deliver(
+      keys,
+      revisedEnvelope(0, 2, { retracted: [premise], added: [anchored] }),
+    );
+    expect(opened(first)).toHaveLength(1);
+    expect(told(again)).toEqual([]);
+  });
+
+  it("[b21.pair-identity] a should premise raised to must is judged again: the suspicion becomes a conflict", () => {
+    const s = subjects();
+    const should = proposition({
+      subject: leaf,
+      relation: "at-most",
+      value: "per-request",
+      strength: "should",
+    });
+    const must = proposition({ subject: leaf, relation: "at-most", value: "per-request" });
+    s.declare(declaredEnvelope(0, [should], []));
+    const first = s.declare(declaredEnvelope(1, [], [effect]));
+    const raised = s.deliver(keys, revisedEnvelope(0, 2, { retracted: [should], added: [must] }));
+    expect([told(first), told(raised)]).toEqual([["PremiseSuspected"], ["ConflictSuspected"]]);
+  });
+});
+
+/** The origin of each conflict that opened. */
+const originsOf = (heard: readonly { draft: { payload: { _tag: string } } }[]) =>
+  heard
+    .filter(({ draft }) => draft.payload._tag === "ConflictSuspected")
+    .map(({ draft }) => Reflect.get(draft.payload, "origin"));
+
+describe("[b21.derived-origin] a conflict's origin is the evidence class of the effect it was judged on", () => {
+  const leaf = key("authz.permission-evaluation");
+  const relied = proposition({ subject: leaf, relation: "at-most", value: "per-request" });
+  it("[b21.derived-origin] clef's effect opens as opinion, an extractor's as fallout", () => {
+    const origins = (["clef", "extractor"] as const).map((method) => {
+      const s = subjects();
+      s.declare(declaredEnvelope(0, [relied], []));
+      const effect = derivedEffect({ subject: leaf, value: "per-session", method });
+      return originsOf(s.deliver(derivedKeys([effect]), derivedEnvelope(1, 5, [effect])));
+    });
+    expect(origins).toEqual([["opinion"], ["fallout"]]);
+  });
+
+  it("[b21.derived-origin] a claim the agent declared stays its own testimony when clef derives it too, and a ruling stands ahead of an opinion of the same claim", () => {
+    const opinion = derivedEffect({ subject: leaf, value: "per-session", method: "clef" });
+    const ruling = derivedEffect({ subject: leaf, value: "per-session" });
+    const declaredToo = subjects();
+    declaredToo.declare(
+      declaredEnvelope(
+        1,
+        [],
+        [proposition({ subject: leaf, relation: "is", value: "per-session" })],
+      ),
+    );
+    declaredToo.deliver(derivedKeys([opinion]), derivedEnvelope(1, 5, [opinion]));
+    const both = subjects();
+    both.deliver(derivedKeys([opinion, ruling]), derivedEnvelope(1, 5, [opinion, ruling]));
+    expect([
+      originsOf(declaredToo.declare(declaredEnvelope(0, [relied], []))),
+      originsOf(both.declare(declaredEnvelope(0, [relied], []))),
+    ]).toEqual([["fallout"], ["fallout"]]);
   });
 });

@@ -2,15 +2,15 @@
 # kills: b21.relying-subscribes
 # why: a subject commits SubjectMinted again for every change that touches it
 diff --git a/packages/core/src/application/coordination/subject.ts b/packages/core/src/application/coordination/subject.ts
-index 59fc567..4635381 100644
+index 0109fd8..fa0e93a 100644
 --- a/packages/core/src/application/coordination/subject.ts
 +++ b/packages/core/src/application/coordination/subject.ts
-@@ -140,7 +140,7 @@ export function hearSubject(
-   const subjectId = subjectIdOf(projectId, key);
+@@ -206,7 +206,7 @@ export function hearSubject(
    const drafts: EventDraft[] = [];
-   const touched = [...after.premises, ...after.declaredEffects];
--  if (touched.length > 0 && store.get(SUBJECT_MINTED, subjectId) === undefined) {
-+  if (touched.length > 0) {
-     const own = touched.find((proposition) => proposition.subject === key);
-     const minted = SubjectMinted.make({
-       subjectId,
+   const named = [...after.premises, ...after.declaredEffects];
+   const found = after.derived?.effects ?? [];
+-  if (named.length + found.length > 0 && store.get(SUBJECT_MINTED, subjectId) === undefined) {
++  if (named.length + found.length > 0) {
+     const own = named.find((proposition) => proposition.subject === key);
+     const derived =
+       own === undefined ? found.find((effect) => effect.proposition.subject === key) : undefined;

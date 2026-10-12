@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/effects-derived.test.ts
+# kills: b21.workspace-intent
+# why: the workspace Precheck reads leaves out the intent, so derivation cannot tell a declared effect from an undeclared one
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index dbee8ba..06ce83d 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -611,7 +611,7 @@ export const changeWorkspace: (
+     ...held,
+     baseSha: change.baseSha,
+     subjects: intentSubjects(change.intent),
+-    intent: change.intent,
++    intent: { ...change.intent, declaredEffects: [] },
+   };
+ });
+ 

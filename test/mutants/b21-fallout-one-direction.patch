@@ -2,15 +2,15 @@
 # kills: b21.fallout-proximity
 # why: a premise declared after the effect that breaks it is never judged against it
 diff --git a/packages/core/src/application/coordination/subject-fallout.ts b/packages/core/src/application/coordination/subject-fallout.ts
-index a852587..84694db 100644
+index 11a7b27..d3303a5 100644
 --- a/packages/core/src/application/coordination/subject-fallout.ts
 +++ b/packages/core/src/application/coordination/subject-fallout.ts
-@@ -82,7 +82,7 @@ export function falloutPairs(
-           premise: { holder: other.changeId, proposition: premise },
-           effect: { changeId: change.changeId, proposition: effect },
+@@ -118,7 +118,7 @@ export function falloutPairs(
+           effect: { changeId: change.changeId, proposition: judged.proposition },
+           judged,
          });
 -    for (const premise of premises)
 +    for (const premise of premises.slice(premises.length))
-       for (const effect of other.declaredEffects)
+       for (const judged of judgedEffects(other))
          pairs.push({
            premise: { holder: change.changeId, proposition: premise },

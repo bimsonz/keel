@@ -210,6 +210,7 @@ function precheckWorld(
       grantedSha: granted,
       projectId,
       subjects: options.subjects ?? [],
+      intent: { revision: 1, goal: "the change under Precheck", footprint: [], premises: [] },
     };
     changes.submit(changeId, 1, workspace);
     return { changeId, revision: 1, commitSha, baseSha: base, instanceId };

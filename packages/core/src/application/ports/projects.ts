@@ -1,4 +1,5 @@
 import { Context, type Effect } from "effect";
+import type { SubjectAnchors } from "../../domain/coordination/index.ts";
 import type { IdempotencyConflict, AgentToken } from "../../domain/identity/index.ts";
 import type { ProjectNotFound } from "../../domain/integration/index.ts";
 import type { Glob, Instant, ProjectId } from "../../domain/kernel/index.ts";
@@ -55,6 +56,10 @@ export interface PutProjectSettings {
  * changed field with ProjectSettingsChanged; an unchanged PUT commits nothing,
  * so a retry is a no-op by content. `requestId` keys the commit: the same id
  * with other settings is IdempotencyConflict.
+ * `liveAnchors` is where the project's live changes anchor their subjects in
+ * code, read from the Project DO's live index: Precheck's derivation
+ * attributes a subject by these and nothing else. A project with no live
+ * change, or none, answers nothing.
  */
 export class Projects extends Context.Service<
   Projects,
@@ -70,5 +75,6 @@ export class Projects extends Context.Service<
       settings: PutProjectSettings,
       requestId: string,
     ) => Effect.Effect<ProjectSettings, ProjectNotFound | IdempotencyConflict>;
+    readonly liveAnchors: (projectId: ProjectId) => Effect.Effect<readonly SubjectAnchors[]>;
   }
 >()("keel/Projects") {}

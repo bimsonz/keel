@@ -6,6 +6,7 @@ import {
   changeRead,
   changeWorkspace,
   declare,
+  effectsDerived,
   getChange,
   HeldWorkspace,
   lapseLease,
@@ -36,6 +37,7 @@ import {
   ChangeCodecs,
   type ChangeRpc,
   DeclareCommand,
+  EffectsDerivedCommand,
   NearbyCommand,
   type ExitCodec,
   PlanCompiledCommand,
@@ -195,6 +197,14 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
       Effect.flatMap((step) => precheckStarted(changeId, step)),
     );
     return this.answer(ChangeCodecs.precheckStarted, program);
+  }
+
+  async effectsDerived(command: typeof EffectsDerivedCommand.Encoded) {
+    const changeId = this.changeId;
+    const program = decoded(EffectsDerivedCommand, command).pipe(
+      Effect.flatMap((derived) => effectsDerived(changeId, derived)),
+    );
+    return this.answer(ChangeCodecs.effectsDerived, program);
   }
 
   async precheckRefused(command: typeof PrecheckRefusedCommand.Encoded) {

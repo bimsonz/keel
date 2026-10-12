@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fallout.test.ts
+# kills: b21.derivation-order
+# why: a subject keeps the first derivation it heard of a change, so a later pass of the same revision never replaces it
+diff --git a/packages/core/src/application/coordination/subject.ts b/packages/core/src/application/coordination/subject.ts
+index 0109fd8..4101cdc 100644
+--- a/packages/core/src/application/coordination/subject.ts
++++ b/packages/core/src/application/coordination/subject.ts
+@@ -170,7 +170,7 @@ export function hearSubject(
+     }
+     case "EffectsDerived": {
+       const derived = Schema.decodeUnknownSync(EffectsDerived)(event.payload);
+-      if (before.derived !== undefined && before.derived.seq >= event.seq) return { drafts: [] };
++      if (before.derived !== undefined) return { drafts: [] };
+       after = {
+         ...before,
+         derived: {

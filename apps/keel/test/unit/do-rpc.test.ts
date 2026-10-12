@@ -69,6 +69,7 @@ const granted = {
   grantedSha: grant.baseSha,
   projectId: "prj_01JZ8PT2C4E6G8J0M2N4Q6S8V5",
   subjects: ["authz.permissions"],
+  intent: { revision: 1, goal: "Cache permission lookups", footprint: [], premises: [] },
 };
 const input = {
   goal: "Cache permission lookups",

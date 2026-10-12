@@ -6,7 +6,7 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import type { AgentToken } from "@keeltown/core/domain/identity";
-import { makeId, type ProjectId } from "@keeltown/core/kernel";
+import { EventEnvelope, makeId, type ProjectId } from "@keeltown/core/kernel";
 import { CodeHost, Projects } from "@keeltown/core/ports";
 import {
   CodeHostFixture,
@@ -15,7 +15,7 @@ import {
   makeWorkspacePoolMemory,
   PORTS,
 } from "@keeltown/testing";
-import { Effect, Layer, ManagedRuntime } from "effect";
+import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
 import type { ProjectDO } from "../../src/adapters/driving/do/project.ts";
 import { ProjectsRpc, type ProjectStub } from "../../src/adapters/driven/do-rpc/projects.ts";
@@ -60,12 +60,19 @@ PORTS.Projects.contract("Project DO over RPC", () => {
       createProject: async (command) => (await onMemory(), stub.createProject(command)),
       settings: async () => (await onMemory(), stub.settings()),
       putSettings: async (command) => (await onMemory(), stub.putSettings(command)),
+      liveAnchors: async () => (await onMemory(), stub.liveAnchors()),
     };
   };
   const layer = ProjectsRpc(project);
   return {
     layer,
     source,
+    hear: (projectId, event) =>
+      Effect.promise(async () => {
+        await env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)).receive([
+          Schema.encodeSync(EventEnvelope)(event),
+        ]);
+      }),
     withSettings: (settings) =>
       Effect.gen(function* () {
         const projects = yield* Projects;

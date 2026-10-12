@@ -1,10 +1,10 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/projects.test.ts
 # why: a PUT through the real Project DO loses verification, so turning it off never sticks
 diff --git a/apps/keel/src/adapters/driven/do-rpc/projects.ts b/apps/keel/src/adapters/driven/do-rpc/projects.ts
-index 9dd183b..2955edf 100644
+index 7fcfb1b..201f703 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/projects.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/projects.ts
-@@ -56,7 +56,12 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
+@@ -59,7 +59,12 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
        putSettings: (principal, projectId, settings, requestId) =>
          callObject(ProjectCodecs.putSettings, () =>
            project(projectId).putSettings(
@@ -17,4 +17,4 @@ index 9dd183b..2955edf 100644
 +            }),
            ),
          ),
-     }),
+       liveAnchors: (projectId) =>

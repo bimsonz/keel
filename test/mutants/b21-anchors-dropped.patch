@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/projects.test.ts
+# kills: b21.live-anchors
+# why: liveAnchors answers no anchors, so derivation can attribute nothing to any subject
+diff --git a/packages/core/src/application/coordination/live-index.ts b/packages/core/src/application/coordination/live-index.ts
+index 6beef97..4290f6f 100644
+--- a/packages/core/src/application/coordination/live-index.ts
++++ b/packages/core/src/application/coordination/live-index.ts
+@@ -238,7 +238,7 @@ export function liveAnchors(store: Store): readonly SubjectAnchors[] {
+       add(named.subject, named.anchors ?? []);
+     for (const effect of live.derived) add(effect.proposition.subject, effect.anchors);
+   }
+-  return [...bySubject.keys()].toSorted().map((subject) => {
++  return [...bySubject.keys()].slice(0, 0).map((subject) => {
+     const held = bySubject.get(subject) ?? new Map<string, Anchor>();
+     return { subject, anchors: [...held.keys()].toSorted().flatMap((key) => held.get(key) ?? []) };
+   });

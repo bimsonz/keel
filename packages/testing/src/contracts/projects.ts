@@ -1,6 +1,13 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { AgentToken } from "@keeltown/core/domain/identity";
-import { AgentId, Glob, ProjectId } from "@keeltown/core/kernel";
+import {
+  AgentId,
+  type ChangeId,
+  EventEnvelope,
+  Glob,
+  makeId,
+  ProjectId,
+} from "@keeltown/core/kernel";
 import { Projects, type ProjectSettings } from "@keeltown/core/ports";
 import { Effect, type Layer, Schema } from "effect";
 
@@ -13,6 +20,8 @@ export interface ProjectsHarness {
   readonly source: string;
   /** A project that holds these settings. */
   readonly withSettings: (settings: ProjectSettings) => Effect.Effect<ProjectId>;
+  /** Feeds the project's live index an event of one of its changes, as the fan-out would. */
+  readonly hear: (projectId: ProjectId, event: EventEnvelope) => Effect.Effect<void>;
 }
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -27,6 +36,53 @@ const operator = (): AgentToken => ({
 });
 
 const key = () => `key-${crypto.randomUUID()}`;
+
+/** An event of `changeId` at `seq` on its log, encoded as the fan-out delivers it. */
+const eventOf = (
+  changeId: ChangeId,
+  seq: number,
+  payload: { readonly _tag: string } & Record<string, unknown>,
+) =>
+  Schema.decodeUnknownSync(EventEnvelope)({
+    eventId: makeId("evt", ulid()),
+    type: payload._tag,
+    entity: { kind: "change", id: changeId },
+    seq,
+    at: Date.now(),
+    dedupeKey: `change:${changeId}/cause-${seq}/${payload._tag}#1`,
+    affected: [],
+    notified: [],
+    payload,
+  });
+
+const COMMIT = "c".repeat(40);
+const anchor = (path: string, symbol?: string) => ({
+  path,
+  ...(symbol === undefined ? {} : { symbol }),
+  commit: COMMIT,
+});
+const fresh = (subject: string, anchors?: readonly ReturnType<typeof anchor>[]) => ({
+  subject,
+  predicate: "freshness",
+  relation: "is",
+  value: "per-session",
+  ...(anchors === undefined ? {} : { anchors }),
+});
+const declaring = (
+  changeId: ChangeId,
+  intent: { readonly premises: readonly unknown[]; readonly declaredEffects?: readonly unknown[] },
+) =>
+  eventOf(changeId, 1, {
+    _tag: "IntentDeclared",
+    changeId,
+    agentId: makeId("agt", ulid()),
+    origin: "agent",
+    revision: 1,
+    goal: "cache the sessions",
+    footprint: [],
+    leaseId: makeId("lse", ulid()),
+    ...intent,
+  });
 
 export function describeProjectsContract(adapter: string, make: () => ProjectsHarness) {
   describe(`Projects contract: ${adapter}`, () => {
@@ -233,5 +289,74 @@ export function describeProjectsContract(adapter: string, make: () => ProjectsHa
         expect(error._tag).toBe("ProjectNotFound");
       }).pipe(Effect.provide(harness.layer));
     });
+    it.live(
+      "[b21.live-anchors] answers where the project's live changes anchor their subjects: declared and derived, each anchor once, gone with the change",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const projects = yield* Projects;
+          const projectId = Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`);
+          const other = Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`);
+          const first = makeId("chg", ulid());
+          const second = makeId("chg", ulid());
+          const evaluate = anchor("src/authz/evaluate.ts", "evaluate");
+          const sessions = anchor("src/authz/sessions.ts");
+          const cache = anchor("src/cache/store.ts", "SessionCache.read");
+          expect(yield* projects.liveAnchors(projectId)).toEqual([]);
+
+          yield* harness.hear(
+            projectId,
+            declaring(first, {
+              premises: [fresh("authz.permission-evaluation", [evaluate])],
+              // Named, and anchored nowhere: derivation could never attribute it.
+              declaredEffects: [fresh("billing.invoice-total")],
+            }),
+          );
+          yield* harness.hear(
+            projectId,
+            declaring(second, {
+              premises: [fresh("authz.permission-evaluation", [sessions, evaluate])],
+            }),
+          );
+          yield* harness.hear(
+            projectId,
+            eventOf(first, 5, {
+              _tag: "EffectsDerived",
+              changeId: first,
+              revision: 1,
+              effects: [
+                {
+                  proposition: fresh("sessions.cache", [cache]),
+                  anchors: [cache],
+                  declared: false,
+                  method: "extractor",
+                  evidenceClass: "ruling",
+                },
+              ],
+              derivationRef: "derivation-1",
+            }),
+          );
+          yield* harness.hear(
+            other,
+            declaring(makeId("chg", ulid()), {
+              premises: [fresh("authz.tokens", [anchor("src/authz/tokens.ts")])],
+            }),
+          );
+          expect(yield* projects.liveAnchors(projectId)).toEqual([
+            { subject: "authz.permission-evaluation", anchors: [evaluate, sessions] },
+            { subject: "sessions.cache", anchors: [cache] },
+          ]);
+
+          yield* harness.hear(
+            projectId,
+            eventOf(second, 2, { _tag: "ChangeWithdrawn", changeId: second, by: "agent" }),
+          );
+          expect(yield* projects.liveAnchors(projectId)).toEqual([
+            { subject: "authz.permission-evaluation", anchors: [evaluate] },
+            { subject: "sessions.cache", anchors: [cache] },
+          ]);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
   });
 }

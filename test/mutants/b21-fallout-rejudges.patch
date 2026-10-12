@@ -2,14 +2,14 @@
 # kills: b21.premise-suspected
 # why: a pair is judged again whenever one side comes back, so the holder is told the same suspicion twice
 diff --git a/packages/core/src/application/coordination/subject-fallout.ts b/packages/core/src/application/coordination/subject-fallout.ts
-index a852587..4378a7b 100644
+index 11a7b27..0e64526 100644
 --- a/packages/core/src/application/coordination/subject-fallout.ts
 +++ b/packages/core/src/application/coordination/subject-fallout.ts
-@@ -133,7 +133,6 @@ export function judgeFallout(
+@@ -177,7 +177,6 @@ export function judgeFallout(
    const problems: string[] = [];
    for (const pair of pairs) {
      const judged = hashedIdBody(pairKey(pair));
 -    if (tx.store.get(FALLOUT_JUDGED, judged) !== undefined) continue;
      tx.store.put(FALLOUT_JUDGED, judged, true);
-     const outcomes = fallout(
-       pair.effect.changeId,
+     const outcomes = fallout(pair.effect.changeId, pair.judged, [pair.premise], []);
+     for (const outcome of outcomes) {

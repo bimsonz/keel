@@ -2,12 +2,12 @@
 # kills: b21.fallout-proximity
 # why: a contradicted should premise opens a conflict instead of a suspicion
 diff --git a/packages/core/src/application/coordination/subject-fallout.ts b/packages/core/src/application/coordination/subject-fallout.ts
-index a852587..3a53702 100644
+index 11a7b27..53ce4bd 100644
 --- a/packages/core/src/application/coordination/subject-fallout.ts
 +++ b/packages/core/src/application/coordination/subject-fallout.ts
-@@ -142,7 +142,7 @@ export function judgeFallout(
-       [],
-     );
+@@ -181,7 +181,7 @@ export function judgeFallout(
+     tx.store.put(FALLOUT_JUDGED, judged, true);
+     const outcomes = fallout(pair.effect.changeId, pair.judged, [pair.premise], []);
      for (const outcome of outcomes) {
 -      if (outcome._tag === "conflict") {
 +      if (outcome._tag !== "notify") {

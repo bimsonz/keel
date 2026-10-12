@@ -1,4 +1,4 @@
-import { hearLiveChange, liveChanges } from "@keeltown/core/application/coordination";
+import { hearLiveChange, liveAnchors, liveChanges } from "@keeltown/core/application/coordination";
 import { changeSettings, createProject, settingsOf } from "@keeltown/core/application/integration";
 import { type EventEnvelope, ProjectId } from "@keeltown/core/kernel";
 import { EntityStore, type Transaction } from "@keeltown/core/ports";
@@ -26,7 +26,8 @@ const projectIdOf = (name: string | undefined) =>
  */
 export class ProjectDO
   extends KeelObjectWith<ProjectServices>
-  implements Pick<ProjectRpc, "createProject" | "settings" | "putSettings" | "liveChanges">
+  implements
+    Pick<ProjectRpc, "createProject" | "settings" | "putSettings" | "liveChanges" | "liveAnchors">
 {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env, projectServices(env));
@@ -64,6 +65,14 @@ export class ProjectDO
     return this.answer(
       ProjectCodecs.liveChanges,
       EntityStore.use((store) => Effect.succeed(liveChanges(store))),
+    );
+  }
+
+  /** Where the project's live changes anchor their subjects, read by each Precheck's derivation. */
+  async liveAnchors() {
+    return this.answer(
+      ProjectCodecs.liveAnchors,
+      EntityStore.use((store) => Effect.succeed(liveAnchors(store))),
     );
   }
 

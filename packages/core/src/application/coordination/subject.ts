@@ -1,6 +1,8 @@
 import { Schema } from "effect";
 import {
   ChangeAdopted,
+  DerivedEffect,
+  EffectsDerived,
   type Intent,
   IntentDeclared,
   IntentRevised,
@@ -18,30 +20,20 @@ import {
   type EntityRef,
   type EventEnvelope,
   type ProjectId,
-  SubjectId,
 } from "../../domain/kernel/index.ts";
 import type { EntityStore, EventDraft, Stored, Transaction } from "../ports/index.ts";
 import { CHANGE_ENDS } from "./change.ts";
-import { hashedIdBody } from "./hashed-id.ts";
-import { falloutPairs, judgeFallout } from "./subject-fallout.ts";
+import { subjectIdOf } from "./hashed-id.ts";
+import { falloutPairs, type HeldBy, judgeFallout } from "./subject-fallout.ts";
 
-export { hashedIdBody } from "./hashed-id.ts";
+export { hashedIdBody, subjectIdOf } from "./hashed-id.ts";
 
 type Store = (typeof EntityStore)["Service"];
 
 /**
- * A subject's id, derived from its project and key: `sub_` and the first 130
- * bits of sha256(`<project>\n<key>`) in Crockford base32. Any object names a
- * subject without asking a registry, and the same key in two projects is two
- * subjects.
- */
-export function subjectIdOf(projectId: ProjectId, key: SubjectKey): SubjectId {
-  return SubjectId.make(`sub_${hashedIdBody(`${projectId}\n${key}`)}`);
-}
-
-/**
  * What a Subject DO keeps of each change that names its key or a key beneath
- * it: those premises and declared effects, by change id. Fallout reads it.
+ * it, by change id: those premises and declared effects, and the effects last
+ * derived for the change there. Fallout reads it.
  */
 export const SUBJECT_HELD = "subject-held";
 /** The subject's own record, written with its SubjectMinted: a subject is minted once. */
@@ -55,6 +47,15 @@ export const HOLDER_HEARS = ["PremiseSuspected"] as const;
 const Held = Schema.Struct({
   premises: Schema.Array(Proposition),
   declaredEffects: Schema.Array(Proposition),
+  /**
+   * The change's latest derivation as this subject heard it: its position on
+   * the change's log, and its effects at or under the key (none, when it
+   * derived nothing here). Two Precheck passes can share a revision, so the
+   * position orders them.
+   */
+  derived: Schema.optional(
+    Schema.Struct({ seq: Schema.Int, effects: Schema.Array(DerivedEffect) }),
+  ),
 });
 type Held = typeof Held.Type;
 
@@ -78,12 +79,29 @@ export type SubjectReaction = (
   | { readonly drafts: readonly [] }
 ) & { readonly problems?: readonly string[] };
 
-/** The propositions at or under `key`: what this subject holds of an intent. */
-const under = (key: SubjectKey, intent: Pick<Intent, "premises" | "declaredEffects">): Held => ({
+/**
+ * The propositions at or under `key`: what this subject holds of an intent.
+ * The derivation it holds of the change stays as it was: only a later
+ * derivation replaces it.
+ */
+const under = (
+  key: SubjectKey,
+  intent: Pick<Intent, "premises" | "declaredEffects">,
+  was: Held,
+): Held => ({
   premises: intent.premises.filter((premise) => isAncestorOrSelf(key, premise.subject)),
   declaredEffects: (intent.declaredEffects ?? []).filter((effect) =>
     isAncestorOrSelf(key, effect.subject),
   ),
+  ...(was.derived === undefined ? {} : { derived: was.derived }),
+});
+
+/** What the subject holds of a change, as fallout reads it. */
+const heldOf = (changeId: ChangeId, held: Held): HeldBy => ({
+  changeId,
+  premises: held.premises,
+  declaredEffects: held.declaredEffects,
+  derived: held.derived?.effects ?? [],
 });
 
 /** The held propositions as an intent, so a revision folds through the domain's `reviseIntent`. */
@@ -102,10 +120,17 @@ const asIntent = (held: Held): Intent => ({
  * that change (a change it never heard of holds nothing yet, so a revision
  * naming the key for the first time starts it); an end drops the change.
  *
+ * A derivation replaces the one the subject held of the change when it is
+ * later on the change's log, whatever its revision; an earlier one arriving
+ * late is ignored. Its effects are judged like declared ones, so a subject the
+ * intent never named still meets the premises that rely on it.
+ *
  * The first time the subject holds anything it commits SubjectMinted, its
- * anchors and gloss from a proposition at exactly its key if there is one,
- * else none and the key. Each premise new at exactly its key commits
- * PremiseRelied; an ancestor keeps a descendant's premise without relying it.
+ * anchors and gloss from a proposition at exactly its key if there is one
+ * (an intent's before a derived effect's, which is the model's when clef
+ * derived it), else none and the key. Each premise new at exactly its key
+ * commits PremiseRelied; an ancestor keeps a descendant's premise without
+ * relying it.
  */
 export function hearSubject(
   tx: Pick<Transaction, "store" | "outbox">,
@@ -127,20 +152,35 @@ export function hearSubject(
   switch (event.type) {
     case "IntentDeclared": {
       const declared = Schema.decodeUnknownSync(IntentDeclared)(event.payload);
-      after = under(key, declared);
+      after = under(key, declared, before);
       relier = declared.changeId;
       heldBy(tx, changeId, declared.agentId);
       break;
     }
     case "IntentRevised": {
       const revised = Schema.decodeUnknownSync(IntentRevised)(event.payload);
-      after = under(key, reviseIntent(asIntent(before), revised));
+      after = under(key, reviseIntent(asIntent(before), revised), before);
       relier = revised.changeId;
       const actor = event.actor?.startsWith("agent:")
         ? event.actor.slice("agent:".length)
         : undefined;
       if (store.get(HOLDER_AGENT, changeId) === undefined && actor !== undefined)
         heldBy(tx, changeId, Schema.decodeUnknownSync(AgentId)(actor));
+      break;
+    }
+    case "EffectsDerived": {
+      const derived = Schema.decodeUnknownSync(EffectsDerived)(event.payload);
+      if (before.derived !== undefined && before.derived.seq >= event.seq) return { drafts: [] };
+      after = {
+        ...before,
+        derived: {
+          seq: event.seq,
+          effects: derived.effects.filter((effect) =>
+            isAncestorOrSelf(key, effect.proposition.subject),
+          ),
+        },
+      };
+      relier = derived.changeId;
       break;
     }
     default:
@@ -153,21 +193,29 @@ export function hearSubject(
       }
       return { drafts: [] };
   }
-  if (after.premises.length === 0 && after.declaredEffects.length === 0)
+  // The row stays while it places a derivation, even one with nothing here: a late earlier one must still lose.
+  if (
+    after.premises.length === 0 &&
+    after.declaredEffects.length === 0 &&
+    after.derived === undefined
+  )
     store.remove(SUBJECT_HELD, changeId);
   else store.put(SUBJECT_HELD, changeId, asStored(Schema.encodeSync(Held)(after)));
 
   const subjectId = subjectIdOf(projectId, key);
   const drafts: EventDraft[] = [];
-  const touched = [...after.premises, ...after.declaredEffects];
-  if (touched.length > 0 && store.get(SUBJECT_MINTED, subjectId) === undefined) {
-    const own = touched.find((proposition) => proposition.subject === key);
+  const named = [...after.premises, ...after.declaredEffects];
+  const found = after.derived?.effects ?? [];
+  if (named.length + found.length > 0 && store.get(SUBJECT_MINTED, subjectId) === undefined) {
+    const own = named.find((proposition) => proposition.subject === key);
+    const derived =
+      own === undefined ? found.find((effect) => effect.proposition.subject === key) : undefined;
     const minted = SubjectMinted.make({
       subjectId,
       key,
-      anchors: own?.anchors ?? [],
-      gloss: own?.gloss ?? key,
-      mintedBy: "agent",
+      anchors: own?.anchors ?? derived?.anchors ?? [],
+      gloss: own?.gloss ?? derived?.proposition.gloss ?? key,
+      mintedBy: derived?.method === "clef" ? "clef" : "agent",
     });
     store.put(SUBJECT_MINTED, subjectId, asStored(Schema.encodeSync(SubjectMinted)(minted)));
     drafts.push({ payload: payloadOf(Schema.encodeSync(SubjectMinted)(minted)) });
@@ -181,17 +229,14 @@ export function hearSubject(
   const others = store
     .list(SUBJECT_HELD)
     .filter((row) => row.id !== changeId)
-    .map((row) => ({
-      changeId: Schema.decodeUnknownSync(ChangeId)(row.id),
-      ...decodeHeld(row.value),
-    }));
+    .map((row) => heldOf(Schema.decodeUnknownSync(ChangeId)(row.id), decodeHeld(row.value)));
   const judged = judgeFallout(
     tx,
     event.at,
     { projectId, key, id: subjectId },
     falloutPairs(
       key,
-      { changeId, before: { changeId, ...before }, after: { changeId, ...after } },
+      { changeId, before: heldOf(changeId, before), after: heldOf(changeId, after) },
       others,
     ),
   );

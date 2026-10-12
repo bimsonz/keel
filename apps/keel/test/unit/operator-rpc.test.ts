@@ -39,6 +39,7 @@ function projectObjects(answer?: (command: typeof CreateProjectCommand.Encoded) 
     },
     settings: () => Promise.reject(new Error("settings is not scripted here")),
     putSettings: () => Promise.reject(new Error("putSettings is not scripted here")),
+    liveAnchors: () => Promise.reject(new Error("liveAnchors is not scripted here")),
   }));
   return { sent, layer };
 }

@@ -12,6 +12,7 @@ import {
   ChangeStateRefused,
   type CommitNotInWorkspace,
   decideChange,
+  type DerivedEffect,
   evolveChange,
   type FootprintEntry,
   type LeaseNotLapsed,
@@ -85,6 +86,7 @@ import {
   WorkspaceRebaser,
 } from "../ports/index.ts";
 import { submissionStateOf } from "../verification/index.ts";
+import { subjectIdOf } from "./hashed-id.ts";
 import { blockersOf, hearConflict, partyConflictOf, policyFor } from "./party-conflicts.ts";
 import { preflightFor } from "./preflight.ts";
 
@@ -124,6 +126,8 @@ export interface WorkspaceView extends HeldWorkspace {
   readonly baseSha: CommitSha;
   /** The subject of each premise and declared effect of the current intent, each once and without ancestors. */
   readonly subjects: readonly SubjectKey[];
+  /** The change's current intent: Precheck derives its effects against what it declared. */
+  readonly intent: Intent;
 }
 
 /** The subjects an intent's premises and declared effects name, each once: what Precheck compiles the plan's guards against. */
@@ -164,6 +168,7 @@ export const LIVE_INDEX_HEARS = [
 export const SUBJECT_HEARS = [
   "IntentDeclared",
   "IntentRevised",
+  "EffectsDerived",
   "ChangeAdopted",
   ...CHANGE_ENDS,
 ] as const;
@@ -310,6 +315,12 @@ export interface CompiledPlan extends PrecheckStep {
   readonly costEstimate: number;
   /** Per predicate, what a conflict proven against the change does; absent, or a predicate left out, is `advise`. */
   readonly predicatePolicy?: PredicatePolicies | undefined;
+}
+
+/** What Precheck derived from the submission's code: the effects, and its own reference for the derivation. */
+export interface DerivedEffects extends PrecheckStep {
+  readonly effects: readonly DerivedEffect[];
+  readonly derivationRef: string;
 }
 
 type Store = Transaction["store"];
@@ -596,7 +607,12 @@ export const changeWorkspace: (
   const held = heldWorkspace(yield* EntityStore, changeId);
   if (held === undefined || change.baseSha === undefined)
     return yield* refused(change, "workspace");
-  return { ...held, baseSha: change.baseSha, subjects: intentSubjects(change.intent) };
+  return {
+    ...held,
+    baseSha: change.baseSha,
+    subjects: intentSubjects(change.intent),
+    intent: change.intent,
+  };
 });
 
 /** Gives a grant back unless the change holds it: `grant` is idempotent per holder, so a live change's own workspace stays. */
@@ -1131,7 +1147,8 @@ export const lapseLease: (
  * inside the transaction (its blockers). `before` commits ahead of the
  * change's own events in the same transaction (a refusal's verdict);
  * `alongside` runs once the commands are decided, before the events are
- * appended (a subscription).
+ * appended (a subscription); `affected` goes on each of the change's own
+ * events.
  */
 const precheckCommand = (
   changeId: ChangeId,
@@ -1141,9 +1158,11 @@ const precheckCommand = (
   {
     before = [],
     alongside,
+    affected,
   }: {
     readonly before?: readonly EventDraft[];
     readonly alongside?: (tx: Transaction) => void;
+    readonly affected?: readonly EntityRef[];
   } = {},
 ) =>
   Effect.gen(function* () {
@@ -1166,7 +1185,11 @@ const precheckCommand = (
           ),
           (decided) => {
             alongside?.(tx);
-            return { value: decided.change, drafts: [...before, ...decided.drafts] };
+            const own =
+              affected === undefined
+                ? decided.drafts
+                : decided.drafts.map((draft) => ({ ...draft, affected }));
+            return { value: decided.change, drafts: [...before, ...own] };
           },
         );
       },
@@ -1184,6 +1207,45 @@ export const precheckStarted: (
       { _tag: "StartPrecheck", instanceId: step.instanceId },
     ]);
     return started.change;
+  });
+
+/**
+ * Precheck derived the submission's effects from its code: commits
+ * EffectsDerived, once per Precheck pass (a second derivation in the pass is
+ * ChangeStateRefused, and a replay of this one answers the change as it
+ * stands). The event names each derived effect's subject as affected, and in
+ * the same transaction the change subscribes those subjects and their
+ * ancestors, scoped to itself: a subject the intent never named hears this
+ * very event, and judges the effect against the premises it holds.
+ */
+export const effectsDerived: (
+  changeId: ChangeId,
+  derived: DerivedEffects,
+) => Effect.Effect<Change, ChangeNotFound | ChangeStateRefused, Clock | EntityStore | EventOutbox> =
+  Effect.fn("coordination/effectsDerived")(function* (changeId: ChangeId, derived: DerivedEffects) {
+    const project = heldWorkspace(yield* EntityStore, changeId)?.projectId;
+    const effects = derived.effects.map((effect) => ({
+      ...effect,
+      proposition: canonicalProposition(effect.proposition),
+    }));
+    const named = { premises: [], declaredEffects: effects.map((effect) => effect.proposition) };
+    const recorded = yield* precheckCommand(
+      changeId,
+      "effectsDerived",
+      derived,
+      [{ _tag: "DeriveEffects", effects, derivationRef: derived.derivationRef }],
+      {
+        affected:
+          project === undefined
+            ? []
+            : intentSubjects(named).map((key) => ({
+                kind: "subject",
+                id: subjectIdOf(project, key),
+              })),
+        alongside: (tx) => subscribeSubjects(tx, changeId, named),
+      },
+    );
+    return recorded.change;
   });
 
 /**

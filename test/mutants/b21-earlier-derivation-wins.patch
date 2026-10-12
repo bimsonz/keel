@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fallout.test.ts
+# kills: b21.derivation-order
+# why: an earlier derivation arriving late replaces the later one the subject already holds
+diff --git a/packages/core/src/application/coordination/subject.ts b/packages/core/src/application/coordination/subject.ts
+index 0109fd8..06495d6 100644
+--- a/packages/core/src/application/coordination/subject.ts
++++ b/packages/core/src/application/coordination/subject.ts
+@@ -170,7 +170,6 @@ export function hearSubject(
+     }
+     case "EffectsDerived": {
+       const derived = Schema.decodeUnknownSync(EffectsDerived)(event.payload);
+-      if (before.derived !== undefined && before.derived.seq >= event.seq) return { drafts: [] };
+       after = {
+         ...before,
+         derived: {

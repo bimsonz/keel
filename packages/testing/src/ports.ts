@@ -255,6 +255,7 @@ function memoryChangePrecheckHarness(): ChangePrecheckHarness {
           grantedSha: GENESIS,
           projectId: freshId("prj"),
           subjects: [Schema.decodeUnknownSync(SubjectKey)("authz.sessions")],
+          intent: { revision: 1, goal: "cache the sessions", footprint: [], premises: [] },
         };
         memory.submit(changeId, 1, workspace);
         return { changeId, revision: 1, workspace };
@@ -281,6 +282,7 @@ function memoryProjectsHarness(): ProjectsHarness {
   return {
     layer: memory.layer,
     source,
+    hear: (projectId, event) => Effect.sync(() => void memory.live.hear(projectId, event)),
     withSettings: (settings) =>
       Effect.sync(() => {
         const projectId = freshId("prj");

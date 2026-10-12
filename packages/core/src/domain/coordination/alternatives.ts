@@ -11,7 +11,7 @@ import type { Proposition } from "./proposition.ts";
  * named from either end is one claim. Anchors, gloss, strength and citations
  * say where and how firmly, not what, and are left out.
  */
-const claimKey = (p: Proposition): string => {
+export const claimKey = (p: Proposition): string => {
   const c = canonicalProposition(p);
   return canonicalJson({
     subject: c.subject,

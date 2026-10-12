@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/effects-derived.test.ts
+# kills: b21.fallout-derived
+# why: EffectsDerived names no subject as affected
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index dbee8ba..13a6af2 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1188,7 +1188,7 @@ const precheckCommand = (
+             const own =
+               affected === undefined
+                 ? decided.drafts
+-                : decided.drafts.map((draft) => ({ ...draft, affected }));
++                : decided.drafts.map((draft) => ({ ...draft, affected: [] }));
+             return { value: decided.change, drafts: [...before, ...own] };
+           },
+         );

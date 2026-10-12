@@ -1,7 +1,7 @@
-import { DerivedEffect, Intent } from "@keeltown/core/domain/coordination";
+import { DerivedEffect, Intent, SubjectKey } from "@keeltown/core/domain/coordination";
 import { IdempotencyConflict } from "@keeltown/core/domain/identity";
 import { ProjectNotFound } from "@keeltown/core/domain/integration";
-import { AgentId, ChangeId, Glob, InstantSchema, ProjectId } from "@keeltown/core/kernel";
+import { AgentId, Anchor, ChangeId, Glob, InstantSchema, ProjectId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
@@ -78,8 +78,15 @@ export const LiveChangeView = Schema.Struct({
   derived: Schema.Array(DerivedEffect),
 });
 
+/** A live subject and the code it is anchored to: the domain's `SubjectAnchors`, as it crosses RPC. */
+export const SubjectAnchorsView = Schema.Struct({
+  subject: SubjectKey,
+  anchors: Schema.Array(Anchor),
+});
+
 export const ProjectCodecs = {
   liveChanges: exitCodec(Schema.Array(LiveChangeView), Schema.Never),
+  liveAnchors: exitCodec(Schema.Array(SubjectAnchorsView), Schema.Never),
   settings: exitCodec(ProjectSettings, ProjectNotFound),
   putSettings: exitCodec(ProjectSettings, Schema.Union([ProjectNotFound, IdempotencyConflict])),
   createProject: exitCodec(ProjectView, Schema.Union([IdempotencyConflict, RepoNotFound])),
@@ -89,6 +96,8 @@ export const ProjectCodecs = {
 export interface ProjectRpc extends EventReceiverRpc {
   /** The project's live changes, from each one's declare until it ends, for preflight. */
   liveChanges(): Promise<ExitJson>;
+  /** Where the project's live changes anchor their subjects in code, for Precheck's derivation. */
+  liveAnchors(): Promise<ExitJson>;
   settings(): Promise<ExitJson>;
   putSettings(command: typeof PutSettingsCommand.Encoded): Promise<ExitJson>;
   createProject(command: typeof CreateProjectCommand.Encoded): Promise<ExitJson>;

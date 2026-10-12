@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fallout.test.ts
+# kills: b21.derived-mint
+# why: a subject first seen through clef's derived effect is recorded as minted by an agent
+diff --git a/packages/core/src/application/coordination/subject.ts b/packages/core/src/application/coordination/subject.ts
+index 0109fd8..614bce8 100644
+--- a/packages/core/src/application/coordination/subject.ts
++++ b/packages/core/src/application/coordination/subject.ts
+@@ -215,7 +215,7 @@ export function hearSubject(
+       key,
+       anchors: own?.anchors ?? derived?.anchors ?? [],
+       gloss: own?.gloss ?? derived?.proposition.gloss ?? key,
+-      mintedBy: derived?.method === "clef" ? "clef" : "agent",
++      mintedBy: "agent",
+     });
+     store.put(SUBJECT_MINTED, subjectId, asStored(Schema.encodeSync(SubjectMinted)(minted)));
+     drafts.push({ payload: payloadOf(Schema.encodeSync(SubjectMinted)(minted)) });

@@ -356,14 +356,17 @@ interface PrecheckedChange {
   state: ChangeState;
   readonly workspace: PrecheckWorkspace | undefined;
   readonly replies: Map<string, VerdictId | undefined>;
+  /** Whether the current Precheck pass has recorded its derivation: one a pass. */
+  derived: boolean;
 }
 
 /**
  * The Change DO's side of `ChangePrecheck`, in memory: the transitions its
- * machine takes (submitted → deriving on `started`, then bounced on
- * `refused`, or on `compiled` verifying and, with no step before the queue
- * at L1, queued in the same commit), idempotent by instance, and
- * ChangeStateRefused for a stale revision or a step the state does not allow.
+ * machine takes (submitted → deriving on `started`, there one derivation a
+ * pass on `derived`, then bounced on `refused`, or on `compiled` verifying
+ * and, with no step before the queue at L1, queued in the same commit),
+ * idempotent by instance, and ChangeStateRefused for a stale revision or a
+ * step the state does not allow.
  * `submit` seeds a change; `calls` lists the writes that took effect.
  */
 export function makeChangePrecheckMemory() {
@@ -395,6 +398,9 @@ export function makeChangePrecheckMemory() {
       const answer = reply();
       change.replies.set(key, answer);
       change.state = to;
+      // A pass starts with no derivation, and records at most one.
+      if (method === "precheckStarted") change.derived = false;
+      if (method === "effectsDerived") change.derived = true;
       calls.push({ changeId, method, call });
       return Effect.succeed(answer);
     });
@@ -402,7 +408,13 @@ export function makeChangePrecheckMemory() {
     calls,
     /** Seeds `changeId` as submitted at `revision`, holding `workspace` (none: it holds none yet). */
     submit: (changeId: ChangeId, revision: number, workspace?: PrecheckWorkspace) => {
-      changes.set(changeId, { revision, state: "submitted", workspace, replies: new Map() });
+      changes.set(changeId, {
+        revision,
+        state: "submitted",
+        workspace,
+        replies: new Map(),
+        derived: false,
+      });
     },
     /** The change's state, for a test to read. */
     stateOf: (changeId: ChangeId) => changes.get(changeId)?.state,
@@ -419,6 +431,12 @@ export function makeChangePrecheckMemory() {
           write(changeId, "precheckStarted", call, "submitted", "deriving", () => undefined).pipe(
             Effect.asVoid,
           ),
+        derived: (changeId, derived) =>
+          Effect.flatMap(known(changeId), (change) =>
+            change.derived && !change.replies.has(`${derived.instanceId}:effectsDerived`)
+              ? Effect.fail(refusedBy(changeId, change, "DeriveEffects"))
+              : write(changeId, "effectsDerived", derived, "deriving", "deriving", () => undefined),
+          ).pipe(Effect.asVoid),
         refused: (changeId, refusal) =>
           write(changeId, "precheckRefused", refusal, "deriving", "bounced", () =>
             makeId("vrd", String((verdicts += 1)).padStart(26, "0")),

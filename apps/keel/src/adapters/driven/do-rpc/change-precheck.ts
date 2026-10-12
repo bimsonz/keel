@@ -3,6 +3,7 @@ import { Effect, Layer, Schema } from "effect";
 import {
   ChangeCodecs,
   decodeExit,
+  EffectsDerivedCommand,
   type ExitCodec,
   PlanCompiledCommand,
   PrecheckRefusedCommand,
@@ -31,6 +32,17 @@ export function ChangePrecheckRpc(changes: Env["CHANGE"]): Layer.Layer<ChangePre
             Schema.encodeSync(PrecheckStartedCommand)({
               revision: step.revision,
               instanceId: step.instanceId,
+            }),
+          ),
+        ).pipe(Effect.asVoid),
+      derived: (changeId, derived) =>
+        call(ChangeCodecs.effectsDerived, () =>
+          change(changeId).effectsDerived(
+            Schema.encodeSync(EffectsDerivedCommand)({
+              revision: derived.revision,
+              instanceId: derived.instanceId,
+              effects: derived.effects,
+              derivationRef: derived.derivationRef,
             }),
           ),
         ).pipe(Effect.asVoid),

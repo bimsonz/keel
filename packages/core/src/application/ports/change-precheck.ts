@@ -2,6 +2,8 @@ import { Context, type Effect } from "effect";
 import type {
   ChangeNotFound,
   ChangeStateRefused,
+  DerivedEffect,
+  Intent,
   PredicatePolicies,
   SubjectKey,
 } from "../../domain/coordination/index.ts";
@@ -20,8 +22,9 @@ import type { RepoRef } from "./code-host.ts";
  * Where Precheck diffs a change: its workspace's repo, its base (the grant's
  * until a rebase moves it), the commit it was granted at (`grantedSha`, its
  * fork point, which never moves), the project whose settings hold the
- * protected globs, and the subjects the change declared it touches or relies
- * on (its premises' and effects'), which compile selects guards by.
+ * protected globs, the subjects the change declared it touches or relies
+ * on (its premises' and effects'), which compile selects guards by, and its
+ * current intent, which derivation reads what it declared from.
  */
 export interface PrecheckWorkspace {
   readonly workspaceId: WorkspaceId;
@@ -31,6 +34,7 @@ export interface PrecheckWorkspace {
   readonly projectId: ProjectId;
   /** The subject of each premise and declared effect of the change's current intent, each once and without ancestors. */
   readonly subjects: readonly SubjectKey[];
+  readonly intent: Intent;
 }
 
 /** Which submission a Precheck step is about, and which Workflow instance is taking it. */
@@ -54,6 +58,12 @@ export interface PrecheckCompiled extends PrecheckCall {
   readonly predicatePolicy?: PredicatePolicies | undefined;
 }
 
+/** Precheck derived the submission's effects from its code: `derivationRef` is Precheck's own name for the derivation. */
+export interface PrecheckDerived extends PrecheckCall {
+  readonly effects: readonly DerivedEffect[];
+  readonly derivationRef: string;
+}
+
 type Refusal = ChangeNotFound | ChangeStateRefused;
 
 /**
@@ -75,6 +85,15 @@ export class ChangePrecheck extends Context.Service<
       changeId: ChangeId,
       refusal: PrecheckRefused,
     ) => Effect.Effect<VerdictId, Refusal>;
+    /**
+     * Commits EffectsDerived, and has the subject of each derived effect (and
+     * its ancestors) hear it. Once per Precheck pass, while the change derives:
+     * a second derivation in the pass is ChangeStateRefused.
+     */
+    readonly derived: (
+      changeId: ChangeId,
+      derived: PrecheckDerived,
+    ) => Effect.Effect<void, Refusal>;
     /** Commits PlanCompiled and queues the change, or bounces it citing a conflict proven against it that blocks under the plan's policy. */
     readonly compiled: (changeId: ChangeId, plan: PrecheckCompiled) => Effect.Effect<void, Refusal>;
   }

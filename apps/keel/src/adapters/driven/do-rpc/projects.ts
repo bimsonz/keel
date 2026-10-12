@@ -9,6 +9,7 @@ export interface ProjectStub {
   createProject(command: typeof CreateProjectCommand.Encoded): Promise<unknown>;
   settings(): Promise<unknown>;
   putSettings(command: typeof PutSettingsCommand.Encoded): Promise<unknown>;
+  liveAnchors(): Promise<unknown>;
 }
 
 const encodeCreate = Schema.encodeSync(CreateProjectCommand);
@@ -21,6 +22,8 @@ const encodePut = Schema.encodeSync(PutSettingsCommand);
  * source crosses as RepoNotFound by shape and is rebuilt as the port's error.
  * `settings` answers the project's settings, or ProjectNotFound; `putSettings`
  * replaces them as the principal, whose id the Project DO audits.
+ * `liveAnchors` reads the Project DO's live index; a project never created
+ * has none.
  */
 export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Layer.Layer<Projects> {
   return Layer.succeed(
@@ -59,6 +62,8 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
             encodePut({ projectId, settings, by: principal.agentId, requestId }),
           ),
         ),
+      liveAnchors: (projectId) =>
+        callObject(ProjectCodecs.liveAnchors, () => project(projectId).liveAnchors()),
     }),
   );
 }

@@ -13,6 +13,7 @@ import {
 } from "@keeltown/core/ports";
 import { Effect, Layer } from "effect";
 import { hashSecret } from "./identity.ts";
+import { makeLiveChangesMemory } from "./live-changes.ts";
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
@@ -40,15 +41,24 @@ const keyOf = (principal: AgentToken, idempotencyKey: string) =>
  * `verification` is `required`; the same request id with other settings is
  * IdempotencyConflict); `setSettings` seeds a project's settings
  * directly. `settings` or `putSettings` of any other project is ProjectNotFound.
+ * `liveAnchors` reads `live`, an in-memory live-change index a test feeds
+ * through `live.hear` as the fan-out feeds the Project DO.
  */
-export function makeProjectsMemory(options: { readonly sources?: Iterable<string> } = {}) {
+export function makeProjectsMemory(
+  options: {
+    readonly sources?: Iterable<string>;
+    readonly live?: ReturnType<typeof makeLiveChangesMemory>;
+  } = {},
+) {
   const sources = new Set(options.sources ?? []);
+  const live = options.live ?? makeLiveChangesMemory();
   const byKey = new Map<string, Keyed<ProjectRecord>>();
   const settings = new Map<ProjectId, ProjectSettings>();
   const requests = new Map<string, string>();
   let count = 0;
   return {
     sources,
+    live,
     addSource: (name: string) => void sources.add(name),
     setSettings: (projectId: ProjectId, value: ProjectSettings) =>
       void settings.set(projectId, value),
@@ -110,6 +120,7 @@ export function makeProjectsMemory(options: { readonly sources?: Iterable<string
               return Effect.succeed(replaced);
             },
           ),
+        liveAnchors: (projectId) => Effect.sync(() => live.anchorsOf(projectId)),
       }),
     ),
   };

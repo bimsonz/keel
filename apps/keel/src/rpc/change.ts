@@ -5,7 +5,9 @@ import {
   ChangeOrigin,
   ChangeStateRefused,
   CommitNotInWorkspace,
+  DerivedEffect,
   FootprintEntry,
+  Intent,
   LeaseNotLapsed,
   LeaseStale,
   PoolExhausted,
@@ -156,8 +158,9 @@ export const SubmissionStatus = Schema.Struct({
  * own `baseSha`: the grant's until a rebase moves it); the commit it was
  * granted at (`grantedSha`, its fork point, which never moves, so an ancestry
  * walk can stop there); the project whose settings hold `protectedPaths`;
- * and the subjects the change's intent names, which the plan's guards are
- * compiled against.
+ * the subjects the change's intent names, which the plan's guards are
+ * compiled against; and that intent, which derivation reads what the change
+ * declared from.
  */
 export const ChangeWorkspace = Schema.Struct({
   workspaceId: WorkspaceId,
@@ -166,6 +169,7 @@ export const ChangeWorkspace = Schema.Struct({
   grantedSha: CommitSha,
   projectId: ProjectId,
   subjects: Schema.Array(SubjectKey),
+  intent: Intent,
 });
 export type ChangeWorkspace = typeof ChangeWorkspace.Type;
 
@@ -210,6 +214,21 @@ export const PlanCompiledCommand = Schema.Struct({
   predicatePolicy: Schema.optional(PredicatePolicies),
 });
 export type PlanCompiledCommand = typeof PlanCompiledCommand.Type;
+
+/**
+ * Precheck derived the submission's effects from its code: commits
+ * EffectsDerived, whose affected subjects (each effect's, with its ancestors)
+ * hear it from this commit on. Once per Precheck pass, while the change
+ * derives: a second derivation in the pass is ChangeStateRefused.
+ * `derivationRef` is Precheck's own name for the derivation.
+ */
+export const EffectsDerivedCommand = Schema.Struct({
+  revision: Schema.Int,
+  instanceId: Schema.NonEmptyString,
+  effects: Schema.Array(DerivedEffect),
+  derivationRef: Schema.NonEmptyString,
+});
+export type EffectsDerivedCommand = typeof EffectsDerivedCommand.Type;
 
 const PrecheckRefusal = Schema.Union([ChangeNotFound, ChangeStateRefused]);
 
@@ -288,6 +307,7 @@ export const ChangeCodecs = {
   submission: exitCodec(SubmissionStatus, ChangeNotFound),
   workspace: exitCodec(ChangeWorkspace, PrecheckRefusal),
   precheckStarted: exitCodec(Change, PrecheckRefusal),
+  effectsDerived: exitCodec(Change, PrecheckRefusal),
   precheckRefused: exitCodec(
     Schema.Struct({ change: Change, verdictId: VerdictId }),
     PrecheckRefusal,
@@ -327,6 +347,7 @@ export interface ChangeRpc extends EventReceiverRpc {
   /** The change's workspace, base and project, for Precheck's diff. ChangeStateRefused when it holds no workspace. */
   workspace(): Promise<ExitJson>;
   precheckStarted(command: typeof PrecheckStartedCommand.Encoded): Promise<ExitJson>;
+  effectsDerived(command: typeof EffectsDerivedCommand.Encoded): Promise<ExitJson>;
   precheckRefused(command: typeof PrecheckRefusedCommand.Encoded): Promise<ExitJson>;
   planCompiled(command: typeof PlanCompiledCommand.Encoded): Promise<ExitJson>;
 }

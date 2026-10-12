@@ -1,4 +1,5 @@
-import { sha256Hex } from "../../domain/kernel/index.ts";
+import type { SubjectKey } from "../../domain/coordination/index.ts";
+import { type ProjectId, sha256Hex, SubjectId } from "../../domain/kernel/index.ts";
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
@@ -14,4 +15,14 @@ export function hashedIdBody(text: string): string {
     (_, i) => CROCKFORD[Number.parseInt(bits.slice(i * 5, i * 5 + 5), 2)] ?? "0",
   );
   return chars.join("");
+}
+
+/**
+ * A subject's id, derived from its project and key: `sub_` and the first 130
+ * bits of sha256(`<project>\n<key>`) in Crockford base32. Any object names a
+ * subject without asking a registry, and the same key in two projects is two
+ * subjects.
+ */
+export function subjectIdOf(projectId: ProjectId, key: SubjectKey): SubjectId {
+  return SubjectId.make(`sub_${hashedIdBody(`${projectId}\n${key}`)}`);
 }

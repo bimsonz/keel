@@ -14,7 +14,7 @@ import {
   type ProjectId,
   weakest,
 } from "@keeltown/core/kernel";
-import { SubjectKey } from "@keeltown/core/domain/coordination";
+import { DerivedEffect, SubjectKey } from "@keeltown/core/domain/coordination";
 import {
   type AdmittedGuard,
   compile,
@@ -28,6 +28,7 @@ import {
   BatchVerdicts,
   BundleStore,
   ChangePrecheck,
+  type PrecheckCall,
   EvidenceStore,
   FlowSpecSource,
   PlanStore,
@@ -536,6 +537,24 @@ const REFUSAL = {
   reasons: ["precheck:protected:src/secret.ts (src/secret*)"] as const,
   nextActions: [{ kind: "call" as const, title: "Submit again", operationId: "submit" }] as const,
 };
+/** What a derive step found: one effect no intent declared, as the extractor rules on it. */
+const DERIVATION = {
+  effects: [
+    Schema.decodeUnknownSync(DerivedEffect)({
+      proposition: {
+        subject: "authz.permission-evaluation",
+        predicate: "freshness",
+        relation: "is",
+        value: "per-session",
+      },
+      anchors: [{ path: "src/authz/evaluate.ts", symbol: "evaluate", commit: "c".repeat(40) }],
+      declared: false,
+      method: "extractor",
+      evidenceClass: "ruling",
+    }),
+  ],
+  derivationRef: "derivation-1",
+};
 
 export function describeChangePrecheckContract(
   adapter: string,
@@ -559,10 +578,12 @@ export function describeChangePrecheckContract(
         const tags = [
           yield* Effect.flip(changes.workspace(unknown)),
           yield* Effect.flip(changes.started(unknown, call)),
+          yield* Effect.flip(changes.derived(unknown, { ...call, ...DERIVATION })),
           yield* Effect.flip(changes.refused(unknown, { ...call, ...REFUSAL })),
           yield* Effect.flip(changes.compiled(unknown, { ...call, ...PLAN })),
         ].map((e) => e._tag);
         expect(tags).toEqual([
+          "ChangeNotFound",
           "ChangeNotFound",
           "ChangeNotFound",
           "ChangeNotFound",
@@ -605,6 +626,59 @@ export function describeChangePrecheckContract(
           expect((yield* Effect.flip(changes.started(changeId, other)))._tag).toBe(
             "ChangeStateRefused",
           );
+        }).pipe(Effect.provide(h.layer));
+      },
+    );
+
+    it.effect(
+      "[b21.effects-derived] records one derivation a pass: its replay commits nothing new, a second is refused, and the plan still compiles",
+      () => {
+        const h = harness();
+        return Effect.gen(function* () {
+          const changes = yield* ChangePrecheck;
+          const { changeId, revision } = yield* h.submitted();
+          const call = { revision, instanceId: `precheck-${random(6)}` };
+          yield* changes.started(changeId, call);
+          yield* changes.derived(changeId, { ...call, ...DERIVATION });
+          yield* changes.derived(changeId, { ...call, ...DERIVATION });
+          const second = { revision, instanceId: `precheck-${random(6)}` };
+          expect(
+            (yield* Effect.flip(changes.derived(changeId, { ...second, ...DERIVATION })))._tag,
+          ).toBe("ChangeStateRefused");
+          yield* changes.compiled(changeId, { ...call, ...PLAN });
+        }).pipe(Effect.provide(h.layer));
+      },
+    );
+
+    it.effect(
+      "[b21.effects-derived] refuses a derivation for a stale revision, before the pass starts, after the plan, and for a change never declared",
+      () => {
+        const h = harness();
+        return Effect.gen(function* () {
+          const changes = yield* ChangePrecheck;
+          const { changeId, revision } = yield* h.submitted();
+          const call = { revision, instanceId: `precheck-${random(6)}` };
+          const tagOf = (derived: PrecheckCall) =>
+            Effect.map(
+              Effect.flip(changes.derived(changeId, { ...derived, ...DERIVATION })),
+              (refusal) => refusal._tag,
+            );
+          const early = yield* tagOf({ revision, instanceId: `precheck-${random(6)}` });
+          yield* changes.started(changeId, call);
+          const stale = yield* tagOf({ revision: revision + 1, instanceId: call.instanceId });
+          // The stale call moved nothing: the current revision still derives.
+          yield* changes.derived(changeId, { ...call, ...DERIVATION });
+          yield* changes.compiled(changeId, { ...call, ...PLAN });
+          const late = yield* tagOf({ revision, instanceId: `precheck-${random(6)}` });
+          const unknown = yield* Effect.flip(
+            changes.derived(freshId("chg"), { ...call, ...DERIVATION }),
+          );
+          expect([early, stale, late, unknown._tag]).toEqual([
+            "ChangeStateRefused",
+            "ChangeStateRefused",
+            "ChangeStateRefused",
+            "ChangeNotFound",
+          ]);
         }).pipe(Effect.provide(h.layer));
       },
     );

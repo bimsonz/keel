@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fallout.test.ts
+# kills: b21.fallout-derived
+# why: a premise declared after a derivation is judged against declared effects only, never the derived ones
+diff --git a/packages/core/src/application/coordination/subject-fallout.ts b/packages/core/src/application/coordination/subject-fallout.ts
+index 11a7b27..1c26ac5 100644
+--- a/packages/core/src/application/coordination/subject-fallout.ts
++++ b/packages/core/src/application/coordination/subject-fallout.ts
+@@ -119,7 +119,7 @@ export function falloutPairs(
+           judged,
+         });
+     for (const premise of premises)
+-      for (const judged of judgedEffects(other))
++      for (const judged of other.declaredEffects.map(declaredEffect))
+         pairs.push({
+           premise: { holder: change.changeId, proposition: premise },
+           effect: { changeId: other.changeId, proposition: judged.proposition },

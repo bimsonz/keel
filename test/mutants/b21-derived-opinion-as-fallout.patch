@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fallout.test.ts
+# kills: b21.derived-origin
+# why: a conflict opened on a model's opinion is recorded as fallout
+diff --git a/packages/core/src/application/coordination/subject-fallout.ts b/packages/core/src/application/coordination/subject-fallout.ts
+index 11a7b27..2cf4311 100644
+--- a/packages/core/src/application/coordination/subject-fallout.ts
++++ b/packages/core/src/application/coordination/subject-fallout.ts
+@@ -190,7 +190,7 @@ export function judgeFallout(
+           subjectId: subject.id,
+           subjectKey: subject.key,
+           predicate: pair.premise.proposition.predicate,
+-          origin: pair.judged.evidenceClass === "opinion" ? "opinion" : "fallout",
++          origin: "fallout",
+           premise: pair.premise,
+           effect: pair.effect,
+         });

@@ -1,16 +1,14 @@
 # expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/subject.test.ts
 # kills: b21.subject-id
 # why: the subject id hashes the key alone, so one key in two projects is one subject
-diff --git a/packages/core/src/application/coordination/subject.ts b/packages/core/src/application/coordination/subject.ts
-index 9763313..9e978b7 100644
---- a/packages/core/src/application/coordination/subject.ts
-+++ b/packages/core/src/application/coordination/subject.ts
-@@ -36,7 +36,7 @@ type Store = (typeof EntityStore)["Service"];
+diff --git a/packages/core/src/application/coordination/hashed-id.ts b/packages/core/src/application/coordination/hashed-id.ts
+index 86143cd..3c727c3 100644
+--- a/packages/core/src/application/coordination/hashed-id.ts
++++ b/packages/core/src/application/coordination/hashed-id.ts
+@@ -24,5 +24,5 @@ export function hashedIdBody(text: string): string {
   * subjects.
   */
  export function subjectIdOf(projectId: ProjectId, key: SubjectKey): SubjectId {
 -  return SubjectId.make(`sub_${hashedIdBody(`${projectId}\n${key}`)}`);
 +  return SubjectId.make(`sub_${hashedIdBody(`${key}`)}`);
  }
- 
- /**
