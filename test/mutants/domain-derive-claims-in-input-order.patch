@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/derive.test.ts
+# kills: derive.deterministic
+# why: caches come out in the order the stores were given
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index fa3c459..f824c70 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -140,9 +140,7 @@ export const storeClaims = (
+   for (const access of facts.accesses) refs.set(refKey(access.in), access.in);
+   const sessionWords = new Set(vocabulary.sessionWords.map((word) => word.toLowerCase()));
+ 
+-  const stores = [...new Map(facts.stores.map((s) => [refKey(s.at), s])).values()].toSorted(
+-    (a, b) => byRef(a.at, b.at),
+-  );
++  const stores = [...new Map(facts.stores.map((s) => [refKey(s.at), s])).values()];
+   return stores.flatMap((store): StoreClaim[] => {
+     if (store.weak || store.holder === "local") return [];
+     const accesses = facts.accesses.filter((a) => refKey(a.store) === refKey(store.at));

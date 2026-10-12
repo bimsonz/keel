@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/derive.test.ts
+# kills: derive.freshness-base
+# why: a map that lives in one function body counts as a cache
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index fa3c459..9864bc7 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -144,7 +144,7 @@ export const storeClaims = (
+     (a, b) => byRef(a.at, b.at),
+   );
+   return stores.flatMap((store): StoreClaim[] => {
+-    if (store.weak || store.holder === "local") return [];
++    if (store.weak) return [];
+     const accesses = facts.accesses.filter((a) => refKey(a.store) === refKey(store.at));
+     const doing = (op: "read" | "write"): ReadonlySet<string> =>
+       new Set(accesses.filter((a) => a.op === op).map((a) => refKey(a.in)));

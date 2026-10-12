@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/derive.test.ts
+# kills: derive.deterministic
+# why: readers and anchors come out in the order the calls were given
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index fa3c459..685ec35 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -65,7 +65,7 @@ const refKey = (r: SymbolRef): string => `${r.path}\n${r.symbol}`;
+ const byRef = (a: SymbolRef, b: SymbolRef): number =>
+   refKey(a) < refKey(b) ? -1 : refKey(a) > refKey(b) ? 1 : 0;
+ const uniqueRefs = (refs: readonly SymbolRef[]): SymbolRef[] =>
+-  [...new Map(refs.map((r) => [refKey(r), r])).values()].toSorted(byRef);
++  [...new Map(refs.map((r) => [refKey(r), r])).values()];
+ 
+ type Edge = { readonly to: string; readonly deferred: boolean };
+ 

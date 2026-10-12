@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/derive.test.ts packages/testing/test/derive-forge-lite.test.ts
+# kills: derive.ruling-shape, derive.forge-lite
+# why: every derived effect reads as declared, so drift never sees an undeclared one
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index fa3c459..cb4cbd1 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -280,7 +280,7 @@ export const deriveEffects = (input: {
+       {
+         proposition: anchored,
+         anchors,
+-        declared: isDeclared(input.intent, anchored),
++        declared: true,
+         method: "extractor",
+         evidenceClass: "ruling",
+       },

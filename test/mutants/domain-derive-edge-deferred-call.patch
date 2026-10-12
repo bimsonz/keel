@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/derive.test.ts
+# kills: derive.invalidation-edge
+# why: an eviction reached through a deferred call counts as synchronous
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index fa3c459..00c48d3 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -91,7 +91,7 @@ const reachedAtOnce = (calls: ReadonlyMap<string, readonly Edge[]>, start: strin
+   const queue = [start];
+   for (let next = queue.pop(); next !== undefined; next = queue.pop())
+     for (const edge of calls.get(next) ?? [])
+-      if (!edge.deferred && !seen.has(edge.to)) {
++      if (!seen.has(edge.to)) {
+         seen.add(edge.to);
+         queue.push(edge.to);
+       }

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/derive.test.ts packages/testing/test/derive-forge-lite.test.ts
+# kills: derive.invalidation-edge, derive.forge-lite
+# why: only an async handler invalidates, so B′'s synchronous eviction is not seen
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index fa3c459..f588176 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -162,7 +162,7 @@ export const storeClaims = (
+     const invalidating = facts.subscriptions.filter(
+       (s) =>
+         vocabulary.registrars.includes(s.via) &&
+-        !s.async &&
++        s.async &&
+         isEventKey(s.event) &&
+         [...reachedAtOnce(calls, refKey(s.handler))].some((key) => evictedIn.has(key)),
+     );

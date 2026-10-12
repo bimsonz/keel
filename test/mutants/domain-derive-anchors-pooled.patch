@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/derive.test.ts packages/testing/test/derive-forge-lite.test.ts
+# kills: derive.attribution-anchors-only, derive.forge-lite
+# why: every subject is given every subject's anchors, so a cache is put on subjects whose own anchors never reach it
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index fa3c459..1937532 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -221,7 +221,7 @@ const attribute = (
+     anchorsOf.set(row.subject, [...(anchorsOf.get(row.subject) ?? []), ...row.anchors]);
+   return [...anchorsOf.keys()].toSorted().flatMap((subject) =>
+     claims.flatMap((claim): Attributed[] => {
+-      const anchors = anchorsOf.get(subject) ?? [];
++      const anchors = [...anchorsOf.values()].flat();
+       const covered = [claim.store, ...claim.readers].filter((ref) =>
+         anchors.some((anchor) => covers(anchor, ref)),
+       );

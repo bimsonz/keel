@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/derive.test.ts
+# kills: syntax.facts-wire
+# why: a call may leave out whether it is deferred, so a missing answer reads as synchronous
+diff --git a/packages/core/src/domain/coordination/syntax.ts b/packages/core/src/domain/coordination/syntax.ts
+index fe37c00..65bff25 100644
+--- a/packages/core/src/domain/coordination/syntax.ts
++++ b/packages/core/src/domain/coordination/syntax.ts
+@@ -71,7 +71,7 @@ export type StoreAccess = typeof StoreAccess.Type;
+ export const Call = Schema.Struct({
+   from: SymbolRef,
+   to: SymbolRef,
+-  deferred: Schema.Boolean,
++  deferred: Schema.optional(Schema.Boolean),
+ });
+ export type Call = typeof Call.Type;
+ 

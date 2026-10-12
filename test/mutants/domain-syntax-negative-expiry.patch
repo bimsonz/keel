@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/derive.test.ts
+# kills: syntax.facts-wire
+# why: an expiry below zero decodes
+diff --git a/packages/core/src/domain/coordination/syntax.ts b/packages/core/src/domain/coordination/syntax.ts
+index fe37c00..4c8a543 100644
+--- a/packages/core/src/domain/coordination/syntax.ts
++++ b/packages/core/src/domain/coordination/syntax.ts
+@@ -40,7 +40,7 @@ export type KeyedStore = typeof KeyedStore.Type;
+ 
+ /** A write's expiry: a literal number of seconds, or one the parser saw and could not evaluate. */
+ export const Expiry = Schema.Union([
+-  Schema.Struct({ seconds: Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)) }),
++  Schema.Struct({ seconds: Schema.Finite }),
+   Schema.Literal("unknown"),
+ ]);
+ export type Expiry = typeof Expiry.Type;

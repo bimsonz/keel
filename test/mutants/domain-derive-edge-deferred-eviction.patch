@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/derive.test.ts
+# kills: derive.invalidation-edge
+# why: a deferred eviction counts as synchronous
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index fa3c459..9de58ff 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -157,7 +157,7 @@ export const storeClaims = (
+ 
+     const writes = accesses.filter((a) => a.op === "write");
+     const evictedIn = new Set(
+-      accesses.filter((a) => a.op === "evict" && !a.deferred).map((a) => refKey(a.in)),
++      accesses.filter((a) => a.op === "evict").map((a) => refKey(a.in)),
+     );
+     const invalidating = facts.subscriptions.filter(
+       (s) =>

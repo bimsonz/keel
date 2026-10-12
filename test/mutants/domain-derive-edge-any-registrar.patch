@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/derive.test.ts
+# kills: derive.invalidation-edge
+# why: any registering method counts as an in-process bus, so a queued handler invalidates
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index fa3c459..b2c01bd 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -161,7 +161,6 @@ export const storeClaims = (
+     );
+     const invalidating = facts.subscriptions.filter(
+       (s) =>
+-        vocabulary.registrars.includes(s.via) &&
+         !s.async &&
+         isEventKey(s.event) &&
+         [...reachedAtOnce(calls, refKey(s.handler))].some((key) => evictedIn.has(key)),

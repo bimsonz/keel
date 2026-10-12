@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/derive.test.ts
+# kills: derive.freshness-base, derive.attribution-anchors-only
+# why: a symbol that only reads a store counts as reading through it, so a table or a primary store becomes a cache and a read-only sibling is attributed
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index fa3c459..d0a90b1 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -151,7 +151,7 @@ export const storeClaims = (
+     const reads = reaching(calledBy, doing("read"));
+     const writers = reaching(calledBy, doing("write"));
+     const readers = uniqueRefs(
+-      [...reads].filter((key) => writers.has(key)).flatMap((key) => refs.get(key) ?? []),
++      [...reads].flatMap((key) => refs.get(key) ?? []),
+     );
+     if (readers.length === 0) return [];
+ 

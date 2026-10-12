@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/derive.test.ts packages/testing/test/derive-forge-lite.test.ts
+# kills: derive.attribution-anchors-only, derive.forge-lite
+# why: an anchor covers every symbol in its file, so a sibling symbol's cache is put on the subject
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index fa3c459..c7a3544 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -196,10 +196,7 @@ export const storeClaims = (
+ 
+ /** An anchor covers a symbol in its file when it names it, names its class, or names no symbol at all. */
+ const covers = (anchor: Anchor, ref: SymbolRef): boolean =>
+-  anchor.path === ref.path &&
+-  (anchor.symbol === undefined ||
+-    anchor.symbol === ref.symbol ||
+-    ref.symbol.startsWith(`${anchor.symbol}.`));
++  anchor.path === ref.path;
+ 
+ type Attributed = {
+   readonly subject: SubjectKey;

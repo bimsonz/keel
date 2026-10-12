@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/derive.test.ts
+# kills: derive.freshness-base
+# why: an expiry the parser could not read is treated as no expiry, so the rules decide what they cannot know
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index fa3c459..279d7be 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -181,8 +181,6 @@ export const storeClaims = (
+ 
+     if (store.holder === "request") return decided("per-request");
+     if (store.holder === "unknown") return [{ ...claim, undecided: "holder-unknown" }];
+-    if (writes.some((w) => w.expiry === "unknown"))
+-      return [{ ...claim, undecided: "expiry-unknown" }];
+     const expiries = writes.flatMap((w) =>
+       w.expiry === undefined || w.expiry === "unknown" ? [] : [w.expiry.seconds],
+     );

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/coordination/derive.test.ts packages/testing/test/derive-forge-lite.test.ts
+# kills: derive.ruling-shape, derive.forge-lite
+# why: an effect's anchors are pinned to base's commit, where the code they name may not exist
+diff --git a/packages/core/src/domain/coordination/derive.ts b/packages/core/src/domain/coordination/derive.ts
+index fa3c459..bc59477 100644
+--- a/packages/core/src/domain/coordination/derive.ts
++++ b/packages/core/src/domain/coordination/derive.ts
+@@ -274,7 +274,7 @@ export const deriveEffects = (input: {
+     if (first === undefined || proposition === undefined) return [];
+     const anchors: Anchor[] = uniqueRefs(
+       group.flatMap((a) => [a.claim.store, ...a.covered, ...a.claim.subscribedIn]),
+-    ).map((ref) => ({ path: ref.path, symbol: ref.symbol, commit: input.head.commit }));
++    ).map((ref) => ({ path: ref.path, symbol: ref.symbol, commit: input.base.commit }));
+     const anchored = { ...proposition, anchors };
+     return [
+       {
