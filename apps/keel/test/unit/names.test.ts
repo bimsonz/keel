@@ -43,9 +43,9 @@ describe("handles and org names", () => {
     }
   });
 
-  it("[names.instance] refuses the instance's own org name, in any case, before anyone signs up", () => {
+  it("[names.instance] the org holding Keel's own projects is an ordinary name: whoever signs up first may take it", () => {
     expect(INSTANCE_ORG).toBe("keel");
-    for (const name of ["keel", "Keel", "KEEL"]) expect(nameRefusal(name)).toMatch(/own org/);
+    for (const name of ["keel", "Keel", "KEEL"]) expect(nameRefusal(name)).toBeUndefined();
   });
 
   it("[names.held] refuses a name held for the claimant, in any case, and holds nothing by default", () => {

@@ -272,9 +272,6 @@ describe("Better Auth at /v1/auth", () => {
     const reserved = await call("/update-user", { body: { username: "Admin" }, jar: bea.jar });
     expect(reserved.status).toBe(400);
     expect(reserved.json.code).toBe("NAME_REFUSED");
-    const instance = await call("/update-user", { body: { username: "Keel" }, jar: bea.jar });
-    expect(instance.status).toBe(400);
-    expect(instance.json.code).toBe("NAME_REFUSED");
     const taken = await call("/update-user", { body: { username: "ada" }, jar: bea.jar });
     expect(taken.status).toBe(400);
 
@@ -283,6 +280,13 @@ describe("Better Auth at /v1/auth", () => {
       jar: ada.jar,
     });
     answered(acme, 200);
+    // The org for Keel's own projects is an ordinary name: whoever asks first takes it.
+    answered(
+      await call("/organization/create", { body: { name: "Keel", slug: "keel" }, jar: ada.jar }),
+      200,
+    );
+    const instance = await call("/update-user", { body: { username: "Keel" }, jar: bea.jar });
+    expect([instance.status, instance.json.code]).toEqual([400, "NAME_TAKEN"]);
     const orgName = await call("/update-user", { body: { username: "acme" }, jar: bea.jar });
     expect(orgName.status).toBe(400);
     expect(orgName.json.code).toBe("NAME_TAKEN");

@@ -19,5 +19,5 @@ variable "host" {
 variable "held_names" {
   description = "Handles and org names held for this instance's claimant (KEEL_HELD_NAMES): no one else may sign up with them, and the claim code releases them."
   type        = list(string)
-  default     = ["bimsonz"]
+  default     = []
 }

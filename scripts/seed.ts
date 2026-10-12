@@ -263,7 +263,8 @@ async function enrol(
   request: Parameters<KeelClient["enrolAgent"]>[0],
 ): Promise<Credential> {
   const kept = previous.get(role);
-  if (kept !== undefined && (await stillWorks(kept))) {
+  // A credential is kept only for the project it was enrolled in: the seed's projects moved to its own org.
+  if (kept !== undefined && kept.projectId === request.projectId && (await stillWorks(kept))) {
     console.log(`ok   ${role}: ${kept.agentId} in ${kept.projectId} (credential kept)`);
     return kept;
   }

@@ -2,10 +2,9 @@
 # kills: names.reserved
 # why: a reserved path in another case is accepted, so API or Login becomes a handle
 diff --git a/apps/keel/src/adapters/driven/better-auth/names.ts b/apps/keel/src/adapters/driven/better-auth/names.ts
-index 11af700..d5f274d 100644
 --- a/apps/keel/src/adapters/driven/better-auth/names.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/names.ts
-@@ -52,7 +52,7 @@ export function nameRefusal(
+@@ -52,7 +52,7 @@
    name: string,
    held: ReadonlySet<string> = new Set(),
  ): string | undefined {
@@ -13,4 +12,4 @@ index 11af700..d5f274d 100644
 +  const lowered = name;
    if (RESERVED_NAMES.has(lowered))
      return `"${name}" is reserved: keel.town serves /${lowered} itself`;
-   if (lowered === INSTANCE_ORG) return `"${name}" is reserved: it is this instance's own org`;
+   if (held.has(lowered)) return `"${name}" is held for this instance's claimant`;

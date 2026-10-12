@@ -34,9 +34,9 @@ export const RESERVED_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * The instance's own org, which holds Keel's own projects. It is claimed with
- * the instance (the claim code makes it, its claimant the owner), so no one
- * may take the name first.
+ * The org that holds Keel's own projects on keel.town. It is an ordinary org
+ * name (sign-up and orgs as on GitHub): its owner creates it like
+ * any other. The claim code, until it goes, also makes it for its claimant.
  */
 export const INSTANCE_ORG = "keel";
 
@@ -55,7 +55,6 @@ export function nameRefusal(
   const lowered = name.toLowerCase();
   if (RESERVED_NAMES.has(lowered))
     return `"${name}" is reserved: keel.town serves /${lowered} itself`;
-  if (lowered === INSTANCE_ORG) return `"${name}" is reserved: it is this instance's own org`;
   if (held.has(lowered)) return `"${name}" is held for this instance's claimant`;
   if (!HANDLE.test(lowered))
     return `"${name}" must be letters, digits and single hyphens, starting and ending with a letter or digit, at most 39 characters`;

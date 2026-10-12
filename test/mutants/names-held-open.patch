@@ -1,14 +1,13 @@
 # expect-red: pnpm exec vitest run --project unit --project pool:keel apps/keel/test/unit/names.test.ts apps/keel/test/pool/auth.test.ts
 # kills: names.held, ba.held
-# why: a name held for the claimant is open, so a stranger signs up as the instance admin's handle first
+# why: a held name is open, so a stranger signs up with a name the instance keeps first
 diff --git a/apps/keel/src/adapters/driven/better-auth/names.ts b/apps/keel/src/adapters/driven/better-auth/names.ts
-index 11af700..09c7c44 100644
 --- a/apps/keel/src/adapters/driven/better-auth/names.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/names.ts
-@@ -56,7 +56,6 @@ export function nameRefusal(
+@@ -55,7 +55,6 @@
+   const lowered = name.toLowerCase();
    if (RESERVED_NAMES.has(lowered))
      return `"${name}" is reserved: keel.town serves /${lowered} itself`;
-   if (lowered === INSTANCE_ORG) return `"${name}" is reserved: it is this instance's own org`;
 -  if (held.has(lowered)) return `"${name}" is held for this instance's claimant`;
    if (!HANDLE.test(lowered))
      return `"${name}" must be letters, digits and single hyphens, starting and ending with a letter or digit, at most 39 characters`;
