@@ -47,12 +47,6 @@ const check = (ok: boolean, what: string) => {
 type EventRecord = Awaited<ReturnType<KeelClient["events"]>>["items"][number];
 type Declared = Awaited<ReturnType<KeelClient["declare"]>>["result"];
 
-async function feedHead(reader: KeelClient): Promise<string> {
-  let page = await reader.events({ limit: 500 });
-  while (page.items.length > 0) page = await reader.events({ cursor: page.nextCursor, limit: 500 });
-  return page.nextCursor;
-}
-
 /** The project's events after `cursor`, read until `done` holds or the deadline passes. */
 async function projectEvents(
   reader: KeelClient,
@@ -158,7 +152,9 @@ try {
   console.log(`     project ${PROJECT}: ${project.id}`);
   const first = await enrolled(operator, "c14-first", project.id);
   const second = await enrolled(operator, "c14-second", project.id);
-  const cursor = await feedHead(first);
+  // The snapshot's cursor is the head of the log: an agent's page of events is one window of
+  // the whole log filtered to its project, so an empty page is not the end of it.
+  const { cursor } = await first.snapshot({ project: project.id });
   console.log(`     feed cursor ${cursor}`);
 
   const a: Declared = await declareWhenPooled(first, `C1.4 ${run}: first`, `c14:${run}:a`);
