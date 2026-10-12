@@ -2,13 +2,13 @@
 # kills: lease.one-terminal
 # why: A finished change keeps a live lease
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 1093838..0bd9c42 100644
+index 3af515e..c5197e0 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -437,7 +437,7 @@ const sameProposition = (a: Proposition, b: Proposition): boolean => canonicalJs
+@@ -818,7 +818,7 @@ const moveTo = (change: Change, next: ChangeState, drop: readonly Optional[] = [
  
  const released = (change: Change, next: ChangeState): Change => ({
-   ...moveTo(change, next, ["parkReason", "escalationId", "batchId", "laneId"]),
+   ...moveTo(change, next, ["parkReason", "escalationId", "parkedFrom", "batchId", "laneId"]),
 -  lease: { ...change.lease, state: "released" },
 +  lease: change.lease,
  });

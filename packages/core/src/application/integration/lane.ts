@@ -1,8 +1,10 @@
 import { Effect, Result, Schema } from "effect";
 import {
   ChangeBounced,
+  ChangeParked,
   ChangeQueued,
   ChangeRequeued,
+  ChangeResumed,
   ChangeSuperseded,
   ChangeWithdrawn,
 } from "../../domain/coordination/index.ts";
@@ -235,6 +237,8 @@ const holds = (store: Store, lane: Lane, changeId: ChangeId): boolean =>
 
 const decodeQueued = Schema.decodeUnknownSync(ChangeQueued);
 const decodeRequeued = Schema.decodeUnknownSync(ChangeRequeued);
+const decodeParked = Schema.decodeUnknownSync(ChangeParked);
+const decodeResumed = Schema.decodeUnknownSync(ChangeResumed);
 const decodeAdvanced = Schema.decodeUnknownSync(TrunkAdvanced);
 const decodeDeclined = Schema.decodeUnknownSync(PromotionDeclined);
 const decodeEnded = Schema.decodeUnknownSync(
@@ -244,7 +248,9 @@ const decodeEnded = Schema.decodeUnknownSync(
 /**
  * A delivered event, inside the transaction that records it: ChangeQueued
  * joins the queue's back, ChangeRequeued its front (it re-enters with no
- * blame), each keeping the plan hash its event names, a change withdrawn,
+ * blame), each keeping the plan hash its event names, a change parked for a
+ * person's ruling while queued leaves the queue with its plan kept and
+ * rejoins at the front when it is resumed, a change withdrawn,
  * superseded or bounced while queued leaves the queue (one in the batch in
  * flight finishes its batch),
  * TrunkAdvanced is noted for staging to follow and names trunk's head, and a
@@ -277,11 +283,29 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
               requeued.planHash,
             );
       }
+      case "ChangeParked": {
+        // Held for a person's ruling: out of the queue, its plan kept for when it resumes.
+        const parked = decodeParked(event.payload);
+        return parked.reason === "awaiting-ruling" && lane.queue.includes(parked.changeId)
+          ? { ...lane, queue: lane.queue.filter((id) => id !== parked.changeId) }
+          : undefined;
+      }
+      case "ChangeResumed": {
+        // Back to the front, with the plan it was queued under: it waited for a person, not for its turn.
+        const { changeId } = decodeResumed(event.payload);
+        const queuedHere = (lane.plans ?? []).some((plan) => plan.changeId === changeId);
+        return queuedHere && !holds(tx.store, lane, changeId)
+          ? { ...lane, queue: [changeId, ...lane.queue] }
+          : undefined;
+      }
       case "ChangeWithdrawn":
       case "ChangeSuperseded":
       case "ChangeBounced": {
         const ended = decodeEnded(event.payload);
-        return lane.queue.includes(ended.changeId)
+        // One held for a ruling is in no queue, and its kept plan goes with it.
+        const kept = (lane.plans ?? []).some((plan) => plan.changeId === ended.changeId);
+        return lane.queue.includes(ended.changeId) ||
+          (kept && !holds(tx.store, lane, ended.changeId))
           ? withPlan(
               { ...lane, queue: lane.queue.filter((id) => id !== ended.changeId) },
               ended.changeId,

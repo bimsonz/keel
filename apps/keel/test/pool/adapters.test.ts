@@ -1,16 +1,22 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { EventEnvelope, makeId } from "@keeltown/core/kernel";
+import { type EntityRef, EventEnvelope, makeId } from "@keeltown/core/kernel";
 import type { AgentId, ProjectId } from "@keeltown/core/kernel";
 import {
   type AgentNotice,
   Enrolments,
   EventOutbox,
+  PROJECTOR,
   Sessions,
   Standings,
 } from "@keeltown/core/ports";
-import { subjectAddress, suspectConflict } from "@keeltown/core/application/coordination";
 import {
+  namespaceAddress,
+  subjectAddress,
+  suspectConflict,
+} from "@keeltown/core/application/coordination";
+import {
+  type EscalationsHarness,
   describeAgentDirectoryContract,
   describeNotifierContract,
   describeTokenIssuerContract,
@@ -22,14 +28,18 @@ import { ulid } from "ulid";
 import { AgentDirectoryD1 } from "../../src/adapters/driven/d1/agent-directory.ts";
 import { EnrolmentsRpc } from "../../src/adapters/driven/do-rpc/enrolments.ts";
 import { LiveChangesRpc } from "../../src/adapters/driven/do-rpc/live-changes.ts";
+import { ConflictMovesRpc } from "../../src/adapters/driven/do-rpc/conflict-moves.ts";
+import { EscalationsRpc } from "../../src/adapters/driven/do-rpc/escalations.ts";
+import { HumanGateRpc } from "../../src/adapters/driven/do-rpc/human-gate.ts";
 import { ProbeLedgerRpc } from "../../src/adapters/driven/do-rpc/probe-ledger.ts";
+import type { NamespaceDO } from "../../src/adapters/driving/do/namespace.ts";
 import type { SubjectDO } from "../../src/adapters/driving/do/subject.ts";
 import { SessionsRpc } from "../../src/adapters/driven/do-rpc/sessions.ts";
 import { StandingsRpc } from "../../src/adapters/driven/do-rpc/standings.ts";
 import { InboxRpc } from "../../src/adapters/driven/do-rpc/inbox.ts";
 import { NotifierRpc } from "../../src/adapters/driven/do-rpc/notifier.ts";
 import { TokenIssuerJose } from "../../src/adapters/driven/jose/token-issuer.ts";
-import { drainAfter, drainOutbox } from "./helpers.ts";
+import { drainAfter, drainOutbox, placeProject } from "./helpers.ts";
 
 // The real adapters pass the same contract suites as the in-memory ones, inside workerd.
 describeAgentDirectoryContract("d1", () => AgentDirectoryD1(env.DB));
@@ -108,6 +118,65 @@ PORTS.ProbeLedger.contract("Subject DO over RPC", () => ({
           instance["runtime"].runPromise(Effect.map(EventOutbox, (outbox) => outbox.log(entity))),
       ),
     ),
+}));
+
+/** A namespace's object, drained after each case. */
+const namespaceObject = (address: string) =>
+  drainAfter(env.NAMESPACE.get(env.NAMESPACE.idFromName(address)));
+
+const theProjector = () => env.PROJECTOR.get(env.PROJECTOR.idFromName(PROJECTOR));
+
+/** An object's committed events on one entity, read inside the object. */
+const logOf = (stub: DurableObjectStub<NamespaceDO | SubjectDO>, entity: EntityRef) =>
+  Effect.promise(() =>
+    runInDurableObject(stub, (instance: NamespaceDO | SubjectDO) =>
+      instance["runtime"].runPromise(Effect.map(EventOutbox, (outbox) => outbox.log(entity))),
+    ),
+  );
+
+/**
+ * Escalations are raised and ruled on the real namespace object, and read
+ * from the real Projector, which hears them by delivery: `settled` waits for
+ * the namespace's outbox to have delivered everything.
+ */
+const escalationsHarness = (): EscalationsHarness => ({
+  layer: Layer.mergeAll(
+    HumanGateRpc(namespaceObject),
+    EscalationsRpc(theProjector, namespaceObject),
+  ),
+  settled: (namespace) =>
+    Effect.promise(() => drainOutbox(namespaceObject(namespaceAddress(namespace)))),
+  log: (namespace, entity) => logOf(namespaceObject(namespaceAddress(namespace)), entity),
+});
+PORTS.HumanGate.contract("namespace object over RPC", escalationsHarness);
+PORTS.Escalations.contract("namespace object and Projector over RPC", escalationsHarness);
+
+/**
+ * A party's move is made on the real Subject DO, which finds its project's
+ * namespace in D1 and raises the escalation on the real namespace object;
+ * the suite reads what was asked from the real Projector.
+ */
+PORTS.ConflictMoves.contract("Subject DO, namespace object and Projector over RPC", () => ({
+  layer: Layer.mergeAll(
+    ConflictMovesRpc(subjectObject),
+    ProbeLedgerRpc(subjectObject),
+    EscalationsRpc(theProjector, namespaceObject),
+  ),
+  suspect: (at, conflictId, suspect) =>
+    Effect.promise(() =>
+      runInDurableObject(
+        subjectObject(subjectAddress(at.projectId, at.key)),
+        (instance: SubjectDO) =>
+          instance["runtime"].runPromise(suspectConflict(at.projectId, conflictId, suspect)),
+      ),
+    ),
+  log: (at, entity) => logOf(subjectObject(subjectAddress(at.projectId, at.key)), entity),
+  place: (projectId, namespace) => Effect.promise(() => placeProject(projectId, namespace)),
+  settled: (at, namespace) =>
+    Effect.promise(async () => {
+      await drainOutbox(subjectObject(subjectAddress(at.projectId, at.key)));
+      await drainOutbox(namespaceObject(namespaceAddress(namespace)));
+    }),
 }));
 
 /**

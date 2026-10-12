@@ -2,15 +2,15 @@
 # kills: b21.proven-blocks
 # why: planCompiled queues with no blockers, so a change with a conflict proven against it under block queues anyway
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 351ed36..d78831a 100644
+index 179323f..8b4730e 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1179,7 +1179,7 @@ export const planCompiled: (
+@@ -1388,7 +1388,7 @@ export const planCompiled: (
        "planCompiled",
        plan,
        (store) => {
 -        const blockers = blockersOf(store, plan.predicatePolicy);
 +        const blockers = { openProvenConflicts: [], failingGuards: [], unresolvedHighDrift: [] };
          const bounce = conflictBounce(blockers.openProvenConflicts);
-         return [compile, bounce ?? { _tag: "Queue", laneId, blockers }];
-       },
+         if (bounce !== undefined) return [compile, bounce];
+         // A conflict already with a person holds the change the moment it is queued.

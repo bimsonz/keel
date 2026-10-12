@@ -2,14 +2,14 @@
 # kills: b21.proven-bounces
 # why: the lane never hears a bounce, so a bounced change stays in its queue
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 351ed36..acc30db 100644
+index 179323f..8e79195 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -179,7 +179,6 @@ export function subjectKeysOf(
+@@ -210,7 +210,6 @@ export function subjectKeysOf(
  export const LANE_HEARS = [
    "ChangeQueued",
    "ChangeRequeued",
 -  "ChangeBounced",
+   "ChangeParked",
+   "ChangeResumed",
    "ChangeWithdrawn",
-   "ChangeSuperseded",
- ] as const;

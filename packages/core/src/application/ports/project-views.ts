@@ -13,6 +13,7 @@ import {
 } from "../../domain/kernel/index.ts";
 import {
   Conflict,
+  Escalation,
   type ConflictNotFound,
   ConflictProven,
   type ConflictState,
@@ -25,6 +26,7 @@ import {
   WorldCheck,
   WorldCheckRan,
 } from "../../domain/verification/index.ts";
+import { DecisionChosen } from "./escalations.ts";
 
 /** One change as the console lists it: `#number`, its state, goal and agent. */
 export const ChangeSummary = Schema.Struct({
@@ -147,6 +149,10 @@ export const ConflictRecord = Schema.Struct({
     decision: Schema.optional(Schema.String),
   }),
   told: Schema.Array(ToldView),
+  /** The question a person was asked about it, once the Projector has heard it raised. */
+  escalation: Schema.optional(Escalation),
+  /** What the ruling's decision chose, once the Projector has heard it recorded. */
+  chosen: Schema.optional(DecisionChosen),
 });
 export type ConflictRecord = typeof ConflictRecord.Type;
 

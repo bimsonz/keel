@@ -62,6 +62,8 @@ const CONTRACT_PORTS = [
   "ProbeLedger",
   "MfpWriter",
   "HumanGate",
+  "Escalations",
+  "ConflictMoves",
   "Deployer",
   "SecretsProvider",
   "Background",

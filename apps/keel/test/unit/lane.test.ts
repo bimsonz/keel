@@ -241,6 +241,17 @@ const requeue = (id: ChangeId, batchId: BatchId, planHash: ContentHash = PLAN.pl
     }),
   );
 
+const parked = (id: ChangeId, reason: string) =>
+  deliver(envelope(changeRef(id), { _tag: "ChangeParked", changeId: id, reason }));
+const resumed = (id: ChangeId) =>
+  deliver(
+    envelope(changeRef(id), {
+      _tag: "ChangeResumed",
+      changeId: id,
+      decisionId: makeId("dec", "01J9KKKKKKKKKKKKKKKKKKKKKK"),
+    }),
+  );
+
 const advance = (from: string, to: string, members: readonly ChangeId[]) =>
   deliver(
     envelope(
@@ -367,6 +378,48 @@ describe("the Lane", () => {
         yield* laneStep(LANE);
         expect((yield* payloads("BatchFormed")).map((p) => p["members"])).toEqual([[change(3)]]);
         expect(laneOf(yield* EntityStore, LANE)?.queue).toEqual([]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
+    "[t35.lane-holds] a change parked for a person's ruling while queued is never batched; resumed, it rejoins at the front under the plan it was queued with",
+    () => {
+      const w = world();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        yield* queue(w, change(2));
+        yield* queue(w, change(3));
+        yield* parked(change(1), "awaiting-ruling");
+        // A lapsed lease parks an agent-owned change, which is in no queue: it moves nothing here.
+        yield* parked(change(2), "lease-lapsed");
+        const held = laneOf(yield* EntityStore, LANE);
+        // A change this lane never queued is not its to take.
+        yield* resumed(change(9));
+        yield* resumed(change(1));
+        const back = laneOf(yield* EntityStore, LANE);
+        // Parked again and then withdrawn: it leaves for good, its plan with it.
+        yield* parked(change(1), "awaiting-ruling");
+        yield* deliver(
+          envelope(changeRef(change(1)), {
+            _tag: "ChangeWithdrawn",
+            changeId: change(1),
+            by: "agent",
+          }),
+        );
+        yield* resumed(change(1));
+        const gone = laneOf(yield* EntityStore, LANE);
+        yield* laneStep(LANE);
+
+        expect(held?.queue).toEqual([change(2), change(3)]);
+        expect(held?.plans?.map((plan) => plan.changeId)).toContain(change(1));
+        expect(back?.queue).toEqual([change(1), change(2), change(3)]);
+        expect(gone?.queue).toEqual([change(2), change(3)]);
+        expect(gone?.plans?.map((plan) => plan.changeId)).not.toContain(change(1));
+        expect((yield* payloads("BatchFormed")).flatMap((p) => p["members"])).not.toContain(
+          change(1),
+        );
       }).pipe(Effect.provide(w.layer));
     },
   );

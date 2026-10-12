@@ -12,6 +12,7 @@ import {
   readConflict,
   readConflictList,
   readProbeSource,
+  resolveMove,
   readEvents,
   readInbox,
   readSnapshot,
@@ -128,6 +129,9 @@ import {
   inboxOk,
   type Input,
   invalid,
+  resolveError,
+  resolveInput,
+  resolveOk,
   statusError,
   statusOk,
   submitError,
@@ -462,7 +466,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods) {
             caller,
             readConflict(scopeOf(caller), ConflictId.make(input.conflictId)).pipe(
               Effect.match({
-                onSuccess: conflictOk,
+                onSuccess: (record) => conflictOk(record, scopeOf(caller).audience),
                 onFailure: (e) => conflictNotFound(caller, e),
               }),
             ),
@@ -477,7 +481,24 @@ export function makeHandlers(run: Runner, signIn: SignInMethods) {
               }),
             ),
           ),
-        resolve: notYet,
+        resolve: (caller: Caller, input: Input<"resolve">) => {
+          const decoded = resolveInput(input);
+          if (Result.isFailure(decoded)) return invalid(caller, decoded.failure);
+          // One move is built: a party puts its conflict to a person. The others are B3's.
+          if (decoded.success.move !== "escalate") return notYet(caller);
+          return run(
+            caller,
+            tokenOf(caller).pipe(
+              Effect.flatMap((principal) =>
+                resolveMove(principal, scopeOf(caller), decoded.success),
+              ),
+              Effect.match({
+                onSuccess: resolveOk,
+                onFailure: (error) => resolveError(caller, error),
+              }),
+            ),
+          );
+        },
         why: notYet,
         Memory_listDecisions: notYet,
         Memory_getDecision: notYet,

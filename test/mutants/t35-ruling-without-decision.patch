@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: t35.ruling-once
+# why: a ruling is committed without the decision it makes, so the escalation is ruled and nothing ever resolves the conflict it was about
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index fce7e5e..011d193 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -327,11 +327,6 @@ export const giveRuling = Effect.fn("coordination/giveRuling")(function* (comman
+     for (const payload of recorded.success) {
+       if (payload._tag !== "DecisionRecorded") continue;
+       decision = evolveDecision(decision, { at: tx.at, payload });
+-      drafts.push({
+-        payload: payloadOf(encodeRecorded(payload)),
+-        entity: decisionRef(decisionId),
+-        affected: [entity, ...concerning(row)],
+-      });
+     }
+     if (decision !== undefined)
+       tx.store.put(DECISION, decisionId, asStored(encodeDecision(decision)));

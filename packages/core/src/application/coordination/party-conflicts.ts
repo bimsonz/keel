@@ -9,6 +9,7 @@ import {
   ConflictId,
   DEFAULT_PREDICATE_POLICY,
   type EntityRef,
+  type EscalationId,
   type EventEnvelope,
   type PredicatePolicy,
   SubjectId,
@@ -16,6 +17,7 @@ import {
 import { Party } from "../../domain/verification/index.ts";
 import type { Transaction } from "../ports/commit.ts";
 import type { Stored } from "../ports/entity-store.ts";
+import { escalationIdOf } from "./escalations.ts";
 
 type Store = Transaction["store"];
 type Outbox = Transaction["outbox"];
@@ -146,3 +148,18 @@ export const blockersOf = (store: Store, policies: PredicatePolicies | undefined
   failingGuards: [],
   unresolvedHighDrift: [],
 });
+
+/**
+ * The escalation the change must wait for: that of a conflict it is a party
+ * to which is with a person and not yet ruled on. The first by conflict id
+ * when there are several: the change waits for one ruling at a time.
+ */
+export function awaitedEscalation(store: Store): EscalationId | undefined {
+  const [first] = store
+    .list(PARTY_CONFLICT)
+    .map((row) => decodeRow(row.value))
+    .filter((row) => row.state === "escalated")
+    .map((row) => row.conflictId)
+    .toSorted();
+  return first === undefined ? undefined : escalationIdOf(first);
+}

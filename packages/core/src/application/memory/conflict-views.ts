@@ -40,6 +40,7 @@ import {
   ToldView,
   type WorldCheckView,
 } from "../ports/index.ts";
+import { decisionChosen, escalationView } from "./escalation-views.ts";
 import { FEED } from "./feed.ts";
 
 /**
@@ -329,8 +330,16 @@ function recordOf(store: Store, project: ProjectId, folded: ConflictFolded): Con
     const stored = store.get(CONFLICT_VIEWS.told(project), `${conflict.id}/${party}`);
     return stored === undefined ? [] : [decodeTold(stored)];
   });
+  const escalation =
+    conflict.escalationId === undefined
+      ? undefined
+      : escalationView(store, conflict.escalationId)?.escalation;
+  const chosen =
+    conflict.decisionId === undefined ? undefined : decisionChosen(store, conflict.decisionId);
   return {
     ...folded,
+    ...(escalation === undefined ? {} : { escalation }),
+    ...(chosen === undefined ? {} : { chosen }),
     number: Number(label.slice(2)),
     labels: {
       conflict: labels.conflict,

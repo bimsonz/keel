@@ -1,0 +1,25 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: t35.unprovable-escalates
+# why: the unprovable conflict's escalation is raised and the conflict is never settled with it, so a person is asked about a conflict that stays suspected for ever
+diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
+index 23f9e41..abc3b32 100644
+--- a/packages/core/src/application/coordination/conflict-moves.ts
++++ b/packages/core/src/application/coordination/conflict-moves.ts
+@@ -114,17 +114,6 @@ export const escalateUnprovable = Effect.fn("coordination/escalateUnprovable")(f
+       ask: askAbout(view, "unprovable"),
+     })
+     .pipe(Effect.orDie);
+-  yield* commit(
+-    {
+-      entity: conflictRef(conflictId),
+-      cause: `settle-escalated:${conflictId}`,
+-      project: at.projectId,
+-    },
+-    conflictMove(conflictId, { _tag: "Settle", escalationId }),
+-  ).pipe(
+-    // Settled meanwhile by another call of this step: the conflict is where this one was taking it.
+-    Effect.catchTag("ConflictStateRefused", () => Effect.void),
+-  );
+ });
+ 
+ /** `probeDraftFailed`, then the escalation an unprovable conflict needs: what the Subject DO runs. */

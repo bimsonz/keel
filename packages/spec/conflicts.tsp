@@ -205,6 +205,29 @@ model ConflictGuard {
 model ConflictEscalation {
   ...ConflictEscalationRef;
   reason?: "human-class" | "unprovable";
+
+  /**
+   * What the person was asked. The question, its state, its options and its
+   * evidence are read by the project's members; any other reader of a public
+   * project sees that a person was asked, and no more.
+   */
+  question?: string;
+
+  state?: "open" | "ruled" | "withdrawn";
+  options?: EscalationOption[];
+  evidence?: EscalationEvidence[];
+}
+
+/** The option a ruling chose: its id among the escalation's options, and its label. */
+model ConflictChoice {
+  id: string;
+  label: string;
+}
+
+/** The decision that resolved a conflict, with what it chose once Keel has heard it recorded. */
+model ConflictDecision {
+  ...ConflictDecisionRef;
+  chosen?: ConflictChoice;
 }
 
 /**
@@ -241,7 +264,7 @@ model ConflictDetail {
   probe?: ConflictProbe;
   guard?: ConflictGuard;
   escalation?: ConflictEscalation;
-  decision?: ConflictDecisionRef;
+  decision?: ConflictDecision;
 
   /** The move that resolved it. */
   move?: Move;

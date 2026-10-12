@@ -132,7 +132,7 @@ const SIDE: Readonly<Record<Key, readonly Kind[]>> = {
   deriving: ["Drift", "Bounce", "Lapse", "Adopt"],
   drifted: ["Lapse", "Adopt", "Renew"],
   verifying: ["Park", "Bounce", "Lapse", "Adopt"],
-  queued: ["Bounce", "Lapse", "Supersede"],
+  queued: ["Park", "Bounce", "Lapse", "Supersede"],
   integrating: ["Requeue", "Bounce", "Lapse", "Adopt"],
   bounced: ["Revise", "Rebase", "Lapse", "Adopt", "Renew"],
   "parked:awaiting-ruling": ["Bounce", "Adopt", "Lapse", "Supersede"],
@@ -569,7 +569,7 @@ const oracle = (
     case "Queue":
       return key === "verifying" && !anyBlocker(command.blockers) ? "queued" : "refused";
     case "Park":
-      return key === "verifying" ? "parked:awaiting-ruling" : "refused";
+      return key === "verifying" || key === "queued" ? "parked:awaiting-ruling" : "refused";
     case "Batch":
       return key === "queued" && !anyBlocker(command.blockers) ? "integrating" : "refused";
     case "Requeue":
@@ -594,7 +594,8 @@ const oracle = (
     case "Land":
       return key === "integrating" ? "landed" : "refused";
     case "Resume":
-      return key === "parked:awaiting-ruling" ? "verifying" : "refused";
+      // Back to where it was parked from.
+      return key === "parked:awaiting-ruling" ? (before.parkedFrom ?? "verifying") : "refused";
     case "Adopt":
       if (!lapsedAt(before, now)) return "refused";
       return key === "parked:lease-lapsed"
@@ -1502,7 +1503,9 @@ const changeTour = (): readonly Fold<Change, ChangeEvent>[] => {
         ),
       ),
     signature: (c) =>
-      c === undefined ? "none" : `${chartKey(c)}|${c.workspaceId !== undefined}|${c.lease.state}`,
+      c === undefined
+        ? "none"
+        : `${chartKey(c)}|${c.parkedFrom ?? ""}|${c.workspaceId !== undefined}|${c.lease.state}`,
   });
   return walkedTour;
 };

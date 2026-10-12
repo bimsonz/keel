@@ -1,24 +1,33 @@
 import { Context, type Effect } from "effect";
-import type { EntityRef, EscalationId } from "../../domain/kernel/index.ts";
+import type { EscalationId, OrgId, ProjectId, UserId } from "../../domain/kernel/index.ts";
+import type { EscalationCommand, InvalidEscalation } from "../../domain/verification/index.ts";
+import type { EscalationRecord } from "./escalations.ts";
 
-export interface EscalationRequest {
-  readonly question: string;
-  readonly options: readonly string[];
-  readonly consequences: readonly string[];
-  readonly about: EntityRef;
-}
+/** What a person is asked: the domain's Raise, without its tag. */
+export type EscalationAsk = Omit<Extract<EscalationCommand, { _tag: "Raise" }>, "_tag">;
 
-export interface Ruling {
+export interface RaiseRequest {
+  /** The namespace that owns the project: its object (`ns:<id>`) hosts the escalation. */
+  readonly namespace: OrgId;
+  /** Derived from what the question is about, so a repeated raise is the same escalation. */
   readonly escalationId: EscalationId;
-  readonly option: string;
-  readonly by: string;
+  readonly project: ProjectId;
+  /** The user asked first. Absent when nobody vouches for the agent concerned: the namespace's maintainers are asked at once. */
+  readonly sponsor?: UserId | undefined;
+  /** The object told when a person has ruled: it hears the escalation's DecisionRecorded. */
+  readonly raisedBy: string;
+  readonly ask: EscalationAsk;
 }
 
-/** Routes a question to a person and waits, event-driven, for the ruling. The default meanwhile is hold. */
+/**
+ * Puts a question to a person. Nothing waits on the answer: the object that
+ * raised it hears the ruling's decision as an event, and holds meanwhile.
+ * Raising the same escalation again answers it as it stands and asks nobody
+ * twice.
+ */
 export class HumanGate extends Context.Service<
   HumanGate,
   {
-    readonly raise: (request: EscalationRequest) => Effect.Effect<EscalationId>;
-    readonly awaitRuling: (escalationId: EscalationId) => Effect.Effect<Ruling>;
+    readonly raise: (request: RaiseRequest) => Effect.Effect<EscalationRecord, InvalidEscalation>;
   }
 >()("keel/HumanGate") {}

@@ -2,10 +2,10 @@
 # kills: b23.conflict-told
 # why: a party bounced over another conflict is shown as told about this one
 diff --git a/packages/core/src/application/memory/conflict-views.ts b/packages/core/src/application/memory/conflict-views.ts
-index 12d96eb..46582e4 100644
+index 75efa49..8e3e5ae 100644
 --- a/packages/core/src/application/memory/conflict-views.ts
 +++ b/packages/core/src/application/memory/conflict-views.ts
-@@ -278,7 +278,7 @@ function foldTold(store: Store, event: EventEnvelope): string | undefined {
+@@ -282,7 +282,7 @@ function foldTold(store: Store, event: EventEnvelope): string | undefined {
    };
    store.put(
      CONFLICT_VIEWS.told(project),
@@ -14,7 +14,7 @@ index 12d96eb..46582e4 100644
      asStored(encodeTold(told)),
    );
    return undefined;
-@@ -323,7 +323,7 @@ function recordOf(store: Store, project: ProjectId, folded: ConflictFolded): Con
+@@ -327,7 +327,7 @@ function recordOf(store: Store, project: ProjectId, folded: ConflictFolded): Con
      decision: labelOf(store, project, "D-", conflict.decisionId),
    };
    const told = conflict.parties.flatMap((party) => {
@@ -22,4 +22,4 @@ index 12d96eb..46582e4 100644
 +    const stored = store.get(CONFLICT_VIEWS.told(project), `${party}`);
      return stored === undefined ? [] : [decodeTold(stored)];
    });
-   return {
+   const escalation =

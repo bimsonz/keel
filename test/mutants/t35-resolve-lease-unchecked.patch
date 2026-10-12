@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts
+# kills: t35.park-resume
+# why: the doorway makes a party's move without checking its change's lease, so an agent holding no lease on a change escalates in its name
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 65424ff..ce0f4bf 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -386,7 +386,7 @@ export const resolveMove: (
+     if (projectId !== scope.project)
+       return yield* new ChangeNotFound({ changeId: input.changeId, nextActions: [] });
+     const held = checkLease(change, input.lease, yield* (yield* Clock).now);
+-    if (Result.isFailure(held)) return yield* held.failure;
++    void held;
+     const { conflict } = yield* (yield* ProjectViews).conflict(scope.project, input.conflictId);
+     if (conflict.subjectKey === undefined)
+       return yield* new MoveRefused({

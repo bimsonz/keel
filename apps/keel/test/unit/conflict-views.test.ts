@@ -9,6 +9,7 @@ import {
   World,
 } from "@keeltown/core/domain/verification";
 import {
+  type EntityRef,
   ChangeId,
   ConflictId,
   ContentHash,
@@ -391,7 +392,7 @@ describe("[b23.conflict-endings] a conflict past its proof", () => {
       } as { _tag: string }),
     ];
     for (const event of arrivals) Effect.runSync(views.arrive(event));
-    const escalated = conflictOk(record(views, events.project, conflictId));
+    const escalated = conflictOk(record(views, events.project, conflictId), "members");
     const resolved = events.of(conflict, {
       _tag: "ConflictResolved",
       conflictId,
@@ -409,7 +410,7 @@ describe("[b23.conflict-endings] a conflict past its proof", () => {
       ),
     );
     const folded = record(views, events.project, conflictId);
-    const served = conflictOk(folded);
+    const served = conflictOk(folded, "members");
 
     expect(escalated.body).toMatchObject({
       state: "escalated",
@@ -483,7 +484,7 @@ describe("[b23.conflict-sides] the two sides of a conflict, as Keel knows them",
     Effect.runSync(views.arrive(events.suspected(derived, holder, other, ruling)));
     const folded = (conflictId: string) => sidesOf(record(views, events.project, conflictId));
     const served = (conflictId: string) =>
-      conflictOk(record(views, events.project, conflictId)).body;
+      conflictOk(record(views, events.project, conflictId), "members").body;
     expect([folded(declared)?.holder.evidence, folded(declared)?.other.evidence]).toEqual([
       undefined,
       testimony,
@@ -682,4 +683,122 @@ describe("[b23.probe-source] a probe's source, from the bundle its draft was kep
       }).pipe(Effect.provide(Layer.mergeAll(views.layer, store.layer)));
     },
   );
+});
+
+describe("a conflict's escalation on its own page", () => {
+  it("[b23.conflict-escalation] a member reads the question, its state, its options and its evidence, and what the decision chose; another reader of a public project is told a person was asked and what was chosen, and nothing of the question", () => {
+    const views = makeProjectViewsMemory();
+    const events = projectEvents(nextId("prj"));
+    const [conflictId, probeId, escalationId, decisionId] = [
+      nextId("cfl"),
+      nextId("prb"),
+      nextId("esc"),
+      nextId("dec"),
+    ];
+    const [holder, other] = [nextId("chg"), nextId("chg")];
+    const conflict: EntityRef = { kind: "conflict", id: conflictId };
+    const escalation: EntityRef = { kind: "escalation", id: escalationId };
+    const concerning: readonly EntityRef[] = [
+      conflict,
+      { kind: "org", id: nextId("org") },
+      { kind: "user", id: nextId("usr") },
+    ];
+    const options = [
+      { id: "premise-holds", label: "The premise holds", consequence: "the other gives way" },
+      { id: "effect-stands", label: "The effect stands", consequence: "the holder gives way" },
+    ];
+    const evidence = [
+      { class: "proof", summary: "a probe tells them apart", ref: `probe:${probeId}` },
+    ];
+    const arrivals = [
+      events.suspected(conflictId, holder, other),
+      events.probeDrafted(conflictId, probeId),
+      events.proven(conflictId, probeId),
+      {
+        ...events.of(escalation, {
+          _tag: "EscalationRaised",
+          escalationId,
+          question: "Which holds?",
+          options,
+          about: conflict,
+          category: "ambiguous-requirement",
+          evidence,
+          precedents: [],
+          default: "premise-holds",
+        } as { _tag: string }),
+        affected: concerning,
+      },
+      events.of(conflict, {
+        _tag: "ConflictEscalated",
+        conflictId,
+        escalationId,
+        reason: "human-class",
+      } as { _tag: string }),
+    ];
+    for (const event of arrivals) Effect.runSync(views.arrive(event));
+    const asked = record(views, events.project, conflictId);
+    const rulings = [
+      events.of(escalation, {
+        _tag: "RulingGiven",
+        escalationId,
+        option: "effect-stands",
+        by: "user:usr_1",
+      } as { _tag: string }),
+      events.of({ kind: "decision", id: decisionId }, {
+        _tag: "DecisionRecorded",
+        decisionId,
+        escalationId,
+        option: "effect-stands",
+        summary: "The effect stands",
+        evidence: [],
+        alternatives: [],
+      } as { _tag: string }),
+      events.of(conflict, {
+        _tag: "ConflictResolved",
+        conflictId,
+        move: "escalate",
+        decisionId,
+      } as { _tag: string }),
+    ];
+    for (const event of rulings) Effect.runSync(views.arrive(event));
+    const ruled = record(views, events.project, conflictId);
+
+    expect(conflictOk(asked, "members").body).toMatchObject({
+      state: "escalated",
+      escalation: {
+        id: escalationId,
+        label: "E-1",
+        open: true,
+        reason: "human-class",
+        question: "Which holds?",
+        state: "open",
+        options,
+        evidence,
+      },
+    });
+    expect(Reflect.get(conflictOk(asked, "public").body, "escalation")).toEqual({
+      id: escalationId,
+      label: "E-1",
+      open: true,
+      reason: "human-class",
+    });
+    const chosen = { id: "effect-stands", label: "The effect stands" };
+    expect(conflictOk(ruled, "members").body).toMatchObject({
+      state: "resolved",
+      move: "escalate",
+      escalation: { open: false, state: "ruled" },
+      decision: { id: decisionId, label: "D-1", chosen },
+    });
+    expect(Reflect.get(conflictOk(ruled, "public").body, "decision")).toEqual({
+      id: decisionId,
+      label: "D-1",
+      chosen,
+    });
+    expect(Reflect.get(conflictOk(ruled, "public").body, "escalation")).toEqual({
+      id: escalationId,
+      label: "E-1",
+      open: false,
+      reason: "human-class",
+    });
+  });
 });

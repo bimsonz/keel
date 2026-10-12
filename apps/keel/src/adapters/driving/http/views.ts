@@ -6,6 +6,7 @@ import {
   sidesOf,
 } from "@keeltown/core/application/memory";
 import type { ChangeState, Proposition } from "@keeltown/core/domain/coordination";
+import type { Audience } from "@keeltown/core/domain/identity";
 import type { ConflictState } from "@keeltown/core/domain/verification";
 import { ChangeId, ProjectId } from "@keeltown/core/kernel";
 import type {
@@ -234,7 +235,39 @@ const sideBody = (side: ConflictSide) => ({
       }),
 });
 
-export function conflictOk(record: ConflictRecord): Conflicts_getConflictResult {
+/**
+ * What a member reads of the question a person was asked. Another reader of
+ * a public project is told that a person was asked, and nothing of what.
+ */
+const escalationAsked = ({ escalation }: ConflictRecord, audience: Audience) =>
+  audience !== "members" || escalation === undefined
+    ? {}
+    : {
+        question: escalation.question,
+        state: escalation.state,
+        options: escalation.options.map((option) => ({ ...option })),
+        evidence: escalation.evidence.map(({ ref, ...evidence }) => ({
+          ...evidence,
+          ...(ref === undefined ? {} : { ref }),
+        })),
+      };
+
+/** The decision that resolved a conflict, with what it chose once the Projector has heard it recorded. */
+const decisionOf = ({ conflict, labels, chosen }: ConflictRecord) =>
+  conflict.decisionId === undefined
+    ? {}
+    : {
+        decision: {
+          id: conflict.decisionId,
+          ...labelled(labels.decision),
+          ...(chosen === undefined ? {} : { chosen: { id: chosen.option, label: chosen.summary } }),
+        },
+      };
+
+export function conflictOk(
+  record: ConflictRecord,
+  audience: Audience,
+): Conflicts_getConflictResult {
   const { conflict, probe, guard, labels } = record;
   const sides = sidesOf(record);
   return {
@@ -304,9 +337,10 @@ export function conflictOk(record: ConflictRecord): Conflicts_getConflictResult 
               ...labelled(labels.escalation),
               open: isOpenConflict(conflict.state),
               ...(record.escalated === undefined ? {} : { reason: record.escalated }),
+              ...escalationAsked(record, audience),
             },
           }),
-      ...decisionRef(record),
+      ...decisionOf(record),
       ...(conflict.move === undefined ? {} : { move: conflict.move }),
     },
   };

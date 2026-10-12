@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: escalations.contract
+# why: the Projector's view of an escalation forgets the user asked first, so the list cannot show it to its sponsor and the doorway cannot let the sponsor rule
+diff --git a/packages/core/src/application/memory/escalation-views.ts b/packages/core/src/application/memory/escalation-views.ts
+index 370bbfc..76f39bf 100644
+--- a/packages/core/src/application/memory/escalation-views.ts
++++ b/packages/core/src/application/memory/escalation-views.ts
+@@ -131,9 +131,7 @@ export function foldEscalationViews(store: Store, event: EventEnvelope): string
+   );
+   if (event.project === undefined || namespace === undefined)
+     return `${payload.escalationId} was raised with no project or no namespace`;
+-  const sponsor = Option.getOrUndefined(
+-    decodeUser(event.affected.find((ref) => ref.kind === "user")?.id),
+-  );
++  const sponsor = Option.getOrUndefined(decodeUser(undefined));
+   store.put(
+     ESCALATION_VIEWS.escalation,
+     payload.escalationId,

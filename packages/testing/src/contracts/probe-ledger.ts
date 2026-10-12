@@ -27,14 +27,14 @@ export interface ProbeLedgerHarness {
 }
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-const ulid = () =>
+export const ulid = () =>
   [...crypto.getRandomValues(new Uint8Array(26))].map((b) => CROCKFORD[b % 32] ?? "0").join("");
 
-const BUNDLE = ContentHash.make(`sha256:${"a".repeat(64)}`);
+export const BUNDLE = ContentHash.make(`sha256:${"a".repeat(64)}`);
 const OTHER_BUNDLE = ContentHash.make(`sha256:${"b".repeat(64)}`);
 
 /** One discriminating run: passes on trunk and in the premise holder's world, fails combined and against the do-nothing mutant. */
-const DISCRIMINATING: readonly (readonly [World, ProbeOutcome])[] = [
+export const DISCRIMINATING: readonly (readonly [World, ProbeOutcome])[] = [
   ["trunk", "pass"],
   ["A", "pass"],
   ["B", "n/a"],
@@ -43,7 +43,7 @@ const DISCRIMINATING: readonly (readonly [World, ProbeOutcome])[] = [
 ];
 
 /** A suspected semantic conflict between two changes on a fresh subject. */
-function conflictOn() {
+export function conflictOn() {
   const at: SubjectRef = {
     projectId: makeId("prj", ulid()),
     key: Schema.decodeUnknownSync(SubjectKey)("authz.permission-evaluation"),
@@ -76,7 +76,7 @@ function conflictOn() {
       },
     },
   };
-  return { at, conflictId, holder, suspect };
+  return { at, conflictId, holder, other, suspect };
 }
 
 const types = (log: readonly EventEnvelope[]) => log.map((event) => event.type);

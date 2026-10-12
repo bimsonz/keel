@@ -2,10 +2,10 @@
 # kills: change.cannot-queue-blocked
 # why: A change is queued with a Proven conflict open
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 1f891e1..f942d85 100644
+index 3af515e..8af09ec 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -553,12 +553,9 @@ export const decideChange = (
+@@ -608,12 +608,9 @@ export const decideChange = (
  
      case "Queue":
        if (!at("verifying")) return refuse(change, command);
@@ -20,4 +20,4 @@ index 1f891e1..f942d85 100644
 +      ]);
  
      case "Park":
-       return at("verifying")
+       // Past its plan and not yet in a batch: a party cannot land past the question a person was asked.

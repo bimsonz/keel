@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: t35.ruling-once
+# why: a ruling's Idempotency-Key is not bound to its body, so a second, different ruling under the same key is answered as if it had been given
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index fce7e5e..68a97a1 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -347,7 +347,6 @@ export const giveRuling = Effect.fn("coordination/giveRuling")(function* (comman
+     {
+       entity,
+       cause: `rule:${command.idempotencyKey}`,
+-      fingerprint: JSON.stringify([command.option, command.by, command.rationale ?? null]),
+       project: known.project,
+       actor: by,
+     },

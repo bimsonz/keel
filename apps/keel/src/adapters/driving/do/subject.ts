@@ -1,23 +1,28 @@
 import {
   conflictView,
+  hearDecision,
   hearSubject,
-  probeCellRan,
+  probeCellRanAt,
   probeDrafted,
-  probeDraftFailed,
+  probeDraftFailedAt,
+  resolveConflict,
   worldCheckRan,
 } from "@keeltown/core/application/coordination";
 import { SubjectKey } from "@keeltown/core/domain/coordination";
 import { ConflictId, type EventEnvelope, ProjectId } from "@keeltown/core/kernel";
 import type { Transaction } from "@keeltown/core/ports";
 import { Effect, Schema } from "effect";
+import { type SubjectServices, subjectServices } from "../../../composition/do.ts";
 import {
   ProbeCellRanCommand,
   ProbeDraftedCommand,
   ProbeDraftFailedCommand,
+  ResolveCommand,
   SubjectCodecs,
+  type SubjectRpc,
   WorldCheckRanCommand,
 } from "../../../rpc/index.ts";
-import { KeelObject, type Reaction } from "./keel-object.ts";
+import { KeelObjectWith, type Reaction } from "./keel-object.ts";
 
 const decoded = <S extends Schema.Top>(schema: S, input: unknown) =>
   Effect.orDie(Schema.decodeUnknownEffect(schema)(input));
@@ -43,13 +48,23 @@ export function subjectOf(name: string | undefined): {
  * to the change; the subject keeps what each change holds at or under its key,
  * mints itself once and records each premise relied at its key. It hosts the
  * subject's conflicts and their probes, and takes the Probe Workflow's facts
- * through the domain's machines. It extends KeelObject, which builds its
- * runtime and the event backbone.
+ * and a party's moves through the domain's machines. A conflict that needs a
+ * person (a party escalated it, or its probe could not decide it) is put to
+ * one through the project's namespace object; the subject hears the decision
+ * that ruling records and resolves the conflict with it. It extends
+ * KeelObjectWith, which builds its runtime and the event backbone.
  */
-export class SubjectDO extends KeelObject {
+export class SubjectDO extends KeelObjectWith<SubjectServices> implements SubjectRpc {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env, subjectServices(env));
+  }
+
   protected override react(event: EventEnvelope, tx: Transaction): Reaction | undefined {
     const { projectId, key } = subjectOf(this.ctx.id.name);
-    const { problems, ...reaction } = hearSubject(tx, projectId, key, event);
+    const { problems, ...reaction } =
+      event.type === "DecisionRecorded"
+        ? hearDecision(tx, projectId, event)
+        : hearSubject(tx, projectId, key, event);
     for (const problem of problems ?? []) console.error(`${this.ctx.id.name}: ${problem}`);
     return reaction;
   }
@@ -71,22 +86,30 @@ export class SubjectDO extends KeelObject {
     );
   }
 
+  async resolve(command: typeof ResolveCommand.Encoded) {
+    const at = subjectOf(this.ctx.id.name);
+    return this.answer(
+      SubjectCodecs.resolve,
+      decoded(ResolveCommand, command).pipe(Effect.flatMap((move) => resolveConflict(at, move))),
+    );
+  }
+
   async probeDraftFailed(command: typeof ProbeDraftFailedCommand.Encoded) {
-    const { projectId } = subjectOf(this.ctx.id.name);
+    const at = subjectOf(this.ctx.id.name);
     return this.answer(
       SubjectCodecs.probeDraftFailed,
       decoded(ProbeDraftFailedCommand, command).pipe(
-        Effect.flatMap((failed) => probeDraftFailed(projectId, failed)),
+        Effect.flatMap((failed) => probeDraftFailedAt(at, failed)),
       ),
     );
   }
 
   async probeCellRan(command: typeof ProbeCellRanCommand.Encoded) {
-    const { projectId } = subjectOf(this.ctx.id.name);
+    const at = subjectOf(this.ctx.id.name);
     return this.answer(
       SubjectCodecs.probeCellRan,
       decoded(ProbeCellRanCommand, command).pipe(
-        Effect.flatMap((cell) => probeCellRan(projectId, cell)),
+        Effect.flatMap((cell) => probeCellRanAt(at, cell)),
       ),
     );
   }

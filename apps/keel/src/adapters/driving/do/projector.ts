@@ -1,7 +1,9 @@
 import {
   conflictRecord,
+  escalationView,
   foldViews,
   listChanges,
+  listEscalations,
   listConflicts,
   probeConflict,
   readFeed,
@@ -11,12 +13,15 @@ import {
 import { noteStanding, repairStandings } from "@keeltown/core/application/identity";
 import type { EventEnvelope } from "@keeltown/core/kernel";
 import { EntityStore, type Stored, type Transaction } from "@keeltown/core/ports";
+import { EscalationNotFound } from "@keeltown/core/domain/verification";
 import { Effect, Schema } from "effect";
 import { type ProjectorServices, projectorServices } from "../../../composition/do.ts";
 import {
   ChangesRead,
   ConflictRead,
   ConflictsRead,
+  EscalationRead,
+  EscalationsRead,
   ProbeConflictRead,
   ProjectorCodecs,
   ProjectorRead,
@@ -121,5 +126,26 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
       Effect.flatMap(({ project, probeId }) => probeConflict(project, probeId)),
     );
     return this.answer(ProjectorCodecs.probeConflict, program);
+  }
+
+  async escalations(request: typeof EscalationsRead.Encoded) {
+    const program = Effect.gen(function* () {
+      const read = yield* Effect.orDie(Schema.decodeUnknownEffect(EscalationsRead)(request));
+      return listEscalations(yield* EntityStore, read);
+    });
+    return this.answer(ProjectorCodecs.escalations, program);
+  }
+
+  async escalation(request: typeof EscalationRead.Encoded) {
+    const program = Effect.gen(function* () {
+      const { escalationId } = yield* Effect.orDie(
+        Schema.decodeUnknownEffect(EscalationRead)(request),
+      );
+      const record = escalationView(yield* EntityStore, escalationId);
+      return record === undefined
+        ? yield* new EscalationNotFound({ escalationId, nextActions: [] })
+        : record;
+    });
+    return this.answer(ProjectorCodecs.escalation, program);
   }
 }

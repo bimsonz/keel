@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: t35.resolve-escalate
+# why: the escalating agent's sponsor is not passed to the raise, so the person who vouches for the agent is never asked first
+diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
+index 23f9e41..f53ae07 100644
+--- a/packages/core/src/application/coordination/conflict-moves.ts
++++ b/packages/core/src/application/coordination/conflict-moves.ts
+@@ -198,7 +198,6 @@ export const resolveConflict = Effect.fn("coordination/resolveConflict")(functio
+       namespace: place.value.org,
+       escalationId,
+       project: at.projectId,
+-      sponsor: command.sponsor,
+       raisedBy: subjectAddress(at.projectId, at.key),
+       ask: askAbout(view, "human-class", command.note),
+     })

@@ -2,21 +2,22 @@
 # kills: lane.change-ends
 # why: A change withdrawn or superseded while queued stays in the queue, so the lane composes and lands it anyway
 diff --git a/packages/core/src/application/integration/lane.ts b/packages/core/src/application/integration/lane.ts
-index 07bdc79..6bee0a7 100644
+index 1562ba3..5a7b6a7 100644
 --- a/packages/core/src/application/integration/lane.ts
 +++ b/packages/core/src/application/integration/lane.ts
-@@ -273,13 +273,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
-       case "ChangeSuperseded":
-       case "ChangeBounced": {
+@@ -304,14 +304,7 @@ export const laneHeard = (tx: Transaction, laneId: string, event: EventEnvelope)
          const ended = decodeEnded(event.payload);
--        return lane.queue.includes(ended.changeId)
+         // One held for a ruling is in no queue, and its kept plan goes with it.
+         const kept = (lane.plans ?? []).some((plan) => plan.changeId === ended.changeId);
+-        return lane.queue.includes(ended.changeId) ||
+-          (kept && !holds(tx.store, lane, ended.changeId))
 -          ? withPlan(
 -              { ...lane, queue: lane.queue.filter((id) => id !== ended.changeId) },
 -              ended.changeId,
 -              undefined,
 -            )
 -          : undefined;
-+        return lane.queue.includes(ended.changeId) ? undefined : undefined;
++        return lane.queue.includes(ended.changeId) && kept ? undefined : undefined;
        }
        case "TrunkAdvanced": {
          const advanced = decodeAdvanced(event.payload);

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/conflict-views.test.ts
+# kills: b23.conflict-escalation
+# why: the question a person was asked, its options and its evidence are served to any reader of a public project, not to its members only
+diff --git a/apps/keel/src/adapters/driving/http/views.ts b/apps/keel/src/adapters/driving/http/views.ts
+index c348b13..bc13f2c 100644
+--- a/apps/keel/src/adapters/driving/http/views.ts
++++ b/apps/keel/src/adapters/driving/http/views.ts
+@@ -240,7 +240,7 @@ const sideBody = (side: ConflictSide) => ({
+  * a public project is told that a person was asked, and nothing of what.
+  */
+ const escalationAsked = ({ escalation }: ConflictRecord, audience: Audience) =>
+-  audience !== "members" || escalation === undefined
++  escalation === undefined
+     ? {}
+     : {
+         question: escalation.question,

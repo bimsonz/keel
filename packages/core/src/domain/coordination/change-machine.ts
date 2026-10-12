@@ -616,7 +616,8 @@ export const decideChange = (
       );
 
     case "Park":
-      return at("verifying")
+      // Past its plan and not yet in a batch: a party cannot land past the question a person was asked.
+      return at("verifying", "queued")
         ? Result.succeed([
             ChangeParked.make({
               changeId: id,
@@ -802,6 +803,7 @@ const illegal = (state: Change | undefined, event: ChangeEvent): never => {
 type Optional =
   | "parkReason"
   | "escalationId"
+  | "parkedFrom"
   | "batchId"
   | "laneId"
   | "predicatePolicy"
@@ -815,7 +817,7 @@ const moveTo = (change: Change, next: ChangeState, drop: readonly Optional[] = [
 };
 
 const released = (change: Change, next: ChangeState): Change => ({
-  ...moveTo(change, next, ["parkReason", "escalationId", "batchId", "laneId"]),
+  ...moveTo(change, next, ["parkReason", "escalationId", "parkedFrom", "batchId", "laneId"]),
   lease: { ...change.lease, state: "released" },
 });
 
@@ -928,21 +930,35 @@ export const evolveChange = (
     case "ChangeBounced":
       if (event.declined !== undefined)
         return from("integrating") && event.declined.batchId === change.batchId
-          ? moveTo(change, "bounced", ["parkReason", "escalationId", "batchId", "laneId"])
+          ? moveTo(change, "bounced", [
+              "parkReason",
+              "escalationId",
+              "parkedFrom",
+              "batchId",
+              "laneId",
+            ])
           : illegal(change, event);
       return from("deriving", "verifying", "queued") ||
         (event.conflictId === undefined &&
           (from("integrating") || (from("parked") && change.parkReason === "awaiting-ruling")))
-        ? moveTo(change, "bounced", ["parkReason", "escalationId", "batchId", "laneId"])
+        ? moveTo(change, "bounced", [
+            "parkReason",
+            "escalationId",
+            "parkedFrom",
+            "batchId",
+            "laneId",
+          ])
         : illegal(change, event);
     case "ConflictNoted":
       return change;
     case "ChangeParked":
       if (event.reason === "awaiting-ruling") {
-        return from("verifying")
+        // It keeps its lane and its plan: the ruling puts it back where it waited.
+        return change.state === "verifying" || change.state === "queued"
           ? {
               ...moveTo(change, "parked"),
               parkReason: "awaiting-ruling",
+              parkedFrom: change.state,
               ...(event.escalationId === undefined ? {} : { escalationId: event.escalationId }),
             }
           : illegal(change, event);
@@ -956,7 +972,11 @@ export const evolveChange = (
         : illegal(change, event);
     case "ChangeResumed":
       return from("parked") && change.parkReason === "awaiting-ruling"
-        ? moveTo(change, "verifying", ["parkReason", "escalationId"])
+        ? moveTo(change, change.parkedFrom ?? "verifying", [
+            "parkReason",
+            "escalationId",
+            "parkedFrom",
+          ])
         : illegal(change, event);
     case "ChangeAdopted": {
       if (!isLapsed(change.lease, committed.at)) return illegal(change, event);

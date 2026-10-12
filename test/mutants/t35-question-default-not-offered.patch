@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations.test.ts
+# kills: t35.question
+# why: the question's default names an option it does not offer, so the domain refuses every raise and no conflict can be escalated
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index fce7e5e..c1259d5 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -159,7 +159,7 @@ export function askAbout(
+     category: reason === "unprovable" ? "unprovable-conflict" : "ambiguous-requirement",
+     evidence: evidenceOf(view, note),
+     precedents: [],
+-    default: PREMISE_HOLDS,
++    default: "hold",
+   };
+ }
+ 

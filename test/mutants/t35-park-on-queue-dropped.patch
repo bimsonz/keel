@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts
+# kills: t35.park-on-queue
+# why: a change whose conflict went to a person before its plan compiled is queued and left there, so it is batched and lands while the ruling is pending
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 179323f..ece9a5e 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1396,7 +1396,6 @@ export const planCompiled: (
+         return [
+           compile,
+           { _tag: "Queue", laneId, blockers },
+-          ...(asked === undefined ? [] : [{ _tag: "Park" as const, escalationId: asked }]),
+         ];
+       },
+       { alongside: (tx) => tx.outbox.subscribe(laneId, LANE_HEARS) },

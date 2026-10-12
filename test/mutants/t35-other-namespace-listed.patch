@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations.test.ts
+# kills: t35.other-namespace-unlisted
+# why: an escalation is listed to anyone who maintains any namespace once thirty minutes pass, so another org's maintainers read this org's questions
+diff --git a/packages/core/src/application/memory/escalation-views.ts b/packages/core/src/application/memory/escalation-views.ts
+index 370bbfc..0511086 100644
+--- a/packages/core/src/application/memory/escalation-views.ts
++++ b/packages/core/src/application/memory/escalation-views.ts
+@@ -173,7 +173,7 @@ export function listedTo(
+   if (reader._tag === "Project") return record.project === reader.project;
+   if (record.sponsor === reader.userId) return true;
+   return (
+-    reader.maintains.includes(record.namespace) &&
++    reader.maintains.length > 0 &&
+     (record.sponsor === undefined || now - record.escalation.raisedAt >= MAINTAINERS_AFTER_MS)
+   );
+ }

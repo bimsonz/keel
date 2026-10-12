@@ -65,6 +65,14 @@ const decodeSameIntent = Schema.decodeUnknownOption(
 const decodeLandedSameIntent = Schema.decodeUnknownOption(
   Schema.Struct({ changeId: Schema.String, landedChangeId: Schema.String }),
 );
+const decodeEscalation = Schema.decodeUnknownOption(
+  Schema.Struct({
+    conflictId: Schema.optional(Schema.String),
+    escalationId: Schema.optional(Schema.String),
+    decisionId: Schema.optional(Schema.String),
+    reason: Schema.optional(Schema.String),
+  }),
+);
 
 /** More than the notice's title says, chosen for the event when it is delivered. */
 export function detailOf(event: EventEnvelope): string | undefined {
@@ -83,6 +91,55 @@ export function detailOf(event: EventEnvelope): string | undefined {
         onSome: (p) =>
           `${p.landedChangeId}, with the same intent as your change ${p.changeId}, landed`,
       });
+    case "ConflictEscalated":
+      return Option.match(decodeEscalation(event.payload), {
+        onNone: () => undefined,
+        onSome: (p) =>
+          `${p.conflictId} was put to a person as ${p.escalationId}${p.reason === "unprovable" ? ": Keel could not prove it either way" : ""}`,
+      });
+    case "ConflictResolved":
+    case "ChangeResumed":
+      return Option.match(decodeEscalation(event.payload), {
+        onNone: () => undefined,
+        onSome: (p) => (p.decisionId === undefined ? undefined : `decided by ${p.decisionId}`),
+      });
+    case "ChangeParked":
+      return Option.match(decodeEscalation(event.payload), {
+        onNone: () => undefined,
+        onSome: (p) =>
+          p.escalationId === undefined ? undefined : `waiting for a ruling on ${p.escalationId}`,
+      });
+    default:
+      return undefined;
+  }
+}
+
+const readConflict = (conflictId: string, title: string): NextAction => ({
+  kind: "read",
+  title,
+  operationId: "Conflicts_getConflict",
+  args: { conflictId },
+});
+
+/**
+ * What an agent can do about a delivered event: the next actions its payload
+ * names, and for a conflict put to a person or ruled on, where to read the
+ * question and the decision.
+ */
+export function actionsOf(event: EventEnvelope): readonly NextAction[] | undefined {
+  const named = Option.getOrUndefined(decodeActionable(event.payload))?.nextActions;
+  if (named !== undefined) return named;
+  const conflictId = Option.getOrUndefined(decodeEscalation(event.payload))?.conflictId;
+  if (conflictId === undefined) return undefined;
+  switch (event.type) {
+    case "ConflictEscalated":
+      return [
+        readConflict(conflictId, "Read the question a person was asked, and wait for the ruling"),
+      ];
+    case "ConflictResolved":
+      return [
+        readConflict(conflictId, "Read the decision, and act on what it means for your change"),
+      ];
     default:
       return undefined;
   }
@@ -96,7 +153,7 @@ export function detailOf(event: EventEnvelope): string | undefined {
 export function recordDelivery(store: Store, event: EventEnvelope): void {
   const next = headOf(store) + 1;
   const detail = detailOf(event);
-  const nextActions = Option.getOrUndefined(decodeActionable(event.payload))?.nextActions;
+  const nextActions = actionsOf(event);
   const entry: typeof InboxEntrySchema.Encoded = {
     eventId: event.eventId,
     type: event.type,

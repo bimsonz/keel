@@ -1,16 +1,18 @@
-import { Effect, Schema } from "effect";
-import type {
-  Change,
-  ChangeInOtherProject,
+import { Effect, Result, Schema } from "effect";
+import {
+  type Change,
+  type ChangeInOtherProject,
   ChangeNotFound,
-  ChangeStateRefused,
-  CommitNotInWorkspace,
-  LeaseNotLapsed,
-  LeaseStale,
-  PoolExhausted,
-  Preflight,
-  RevisionMismatch,
-  SketchNotFound,
+  checkLease,
+  type Move,
+  type ChangeStateRefused,
+  type CommitNotInWorkspace,
+  type LeaseNotLapsed,
+  type LeaseStale,
+  type PoolExhausted,
+  type Preflight,
+  type RevisionMismatch,
+  type SketchNotFound,
 } from "../../domain/coordination/index.ts";
 import type {
   Audience,
@@ -27,15 +29,22 @@ import {
   type ProjectId,
   type UserId,
 } from "../../domain/kernel/index.ts";
-import type { ConflictNotFound, ProbeNotFound } from "../../domain/verification/index.ts";
+import {
+  type ConflictNotFound,
+  MoveRefused,
+  type ProbeNotFound,
+} from "../../domain/verification/index.ts";
 import {
   type ChangeListPage,
   type ChangeListRead,
   type ChangeRead,
   Changes,
+  Clock,
   type ConflictListPage,
   type ConflictListRead,
+  ConflictMoves,
   type ConflictRecord,
+  type ConflictView,
   EventFeed,
   type EventFeedEntry,
   type EventFeedPage,
@@ -344,3 +353,56 @@ export const readSnapshot: (
   scope: ProjectScope,
 ) => Effect.Effect<ViewSnapshot, never, ProjectViews> = (scope) =>
   ProjectViews.use((views) => views.snapshot(scope.project));
+
+/** A party's move on a conflict, as the doorway hands it over: the `Keel-Lease` value and the Idempotency-Key with it. */
+export interface ResolveInput {
+  readonly conflictId: ConflictId;
+  readonly changeId: ChangeId;
+  readonly lease: LeaseId;
+  readonly move: Move;
+  readonly note?: string | undefined;
+  readonly idempotencyKey: string;
+}
+
+/**
+ * A party moves on a conflict of the project the doorway authorised it in,
+ * under its change's lease. The change must be that project's and the lease
+ * its current one, read from the change's own DO; the conflict's subject
+ * comes from the Projector, and the move is made at the Subject DO that hosts
+ * the conflict, with the agent's sponsor as the person to ask first. A change
+ * of another project is ChangeNotFound, as one that does not exist.
+ */
+export const resolveMove: (
+  principal: AgentToken,
+  scope: ProjectScope,
+  input: ResolveInput,
+) => Effect.Effect<
+  ConflictView,
+  ChangeNotFound | LeaseStale | ConflictNotFound | MoveRefused | IdempotencyConflict,
+  Changes | ProjectViews | ConflictMoves | Clock
+> = (principal, scope, input) =>
+  Effect.gen(function* () {
+    const { change, projectId } = yield* (yield* Changes).get(input.changeId);
+    if (projectId !== scope.project)
+      return yield* new ChangeNotFound({ changeId: input.changeId, nextActions: [] });
+    const held = checkLease(change, input.lease, yield* (yield* Clock).now);
+    if (Result.isFailure(held)) return yield* held.failure;
+    const { conflict } = yield* (yield* ProjectViews).conflict(scope.project, input.conflictId);
+    if (conflict.subjectKey === undefined)
+      return yield* new MoveRefused({
+        conflictId: input.conflictId,
+        reason: "the conflict names no subject to move it on",
+      });
+    return yield* (yield* ConflictMoves).resolve(
+      { projectId: scope.project, key: conflict.subjectKey },
+      {
+        conflictId: input.conflictId,
+        changeId: input.changeId,
+        agentId: principal.agentId,
+        sponsor: principal.sponsor,
+        move: input.move,
+        note: input.note,
+        idempotencyKey: input.idempotencyKey,
+      },
+    );
+  });

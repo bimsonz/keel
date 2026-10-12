@@ -1,0 +1,24 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: t35.unprovable-escalates
+# why: an unprovable conflict is settled as escalated with an id nobody raised, so it waits on a question no person was ever asked
+diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
+index 23f9e41..aa452d6 100644
+--- a/packages/core/src/application/coordination/conflict-moves.ts
++++ b/packages/core/src/application/coordination/conflict-moves.ts
+@@ -104,16 +104,6 @@ export const escalateUnprovable = Effect.fn("coordination/escalateUnprovable")(f
+       ? undefined
+       : Option.getOrUndefined(yield* (yield* AgentDirectory).findAgent(agentId));
+   const escalationId = escalationIdOf(conflictId);
+-  yield* (yield* HumanGate)
+-    .raise({
+-      namespace: place.value.org,
+-      escalationId,
+-      project: at.projectId,
+-      sponsor: agent?.sponsor,
+-      raisedBy: subjectAddress(at.projectId, at.key),
+-      ask: askAbout(view, "unprovable"),
+-    })
+-    .pipe(Effect.orDie);
+   yield* commit(
+     {
+       entity: conflictRef(conflictId),

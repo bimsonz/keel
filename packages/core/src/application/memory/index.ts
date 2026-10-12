@@ -1,16 +1,15 @@
 import type { Effect } from "effect";
 import type { SubjectKey } from "../../domain/coordination/index.ts";
 import type { AgentToken } from "../../domain/identity/index.ts";
-import type { DecisionId, EscalationId } from "../../domain/kernel/index.ts";
+import type { DecisionId } from "../../domain/kernel/index.ts";
 import type {
   Decision,
   DecisionNotFound,
   NothingToExplain,
   WhyLink,
 } from "../../domain/memory/index.ts";
-import type { EscalationNotFound } from "../../domain/verification/index.ts";
 import { stub } from "../not-implemented.ts";
-import type { Clock, EntityStore, EventOutbox, Ids, SubjectRegistry } from "../ports/index.ts";
+import type { EntityStore, SubjectRegistry } from "../ports/index.ts";
 
 /** memory use-cases reachable from the API. Signatures are fixed here. */
 
@@ -35,16 +34,7 @@ export const getDecision: (
   decisionId: DecisionId,
 ) => Effect.Effect<Decision, DecisionNotFound, EntityStore> = stub("memory/getDecision");
 
-export const giveRuling: (
-  principal: AgentToken,
-  input: {
-    readonly escalationId: EscalationId;
-    readonly option: string;
-    readonly rationale?: string;
-  },
-) => Effect.Effect<Decision, EscalationNotFound, EntityStore | EventOutbox | Ids | Clock> =
-  stub("memory/giveRuling");
-
 export * from "./change-views.ts";
 export * from "./conflict-views.ts";
+export * from "./escalation-views.ts";
 export * from "./feed.ts";

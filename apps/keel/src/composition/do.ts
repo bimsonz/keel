@@ -9,6 +9,7 @@ import {
   type EntityStore,
   type EventOutbox,
   type FanOut,
+  type HumanGate,
   type Ids,
   type OrgUsage,
   type ProjectOrgs,
@@ -41,6 +42,7 @@ import { WorkspaceRebaserGitCore } from "../adapters/driven/gitcore/workspace-re
 import { WorkspaceRefresherGitCore } from "../adapters/driven/gitcore/workspace-refresher.ts";
 import { BundleStoreR2 } from "../adapters/driven/r2/bundle-store.ts";
 import { BatchVerificationWorkflow } from "../adapters/driven/workflow/batch-verification.ts";
+import { HumanGateRpc } from "../adapters/driven/do-rpc/human-gate.ts";
 import { LiveChangesRpc } from "../adapters/driven/do-rpc/live-changes.ts";
 import { WorkspacePoolRpc } from "../adapters/driven/do-rpc/workspace-pool.ts";
 import { EntityStoreSql, migrateEntityStore } from "../adapters/driven/do-storage/entity-store.ts";
@@ -73,6 +75,23 @@ export function projectorServices(env: Env): Layer.Layer<ProjectorServices> {
 /** The AgentSession DO writes the AgentDirectory D1 row inline, so enrolment and revocation bind the next request. */
 export function agentSessionServices(env: Env): Layer.Layer<AgentSessionServices> {
   return AgentDirectoryD1(env.DB);
+}
+
+/** The Subject DO's driven adapters beyond the backbone: what it needs to put a conflict to a person. */
+export type SubjectServices = HumanGate | AgentDirectory | ProjectOrgs;
+
+/**
+ * The Subject DO raises an escalation on the object of the namespace its
+ * project belongs to, which it finds in D1's `projects` table; when Keel
+ * escalates on its own, it reads who vouches for the premise holder's agent
+ * from the directory.
+ */
+export function subjectServices(env: Env): Layer.Layer<SubjectServices> {
+  return Layer.mergeAll(
+    HumanGateRpc((address) => env.NAMESPACE.get(env.NAMESPACE.idFromName(address))),
+    AgentDirectoryD1(env.DB),
+    ProjectOrgsD1(env.DB),
+  );
 }
 
 /** The Project DO's driven adapters beyond the backbone: it bootstraps a project's repos, trunk and pool. */

@@ -162,6 +162,7 @@ union ProblemCode {
   internalDefect: "internal.defect",
   changeNotFound: "change.not_found",
   conflictNotFound: "conflict.not_found",
+  conflictMoveRefused: "conflict.move_refused",
   probeNotFound: "probe.not_found",
   changeLeaseStale: "change.lease_stale",
   changeLeaseNotLapsed: "change.lease_not_lapsed",

@@ -29,6 +29,8 @@ import { OrgsD1 } from "../adapters/driven/d1/orgs.ts";
 import { ProjectOrgsD1 } from "../adapters/driven/d1/project-orgs.ts";
 import { UsersD1 } from "../adapters/driven/d1/users.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
+import { ConflictMovesRpc } from "../adapters/driven/do-rpc/conflict-moves.ts";
+import { EscalationsRpc } from "../adapters/driven/do-rpc/escalations.ts";
 import { EnrolmentsRpc } from "../adapters/driven/do-rpc/enrolments.ts";
 import { SessionsRpc } from "../adapters/driven/do-rpc/sessions.ts";
 import { StandingsRpc } from "../adapters/driven/do-rpc/standings.ts";
@@ -70,6 +72,8 @@ export function isolateLayer(
     overrides.inbox ?? InboxRpc(agentSession),
     overrides.eventFeed ?? EventFeedRpc(projector),
     ProjectViewsRpc(projector),
+    EscalationsRpc(projector, (address) => env.NAMESPACE.get(env.NAMESPACE.idFromName(address))),
+    ConflictMovesRpc((address) => env.SUBJECT.get(env.SUBJECT.idFromName(address))),
     ProbeStoreR2(env.BUNDLES),
     overrides.notifier ?? NotifierRpc(agentSession),
     overrides.projects ?? ProjectsRpc(project),

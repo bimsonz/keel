@@ -105,6 +105,8 @@ export const Change = Schema.Struct({
   batchId: Schema.optional(BatchId),
   /** The escalation it waits on, while Parked awaiting a ruling. */
   escalationId: Schema.optional(EscalationId),
+  /** Where it was parked from awaiting a ruling, and so where its resume returns it. */
+  parkedFrom: Schema.optional(Schema.Literals(["verifying", "queued"])),
   /** The plan it was last compiled to (PlanCompiled), carried onto ChangeQueued and ChangeRequeued. */
   planHash: Schema.optional(ContentHash),
   /** That plan's predicate policy (PlanCompiled), applied to a proven conflict. Absent, or a predicate left out, is `advise`. */

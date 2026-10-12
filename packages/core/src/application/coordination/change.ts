@@ -59,7 +59,12 @@ import {
   type VerdictId,
   WorkspaceId,
 } from "../../domain/kernel/index.ts";
-import { ConflictProven, VerdictIssued } from "../../domain/verification/index.ts";
+import {
+  ConflictEscalated,
+  ConflictProven,
+  ConflictResolved,
+  VerdictIssued,
+} from "../../domain/verification/index.ts";
 import {
   type ChangeRead,
   Clock,
@@ -86,8 +91,15 @@ import {
   WorkspaceRebaser,
 } from "../ports/index.ts";
 import { planStateOf, submissionStateOf } from "../verification/index.ts";
+import { escalationIdOf } from "./escalations.ts";
 import { subjectIdOf } from "./hashed-id.ts";
-import { blockersOf, hearConflict, partyConflictOf, policyFor } from "./party-conflicts.ts";
+import {
+  awaitedEscalation,
+  blockersOf,
+  hearConflict,
+  partyConflictOf,
+  policyFor,
+} from "./party-conflicts.ts";
 import { preflightFor } from "./preflight.ts";
 
 /**
@@ -199,6 +211,8 @@ export const LANE_HEARS = [
   "ChangeQueued",
   "ChangeRequeued",
   "ChangeBounced",
+  "ChangeParked",
+  "ChangeResumed",
   "ChangeWithdrawn",
   "ChangeSuperseded",
 ] as const;
@@ -1343,9 +1357,13 @@ const conflictBounce = (blocking: readonly ConflictId[]): ChangeCommand | undefi
  * which keeps the plan's predicate policy on the change, then, since L1 has
  * no step between the plan and the queue, ChangeQueued on the project's lane
  * in the same transaction. A conflict proven against the change under the
- * plan's `block` policy bounces it instead, citing the conflict. The lane is
- * subscribed there to ChangeQueued, ChangeRequeued, ChangeBounced and the
- * change's ends, so it hears the change it must batch, re-enqueue or drop.
+ * plan's `block` policy bounces it instead, citing the conflict. A conflict
+ * of the change's that is with a person, unruled, parks it straight after it
+ * is queued (ChangeParked in the same transaction), so no party lands past
+ * the question; the ruling resumes it into the queue. The lane is subscribed
+ * there to ChangeQueued, ChangeRequeued, ChangeBounced, ChangeParked,
+ * ChangeResumed and the change's ends, so it hears the change it must batch,
+ * re-enqueue, hold or drop.
  */
 export const planCompiled: (
   changeId: ChangeId,
@@ -1372,7 +1390,14 @@ export const planCompiled: (
       (store) => {
         const blockers = blockersOf(store, plan.predicatePolicy);
         const bounce = conflictBounce(blockers.openProvenConflicts);
-        return [compile, bounce ?? { _tag: "Queue", laneId, blockers }];
+        if (bounce !== undefined) return [compile, bounce];
+        // A conflict already with a person holds the change the moment it is queued.
+        const asked = awaitedEscalation(store);
+        return [
+          compile,
+          { _tag: "Queue", laneId, blockers },
+          ...(asked === undefined ? [] : [{ _tag: "Park" as const, escalationId: asked }]),
+        ];
       },
       { alongside: (tx) => tx.outbox.subscribe(laneId, LANE_HEARS) },
     );
@@ -1488,6 +1513,8 @@ const CONFLICT_BOUNCEABLE: ReadonlySet<Change["state"]> = new Set([
 ]);
 
 const decodeProven = Schema.decodeUnknownOption(ConflictProven);
+const decodeEscalated = Schema.decodeUnknownOption(ConflictEscalated);
+const decodeResolved = Schema.decodeUnknownOption(ConflictResolved);
 
 /**
  * A conflict proven against the change, under the predicate policy its latest
@@ -1541,7 +1568,14 @@ const commandFor = (
   store: Store,
   change: Change,
   event: EventEnvelope,
-): { readonly command?: ChangeCommand; readonly problem?: string } | undefined => {
+):
+  | {
+      readonly command?: ChangeCommand;
+      readonly problem?: string;
+      /** The machine may refuse this command where the change stands, and that is expected. */
+      readonly refusable?: true;
+    }
+  | undefined => {
   const ours = (batchId: string) => change.batchId !== undefined && batchId === change.batchId;
   switch (event.type) {
     case "BatchFormed": {
@@ -1561,11 +1595,32 @@ const commandFor = (
       return provenAgainst(store, change, event);
     case "ConflictSuspected":
     case "ConflictDismissed":
-    case "ConflictEscalated":
-    case "ConflictResolved":
       // The change keeps the conflicts it is a party to; its queue and batch read them as blockers.
       hearConflict(store, event);
       return undefined;
+    case "ConflictEscalated": {
+      hearConflict(store, event);
+      const escalated = decodeEscalated(event.payload);
+      // The machine says where a change parks; anywhere else it goes on as it was, and that is no problem.
+      return Option.isSome(escalated)
+        ? {
+            command: { _tag: "Park", escalationId: escalated.value.escalationId },
+            refusable: true,
+          }
+        : undefined;
+    }
+    case "ConflictResolved": {
+      hearConflict(store, event);
+      const resolved = decodeResolved(event.payload);
+      if (Option.isNone(resolved)) return undefined;
+      const { conflictId, decisionId } = resolved.value;
+      // Only the ruling on the escalation the change waits for resumes it.
+      return decisionId !== undefined &&
+        change.parkReason === "awaiting-ruling" &&
+        change.escalationId === escalationIdOf(conflictId)
+        ? { command: { _tag: "Resume", decisionId }, refusable: true }
+        : undefined;
+    }
     case "VerdictIssued": {
       const verdict = decodeVerdict(event.payload);
       if (Option.isNone(verdict) || !ours(verdict.value.subject)) return undefined;
@@ -1640,7 +1695,9 @@ export interface BatchReaction {
  * transaction that records the delivery: BatchFormed naming it → ChangeBatched;
  * BatchFailed attributed to it → ChangeBounced with the verdict's reasons and
  * next actions; BatchFailed `infra`, CandidateBisected or CandidateInvalidated
- * → ChangeRequeued. The cause is the delivery's dedupe key, so a redelivery is
+ * → ChangeRequeued. A conflict it is a party to, put to a person →
+ * ChangeParked where the machine parks a change, and that escalation's ruling
+ * → ChangeResumed. The cause is the delivery's dedupe key, so a redelivery is
  * a no-op. A refusal by the machine commits nothing and is reported as a
  * `problem`: a reaction never fails the delivery, which would be redelivered
  * forever. Undefined when the event is none of these.
@@ -1658,10 +1715,12 @@ export const reactToBatch = (
     return { drafts: [], ...(reacting.problem === undefined ? {} : { problem: reacting.problem }) };
   const decided = transition(tx, changeId, REACTION_REFUSALS, [reacting.command]);
   if (Result.isFailure(decided))
-    return {
-      drafts: [],
-      problem: `${event.type} refused with ${decided.failure._tag} in state ${change.state}`,
-    };
+    return reacting.refusable === true && decided.failure._tag === "ChangeStateRefused"
+      ? { drafts: [] }
+      : {
+          drafts: [],
+          problem: `${event.type} refused with ${decided.failure._tag} in state ${change.state}`,
+        };
   return {
     drafts: decided.success.drafts,
     ...inProject(tx.store, changeId),

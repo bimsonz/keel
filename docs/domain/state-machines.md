@@ -24,9 +24,9 @@ Terms are in [CONTEXT.md](../../CONTEXT.md).
 | trunk (promotion) | Trunk DO | `trunk:<projectId>`: its own entity kind and seq, apart from the project's |
 | candidate | Lane DO | `lane:<project>:<id>` |
 | verdict | the DO that issued it: Change DO for a change, Lane DO for a batch | as its issuer |
-| decision | Subject DO | `subj:<project>:<key>` |
+| decision | the namespace object that took the ruling, in the ruling's own transaction | `ns:<namespaceId>` |
 | tenet | Subject DO | `subj:<project>:<key>` |
-| escalation | the DO that raised it | as its raiser |
+| escalation | the object of the namespace that owns its project | `ns:<namespaceId>` |
 | deployment | the DO that created it | as its creator |
 | user | none: D1 (Better Auth) holds it; its tenancy events are committed for the audit | `user:<userId>` |
 | org | none: D1 (Better Auth) holds it; its tenancy events are committed to the org's object | `org:<orgId>` |
@@ -83,6 +83,7 @@ stateDiagram-v2
   Verifying --> Withdrawn: ChangeWithdrawn
   Verifying --> Superseded: ChangeSuperseded
   Queued --> Integrating: ChangeBatched
+  Queued --> AwaitingRuling: ChangeParked
   Queued --> Bounced: ChangeBounced
   Queued --> Queued: ChangeAdopted
   Queued --> Withdrawn: ChangeWithdrawn
@@ -100,7 +101,8 @@ stateDiagram-v2
   Bounced --> Superseded: ChangeSuperseded
   Parked --> Withdrawn: ChangeWithdrawn
   Parked --> Superseded: ChangeSuperseded
-  AwaitingRuling --> Verifying: ChangeResumed
+  AwaitingRuling --> Verifying: ChangeResumed [parked from Verifying]
+  AwaitingRuling --> Queued: ChangeResumed [parked from Queued]
   AwaitingRuling --> Bounced: ChangeBounced
   AwaitingRuling --> AwaitingRuling: ChangeAdopted
   LeaseLapsed --> Working: ChangeAdopted [has-workspace]
@@ -126,14 +128,14 @@ stateDiagram-v2
 | Drifted, Bounced | Working | `revise` | Valid lease | `IntentRevised` |
 | Verifying | Queued | The plan's pre-queue steps pass | No Proven conflict is open, no guard fails, no high-severity drift is unresolved; otherwise the command is refused as blocked, with no event | `ChangeQueued`, carrying the hash of the plan the change was compiled to (as does `ChangeRequeued`) |
 | Verifying | Bounced | A conflict is proven against the change under a `block` policy, or a guard fails | — | `ChangeBounced`, naming exactly one cause: the verdict, or the conflict (a conflict bounces a change only from Deriving, Verifying or Queued) |
-| Verifying | Parked | A human-class conflict or step | — | `ChangeParked {reason: awaiting-ruling}` |
+| Verifying, Queued | Parked | A conflict the change is a party to is put to a person (caused by `ConflictEscalated`), or one already is when the change is queued: `ChangeParked` then follows `ChangeQueued` in the same commit | — | `ChangeParked {reason: awaiting-ruling}`. The change keeps its lane and its plan; its lane takes it out of the queue, so no batch forms with it. A change already Integrating is not parked: it finishes its batch |
 | Queued | Integrating | Caused by `BatchFormed` | Nothing blocks it, as for queueing; a blocked change refuses the batch and is bounced | `ChangeBatched` |
 | Queued | Bounced | A conflict is proven against the change (caused by `ConflictProven`), or it is blocked when batched | — | `ChangeBounced` |
 | Integrating | Queued | Caused by `BatchFailed` blaming another member, `infra`, `textual` or `interaction`; by `CandidateBisected`; or by `CandidateInvalidated` | The domain's `redExit` reads the cause from the attribution. Two infra failures requeue with no blame. A member requeued for `textual` or `interaction` runs alone in its next batch (`runsAlone`), so a clash between members ends in one landing and one sole-member failure | `ChangeRequeued {reason}`: `co-member-failed`, `infra-failure`, `textual`, `interaction`, `bisection` or `invalidated` |
 | Integrating | Bounced | Caused by `BatchFailed` attributed to this change | — | `ChangeBounced` |
 | Integrating | Bounced | Caused by `PromotionDeclined` for a refused push that bounces its members: a pack too large for a batch promoted alone, or a repo at its size quota | The declined batch is the change's own | `ChangeBounced {declined: {batchId, reason}}`, with the way forward for the reason: split the change, or have room made and submit again |
 | Integrating | Landed | Caused by `TrunkAdvanced` | None: `TrunkAdvanced` is a fact, so landing is never refused. The invariant is enforced before trunk moves: at queueing, by Queued → Bounced, and by the lane pulling a blocked member out before promotion (`CandidateInvalidated`, then `ChangeRequeued {reason: invalidated}`) | `ChangeLanded`, copied from the change's landing in `TrunkAdvanced`: its commit on trunk, the trunk head, its candidate and its proof |
-| Parked (awaiting-ruling) | Verifying | Caused by `RulingGiven` | — | `ChangeResumed` |
+| Parked (awaiting-ruling) | Verifying or Queued: the state it was parked from | The escalation it waits for is ruled on (caused by the `ConflictResolved` that carries the ruling's decision) | The decision is that escalation's; another conflict's leaves it parked | `ChangeResumed`. Back in Queued it rejoins its lane at the front, under the plan it was queued with |
 | Parked (awaiting-ruling) | Bounced | Caused by `RulingGiven` choosing to bounce | — | `ChangeBounced` |
 | Parked (lease-lapsed) | Working | `adopt` | The lease is Lapsed | `ChangeAdopted` (new lease; the old token is fenced). A change parked before its workspace was granted returns to Declared |
 | any other non-terminal state | the same state | `adopt` | The lease is Lapsed | `ChangeAdopted`: the change keeps waiting (e.g. Parked awaiting-ruling, Verifying), now with the new lease |
@@ -393,7 +395,7 @@ The Auditor's full-suite run on each new head is recorded as `AuditCompleted`. O
 
 ## Escalation
 
-Owner: the DO that raised it. An Escalation is a question routed to a person, with options and their consequences.
+Owner: the object of the namespace that owns the project the question is about (`ns:<namespaceId>`), whoever raised it. Its id is derived from what it is about, so the same question raised again (a retry, the other party) is the same escalation. An Escalation is a question routed to a person, with options and their consequences.
 
 <!-- chart:escalation — generated from packages/core/test/charts/charts.ts by render.ts; edit the chart, not this block -->
 ```mermaid
@@ -409,7 +411,7 @@ stateDiagram-v2
 | From | To | Trigger | Guard | Event |
 |---|---|---|---|---|
 | — | Open | A human-class conflict or step, an unprovable conflict, an overrule request, a frozen trunk | At least two options with unique ids, and the default among them (otherwise invalid) | `EscalationRaised` |
-| Open | Ruled | A person answers | Scope `operator`; the option is one the escalation offers (otherwise refused, with a next action per valid id) | `RulingGiven`, emitted by the owner; it resumes waiting Workflows through `sendEvent` |
+| Open | Ruled | A person answers | Scope `operator`; the option is one the escalation offers (otherwise refused, with a next action per valid id) | `RulingGiven`, emitted by the owner, with the `DecisionRecorded` it makes in the same transaction. The object that raised the escalation hears the decision and acts on it (a conflict resolves with it, and its parked parties resume) |
 | Open | Withdrawn | Its subject was resolved some other way | — | `EscalationWithdrawn` |
 
 **Terminal:** Ruled, Withdrawn: a second ruling, even an identical one, is refused (the doorway's idempotency key covers retries). While Open the owner holds; the default is only a suggestion and is never applied on a timeout. A ruling produces a Decision.

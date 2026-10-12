@@ -1,17 +1,15 @@
 import type { Effect } from "effect";
-import type { Move } from "../../domain/coordination/index.ts";
 import type { AgentToken } from "../../domain/identity/index.ts";
-import type { ChangeId, ConflictId, LeaseId, VerdictId } from "../../domain/kernel/index.ts";
+import type { ChangeId, ConflictId, VerdictId } from "../../domain/kernel/index.ts";
 import type {
   Conflict,
   ConflictNotFound,
   ConflictState,
-  MoveRefused,
   VerdictNotFound,
   VerdictOutcome,
 } from "../../domain/verification/index.ts";
 import { stub } from "../not-implemented.ts";
-import type { EntityStore, EventOutbox, HumanGate } from "../ports/index.ts";
+import type { EntityStore } from "../ports/index.ts";
 
 /** verification use-cases reachable from the API. Their signatures are fixed here. */
 
@@ -25,14 +23,6 @@ export interface ConflictQuery {
 export interface ConflictPage {
   readonly items: readonly Conflict[];
   readonly nextCursor?: string;
-}
-
-export interface ResolveInput {
-  readonly conflictId: ConflictId;
-  readonly changeId: ChangeId;
-  readonly lease: LeaseId;
-  readonly move: Move;
-  readonly note?: string;
 }
 
 export interface VerdictView {
@@ -50,15 +40,6 @@ export const getConflict: (
   principal: AgentToken,
   conflictId: ConflictId,
 ) => Effect.Effect<Conflict, ConflictNotFound, EntityStore> = stub("verification/getConflict");
-
-export const resolveConflict: (
-  principal: AgentToken,
-  input: ResolveInput,
-) => Effect.Effect<
-  Conflict,
-  ConflictNotFound | MoveRefused,
-  EntityStore | EventOutbox | HumanGate
-> = stub("verification/resolveConflict");
 
 export const getVerdict: (
   principal: AgentToken,

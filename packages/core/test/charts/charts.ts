@@ -54,6 +54,7 @@ export const changeChart: Chart = {
     queued: {
       on: {
         ChangeBatched: c("integrating"),
+        ChangeParked: c("parked.awaitingRuling"),
         ChangeBounced: c("bounced"),
         ...waits("queued"),
         ...ends,
@@ -83,7 +84,10 @@ export const changeChart: Chart = {
       states: {
         awaitingRuling: {
           on: {
-            ChangeResumed: c("verifying"),
+            ChangeResumed: [
+              { target: c("verifying"), guard: "parked from Verifying" },
+              { target: c("queued"), guard: "parked from Queued" },
+            ],
             ChangeBounced: c("bounced"),
             ...waits("parked.awaitingRuling"),
           },

@@ -1,0 +1,28 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: t35.raise-once
+# why: a raise that comes again with another sponsor is committed again under a cause of its own, so one conflict asks two people and its escalation's events repeat
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index fce7e5e..6dc31a8 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -237,8 +237,6 @@ export const raiseEscalation = Effect.fn("coordination/raiseEscalation")(functio
+ ) {
+   const entity = escalationRef(request.escalationId);
+   const raise = (tx: Transaction): Result.Result<Transition<undefined>, InvalidEscalation> => {
+-    if (storedRow(tx.store, request.escalationId) !== undefined)
+-      return Result.succeed({ drafts: [], value: undefined });
+     const decided = decideEscalation(
+       undefined,
+       { _tag: "Raise", ...request.ask },
+@@ -270,7 +268,10 @@ export const raiseEscalation = Effect.fn("coordination/raiseEscalation")(functio
+       value: undefined,
+     });
+   };
+-  yield* commit({ entity, cause: RAISE, project: request.project }, raise);
++  yield* commit(
++    { entity, cause: `${RAISE}:${request.sponsor ?? ""}`, project: request.project },
++    raise,
++  );
+   return yield* Effect.orDie(escalationRecord(request.escalationId));
+ });
+ 

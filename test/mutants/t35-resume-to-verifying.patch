@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts
+# kills: t35.park-resume
+# why: a change parked from the queue resumes to verifying, where nothing ever moves it, so a ruled change is stranded
+diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
+index 3af515e..4dd1f14 100644
+--- a/packages/core/src/domain/coordination/change-machine.ts
++++ b/packages/core/src/domain/coordination/change-machine.ts
+@@ -972,7 +972,7 @@ export const evolveChange = (
+         : illegal(change, event);
+     case "ChangeResumed":
+       return from("parked") && change.parkReason === "awaiting-ruling"
+-        ? moveTo(change, change.parkedFrom ?? "verifying", [
++        ? moveTo(change, "verifying", [
+             "parkReason",
+             "escalationId",
+             "parkedFrom",

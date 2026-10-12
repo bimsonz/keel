@@ -3,7 +3,6 @@ import {
   type ChangeId,
   CommitSha,
   ContentHash,
-  type EscalationId,
   makeId,
   type VerdictId,
 } from "@keeltown/core/kernel";
@@ -32,7 +31,6 @@ import {
   DecisionModel,
   FlowSpecSource,
   type GuardRefused,
-  HumanGate,
   ObjectNotFound,
   type PlatformFunctionCall,
   PlatformFunction,
@@ -42,7 +40,6 @@ import {
   type ProbeRunRequest,
   ProbeRunnerUnavailable,
   ProbeStore,
-  type Ruling,
   VerifierRuntime,
 } from "@keeltown/core/ports";
 import {
@@ -244,40 +241,6 @@ export function makeAdmittedGuardsMemory(): AdmittedGuardsHarness {
 }
 
 const readGuardId = (text: string): unknown => Reflect.get(Object(JSON.parse(text)), "guardId");
-
-/** Escalations wait for `rule` to be called; `awaitRuling` resolves when it is. */
-export function makeHumanGateMemory() {
-  const raised: { readonly escalationId: EscalationId; readonly question: string }[] = [];
-  const waiting = new Map<EscalationId, (ruling: Ruling) => void>();
-  const ruled = new Map<EscalationId, Ruling>();
-  let counter = 0;
-  return {
-    raised,
-    rule: (escalationId: EscalationId, option: string, by = "test") => {
-      const ruling = { escalationId, option, by };
-      ruled.set(escalationId, ruling);
-      waiting.get(escalationId)?.(ruling);
-    },
-    layer: Layer.succeed(
-      HumanGate,
-      HumanGate.of({
-        raise: (request) =>
-          Effect.sync(() => {
-            counter += 1;
-            const escalationId = makeId("esc", counter.toString().padStart(26, "0"));
-            raised.push({ escalationId, question: request.question });
-            return escalationId;
-          }),
-        awaitRuling: (escalationId) =>
-          Effect.callback<Ruling>((resume) => {
-            const already = ruled.get(escalationId);
-            if (already !== undefined) resume(Effect.succeed(already));
-            else waiting.set(escalationId, (ruling) => resume(Effect.succeed(ruling)));
-          }),
-      }),
-    ),
-  };
-}
 
 /** A batch as the in-memory lane knows it: its members, its candidate, and the attempt and epoch results are fenced on. */
 export interface LaneBatch {

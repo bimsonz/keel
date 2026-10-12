@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations.test.ts
+# kills: t35.hear-decision
+# why: a decision of another escalation resolves this conflict, so a ruling on one question settles a different one
+diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
+index 23f9e41..9eca8e5 100644
+--- a/packages/core/src/application/coordination/conflict-moves.ts
++++ b/packages/core/src/application/coordination/conflict-moves.ts
+@@ -253,7 +253,7 @@ export function hearDecision(
+   const conflict = conflictId === undefined ? undefined : storedConflict(tx.store, conflictId);
+   if (conflictId === undefined || conflict === undefined)
+     return { drafts: [], problems: [`${decisionId} names no conflict this subject hosts`] };
+-  if (conflict.escalationId !== escalationId)
++  if (conflict.escalationId === undefined)
+     return {
+       drafts: [],
+       problems: [`${decisionId} rules on ${escalationId}, which is not ${conflictId}'s escalation`],

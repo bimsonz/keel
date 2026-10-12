@@ -2,12 +2,12 @@
 # kills: b23.conflict-views
 # why: the Projector records a conflict's events on the feed and folds none of them into its view
 diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
-index 0d5b49f..f72b443 100644
+index 3c55064..74e8f36 100644
 --- a/packages/core/src/application/memory/change-views.ts
 +++ b/packages/core/src/application/memory/change-views.ts
-@@ -112,7 +112,7 @@ function foldTrunk(store: Store, event: EventEnvelope): string | undefined {
-  */
+@@ -114,7 +114,7 @@ function foldTrunk(store: Store, event: EventEnvelope): string | undefined {
  export function foldViews(store: Store, event: EventEnvelope): string | undefined {
+   if (foldsEscalation(event)) return foldEscalationViews(store, event);
    // A change's bounce over a conflict, or a conflict noted on it, is also what the conflict's view shows its party was told.
 -  const conflict = foldsConflict(event) ? foldConflictViews(store, event) : undefined;
 +  const conflict = foldsConflict(event) && false ? foldConflictViews(store, event) : undefined;

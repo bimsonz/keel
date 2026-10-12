@@ -9,13 +9,21 @@ import {
   planCompiled,
   precheckRefused,
   precheckStarted,
+  escalationIdOf,
   reactToBatch,
   revise,
   submissionStatus,
   submit,
 } from "@keeltown/core/application/coordination";
 import { LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
-import { ChangeId, CommitSha, type EntityRef, EventEnvelope, makeId } from "@keeltown/core/kernel";
+import {
+  ChangeId,
+  CommitSha,
+  ConflictId,
+  type EntityRef,
+  EventEnvelope,
+  makeId,
+} from "@keeltown/core/kernel";
 import { Clock, CodeHost, EntityStore, EventOutbox } from "@keeltown/core/ports";
 import {
   CodeHostFixture,
@@ -905,6 +913,131 @@ describe("the remedy a status read carries", () => {
         expect(parked.remedy).toEqual(bounced.remedy);
         expect(resubmitted.change.state).toBe("submitted");
         expect(resubmitted.remedy).toBeUndefined();
+      }).pipe(Effect.provide(layer));
+    },
+  );
+});
+
+const CONFLICT = makeId("cfl", "01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const OTHER_CONFLICT = makeId("cfl", "01JZ8PT2C4E6G8J0M2N4Q6S8V1");
+const DECISION = makeId("dec", "01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const escalated = (conflictId: string) =>
+  arriving(
+    { kind: "conflict", id: conflictId },
+    {
+      _tag: "ConflictEscalated",
+      conflictId,
+      escalationId: escalationIdOf(Schema.decodeUnknownSync(ConflictId)(conflictId)),
+      reason: "human-class",
+    },
+  );
+const resolved = (conflictId: string, decisionId?: string) =>
+  arriving(
+    { kind: "conflict", id: conflictId },
+    {
+      _tag: "ConflictResolved",
+      conflictId,
+      move: "escalate",
+      ...(decisionId === undefined ? {} : { decisionId }),
+    },
+  );
+const typesOf = Effect.map(EventOutbox, (outbox) => outbox.log(changeRef).map((e) => e.type));
+
+describe("a conflict of the change put to a person", () => {
+  it.effect(
+    "[t35.park-resume] parks a queued party, keeping its lane and plan, and resumes it into the queue on that escalation's decision and on no other",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* queued;
+        const before = yield* getChange(changeId);
+        const asked = escalated(CONFLICT);
+        const parking = yield* receive(asked);
+        yield* receive(asked);
+        const parked = yield* getChange(changeId);
+        // Another conflict's decision, and a resolution with no decision, are not what it waits for.
+        yield* receive(resolved(OTHER_CONFLICT, DECISION));
+        yield* receive(resolved(CONFLICT));
+        const waiting = yield* getChange(changeId);
+        const ruling = resolved(CONFLICT, DECISION);
+        yield* receive(ruling);
+        const resumed = yield* getChange(changeId);
+        const log = (yield* EventOutbox).log(changeRef);
+
+        expect(parking?.problem).toBeUndefined();
+        expect(parked).toMatchObject({
+          state: "parked",
+          parkReason: "awaiting-ruling",
+          parkedFrom: "queued",
+          escalationId: escalationIdOf(CONFLICT),
+          laneId: before.laneId,
+          planHash: before.planHash,
+        });
+        expect(waiting.state).toBe("parked");
+        expect(resumed.state).toBe("queued");
+        expect(resumed).toMatchObject({ laneId: before.laneId, planHash: before.planHash });
+        expect([resumed.parkReason, resumed.escalationId, resumed.parkedFrom]).toEqual([
+          undefined,
+          undefined,
+          undefined,
+        ]);
+        expect(log.map((e) => e.type).slice(-2)).toEqual(["ChangeParked", "ChangeResumed"]);
+        expect(log.at(-2)).toMatchObject({
+          causation: asked.eventId,
+          project: sampleProjectId,
+          payload: { reason: "awaiting-ruling", escalationId: escalationIdOf(CONFLICT) },
+        });
+        expect(log.at(-1)).toMatchObject({
+          causation: ruling.eventId,
+          payload: { decisionId: DECISION },
+        });
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[t35.park-on-queue] a change whose conflict went to a person while it derived is parked in the commit that queues it, and one with none is queued and left there",
+    () => {
+      const asked = changeObject();
+      const free = changeObject();
+      return Effect.gen(function* () {
+        yield* deriving("precheck-1");
+        const early = yield* receive(escalated(CONFLICT));
+        const stillDeriving = (yield* getChange(changeId)).state;
+        yield* planCompiled(changeId, compiling(1, "precheck-1"));
+        const parked = yield* getChange(changeId);
+        const committed = (yield* typesOf).slice(-3);
+        yield* receive(resolved(CONFLICT, DECISION));
+        const resumed = (yield* getChange(changeId)).state;
+        const unasked = yield* Effect.gen(function* () {
+          yield* queued;
+          return [(yield* getChange(changeId)).state, (yield* typesOf).at(-1)];
+        }).pipe(Effect.provide(free.layer));
+
+        // Where the machine parks nothing the change goes on as it was, and that is no problem.
+        expect([early?.problem, stillDeriving]).toEqual([undefined, "deriving"]);
+        expect(committed).toEqual(["PlanCompiled", "ChangeQueued", "ChangeParked"]);
+        expect(parked).toMatchObject({
+          state: "parked",
+          parkedFrom: "queued",
+          escalationId: escalationIdOf(CONFLICT),
+        });
+        expect(resumed).toBe("queued");
+        expect(unasked).toEqual(["queued", "ChangeQueued"]);
+      }).pipe(Effect.provide(asked.layer));
+    },
+  );
+
+  it.effect(
+    "[t35.park-resume] a party already in a batch is not parked: it finishes its batch, and nothing is reported",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* batched;
+        const reaction = yield* receive(escalated(CONFLICT));
+        expect(reaction?.problem).toBeUndefined();
+        expect(reaction?.drafts).toEqual([]);
+        expect((yield* getChange(changeId)).state).toBe("integrating");
       }).pipe(Effect.provide(layer));
     },
   );

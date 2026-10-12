@@ -54,7 +54,7 @@ const isProbeEvent = Schema.is(ProbeEvent);
 const payloadOf = (encoded: unknown): EventDraft["payload"] => JSON.parse(JSON.stringify(encoded));
 const asStored = (encoded: unknown): Stored => JSON.parse(JSON.stringify(encoded));
 
-const conflictRef = (id: ConflictId): EntityRef => ({ kind: "conflict", id });
+export const conflictRef = (id: ConflictId): EntityRef => ({ kind: "conflict", id });
 
 const PARTY_MOVES: ReadonlySet<string> = new Set(PARTY_HEARS);
 
@@ -68,7 +68,7 @@ const ledgerDraft = (
 });
 const probeRef = (id: ProbeId): EntityRef => ({ kind: "probe", id });
 
-const storedConflict = (store: Store, conflictId: ConflictId): Conflict | undefined => {
+export const storedConflict = (store: Store, conflictId: ConflictId): Conflict | undefined => {
   const value = store.get(CONFLICT, conflictId);
   return value === undefined ? undefined : decodeConflict(value);
 };
@@ -84,7 +84,7 @@ const probeOf = (store: Store, conflictId: ConflictId): Probe | undefined => {
   return typeof id === "string" ? storedProbe(store, id) : undefined;
 };
 
-const viewOf = (store: Store, conflictId: ConflictId): ConflictView | undefined => {
+export const viewOf = (store: Store, conflictId: ConflictId): ConflictView | undefined => {
   const conflict = storedConflict(store, conflictId);
   if (conflict === undefined) return undefined;
   const probe = probeOf(store, conflictId);
@@ -98,7 +98,7 @@ const viewOf = (store: Store, conflictId: ConflictId): ConflictView | undefined 
  * as the domain plays them. Every event lands on the commit's entity; a
  * settle after a probe step names the conflict itself (`settleStep`).
  */
-function ledgerStep(
+export function ledgerStep(
   tx: Transaction,
   conflictId: ConflictId,
   step:
@@ -140,8 +140,9 @@ function ledgerStep(
  * discarded), in the same transaction, since the Subject DO never hears its
  * own events. Proven or dismissed lands on the conflict's own entity. A settle
  * the machine refuses (the probe still pending, or an unprovable probe that
- * needs an escalation, which T3.5 raises) commits nothing and leaves the
- * conflict open.
+ * needs an escalation) commits nothing here and leaves the conflict open: a
+ * transaction cannot ask a person, so `escalateUnprovable` raises the
+ * escalation once this one has committed, and settles with its id.
  */
 function settleStep(
   tx: Transaction,
@@ -243,7 +244,8 @@ export const probeDrafted = Effect.fn("coordination/probeDrafted")(function* (
  * built, …): the probe begins and ends discarded as draft-failed, its
  * ProbeDiscarded carrying the reason as `detail`, so the conflict never waits
  * on a draft that will not come. Once per conflict, as `probeDrafted`. The
- * conflict stays open: settling an unprovable probe needs an escalation.
+ * conflict stays open here: settling an unprovable probe needs an escalation,
+ * which the subject raises next (`escalateUnprovable`).
  */
 export const probeDraftFailed = Effect.fn("coordination/probeDraftFailed")(function* (
   projectId: ProjectId,

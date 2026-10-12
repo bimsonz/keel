@@ -2,15 +2,15 @@
 # kills: b21.proven-blocks
 # why: a plan compiled under block with a proof standing still asks to queue, which the machine refuses as blocked
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 351ed36..39a6126 100644
+index 179323f..6ec2b63 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1181,7 +1181,7 @@ export const planCompiled: (
+@@ -1390,7 +1390,7 @@ export const planCompiled: (
        (store) => {
          const blockers = blockersOf(store, plan.predicatePolicy);
          const bounce = conflictBounce(blockers.openProvenConflicts);
--        return [compile, bounce ?? { _tag: "Queue", laneId, blockers }];
-+        return [compile, { _tag: "Queue", laneId, blockers }];
-       },
-       { alongside: (tx) => tx.outbox.subscribe(laneId, LANE_HEARS) },
-     );
+-        if (bounce !== undefined) return [compile, bounce];
++        void bounce;
+         // A conflict already with a person holds the change the moment it is queued.
+         const asked = awaitedEscalation(store);
+         return [

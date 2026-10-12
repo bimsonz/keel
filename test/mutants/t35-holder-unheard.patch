@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts
+# kills: t35.park-resume
+# why: a party's agent is not subscribed to its conflict's escalation and resolution, so the agent that did not escalate is never told a person was asked
+diff --git a/packages/core/src/application/coordination/subject.ts b/packages/core/src/application/coordination/subject.ts
+index f29b8a7..6bdab91 100644
+--- a/packages/core/src/application/coordination/subject.ts
++++ b/packages/core/src/application/coordination/subject.ts
+@@ -46,7 +46,7 @@ export const HOLDER_AGENT = "holder-agent";
+  * that change: its premise suspected, and a conflict it is a party to put to
+  * a person or resolved, whether or not that parked the change.
+  */
+-export const HOLDER_HEARS = ["PremiseSuspected", "ConflictEscalated", "ConflictResolved"] as const;
++export const HOLDER_HEARS = ["PremiseSuspected"] as const;
+ 
+ const Held = Schema.Struct({
+   premises: Schema.Array(Proposition),

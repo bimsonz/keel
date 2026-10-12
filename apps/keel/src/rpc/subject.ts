@@ -11,7 +11,8 @@ import {
   ProbeStateRefused,
   World,
 } from "@keeltown/core/domain/verification";
-import { ConflictId, ContentHash, ProbeId } from "@keeltown/core/kernel";
+import { Move } from "@keeltown/core/domain/coordination";
+import { AgentId, ChangeId, ConflictId, ContentHash, ProbeId, UserId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
@@ -60,6 +61,17 @@ export const WorldCheckRanCommand = Schema.Struct({
   reason: Schema.optional(Schema.String),
 });
 
+/** A party's move on a conflict (core's `ResolveCommand`): the doorway has checked the party's lease. */
+export const ResolveCommand = Schema.Struct({
+  conflictId: ConflictId,
+  changeId: ChangeId,
+  agentId: AgentId,
+  sponsor: Schema.optional(UserId),
+  move: Move,
+  note: Schema.optional(Schema.String),
+  idempotencyKey: Schema.String,
+});
+
 const LedgerRefusal = Schema.Union([
   ConflictNotFound,
   ConflictStateRefused,
@@ -70,7 +82,10 @@ const LedgerRefusal = Schema.Union([
 
 export const SubjectCodecs = {
   conflict: exitCodec(ConflictView, ConflictNotFound),
-  resolve: exitCodec(Conflict, Schema.Union([ConflictNotFound, MoveRefused])),
+  resolve: exitCodec(
+    ConflictView,
+    Schema.Union([ConflictNotFound, MoveRefused, IdempotencyConflict]),
+  ),
   probeDrafted: exitCodec(ConflictView, LedgerRefusal),
   probeDraftFailed: exitCodec(ConflictView, LedgerRefusal),
   probeCellRan: exitCodec(ConflictView, LedgerRefusal),
@@ -80,11 +95,13 @@ export const SubjectCodecs = {
 /**
  * The Subject DO (`subj:<project>:<key>`): premises, tenets, decisions, fallout, semantic and precedent conflicts,
  * and each conflict's probe. A change relies on a subject through its own Change DO, which subscribes the subject;
- * there is no rely here. The Probe Workflow reports its facts through the four probe methods.
+ * there is no rely here. The Probe Workflow reports its facts through the four probe methods; a probe that
+ * leaves its conflict unprovable has the subject raise an escalation in the project's namespace before the method answers.
  */
 export interface SubjectRpc extends EventReceiverRpc {
   conflict(conflictId: string): Promise<ExitJson>;
-  resolve(command: unknown): Promise<ExitJson>;
+  /** A party's move. `escalate` puts a proven conflict to a person, once; every other move is MoveRefused until it is built. */
+  resolve(command: typeof ResolveCommand.Encoded): Promise<ExitJson>;
   probeDrafted(command: typeof ProbeDraftedCommand.Encoded): Promise<ExitJson>;
   probeDraftFailed(command: typeof ProbeDraftFailedCommand.Encoded): Promise<ExitJson>;
   probeCellRan(command: typeof ProbeCellRanCommand.Encoded): Promise<ExitJson>;

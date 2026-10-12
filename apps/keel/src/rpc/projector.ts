@@ -1,4 +1,5 @@
 import { ChangeState, ParkReason } from "@keeltown/core/domain/coordination";
+import { EscalationState } from "@keeltown/core/domain/memory";
 import {
   Conflict,
   ConflictEscalated,
@@ -6,6 +7,8 @@ import {
   ConflictProven,
   ConflictState,
   DraftFailure,
+  Escalation,
+  EscalationNotFound,
   Probe,
   ProbeNotFound,
   ProbeOutcome,
@@ -18,16 +21,20 @@ import {
   ChangeId,
   CommitSha,
   ConflictId,
+  EscalationId,
   EventEnvelope,
   GuardId,
   InstantSchema,
   NextAction,
+  OrgId,
   ProbeId,
   ProjectId,
+  UserId,
 } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
+import { EscalationRecord } from "./namespace.ts";
 
 /** A feed position: twelve digits, so positions sort as strings. */
 const Position = Schema.String.check(Schema.isPattern(/^\d{12}$/));
@@ -153,6 +160,8 @@ export const ConflictRecord = Schema.Struct({
       at: InstantSchema,
     }),
   ),
+  escalation: Schema.optional(Escalation),
+  chosen: Schema.optional(Schema.Struct({ option: Schema.String, summary: Schema.String })),
 });
 
 /** A project's conflicts, newest `C-n` first: open or settled, in one `state`, of one change, numbered below `cursor`, at most `limit` (1–100, default 50). */
@@ -176,6 +185,33 @@ export const ConflictRead = Schema.Struct({ project: ProjectId, conflictId: Conf
 
 export const ProbeConflictRead = Schema.Struct({ project: ProjectId, probeId: ProbeId });
 
+/**
+ * A reader's escalations, newest first (the port's `EscalationListRead`): an
+ * agent's are its project's; a person's are those asked of them, and of the
+ * namespaces they maintain once the maintainers' turn has come by `now`.
+ */
+export const EscalationsRead = Schema.Struct({
+  reader: Schema.Union([
+    Schema.Struct({ _tag: Schema.Literal("Project"), project: ProjectId }),
+    Schema.Struct({
+      _tag: Schema.Literal("User"),
+      userId: UserId,
+      maintains: Schema.Array(OrgId),
+    }),
+  ]),
+  now: InstantSchema,
+  state: Schema.optional(EscalationState),
+  cursor: Schema.optional(Schema.String),
+  limit: Schema.optional(Schema.Int),
+});
+
+export const EscalationPage = Schema.Struct({
+  items: Schema.Array(EscalationRecord),
+  nextCursor: Schema.optional(Schema.String),
+});
+
+export const EscalationRead = Schema.Struct({ escalationId: EscalationId });
+
 export const ProjectorCodecs = {
   nudge: exitCodec(Schema.Struct({ drained: Schema.Int }), Schema.Never),
   read: exitCodec(FeedPage, Schema.Never),
@@ -184,6 +220,8 @@ export const ProjectorCodecs = {
   conflicts: exitCodec(ConflictPage, Schema.Never),
   conflict: exitCodec(ConflictRecord, ConflictNotFound),
   probeConflict: exitCodec(ConflictRecord, ProbeNotFound),
+  escalations: exitCodec(EscalationPage, Schema.Never),
+  escalation: exitCodec(EscalationRecord, EscalationNotFound),
 };
 
 /**
@@ -207,4 +245,8 @@ export interface ProjectorRpc extends EventReceiverRpc {
   conflict(request: typeof ConflictRead.Encoded): Promise<ExitJson>;
   /** The conflict a probe of a project belongs to, as `conflict` answers it. ProbeNotFound when the project's feed has no such probe. */
   probeConflict(request: typeof ProbeConflictRead.Encoded): Promise<ExitJson>;
+  /** A reader's escalations, newest first, by the list's own rule of who is asked when. */
+  escalations(request: typeof EscalationsRead.Encoded): Promise<ExitJson>;
+  /** One escalation with its place. EscalationNotFound for one the feed has not heard raised. */
+  escalation(request: typeof EscalationRead.Encoded): Promise<ExitJson>;
 }

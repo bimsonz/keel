@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations.test.ts
+# kills: t35.sponsor-then-maintainers
+# why: an escalation is listed to the namespace's maintainers the moment it is raised, so the person asked first is never asked first
+diff --git a/packages/core/src/application/memory/escalation-views.ts b/packages/core/src/application/memory/escalation-views.ts
+index 370bbfc..816e566 100644
+--- a/packages/core/src/application/memory/escalation-views.ts
++++ b/packages/core/src/application/memory/escalation-views.ts
+@@ -174,7 +174,7 @@ export function listedTo(
+   if (record.sponsor === reader.userId) return true;
+   return (
+     reader.maintains.includes(record.namespace) &&
+-    (record.sponsor === undefined || now - record.escalation.raisedAt >= MAINTAINERS_AFTER_MS)
++    (record.sponsor === undefined || now >= record.escalation.raisedAt)
+   );
+ }
+ 

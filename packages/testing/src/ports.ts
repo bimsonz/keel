@@ -21,9 +21,19 @@ import {
   describeProbeChangesContract,
   type ProbeChangesHarness,
 } from "./contracts/probe-changes.ts";
+import {
+  type ConflictMovesHarness,
+  describeConflictMovesContract,
+} from "./contracts/conflict-moves.ts";
+import {
+  describeEscalationsContract,
+  describeHumanGateContract,
+  type EscalationsHarness,
+} from "./contracts/escalations.ts";
 import { describeProbeLedgerContract, type ProbeLedgerHarness } from "./contracts/probe-ledger.ts";
 import { makeProbeChangesMemory, makeWorldChecksMemory } from "./memory/probe-changes.ts";
 import { makeLiveChangesMemory } from "./memory/live-changes.ts";
+import { makeEscalationsMemory } from "./memory/escalations.ts";
 import { makeProbeLedgerMemory } from "./memory/probe-ledger.ts";
 import {
   describeNoopWorldsContract,
@@ -103,6 +113,9 @@ import type {
   AdmittedGuards,
   AgentDirectory,
   CodeHost,
+  ConflictMoves,
+  Escalations,
+  HumanGate,
   BatchVerdicts,
   ChangePrecheck,
   Changes,
@@ -325,6 +338,35 @@ function memoryEnrolmentsHarness(): EnrolmentsHarness {
 function memoryProbeLedgerHarness(): ProbeLedgerHarness {
   const memory = makeProbeLedgerMemory();
   return { layer: memory.layer, suspect: memory.suspect, log: memory.log };
+}
+
+/** The in-memory subjects escalate into the in-memory namespaces, whose reads fold at once: nothing to wait for. */
+function memoryConflictMovesHarness(): ConflictMovesHarness {
+  const memory = makeProbeLedgerMemory();
+  return {
+    layer: memory.world,
+    suspect: memory.suspect,
+    log: memory.log,
+    place: (projectId, namespace) =>
+      Effect.sync(() => {
+        memory.orgs.places.set(projectId, {
+          projectId,
+          org: namespace,
+          name: projectId.toLowerCase(),
+        });
+      }),
+    settled: () => Effect.void,
+  };
+}
+
+/** The in-memory namespaces run the namespace object's own use-cases, and their reads fold at once. */
+function memoryEscalationsHarness(): EscalationsHarness {
+  const memory = makeEscalationsMemory();
+  return {
+    layer: memory.layer,
+    settled: () => Effect.void,
+    log: (namespace, entity) => Effect.sync(() => memory.log(namespace, entity)),
+  };
 }
 
 /** The in-memory index folds what the suite feeds it with the Project DO's own `hearLiveChange`. */
@@ -563,9 +605,17 @@ export const PORTS = {
     () => storage.makeMfpWriterMemory().layer,
     pending("MfpWriter", ["write", "note"]),
   ),
-  HumanGate: port(
-    () => verification.makeHumanGateMemory().layer,
-    pending("HumanGate", ["raise", "awaitRuling"]),
+  HumanGate: harnessed<HumanGate | Escalations, EscalationsHarness>(
+    memoryEscalationsHarness,
+    describeHumanGateContract,
+  ),
+  Escalations: harnessed<HumanGate | Escalations, EscalationsHarness>(
+    memoryEscalationsHarness,
+    describeEscalationsContract,
+  ),
+  ConflictMoves: harnessed<ConflictMoves | ProbeLedger | Escalations, ConflictMovesHarness>(
+    memoryConflictMovesHarness,
+    describeConflictMovesContract,
   ),
   Deployer: port(
     () => delivery.makeDeployerMemory().layer,

@@ -18,10 +18,10 @@ index 91279af..056fbc5 100644
    Memory_listDecisions: ownProject,
    Memory_getDecision: ownProject,
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
-index ca55324..49e4f93 100644
+index 0a05e56..1b67fc1 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -471,7 +471,12 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, makeUser: MakeU
+@@ -475,7 +475,12 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, makeUser: MakeU
          Conflicts_getConflict: (caller: Caller, input: Input<"Conflicts_getConflict">) =>
            run(
              caller,
@@ -33,5 +33,5 @@ index ca55324..49e4f93 100644
 +              ConflictId.make(input.conflictId),
 +            ).pipe(
                Effect.match({
-                 onSuccess: conflictOk,
+                 onSuccess: (record) => conflictOk(record, scopeOf(caller).audience),
                  onFailure: (e) => conflictNotFound(caller, e),

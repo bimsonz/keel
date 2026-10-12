@@ -8,6 +8,7 @@ import type {
   RebasedChange,
   RebaseInput,
   RelyInput,
+  ResolveInput,
   ReviseInput,
   Revised,
   SubmitInput,
@@ -26,21 +27,24 @@ import {
   type LeaseStale,
   type PoolExhausted,
   type Preflight,
+  Move,
   Proposition,
   type RevisionMismatch,
   type SketchNotFound,
 } from "@keeltown/core/domain/coordination";
 import type { IdempotencyConflict, InboxPage } from "@keeltown/core/domain/identity";
+import type { ConflictNotFound, MoveRefused } from "@keeltown/core/domain/verification";
 import {
   type Anchor,
   ChangeId,
   type NextAction as DomainNextAction,
   type Citation,
   CommitSha,
+  ConflictId,
   LeaseId,
   SketchId,
 } from "@keeltown/core/kernel";
-import type { PackTooLarge, Remedy, SubmissionStatus } from "@keeltown/core/ports";
+import type { ConflictView, PackTooLarge, Remedy, SubmissionStatus } from "@keeltown/core/ports";
 import { Result, Schema, SchemaIssue } from "effect";
 import type {
   AbandonResult,
@@ -52,6 +56,7 @@ import type {
   Operations,
   RebaseResult,
   RelyResult,
+  ResolveResult,
   ReviseResult,
   StatusResult,
   SubmitResult,
@@ -1039,4 +1044,105 @@ export function inboxOk(page: InboxPage): InboxResult {
       ],
     ),
   };
+}
+
+const ResolveFields = Schema.Struct({
+  conflictId: ConflictId,
+  changeId: ChangeId,
+  lease: LeaseId,
+  move: Move,
+  note: Schema.optional(Schema.String),
+});
+
+export function resolveInput(input: Input<"resolve">): Result.Result<ResolveInput, Issues> {
+  return Result.map(
+    decodeWith(ResolveFields, {
+      conflictId: input.conflictId,
+      changeId: input.changeId,
+      lease: input["keel-lease"],
+      move: input.move,
+      ...(input.note === undefined ? {} : { note: input.note }),
+    }),
+    (fields) => ({ ...fields, idempotencyKey: input["idempotency-key"] }),
+  );
+}
+
+/** The conflict once a party's escalate has put it to a person, with what the agent does while it waits. */
+export function resolveOk({ conflict }: ConflictView): ResolveResult {
+  return {
+    status: 200,
+    body: envelope(
+      `${conflict.id} is with a person${conflict.escalationId === undefined ? "" : ` as ${conflict.escalationId}`}. Keel tells you when it is ruled on.`,
+      {
+        conflict: {
+          id: conflict.id,
+          kind: conflict.kind,
+          state: conflict.state,
+          parties: [...conflict.parties],
+          ...(conflict.subjectKey === undefined ? {} : { subject: conflict.subjectKey }),
+          openedAt: iso(conflict.openedAt),
+        },
+      },
+      [
+        {
+          kind: "read",
+          title: "Read the question the person was asked",
+          operationId: "Conflicts_getConflict",
+          args: { conflictId: conflict.id },
+        },
+        {
+          kind: "wait",
+          title: "Wait for the ruling: it reaches your inbox as ConflictResolved",
+          operationId: "inbox",
+        },
+      ],
+    ),
+  };
+}
+
+export function resolveError(
+  caller: Caller,
+  error: ChangeNotFound | LeaseStale | ConflictNotFound | MoveRefused | IdempotencyConflict,
+): ResolveResult {
+  switch (error._tag) {
+    case "ChangeNotFound":
+      return changeNotFound(caller, error);
+    case "LeaseStale":
+      return leaseStale(caller, error);
+    case "ConflictNotFound":
+      return {
+        status: 404,
+        body: problem(404, "conflict.not_found", caller.requestId, {
+          detail: `No conflict ${error.conflictId} in that project.`,
+          nextActions: [
+            {
+              kind: "read",
+              title: "List the project's conflicts",
+              operationId: "Conflicts_listConflicts",
+            },
+          ],
+        }),
+      };
+    case "MoveRefused":
+      return {
+        status: 409,
+        body: problem(409, "conflict.move_refused", caller.requestId, {
+          detail: `${error.conflictId}: ${error.reason}.`,
+          nextActions: [
+            {
+              kind: "read",
+              title: "Read the conflict for where it stands",
+              operationId: "Conflicts_getConflict",
+              args: { conflictId: error.conflictId },
+            },
+          ],
+        }),
+      };
+    case "IdempotencyConflict":
+      return reusedKey(caller, error, "resolve", "Resolve");
+    default: {
+      const unmapped: never = error;
+      return unmapped;
+    }
+  }
 }

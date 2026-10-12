@@ -1,0 +1,103 @@
+import {
+  decisionIdOf,
+  giveRuling,
+  namespaceAddress,
+  raiseEscalation,
+} from "@keeltown/core/application/coordination";
+import {
+  escalationView,
+  foldEscalationViews,
+  listEscalations,
+} from "@keeltown/core/application/memory";
+import { EscalationNotFound } from "@keeltown/core/domain/verification";
+import type { EntityRef, EscalationId, EventEnvelope, OrgId } from "@keeltown/core/kernel";
+import {
+  type Clock,
+  type EntityStore,
+  Escalations,
+  type EventOutbox,
+  HumanGate,
+} from "@keeltown/core/ports";
+import { Effect, Layer } from "effect";
+import { makeEventOutboxMemory, makeManualClock, type ManualClock } from "./event-outbox.ts";
+import { makeEntityStoreMemory } from "./storage.ts";
+
+type Hosted = Clock | EntityStore | EventOutbox;
+
+const notFound = (escalationId: EscalationId) =>
+  new EscalationNotFound({ escalationId, nextActions: [] });
+
+/**
+ * HumanGate and Escalations in memory: one object per namespace address, each
+ * with its own store and outbox, running the use-cases the namespace's
+ * Durable Object runs; and one view store folding what they commit with the
+ * Projector's own fold, as soon as it is committed.
+ */
+export function makeEscalationsMemory(clock: ManualClock = makeManualClock()) {
+  const objects = new Map<string, ReturnType<typeof makeEventOutboxMemory>>();
+  const views = makeEntityStoreMemory().service;
+  const folded = new Set<string>();
+  const objectAt = (namespace: OrgId) => {
+    const address = namespaceAddress(namespace);
+    let object = objects.get(address);
+    if (object === undefined) {
+      object = makeEventOutboxMemory();
+      objects.set(address, object);
+    }
+    return object;
+  };
+  const on = <A, E>(namespace: OrgId, program: Effect.Effect<A, E, Hosted>) =>
+    Effect.provide(program, Layer.mergeAll(objectAt(namespace).layer, clock.layer));
+  const log = (namespace: OrgId, entity: EntityRef): readonly EventEnvelope[] =>
+    objectAt(namespace).service.log(entity);
+  /** Folds what the namespace's object has committed on an escalation and its decision, in commit order. */
+  const project = (namespace: OrgId, escalationId: EscalationId) => {
+    const events = [
+      ...log(namespace, { kind: "escalation", id: escalationId }),
+      ...log(namespace, { kind: "decision", id: decisionIdOf(escalationId) }),
+    ];
+    for (const event of events) {
+      if (folded.has(event.eventId)) continue;
+      folded.add(event.eventId);
+      foldEscalationViews(views, event);
+    }
+  };
+  const gate = Layer.succeed(
+    HumanGate,
+    HumanGate.of({
+      raise: (request) =>
+        on(request.namespace, raiseEscalation(request)).pipe(
+          Effect.tap(() => Effect.sync(() => project(request.namespace, request.escalationId))),
+        ),
+    }),
+  );
+  const escalations = Layer.succeed(
+    Escalations,
+    Escalations.of({
+      list: (read) => Effect.sync(() => listEscalations(views, read)),
+      get: (escalationId) =>
+        Effect.suspend(() => {
+          const record = escalationView(views, escalationId);
+          return record === undefined
+            ? Effect.fail(notFound(escalationId))
+            : Effect.succeed(record);
+        }),
+      rule: (command) =>
+        Effect.suspend(() => {
+          const known = escalationView(views, command.escalationId);
+          if (known === undefined) return Effect.fail(notFound(command.escalationId));
+          return on(known.namespace, giveRuling(command)).pipe(
+            Effect.tap(() => Effect.sync(() => project(known.namespace, command.escalationId))),
+          );
+        }),
+    }),
+  );
+  return {
+    clock,
+    gate,
+    layer: Layer.mergeAll(gate, escalations),
+    /** The events committed on `entity` in a namespace's object. */
+    log,
+  };
+}
+export type EscalationsMemory = ReturnType<typeof makeEscalationsMemory>;

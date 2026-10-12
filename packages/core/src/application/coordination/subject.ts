@@ -41,8 +41,12 @@ export const SUBJECT_MINTED = "subject-minted";
 /** Each held change's agent, who hears the change's PremiseSuspected: by change id. */
 export const HOLDER_AGENT = "holder-agent";
 
-/** What a change's agent hears from a subject, on its subscription scoped to that change. */
-export const HOLDER_HEARS = ["PremiseSuspected"] as const;
+/**
+ * What a change's agent hears from a subject, on its subscription scoped to
+ * that change: its premise suspected, and a conflict it is a party to put to
+ * a person or resolved, whether or not that parked the change.
+ */
+export const HOLDER_HEARS = ["PremiseSuspected", "ConflictEscalated", "ConflictResolved"] as const;
 
 const Held = Schema.Struct({
   premises: Schema.Array(Proposition),
@@ -249,7 +253,8 @@ export function hearSubject(
 
 const changeRef = (changeId: ChangeId): EntityRef => ({ kind: "change", id: changeId });
 
-const holderAgent = (store: Store, changeId: ChangeId): AgentId | undefined => {
+/** The agent that holds a change this subject keeps, while it keeps it. */
+export const holderAgent = (store: Store, changeId: ChangeId): AgentId | undefined => {
   const stored = store.get(HOLDER_AGENT, changeId);
   return stored === undefined ? undefined : Schema.decodeUnknownSync(AgentId)(stored);
 };

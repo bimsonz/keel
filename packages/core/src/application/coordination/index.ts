@@ -110,6 +110,8 @@ export const openSketch: (
 
 /** The Change DO's use-cases. */
 export * from "./change.ts";
+export * from "./conflict-moves.ts";
+export * from "./escalations.ts";
 export * from "./live-index.ts";
 export * from "./party-conflicts.ts";
 export * from "./preflight.ts";
