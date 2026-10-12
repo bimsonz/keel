@@ -36,6 +36,7 @@ import {
 import { describeInboxContract, type InboxHarness } from "./contracts/inbox.ts";
 import { describeNotifierContract, type NotifierHarness } from "./contracts/notifier.ts";
 import { describeWorkspacePoolContract, type StockedPool } from "./contracts/workspace-pool.ts";
+import { describeRepoServerContract } from "./contracts/repo-server.ts";
 import {
   describeWorkspaceRebaserContract,
   type WorkspaceRebaserHarness,
@@ -166,6 +167,12 @@ function memoryWorkspaceRebaserHarness(): WorkspaceRebaserHarness {
     trunk,
     layer: Layer.mergeAll(code.layer, codeHost.makeWorkspaceRebaserMemory(code, () => trunk).layer),
   };
+}
+
+/** The in-memory RepoServer serves the in-memory code host's repos. */
+function memoryRepoServer() {
+  const code = codeHost.makeCodeHostMemory();
+  return Layer.mergeAll(code.layer, codeHost.makeRepoServerMemory(code).layer);
 }
 
 function memoryEventFeedHarness(): EventFeedHarness {
@@ -328,6 +335,7 @@ export const PORTS = {
     WorkspaceRebaser | CodeHost | CodeHostFixture,
     WorkspaceRebaserHarness
   >(memoryWorkspaceRebaserHarness, describeWorkspaceRebaserContract),
+  RepoServer: port(memoryRepoServer, describeRepoServerContract),
   Trunks: port(
     () => integration.makeTrunksMemory().layer,
     pending("Trunks", ["initialize", "sync"]),

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/git-clone.test.ts -t "reposerver.not-git"
+# kills: reposerver.not-git
+# why: a redirect or a refusal from the host is passed on as a fetch's answer
+diff --git a/apps/keel/src/adapters/driven/artifacts/repo-server.ts b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
+index 6dcc0c9..5232d48 100644
+--- a/apps/keel/src/adapters/driven/artifacts/repo-server.ts
++++ b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
+@@ -73,7 +73,7 @@ export const RepoServerArtifacts = (fetcher: typeof fetch = (input, init) => fet
+             }).pipe(Effect.catch(() => Effect.succeed(null)));
+             if (answered === null) return BAD_GATEWAY;
+             const type = answered.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
+-            if (answered.status !== 200 || type !== expected || answered.body === null) {
++            if (type !== expected || answered.body === null) {
+               yield* Effect.promise(
+                 async () => await answered.body?.cancel().catch(() => undefined),
+               );

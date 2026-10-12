@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/git-clone.test.ts -t "reposerver.read-token"
+# kills: reposerver.read-token
+# why: the host never hears the client's protocol version
+diff --git a/apps/keel/src/adapters/driven/artifacts/repo-server.ts b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
+index 6dcc0c9..f65fc87 100644
+--- a/apps/keel/src/adapters/driven/artifacts/repo-server.ts
++++ b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
+@@ -53,7 +53,7 @@ export const RepoServerArtifacts = (fetcher: typeof fetch = (input, init) => fet
+               Authorization: `Bearer ${token.token}`,
+               Accept: expected,
+             });
+-            if (request.protocol !== null) headers.set("Git-Protocol", request.protocol);
++            if (request.protocol === undefined) headers.set("Git-Protocol", request.protocol);
+             if (request.service === "negotiate")
+               headers.set("Content-Type", UPLOAD_PACK_REQUEST_TYPE);
+             const answered = yield* Effect.tryPromise({

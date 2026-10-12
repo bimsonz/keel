@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "reposerver.contract.fetch|reposerver.contract.v2"
+# kills: reposerver.contract.fetch, reposerver.contract.v2
+# why: a fetch is answered with a pack that holds nothing
+diff --git a/packages/testing/src/memory/code-host.ts b/packages/testing/src/memory/code-host.ts
+index 0c75557..f225851 100644
+--- a/packages/testing/src/memory/code-host.ts
++++ b/packages/testing/src/memory/code-host.ts
+@@ -360,7 +360,7 @@ async function uploadPackAnswer(found: MemoryRepo, request: UploadPackRequest) {
+     line === null ? [] : [dec.decode(line).replace(/\n$/, "")],
+   );
+   const wants = lines.filter((l) => l.startsWith("want ")).map((l) => l.slice(5, 45));
+-  const packed = async () => await writePack(reachable(found, wants));
++  const packed = async () => await writePack(reachable(found, []));
+ 
+   if (request.protocol === "version=2") {
+     if (request.service === "advertise")

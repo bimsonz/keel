@@ -20,6 +20,7 @@ export * from "./memory/verification.ts";
 export * from "./contracts/index.ts";
 export * from "./contracts/code-host.ts";
 export * from "./contracts/workspace-pool.ts";
+export * from "./contracts/repo-server.ts";
 export * from "./contracts/verification.ts";
 export * from "./contracts/enrolments.ts";
 export * from "./contracts/sessions.ts";

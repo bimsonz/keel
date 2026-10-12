@@ -2,7 +2,8 @@
 //
 // In a project of its own (c14-rebase, forked from the seeded fixture repo, so
 // S-0's projects are untouched), two agents rewrite the same line:
-//   (a) the first lands;
+//   (a) the first lands (rebased onto trunk first, when its slot was forked
+//       before trunk last moved);
 //   (b) the second bounces textually, with `rebase` as its first next action;
 //   (c) it rebases (POST /v1/changes/{id}/rebase), merges keel/trunk as the
 //       bounce says (`git fetch origin keel/trunk && git merge FETCH_HEAD`),
@@ -175,6 +176,25 @@ try {
   const dirA = cloneWorkspace(a.workspace.remote, tokenA);
   const dirB = cloneWorkspace(b.workspace.remote, tokenB);
   dirs.push(dirA, dirB);
+  // A slot forked before trunk last moved is behind it. The first change then starts from
+  // trunk's head, as an agent told to rebase would, so (a) holds on any run of this project.
+  const trunkAtStart = (await first.commits(project.id, { limit: 1 })).items[0]?.sha ?? "";
+  for (const [who, dir] of [
+    ["first", dirA],
+    ["second", dirB],
+  ] as const)
+    console.log(
+      `     ${who}'s base ${git(dir, ["rev-parse", "HEAD"]).slice(0, 12)}, trunk's head ${trunkAtStart.slice(0, 12)}`,
+    );
+  if (git(dirA, ["rev-parse", "HEAD"]) !== trunkAtStart) {
+    const { result: moved } = await first.rebase(a.change.id, {
+      lease: a.lease.id,
+      idempotencyKey: `c14:${run}:a:rebase`,
+    });
+    git(dirA, ["fetch", "-q", "origin", "keel/trunk"], tokenA);
+    git(dirA, ["merge", "-q", "--ff-only", "FETCH_HEAD"]);
+    console.log(`     first's slot was behind trunk: rebased onto ${moved.base.slice(0, 12)}`);
+  }
   const textA = `forge-lite, as the first agent left it in rebase run ${run}`;
   const textB = `forge-lite, as the second agent left it in rebase run ${run}`;
   describeAs(dirA, textA);

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/git-clone.test.ts -t "clone.receive-pack-refused"
+# kills: clone.receive-pack-refused
+# why: a push's request is looked up and sent on as if it were a fetch
+diff --git a/apps/keel/src/adapters/driving/http/git-clone.ts b/apps/keel/src/adapters/driving/http/git-clone.ts
+index 7f5e8e1..bb0069e 100644
+--- a/apps/keel/src/adapters/driving/http/git-clone.ts
++++ b/apps/keel/src/adapters/driving/http/git-clone.ts
+@@ -160,5 +160,7 @@ export function registerGitClone(app: Hono<AppEnv>, git: GitClone): void {
+   app.post(`${repo}/git-upload-pack`, async (c) =>
+     serve(git, c.req.raw, c.req.param("org"), c.req.param("repo"), "negotiate"),
+   );
+-  app.all(`${repo}/git-receive-pack`, () => readOnly());
++  app.all(`${repo}/git-receive-pack`, async (c) =>
++    serve(git, c.req.raw, c.req.param("org"), c.req.param("repo"), "negotiate"),
++  );
+ }

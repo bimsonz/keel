@@ -11,6 +11,7 @@ const CONTRACT_PORTS = [
   "CodeHost",
   "WorkspacePool",
   "WorkspaceRebaser",
+  "RepoServer",
   "SubjectRegistry",
   "Recall",
   "Notifier",

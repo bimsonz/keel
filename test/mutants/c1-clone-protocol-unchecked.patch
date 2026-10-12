@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/git-clone.test.ts -t "clone.v2"
+# kills: clone.v2
+# why: whatever the client puts in Git-Protocol is sent to the host
+diff --git a/apps/keel/src/adapters/driving/http/git-clone.ts b/apps/keel/src/adapters/driving/http/git-clone.ts
+index 7f5e8e1..f22abb6 100644
+--- a/apps/keel/src/adapters/driving/http/git-clone.ts
++++ b/apps/keel/src/adapters/driving/http/git-clone.ts
+@@ -51,7 +51,7 @@ const tooLarge = () => text(413, "The request exceeds 8 MiB.");
+ /** The client's protocol version as git sends it, or null: nothing else of the header is passed on. */
+ const protocolOf = (request: Request): string | null => {
+   const sent = request.headers.get("git-protocol");
+-  return sent !== null && /^version=[12]$/.test(sent) ? sent : null;
++  return sent;
+ };
+ 
+ /** A negotiation's pkt-lines, gunzipped when the client compressed them, or the response that refuses them. */

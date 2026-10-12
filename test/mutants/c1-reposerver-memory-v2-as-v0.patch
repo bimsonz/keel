@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "reposerver.contract.v2"
+# kills: reposerver.contract.v2
+# why: the memory adapter answers protocol v0 to a v2 client
+diff --git a/packages/testing/src/memory/code-host.ts b/packages/testing/src/memory/code-host.ts
+index 0c75557..50579ca 100644
+--- a/packages/testing/src/memory/code-host.ts
++++ b/packages/testing/src/memory/code-host.ts
+@@ -362,7 +362,7 @@ async function uploadPackAnswer(found: MemoryRepo, request: UploadPackRequest) {
+   const wants = lines.filter((l) => l.startsWith("want ")).map((l) => l.slice(5, 45));
+   const packed = async () => await writePack(reachable(found, wants));
+ 
+-  if (request.protocol === "version=2") {
++  if (request.protocol === "version=3") {
+     if (request.service === "advertise")
+       return concat([
+         pkt("version 2\n"),

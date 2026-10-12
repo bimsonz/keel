@@ -10,20 +10,30 @@ import {
   RepoAlreadyExists,
   RepoNotFound,
   type RepoRef,
+  RepoServer,
   type SyncOutcome,
   type TreeEntry,
+  UPLOAD_PACK_ANSWER_TYPE,
+  type UploadPackRequest,
   WorkspaceRebaser,
 } from "@keeltown/core/ports";
 import {
   compareTreeEntries,
+  concat,
+  dec,
   decodeCommit,
   decodeTree,
   diffTrees,
+  FLUSH,
   type GitObject,
   isAncestor,
   MissingObject,
   MODE_GITLINK,
   MODE_TREE,
+  pkt,
+  readPkts,
+  writePack,
+  ZERO_OID,
 } from "@keeltown/gitcore";
 import { Clock as EffectClock, Effect, Layer, Schema } from "effect";
 import { buildCommit, buildTree, CodeHostFixture } from "../code-host-fixture.ts";
@@ -291,6 +301,151 @@ export function makeWorkspaceRebaserMemory(
             target.refs.set(KEEL_TRUNK_REF, head);
             pushed.push({ workspace, to: head });
             return Effect.succeed("advanced");
+          }),
+      }),
+    ),
+  };
+}
+
+const MAIN = "refs/heads/main";
+const UPLOAD_PACK_CAPS = "side-band-64k ofs-delta no-progress agent=keel-memory";
+/** The most pack bytes one side-band-64k packet carries after its band byte. */
+const BAND_BYTES = 65_515;
+
+/** Every object reachable from `wants` that the repo holds: what a fetch of them with no haves sends. */
+function reachable(found: MemoryRepo, wants: readonly string[]): GitObject[] {
+  const seen = new Set<string>();
+  const out: GitObject[] = [];
+  const stack = [...wants];
+  for (let oid = stack.pop(); oid !== undefined; oid = stack.pop()) {
+    if (seen.has(oid)) continue;
+    seen.add(oid);
+    const o = found.objects.get(oid);
+    if (o === undefined) continue;
+    out.push(o);
+    if (o.type === "commit") {
+      const commit = decodeCommit(o.body);
+      stack.push(commit.tree, ...commit.parents);
+    } else if (o.type === "tree") {
+      for (const e of decodeTree(o.body)) if (e.mode !== MODE_GITLINK) stack.push(e.oid);
+    }
+  }
+  return out;
+}
+
+/** A pack in band 1 of a side-band-64k stream, then the flush that ends it. */
+function banded(pack: Uint8Array): Uint8Array[] {
+  const out: Uint8Array[] = [];
+  for (let at = 0; at < pack.length; at += BAND_BYTES)
+    out.push(pkt(concat([Uint8Array.of(1), pack.subarray(at, at + BAND_BYTES)])));
+  out.push(FLUSH);
+  return out;
+}
+
+/** A repo's refs as upload-pack lists them: HEAD first (it points at main), then each ref by name. */
+function listedRefs(found: MemoryRepo): (readonly [sha: string, ref: string])[] {
+  const head = found.refs.get(MAIN);
+  return [
+    ...(head === undefined ? [] : [[head, "HEAD"] as const]),
+    ...[...found.refs]
+      .toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([ref, sha]) => [sha, ref] as const),
+  ];
+}
+
+/** One upload-pack answer over a memory repo, in protocol v0 or (for `version=2`) v2. */
+async function uploadPackAnswer(found: MemoryRepo, request: UploadPackRequest) {
+  const refs = listedRefs(found);
+  const lines = [...readPkts(request.body ?? new Uint8Array())].flatMap((line) =>
+    line === null ? [] : [dec.decode(line).replace(/\n$/, "")],
+  );
+  const wants = lines.filter((l) => l.startsWith("want ")).map((l) => l.slice(5, 45));
+  const packed = async () => await writePack(reachable(found, wants));
+
+  if (request.protocol === "version=2") {
+    if (request.service === "advertise")
+      return concat([
+        pkt("version 2\n"),
+        pkt("agent=keel-memory\n"),
+        pkt("ls-refs\n"),
+        pkt("fetch\n"),
+        FLUSH,
+      ]);
+    const command = lines.find((l) => l.startsWith("command="))?.slice("command=".length);
+    if (command === "ls-refs") {
+      const prefixes = lines
+        .filter((l) => l.startsWith("ref-prefix "))
+        .map((l) => l.slice("ref-prefix ".length));
+      const symrefs = lines.includes("symrefs");
+      return concat([
+        ...refs
+          .filter(([, ref]) => prefixes.length === 0 || prefixes.some((p) => ref.startsWith(p)))
+          .map(([sha, ref]) =>
+            pkt(`${sha} ${ref}${symrefs && ref === "HEAD" ? ` symref-target:${MAIN}` : ""}\n`),
+          ),
+        FLUSH,
+      ]);
+    }
+    if (command !== "fetch") return pkt(`ERR unknown command ${command ?? ""}\n`);
+    if (!lines.includes("done")) return concat([pkt("acknowledgments\n"), pkt("NAK\n"), FLUSH]);
+    return concat([pkt("packfile\n"), ...banded(await packed())]);
+  }
+
+  if (request.service === "advertise") {
+    const caps = `${UPLOAD_PACK_CAPS}${refs.length === 0 ? "" : ` symref=HEAD:${MAIN}`}`;
+    return concat([
+      pkt("# service=git-upload-pack\n"),
+      FLUSH,
+      ...(refs.length === 0
+        ? [pkt(`${ZERO_OID} capabilities^{}\0${caps}\n`)]
+        : refs.map(([sha, ref], i) =>
+            pkt(i === 0 ? `${sha} ${ref}\0${caps}\n` : `${sha} ${ref}\n`),
+          )),
+      FLUSH,
+    ]);
+  }
+  if (!lines.includes("done")) return pkt("NAK\n");
+  const pack = await packed();
+  const sideband = lines.some((l) => l.startsWith("want ") && l.includes("side-band-64k"));
+  return concat([pkt("NAK\n"), ...(sideband ? banded(pack) : [pack])]);
+}
+
+/**
+ * RepoServer over a memory code host: a small upload-pack that advertises the
+ * repo's refs and answers a fetch with every object reachable from its wants
+ * (haves are ignored, which is valid and never thin), in protocol v0 and v2.
+ * `served` records each request in order.
+ */
+export function makeRepoServerMemory(code: Pick<ReturnType<typeof makeCodeHostMemory>, "repos">) {
+  const served: {
+    readonly repo: RepoRef;
+    readonly service: UploadPackRequest["service"];
+    readonly protocol: string | null;
+  }[] = [];
+  return {
+    served,
+    layer: Layer.succeed(
+      RepoServer,
+      RepoServer.of({
+        uploadPack: (repo, request) =>
+          Effect.suspend(() => {
+            const found = code.repos.get(repoKey(repo));
+            if (found === undefined) return Effect.fail(new RepoNotFound({ repo: plain(repo) }));
+            served.push({
+              repo: plain(repo),
+              service: request.service,
+              protocol: request.protocol,
+            });
+            return Effect.promise(async () => {
+              const bytes = await uploadPackAnswer(found, request);
+              return {
+                status: 200,
+                contentType: UPLOAD_PACK_ANSWER_TYPE[request.service],
+                body: (async function* () {
+                  yield bytes;
+                })(),
+              };
+            });
           }),
       }),
     ),

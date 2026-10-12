@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/git-clone.test.ts -t "clone.refusals"
+# kills: clone.refusals
+# why: a repo the host lacks answers differently from one the caller cannot see
+diff --git a/apps/keel/src/adapters/driving/http/git-clone.ts b/apps/keel/src/adapters/driving/http/git-clone.ts
+index 7f5e8e1..5912c6a 100644
+--- a/apps/keel/src/adapters/driving/http/git-clone.ts
++++ b/apps/keel/src/adapters/driving/http/git-clone.ts
+@@ -127,7 +127,7 @@ async function serve(
+     protocol: protocolOf(request),
+     body,
+   });
+-  if (answer === null) return notFound();
++  if (answer === null) return text(502, "The repository host did not answer.");
+   if (answer.status !== 200 || answer.body === null)
+     return text(502, "The repository host did not answer.");
+   return new Response(streamOf(answer.body), {

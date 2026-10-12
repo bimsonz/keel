@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/git-clone.test.ts -t "clone.v2"
+# kills: clone.v2
+# why: Git-Protocol is dropped, so every client is answered in protocol v0 whatever it asked
+diff --git a/apps/keel/src/adapters/driving/http/git-clone.ts b/apps/keel/src/adapters/driving/http/git-clone.ts
+index 7f5e8e1..48adda3 100644
+--- a/apps/keel/src/adapters/driving/http/git-clone.ts
++++ b/apps/keel/src/adapters/driving/http/git-clone.ts
+@@ -124,7 +124,7 @@ async function serve(
+   if (body instanceof Response) return body;
+   const answer = await git.uploadPack(access.repo, {
+     service,
+-    protocol: protocolOf(request),
++    protocol: null,
+     body,
+   });
+   if (answer === null) return notFound();

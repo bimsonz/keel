@@ -43,6 +43,7 @@ export * from "./platform-function.ts";
 export * from "./project-views.ts";
 export * from "./projects.ts";
 export * from "./recall.ts";
+export * from "./repo-server.ts";
 export * from "./secrets-provider.ts";
 export * from "./session-store.ts";
 export * from "./sessions.ts";

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/git-clone.test.ts -t "clone.body-cap"
+# kills: clone.body-cap
+# why: a negotiation of any size is read into memory
+diff --git a/apps/keel/src/adapters/driving/http/git-clone.ts b/apps/keel/src/adapters/driving/http/git-clone.ts
+index 7f5e8e1..c7418c1 100644
+--- a/apps/keel/src/adapters/driving/http/git-clone.ts
++++ b/apps/keel/src/adapters/driving/http/git-clone.ts
+@@ -76,7 +76,7 @@ async function negotiation(request: Request): Promise<Uint8Array | Response> {
+       const next = await reader.read();
+       if (next.done) break;
+       size += next.value.length;
+-      if (size > MAX_UPLOAD_PACK_REQUEST_BYTES) {
++      if (size > Number.POSITIVE_INFINITY) {
+         void reader.cancel().catch(() => undefined);
+         return tooLarge();
+       }

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/git-clone.test.ts -t "reposerver.read-token"
+# kills: reposerver.read-token
+# why: the adapter follows the host's redirect, carrying its token wherever it points
+diff --git a/apps/keel/src/adapters/driven/artifacts/repo-server.ts b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
+index 6dcc0c9..7b37950 100644
+--- a/apps/keel/src/adapters/driven/artifacts/repo-server.ts
++++ b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
+@@ -61,7 +61,7 @@ export const RepoServerArtifacts = (fetcher: typeof fetch = (input, init) => fet
+                 request.service === "advertise"
+                   ? fetcher(`${info.remote}/info/refs?service=git-upload-pack`, {
+                       headers,
+-                      redirect: "manual",
++                      redirect: "follow",
+                     })
+                   : fetcher(`${info.remote}/git-upload-pack`, {
+                       method: "POST",

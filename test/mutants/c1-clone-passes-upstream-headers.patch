@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/git-clone.test.ts -t "clone.token-never-returned"
+# kills: clone.token-never-returned
+# why: the host's own content-type header is passed to the client, with whatever the host put in it
+diff --git a/apps/keel/src/adapters/driven/artifacts/repo-server.ts b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
+index 6dcc0c9..ef57b9f 100644
+--- a/apps/keel/src/adapters/driven/artifacts/repo-server.ts
++++ b/apps/keel/src/adapters/driven/artifacts/repo-server.ts
+@@ -81,7 +81,7 @@ export const RepoServerArtifacts = (fetcher: typeof fetch = (input, init) => fet
+             }
+             return {
+               status: 200,
+-              contentType: expected,
++              contentType: answered.headers.get("content-type") ?? expected,
+               body: chunks(answered.body),
+             } satisfies UploadPackAnswer;
+           }),

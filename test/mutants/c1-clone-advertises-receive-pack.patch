@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/git-clone.test.ts -t "clone.receive-pack-refused"
+# kills: clone.receive-pack-refused
+# why: a push's advertisement is answered as a fetch's, so git goes on to push
+diff --git a/apps/keel/src/adapters/driving/http/git-clone.ts b/apps/keel/src/adapters/driving/http/git-clone.ts
+index 7f5e8e1..96447c3 100644
+--- a/apps/keel/src/adapters/driving/http/git-clone.ts
++++ b/apps/keel/src/adapters/driving/http/git-clone.ts
+@@ -152,8 +152,7 @@ export function registerGitClone(app: Hono<AppEnv>, git: GitClone): void {
+   const repo = "/:org/:repo{[^/]+\\.git}";
+   app.get(`${repo}/info/refs`, async (c) => {
+     const service = c.req.query("service");
+-    if (service === "git-receive-pack") return readOnly();
+-    if (service !== "git-upload-pack")
++    if (service !== "git-upload-pack" && service !== "git-receive-pack")
+       return text(403, "Keel serves git's smart HTTP protocol only.");
+     return await serve(git, c.req.raw, c.req.param("org"), c.req.param("repo"), "advertise");
+   });

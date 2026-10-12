@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/git-clone.test.ts -t "clone.fetch|clone.body-cap"
+# kills: clone.fetch, clone.body-cap
+# why: a gzipped negotiation reaches the host still compressed, and the cap counts compressed bytes
+diff --git a/apps/keel/src/adapters/driving/http/git-clone.ts b/apps/keel/src/adapters/driving/http/git-clone.ts
+index 7f5e8e1..67c9732 100644
+--- a/apps/keel/src/adapters/driving/http/git-clone.ts
++++ b/apps/keel/src/adapters/driving/http/git-clone.ts
+@@ -66,7 +66,7 @@ async function negotiation(request: Request): Promise<Uint8Array | Response> {
+     return tooLarge();
+   if (request.body === null) return new Uint8Array();
+   const reader = (
+-    encoding === "gzip" ? request.body.pipeThrough(new DecompressionStream("gzip")) : request.body
++    request.body
+   ).getReader();
+   const parts: Uint8Array[] = [];
+   let size = 0;
