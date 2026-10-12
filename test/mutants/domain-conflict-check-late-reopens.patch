@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.world-checks, conflict.chart, conflict.one-terminal
+# why: A late suite cell sends a decided conflict back to Probing: evidence for people moves the conflict, and an ended one reopens
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index 80645e2..9aa95d1 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -378,6 +378,7 @@ export const evolveConflict = (
+       return conflict.probeId !== undefined && sameCell(conflict, event) === undefined
+         ? {
+             ...conflict,
++            state: "probing",
+             checks: [
+               ...(conflict.checks ?? []),
+               { world: event.world, check: event.check, run: event.run, outcome: event.outcome },

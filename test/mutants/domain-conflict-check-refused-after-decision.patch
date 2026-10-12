@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.world-checks, conflict.chart, conflict.transitions
+# why: A suite's cell is refused once the probe has decided, so the world checks, which finish minutes after the deciding cell, are never recorded
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index 80645e2..4404b1f 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -307,7 +307,7 @@ export const decideConflict = (
+         : refuse();
+     }
+     case "RecordCheck": {
+-      if (conflict.probeId === undefined) return refuse("no-probe-drafted", awaitProbe);
++      if (conflict.state !== "probing") return refuse("no-probe-drafted", awaitProbe);
+       const cell = {
+         conflictId: conflict.id,
+         world: command.world,
