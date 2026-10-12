@@ -1,0 +1,29 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/event-catalogue.test.ts
+# kills: events.envelope
+# why: the published pattern takes any text after `user:` where core takes a user id, so a consumer is told to expect actors core refuses.
+diff --git a/packages/contracts/openapi.json b/packages/contracts/openapi.json
+index 2e96e9b..616936d 100644
+--- a/packages/contracts/openapi.json
++++ b/packages/contracts/openapi.json
+@@ -10409,7 +10409,7 @@
+       },
+       "EventActor": {
+         "type": "string",
+-        "pattern": "^(agent:agt_[0-9A-HJKMNP-TV-Z]{26}|user:usr_[0-9A-HJKMNP-TV-Z]{26}|operator:.+)$",
++        "pattern": "^(agent:agt_[0-9A-HJKMNP-TV-Z]{26}|user:.+|operator:.+)$",
+         "description": "The principal whose command caused an event: `agent:<agent id>` or `user:<user id>`. Events committed before users\nexisted name a person as `operator:<by>`, and still read so."
+       },
+       "EventAnchor": {
+diff --git a/packages/spec/inbox.tsp b/packages/spec/inbox.tsp
+index a9aca1a..d9eac44 100644
+--- a/packages/spec/inbox.tsp
++++ b/packages/spec/inbox.tsp
+@@ -22,7 +22,7 @@ model InboxEnvelope is AgentEnvelope<InboxPage>;
+  * The principal whose command caused an event: `agent:<agent id>` or `user:<user id>`. Events committed before users
+  * existed name a person as `operator:<by>`, and still read so.
+  */
+-@pattern("^(agent:agt_[0-9A-HJKMNP-TV-Z]{26}|user:usr_[0-9A-HJKMNP-TV-Z]{26}|operator:.+)$")
++@pattern("^(agent:agt_[0-9A-HJKMNP-TV-Z]{26}|user:.+|operator:.+)$")
+ scalar EventActor extends string;
+ 
+ /**

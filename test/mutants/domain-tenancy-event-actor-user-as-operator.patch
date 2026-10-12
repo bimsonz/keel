@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/tenancy.test.ts
+# kills: tenancy.event-actor
+# why: a granted user is still named `operator:<id>`, the spelling from before users existed, so the feed cannot tell a person from the old instance operator.
+diff --git a/packages/core/src/domain/identity/tenancy.ts b/packages/core/src/domain/identity/tenancy.ts
+index 75ad2cf..a036dd2 100644
+--- a/packages/core/src/domain/identity/tenancy.ts
++++ b/packages/core/src/domain/identity/tenancy.ts
+@@ -114,7 +114,7 @@ export const actorId = (actor: Actor): string =>
+ 
+ /** The actor as an event's envelope names it: `agent:<id>` or `user:<id>`. */
+ export const eventActorOf = (actor: Actor): EventActor =>
+-  actor._tag === "Agent" ? agentActor(actor.agentId) : userActor(actor.userId);
++  actor._tag === "Agent" ? agentActor(actor.agentId) : `operator:${actor.userId}`;
+ 
+ /** The instance itself: its quotas, its users, its spend. */
+ export interface InstanceResource {

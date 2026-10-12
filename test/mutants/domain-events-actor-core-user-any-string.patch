@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/tooling/test/event-catalogue.test.ts
+# kills: events.envelope
+# why: core takes any text after `user:` where the published pattern takes a user id, so core commits actors the contract says cannot exist.
+diff --git a/packages/core/src/domain/kernel/event.ts b/packages/core/src/domain/kernel/event.ts
+index aabcd50..f6b38cb 100644
+--- a/packages/core/src/domain/kernel/event.ts
++++ b/packages/core/src/domain/kernel/event.ts
+@@ -14,7 +14,7 @@ import { AgentId, EventId, type Instant, InstantSchema, ProjectId, UserId } from
+  */
+ export const Actor = Schema.Union([
+   Schema.TemplateLiteral(["agent:", AgentId]),
+-  Schema.TemplateLiteral(["user:", UserId]),
++  Schema.TemplateLiteral(["user:", Schema.NonEmptyString]),
+   Schema.TemplateLiteral(["operator:", Schema.NonEmptyString]),
+ ]);
+ export type Actor = typeof Actor.Type;

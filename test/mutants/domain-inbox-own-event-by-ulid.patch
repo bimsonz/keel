@@ -1,0 +1,13 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/inbox.test.ts
+# kills: inbox.annotate-silent
+# why: an event counts as the agent's own when its actor's id ends as the agent's does, whatever kind of actor it is, so a user whose id shares the ULID is never heard.
+diff --git a/packages/core/src/domain/identity/inbox.ts b/packages/core/src/domain/identity/inbox.ts
+index 884c9f0..684a8bf 100644
+--- a/packages/core/src/domain/identity/inbox.ts
++++ b/packages/core/src/domain/identity/inbox.ts
+@@ -80,4 +80,4 @@ const isAnnotation = Schema.is(
+  * is recorded for the record only, so it notifies no one.
+  */
+ export const notifies = (agentId: AgentId, event: EventEnvelope): boolean =>
+-  event.actor !== agentActor(agentId) && !isAnnotation(event.payload);
++  event.actor?.slice(-26) !== agentId.slice(-26) && !isAnnotation(event.payload);
