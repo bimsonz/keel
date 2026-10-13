@@ -532,6 +532,53 @@ describe("a new project's source", () => {
     expect([next.status, next.body.name]).toEqual([201, early.name]);
   });
 
+  it("[projects.quota-real] a person's namespace holds ten projects: the eleventh is refused 403 quota.exceeded, naming the ten and the way on, and takes no place; another person's first is made, and one of the ten is itself again under its key", async () => {
+    const app = sourceApp();
+    const ada = await app.signUp("quota");
+    const keys = Array.from({ length: 10 }, key);
+    for (const [n, idempotencyKey] of keys.entries()) {
+      const made = await app.create(
+        ada.token,
+        { namespace: ada.namespace, name: `app-${n}`, source: FROM_TEMPLATE },
+        idempotencyKey,
+      );
+      expect([n, made.status]).toEqual([n, 201]);
+    }
+
+    const over = key();
+    const refused = await app.create(
+      ada.token,
+      { namespace: ada.namespace, name: "app-over", source: FROM_TEMPLATE },
+      over,
+    );
+    expect([refused.status, refused.body]).toEqual([
+      403,
+      expect.objectContaining({
+        code: "quota.exceeded",
+        detail: `${ada.handle} holds 10 projects, and it may hold at most 10. No project was made.`,
+        nextActions: [
+          expect.objectContaining({ kind: "call", operationId: "Operator_createProject" }),
+        ],
+      }),
+    ]);
+    expect(await placed(wouldBe(ada.userId, over))).toBe(false);
+
+    const bea = await app.signUp("quota");
+    const beside = await app.create(bea.token, {
+      namespace: bea.namespace,
+      name: "app-over",
+      source: FROM_TEMPLATE,
+    });
+    expect(beside.status).toBe(201);
+
+    const again = await app.create(
+      ada.token,
+      { namespace: ada.namespace, name: "app-3", source: FROM_TEMPLATE },
+      keys[3],
+    );
+    expect([again.status, again.body.id]).toEqual([201, wouldBe(ada.userId, keys[3] ?? "")]);
+  });
+
   it("[run.own-project] an agent makes a project in its own namespace with a run's token: it is placed there, and its first event names the agent and the run; a token that names no run names none; a namespace that is not its own is refused and nothing is made", async () => {
     const world = sourceApp();
     const agent = await keyAgent();

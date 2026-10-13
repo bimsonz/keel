@@ -5,6 +5,7 @@ import {
   IdempotencyConflict,
   type Principal,
   ProjectNameTaken,
+  QuotaExceeded,
   ScopeNotGranted,
 } from "@keeltown/core/domain/identity";
 import type { Change } from "@keeltown/core/domain/coordination";
@@ -36,6 +37,7 @@ import {
   sampleOrgId,
   sampleProjectId,
   sampleSponsorId,
+  makeOrgUsageMemory,
 } from "@keeltown/testing";
 import { ulid } from "ulid";
 import { Layer, ManagedRuntime, Schema } from "effect";
@@ -138,6 +140,7 @@ function grantedSurface() {
   const rows = makeBetterAuthMemory({ orgs: [{ id: sampleOrgId, slug: "stubs" }] });
   const runtime = ManagedRuntime.make(
     Layer.mergeAll(
+      makeOrgUsageMemory().layer,
       directory,
       projects.layer,
       makeTrunksMemory().layer,
@@ -313,4 +316,51 @@ describe("a project's name that is taken", () => {
       ]);
     },
   );
+});
+
+describe("a namespace at its limit of projects", () => {
+  it("[projects.quota-http] is refused 403 quota.exceeded, naming the namespace, what it holds and its limit, with the way on, and says nothing of bytes", () => {
+    const refused = createProjectError(
+      caller,
+      "ada",
+      new QuotaExceeded({
+        kind: "projects",
+        reason: "limit",
+        limit: 10,
+        used: 10,
+        requested: 1,
+        nextActions: [{ kind: "escalate", title: "The org is at its projects limit (10)" }],
+      }),
+    );
+    expect([refused.status, refused.body]).toEqual([
+      403,
+      expect.objectContaining({
+        code: "quota.exceeded",
+        detail: "ada holds 10 projects, and it may hold at most 10. No project was made.",
+        nextActions: [
+          {
+            kind: "call",
+            title: "Create the project in an org you are a member of",
+            operationId: "Operator_createProject",
+          },
+        ],
+      }),
+    ]);
+  });
+
+  it("[projects.quota-http-bytes] a history over the namespace's bytes still reads as bytes", () => {
+    const refused = createProjectError(
+      caller,
+      "ada",
+      new QuotaExceeded({
+        kind: "repo-bytes",
+        reason: "limit",
+        limit: 100,
+        used: 90,
+        requested: 20,
+        nextActions: [],
+      }),
+    );
+    expect(refused.status === 403 && refused.body.detail).toContain("20 bytes");
+  });
 });

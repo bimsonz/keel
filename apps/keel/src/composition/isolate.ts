@@ -55,6 +55,7 @@ import { EventFeedRpc } from "../adapters/driven/do-rpc/event-feed.ts";
 import { ProjectViewsRpc } from "../adapters/driven/do-rpc/project-views.ts";
 import { InboxRpc } from "../adapters/driven/do-rpc/inbox.ts";
 import { NotifierRpc } from "../adapters/driven/do-rpc/notifier.ts";
+import { OrgUsageRpc } from "../adapters/driven/do-rpc/org-usage.ts";
 import { ProjectsRpc } from "../adapters/driven/do-rpc/projects.ts";
 import { TrunksRpc } from "../adapters/driven/do-rpc/trunks.ts";
 import { signersFile } from "../adapters/driven/gitcore/commit-signing.ts";
@@ -111,6 +112,8 @@ export function isolateLayer(
     MembershipsD1(env.DB),
     NamespacesD1(env.DB),
     ProjectNamespacesD1(env.DB),
+    // A namespace's own limits, read where a project is made.
+    OrgUsageRpc(env.ORG_USAGE),
     // The repo read API reads trunks, which live in the core namespace alone.
     overrides.codeHost ?? CodeHostArtifacts({ "keel-core": env.ARTIFACTS }),
     TokenIssuerJose({ privateJwk: env.KEEL_SIGNING_KEY, issuer: env.KEEL_HOST }).pipe(

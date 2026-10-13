@@ -28,6 +28,7 @@ import {
   sampleOrgId,
   sampleProjectId,
   sampleSponsorId,
+  makeOrgUsageMemory,
 } from "@keeltown/testing";
 import { decodeJwt } from "jose";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
@@ -80,6 +81,7 @@ async function serve(seeded: Agent, clock: Layer.Layer<Clock>) {
   const inbox = makeInboxMemory();
   const runtime = ManagedRuntime.make(
     Layer.mergeAll(
+      makeOrgUsageMemory().layer,
       directory.layer,
       TokenIssuerJose({ privateJwk, issuer: "keel.unit" }).pipe(Layer.provide(clock)),
       clock,

@@ -15,6 +15,7 @@ import type {
   Notifier,
   Namespaces,
   ProbeStore,
+  OrgUsage,
   ProjectNamespaces,
   Projects,
   ProjectViews,
@@ -59,7 +60,8 @@ export type IsolateServices =
   | Memberships
   | Namespaces
   | ProjectNamespaces
-  | Trunks;
+  | Trunks
+  | OrgUsage;
 
 /**
  * One line a request that hit a defect, found by its request id: the defect's

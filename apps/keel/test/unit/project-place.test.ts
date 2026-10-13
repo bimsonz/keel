@@ -8,6 +8,7 @@ import {
   CodeHost,
   type EntityStore,
   EventOutbox,
+  OrgUsage,
   ProjectNamespaces,
   type ProjectPlace,
   Projects,
@@ -18,6 +19,7 @@ import {
   CodeHostFixture,
   makeCodeHostMemory,
   makeEventOutboxMemory,
+  makeOrgUsageMemory,
   makeManualClock,
   makeProjectNamespacesMemory,
   makeTrunksMemory,
@@ -26,6 +28,7 @@ import {
 import { Effect, Exit, Layer, Option, Schema } from "effect";
 
 const ORG = Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const ELSEWHERE = Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V7");
 const user = (id: string): Actor => ({
   _tag: "User",
   userId: Schema.decodeUnknownSync(UserId)(id),
@@ -51,8 +54,8 @@ function world(options: { readonly failSyncOnce?: boolean } = {}) {
     Effect.map(ProjectNamespaces, (inner) =>
       ProjectNamespaces.of({
         ...inner,
-        assign: (place) =>
-          Effect.tap(inner.assign(place), () =>
+        assign: (place, room) =>
+          Effect.tap(inner.assign(place, room), () =>
             Effect.sync(() => journal.push(`assign ${place.projectId}`)),
           ),
       }),
@@ -108,7 +111,15 @@ function world(options: { readonly failSyncOnce?: boolean } = {}) {
       makeWorkspacePoolMemory({ journal }).layer,
     ]),
   );
-  const layer = Layer.mergeAll(projectObject, placed, code.layer, outbox.layer);
+  const usage = makeOrgUsageMemory();
+  const layer = Layer.mergeAll(
+    projectObject,
+    placed,
+    code.layer,
+    outbox.layer,
+    usage.layer,
+    usage.clock.layer,
+  );
   return { journal, places, seen, layer };
 }
 
@@ -229,6 +240,97 @@ describe("createProject", () => {
         );
         expect(reused).toMatchObject({ _tag: "IdempotencyConflict" });
         expect(places.places.get(project.id)).toMatchObject({ namespace: ORG, name: "forge" });
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[projects.quota] a namespace's eleventh project is QuotaExceeded of kind projects, naming the ten it holds, and reaches no Project DO; another namespace has room of its own, and one already made is itself again",
+    () => {
+      const { journal, places, layer } = world();
+      return Effect.gen(function* () {
+        yield* seedSource;
+        for (let n = 1; n <= 10; n += 1) yield* creating(alice, `app-${n}`, `create-${n}`);
+        const steps = journal.length;
+        const over = yield* Effect.flip(creating(alice, "app-11", "create-11"));
+        expect(over).toMatchObject({
+          _tag: "QuotaExceeded",
+          kind: "projects",
+          reason: "limit",
+          limit: 10,
+          used: 10,
+          requested: 1,
+        });
+        expect(journal).toHaveLength(steps);
+        expect(places.places.size).toBe(10);
+        expect(places.places.has(projectIdFor(alice, "create-11"))).toBe(false);
+
+        const elsewhere = yield* createProject(alice, {
+          namespace: ELSEWHERE,
+          name: "app-11",
+          source: TEMPLATE,
+          idempotencyKey: "create-12",
+        });
+        expect(places.places.get(elsewhere.id)).toMatchObject({ namespace: ELSEWHERE });
+        expect((yield* creating(alice, "app-3", "create-3")).id).toBe(
+          projectIdFor(alice, "create-3"),
+        );
+        expect(places.places.size).toBe(11);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[projects.quota-own-limit] a namespace's own limit comes before the instance's: one set to two refuses its third, and set to twelve it is given its eleventh and twelfth",
+    () => {
+      const { layer } = world();
+      return Effect.gen(function* () {
+        yield* seedSource;
+        const usage = yield* OrgUsage;
+        yield* usage.configure(ORG, { overrides: { projects: 2 }, halted: false });
+        yield* creating(alice, "app-1", "create-1");
+        yield* creating(alice, "app-2", "create-2");
+        expect(yield* Effect.flip(creating(alice, "app-3", "create-3"))).toMatchObject({
+          _tag: "QuotaExceeded",
+          kind: "projects",
+          limit: 2,
+          used: 2,
+        });
+        yield* usage.configure(ORG, { overrides: { projects: 12 }, halted: false });
+        for (let n = 3; n <= 12; n += 1) yield* creating(alice, `app-${n}`, `again-${n}`);
+        expect(yield* Effect.flip(creating(alice, "app-13", "again-13"))).toMatchObject({
+          _tag: "QuotaExceeded",
+          kind: "projects",
+          limit: 12,
+          used: 12,
+        });
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[projects.quota-room-back] a start the Project DO refuses takes none of the namespace's room: at nine, the tenth is still made after one, and the eleventh is refused",
+    () => {
+      const { places, layer } = world();
+      const nowhere = { _tag: "Import", url: "https://git.memory.test/upstream/none" } as const;
+      return Effect.gen(function* () {
+        yield* seedSource;
+        for (let n = 1; n <= 9; n += 1) yield* creating(alice, `app-${n}`, `create-${n}`);
+        const refused = yield* Effect.flip(
+          createProject(alice, {
+            namespace: ORG,
+            name: "app-10",
+            source: nowhere,
+            idempotencyKey: "create-none",
+          }),
+        );
+        expect(refused).toMatchObject({ _tag: "ImportRefused" });
+        expect(places.places.size).toBe(9);
+        yield* creating(alice, "app-ten", "create-10");
+        expect(yield* Effect.flip(creating(alice, "app-11", "create-11"))).toMatchObject({
+          _tag: "QuotaExceeded",
+          used: 10,
+        });
       }).pipe(Effect.provide(layer));
     },
   );

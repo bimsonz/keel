@@ -1,6 +1,7 @@
 import { Context, type Effect, type Option } from "effect";
 import type {
   Handle,
+  NamespaceFull,
   ProjectAudience,
   ProjectNameTaken,
   Visibility,
@@ -26,12 +27,23 @@ export interface ListedProject extends ProjectPlace {
   readonly suspended: boolean;
 }
 
+/** How many projects a namespace may hold once an assignment is made. */
+export interface NamespaceRoom {
+  readonly atMost: number;
+}
+
 /**
  * Each project's namespace and name. Keel owns them, in its D1 `projects`
  * table, written when a project is created. A name is held lower-case, unique
  * in its namespace and found in any case. Assigning a project the place it has
  * is a no-op; a name another project of the namespace holds, or another place
  * for a placed project (a project never moves), is ProjectNameTaken.
+ *
+ * An assignment given `room` is made only while the namespace holds fewer
+ * projects than `atMost`, decided with the write, so two at once never both
+ * take the last place: otherwise it is NamespaceFull, with the number held. A
+ * taken name is told first, and a repeat of a project's own place is a no-op
+ * however many the namespace holds.
  *
  * The row also mirrors the project's visibility, so a list is narrowed where
  * it is read. The Project object stays the authority: it writes the mirror
@@ -41,7 +53,10 @@ export interface ListedProject extends ProjectPlace {
 export class ProjectNamespaces extends Context.Service<
   ProjectNamespaces,
   {
-    readonly assign: (place: ProjectPlace) => Effect.Effect<void, ProjectNameTaken>;
+    readonly assign: (
+      place: ProjectPlace,
+      room?: NamespaceRoom,
+    ) => Effect.Effect<void, ProjectNameTaken | NamespaceFull>;
     /**
      * Gives a project's place back, so its name is free in its namespace
      * again. For a project that was never made (its start was refused, and

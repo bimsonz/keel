@@ -38,6 +38,7 @@ import {
   makeTokenIssuerMemory,
   makeTrunksMemory,
   makeUsersMemory,
+  makeOrgUsageMemory,
 } from "@keeltown/testing";
 import { Layer, ManagedRuntime } from "effect";
 import { ulid } from "ulid";
@@ -100,6 +101,7 @@ function world() {
   });
   const runtime = ManagedRuntime.make(
     Layer.mergeAll(
+      makeOrgUsageMemory().layer,
       directory,
       projects.layer,
       makeTrunksMemory().layer,

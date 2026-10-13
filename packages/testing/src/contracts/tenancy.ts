@@ -526,6 +526,89 @@ export function describeProjectNamespacesContract(
     );
 
     it.effect(
+      "[ports.project-namespaces-room] an assignment given room is made while the namespace holds fewer projects than that, and the next is NamespaceFull with the number held; room is asked for by each assignment",
+      () =>
+        Effect.gen(function* () {
+          const projects = yield* ProjectNamespaces;
+          const org = orgId();
+          const place = () => ({ projectId: projectId(), namespace: org, name: fresh("app") });
+          const room = { atMost: 3 };
+          yield* projects.assign(place(), room);
+          yield* projects.assign(place(), room);
+          yield* projects.assign(place(), room);
+          const over = place();
+          expect(yield* Effect.flip(projects.assign(over, room))).toMatchObject({
+            _tag: "NamespaceFull",
+            namespace: org,
+            held: 3,
+          });
+          expect(Option.isNone(yield* projects.byId(over.projectId))).toBe(true);
+          expect(yield* projects.inNamespace(org)).toHaveLength(3);
+
+          yield* projects.assign(over, { atMost: 4 });
+          yield* projects.assign(place());
+          expect(yield* projects.inNamespace(org)).toHaveLength(5);
+        }).pipe(Effect.provide(make().layer)),
+    );
+
+    it.effect(
+      "[ports.project-namespaces-room-own] a namespace's room is its own: another namespace's projects take none of it",
+      () =>
+        Effect.gen(function* () {
+          const projects = yield* ProjectNamespaces;
+          const first = orgId();
+          const second = userId();
+          const room = { atMost: 2 };
+          for (const namespace of [first, first, second, second])
+            yield* projects.assign({ projectId: projectId(), namespace, name: fresh("app") }, room);
+          expect(
+            yield* Effect.flip(
+              projects.assign(
+                { projectId: projectId(), namespace: second, name: fresh("app") },
+                room,
+              ),
+            ),
+          ).toMatchObject({ _tag: "NamespaceFull", namespace: second, held: 2 });
+        }).pipe(Effect.provide(make().layer)),
+    );
+
+    it.effect(
+      "[ports.project-namespaces-room-repeat] a placed project's own place is assigned again in a full namespace, in any case, and changes nothing",
+      () =>
+        Effect.gen(function* () {
+          const projects = yield* ProjectNamespaces;
+          const org = orgId();
+          const one = { projectId: projectId(), namespace: org, name: fresh("app") };
+          const two = { projectId: projectId(), namespace: org, name: fresh("app") };
+          const room = { atMost: 2 };
+          yield* projects.assign(one, room);
+          yield* projects.assign(two, room);
+          yield* projects.assign(one, room);
+          yield* projects.assign({ ...two, name: two.name.toUpperCase() }, room);
+          expect(yield* projects.inNamespace(org)).toHaveLength(2);
+        }).pipe(Effect.provide(make().layer)),
+    );
+
+    it.effect(
+      "[ports.project-namespaces-room-name-first] a name the namespace holds is refused as taken, though the namespace is full as well",
+      () =>
+        Effect.gen(function* () {
+          const projects = yield* ProjectNamespaces;
+          const org = orgId();
+          const held = { projectId: projectId(), namespace: org, name: fresh("app") };
+          const room = { atMost: 1 };
+          yield* projects.assign(held, room);
+          expect(
+            yield* Effect.flip(
+              projects.assign(
+                { projectId: projectId(), namespace: org, name: held.name.toUpperCase() },
+                room,
+              ),
+            ),
+          ).toMatchObject({ _tag: "ProjectNameTaken", namespace: org, name: held.name });
+        }).pipe(Effect.provide(make().layer)),
+    );
+    it.effect(
       "[ports.project-namespaces-in-namespace] lists a namespace's projects by name, and only its own",
       () =>
         Effect.gen(function* () {

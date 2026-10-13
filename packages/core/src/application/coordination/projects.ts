@@ -1,13 +1,18 @@
-import { Effect, Option } from "effect";
+import { Effect, Option, Result } from "effect";
 import {
   type Actor,
   actorId,
+  admitQuota,
+  DEFAULT_QUOTAS,
   IdempotencyConflict,
   type ProjectNameTaken,
+  quotaLimit,
 } from "../../domain/identity/index.ts";
 import type { ProjectNotFound } from "../../domain/integration/index.ts";
 import { type NamespaceId, ProjectId, type RunRef } from "../../domain/kernel/index.ts";
 import {
+  Clock,
+  OrgUsage,
   type ProjectRecord,
   ProjectNamespaces,
   Projects,
@@ -45,7 +50,12 @@ export const projectIdFor = (actor: Actor, idempotencyKey: string): ProjectId =>
  * Creates a project in `input.namespace`, which the doorway authorised the
  * actor in, from `input.source`, which the doorway let the actor fork when it
  * is a project. Its place comes first: the name, lower-case, must be free there
- * (ProjectNameTaken otherwise) before anything is made. Then its Project DO
+ * (ProjectNameTaken otherwise), and the namespace must hold fewer projects
+ * than its limit, its own when its usage settings name one and the instance's
+ * otherwise (QuotaExceeded of kind `projects`, as the domain words it), before
+ * anything is made. The count is the directory's own, taken with the write: a
+ * project is counted from the moment it has a place, and a place given back
+ * is room again. Then its Project DO
  * makes trunk by the start, initialises it at its first head, which reads the
  * place, and makes staging, the workspace mirror and pool. The id is derived
  * from the actor and the key, so a retry reaches the same place (a no-op) and
@@ -61,7 +71,7 @@ export const createProject: (
 ) => Effect.Effect<
   ProjectRecord,
   IdempotencyConflict | ProjectNameTaken | ProjectStartRefused,
-  Projects | ProjectNamespaces
+  Projects | ProjectNamespaces | OrgUsage | Clock
 > = Effect.fn("coordination/createProject")(function* (actor: Actor, input: NewProject) {
   const { namespace, idempotencyKey } = input;
   const projectId = projectIdFor(actor, idempotencyKey);
@@ -70,7 +80,28 @@ export const createProject: (
   const placed = yield* places.byId(projectId);
   if (Option.isSome(placed) && (placed.value.namespace !== namespace || placed.value.name !== name))
     return yield* new IdempotencyConflict({ idempotencyKey });
-  yield* places.assign({ projectId, namespace, name });
+  const { overrides, halted } = yield* (yield* OrgUsage).settings(namespace);
+  const atMost = quotaLimit("projects", DEFAULT_QUOTAS, overrides);
+  yield* places.assign({ projectId, namespace, name }, { atMost }).pipe(
+    Effect.catchTag("NamespaceFull", (full) =>
+      Effect.gen(function* () {
+        const now = yield* (yield* Clock).now;
+        const decided = admitQuota({
+          kind: "projects",
+          amount: 1,
+          used: Math.max(full.held, atMost),
+          now,
+          overrides,
+          halted,
+        });
+        // The directory refused one more at this limit: the namespace held that many as it decided,
+        // whatever a place given back since has left, so the domain refuses one more of that count.
+        return yield* Result.isFailure(decided)
+          ? Effect.fail(decided.failure)
+          : Effect.die(new Error(`${namespace} was full at ${full.held} of ${atMost} projects`));
+      }),
+    ),
+  );
   return yield* (yield* Projects)
     .create(actor, {
       projectId,

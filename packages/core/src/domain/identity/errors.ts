@@ -132,6 +132,12 @@ export class ProjectNameTaken extends Schema.TaggedError<ProjectNameTaken>()("Pr
   name: Schema.String,
 }) {}
 
+/** The namespace holds as many projects as it was given room for: `held` of them. */
+export class NamespaceFull extends Schema.TaggedError<NamespaceFull>()("NamespaceFull", {
+  namespace: NamespaceId,
+  held: Schema.Number,
+}) {}
+
 /** 403: the caller sees the resource but may not do this. */
 export class AccessRefused extends Schema.TaggedError<AccessRefused>()("AccessRefused", {
   reason: RefusalReason,

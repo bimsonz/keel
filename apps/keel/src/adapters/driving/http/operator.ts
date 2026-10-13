@@ -276,6 +276,15 @@ export function createProjectError(
         }),
       };
     case "QuotaExceeded":
+      // A namespace's count of projects is no size: its refusal names the count, and the one way on.
+      if (error.kind === "projects")
+        return {
+          status: 403,
+          body: problem(403, "quota.exceeded", caller.requestId, {
+            detail: `${namespace} holds ${error.used} projects, and it may hold at most ${error.limit}. No project was made.`,
+            nextActions: [again("Create the project in an org you are a member of")],
+          }),
+        };
       return {
         status: 403,
         body: problem(403, "quota.exceeded", caller.requestId, {

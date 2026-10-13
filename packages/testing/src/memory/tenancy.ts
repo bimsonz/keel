@@ -2,6 +2,7 @@ import {
   banHolds,
   Handle,
   type Membership,
+  NamespaceFull,
   ProjectNameTaken,
   strongestRole,
   type Visibility,
@@ -216,14 +217,19 @@ export function makeProjectNamespacesMemory(rows: BetterAuthMemory = makeBetterA
     layer: Layer.succeed(
       ProjectNamespaces,
       ProjectNamespaces.of({
-        assign: (place) =>
-          Effect.suspend(() => {
+        assign: (place, room) =>
+          Effect.suspend((): Effect.Effect<void, ProjectNameTaken | NamespaceFull> => {
             const name = place.name.toLowerCase();
             const taken = Effect.fail(new ProjectNameTaken({ namespace: place.namespace, name }));
             const held = places.get(place.projectId);
             if (held !== undefined)
               return held.namespace === place.namespace && held.name === name ? Effect.void : taken;
             if (byName(place.namespace, name) !== undefined) return taken;
+            const there = [...places.values()].filter((p) => p.namespace === place.namespace);
+            if (room !== undefined && there.length >= room.atMost)
+              return Effect.fail(
+                new NamespaceFull({ namespace: place.namespace, held: there.length }),
+              );
             places.set(place.projectId, { ...place, name });
             return Effect.void;
           }),

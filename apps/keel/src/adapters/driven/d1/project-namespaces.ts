@@ -1,4 +1,9 @@
-import { Handle, ProjectNameTaken, Visibility } from "@keeltown/core/domain/identity";
+import {
+  Handle,
+  NamespaceFull,
+  ProjectNameTaken,
+  Visibility,
+} from "@keeltown/core/domain/identity";
 import { NamespaceId, NamespaceKind, ProjectId } from "@keeltown/core/kernel";
 import { type ListedProject, type ProjectPlace, ProjectNamespaces } from "@keeltown/core/ports";
 import { Clock as EffectClock, Effect, Layer, Option, Schema } from "effect";
@@ -86,6 +91,12 @@ const SHOWN = listed(
  * either writes nothing, and the project's own row then tells a repeat of its
  * place from a taken name or a move. A row that fails to decode is a defect.
  *
+ * An assignment with room inserts only while the namespace's rows number fewer
+ * than `atMost`, counted in the insert's own statement: D1 runs one statement
+ * at a time, so no other assignment lands between the count and the write.
+ * When nothing was written and the project has no row, a row of that name
+ * says the name is taken, and otherwise the namespace was full.
+ *
  * The mirrored visibility is written by `visibility` alone, guarded by
  * `visibility_seq` (migration 0014); a row is `private` as it is inserted.
  */
@@ -97,25 +108,45 @@ export function ProjectNamespacesD1(db: D1Database) {
   return Layer.succeed(
     ProjectNamespaces,
     ProjectNamespaces.of({
-      assign: (place) =>
+      assign: (place, room) =>
         Effect.gen(function* () {
           const name = place.name.toLowerCase();
           const at = yield* EffectClock.currentTimeMillis;
           const inserted = yield* Effect.promise(() =>
-            db
-              .prepare(
-                "INSERT INTO projects (id, namespace_id, name, created_at) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
-              )
-              .bind(place.projectId, place.namespace, name, at)
-              .run(),
+            (room === undefined
+              ? db
+                  .prepare(
+                    "INSERT INTO projects (id, namespace_id, name, created_at) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
+                  )
+                  .bind(place.projectId, place.namespace, name, at)
+              : db
+                  .prepare(
+                    `INSERT INTO projects (id, namespace_id, name, created_at)
+                     SELECT ?1, ?2, ?3, ?4
+                     WHERE (SELECT COUNT(*) FROM projects WHERE namespace_id = ?2) < ?5
+                     ON CONFLICT DO NOTHING`,
+                  )
+                  .bind(place.projectId, place.namespace, name, at, room.atMost)
+            ).run(),
           );
           if (inserted.meta.changes === 1) return;
           const held = yield* byId(place.projectId);
-          const repeated =
-            Option.isSome(held) &&
-            held.value.namespace === place.namespace &&
-            held.value.name === name;
-          if (!repeated) yield* new ProjectNameTaken({ namespace: place.namespace, name });
+          if (Option.isSome(held)) {
+            if (held.value.namespace !== place.namespace || held.value.name !== name)
+              yield* new ProjectNameTaken({ namespace: place.namespace, name });
+            return;
+          }
+          const there = yield* Effect.promise(() =>
+            db
+              .prepare(
+                "SELECT COUNT(*) AS held, SUM(name = ?2) AS named FROM projects WHERE namespace_id = ?1",
+              )
+              .bind(place.namespace, name)
+              .first<{ held: number; named: number | null }>(),
+          );
+          if (room === undefined || (there?.named ?? 0) > 0)
+            yield* new ProjectNameTaken({ namespace: place.namespace, name });
+          else yield* new NamespaceFull({ namespace: place.namespace, held: there?.held ?? 0 });
         }),
       release: (projectId) =>
         Effect.promise(() =>
