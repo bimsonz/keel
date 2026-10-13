@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.fold-table
+# why: the fold takes VerificationStarted with its guard gone: `batch.state === "assembled"`.
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index 46ee4c8c..54318e8e 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -387,7 +387,7 @@ export const evolveCandidate = (
+         ? { ...batch, state: "assembled", candidateId: event.candidateId }
+         : illegal(batch, event);
+     case "VerificationStarted":
+-      return batch.state === "assembled" ? { ...batch, state: "verifying" } : illegal(batch, event);
++      return { ...batch, state: "verifying" };
+     case "BatchVerified":
+       return batch.state === "verifying" ? { ...batch, state: "green" } : illegal(batch, event);
+     case "BatchFailed":

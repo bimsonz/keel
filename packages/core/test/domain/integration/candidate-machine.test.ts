@@ -23,6 +23,7 @@ import {
 import { candidateChart } from "../../charts/charts.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
+import { foldCases, foldLines, foldShape } from "../../support/fold-table.ts";
 import { type Fold, type Machine, tour } from "../../support/machine.ts";
 
 const T0 = Instant(1_760_000_000_000);
@@ -724,6 +725,151 @@ const candidateTour = (): readonly Fold<Batch, CandidateEvent>[] => {
   });
   return walkedTour;
 };
+
+/** The same walk for a batch of one, where the sole member may be blamed before anything ran. */
+const soloTour = (): readonly Fold<Batch, CandidateEvent>[] => {
+  let n = 500;
+  return tour(candidateMachine, {
+    start: T0,
+    facts: (now) => ({ now, batchId: BATCH }),
+    moves: (state) =>
+      KINDS.flatMap((kind) =>
+        [0, 1, 2, 3, 4, 5].map((blame) => ({
+          command: build(
+            kind,
+            state,
+            { ...TOUR_PLAN, members: [A] },
+            { mode: "progress", pick: 0, fenced: false, blame },
+            (n += 2),
+          ),
+          dt: 1,
+        })),
+      ),
+    signature: (b) => `${keyOf(b)}|${b?.attribution ?? ""}`,
+  });
+};
+
+const ANOTHER_BATCH = makeId("bat", ulid(2));
+const BLAMES: readonly BatchAttribution[] = [
+  "textual",
+  "interaction",
+  "infra",
+  "unattributed",
+  A,
+  B,
+];
+
+/** What the fold's table is about: whose the batch is, its state, its members and who is blamed. */
+interface Folded {
+  readonly id: Batch["id"];
+  readonly state: Batch["state"];
+  readonly members: readonly ChangeId[];
+  readonly attribution?: BatchAttribution;
+}
+
+/** Which blame a failure may carry from each state (state-machines.md § Candidate). */
+const blamed = (from: Folded, blame: BatchAttribution): boolean => {
+  const named = !["textual", "interaction", "infra", "unattributed"].includes(blame);
+  if (from.state === "forming")
+    return blame === "textual" || (from.members.length === 1 && blame === from.members[0]);
+  if (from.state === "assembled") return named || blame === "infra";
+  return from.state === "verifying" && blame !== "textual";
+};
+
+/** The fold's from-table (state-machines.md § Candidate), typed apart from `evolveCandidate`. */
+const folds = (from: Folded | undefined, event: CandidateEvent): Folded | "illegal" => {
+  if (from === undefined)
+    return event._tag === "BatchFormed" && event.projectId !== undefined
+      ? { id: event.batchId, state: "forming", members: event.members }
+      : "illegal";
+  if (event._tag === "BatchFormed" || event.batchId !== from.id) return "illegal";
+  const moves = (state: Batch["state"], to: Batch["state"]): Folded | "illegal" =>
+    from.state === state ? { ...from, state: to } : "illegal";
+  switch (event._tag) {
+    case "CandidateAssembled":
+      return moves("forming", "assembled");
+    case "VerificationStarted":
+      return moves("assembled", "verifying");
+    case "BatchVerified":
+      return moves("verifying", "green");
+    case "BatchFailed":
+      return blamed(from, event.attribution)
+        ? { ...from, state: "red", attribution: event.attribution }
+        : "illegal";
+    case "CandidateBisected":
+      return from.state === "red" && from.attribution === "unattributed" && from.members.length > 1
+        ? { ...from, state: "bisected" }
+        : "illegal";
+    case "CandidatePromoted":
+      return moves("green", "promoted");
+    case "CandidateInvalidated":
+      return moves("green", "invalidated");
+    default: {
+      const unreachable: never = event;
+      return unreachable;
+    }
+  }
+};
+
+describe("the Candidate fold", () => {
+  it("[candidate.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
+    const cases = foldCases<Batch, CandidateEvent, Folded>({
+      evolve: evolveCandidate,
+      walked: [...candidateTour(), ...soloTour()],
+      summary: (b) => ({
+        id: b.id,
+        state: b.state,
+        members: b.members,
+        ...(b.attribution === undefined ? {} : { attribution: b.attribution }),
+      }),
+      shown: (f) =>
+        `${f.id} ${f.state} of ${f.members.length}${f.attribution === undefined ? "" : `, blaming ${f.attribution}`}`,
+      // Each event as committed and as another batch's; a forming that names no project;
+      // and a failure with every blame there is.
+      forms: (event) => [
+        event,
+        { ...event, batchId: ANOTHER_BATCH },
+        ...(event._tag === "BatchFormed" ? [{ ...event, projectId: undefined }] : []),
+        ...(event._tag === "BatchFailed"
+          ? BLAMES.map((attribution) => ({ ...event, attribution }))
+          : []),
+      ],
+      times: [T0],
+      table: folds,
+    });
+    const { folded, table } = foldLines(cases);
+    expect(folded).toEqual(table);
+    // Twenty-one rows, a batch of two and a batch of one in every state each reaches, by
+    // every event the two walks committed in each of its forms.
+    expect(foldShape(cases)).toEqual({
+      folds: 6027,
+      refused: 5424,
+      rows: [
+        "none",
+        `${BATCH} forming of 2`,
+        `${BATCH} assembled of 2`,
+        `${BATCH} red of 2, blaming textual`,
+        `${BATCH} verifying of 2`,
+        `${BATCH} red of 2, blaming ${A}`,
+        `${BATCH} red of 2, blaming infra`,
+        `${BATCH} green of 2`,
+        `${BATCH} red of 2, blaming interaction`,
+        `${BATCH} red of 2, blaming unattributed`,
+        `${BATCH} promoted of 2`,
+        `${BATCH} invalidated of 2`,
+        `${BATCH} bisected of 2, blaming unattributed`,
+        `${BATCH} forming of 1`,
+        `${BATCH} assembled of 1`,
+        `${BATCH} red of 1, blaming ${A}`,
+        `${BATCH} verifying of 1`,
+        `${BATCH} red of 1, blaming infra`,
+        `${BATCH} green of 1`,
+        `${BATCH} promoted of 1`,
+        `${BATCH} invalidated of 1`,
+      ],
+    });
+  });
+});
 
 describe("the Candidate chart", { timeout: PROPERTY_TIMEOUT }, () => {
   it("[candidate.chart] every state change a run makes is an edge of the Candidate chart, and a tour of the machine exercises every edge", () => {

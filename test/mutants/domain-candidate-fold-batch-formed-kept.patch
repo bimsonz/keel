@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.fold-table
+# why: the fold passes over a second BatchFormed where it is illegal, so a log holding two replays as if it held one.
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index 46ee4c8c..89b85d05 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -381,7 +381,7 @@ export const evolveCandidate = (
+   if (event._tag !== "BatchFormed" && event.batchId !== batch.id) return illegal(batch, event);
+   switch (event._tag) {
+     case "BatchFormed":
+-      return illegal(batch, event);
++      return batch as never;
+     case "CandidateAssembled":
+       return batch.state === "forming"
+         ? { ...batch, state: "assembled", candidateId: event.candidateId }

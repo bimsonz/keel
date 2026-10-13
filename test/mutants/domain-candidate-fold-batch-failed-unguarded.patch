@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.fold-table
+# why: the fold takes BatchFailed with its guard gone: `failsFrom(batch, event.attribution)`.
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index 46ee4c8c..c71ff985 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -391,9 +391,7 @@ export const evolveCandidate = (
+     case "BatchVerified":
+       return batch.state === "verifying" ? { ...batch, state: "green" } : illegal(batch, event);
+     case "BatchFailed":
+-      return failsFrom(batch, event.attribution)
+-        ? { ...batch, state: "red", attribution: event.attribution }
+-        : illegal(batch, event);
++      return { ...batch, state: "red", attribution: event.attribution };
+     case "CandidateBisected":
+       return isBisectable(batch) ? { ...batch, state: "bisected" } : illegal(batch, event);
+     case "CandidatePromoted":

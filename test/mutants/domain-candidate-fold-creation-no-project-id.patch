@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/candidate-machine.test.ts
+# kills: candidate.fold-table
+# why: the fold no longer refuses BatchFormed on `event.projectId === undefined`.
+diff --git a/packages/core/src/domain/integration/candidate-machine.ts b/packages/core/src/domain/integration/candidate-machine.ts
+index 46ee4c8c..d212cd25 100644
+--- a/packages/core/src/domain/integration/candidate-machine.ts
++++ b/packages/core/src/domain/integration/candidate-machine.ts
+@@ -364,7 +364,7 @@ export const evolveCandidate = (
+ ): Batch => {
+   const event = committed.payload;
+   if (state === undefined) {
+-    if (event._tag !== "BatchFormed" || event.projectId === undefined) return illegal(state, event);
++    if (event._tag !== "BatchFormed") return illegal(state, event);
+     return {
+       id: event.batchId,
+       laneId: event.laneId,
