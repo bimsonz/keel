@@ -3,7 +3,7 @@ import { runIdOf } from "@keeltown/core/domain/identity";
 import { RunLabel } from "@keeltown/core/kernel";
 import { sampleProjectId } from "@keeltown/testing";
 import { Schema } from "effect";
-import { decodeJwt, decodeProtectedHeader } from "jose";
+import { decodeJwt, decodeProtectedHeader, exportJWK, generateKeyPair, SignJWT } from "jose";
 import { describe, expect, it } from "vitest";
 import {
   assertionBy,
@@ -14,6 +14,7 @@ import {
   requestToken,
   seedKeyAgent,
   type TestKey,
+  TOKEN_ENDPOINT,
 } from "./agent-keys.ts";
 import { BASE, seedUser, uniqueHandle, worker } from "./helpers.ts";
 
@@ -22,6 +23,15 @@ const refusal = async (response: Response) => ({
   status: response.status,
   error: (await response.json<{ error?: string }>()).error,
 });
+
+/** A proof for the token endpoint made by a fresh key of `alg`. */
+const proofWith = async (alg: "ES256" | "ES512") => {
+  const { privateKey, publicKey } = await generateKeyPair(alg);
+  return new SignJWT({ htm: "POST", htu: TOKEN_ENDPOINT, jti: crypto.randomUUID() })
+    .setProtectedHeader({ alg, typ: "dpop+jwt", jwk: await exportJWK(publicKey) })
+    .setIssuedAt()
+    .sign(privateKey);
+};
 
 describe("a token for an agent that holds only a key", () => {
   it("[token.shape] a request signed by the agent's key gets a 300-second token, the agent its subject, bound to the run's key", async () => {
@@ -123,6 +133,18 @@ describe("a token for an agent that holds only a key", () => {
       status: 400,
       error: "invalid_dpop_proof",
     });
+  });
+
+  it("[dpop.algorithms] the token endpoint takes a proof made by a P-256 key, and refuses one made by a key of an algorithm the documents do not name", async () => {
+    const account = await newKey();
+    const agent = await seedKeyAgent(account);
+    const taken = await granted(
+      await requestToken(agent.id, account, { proof: await proofWith("ES256") }),
+    );
+    expect(taken.token_type).toBe("DPoP");
+    expect(
+      await refusal(await requestToken(agent.id, account, { proof: await proofWith("ES512") })),
+    ).toEqual({ status: 400, error: "invalid_dpop_proof" });
   });
 
   it("[dpop.unbound] a request with no proof gets a plain 300-second bearer, bound to no key", async () => {

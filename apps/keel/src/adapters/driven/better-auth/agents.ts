@@ -16,6 +16,7 @@ import { APIError } from "better-auth/api";
 import { deriveDpopJkt } from "better-auth/oauth2";
 import { Result, Schema } from "effect";
 import { decodeProtectedHeader } from "jose";
+import { KEY_ALGORITHMS } from "./key-proofs.ts";
 
 /**
  * Keel as an authorization server for agents, on Better Auth's
@@ -262,6 +263,8 @@ export function agentTokens(config: AgentTokensConfig): BetterAuthPlugin {
     enforcePerClientResources: false,
     m2mAccessTokenExpiresIn: AGENT_TOKEN_SECONDS,
     assertionMaxLifetime: ASSERTION_SECONDS,
+    // A token is bound only to a key whose proofs Keel's own doors take: the library's list is wider.
+    dpop: { signingAlgorithms: [...KEY_ALGORITHMS] },
     allowDynamicClientRegistration: false,
     extensions: [
       {

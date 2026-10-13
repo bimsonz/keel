@@ -593,6 +593,10 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 - `WorkspacePool.release(projectId, workspaceId, reason?)` names the project, as `grant` does, so the RPC adapter can address `pool:<projectId>` (no callers).
 - The coordination use-cases `declare`, `revise`, `submit`, `abandon`, `adopt` and `getChange` are the Change DO's: they take the change id and the decoded Change RPC command, and carry exactly the ports and errors they use (`submit` needs `CodeHost`; `declare` no longer names `SubjectRegistry`). `declare` answers `{change, preflight, grant}`. `DeclareInput`, `SubmitInput` and `Declared` stay as the `Changes` port's inputs, and `rely`, `nearby` and `openSketch` stay stubs (unused since contracts-v0).
 
+### Fixed
+
+- The token endpoint binds a token only to a key whose proofs Keel takes: a DPoP proof made with `EdDSA` or `ES256`, the two the authorization server's document names. It used to take the library's wider list, so a request with a proof made by a P-521 or RSA key was granted a token that every Keel door then refused. Such a request is now refused `400 invalid_dpop_proof`.
+
 ### Removed
 
 - **`sketch` and a workspace's release leave the API** (breaking). Each has only ever answered `503 service.not_implemented`.
