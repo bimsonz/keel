@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts
+# kills: ports.project-namespaces-release-fresh
+# why: The memory adapter keeps a released project's mirrored visibility, so placed again it starts public where D1's new row is private
+diff --git a/packages/testing/src/memory/tenancy.ts b/packages/testing/src/memory/tenancy.ts
+index 277fa26c..a026647d 100644
+--- a/packages/testing/src/memory/tenancy.ts
++++ b/packages/testing/src/memory/tenancy.ts
+@@ -214,7 +214,6 @@ export function makeProjectNamespacesMemory(rows: BetterAuthMemory = makeBetterA
+         release: (projectId) =>
+           Effect.sync(() => {
+             places.delete(projectId);
+-            mirrored.delete(projectId);
+           }),
+         byId: (projectId) => Effect.sync(() => Option.fromNullishOr(places.get(projectId))),
+         byName: (namespace, name) =>

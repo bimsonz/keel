@@ -456,7 +456,34 @@ export function describeProjectNamespacesContract(
           yield* projects.assign(next);
           expect(yield* projects.byName(org, name)).toEqual(Option.some(next));
           expect(yield* projects.byId(kept.projectId)).toEqual(Option.some(kept));
-        }).pipe(Effect.provide(make())),
+        }).pipe(Effect.provide(make().layer)),
+    );
+
+    it.effect(
+      "[ports.project-namespaces-release-fresh] a released project placed again starts as any new one: private, and taking a visibility from the first seq, whatever its earlier row had mirrored",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const projects = yield* ProjectNamespaces;
+          const org = { id: orgId(), slug: fresh("again") };
+          yield* harness.seed({ orgs: [org] });
+          const place = { projectId: projectId(), namespace: org.id, name: fresh("again") };
+          const mirrored = Effect.map(
+            projects.shownTo({ namespaces: [org.id] }, undefined, 10_000),
+            (rows) => rows.find((row) => row.projectId === place.projectId)?.visibility,
+          );
+          yield* projects.assign(place);
+          yield* projects.visibility(place.projectId, "public", 7);
+          expect(yield* mirrored).toBe("public");
+
+          yield* projects.release(place.projectId);
+          expect(yield* mirrored).toBeUndefined();
+          yield* projects.assign(place);
+          expect(yield* mirrored).toBe("private");
+          yield* projects.visibility(place.projectId, "public", 1);
+          expect(yield* mirrored).toBe("public");
+        }).pipe(Effect.provide(harness.layer));
+      },
     );
 
     it.effect(

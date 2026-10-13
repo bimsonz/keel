@@ -247,6 +247,7 @@ describe("a project's visibility reaches the list", () => {
               ProjectNamespaces,
               ProjectNamespaces.of({
                 assign: () => Effect.die("unused"),
+                release: () => Effect.die("unused"),
                 byId: () => Effect.die("unused"),
                 byName: () => Effect.die("unused"),
                 inNamespace: () => Effect.die("unused"),

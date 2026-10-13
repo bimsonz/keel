@@ -20,6 +20,7 @@ const places = Layer.succeed(
   ProjectNamespaces,
   ProjectNamespaces.of({
     assign: () => Effect.die("unused"),
+    release: () => Effect.die("unused"),
     byId: (projectId) =>
       Effect.succeed(
         projectId === PLACED
