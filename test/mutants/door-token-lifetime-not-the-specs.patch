@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/front-door.test.ts -t door.token-spec
+# kills: door.token-spec
+# why: a token lasts ten minutes where the spec, and so the page, says five, so an agent that plans by the page asks again later than it needs to and one that trusts the answer is told another number than it read
+diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
+index 5a71018f..d73b906a 100644
+--- a/apps/keel/src/adapters/driven/better-auth/agents.ts
++++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
+@@ -69,7 +69,7 @@ export const CLOSED_PATHS = [
+ export const AGENT_DISCOVERY = "keel-agents";
+ 
+ /** How long an agent's token lasts: short, because the agent asks again with its key. */
+-export const AGENT_TOKEN_SECONDS = 300;
++export const AGENT_TOKEN_SECONDS = 600;
+ 
+ /** The longest a signed token request may say it is good for. */
+ export const ASSERTION_SECONDS = 60;

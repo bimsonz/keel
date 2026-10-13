@@ -3,14 +3,14 @@
 # why: the spec's token request has no field for the door, so the request the SDK sends for the MCP endpoint is not the spec's and the walk cannot say how that token is asked for
 # regen
 diff --git a/packages/spec/auth.tsp b/packages/spec/auth.tsp
-index ce9ecec6..952bcc81 100644
+index ccafad35..78a2b0db 100644
 --- a/packages/spec/auth.tsp
 +++ b/packages/spec/auth.tsp
-@@ -67,7 +67,6 @@ model AgentTokenRequest {
+@@ -68,7 +68,6 @@ model AgentTokenRequest {
     * what a request that names none gets, or the origin followed by `/mcp` for
     * the MCP endpoint. A token for one door is refused at the other.
     */
 -  resource?: string;
  
    /**
-    * The project the token works in: its feed, its settings and every work
+    * The id of the project the token works in (`prj_…`, the `id` a created

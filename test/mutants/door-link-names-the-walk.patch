@@ -2,10 +2,10 @@
 # kills: door.link
 # why: the Link header gives the walk's own address as the catalogue, so a reader that follows it is handed the page it came from in place of the linkset
 diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
-index 014ed364..cea16c07 100644
+index f2983bc3..9b706c2b 100644
 --- a/apps/keel/src/adapters/driving/http/front-door.ts
 +++ b/apps/keel/src/adapters/driving/http/front-door.ts
-@@ -651,7 +651,7 @@ export function registerFrontDoor(app: Hono<AppEnv>, where: DoorPlace): void {
+@@ -652,7 +652,7 @@ export function registerFrontDoor(app: Hono<AppEnv>, where: DoorPlace): void {
    let made: FrontDoor | undefined;
    const door = (): FrontDoor => (made ??= frontDoor(openApiDocument, where));
    // RFC 9727: a reader of either page is told where the catalogue is by the answer's own header.

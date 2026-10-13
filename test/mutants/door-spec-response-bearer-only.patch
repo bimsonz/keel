@@ -3,15 +3,15 @@
 # why: the spec's token answer allows a plain bearer alone, so the answer Keel gives a request that carried a proof is not the spec's
 # regen
 diff --git a/packages/spec/auth.tsp b/packages/spec/auth.tsp
-index ce9ecec6..7dd25923 100644
+index ccafad35..b690fa6f 100644
 --- a/packages/spec/auth.tsp
 +++ b/packages/spec/auth.tsp
-@@ -96,7 +96,7 @@ model AgentTokenResponse {
+@@ -102,7 +102,7 @@ model AgentTokenResponse {
     * the same key for that request's method and URL, whose `ath` is the
     * base64url SHA-256 of the token. `Bearer` otherwise: `Authorization: Bearer <token>`.
     */
 -  token_type: "DPoP" | "Bearer";
 +  token_type: "Bearer";
  
-   /** Seconds until the token expires. */
-   expires_in: int32;
+   /**
+    * Seconds until the token expires: five minutes. There is no refresh token:

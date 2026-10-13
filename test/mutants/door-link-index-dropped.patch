@@ -2,10 +2,10 @@
 # kills: door.link
 # why: the index answers with no Link header, so a reader that arrives at /llms.txt is not told where the catalogue is
 diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
-index 014ed364..66f66213 100644
+index f2983bc3..0c87e07c 100644
 --- a/apps/keel/src/adapters/driving/http/front-door.ts
 +++ b/apps/keel/src/adapters/driving/http/front-door.ts
-@@ -665,7 +665,7 @@ export function registerFrontDoor(app: Hono<AppEnv>, where: DoorPlace): void {
+@@ -666,7 +666,7 @@ export function registerFrontDoor(app: Hono<AppEnv>, where: DoorPlace): void {
      LLMS_PATH,
      () =>
        new Response(llmsText(door()), {

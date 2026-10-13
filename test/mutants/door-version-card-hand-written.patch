@@ -2,10 +2,10 @@
 # kills: door.version
 # why: the MCP server's card carries a version written by hand, so it goes on saying the old one when the document's moves
 diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
-index 014ed364..148963d7 100644
+index f2983bc3..537cdd01 100644
 --- a/apps/keel/src/adapters/driving/http/front-door.ts
 +++ b/apps/keel/src/adapters/driving/http/front-door.ts
-@@ -618,7 +618,7 @@ export function serverCard(door: FrontDoor): unknown {
+@@ -619,7 +619,7 @@ export function serverCard(door: FrontDoor): unknown {
    return {
      $schema: CARD_SCHEMA,
      name: `${host.split(".").toReversed().join(".")}/${door.name.toLowerCase()}`,

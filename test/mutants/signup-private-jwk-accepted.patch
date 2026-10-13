@@ -3,12 +3,12 @@
 # why: the sign-up's key model names the private member, so an agent that sends its whole key is signed up and its private half has crossed the wire unremarked
 # regen
 diff --git a/packages/spec/auth.tsp b/packages/spec/auth.tsp
-index 019d5e66..cc8fc1e1 100644
+index ccafad35..76e9f1c1 100644
 --- a/packages/spec/auth.tsp
 +++ b/packages/spec/auth.tsp
-@@ -52,6 +52,7 @@ model RegistrationJwk {
-   use?: "sig";
-   alg?: "EdDSA" | "ES256";
+@@ -139,6 +139,7 @@ model RegistrationJwk {
+ 
+   /** Taken and not kept: Keel checks signatures with the key and uses it for nothing else. */
    key_ops?: string[];
 +  d?: string;
  }

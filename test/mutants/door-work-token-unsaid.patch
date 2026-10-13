@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/front-door.test.ts
+# kills: door.from-spec
+# why: the walk's second token step drops the request's description, so the page has an empty line where the step should say what the request is
+diff --git a/apps/keel/src/adapters/driving/http/front-door.ts b/apps/keel/src/adapters/driving/http/front-door.ts
+index f2983bc3..c918acc0 100644
+--- a/apps/keel/src/adapters/driving/http/front-door.ts
++++ b/apps/keel/src/adapters/driving/http/front-door.ts
+@@ -366,7 +366,7 @@ export function frontDoor(document: unknown, where: DoorPlace): FrontDoor {
+     return {
+       id,
+       title,
+-      ...(say === undefined ? {} : { say: flat(say) }),
++      ...(say === undefined || names.length > 0 ? {} : { say: flat(say) }),
+       method: "POST",
+       url: `${origin}${tokenUrl}`,
+       contentType: "application/x-www-form-urlencoded",

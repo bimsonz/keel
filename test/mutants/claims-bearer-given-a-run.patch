@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-tokens.test.ts -t token.claims
+# kills: token.claims
+# why: a token asked for with no proof and no label is put in a run of its own, so a tool that fetches a new bearer every five minutes is another run each time and is never told of what its earlier token declared
+diff --git a/packages/core/src/domain/identity/run.ts b/packages/core/src/domain/identity/run.ts
+index d21f06d1..0afddcf4 100644
+--- a/packages/core/src/domain/identity/run.ts
++++ b/packages/core/src/domain/identity/run.ts
+@@ -80,7 +80,7 @@ export function runClaims(agent: Agent, request: RunRequest): Result.Result<RunC
+   const label = request.run === undefined ? undefined : asLabel(request.run);
+   if (label?._tag === "None") return Result.fail(new RunLabelRefused());
+   const name: RunName | undefined =
+-    label !== undefined ? { label: label.value } : runKey === undefined ? undefined : { runKey };
++    label !== undefined ? { label: label.value } : runKey === undefined ? { label: `bearer-${crypto.randomUUID()}` } : { runKey };
+   return Result.succeed({
+     epoch: agent.revocationEpoch,
+     ...(agent.handle === undefined ? {} : { handle: agent.handle }),

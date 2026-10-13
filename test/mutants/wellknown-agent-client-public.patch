@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-discovery.test.ts -t wellknown.refuses
+# kills: wellknown.refuses
+# why: an agent is presented to the provider as a client that needs no authentication, so a request that names it and signs nothing is given its token
+diff --git a/apps/keel/src/adapters/driven/better-auth/agents.ts b/apps/keel/src/adapters/driven/better-auth/agents.ts
+index 5a71018f..a72b76b6 100644
+--- a/apps/keel/src/adapters/driven/better-auth/agents.ts
++++ b/apps/keel/src/adapters/driven/better-auth/agents.ts
+@@ -100,7 +100,7 @@ export function agentDiscovery(agents: AgentAccess): ClientDiscovery {
+         clientDiscoveryId: AGENT_DISCOVERY,
+         name: agent.name,
+         disabled: agent.state !== "active",
+-        tokenEndpointAuthMethod: "private_key_jwt",
++        tokenEndpointAuthMethod: "none",
+         grantTypes: ["client_credentials"],
+         redirectUris: [],
+         // Each key is named by its thumbprint: the provider picks the key a request names, and

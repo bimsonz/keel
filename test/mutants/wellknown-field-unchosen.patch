@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/agent-discovery.test.ts -t wellknown.takes
+# kills: wellknown.takes
+# why: a field of the library's that Keel has no use for is let through, so the document speaks of an authorization code's challenge where there is no authorization endpoint
+diff --git a/apps/keel/src/adapters/driven/better-auth/discovery.ts b/apps/keel/src/adapters/driven/better-auth/discovery.ts
+index 3fb3c70f..67d114eb 100644
+--- a/apps/keel/src/adapters/driven/better-auth/discovery.ts
++++ b/apps/keel/src/adapters/driven/better-auth/discovery.ts
+@@ -36,6 +36,7 @@ const PROVIDED = [
+   "scopes_supported",
+   "response_types_supported",
+   "grant_types_supported",
++  "code_challenge_methods_supported",
+ ] as const;
+ 
+ /**

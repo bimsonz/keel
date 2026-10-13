@@ -2,15 +2,14 @@
 # kills: door.found
 # why: the authorization server's document does not name the walk, so a client that starts from the server's metadata is never pointed at it
 diff --git a/apps/keel/src/adapters/driven/better-auth/discovery.ts b/apps/keel/src/adapters/driven/better-auth/discovery.ts
-index 292f1728..b1f20aa6 100644
+index 3fb3c70f..d6d61cec 100644
 --- a/apps/keel/src/adapters/driven/better-auth/discovery.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/discovery.ts
-@@ -46,7 +46,7 @@ export async function authorizationServerDocument(
-     ),
-   );
-   return Response.json(
--    { ...served, registration_endpoint: where.signUpUrl, service_documentation: where.startUrl },
-+    { ...served, registration_endpoint: where.signUpUrl },
+@@ -63,7 +63,6 @@ export async function authorizationServerDocument(
+       token_endpoint_auth_signing_alg_values_supported: [...KEY_ALGORITHMS],
+       dpop_signing_alg_values_supported: [...KEY_ALGORITHMS],
+       registration_endpoint: where.signUpUrl,
+-      service_documentation: where.startUrl,
+     },
      { status: answer.status, headers: CACHED },
    );
- }
