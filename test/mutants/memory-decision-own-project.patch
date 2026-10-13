@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/decisions.test.ts -t memory.decisions-http
+# kills: memory.decisions-http
+# why: a decision is decided on the caller's own project, so a member of the org and a visitor of a public project never read it
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index 46f99cb8..c6b574de 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -348,7 +348,7 @@ export const RESOLVERS: Resolvers = {
+   Conflicts_getConflict: (input, caller) => projectOrOwn(input.project, caller),
+   Probes_getProbeSource: (input, caller) => projectOrOwn(input.project, caller),
+   Memory_listDecisions: (input, caller) => projectOrOwn(input.project, caller),
+-  Memory_getDecision: (input) => decisionProject(input.decisionId),
++  Memory_getDecision: ownProject,
+   why: ownProject,
+ 
+   Operator_getSettings: (input) => projectNamed(input.projectId),

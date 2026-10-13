@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/decisions.test.ts -t memory.decisions-http
+# kills: memory.decisions-http
+# why: the list's subject filter is dropped, so every decision is on every subject
+diff --git a/apps/keel/src/adapters/driving/http/decisions.ts b/apps/keel/src/adapters/driving/http/decisions.ts
+index 65a4a69d..d2dbae33 100644
+--- a/apps/keel/src/adapters/driving/http/decisions.ts
++++ b/apps/keel/src/adapters/driving/http/decisions.ts
+@@ -81,7 +81,6 @@ export function decisionHandlers(run: Runner) {
+         Decisions.use((decisions) =>
+           decisions.list({
+             project: projectIn(caller).projectId,
+-            ...(subject === undefined ? {} : { subject: subject.value }),
+             ...(cursor === undefined ? {} : { cursor: cursor.value }),
+             ...(input.limit === undefined ? {} : { limit: input.limit }),
+           }),

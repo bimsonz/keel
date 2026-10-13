@@ -2,15 +2,15 @@
 # kills: flow.guard-policy
 # why: a predicate the change's policy leaves out blocks, where the default is advise
 diff --git a/packages/core/src/domain/verification/compile.ts b/packages/core/src/domain/verification/compile.ts
-index e093244..3fc4471 100644
+index c21fc356..6c538402 100644
 --- a/packages/core/src/domain/verification/compile.ts
 +++ b/packages/core/src/domain/verification/compile.ts
-@@ -477,7 +477,7 @@ export const compile = (
-           : {
-               guards: {
-                 predicate: s.guards.predicate,
--                policy: facts.predicatePolicy?.[s.guards.predicate] ?? DEFAULT_PREDICATE_POLICY,
-+                policy: facts.predicatePolicy?.[s.guards.predicate] ?? "block",
+@@ -499,7 +499,7 @@ export const compile = (
+                 // A ruled guard blocks whatever the predicate's policy; an unruled proof takes the project's (ADR 0005, decided 13 Oct).
+                 policy:
+                   s.guards.decision === undefined
+-                    ? (facts.predicatePolicy?.[s.guards.predicate] ?? DEFAULT_PREDICATE_POLICY)
++                    ? (facts.predicatePolicy?.[s.guards.predicate] ?? "block")
+                     : "block",
                  probe: s.guards.probe,
-               },
-             }),
+                 ...(s.guards.decision === undefined ? {} : { decision: s.guards.decision }),

@@ -2,10 +2,10 @@
 # kills: verify.type-errors-cited
 # why: A bounce never reads a typecheck's errors back from its evidence, so the remedy names nothing to fix
 diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
-index a3da276f..8606ec87 100644
+index 3be30dfd..d36fb86e 100644
 --- a/packages/core/src/application/verification/verify-candidate.ts
 +++ b/packages/core/src/application/verification/verify-candidate.ts
-@@ -202,8 +202,6 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+@@ -213,8 +213,6 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
          kind: "test",
          name: f.test === undefined ? f.file : `${f.file} > ${f.test}`,
        });

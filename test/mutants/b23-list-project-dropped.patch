@@ -2,10 +2,10 @@
 # kills: b23.conflicts-audience
 # why: the list is decided on the caller's own project whatever project it names, so a public project's conflicts cannot be read without a token
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-index f17c43a2..4b1beb48 100644
+index 46f99cb8..ff621ce5 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-@@ -327,7 +327,7 @@ export const RESOLVERS: Resolvers = {
+@@ -344,7 +344,7 @@ export const RESOLVERS: Resolvers = {
    Views_getTrunk: (input) => projectNamed(input.projectId),
    Views_listLanes: (input) => projectNamed(input.projectId),
    Views_getVerdict: ownProject,
@@ -13,4 +13,4 @@ index f17c43a2..4b1beb48 100644
 +  Conflicts_listConflicts: ownProject,
    Conflicts_getConflict: (input, caller) => projectOrOwn(input.project, caller),
    Probes_getProbeSource: (input, caller) => projectOrOwn(input.project, caller),
-   Memory_listDecisions: ownProject,
+   Memory_listDecisions: (input, caller) => projectOrOwn(input.project, caller),

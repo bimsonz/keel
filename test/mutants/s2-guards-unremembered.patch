@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/precheck.test.ts -t s2.guard-cites
+# kills: s2.guard-cites
+# why: Precheck never asks Keel's memory what the guards hold
+diff --git a/packages/core/src/application/verification/precheck.ts b/packages/core/src/application/verification/precheck.ts
+index 899144f7..23a3a0de 100644
+--- a/packages/core/src/application/verification/precheck.ts
++++ b/packages/core/src/application/verification/precheck.ts
+@@ -234,7 +234,7 @@ export const listGuards = Effect.fn("verification/listGuards")(function* (
+       Effect.succeed<GuardsRead>({ _tag: "Unreadable", reason: `guards: ${e.reason}` }),
+     ),
+   );
+-  if (listed._tag === "Unreadable" || listed.admitted.length === 0) return listed;
++  return listed;
+   const held = yield* (yield* Decisions).ofGuards(
+     workspace.projectId,
+     listed.admitted.map((g) => g.guardId),

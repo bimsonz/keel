@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t decisions.contract
+# kills: decisions.contract
+# why: a guard drawn from the premise is said to hold a ruling that went for the effect
+diff --git a/packages/core/src/application/memory/decision-index.ts b/packages/core/src/application/memory/decision-index.ts
+index 11a1bb0e..e06d89ff 100644
+--- a/packages/core/src/application/memory/decision-index.ts
++++ b/packages/core/src/application/memory/decision-index.ts
+@@ -144,7 +144,7 @@ function joined(store: Store, row: DecisionRow): IndexedDecision {
+     guard !== undefined &&
+     guard.retiredAt === undefined &&
+     asserted !== undefined &&
+-    upheld.some((p) => sameProposition(p, asserted));
++    true;
+   return {
+     decision: row.decision,
+     // The Projector records an arrival on the feed before it folds it, so only a store the feed never numbered answers `D-0`.

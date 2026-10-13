@@ -2,11 +2,11 @@
 # kills: t67.ruling
 # why: an escalation of a project the caller may not see answers the plain 404 and a missing one its own, so a caller tells a hidden question from one that is not there
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-index 935d761f..7880b0eb 100644
+index 46f99cb8..79df09b4 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-@@ -292,11 +292,6 @@ export function refusalResult(
-         return conflictNotFound({ requestId }, { conflictId: String(Object(input).conflictId) });
+@@ -417,11 +417,6 @@ export function refusalResult(
+         return decisionNotFound({ requestId }, String(Object(input).decisionId));
        if (action === "Probes_getProbeSource")
          return probeNotFound({ requestId }, { probeId: String(Object(input).probeId) });
 -      if (action === "Operator_giveRuling")

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/keel-verify.test.ts -t s2.bounce-cites
+# kills: s2.bounce-cites
+# why: a bounce on a decided guard gives no next action to read the decision
+diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
+index de8177d2..97ca344b 100644
+--- a/packages/core/src/application/verification/verify-candidate.ts
++++ b/packages/core/src/application/verification/verify-candidate.ts
+@@ -222,7 +222,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+     failingTests,
+     nextActions:
+       decided.success.outcome === "bounce"
+-        ? [remedy(cited, more), ...[...held.values()].map(readDecision)]
++        ? [remedy(cited, more)]
+         : [],
+   };
+   return settled;

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t decisions.contract
+# kills: decisions.contract
+# why: a project's decisions list oldest first, so a page's cursor walks the wrong way
+diff --git a/packages/core/src/application/memory/decision-index.ts b/packages/core/src/application/memory/decision-index.ts
+index 4cbc6b8e..823d0536 100644
+--- a/packages/core/src/application/memory/decision-index.ts
++++ b/packages/core/src/application/memory/decision-index.ts
+@@ -169,7 +169,7 @@ const decisionsOf = (store: Store, project: ProjectId): readonly IndexedDecision
+     .flatMap(({ id }) => indexedDecision(store, id) ?? [])
+     .toSorted(
+       (a, b) =>
+-        b.decision.decidedAt - a.decision.decidedAt || b.decision.id.localeCompare(a.decision.id),
++        a.decision.decidedAt - b.decision.decidedAt || a.decision.id.localeCompare(b.decision.id),
+     );
+ 
+ /** One decision, joined. DecisionNotFound for one the index has not heard recorded. */

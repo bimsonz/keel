@@ -2,10 +2,10 @@
 # kills: b23.probe-source-audience
 # why: an agent's read of a probe's source is decided on its own project while the handler reads the project the query names, so an agent reads a private project's probe by naming it
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-index 91279af..d34bc6b 100644
+index 46f99cb8..21ea1553 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-@@ -196,7 +196,10 @@ export const RESOLVERS: Resolvers = {
+@@ -346,7 +346,10 @@ export const RESOLVERS: Resolvers = {
    Views_getVerdict: ownProject,
    Conflicts_listConflicts: (input, caller) => projectOrOwn(input.project, caller),
    Conflicts_getConflict: (input, caller) => projectOrOwn(input.project, caller),
@@ -14,14 +14,14 @@ index 91279af..d34bc6b 100644
 +    caller.principal._tag === "Agent"
 +      ? ownProject(input, caller)
 +      : projectOrOwn(input.project, caller),
-   Memory_listDecisions: ownProject,
-   Memory_getDecision: ownProject,
+   Memory_listDecisions: (input, caller) => projectOrOwn(input.project, caller),
+   Memory_getDecision: (input) => decisionProject(input.decisionId),
    why: ownProject,
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
-index ca55324..4b8455c 100644
+index 219e6bbb..58114ec8 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -481,7 +481,12 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, makeUser: MakeU
+@@ -834,7 +834,12 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
          Probes_getProbeSource: (caller: Caller, input: Input<"Probes_getProbeSource">) =>
            run(
              caller,

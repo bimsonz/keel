@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t decisions.contract
+# kills: decisions.contract
+# why: every project's list reads every other project's decisions
+diff --git a/packages/core/src/application/memory/decision-index.ts b/packages/core/src/application/memory/decision-index.ts
+index 4cbc6b8e..746364fa 100644
+--- a/packages/core/src/application/memory/decision-index.ts
++++ b/packages/core/src/application/memory/decision-index.ts
+@@ -38,7 +38,7 @@ export const DECISION_INDEX = {
+   /** The decision as its events leave it, with its project and conflict, by decision id. */
+   decision: "decision-index",
+   /** A project's decisions, by decision id, each with when it was decided: what its list reads. */
+-  project: (project: ProjectId) => `decision-list:${project}`,
++  project: (_project: ProjectId) => "decision-list",
+   /** The decision recorded on a conflict, by conflict id. */
+   conflict: (project: ProjectId) => `decision-conflict:${project}`,
+ } as const;

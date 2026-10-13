@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t decisions.contract
+# kills: decisions.contract
+# why: the Projector's receipt never folds a decision into the index
+diff --git a/packages/core/src/application/memory/change-views.ts b/packages/core/src/application/memory/change-views.ts
+index 970bb2d3..21cb00ea 100644
+--- a/packages/core/src/application/memory/change-views.ts
++++ b/packages/core/src/application/memory/change-views.ts
+@@ -114,7 +114,7 @@ function foldTrunk(store: Store, event: EventEnvelope): string | undefined {
+  */
+ export function foldViews(store: Store, event: EventEnvelope): string | undefined {
+   // A ruling's decision is both the escalation's answer and the index's row.
+-  const decided = foldsDecision(event) ? foldDecisionIndex(store, event) : undefined;
++  const decided = foldsDecision(event) ? undefined : foldDecisionIndex(store, event);
+   if (foldsEscalation(event)) return foldEscalationViews(store, event) ?? decided;
+   // A change's bounce over a conflict, or a conflict noted on it, is also what the conflict's view shows its party was told.
+   const conflict = foldsConflict(event) ? foldConflictViews(store, event) : undefined;

@@ -2,13 +2,13 @@
 # kills: b23.probe-source-audience
 # why: a probe of a project the caller may not see answers the plain 404 and a missing probe its own, so a caller tells a hidden project from a probe that is not there
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-index 935d761f..ae965863 100644
+index 46f99cb8..5c4386eb 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-@@ -290,8 +290,6 @@ export function refusalResult(
-         return changeNotFound({ requestId }, { changeId: String(Object(input).changeId) });
-       if (action === "Conflicts_getConflict")
+@@ -415,8 +415,6 @@ export function refusalResult(
          return conflictNotFound({ requestId }, { conflictId: String(Object(input).conflictId) });
+       if (action === "Memory_getDecision")
+         return decisionNotFound({ requestId }, String(Object(input).decisionId));
 -      if (action === "Probes_getProbeSource")
 -        return probeNotFound({ requestId }, { probeId: String(Object(input).probeId) });
        if (action === "Operator_giveRuling")

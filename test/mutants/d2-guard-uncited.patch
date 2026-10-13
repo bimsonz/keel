@@ -2,15 +2,15 @@
 # kills: d21.guard-step
 # why: A bounce never names the guard whose probe failed, so the agent is told to fix nothing in particular
 diff --git a/packages/core/src/application/verification/verify-candidate.ts b/packages/core/src/application/verification/verify-candidate.ts
-index a3da276f..c6dcefcd 100644
+index 3be30dfd..9117f456 100644
 --- a/packages/core/src/application/verification/verify-candidate.ts
 +++ b/packages/core/src/application/verification/verify-candidate.ts
-@@ -209,7 +209,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
+@@ -220,7 +220,7 @@ export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
      const depsName = refusal === undefined ? undefined : `${refusal.refused}: ${refusal.remedy}`;
      if (depsName !== undefined && !failures.some((f) => f.kind === "deps" && f.name === depsName))
        failures.push({ kind: "deps", name: depsName });
--    if (stored.value.guard !== undefined)
-+    if (stored.value.guard !== undefined && stored.value.guard === undefined)
+-    if (stored.value.guard !== undefined) {
++    if (stored.value.guard !== undefined && stored.value.guard === undefined) {
+       const decision = plan.steps.find((s) => s.id === r.stepId)?.guards?.decision;
+       if (decision !== undefined) held.set(decision.id, decision);
        failures.push({
-         kind: "guard",
-         name: `${r.stepId} (${stored.value.guard.predicate}): ${stored.value.reason ?? "its probe failed"}`,

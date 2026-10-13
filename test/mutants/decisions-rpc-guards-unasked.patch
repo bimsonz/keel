@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/decisions.test.ts -t decisions.contract
+# kills: decisions.contract
+# why: the Projector is asked about no guard, so no guard reads the decision it holds
+diff --git a/apps/keel/src/adapters/driven/do-rpc/decisions.ts b/apps/keel/src/adapters/driven/do-rpc/decisions.ts
+index 41dabc85..2de81a90 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/decisions.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/decisions.ts
+@@ -30,7 +30,7 @@ export function DecisionsRpc(projector: () => DecisionIndexStub): Layer.Layer<De
+         ),
+       ofGuards: (project, guardIds) =>
+         callObject(ProjectorCodecs.guardDecisions, () =>
+-          projector().guardDecisions({ project, guardIds: [...guardIds] }),
++          projector().guardDecisions({ project, guardIds: [] }),
+         ),
+       onSubjects: (project, subjects) =>
+         callObject(ProjectorCodecs.subjectDecisions, () =>

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t decisions.contract
+# kills: decisions.contract
+# why: a decision forgets the conflict its ruling was about, so nothing it settled is read
+diff --git a/packages/core/src/application/memory/decision-index.ts b/packages/core/src/application/memory/decision-index.ts
+index 4cbc6b8e..20b85e72 100644
+--- a/packages/core/src/application/memory/decision-index.ts
++++ b/packages/core/src/application/memory/decision-index.ts
+@@ -105,7 +105,7 @@ export function foldDecisionIndex(store: Store, event: EventEnvelope): string |
+   const { project } = event;
+   if (project === undefined) return `${payload.decisionId} was recorded with no project`;
+   const conflictId = Option.getOrUndefined(
+-    decodeConflictId(event.affected.find((ref) => ref.kind === "conflict")?.id),
++    decodeConflictId(undefined),
+   );
+   store.put(
+     DECISION_INDEX.decision,

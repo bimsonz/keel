@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts -t decisions.contract
+# kills: decisions.contract
+# why: the index never reads what the ruling upheld from the conflict's resolution
+diff --git a/packages/core/src/application/memory/decision-index.ts b/packages/core/src/application/memory/decision-index.ts
+index 4cbc6b8e..33e31689 100644
+--- a/packages/core/src/application/memory/decision-index.ts
++++ b/packages/core/src/application/memory/decision-index.ts
+@@ -136,7 +136,7 @@ function joined(store: Store, row: DecisionRow): IndexedDecision {
+   const folded = stored === undefined ? undefined : decodeFolded(stored);
+   const conflict = folded?.conflict;
+   const resolved = conflict?.decisionId === row.decision.id ? conflict : undefined;
+-  const upheld = resolved === undefined ? [] : holds(resolved, resolved.against ?? []);
++  const upheld: readonly Proposition[] = [];
+   const asserted = conflict?.premise?.proposition;
+   const guard = folded?.guard;
+   const standing =

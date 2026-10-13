@@ -2,10 +2,10 @@
 # kills: b23.conflicts-audience
 # why: an agent's read of one conflict is decided on its own project while the handler reads the project the query names, so an agent reads a private project's conflict by naming it
 diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-index f17c43a2..34b089d7 100644
+index 46f99cb8..387c7884 100644
 --- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
-@@ -328,7 +328,10 @@ export const RESOLVERS: Resolvers = {
+@@ -345,7 +345,10 @@ export const RESOLVERS: Resolvers = {
    Views_listLanes: (input) => projectNamed(input.projectId),
    Views_getVerdict: ownProject,
    Conflicts_listConflicts: (input, caller) => projectOrOwn(input.project, caller),
@@ -15,13 +15,13 @@ index f17c43a2..34b089d7 100644
 +      ? ownProject(input, caller)
 +      : projectOrOwn(input.project, caller),
    Probes_getProbeSource: (input, caller) => projectOrOwn(input.project, caller),
-   Memory_listDecisions: ownProject,
-   Memory_getDecision: ownProject,
+   Memory_listDecisions: (input, caller) => projectOrOwn(input.project, caller),
+   Memory_getDecision: (input) => decisionProject(input.decisionId),
 diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
-index 79f0135b..42f8329e 100644
+index 219e6bbb..67beb463 100644
 --- a/apps/keel/src/adapters/driving/http/handlers.ts
 +++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -802,7 +802,12 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+@@ -824,7 +824,12 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
          Conflicts_getConflict: (caller: Caller, input: Input<"Conflicts_getConflict">) =>
            run(
              caller,

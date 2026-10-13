@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/decisions.test.ts -t memory.decisions-http
+# kills: memory.decisions-http
+# why: a decision is shown without what its ruling upheld
+diff --git a/apps/keel/src/adapters/driving/http/decisions.ts b/apps/keel/src/adapters/driving/http/decisions.ts
+index 65a4a69d..b241dc3d 100644
+--- a/apps/keel/src/adapters/driving/http/decisions.ts
++++ b/apps/keel/src/adapters/driving/http/decisions.ts
+@@ -31,7 +31,7 @@ export const decisionView = (d: IndexedDecision) => ({
+   project: d.project,
+   ...(d.conflictId === undefined ? {} : { conflictId: d.conflictId }),
+   ...(d.subjectKey === undefined ? {} : { subject: d.subjectKey }),
+-  holds: d.holds.map(eventProposition),
++  holds: [],
+   ...(d.against === undefined ? {} : { against: [...d.against] }),
+   guards: [...d.guards],
+ });
