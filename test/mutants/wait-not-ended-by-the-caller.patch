@@ -1,0 +1,25 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-wait.test.ts -t wait.abort
+# kills: wait.abort
+# why: the holds cannot be interrupted, so a wait goes on asking an object to hold for up to fifteen minutes after its caller has gone
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 8f4b02be..8f7e90a7 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -129,7 +129,7 @@ const inHolds = <A, E, R>(
+   hold: (seconds: number, last: A | undefined) => Effect.Effect<A, E, R>,
+   ready: (answer: A) => boolean,
+ ): Effect.Effect<A, E, R | Clock> =>
+-  Effect.gen(function* () {
++  Effect.uninterruptible(Effect.gen(function* () {
+     const clock = yield* Clock;
+     const wait = clampWait(waitSeconds);
+     const deadline = (yield* clock.now) + wait * 1000;
+@@ -140,7 +140,7 @@ const inHolds = <A, E, R>(
+       answer = yield* hold(Math.min(HOLD_SECONDS, left), answer);
+     }
+     return answer;
+-  });
++  }));
+ 
+ export const declareChange: (
+   principal: AgentToken,

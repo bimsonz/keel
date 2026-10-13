@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/notices.test.ts -t wait.spec
+# kills: wait.spec
+# why: the document still bounds `wait` at 30, so the door refuses the longer wait the gateway would keep
+# regen
+diff --git a/packages/spec/common.tsp b/packages/spec/common.tsp
+index 535195cf..45269015 100644
+--- a/packages/spec/common.tsp
++++ b/packages/spec/common.tsp
+@@ -449,7 +449,7 @@ model WaitQuery {
+    */
+   @query
+   @minValue(0)
+-  @maxValue(900)
++  @maxValue(30)
+   wait?: int32;
+ }
+ 

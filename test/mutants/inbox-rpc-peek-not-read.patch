@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/notices.test.ts -t inbox.peek-pool
+# kills: inbox.peek-pool
+# why: the object's request has no `peek`, so a watch is decoded as a read and counts what it answers as read
+diff --git a/apps/keel/src/rpc/agent-session.ts b/apps/keel/src/rpc/agent-session.ts
+index 65168cdf..fbf4d5e3 100644
+--- a/apps/keel/src/rpc/agent-session.ts
++++ b/apps/keel/src/rpc/agent-session.ts
+@@ -81,7 +81,6 @@ export const InboxRead = Schema.Struct({
+   cursor: Schema.optional(Schema.String),
+   waitMs: Schema.Int,
+   run: Schema.optional(RunId),
+-  peek: Schema.optional(Schema.Boolean),
+ });
+ 
+ /** Take the notices no tool result of this run has carried yet: at most `limit`, and never more than 3. */

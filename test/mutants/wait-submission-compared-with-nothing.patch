@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-wait.test.ts -t wait.submission
+# kills: wait.submission
+# why: no hold's answer counts as a move, so a submission that lands under a long wait is told only when the whole wait has run out
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 8f4b02be..79018ecf 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -303,7 +303,7 @@ export const submissionOf: (
+           inHolds(
+             waitSeconds,
+             (seconds) => changes.awaitSubmission(changeId, seconds),
+-            (now) => submissionMoved(first, now),
++            () => false,
+           ),
+         ),
+   );

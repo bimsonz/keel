@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/agent-session.test.ts -t inbox.read-mark
+# kills: inbox.read-mark
+# why: a read sets the run's mark to its page's last notice even when the mark is past it, so an earlier page read again sends the newer notices round on tool results
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index a2c462f8..b8b9994f 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -312,8 +312,7 @@ export function entriesAfter(
+ 
+ /** Moves the run's `piggybacked` up to `at`, the position of the last notice a read answered: never back. */
+ function markRead(store: Store, at: string, run: RunId | undefined): void {
+-  if (at > piggybackedOf(store, run))
+-    store.put(INBOX.piggybacked.kind, run ?? INBOX.piggybacked.id, at);
++  store.put(INBOX.piggybacked.kind, run ?? INBOX.piggybacked.id, at);
+ }
+ 
+ /**

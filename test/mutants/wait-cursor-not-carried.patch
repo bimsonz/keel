@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-wait.test.ts -t wait.cursor
+# kills: wait.cursor
+# why: every hold reads from the cursor the caller gave, so `end` is sent again at each hold and what lands between two holds is behind the new head: never told
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 8f4b02be..69ec5b27 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -322,7 +322,7 @@ export const readInbox: (
+     inHolds(
+       waitSeconds,
+       (seconds, last) =>
+-        inbox.read(principal.agentId, last?.cursor ?? cursor, seconds, principal.run?.id),
++        inbox.read(principal.agentId, cursor, seconds, principal.run?.id),
+       (page) => page.notices.length > 0,
+     ),
+   );

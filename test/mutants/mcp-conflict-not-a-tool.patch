@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/contract.test.ts -t mcp.tools-read-on
+# kills: mcp.tools-read-on
+# why: a conflict's read carries no `mcp` tag, so the next action of a conflict's notice names a tool the door does not have
+# regen
+diff --git a/packages/spec/conflicts.tsp b/packages/spec/conflicts.tsp
+index caf45e6a..0022a1bc 100644
+--- a/packages/spec/conflicts.tsp
++++ b/packages/spec/conflicts.tsp
+@@ -300,7 +300,6 @@ interface Conflicts {
+    * another. A conflict the caller may not read is the 404 of an unknown one.
+    */
+   @summary("Get a conflict")
+-  @tag("mcp")
+   @useAuth(NoAuth | AgentRead | SessionAuth)
+   @route("/{conflictId}")
+   @get

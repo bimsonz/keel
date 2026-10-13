@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-wait.test.ts -t wait.feed
+# kills: wait.feed
+# why: every hold of the feed reads from the cursor the caller gave, so a page the reader is shown nothing of is read again and again and `end` finds a new head each time
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 8f4b02be..12b2abc7 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -386,7 +386,7 @@ export const readEvents: (
+     inHolds(
+       input.waitSeconds,
+       (seconds, last: EventFeedPage | undefined) => {
+-        const cursor = last?.cursor ?? input.cursor;
++        const cursor = input.cursor;
+         return feed
+           .read({
+             ...(cursor === undefined ? {} : { cursor }),

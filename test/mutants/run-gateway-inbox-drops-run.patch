@@ -2,15 +2,15 @@
 # kills: run.pool-inbox
 # why: the inbox read never passes the token's run, so a lane reads only what is for every run and never its own notices
 diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
-index 66d30b43..69aa0b4c 100644
+index 8f4b02be..d158da18 100644
 --- a/packages/core/src/application/coordination/gateway.ts
 +++ b/packages/core/src/application/coordination/gateway.ts
-@@ -231,7 +231,7 @@ export const readInbox: (
-   waitSeconds?: number,
- ) => Effect.Effect<InboxPage, never, Inbox> = (principal, cursor, waitSeconds) =>
-   Inbox.use((inbox) =>
--    inbox.read(principal.agentId, cursor, clampWait(waitSeconds), principal.run?.id),
-+    inbox.read(principal.agentId, cursor, clampWait(waitSeconds)),
+@@ -322,7 +322,7 @@ export const readInbox: (
+     inHolds(
+       waitSeconds,
+       (seconds, last) =>
+-        inbox.read(principal.agentId, last?.cursor ?? cursor, seconds, principal.run?.id),
++        inbox.read(principal.agentId, last?.cursor ?? cursor, seconds),
+       (page) => page.notices.length > 0,
+     ),
    );
- 
- /**

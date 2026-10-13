@@ -2,7 +2,7 @@
 # kills: rpc.held-inbox
 # why: an agent's waiting inbox read is a plain object call again, a 500 when its AgentSession restarts under it
 diff --git a/apps/keel/src/adapters/driven/do-rpc/inbox.ts b/apps/keel/src/adapters/driven/do-rpc/inbox.ts
-index 81eeaefb..5bbededc 100644
+index ad074a0f..e2ac12af 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/inbox.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/inbox.ts
 @@ -2,7 +2,7 @@ import type { AgentId } from "@keeltown/core/kernel";
@@ -17,7 +17,7 @@ index 81eeaefb..5bbededc 100644
 @@ -22,10 +22,10 @@ export function InboxRpc(
      Inbox,
      Inbox.of({
-       read: (agentId, cursor, waitSeconds, run) =>
+       read: (agentId, cursor, waitSeconds, run, peek) =>
 -        callHeldRead(AgentSessionCodecs.inbox, "inbox", waitSeconds * 1000, (waitMs) =>
 +        callObject(AgentSessionCodecs.inbox, () =>
            agentSession(agentId).inbox({
@@ -25,5 +25,5 @@ index 81eeaefb..5bbededc 100644
 -            waitMs,
 +            waitMs: waitSeconds * 1000,
              ...(run === undefined ? {} : { run }),
+             ...(peek === true ? { peek } : {}),
            }),
-         ).pipe(

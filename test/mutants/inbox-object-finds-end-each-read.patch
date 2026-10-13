@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/notices.test.ts -t inbox.end-held
+# kills: inbox.end-held
+# why: the object reads from `end` again at every wake, so each read finds the new head and a hold from `end` is never answered by what lands under it
+diff --git a/apps/keel/src/adapters/driving/do/agent-session.ts b/apps/keel/src/adapters/driving/do/agent-session.ts
+index d2ef0cb2..c6681a8b 100644
+--- a/apps/keel/src/adapters/driving/do/agent-session.ts
++++ b/apps/keel/src/adapters/driving/do/agent-session.ts
+@@ -130,7 +130,7 @@ export class AgentSessionDO
+             ? Effect.map(readInbox(INBOX_END, run, true), (head) => head.cursor)
+             : Effect.succeed(cursor),
+           (from) =>
+-            waiters.until(waitMs, readInbox(from, run, peek), (page) => page.notices.length > 0),
++            waiters.until(waitMs, readInbox(cursor, run, peek), (page) => page.notices.length > 0),
+         ),
+       ),
+     );

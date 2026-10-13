@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-wait.test.ts -t wait.budget
+# kills: wait.budget
+# why: a wait makes ten times the holds, so an object that keeps restarting under a waiting read spins the request through hundreds of calls before it is answered
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 8f4b02be..e84038b0 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -113,7 +113,7 @@ const clampWait = (seconds: number | undefined) =>
+  * counted, so an object that keeps going or a busy feed ends a wait early, as
+  * it stands, and never runs a request out of calls.
+  */
+-export const MAX_HOLDS = 60;
++export const MAX_HOLDS = 600;
+ 
+ /**
+  * A wait longer than one object's hold: holds of at most `HOLD_SECONDS`, one

@@ -2,15 +2,15 @@
 # kills: a11.events-wait
 # why: a waiting read answers at once, so the event that arrives is missed
 diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
-index 99830384..7921e9d2 100644
+index 8f4b02be..67655659 100644
 --- a/packages/core/src/application/coordination/gateway.ts
 +++ b/packages/core/src/application/coordination/gateway.ts
-@@ -283,7 +283,7 @@ export const readEvents: (
-     feed.read({
-       ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-       ...(input.limit === undefined ? {} : { limit: input.limit }),
--      waitSeconds: clampWait(input.waitSeconds),
-+      waitSeconds: 0,
-       ...(scope._tag === "Project" ? { project: scope.project } : {}),
-     }),
-   ).pipe(
+@@ -384,7 +384,7 @@ export const readEvents: (
+ ) => Effect.Effect<EventFeedPage, never, EventFeed | Clock> = (scope, input) =>
+   EventFeed.use((feed) =>
+     inHolds(
+-      input.waitSeconds,
++      0,
+       (seconds, last: EventFeedPage | undefined) => {
+         const cursor = last?.cursor ?? input.cursor;
+         return feed

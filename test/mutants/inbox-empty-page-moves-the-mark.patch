@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/agent-session.test.ts -t inbox.empty-mark
+# kills: inbox.empty-mark
+# why: an empty page moves the run's mark up to the cursor it was asked from, so a read from the head's cursor counts every waiting notice as read without showing one
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index a2c462f8..4c346d22 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -341,7 +341,7 @@ export const readInbox: (
+     const from = cursor === INBOX_END ? position(headOf(store)) : cursor;
+     const entries = entriesAfter(store, from, run);
+     const last = entries.at(-1)?.position;
+-    if (last !== undefined && peek !== true) markRead(store, last, run);
++    if (peek !== true) markRead(store, last ?? from ?? START, run);
+     return {
+       notices: entries.map(({ entry, position: at }) => noticeOf(entry, at)),
+       cursor: last ?? from ?? START,

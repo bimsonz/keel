@@ -2,10 +2,10 @@
 # kills: run.piggyback
 # why: a page is cut to its limit before the run's entries are picked, so three notices of another lane's leave a tool result empty and the mark where it was
 diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
-index 97df2626..3a6f673c 100644
+index a2c462f8..b3dda759 100644
 --- a/packages/core/src/application/identity/inbox.ts
 +++ b/packages/core/src/application/identity/inbox.ts
-@@ -209,8 +209,8 @@ export function entriesAfter(
+@@ -306,8 +306,8 @@ export function entriesAfter(
        position: row.id,
        entry: Schema.decodeUnknownSync(InboxEntrySchema)(row.value),
      }))
@@ -15,4 +15,4 @@ index 97df2626..3a6f673c 100644
 +    .filter(({ entry }) => shownTo(entry, run));
  }
  
- /**
+ /** Moves the run's `piggybacked` up to `at`, the position of the last notice a read answered: never back. */

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/agent-session.test.ts -t inbox.peek
+# kills: inbox.peek
+# why: a peek moves the run's mark as a read does, so a notice a listen only watched for never rides the run's tool results
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index a2c462f8..344624bb 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -341,7 +341,7 @@ export const readInbox: (
+     const from = cursor === INBOX_END ? position(headOf(store)) : cursor;
+     const entries = entriesAfter(store, from, run);
+     const last = entries.at(-1)?.position;
+-    if (last !== undefined && peek !== true) markRead(store, last, run);
++    if (last !== undefined) markRead(store, last, run);
+     return {
+       notices: entries.map(({ entry, position: at }) => noticeOf(entry, at)),
+       cursor: last ?? from ?? START,

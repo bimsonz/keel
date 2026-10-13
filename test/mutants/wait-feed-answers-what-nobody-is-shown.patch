@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-wait.test.ts -t wait.feed
+# kills: wait.feed
+# why: a page of events the reader is shown none of ends the wait, so a member's event answers a public reader's long wait with nothing
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 8f4b02be..77ea2a5c 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -400,7 +400,7 @@ export const readEvents: (
+             ),
+           );
+       },
+-      (page) => page.events.length > 0,
++      () => true,
+     ),
+   );
+ 

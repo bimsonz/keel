@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-wait.test.ts -t wait.holds
+# kills: wait.holds
+# why: every hold is a whole one whatever is left of the wait, so a wait of 70 seconds answers after 90
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 8f4b02be..e4e59190 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -137,7 +137,7 @@ const inHolds = <A, E, R>(
+     for (let holds = 1; !ready(answer) && holds < MAX_HOLDS; holds += 1) {
+       const left = Math.ceil((deadline - (yield* clock.now)) / 1000);
+       if (left <= 0) break;
+-      answer = yield* hold(Math.min(HOLD_SECONDS, left), answer);
++      answer = yield* hold(HOLD_SECONDS, answer);
+     }
+     return answer;
+   });

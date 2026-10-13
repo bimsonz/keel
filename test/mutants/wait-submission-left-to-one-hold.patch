@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-wait.test.ts -t wait.submission
+# kills: wait.submission
+# why: a long wait on a submission is handed to the object whole, which holds 30 seconds at most, so the caller is answered after 30 whatever it asked
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 8f4b02be..b8a6b652 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -297,7 +297,7 @@ export const submissionOf: (
+   waitSeconds?: number,
+ ) => Effect.Effect<SubmissionStatus, ChangeNotFound, Changes | Clock> = (changeId, waitSeconds) =>
+   Changes.use((changes) =>
+-    clampWait(waitSeconds) <= HOLD_SECONDS
++    clampWait(waitSeconds) <= MAX_WAIT_SECONDS
+       ? changes.awaitSubmission(changeId, clampWait(waitSeconds))
+       : Effect.flatMap(changes.awaitSubmission(changeId, 0), (first) =>
+           inHolds(

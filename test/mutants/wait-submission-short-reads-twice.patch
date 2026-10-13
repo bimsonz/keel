@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-wait.test.ts -t wait.submission-short
+# kills: wait.submission-short
+# why: a wait one hold can keep is given the long wait's first read too, so every status read is two calls on the change's object
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 8f4b02be..ceff6bd6 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -297,7 +297,7 @@ export const submissionOf: (
+   waitSeconds?: number,
+ ) => Effect.Effect<SubmissionStatus, ChangeNotFound, Changes | Clock> = (changeId, waitSeconds) =>
+   Changes.use((changes) =>
+-    clampWait(waitSeconds) <= HOLD_SECONDS
++    clampWait(waitSeconds) < 0
+       ? changes.awaitSubmission(changeId, clampWait(waitSeconds))
+       : Effect.flatMap(changes.awaitSubmission(changeId, 0), (first) =>
+           inHolds(

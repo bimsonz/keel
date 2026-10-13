@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/notices.test.ts -t inbox.end-pool
+# kills: inbox.end-pool
+# why: the object reads `end` as no cursor, so `cursor=end` answers the inbox from its start
+diff --git a/apps/keel/src/adapters/driving/do/agent-session.ts b/apps/keel/src/adapters/driving/do/agent-session.ts
+index d2ef0cb2..ebc40488 100644
+--- a/apps/keel/src/adapters/driving/do/agent-session.ts
++++ b/apps/keel/src/adapters/driving/do/agent-session.ts
+@@ -127,7 +127,7 @@ export class AgentSessionDO
+       Effect.flatMap(({ cursor, waitMs, run, peek }) =>
+         Effect.flatMap(
+           cursor === INBOX_END
+-            ? Effect.map(readInbox(INBOX_END, run, true), (head) => head.cursor)
++            ? Effect.succeed(undefined)
+             : Effect.succeed(cursor),
+           (from) =>
+             waiters.until(waitMs, readInbox(from, run, peek), (page) => page.notices.length > 0),

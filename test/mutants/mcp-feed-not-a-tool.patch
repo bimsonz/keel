@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/contract.test.ts -t mcp.tools-read-on
+# kills: mcp.tools-read-on
+# why: the feed's read carries no `mcp` tag, so an agent told to read on from a cursor has no tool to do it with
+# regen
+diff --git a/packages/spec/inbox.tsp b/packages/spec/inbox.tsp
+index ebeb67a6..300ce7de 100644
+--- a/packages/spec/inbox.tsp
++++ b/packages/spec/inbox.tsp
+@@ -98,7 +98,6 @@ interface Inbox {
+    * moves stay with the project's members. Without a token and without `project`, 401.
+    */
+   @summary("Read events")
+-  @tag("mcp")
+   @useAuth(NoAuth | AgentRead | SessionAuth)
+   @route("/events")
+   @get

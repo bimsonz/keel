@@ -2,10 +2,10 @@
 # kills: run.piggyback
 # why: every run shares the one `piggybacked` mark, so one lane's tool result marks another lane's notices carried and they never ride
 diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
-index 97df2626..7b650e2c 100644
+index a2c462f8..45d94617 100644
 --- a/packages/core/src/application/identity/inbox.ts
 +++ b/packages/core/src/application/identity/inbox.ts
-@@ -45,7 +45,7 @@ const headOf = (store: Store): number => {
+@@ -52,7 +52,7 @@ const headOf = (store: Store): number => {
  };
  
  const piggybackedOf = (store: Store, run: RunId | undefined): string => {
@@ -14,16 +14,16 @@ index 97df2626..7b650e2c 100644
    return typeof at === "string" ? at : START;
  };
  
-@@ -222,7 +222,7 @@ function markRead(store: Store, cursor: string, run: RunId | undefined): void {
-   const head = position(headOf(store));
-   const read = cursor > head ? head : cursor;
-   if (read > piggybackedOf(store, run))
--    store.put(INBOX.piggybacked.kind, run ?? INBOX.piggybacked.id, read);
-+    store.put(INBOX.piggybacked.kind, INBOX.piggybacked.id, read);
+@@ -313,7 +313,7 @@ export function entriesAfter(
+ /** Moves the run's `piggybacked` up to `at`, the position of the last notice a read answered: never back. */
+ function markRead(store: Store, at: string, run: RunId | undefined): void {
+   if (at > piggybackedOf(store, run))
+-    store.put(INBOX.piggybacked.kind, run ?? INBOX.piggybacked.id, at);
++    store.put(INBOX.piggybacked.kind, INBOX.piggybacked.id, at);
  }
  
  /**
-@@ -273,7 +273,7 @@ export const takeNotices: (
+@@ -372,7 +372,7 @@ export const takeNotices: (
        );
        const last = entries.at(-1);
        if (last !== undefined)

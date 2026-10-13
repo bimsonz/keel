@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/held-wait.test.ts -t wait.holds
+# kills: wait.holds
+# why: the longest wait is still one hold, so a wait of 70 seconds is answered after 30
+diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
+index 8f4b02be..97444465 100644
+--- a/packages/core/src/application/coordination/gateway.ts
++++ b/packages/core/src/application/coordination/gateway.ts
+@@ -98,7 +98,7 @@ import { audienceOf, type FeedScope, type ProjectScope } from "./read-scope.ts";
+  */
+ 
+ /** The longest a read may wait, in seconds (the spec's `?wait`). */
+-export const MAX_WAIT_SECONDS = 900;
++export const MAX_WAIT_SECONDS = 30;
+ 
+ /** The longest one hold on an object, in seconds: the object's own bound. */
+ export const HOLD_SECONDS = 30;

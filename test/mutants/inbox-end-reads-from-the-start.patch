@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/agent-session.test.ts -t inbox.end
+# kills: inbox.end
+# why: the cursor `end` is read as no cursor, so a read from it answers every notice from the start and counts them read
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index a2c462f8..ea83c41e 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -338,7 +338,7 @@ export const readInbox: (
+ ) {
+   const store = yield* EntityStore;
+   return store.transaction((): InboxPage => {
+-    const from = cursor === INBOX_END ? position(headOf(store)) : cursor;
++    const from = cursor === INBOX_END ? undefined : cursor;
+     const entries = entriesAfter(store, from, run);
+     const last = entries.at(-1)?.position;
+     if (last !== undefined && peek !== true) markRead(store, last, run);
