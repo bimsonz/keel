@@ -36,7 +36,7 @@ import { fc } from "../../support/fast-check.ts";
 import { assertReaching } from "../../support/reach.ts";
 import { foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { changeChart, leaseChart } from "../../charts/charts.ts";
-import { type Fold, type Machine, tour } from "../../support/machine.ts";
+import { type Fold, type Machine, memo, tour } from "../../support/machine.ts";
 
 // The lease TTL as the docs state it (state-machines.md § Lease), typed here rather than imported.
 const TTL = 15 * 60 * 1000;
@@ -572,16 +572,7 @@ const play = (plan: Plan): Trace => {
   return { records, log, final: state };
 };
 
-/** Every property draws the same plans from the same seed: play each one once. */
-const traces = new Map<string, Trace>();
-const run = (plan: Parameters<typeof play>[0]): Trace => {
-  const key = JSON.stringify(plan);
-  const known = traces.get(key);
-  if (known !== undefined) return known;
-  const trace = play(plan);
-  traces.set(key, trace);
-  return trace;
-};
+const run = memo(play);
 
 /** What stops a queueing. An awaited ruling is not one of them: it holds a change out of a batch only. */
 const anyBlocker = (b: Blockers): boolean =>

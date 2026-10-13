@@ -23,4 +23,7 @@ fc.configureGlobal({
  */
 vi.setConfig({ testTimeout: 60_000 });
 
+/** Whether every property of this run draws from one pinned seed, and so draws the same plans. */
+export const seedPinned = seed !== undefined;
+
 export { fc };
