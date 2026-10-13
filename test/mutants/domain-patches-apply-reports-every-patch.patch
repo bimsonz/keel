@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts
+# kills: patches-apply.control, patches-apply.index, patches-apply.every-patch
+# why: every patch is reported, the ones that apply among them, so the guard is red on a tree with nothing stale
+diff --git a/packages/tooling/src/guards/patches-apply.ts b/packages/tooling/src/guards/patches-apply.ts
+index 966e16f5..c42dece7 100644
+--- a/packages/tooling/src/guards/patches-apply.ts
++++ b/packages/tooling/src/guards/patches-apply.ts
+@@ -93,7 +93,6 @@ export async function checkPatchesApply(
+   const against = scanned.length > 0 && (await isRepository(root)) ? ["--cached"] : [];
+   const refused = await eachOf(scanned, async (file): Promise<Violation[]> => {
+     const applied = await git(root, ["apply", "--check", ...against, file]);
+-    if (applied.status === 0) return [];
+     const said =
+       applied.stderr.split("\n").find((line) => line.trim() !== "") ?? "git said nothing";
+     return [

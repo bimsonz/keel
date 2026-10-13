@@ -3,6 +3,7 @@ import { checkEventNames, EVENT_NAMES } from "./guards/event-names.ts";
 import { checkLintConfig, LINT_CONFIG } from "./guards/lint-config.ts";
 import { checkLoaderSpec, LOADER_SPEC } from "./guards/loader-spec.ts";
 import { checkModelPins, MODEL_PINS } from "./guards/model-pins.ts";
+import { checkPatchesApply, PATCHES_APPLY } from "./guards/patches-apply.ts";
 import { checkPublicScrub, PUBLIC_SCRUB } from "./guards/public-scrub.ts";
 import { checkR2NamespaceKeys, R2_NAMESPACE_KEYS } from "./guards/r2-namespace-keys.ts";
 import { checkReadonlyBundles, READONLY_BUNDLES } from "./guards/readonly-bundles.ts";
@@ -56,6 +57,7 @@ export const guards: readonly RegisteredGuard[] = [
     run: checkR2NamespaceKeys,
     controlCanary: "apps/keel/src/adapters/driven/r2/bundle-store.ts",
   },
+  { name: PATCHES_APPLY, run: checkPatchesApply, controlCanary: "test/mutants/stale.patch" },
 ];
 
 /**

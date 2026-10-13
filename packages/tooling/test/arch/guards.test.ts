@@ -1,7 +1,9 @@
+import { execFileSync } from "node:child_process";
 import { cpSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { checkPatchesApply } from "../../src/guards/patches-apply.ts";
 import { allChecks } from "../../src/registry.ts";
 import { repoRoot } from "../../src/scan.ts";
 
@@ -54,6 +56,7 @@ const EXPECTED: Record<string, readonly RegExp[]> = {
     /builds a key under evidence\/ by hand/,
     /builds a key under ns\/ by hand/,
   ],
+  "patches-apply": [/does not apply: patch failed: notes\.txt:1/],
   R1: [
     /outside the domain/,
     /package hono/,
@@ -131,6 +134,60 @@ describe.each(allChecks.map((check) => [check.name, check] as const))("%s", (nam
 
 it("every check has its expected control reasons written down", () => {
   expect(allChecks.map((c) => c.name).toSorted()).toEqual(Object.keys(EXPECTED).toSorted());
+});
+
+describe("patches-apply", () => {
+  const control = join(root, "test/controls/patches-apply");
+  const vacuity = { minFiles: 1, canary: "test/mutants/stale.patch" };
+  const stale = ["test/mutants/stale.patch"];
+
+  it("[patches-apply.control] reports the patch that cannot apply and no other", async () => {
+    const result = await checkPatchesApply(control, { vacuity });
+    expect(result.filesScanned).toBe(2);
+    expect(result.violations.map((v) => v.file)).toEqual(stale);
+  });
+
+  it("[patches-apply.index] reads a repository's index, so a mutant applied to the working tree leaves its own patch fresh", async () => {
+    const repo = mkdtempSync(join(tmpdir(), "keel-guard-patches-"));
+    try {
+      cpSync(control, repo, { recursive: true });
+      for (const args of [
+        ["init", "--quiet"],
+        ["add", "--all"],
+        ["apply", "test/mutants/fresh.patch"],
+      ])
+        execFileSync("git", ["-C", repo, ...args], { stdio: "pipe" });
+      const result = await checkPatchesApply(repo, { vacuity });
+      expect(result.violations.map((v) => v.file)).toEqual(stale);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it("[patches-apply.every-patch] checks every patch when there are more than run at once", async () => {
+    const copy = mkdtempSync(join(tmpdir(), "keel-guard-patches-"));
+    try {
+      cpSync(control, copy, { recursive: true });
+      const more = Array.from({ length: 20 }, (_, i) => `test/mutants/z-${i + 10}.patch`);
+      for (const patch of more)
+        cpSync(join(control, "test/mutants/stale.patch"), join(copy, patch));
+      const result = await checkPatchesApply(copy, { vacuity });
+      expect(result.violations.map((v) => v.file)).toEqual([...stale, ...more]);
+    } finally {
+      rmSync(copy, { recursive: true, force: true });
+    }
+  });
+
+  it("[patches-apply.git-broke] throws when git cannot say whether the root is a repository", async () => {
+    const broken = mkdtempSync(join(tmpdir(), "keel-guard-patches-"));
+    try {
+      cpSync(control, broken, { recursive: true });
+      writeFileSync(join(broken, ".git"), "not a gitfile\n");
+      await expect(checkPatchesApply(broken, { vacuity })).rejects.toThrow(/git rev-parse failed/);
+    } finally {
+      rmSync(broken, { recursive: true, force: true });
+    }
+  });
 });
 
 /** Every source file under `dir`, recursively. */

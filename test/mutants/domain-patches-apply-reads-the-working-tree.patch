@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts
+# kills: patches-apply.index
+# why: in a repository the working tree is read where the index is meant, so a mutant applied by the runner makes its own patch stale and every proof that runs the guards goes red by this guard alone
+diff --git a/packages/tooling/src/guards/patches-apply.ts b/packages/tooling/src/guards/patches-apply.ts
+index 966e16f5..8f8f3b99 100644
+--- a/packages/tooling/src/guards/patches-apply.ts
++++ b/packages/tooling/src/guards/patches-apply.ts
+@@ -90,7 +90,7 @@ export async function checkPatchesApply(
+         .toSorted()
+         .map((name) => `${MUTANTS}/${name}`)
+     : [];
+-  const against = scanned.length > 0 && (await isRepository(root)) ? ["--cached"] : [];
++  const against = scanned.length > 0 && (await isRepository(root)) ? [] : [];
+   const refused = await eachOf(scanned, async (file): Promise<Violation[]> => {
+     const applied = await git(root, ["apply", "--check", ...against, file]);
+     if (applied.status === 0) return [];

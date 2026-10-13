@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts
+# kills: patches-apply.control, patches-apply.every-patch
+# why: a root that is no repository is checked against an index it does not have, so in an export git refuses every patch and all of them are reported
+diff --git a/packages/tooling/src/guards/patches-apply.ts b/packages/tooling/src/guards/patches-apply.ts
+index 966e16f5..0cd16a9f 100644
+--- a/packages/tooling/src/guards/patches-apply.ts
++++ b/packages/tooling/src/guards/patches-apply.ts
+@@ -48,7 +48,7 @@ function git(root: string, args: readonly string[]): Promise<GitExit> {
+ async function isRepository(root: string): Promise<boolean> {
+   const asked = await git(root, ["rev-parse", "--is-inside-work-tree"]);
+   if (asked.status === 0) return true;
+-  if (asked.status === 128 && /not a git repository/.test(asked.stderr)) return false;
++  if (asked.status === 128 && /not a git repository/.test(asked.stderr)) return true;
+   throw new Error(`git rev-parse failed in ${root}: ${asked.stderr.trim()}`);
+ }
+ 

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts
+# kills: patches-apply.git-broke
+# why: any failure of git is taken for no repository, so a clone git cannot read is checked against its working tree and nobody is told
+diff --git a/packages/tooling/src/guards/patches-apply.ts b/packages/tooling/src/guards/patches-apply.ts
+index 966e16f5..9b846d28 100644
+--- a/packages/tooling/src/guards/patches-apply.ts
++++ b/packages/tooling/src/guards/patches-apply.ts
+@@ -48,7 +48,7 @@ function git(root: string, args: readonly string[]): Promise<GitExit> {
+ async function isRepository(root: string): Promise<boolean> {
+   const asked = await git(root, ["rev-parse", "--is-inside-work-tree"]);
+   if (asked.status === 0) return true;
+-  if (asked.status === 128 && /not a git repository/.test(asked.stderr)) return false;
++  if (asked.status !== 0) return false;
+   throw new Error(`git rev-parse failed in ${root}: ${asked.stderr.trim()}`);
+ }
+ 

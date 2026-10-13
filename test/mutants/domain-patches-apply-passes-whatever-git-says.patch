@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts
+# kills: patches-apply.control, patches-apply.index, patches-apply.every-patch
+# why: the check passes whatever git says, so a patch that no longer applies is reported by nobody
+diff --git a/packages/tooling/src/guards/patches-apply.ts b/packages/tooling/src/guards/patches-apply.ts
+index 966e16f5..e2dfd334 100644
+--- a/packages/tooling/src/guards/patches-apply.ts
++++ b/packages/tooling/src/guards/patches-apply.ts
+@@ -93,7 +93,7 @@ export async function checkPatchesApply(
+   const against = scanned.length > 0 && (await isRepository(root)) ? ["--cached"] : [];
+   const refused = await eachOf(scanned, async (file): Promise<Violation[]> => {
+     const applied = await git(root, ["apply", "--check", ...against, file]);
+-    if (applied.status === 0) return [];
++    if (applied.status >= 0) return [];
+     const said =
+       applied.stderr.split("\n").find((line) => line.trim() !== "") ?? "git said nothing";
+     return [

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts
+# kills: patches-apply.every-patch
+# why: each worker checks one patch and stops, so only the first eight are checked and a stale patch after them passes
+diff --git a/packages/tooling/src/guards/patches-apply.ts b/packages/tooling/src/guards/patches-apply.ts
+index 966e16f5..fd194c70 100644
+--- a/packages/tooling/src/guards/patches-apply.ts
++++ b/packages/tooling/src/guards/patches-apply.ts
+@@ -61,7 +61,6 @@ async function eachOf<T, R>(items: readonly T[], task: (item: T) => Promise<R>):
+     if (next.done === true) return;
+     const [index, item] = next.value;
+     answers[index] = await task(item);
+-    await worker();
+   };
+   await Promise.all(Array.from({ length: AT_ONCE }, () => worker()));
+   return answers;

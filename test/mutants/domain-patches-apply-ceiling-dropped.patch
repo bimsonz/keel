@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project arch packages/tooling/test/arch/guards.test.ts
+# kills: patches-apply.control
+# why: git walks up from the root: in a folder inside a repository it skips every path outside the folder and exits 0, so a patch that cannot apply reads as one that does
+diff --git a/packages/tooling/src/guards/patches-apply.ts b/packages/tooling/src/guards/patches-apply.ts
+index 966e16f5..2cb907de 100644
+--- a/packages/tooling/src/guards/patches-apply.ts
++++ b/packages/tooling/src/guards/patches-apply.ts
+@@ -29,7 +29,7 @@ function git(root: string, args: readonly string[]): Promise<GitExit> {
+     execFile(
+       "git",
+       [...args],
+-      { cwd: root, env: { ...process.env, GIT_CEILING_DIRECTORIES: dirname(root) } },
++      { cwd: root },
+       (error, _stdout, stderr) => {
+         if (error === null) resolve({ status: 0, stderr });
+         else if (typeof error.code === "number") resolve({ status: error.code, stderr });
