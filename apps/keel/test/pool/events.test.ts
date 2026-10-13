@@ -247,6 +247,28 @@ describe("GET /v1/events", () => {
     expect(on.body.items.map((e) => e.eventId)).toEqual([arrived.eventId]);
   });
 
+  it("[feed.timeout-beside-wait] a waiting read that times out answers its own empty page and leaves a younger one waiting: both are answered 200, each at its own deadline", async () => {
+    const { projectA, member } = await tenancy();
+    const from = await head(member);
+    const timed = async (wait: number) => {
+      const started = Date.now();
+      const page = await events(
+        member,
+        `?project=${projectA}&cursor=${from}&limit=500&wait=${wait}`,
+      );
+      return { page, ms: Date.now() - started };
+    };
+    const older = timed(1);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const younger = timed(2);
+    const [first, second] = await Promise.all([older, younger]);
+    expect([first.page.status, first.page.body.items]).toEqual([200, []]);
+    expect([second.page.status, second.page.body.items]).toEqual([200, []]);
+    // The older one's answer woke the younger, which read again and waited on: its page came at its own deadline.
+    expect(first.ms).toBeGreaterThanOrEqual(1_000);
+    expect(second.ms).toBeGreaterThanOrEqual(2_000);
+  });
+
   it("[a11.events-cursor] refuses a cursor that is not a feed position, naming it", async () => {
     const { member } = await tenancy();
     const page = await events(member, "?cursor=not-a-cursor");

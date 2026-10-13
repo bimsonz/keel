@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/events.test.ts -t feed.timeout-beside-wait
+# kills: feed.timeout-beside-wait
+# why: one read's timeout answers every read waiting beside it, each with an empty page before its own wait is up
+diff --git a/apps/keel/src/adapters/driving/do/waiters.ts b/apps/keel/src/adapters/driving/do/waiters.ts
+index 68d13dbe..1cae47cb 100644
+--- a/apps/keel/src/adapters/driving/do/waiters.ts
++++ b/apps/keel/src/adapters/driving/do/waiters.ts
+@@ -48,6 +48,7 @@ export class Waiters {
+         if (left <= 0) break;
+         yield* Effect.promise(() => next(left));
+         value = yield* read;
++        break;
+       }
+       return value;
+     });

@@ -1,0 +1,27 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/events.test.ts -t feed.timeout-beside-wait
+# kills: feed.timeout-beside-wait
+# why: the oldest waiter's answer fails every other waiter; a held read is read again, so only the time of its answer shows it
+diff --git a/apps/keel/src/adapters/driving/do/waiters.ts b/apps/keel/src/adapters/driving/do/waiters.ts
+index 68d13dbe..d2a40b97 100644
+--- a/apps/keel/src/adapters/driving/do/waiters.ts
++++ b/apps/keel/src/adapters/driving/do/waiters.ts
+@@ -19,14 +19,17 @@ export class Waiters {
+ 
+   /** Resolves on the next wake, or after `ms`, whichever comes first. */
+   next(ms: number): Promise<void> {
+-    return new Promise((resolve) => {
++    return new Promise((resolve, reject) => {
+       const done = () => {
+         clearTimeout(timer);
+         this.pending.delete(done);
+         resolve();
+       };
+       const timer = setTimeout(done, ms);
+-      this.pending.add(done);
++      this.pending.add(() => {
++        clearTimeout(timer);
++        reject(new Error("another waiter's answer took this one with it"));
++      });
+     });
+   }
+ 
