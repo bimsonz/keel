@@ -1,4 +1,4 @@
-import { introspectWorkflow, runInDurableObject } from "cloudflare:test";
+import { runInDurableObject } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
 import { laneOf } from "@keeltown/core/application/coordination";
 import { projectRepos } from "@keeltown/core/application/integration";
@@ -44,6 +44,20 @@ import { inertPrecheck } from "./inert-precheck.ts";
 
 /** How long a test waits for something the object does by itself (a flush, an alarm). */
 const WAIT = { timeout: 10_000, interval: 20 };
+
+/**
+ * Waits until each ChangeSubmitted in `c`'s log has started its Precheck
+ * under `precheck`, which holds it inert. A case that submits ends with it:
+ * an instance started after the case let go of `precheck` would run for real,
+ * against a workspace no Artifacts binding serves, and retry past the file's end.
+ */
+async function prechecksStarted(
+  c: { log(): Promise<readonly { readonly type: string }[]> },
+  precheck: { get(): Promise<readonly unknown[]> },
+): Promise<void> {
+  const submitted = (await c.log()).filter((event) => event.type === "ChangeSubmitted");
+  await vi.waitFor(async () => expect(await precheck.get()).toHaveLength(submitted.length), WAIT);
+}
 const PLAN_HASH = `sha256:${"0".repeat(64)}`;
 const seed = env.FC_SEED === undefined ? {} : { seed: Number(env.FC_SEED) };
 
@@ -218,6 +232,7 @@ describe("the Change DO over real RPC", () => {
   );
 
   it("[b11.declare-working] [b11.base-sha] answers a declare Working on its base, ready to submit at once", async () => {
+    await using precheck = await inertPrecheck();
     const c = await changeUnderTest();
     const declared = ok(await c.declare());
     const sha = await c.push();
@@ -226,6 +241,7 @@ describe("the Change DO over real RPC", () => {
     expect(declared.change.state).toBe("working");
     expect(declared.change.baseSha).toBe(declared.grant.baseSha);
     expect(ok(submitted).state).toBe("submitted");
+    await prechecksStarted(c, precheck);
   });
 
   it("[b11.stale-lease] refuses the old token after adoption, with next actions", async () => {
@@ -244,6 +260,7 @@ describe("the Change DO over real RPC", () => {
 
 describe("ten concurrent calls on one change", () => {
   it("[b11.racers] revising and submitting under one lease leave exactly the state the log says", async () => {
+    await using precheck = await inertPrecheck();
     const c = await changeUnderTest();
     const lease = ok(await c.declare()).change.lease.id;
     const sha = await c.push();
@@ -259,6 +276,7 @@ describe("ten concurrent calls on one change", () => {
     expect(answers.filter((answer) => answer._tag === "Success")).toHaveLength(
       types.filter((type) => type === "ChangeSubmitted" || type === "IntentRevised").length,
     );
+    await prechecksStarted(c, precheck);
   });
 
   it("[b11.racers] adopting, revising and submitting a lapsed change: exactly one adoption wins, one token is live", async () => {
@@ -362,14 +380,14 @@ describe("the lease's deadline", () => {
 
 describe("Precheck and the change", () => {
   it("[b11.precheck-once] starts one Precheck instance per submission, named for its ChangeSubmitted", async () => {
-    await using introspector = await introspectWorkflow(env.PRECHECK);
+    await using precheck = await inertPrecheck();
     const c = await changeUnderTest();
     const lease = ok(await c.declare()).change.lease.id;
     ok(await submit(c, lease, await c.push(), "submit-1"));
     const submitted = (await c.log()).find((event) => event.type === "ChangeSubmitted");
     if (submitted === undefined) throw new Error("no ChangeSubmitted was committed");
 
-    await vi.waitFor(async () => expect(await introspector.get()).toHaveLength(1), WAIT);
+    await prechecksStarted(c, precheck);
     await expect(env.PRECHECK.get(`precheck-${submitted.eventId}`)).resolves.toBeDefined();
   });
 });
@@ -813,6 +831,7 @@ describe("a parked change's next actions", () => {
 
 describe("waiting on a submission", () => {
   it("[b11.waiter] answers as soon as the change is submitted, well before the deadline", async () => {
+    await using precheck = await inertPrecheck();
     const c = await changeUnderTest();
     const lease = ok(await c.declare()).change.lease.id;
     const sha = await c.push();
@@ -825,6 +844,7 @@ describe("waiting on a submission", () => {
     expect(status.change.state).toBe("submitted");
     expect(status.commitSha).toBe(sha);
     expect(Date.now() - started).toBeLessThan(5_000);
+    await prechecksStarted(c, precheck);
   });
 
   it("[b11.waiter] answers the change as it stands at the deadline when nothing moves", async () => {

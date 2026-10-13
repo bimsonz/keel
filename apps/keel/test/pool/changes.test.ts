@@ -10,10 +10,11 @@ import { type AgentId, type ChangeId, makeId, type ProjectId } from "@keeltown/c
 import { makeManualClock, PORTS } from "@keeltown/testing";
 import { Effect, Exit } from "effect";
 import { ulid } from "ulid";
-import { expect, vi } from "vitest";
+import { afterAll, beforeAll, expect, vi } from "vitest";
 import { ChangesRpc } from "../../src/adapters/driven/do-rpc/changes.ts";
 import { changeServices } from "../../src/composition/do.ts";
 import { rewire } from "./change-harness.ts";
+import { inertPrecheck } from "./inert-precheck.ts";
 import { followTrunk } from "./pool-harness.ts";
 import { decodeExit, WorkspacePoolCodecs } from "../../src/rpc/index.ts";
 
@@ -45,6 +46,16 @@ async function stockedCaller(): Promise<AgentToken> {
   const agentId: AgentId = makeId("agt", ulid());
   return { agentId, projectId, scopes: ["agent:read", "agent:work"], revocationEpoch: 0 };
 }
+
+// The contract asks nothing of Precheck, and each submit starts one: held inert for the whole
+// file, where its real run would refuse the caller's unplaced project behind the case's back.
+let precheck: Awaited<ReturnType<typeof inertPrecheck>> | undefined;
+beforeAll(async () => {
+  precheck = await inertPrecheck();
+});
+afterAll(async () => {
+  await precheck?.dispose();
+});
 
 PORTS.Changes.contract("Change DO over RPC", () => ({
   layer: ChangesRpc({
