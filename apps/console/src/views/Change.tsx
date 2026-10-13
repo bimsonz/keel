@@ -18,7 +18,7 @@ import type {
 } from "../domain/state.ts";
 import { noneDerived, unjudged } from "../engine/judged.ts";
 import type { ChangeTab } from "../route.ts";
-import { useWhere } from "../router.tsx";
+import { Link, useWhere } from "../router.tsx";
 import type { Mode } from "../theme/mode.ts";
 import { Detail, Head, Split, SubTabs, Tied } from "./Detail.tsx";
 import { CHANGE_TONE, CONFLICT_TONE } from "./List.tsx";
@@ -780,9 +780,20 @@ export function Change({
                 </Tied>
               )}
               <Tied title="Where it is">
+                {/* A change lands as a commit of Keel's on trunk, which is not the one its workspace pushed. */}
+                {change.landedAs !== undefined && (
+                  <span data-part="landed-as">
+                    landed on trunk as commit{" "}
+                    <Link to={{ at: "commit", sha: change.landedAs }} className="a-mono a-link">
+                      {change.landedAs.slice(0, 7)}
+                    </Link>
+                  </span>
+                )}
                 {change.commit !== "" && (
                   <span>
-                    commit <span className="a-mono text-kumo-strong">{change.commit}</span>
+                    {/* Beside the commit it landed as, the change's own is said to be the one it pushed. */}
+                    {change.landedAs === undefined ? "commit" : "pushed as commit"}{" "}
+                    <span className="a-mono text-kumo-strong">{change.commit}</span>
                   </span>
                 )}
                 {change.workspace !== "" && (
@@ -1003,6 +1014,17 @@ export function Change({
                 : diff.state === "refused"
                   ? "Keel does not serve this change's diff. Nothing is shown in its place."
                   : "This change's commit alters no file Keel can show."}
+            {/* What landed is a commit on trunk, and Keel serves that: the way to it is offered. */}
+            {change.commit !== "" && diff.state === "refused" && change.landedAs !== undefined && (
+              <>
+                {" "}
+                It landed on trunk as commit{" "}
+                <span className="a-mono text-kumo-strong">{change.landedAs.slice(0, 7)}</span>.{" "}
+                <Link to={{ at: "commit", sha: change.landedAs }} className="a-link">
+                  See what that commit changed
+                </Link>
+              </>
+            )}
           </p>
         ) : (
           <>

@@ -347,6 +347,8 @@ export interface ChangePageState {
     commit: string;
     /** True once Keel has derived the effects of a commit of it, whether or not it found any. */
     derived: boolean;
+    /** The commit on trunk it landed as, where it has landed: Keel's own name for it, and a page of its own. */
+    landedAs?: string;
     workspace: string;
     declaredAt: string;
     submittedAt?: string;

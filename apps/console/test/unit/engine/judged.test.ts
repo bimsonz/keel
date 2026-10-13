@@ -22,6 +22,8 @@ const WAITING = "chg_00000000000000000WAITING";
 const VERDICT = "vrd_00000000000000000000000001";
 const BATCH = "bat_00000000000000000000000001";
 const COMMIT = "c96bc39b527c51c1bf0bef6d65d660c5ccb70b7d";
+/** The commit Keel composed on trunk for the change: another than the one its workspace pushed. */
+const ON_TRUNK = "8b1f34de3eb2f8ffec648f7741698ee62ad3f138";
 const OFF = "verification-off: the project's verification is off, so no plan ran";
 
 /**
@@ -95,6 +97,18 @@ function asKeelWrites(): World {
       verdictId: VERDICT,
       members: [LANDED],
       verified: false,
+    },
+  });
+  b.emit({
+    type: "ChangeLanded",
+    entity: { kind: "change", id: LANDED },
+    payload: {
+      changeId: LANDED,
+      commitSha: ON_TRUNK,
+      // Trunk's head once the batch is on it: another commit, where a batch lands more than this change.
+      trunkSha: "0f0e0d0c0b0a09080706050403020100ffeeddcc",
+      candidateId: "cnd_1",
+      proofId: "sha256:159a",
     },
   });
   b.at(3);
@@ -192,6 +206,17 @@ describe("a change's page, in Keel's own fields", () => {
       commit: "0a1b2c3",
       derived: false,
     });
+  });
+
+  it("[judged.landed-as] names the commit a change landed as on trunk, which Keel's landing names and is not the one its workspace pushed, and names none for a change that has not landed", () => {
+    const world = asKeelWrites();
+    expect(changePageOf(world, LANDED, NO_RESOURCES)?.change).toMatchObject({
+      state: "landed",
+      commit: COMMIT,
+      landedAs: ON_TRUNK,
+    });
+    expect(changePageOf(world, WITHDRAWN, NO_RESOURCES)?.change.landedAs).toBeUndefined();
+    expect(changePageOf(world, WAITING, NO_RESOURCES)?.change.landedAs).toBeUndefined();
   });
 
   it("[judged.recorded] lists what the verdict's own event recorded where Keel serves no view of the verdict, and nothing of it where Keel serves one or has not answered", () => {

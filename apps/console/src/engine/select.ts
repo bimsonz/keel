@@ -670,6 +670,7 @@ export function changePageOf(
       unverified: change.unverified,
       commit: change.commit ?? "",
       derived: change.derived,
+      ...(change.landedAs === undefined ? {} : { landedAs: change.landedAs }),
       workspace:
         change.workspaceId === undefined ? "" : `ws-${change.workspaceId.slice(-8).toLowerCase()}`,
       declaredAt: change.declaredAt,

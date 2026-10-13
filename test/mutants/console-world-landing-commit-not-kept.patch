@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/judged.test.ts
+# kills: judged.landed-as
+# why: the fold drops the commit Keel's landing names, so a landed change leads to no commit
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 0a9e0aee..cc5c089f 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -770,7 +770,6 @@ export class World {
+         const change = this.#change(event.payload.changeId, "landed");
+         if (change === undefined) break;
+         change.landedT = t;
+-        change.landedAs = event.payload.commitSha;
+         this.trunk.changesLanded += 1;
+         // By the events' own timestamps: history replayed at once still took the time it took.
+         this.trunk.landings.push({

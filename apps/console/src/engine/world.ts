@@ -126,6 +126,8 @@ export interface ChangeEntry {
   submittedAt?: string;
   submittedT?: number;
   landedT?: number;
+  /** The commit on trunk the change landed as, as Keel's `ChangeLanded` names it. Not its own workspace's commit. */
+  landedAs?: string;
   escalationId?: string;
   verdictIds: string[];
   /** The revision the change stood at when its latest verdict reached it. A verdict names no revision itself. */
@@ -768,6 +770,7 @@ export class World {
         const change = this.#change(event.payload.changeId, "landed");
         if (change === undefined) break;
         change.landedT = t;
+        change.landedAs = event.payload.commitSha;
         this.trunk.changesLanded += 1;
         // By the events' own timestamps: history replayed at once still took the time it took.
         this.trunk.landings.push({

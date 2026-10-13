@@ -487,6 +487,22 @@ expectEqual(
 
 // Where the plans say nothing of the predicate, Keel notes the conflict on both changes and holds neither.
 await page.goto(at("/changes/1", "scenario=s3&t=495&play=0"), { waitUntil: "networkidle" });
+// A change lands as a commit of Keel's on trunk, which is another than the one its workspace pushed: the page
+// names the one Keel's landing names, and it leads to that commit's own page.
+const landedAs = page.locator('[data-part="landed-as"]');
+const landedLink = String(
+  await landedAs
+    .getByRole("link")
+    .getAttribute("href", { timeout: 3000 })
+    .catch(() => "no link"),
+);
+const landedSha = new URL(landedLink, dev).pathname.split("/").at(-1) ?? "";
+const landedSaid = squash(await landedAs.innerText({ timeout: 3000 }).catch(() => "no line"));
+expectEqual(
+  "change: a landed change names the commit it landed as on trunk, and that leads to the commit's own page",
+  `${landedSaid.replace(/[0-9a-f]{7}$/, "<sha>")} | ${new URL(landedLink, dev).pathname.replace(/[0-9a-f]{7,40}$/, "<sha>")} | ${String(landedSha.length === 40 && landedSaid.endsWith(landedSha.slice(0, 7)))}`,
+  "landed on trunk as commit <sha> | /acme/demo/commit/<sha> | true",
+);
 const noted = page.locator("section", { has: page.getByRole("heading", { name: "Noted" }) }).last();
 const notedText = async (): Promise<string> =>
   (await noted.count()) === 0 ? "nothing noted" : squash(await noted.innerText());

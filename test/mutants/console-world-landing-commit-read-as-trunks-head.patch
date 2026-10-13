@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/judged.test.ts
+# kills: judged.landed-as
+# why: a change is said to have landed as trunk's head, which is another change's commit where a batch lands several
+diff --git a/apps/console/src/engine/world.ts b/apps/console/src/engine/world.ts
+index 0a9e0aee..a855871a 100644
+--- a/apps/console/src/engine/world.ts
++++ b/apps/console/src/engine/world.ts
+@@ -770,7 +770,7 @@ export class World {
+         const change = this.#change(event.payload.changeId, "landed");
+         if (change === undefined) break;
+         change.landedT = t;
+-        change.landedAs = event.payload.commitSha;
++        change.landedAs = event.payload.trunkSha;
+         this.trunk.changesLanded += 1;
+         // By the events' own timestamps: history replayed at once still took the time it took.
+         this.trunk.landings.push({
