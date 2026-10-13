@@ -7,20 +7,21 @@ import {
 } from "../../domain/identity/index.ts";
 import type { ProjectNotFound } from "../../domain/integration/index.ts";
 import { type NamespaceId, ProjectId } from "../../domain/kernel/index.ts";
-import { projectRepos, type ProjectSource } from "../integration/index.ts";
 import {
   type ProjectRecord,
   ProjectNamespaces,
   Projects,
   type ProjectSettings,
+  type ProjectSource,
+  type ProjectStartRefused,
   type PutProjectSettings,
-  type RepoNotFound,
 } from "../ports/index.ts";
 import { hashedIdBody } from "./hashed-id.ts";
 
 /**
- * A new project in a namespace: trunk is forked from `source`, a template or
- * the trunk of a project the doorway let the actor fork.
+ * A new project in a namespace, and where its trunk starts: empty, a public
+ * Git repository, a template, or the trunk of a project the doorway let the
+ * actor fork.
  */
 export interface NewProject {
   readonly namespace: NamespaceId;
@@ -30,10 +31,6 @@ export interface NewProject {
   readonly source: ProjectSource;
   readonly idempotencyKey: string;
 }
-
-/** The repo in the core namespace a source names: the template's own, or the project's trunk. */
-const sourceRepo = (source: ProjectSource): string =>
-  source._tag === "Template" ? source.repo : projectRepos(source.projectId).trunk.name;
 
 /**
  * The project an actor's Idempotency-Key creates: derived from both, so a retry
@@ -47,19 +44,21 @@ export const projectIdFor = (actor: Actor, idempotencyKey: string): ProjectId =>
  * actor in, from `input.source`, which the doorway let the actor fork when it
  * is a project. Its place comes first: the name, lower-case, must be free there
  * (ProjectNameTaken otherwise) before anything is made. Then its Project DO
- * forks trunk from the source, makes staging, the workspace mirror and pool,
- * and initialises trunk at the source's head, which reads the place. The id is
- * derived from the actor and the key, so a retry reaches the same place (a
- * no-op) and the same DO, which replays by key: a retry finishes a project
- * whose DO failed after its place was taken. The key reused for another
- * namespace or name is IdempotencyConflict.
+ * makes trunk by the start, initialises it at its first head, which reads the
+ * place, and makes staging, the workspace mirror and pool. The id is derived
+ * from the actor and the key, so a retry reaches the same place (a no-op) and
+ * the same DO, which replays by key: a retry finishes a project whose DO
+ * failed after its place was taken. The key reused for another namespace or
+ * name is IdempotencyConflict. A start the Project DO refuses made no project
+ * and left no repo, so its place is given back: the name is free for the
+ * next try, under any key.
  */
 export const createProject: (
   actor: Actor,
   input: NewProject,
 ) => Effect.Effect<
   ProjectRecord,
-  IdempotencyConflict | ProjectNameTaken | RepoNotFound,
+  IdempotencyConflict | ProjectNameTaken | ProjectStartRefused,
   Projects | ProjectNamespaces
 > = Effect.fn("coordination/createProject")(function* (actor: Actor, input: NewProject) {
   const { namespace, idempotencyKey } = input;
@@ -70,8 +69,13 @@ export const createProject: (
   if (Option.isSome(placed) && (placed.value.namespace !== namespace || placed.value.name !== name))
     return yield* new IdempotencyConflict({ idempotencyKey });
   yield* places.assign({ projectId, namespace, name });
-  const source = sourceRepo(input.source);
-  return yield* (yield* Projects).create(actor, { projectId, name, source, idempotencyKey });
+  return yield* (yield* Projects)
+    .create(actor, { projectId, name, source: input.source, idempotencyKey })
+    .pipe(
+      Effect.tapError((refused) =>
+        refused._tag === "IdempotencyConflict" ? Effect.void : places.release(projectId),
+      ),
+    );
 });
 
 /** The project's settings, as its Project DO holds them. */

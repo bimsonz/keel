@@ -227,6 +227,7 @@ export function makeProjectNamespacesMemory(rows: BetterAuthMemory = makeBetterA
             places.set(place.projectId, { ...place, name });
             return Effect.void;
           }),
+        release: (projectId) => Effect.sync(() => void places.delete(projectId)),
         byId: (projectId) => Effect.sync(() => Option.fromNullishOr(places.get(projectId))),
         byName: (namespace, name) =>
           Effect.sync(() => Option.fromNullishOr(byName(namespace, name))),

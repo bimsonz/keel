@@ -49,8 +49,15 @@ interface Made {
 interface Creating {
   readonly namespace: string;
   readonly name: string;
-  readonly source: string;
+  readonly source:
+    | { readonly kind: "template"; readonly name: string }
+    | { readonly kind: "fork"; readonly project: string };
 }
+
+/** The template, as a request's source. */
+const FROM_TEMPLATE = { kind: "template", name: "fixture-forge-lite" } as const;
+/** A fork of the project, as a request's source. */
+const forkOf = (project: string) => ({ kind: "fork", project }) as const;
 
 const key = () => `prj-${crypto.randomUUID()}`;
 
@@ -185,7 +192,7 @@ function sourceApp(options: { readonly template?: boolean } = {}) {
       const made = await create(token, {
         namespace: "pool",
         name: uniqueHandle("src"),
-        source: TEMPLATE,
+        source: FROM_TEMPLATE,
       });
       expect(made.status).toBe(201);
       const { trunk } = projectRepos(made.body.id);
@@ -220,13 +227,13 @@ describe("a new project's source", () => {
 
     // Anyone who signs up, creating in the org that is theirs, naming the trunk by the project's id.
     const stranger = await world.signUp("stranger");
-    const wanted = { namespace: stranger.handle, name: "copied", source: secret.trunk };
+    const wanted = { namespace: stranger.handle, name: "copied", source: forkOf(secret.id) };
     const asked = key();
     const refused = await world.create(stranger.token, wanted, asked);
     expect([refused.status, blank(refused.body)]).toEqual([404, { ...NOT_FOUND, nextActions: [] }]);
     // A project that was never made reads the same.
-    const never = projectRepos(makeId("prj", ulid())).trunk.name;
-    const missing = await world.create(stranger.token, { ...wanted, source: never });
+    const never: ProjectId = makeId("prj", ulid());
+    const missing = await world.create(stranger.token, { ...wanted, source: forkOf(never) });
     expect([missing.status, blank(missing.body)]).toEqual([refused.status, blank(refused.body)]);
     // The refused call made no project: it holds no place and has no trunk.
     const unmade = wouldBe(stranger.userId, asked);
@@ -235,7 +242,7 @@ describe("a new project's source", () => {
       false,
     ]);
     // So the name it asked for is still free in the org.
-    const free = await world.create(stranger.token, { ...wanted, source: TEMPLATE });
+    const free = await world.create(stranger.token, { ...wanted, source: FROM_TEMPLATE });
     expect([free.status, free.body.name]).toEqual([201, "copied"]);
     expect(await world.head(free.body.id)).toBe(await world.templateHead);
 
@@ -246,7 +253,7 @@ describe("a new project's source", () => {
     const carried = key();
     const across = await world.create(
       member.token,
-      { namespace: "elsewhere", name: "carried", source: secret.trunk },
+      { namespace: "elsewhere", name: "carried", source: forkOf(secret.id) },
       carried,
     );
     expect([across.status, blank(across.body)]).toEqual([
@@ -283,7 +290,7 @@ describe("a new project's source", () => {
     const within = await world.create(member.token, {
       namespace: "pool",
       name: uniqueHandle("fork"),
-      source: source.trunk,
+      source: forkOf(source.id),
     });
     expect([within.status, within.body.namespace.handle, within.body.viewer]).toEqual([
       201,
@@ -294,7 +301,7 @@ describe("a new project's source", () => {
 
     // Someone outside the org: refused while the project is private, and forks it once it is public.
     const anyone = await world.signUp("anyone");
-    const theirs = { namespace: anyone.handle, name: "theirs", source: source.trunk };
+    const theirs = { namespace: anyone.handle, name: "theirs", source: forkOf(source.id) };
     expect((await world.create(anyone.token, theirs)).status).toBe(404);
     await world.open(owner.token, source.id);
     const forked = await world.create(anyone.token, theirs);
@@ -307,7 +314,7 @@ describe("a new project's source", () => {
     expect(await world.head(forked.body.id)).toBe(source.head);
   });
 
-  it("[project.source-unknown] a name that is no template and no project's trunk is no source, whatever the core namespace holds by it", async () => {
+  it("[project.source-unknown] a name that is no template is no source, whatever the core namespace holds by it", async () => {
     const world = sourceApp();
     const owner = await maintainer();
     const source = await world.source(owner.token);
@@ -326,12 +333,13 @@ describe("a new project's source", () => {
       repos.staging.name,
       repos.guards.name,
       "keel-core/x",
+      source.trunk,
       `keel-core/${source.trunk}`,
     ]) {
       const asked = key();
       const answer = await world.create(
         owner.token,
-        { namespace: "pool", name, source: unknown },
+        { namespace: "pool", name, source: { kind: "template", name: unknown } },
         asked,
       );
       expect([unknown, answer.status, blank(answer.body)]).toEqual([
@@ -339,13 +347,13 @@ describe("a new project's source", () => {
         404,
         {
           ...NOT_FOUND,
-          detail: `No template or readable project has the name "${unknown}".`,
+          detail: `No template has the name "${unknown}".`,
           nextActions: [
             {
               kind: "call",
               title: `Create the project from the template ${TEMPLATE}`,
               operationId: "Operator_createProject",
-              args: { namespace: "pool", name, source: TEMPLATE },
+              args: { namespace: "pool", name, source: FROM_TEMPLATE },
             },
           ],
         },
@@ -353,17 +361,20 @@ describe("a new project's source", () => {
       expect([unknown, await placed(wouldBe(owner.userId, asked))]).toEqual([unknown, false]);
     }
     // No refusal took the name: the next action's own arguments make the project.
-    const made = await world.create(owner.token, { namespace: "pool", name, source: TEMPLATE });
+    const made = await world.create(owner.token, {
+      namespace: "pool",
+      name,
+      source: FROM_TEMPLATE,
+    });
     expect([made.status, made.body.name]).toEqual([201, name]);
   });
 
-  it("[project.source-absent] a template the core namespace does not hold answers 404, naming its repo", async () => {
+  it("[project.source-absent] a template the core namespace does not hold answers 404, naming its repo, and the project that was not made holds no place: its name is free for the next try", async () => {
     const world = sourceApp({ template: false });
-    const missing = await world.create((await maintainer()).token, {
-      namespace: "pool",
-      name: uniqueHandle("early"),
-      source: TEMPLATE,
-    });
+    const owner = await maintainer();
+    const asked = key();
+    const early = { namespace: "pool", name: uniqueHandle("early"), source: FROM_TEMPLATE };
+    const missing = await world.create(owner.token, early, asked);
     expect([missing.status, missing.body.code, missing.body.detail]).toEqual([
       404,
       "resource.not_found",
@@ -372,5 +383,10 @@ describe("a new project's source", () => {
     expect(missing.body.nextActions).toEqual([
       expect.objectContaining({ operationId: "Operator_createProject" }),
     ]);
+    // The refused start gave its place back: no row, and the same name is taken by the next try under another key.
+    expect(await placed(wouldBe(owner.userId, asked))).toBe(false);
+    await world.hold({ namespace: "keel-core", name: TEMPLATE }, "the template");
+    const next = await world.create(owner.token, early);
+    expect([next.status, next.body.name]).toEqual([201, early.name]);
   });
 });

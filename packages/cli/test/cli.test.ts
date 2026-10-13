@@ -48,6 +48,79 @@ const only = (requests: { url: string; init: RequestInit }[]) => {
   };
 };
 
+const created = () =>
+  Response.json(
+    {
+      id: "prj_1",
+      namespace: { handle: "keel", kind: "org" },
+      name: "forge",
+      visibility: "private",
+    },
+    { status: 201 },
+  );
+const create = (...start: readonly string[]) => [
+  "project",
+  "create",
+  "--namespace",
+  "keel",
+  "--name",
+  "forge",
+  ...start,
+  "--json",
+];
+
+describe("keeltown project create", () => {
+  it.each([
+    [["--empty"], { kind: "empty" }],
+    [
+      ["--import", "https://git.example/team/app"],
+      { kind: "import", url: "https://git.example/team/app" },
+    ],
+    [
+      ["--import", "https://git.example/team/app", "--ref", "release/1.x"],
+      { kind: "import", url: "https://git.example/team/app", ref: "release/1.x" },
+    ],
+    [
+      ["--fork", "prj_01J9ZZZZZZZZZZZZZZZZZZZZZZ"],
+      { kind: "fork", project: "prj_01J9ZZZZZZZZZZZZZZZZZZZZZZ" },
+    ],
+    [["--template", "starter"], { kind: "template", name: "starter" }],
+  ])(
+    "[cli.project-source] %j sends the start it names as the request's source",
+    async (start, source) => {
+      const keel = fakeKeel(created);
+      const session = {
+        ...keel.io,
+        env: { KEEL_URL: "https://keel.test", KEEL_SESSION: "sess-1" },
+      };
+      expect(await run(create(...start), session)).toBe(0);
+      expect(only(keel.requests).body).toEqual({ namespace: "keel", name: "forge", source });
+    },
+  );
+
+  it.each([
+    [[], "exactly one of --empty, --import, --fork and --template"],
+    [
+      ["--empty", "--template", "starter"],
+      "exactly one of --empty, --import, --fork and --template",
+    ],
+    [["--import", "https://git.example/a/b", "--fork", "prj_1"], "exactly one of --empty"],
+    [["--empty", "--ref", "main"], "--ref names a branch of the repository --import takes"],
+  ])(
+    "[cli.project-source-usage] %j is a usage error that says what to give, and nothing is sent",
+    async (start, said) => {
+      const keel = fakeKeel(created);
+      const session = {
+        ...keel.io,
+        env: { KEEL_URL: "https://keel.test", KEEL_SESSION: "sess-1" },
+      };
+      expect(await run(create(...start), session)).toBe(2);
+      expect(keel.err.join("\n")).toContain(said);
+      expect(keel.requests).toEqual([]);
+    },
+  );
+});
+
 describe("keeltown", () => {
   it("[cli.session] a user's session governs: project create sends its namespace under the session as a bearer, and enrol needs its project", async () => {
     const keel = fakeKeel(() =>
@@ -71,7 +144,7 @@ describe("keeltown", () => {
           "keel",
           "--name",
           "forge",
-          "--source",
+          "--template",
           "fixture",
           "--json",
         ],
@@ -82,7 +155,7 @@ describe("keeltown", () => {
     expect([sent.url, sent.headers.get("authorization"), sent.body]).toEqual([
       "https://keel.test/v1/projects",
       "Bearer sess-1",
-      { namespace: "keel", name: "forge", source: "fixture" },
+      { namespace: "keel", name: "forge", source: { kind: "template", name: "fixture" } },
     ]);
     expect(await run(["agent", "enrol", "--name", "a1", "--scope", "agent:work"], session)).toBe(2);
     expect(keel.err.join("\n")).toContain("--project");

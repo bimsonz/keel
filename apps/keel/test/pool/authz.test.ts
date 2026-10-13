@@ -447,7 +447,7 @@ describe("[authz.create-project] creating a project in an org", () => {
       token,
       method: "POST",
       key: `create-${ulid()}`,
-      body: { namespace: org, name, source: SOURCE },
+      body: { namespace: org, name, source: { kind: "template", name: SOURCE } },
     });
 
   it("[authz.create-project] a member creates one in its org; the same name in another case is taken; an outsider lacks the role", async () => {

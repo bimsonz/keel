@@ -1,6 +1,14 @@
 import { Option, Schema } from "effect";
 import { ProjectId } from "../../domain/kernel/index.ts";
-import { projectRepos } from "./project-repos.ts";
+import type { ProjectSource } from "../ports/index.ts";
+
+export type {
+  EmptySource,
+  ImportSource,
+  ProjectSource,
+  TemplateSource,
+  TrunkSource,
+} from "../ports/index.ts";
 
 /**
  * The repos in the core namespace that anyone may start a project from. The
@@ -8,34 +16,6 @@ import { projectRepos } from "./project-repos.ts";
  * a template only by being listed here.
  */
 export const PROJECT_TEMPLATES: ReadonlySet<string> = new Set(["fixture-forge-lite"]);
-
-/** A template, by its repo's name in the core namespace. */
-export interface TemplateSource {
-  readonly _tag: "Template";
-  readonly repo: string;
-}
-
-/** Another project's trunk: a fork, which the policy decides on that project. */
-export interface TrunkSource {
-  readonly _tag: "Project";
-  readonly projectId: ProjectId;
-}
-
-/** Nothing to start from: Keel writes the project's first commit itself. */
-export interface EmptySource {
-  readonly _tag: "Empty";
-}
-
-/**
- * A public Git repository, by the URL `importUrl` admitted. `ref` is the
- * upstream's branch to take, as `importRef` admitted it; its default branch
- * when absent.
- */
-export interface ImportSource {
-  readonly _tag: "Import";
-  readonly url: string;
-  readonly ref?: string;
-}
 
 /** The longest URL a project is imported from, in characters. */
 export const IMPORT_URL_MAX = 2048;
@@ -118,29 +98,51 @@ export const importRef = (text: string): string | undefined => {
   return text.split("/").every(branchSegment) ? text : undefined;
 };
 
-/** A name that is neither: nothing is forked from it. */
+/** A template's name that is not one, or a project's id that is not one: nothing is forked from it. */
 export interface UnknownSource {
   readonly _tag: "Unknown";
 }
 
-/** What a new project's trunk may be forked from. */
-export type ProjectSource = TemplateSource | TrunkSource;
+/** An import whose URL or branch Keel takes none like: `field` is the one to fix, and `why` what is wrong with it. */
+export interface RefusedSource {
+  readonly _tag: "Refused";
+  readonly field: "url" | "ref";
+  readonly why: ImportUrlRefusal | "not-a-branch";
+}
 
-const decodeProjectId = Schema.decodeUnknownOption(ProjectId);
+/** A new project's `source` as the API's request carries it. */
+export type SourceRequest =
+  | { readonly kind: "empty" }
+  | { readonly kind: "import"; readonly url: string; readonly ref?: string | undefined }
+  | { readonly kind: "fork"; readonly project: string }
+  | { readonly kind: "template"; readonly name: string };
+
 const UNKNOWN: UnknownSource = { _tag: "Unknown" };
+const decodeProjectId = Schema.decodeUnknownOption(ProjectId);
 
 /**
- * What the `source` of a new project names. A template is named by its repo.
- * A project is named by its trunk's repo, exactly as `projectRepos` spells it:
- * its staging and guards repos, a name with a namespace before it, the id
- * itself and the name in another case are all unknown, so no repo in the core
- * namespace is reached by guessing at its name.
+ * What the `source` of a new project names. A template is named by its repo,
+ * and only a listed one is known, so no repo in the core namespace is reached
+ * by guessing at its name. A fork names a project by its id, which the policy
+ * then decides on. An import's URL and branch are read by `importUrl` and
+ * `importRef`, and the URL is answered as it will be recorded.
  */
-export const projectSource = (source: string): ProjectSource | UnknownSource => {
-  if (PROJECT_TEMPLATES.has(source)) return { _tag: "Template", repo: source };
-  // The project whose trunk this would be, if it is one: spelling its trunk again decides.
-  const projectId = decodeProjectId(`prj_${source.slice("prj-".length).toUpperCase()}`);
-  return Option.isSome(projectId) && projectRepos(projectId.value).trunk.name === source
-    ? { _tag: "Project", projectId: projectId.value }
-    : UNKNOWN;
+export const projectSource = (
+  source: SourceRequest,
+): ProjectSource | UnknownSource | RefusedSource => {
+  if (source.kind === "empty") return { _tag: "Empty" };
+  if (source.kind === "template")
+    return PROJECT_TEMPLATES.has(source.name) ? { _tag: "Template", repo: source.name } : UNKNOWN;
+  if (source.kind === "fork")
+    return Option.match(decodeProjectId(source.project), {
+      onNone: () => UNKNOWN,
+      onSome: (projectId): ProjectSource => ({ _tag: "Project", projectId }),
+    });
+  const url = importUrl(source.url);
+  if (url._tag === "Refused") return { _tag: "Refused", field: "url", why: url.why };
+  if (source.ref === undefined) return { _tag: "Import", url: url.url };
+  const ref = importRef(source.ref);
+  return ref === undefined
+    ? { _tag: "Refused", field: "ref", why: "not-a-branch" }
+    : { _tag: "Import", url: url.url, ref };
 };

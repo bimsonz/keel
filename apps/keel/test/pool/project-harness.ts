@@ -57,7 +57,7 @@ export async function project() {
       await stub.createProject({
         projectId,
         name: "Seed app",
-        source: SOURCE.name,
+        source: { _tag: "Template", repo: SOURCE.name },
         by: makeId("usr", ulid()),
         idempotencyKey: "create-1",
         fingerprint: "body-1",

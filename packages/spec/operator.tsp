@@ -35,13 +35,59 @@ model CreateProjectRequest {
   @minLength(1)
   name: string;
 
+  /** Where the project's trunk starts. */
+  source: ProjectSource;
+}
+
+/** An empty project: Keel writes trunk's first commit, a README naming the project, and signs it. */
+model EmptySource {
+  kind: "empty";
+}
+
+/**
+ * A public Git repository, imported once. Its history must fit what the namespace has left of its repository
+ * quota, and what Keel copies in one piece.
+ */
+model ImportSource {
+  kind: "import";
+
   /**
-   * What trunk is forked from: a template's name, or the trunk of a project the caller may fork, named by that
-   * project's id in lower case with a hyphen (`prj-01…`). A public project forks into the caller's own namespace
-   * or any org the caller is a member of; a private one only into its own namespace.
+   * `https://<host>/<path>` and nothing more: no credential, port, query or fragment, and a host by name. It is
+   * recorded as the project's origin, for every reader of the project.
    */
   @minLength(1)
-  source: string;
+  @maxLength(2048)
+  url: string;
+
+  /** The upstream branch to take, by its short name (`main`, `release/1.x`); the upstream's default when absent. */
+  @minLength(1)
+  @maxLength(255)
+  ref?: string;
+}
+
+/**
+ * The trunk of a project the caller may fork. A public project forks into the caller's own namespace or any org
+ * the caller is a member of; a private one only into its own namespace.
+ */
+model ForkSource {
+  kind: "fork";
+  project: ProjectId;
+}
+
+/** A template, by name. An interim start: it leaves the API once Keel's fixture is a public repository to import. */
+model TemplateSource {
+  kind: "template";
+
+  @minLength(1)
+  name: string;
+}
+
+/** Where a new project's trunk starts, told apart by `kind`. */
+union ProjectSource {
+  empty: EmptySource,
+  `import`: ImportSource,
+  fork: ForkSource,
+  template: TemplateSource,
 }
 
 model ProjectSettings {

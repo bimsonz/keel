@@ -215,6 +215,9 @@ union ProblemCode {
   repoPathNotFound: "repo.path_not_found",
   agentStateRefused: "agent.state_refused",
   projectNameTaken: "project.name_taken",
+  projectImportRefused: "project.import_refused",
+  projectImportTooLarge: "project.import_too_large",
+  quotaExceeded: "quota.exceeded",
 }
 
 /** What an agent can do next. Each one can be fed straight into the matching tool. */

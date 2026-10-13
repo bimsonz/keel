@@ -10521,9 +10521,12 @@
             "description": "The project's name in its namespace, unique there in any case."
           },
           "source": {
-            "type": "string",
-            "minLength": 1,
-            "description": "What trunk is forked from: a template's name, or the trunk of a project the caller may fork, named by that\nproject's id in lower case with a hyphen (`prj-01…`). A public project forks into the caller's own namespace\nor any org the caller is a member of; a private one only into its own namespace."
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProjectSource"
+              }
+            ],
+            "description": "Where the project's trunk starts."
           }
         },
         "additionalProperties": {
@@ -11141,6 +11144,24 @@
         "additionalProperties": {
           "not": {}
         }
+      },
+      "EmptySource": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "empty"
+            ]
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "An empty project: Keel writes trunk's first commit, a README naming the project, and signs it."
       },
       "EnrolAgentRequest": {
         "type": "object",
@@ -12294,6 +12315,28 @@
         },
         "description": "Something Keel found that the agent should know about."
       },
+      "ForkSource": {
+        "type": "object",
+        "required": [
+          "kind",
+          "project"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fork"
+            ]
+          },
+          "project": {
+            "$ref": "#/components/schemas/ProjectId"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "The trunk of a project the caller may fork. A public project forks into the caller's own namespace or any org\nthe caller is a member of; a private one only into its own namespace."
+      },
       "GuardAdmitted": {
         "type": "object",
         "required": [
@@ -12395,6 +12438,37 @@
         "type": "string",
         "pattern": "^[a-z0-9](?:-?[a-z0-9]){0,38}$",
         "description": "A user's handle or an org's name: one segment of `/<org>/<project>`."
+      },
+      "ImportSource": {
+        "type": "object",
+        "required": [
+          "kind",
+          "url"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "import"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "description": "`https://<host>/<path>` and nothing more: no credential, port, query or fragment, and a host by name. It is\nrecorded as the project's origin, for every reader of the project."
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "The upstream branch to take, by its short name (`main`, `release/1.x`); the upstream's default when absent."
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A public Git repository, imported once. Its history must fit what the namespace has left of its repository\nquota, and what Keel copies in one piece."
       },
       "InboxEnvelope": {
         "type": "object",
@@ -16227,7 +16301,10 @@
           "repo.ref_not_found",
           "repo.path_not_found",
           "agent.state_refused",
-          "project.name_taken"
+          "project.name_taken",
+          "project.import_refused",
+          "project.import_too_large",
+          "quota.exceeded"
         ],
         "description": "Machine-readable reason for a problem. Dotted; lanes add codes as they build."
       },
@@ -16509,6 +16586,23 @@
           "not": {}
         },
         "description": "An operator changed the project's settings: every change is audited, e.g. turning verification off."
+      },
+      "ProjectSource": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/EmptySource"
+          },
+          {
+            "$ref": "#/components/schemas/ImportSource"
+          },
+          {
+            "$ref": "#/components/schemas/ForkSource"
+          },
+          {
+            "$ref": "#/components/schemas/TemplateSource"
+          }
+        ],
+        "description": "Where a new project's trunk starts, told apart by `kind`."
       },
       "ProjectView": {
         "type": "object",
@@ -18380,6 +18474,29 @@
           "not": {}
         }
       },
+      "TemplateSource": {
+        "type": "object",
+        "required": [
+          "kind",
+          "name"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "template"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A template, by name. An interim start: it leaves the API once Keel's fixture is a public repository to import."
+      },
       "TenetContested": {
         "type": "object",
         "required": [
@@ -18729,8 +18846,7 @@
         "description": "The trunk's first known head, from the project's start. Nothing promotes before it."
       },
       "TrunkOrigin": {
-        "type": "object",
-        "oneOf": [
+        "anyOf": [
           {
             "$ref": "#/components/schemas/TrunkOriginEmpty"
           },
@@ -18744,16 +18860,7 @@
             "$ref": "#/components/schemas/TrunkOriginTemplate"
           }
         ],
-        "discriminator": {
-          "propertyName": "kind",
-          "mapping": {
-            "empty": "#/components/schemas/TrunkOriginEmpty",
-            "imported": "#/components/schemas/TrunkOriginImported",
-            "forked": "#/components/schemas/TrunkOriginForked",
-            "template": "#/components/schemas/TrunkOriginTemplate"
-          }
-        },
-        "description": "Where a project's trunk started, kept for good."
+        "description": "Where a project's trunk started, kept for good. Told apart by `kind`."
       },
       "TrunkOriginEmpty": {
         "type": "object",

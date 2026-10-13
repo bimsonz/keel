@@ -1,9 +1,10 @@
 import { Context, type Effect } from "effect";
 import type { SubjectAnchors } from "../../domain/coordination/index.ts";
-import type { Actor, IdempotencyConflict } from "../../domain/identity/index.ts";
+import type { Actor, IdempotencyConflict, QuotaExceeded } from "../../domain/identity/index.ts";
 import type { ProjectNotFound } from "../../domain/integration/index.ts";
 import type { Glob, Instant, ProjectId } from "../../domain/kernel/index.ts";
-import type { RepoNotFound } from "./code-host.ts";
+import type { ImportRefused, RepoNotFound } from "./code-host.ts";
+import type { ImportTooLarge } from "./trunks.ts";
 
 /** A project as its operator sees it. */
 export interface ProjectRecord {
@@ -12,13 +13,53 @@ export interface ProjectRecord {
   readonly createdAt: Instant;
 }
 
+/** A template, by its repo's name in the core namespace. */
+export interface TemplateSource {
+  readonly _tag: "Template";
+  readonly repo: string;
+}
+
+/** Another project's trunk: a fork, which the policy decides on that project. */
+export interface TrunkSource {
+  readonly _tag: "Project";
+  readonly projectId: ProjectId;
+}
+
+/** Nothing to start from: Keel writes the project's first commit itself. */
+export interface EmptySource {
+  readonly _tag: "Empty";
+}
+
+/**
+ * A public Git repository, by the URL `importUrl` admitted. `ref` is the
+ * upstream's branch to take, as `importRef` admitted it; its default branch
+ * when absent.
+ */
+export interface ImportSource {
+  readonly _tag: "Import";
+  readonly url: string;
+  readonly ref?: string | undefined;
+}
+
+/** Where a new project's trunk starts. Never a repo's name as a caller wrote it: the doorway reads that first. */
+export type ProjectSource = EmptySource | ImportSource | TrunkSource | TemplateSource;
+
+/**
+ * A start that made no project, and left no repo behind: the template or the
+ * project to fork is not there (RepoNotFound), the code host imported nothing
+ * from the URL (ImportRefused), or the imported history is over what its
+ * namespace has left (QuotaExceeded) or over what one relay carries
+ * (ImportTooLarge).
+ */
+export type ProjectStartRefused = RepoNotFound | ImportRefused | QuotaExceeded | ImportTooLarge;
+
 /** A project to create, its id derived from its creator and the Idempotency-Key. */
 export interface CreateProjectInput {
   readonly projectId: ProjectId;
   /** Its name in its org, lower-case. */
   readonly name: string;
-  /** The repository in the core namespace that trunk is forked from. */
-  readonly source: string;
+  /** Where trunk starts. */
+  readonly source: ProjectSource;
   readonly idempotencyKey: string;
 }
 
@@ -71,7 +112,7 @@ export class Projects extends Context.Service<
     readonly create: (
       actor: Actor,
       input: CreateProjectInput,
-    ) => Effect.Effect<ProjectRecord, IdempotencyConflict | RepoNotFound>;
+    ) => Effect.Effect<ProjectRecord, IdempotencyConflict | ProjectStartRefused>;
     readonly settings: (projectId: ProjectId) => Effect.Effect<ProjectSettings, ProjectNotFound>;
     readonly putSettings: (
       actor: Actor,

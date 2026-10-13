@@ -692,7 +692,7 @@ export class KeelClient {
     return this.call("Views_getTrunk", { projectId }, options);
   }
 
-  /** Operator: creates a project whose trunk is forked from `source`. */
+  /** Operator: creates a project whose trunk starts as `source` says: empty, imported from a public Git URL, forked from a project, or made from a template. */
   createProject(
     project: CreateProjectRequest,
     options: Idempotent = {},

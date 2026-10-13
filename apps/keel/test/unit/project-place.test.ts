@@ -204,6 +204,40 @@ describe("createProject", () => {
     },
   );
 
+  it.effect(
+    "[project.place-released] a start the Project DO refuses gives the project's place back, so its name is free for the next try under another key; a key reused for another body gives nothing back",
+    () => {
+      const { places, layer } = world();
+      const nowhere = { _tag: "Import", url: "https://git.memory.test/upstream/none" } as const;
+      return Effect.gen(function* () {
+        yield* seedSource;
+        const refused = yield* Effect.flip(
+          createProject(alice, {
+            namespace: ORG,
+            name: "forge",
+            source: nowhere,
+            idempotencyKey: "create-1",
+          }),
+        );
+        expect(refused).toMatchObject({ _tag: "ImportRefused", reason: "not-found" });
+        expect(places.places.size).toBe(0);
+
+        const project = yield* creating(alice, "forge", "create-2");
+        expect(places.places.get(project.id)).toMatchObject({ namespace: ORG, name: "forge" });
+        const reused = yield* Effect.flip(
+          createProject(alice, {
+            namespace: ORG,
+            name: "forge",
+            source: nowhere,
+            idempotencyKey: "create-2",
+          }),
+        );
+        expect(reused).toMatchObject({ _tag: "IdempotencyConflict" });
+        expect(places.places.get(project.id)).toMatchObject({ namespace: ORG, name: "forge" });
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
   it.effect("refuses the key reused for another name or org as IdempotencyConflict", () => {
     const { journal, layer } = world();
     return Effect.gen(function* () {

@@ -1,11 +1,12 @@
 import type { EnrolAgentInput } from "@keeltown/core/application/identity";
-import { PROJECT_TEMPLATES } from "@keeltown/core/application/integration";
+import { PROJECT_TEMPLATES, type RefusedSource } from "@keeltown/core/application/integration";
 import type {
   Enrolment,
+  ImportRefused,
   ProjectRecord,
   ProjectSettings,
+  ProjectStartRefused,
   PutProjectSettings,
-  RepoNotFound,
   StandingInput,
 } from "@keeltown/core/ports";
 import type {
@@ -180,9 +181,47 @@ const conflict = (
   }),
 });
 
+/** What to do about an import the code host took nothing from, by its reason. */
+const IMPORT_REFUSALS: Record<
+  ImportRefused["reason"],
+  { readonly status: 403 | 404 | 503; readonly detail: string; readonly next: string }
+> = {
+  "not-found": {
+    status: 404,
+    detail: "No public repository answers at that URL. A private one reads the same.",
+    next: "Check the URL names a public repository, then create the project again",
+  },
+  "not-git": {
+    status: 404,
+    detail: "What answers at that URL is not a Git repository.",
+    next: "Give the repository's own clone URL, then create the project again",
+  },
+  "no-branch": {
+    status: 404,
+    detail: "The repository lacks the branch named, or holds no branch at all.",
+    next: "Name a branch the repository holds, or leave `ref` out to take its default",
+  },
+  unreachable: {
+    status: 503,
+    detail: "The repository's host did not answer.",
+    next: "Create the project again shortly, with the same Idempotency-Key",
+  },
+  "too-large": {
+    status: 403,
+    detail: "The repository is larger than the code host imports.",
+    next: "Import a smaller repository, or one branch of it with `ref`",
+  },
+};
+
+const again = (title: string) => ({
+  kind: "call" as const,
+  title,
+  operationId: "Operator_createProject",
+});
+
 export function createProjectError(
   caller: Caller,
-  error: IdempotencyConflict | RepoNotFound | ProjectNameTaken,
+  error: IdempotencyConflict | ProjectNameTaken | ProjectStartRefused,
 ): Operator_createProjectResult {
   switch (error._tag) {
     case "IdempotencyConflict":
@@ -192,9 +231,7 @@ export function createProjectError(
         status: 409,
         body: problem(409, "project.name_taken", caller.requestId, {
           detail: `The org already has a project named "${error.name}", in some case.`,
-          nextActions: [
-            { kind: "call", title: "Choose another name", operationId: "Operator_createProject" },
-          ],
+          nextActions: [again("Choose another name")],
         }),
       };
     case "RepoNotFound":
@@ -203,11 +240,46 @@ export function createProjectError(
         body: problem(404, "resource.not_found", caller.requestId, {
           detail: `No source repo ${error.repo.name} in namespace ${error.repo.namespace}.`,
           nextActions: [
-            {
-              kind: "call",
-              title: `Create or push the source repo ${error.repo.name}, then create the project again`,
-              operationId: "Operator_createProject",
-            },
+            again(
+              `Create or push the source repo ${error.repo.name}, then create the project again`,
+            ),
+          ],
+        }),
+      };
+    case "ImportRefused": {
+      const { status, detail, next } = IMPORT_REFUSALS[error.reason];
+      return {
+        status,
+        body: problem(status, "project.import_refused", caller.requestId, {
+          detail: `${detail} Nothing was imported, and no project was made (${error.reason}).`,
+          nextActions: [
+            error.reason === "unreachable" ? { kind: "wait" as const, title: next } : again(next),
+          ],
+          ...(error.reason === "unreachable" ? { retryAfterMs: 5_000 } : {}),
+        }),
+      };
+    }
+    case "ImportTooLarge":
+      return {
+        status: 403,
+        body: problem(403, "project.import_too_large", caller.requestId, {
+          detail: `The repository's history is ${error.bytes} bytes, and Keel imports at most ${error.limit} in one piece. Nothing was kept, and no project was made.`,
+          nextActions: [again("Import a smaller repository, or one branch of it with `ref`")],
+        }),
+      };
+    case "QuotaExceeded":
+      return {
+        status: 403,
+        body: problem(403, "quota.exceeded", caller.requestId, {
+          detail: `The repository's history is ${error.requested} bytes, and the namespace has ${Math.max(0, error.limit - error.used)} of its ${error.limit} left (${error.kind}). Nothing was kept, and no project was made.`,
+          nextActions: [
+            ...error.nextActions.map(({ kind, title, operationId, args }) => ({
+              kind,
+              title,
+              ...(operationId === undefined ? {} : { operationId }),
+              ...(args === undefined ? {} : { args }),
+            })),
+            again("Import a smaller repository, or create the project in a namespace with room"),
           ],
         }),
       };
@@ -219,24 +291,59 @@ export function createProjectError(
 }
 
 /**
- * A source that names no template and no project's trunk. Nothing in the core
- * namespace is looked up by it, so it reads the same whatever repo is there.
- * Each template is offered, with the org and the name the caller asked for.
+ * A template's name that is not one, or a fork of something that is no
+ * project. Nothing in the core namespace is looked up by it, so it reads the
+ * same whatever repo is there. Each template is offered, with the namespace
+ * and the name the caller asked for.
  */
 export function sourceNotFound(
   caller: Caller,
   input: Input<"Operator_createProject">,
 ): Extract<Operator_createProjectResult, { readonly status: 404 }> {
+  const named = input.source.kind === "template" ? input.source.name : "";
   return {
     status: 404,
     body: problem(404, "resource.not_found", caller.requestId, {
-      detail: `No template or readable project has the name "${input.source}".`,
+      detail: `No template has the name "${named}".`,
       nextActions: Array.from(PROJECT_TEMPLATES, (template) => ({
         kind: "call" as const,
         title: `Create the project from the template ${template}`,
         operationId: "Operator_createProject",
-        args: { namespace: input.namespace, name: input.name, source: template },
+        args: {
+          namespace: input.namespace,
+          name: input.name,
+          source: { kind: "template", name: template },
+        },
       })),
+    }),
+  };
+}
+
+/** Why Keel imports from no URL like the one given, said for the person who typed it. */
+const URL_REFUSALS: Record<RefusedSource["why"], string> = {
+  "too-long": "is longer than 2,048 characters",
+  "not-https": "must begin with https://",
+  credential: "must not hold a user name or a password: the URL is recorded for every reader",
+  query: "must not hold a query",
+  fragment: "must not hold a fragment",
+  port: "must not name a port",
+  "ip-literal": "must name its host, not give an address",
+  host: "must name a host of dotted labels",
+  path: "must hold a path of plain segments, with no escapes and no trailing slash",
+  "not-a-branch": "must be a branch's short name, such as main or release/1.x",
+};
+
+/** An import whose URL or branch Keel takes none like: the field to fix, and what is wrong with it. */
+export function sourceRefused(
+  caller: Caller,
+  refused: RefusedSource,
+): Extract<Operator_createProjectResult, { readonly status: 400 }> {
+  return {
+    status: 400,
+    body: problem(400, "request.invalid", caller.requestId, {
+      detail: `The import's ${refused.field} ${URL_REFUSALS[refused.why]} (${refused.why}).`,
+      issues: [{ path: ["body", "source", refused.field], message: URL_REFUSALS[refused.why] }],
+      nextActions: [again(`Correct the import's ${refused.field}, then create the project again`)],
     }),
   };
 }

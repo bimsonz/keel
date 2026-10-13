@@ -50,7 +50,15 @@ const create = (
   idempotencyKey: string,
   source = "fixture-forge-lite",
   projectId = PROJECT,
-) => Projects.use((projects) => projects.create(by, { projectId, name, source, idempotencyKey }));
+) =>
+  Projects.use((projects) =>
+    projects.create(by, {
+      projectId,
+      name,
+      source: { _tag: "Template", repo: source },
+      idempotencyKey,
+    }),
+  );
 
 describe("Projects over Durable Object RPC", () => {
   it.effect(

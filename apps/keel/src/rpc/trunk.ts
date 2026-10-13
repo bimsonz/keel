@@ -7,7 +7,7 @@ import { QuotaExceeded } from "@keeltown/core/domain/identity";
 import { CommitSha, type InstantSchema } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { exitCodec, type ExitJson } from "./exit.ts";
-import { RepoNotFound } from "./project.ts";
+import { ImportTooLarge, RepoNotFound } from "./project.ts";
 import { RepoRef } from "./workspace-pool.ts";
 
 export const TrunkStatus = Schema.Struct({
@@ -31,13 +31,6 @@ export const TrunkSync = Schema.Struct({
 /** The TrunkWriter port's PackTooLarge, by shape (rule R15): a relayed pack over the receive-pack cap. */
 export const PackTooLarge = Schema.TaggedStruct("PackTooLarge", {
   repo: RepoRef,
-  bytes: Schema.Number,
-  limit: Schema.Number,
-});
-
-/** The Trunks port's ImportTooLarge, by shape (rule R15): an imported history over what one relay carries. */
-export const ImportTooLarge = Schema.TaggedStruct("ImportTooLarge", {
-  projectId: Schema.String,
   bytes: Schema.Number,
   limit: Schema.Number,
 });

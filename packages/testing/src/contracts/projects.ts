@@ -40,7 +40,7 @@ const key = () => `key-${crypto.randomUUID()}`;
 const creating = (source: string, name = "forge") => ({
   projectId: Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`),
   name,
-  source,
+  source: { _tag: "Template" as const, repo: source },
   idempotencyKey: key(),
 });
 

@@ -1,5 +1,5 @@
 import { signUp } from "@keeltown/core/application/identity";
-import { DEFAULT_SETTINGS } from "@keeltown/core/application/integration";
+import { DEFAULT_SETTINGS, projectRepos } from "@keeltown/core/application/integration";
 import {
   type Actor,
   actorId,
@@ -17,6 +17,8 @@ import {
   type ProjectRecord,
   Projects,
   type ProjectSettings,
+  type ProjectSource,
+  type ProjectStartRefused,
   RepoNotFound,
 } from "@keeltown/core/ports";
 import { Effect, Layer } from "effect";
@@ -60,6 +62,8 @@ export function makeProjectsMemory(
   } = {},
 ) {
   const sources = new Set(options.sources ?? []);
+  let refusal: ProjectStartRefused | undefined;
+  const starts = new Map<ProjectId, ProjectSource>();
   const live = options.live ?? makeLiveChangesMemory();
   const byKey = new Map<string, Keyed<ProjectRecord>>();
   const settings = new Map<ProjectId, ProjectSettings>();
@@ -68,6 +72,12 @@ export function makeProjectsMemory(
     sources,
     live,
     addSource: (name: string) => void sources.add(name),
+    /** Every start is refused with `refused` from here on, as a Project DO that made nothing; undefined lifts it. */
+    refuse: (refused: ProjectStartRefused | undefined) => {
+      refusal = refused;
+    },
+    /** Where each project made here started. */
+    starts,
     setSettings: (projectId: ProjectId, value: ProjectSettings) =>
       void settings.set(projectId, value),
     projects: () => [...byKey.values()].map((keyed) => keyed.made),
@@ -75,28 +85,39 @@ export function makeProjectsMemory(
       Projects,
       Projects.of({
         create: (_actor, input) =>
-          Effect.suspend((): Effect.Effect<ProjectRecord, IdempotencyConflict | RepoNotFound> => {
-            const key = `${input.projectId}\u0000${input.idempotencyKey}`;
-            const fingerprint = JSON.stringify([input.name, input.source]);
-            const known = byKey.get(key);
-            if (known !== undefined) {
-              return known.fingerprint === fingerprint
-                ? Effect.succeed(known.made)
-                : Effect.fail(new IdempotencyConflict({ idempotencyKey: input.idempotencyKey }));
-            }
-            if (!sources.has(input.source))
-              return Effect.fail(
-                new RepoNotFound({ repo: { namespace: "keel-core", name: input.source } }),
-              );
-            const made: ProjectRecord = {
-              id: input.projectId,
-              name: input.name,
-              createdAt: Instant(Date.now()),
-            };
-            byKey.set(key, { made, fingerprint });
-            settings.set(made.id, DEFAULT_SETTINGS);
-            return Effect.succeed(made);
-          }),
+          Effect.suspend(
+            (): Effect.Effect<ProjectRecord, IdempotencyConflict | ProjectStartRefused> => {
+              const key = `${input.projectId}\u0000${input.idempotencyKey}`;
+              const fingerprint = JSON.stringify([input.name, input.source]);
+              const known = byKey.get(key);
+              if (known !== undefined) {
+                return known.fingerprint === fingerprint
+                  ? Effect.succeed(known.made)
+                  : Effect.fail(new IdempotencyConflict({ idempotencyKey: input.idempotencyKey }));
+              }
+              // A template and a fork need their repo in the core namespace; an empty project and an import need none.
+              const repo =
+                input.source._tag === "Template"
+                  ? input.source.repo
+                  : input.source._tag === "Project"
+                    ? projectRepos(input.source.projectId).trunk.name
+                    : undefined;
+              if (repo !== undefined && !sources.has(repo))
+                return Effect.fail(
+                  new RepoNotFound({ repo: { namespace: "keel-core", name: repo } }),
+                );
+              if (refusal !== undefined) return Effect.fail(refusal);
+              starts.set(input.projectId, input.source);
+              const made: ProjectRecord = {
+                id: input.projectId,
+                name: input.name,
+                createdAt: Instant(Date.now()),
+              };
+              byKey.set(key, { made, fingerprint });
+              settings.set(made.id, DEFAULT_SETTINGS);
+              return Effect.succeed(made);
+            },
+          ),
         settings: (projectId) =>
           Effect.suspend(() => {
             const found = settings.get(projectId);

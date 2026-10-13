@@ -290,7 +290,7 @@ try {
   const projects: Record<string, { id: string; verification: string; agents: Credential[] }> = {};
   for (const [name, declared] of Object.entries(PROJECTS)) {
     const project = await asSeed.createProject(
-      { namespace: SEED_HANDLE, name, source: FIXTURE },
+      { namespace: SEED_HANDLE, name, source: { kind: "template", name: FIXTURE } },
       { idempotencyKey: key(`project:${name}`) },
     );
     console.log(`ok   project ${name}: ${project.id}`);

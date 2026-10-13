@@ -1,5 +1,9 @@
 import { env } from "cloudflare:workers";
+import { QuotaExceeded } from "@keeltown/core/domain/identity";
+import { ProjectId } from "@keeltown/core/kernel";
+import { ImportRefused, ImportTooLarge } from "@keeltown/core/ports";
 import { makeEnrolmentsMemory, makeProjectsMemory } from "@keeltown/testing";
+import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { signUp } from "../../../../scripts/lib/account.ts";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
@@ -59,7 +63,10 @@ interface Body {
   readonly detail: string;
   readonly nextActions: readonly { readonly operationId?: string; readonly title: string }[];
   readonly result: { readonly agent: { readonly id: string; readonly projectId: string } };
-  readonly issues?: readonly { readonly path: readonly (string | number)[] }[];
+  readonly issues?: readonly {
+    readonly path: readonly (string | number)[];
+    readonly message: string;
+  }[];
   readonly userId: string;
   readonly handle: string;
   readonly session: { readonly token: string };
@@ -126,7 +133,7 @@ describe("project bootstrap", () => {
       user,
       "POST",
       "/projects",
-      { namespace: handle, name: "forge", source: SOURCE },
+      { namespace: handle, name: "forge", source: { kind: "template", name: SOURCE } },
       key("prj"),
     );
     expect(project.status).toBe(201);
@@ -173,7 +180,7 @@ describe("project bootstrap", () => {
       session.token,
       "POST",
       "/projects",
-      { namespace: handle.toUpperCase(), name: "mine", source: SOURCE },
+      { namespace: handle.toUpperCase(), name: "mine", source: { kind: "template", name: SOURCE } },
       key("prj"),
     );
     expect(project.status).toBe(201);
@@ -214,7 +221,7 @@ describe("project bootstrap", () => {
       other,
       "POST",
       "/projects",
-      { namespace: handle, name: "theirs", source: SOURCE },
+      { namespace: handle, name: "theirs", source: { kind: "template", name: SOURCE } },
       key("prj"),
     );
     expect([theirs.status, theirs.body.code]).toEqual([403, "auth.forbidden"]);
@@ -232,7 +239,7 @@ describe("project bootstrap", () => {
       user,
       "POST",
       "/projects",
-      { namespace: "pool", name, source: SOURCE },
+      { namespace: "pool", name, source: { kind: "template", name: SOURCE } },
       reused,
     );
     expect(first.status).toBe(201);
@@ -247,7 +254,7 @@ describe("project bootstrap", () => {
       user,
       "POST",
       "/projects",
-      { namespace: "pool", name, source: SOURCE },
+      { namespace: "pool", name, source: { kind: "template", name: SOURCE } },
       reused,
     );
     expect(again).toEqual(first);
@@ -263,7 +270,7 @@ describe("project bootstrap", () => {
       user,
       "POST",
       "/projects",
-      { namespace: "pool", name: projectName("forge"), source: SOURCE },
+      { namespace: "pool", name: projectName("forge"), source: { kind: "template", name: SOURCE } },
       projectKey,
     );
     const project = await call(
@@ -271,7 +278,7 @@ describe("project bootstrap", () => {
       user,
       "POST",
       "/projects",
-      { namespace: "pool", name: projectName("other"), source: SOURCE },
+      { namespace: "pool", name: projectName("other"), source: { kind: "template", name: SOURCE } },
       projectKey,
     );
     expect(project.status).toBe(409);
@@ -298,7 +305,11 @@ describe("project bootstrap", () => {
       await maintainer(),
       "POST",
       "/projects",
-      { namespace: "pool", name: projectName("forge"), source: "no-such-repo" },
+      {
+        namespace: "pool",
+        name: projectName("forge"),
+        source: { kind: "template", name: "no-such-repo" },
+      },
       key("prj"),
     );
     expect(missing.status).toBe(404);
@@ -309,6 +320,122 @@ describe("project bootstrap", () => {
     ]);
   });
 
+  it("[a11b.starts] an empty project and an import reach the Project DO as the doorway read them: the import's URL as it will be recorded, and its branch", async () => {
+    const { projects, via } = operatorApp();
+    const user = await maintainer();
+    const create = (name: string, source: object) =>
+      call(via, user, "POST", "/projects", { namespace: "pool", name, source }, key("prj"));
+
+    const empty = await create(projectName("empty"), { kind: "empty" });
+    const imported = await create(projectName("imported"), {
+      kind: "import",
+      url: "https://Git.Example/team/app",
+      ref: "release/1.x",
+    });
+    expect([empty.status, imported.status]).toEqual([201, 201]);
+    expect([
+      projects.starts.get(Schema.decodeUnknownSync(ProjectId)(empty.body.id)),
+      projects.starts.get(Schema.decodeUnknownSync(ProjectId)(imported.body.id)),
+    ]).toEqual([
+      { _tag: "Empty" },
+      { _tag: "Import", url: "https://git.example/team/app", ref: "release/1.x" },
+    ]);
+  });
+
+  it("[a11b.source-refused] an import whose URL or branch Keel takes none like is 400, naming the field and why, and reaches no Project DO", async () => {
+    const { projects, via } = operatorApp();
+    const user = await maintainer();
+    const refusals = [];
+    for (const source of [
+      { kind: "import", url: "https://user:secret@git.example/team/app" },
+      { kind: "import", url: "http://git.example/team/app" },
+      { kind: "import", url: "https://git.example/team/app", ref: "refs/heads/main" },
+    ]) {
+      const refused = await call(
+        via,
+        user,
+        "POST",
+        "/projects",
+        { namespace: "pool", name: projectName("refused"), source },
+        key("prj"),
+      );
+      refusals.push([refused.status, refused.body.code, refused.body.issues, refused.body.detail]);
+    }
+    expect(refusals).toEqual([
+      [
+        400,
+        "request.invalid",
+        [{ path: ["body", "source", "url"], message: expect.stringContaining("user name") }],
+        expect.stringContaining("(credential)"),
+      ],
+      [
+        400,
+        "request.invalid",
+        [{ path: ["body", "source", "url"], message: "must begin with https://" }],
+        expect.stringContaining("(not-https)"),
+      ],
+      [
+        400,
+        "request.invalid",
+        [{ path: ["body", "source", "ref"], message: expect.stringContaining("short name") }],
+        expect.stringContaining("(not-a-branch)"),
+      ],
+    ]);
+    expect(projects.projects()).toEqual([]);
+  });
+
+  it("[a11b.start-refused] a start the Project DO refuses is said by its own problem, with a next action, and the name it asked for is free again", async () => {
+    const { projects, via } = operatorApp();
+    const user = await maintainer();
+    const name = projectName("wanted");
+    const source = { kind: "import", url: "https://git.example/team/app" };
+    const create = () =>
+      call(via, user, "POST", "/projects", { namespace: "pool", name, source }, key("prj"));
+    const answers = [];
+    for (const refusal of [
+      new ImportRefused({ reason: "not-found" }),
+      new ImportRefused({ reason: "no-branch" }),
+      new ImportRefused({ reason: "unreachable" }),
+      new ImportRefused({ reason: "too-large" }),
+      new ImportTooLarge({ projectId: "prj_x", bytes: 70_000_000, limit: 62_914_560 }),
+      new QuotaExceeded({
+        kind: "repo-bytes",
+        reason: "limit",
+        limit: 5_000,
+        used: 4_000,
+        requested: 4_000,
+        nextActions: [{ kind: "escalate", title: "Ask an owner to raise the namespace's limit" }],
+      }),
+    ]) {
+      projects.refuse(refusal);
+      const refused = await create();
+      answers.push([
+        refused.status,
+        refused.body.code,
+        refused.body.nextActions.map((next) => next.title),
+      ]);
+    }
+    expect(answers).toEqual([
+      [404, "project.import_refused", [expect.stringContaining("public repository")]],
+      [404, "project.import_refused", [expect.stringContaining("branch")]],
+      [503, "project.import_refused", [expect.stringContaining("again shortly")]],
+      [403, "project.import_refused", [expect.stringContaining("smaller repository")]],
+      [403, "project.import_too_large", [expect.stringContaining("smaller repository")]],
+      [
+        403,
+        "quota.exceeded",
+        [
+          "Ask an owner to raise the namespace's limit",
+          expect.stringContaining("namespace with room"),
+        ],
+      ],
+    ]);
+    // Six refusals under six keys asked for one name: none of them holds it.
+    projects.refuse(undefined);
+    const made = await create();
+    expect([made.status, made.body.name]).toEqual([201, name]);
+  });
+
   it("[a11e.synthetic-rest] enrols a synthetic agent whose credential exchanges at once", async () => {
     const { via } = operatorApp();
     const user = await maintainer();
@@ -317,7 +444,7 @@ describe("project bootstrap", () => {
       user,
       "POST",
       "/projects",
-      { namespace: "pool", name: projectName("load"), source: SOURCE },
+      { namespace: "pool", name: projectName("load"), source: { kind: "template", name: SOURCE } },
       key("prj"),
     );
     const enrolled = await call(
@@ -353,7 +480,7 @@ describe("project bootstrap", () => {
       agent,
       "POST",
       "/projects",
-      { namespace: "pool", name: projectName("forge"), source: SOURCE },
+      { namespace: "pool", name: projectName("forge"), source: { kind: "template", name: SOURCE } },
       key("prj"),
     );
     expect([project.status, project.body.detail]).toEqual([403, "Refused: users-only."]);
@@ -362,7 +489,7 @@ describe("project bootstrap", () => {
       await maintainer(),
       "POST",
       "/projects",
-      { namespace: "pool", name: projectName("forge"), source: SOURCE },
+      { namespace: "pool", name: projectName("forge"), source: { kind: "template", name: SOURCE } },
       key("prj"),
     );
     expect(made.status).toBe(201);

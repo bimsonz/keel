@@ -43,7 +43,7 @@ const USAGE = `keeltown <command> [options]
   abandon <chg_…> [--reason <text>] [--lease <lse_…>] [--key <idempotency-key>]
   inbox [--cursor <cursor>] [--wait <0-30>]
   events [--cursor <cursor>] [--wait <0-30>] [--limit <1-500>]
-  project create --namespace <handle> --name <name> --source <repo> [--key <idempotency-key>]
+  project create --namespace <handle> --name <name> (--empty | --import <https-url> [--ref <branch>] | --fork <prj_…> | --template <name>) [--key <idempotency-key>]
   agent enrol --project <prj_…> --name <name> --scope <scope>... [--kind interactive|hosted|human|synthetic] [--key <idempotency-key>]
 
 A premise is a proposition as JSON: {"subject", "predicate", "relation", "value", …}.
@@ -71,7 +71,11 @@ const OPTIONS = {
   limit: { type: "string" },
   name: { type: "string" },
   namespace: { type: "string" },
-  source: { type: "string" },
+  empty: { type: "boolean" },
+  import: { type: "string" },
+  ref: { type: "string" },
+  fork: { type: "string" },
+  template: { type: "string" },
   scope: { type: "string", multiple: true },
   kind: { type: "string" },
   project: { type: "string" },
@@ -92,6 +96,36 @@ class UsageError extends Error {}
 function required(value: string | undefined, flag: string): string {
   if (value === undefined || value === "") throw new UsageError(`missing --${flag}`);
   return value;
+}
+
+/** Where a new project starts: exactly one of --empty, --import, --fork and --template. */
+function sourceOf(values: {
+  readonly empty?: boolean | undefined;
+  readonly import?: string | undefined;
+  readonly ref?: string | undefined;
+  readonly fork?: string | undefined;
+  readonly template?: string | undefined;
+}): Parameters<KeelClient["createProject"]>[0]["source"] {
+  const given = [
+    values.empty === true,
+    values.import !== undefined,
+    values.fork !== undefined,
+    values.template !== undefined,
+  ].filter(Boolean).length;
+  if (given !== 1)
+    throw new UsageError("give exactly one of --empty, --import, --fork and --template");
+  if (values.ref !== undefined && values.import === undefined)
+    throw new UsageError("--ref names a branch of the repository --import takes");
+  if (values.import !== undefined)
+    return {
+      kind: "import",
+      url: required(values.import, "import"),
+      ...(values.ref === undefined ? {} : { ref: required(values.ref, "ref") }),
+    };
+  if (values.fork !== undefined) return { kind: "fork", project: required(values.fork, "fork") };
+  if (values.template !== undefined)
+    return { kind: "template", name: required(values.template, "template") };
+  return { kind: "empty" };
 }
 
 function count(value: string | undefined, flag: string): number | undefined {
@@ -197,7 +231,7 @@ async function dispatch(
         {
           namespace: required(values.namespace, "namespace"),
           name: required(values.name, "name"),
-          source: required(values.source, "source"),
+          source: sourceOf(values),
         },
         idempotent,
       );

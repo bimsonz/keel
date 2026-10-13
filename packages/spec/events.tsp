@@ -1383,8 +1383,7 @@ model TrunkOriginTemplate {
   commit: CommitSha;
 }
 
-/** Where a project's trunk started, kept for good. */
-@discriminated(#{ envelope: "none", discriminatorPropertyName: "kind" })
+/** Where a project's trunk started, kept for good. Told apart by `kind`. */
 union TrunkOrigin {
   empty: TrunkOriginEmpty,
   imported: TrunkOriginImported,

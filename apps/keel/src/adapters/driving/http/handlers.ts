@@ -101,6 +101,7 @@ import {
   settingsOk,
   settingsProject,
   sourceNotFound,
+  sourceRefused,
   type StandingOperation,
   standingError,
   standingInput,
@@ -911,11 +912,13 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             ),
           );
         },
-        // The namespace was decided before this ran. The source is a second resource, named in the body:
-        // it is read and, when it is a project, decided as a fork before anything is made.
+        // The namespace was decided before this ran. The source is read before anything is made: an
+        // import's URL and branch by Keel's own rules, and a project to fork, which is a second resource
+        // named in the body, decided as a fork.
         Operator_createProject: (caller: Caller, input: Input<"Operator_createProject">) => {
           const source = projectSource(input.source);
-          if (source._tag === "Unknown") return sourceNotFound(caller, input);
+          if (source._tag === "Unknown") return Promise.resolve(sourceNotFound(caller, input));
+          if (source._tag === "Refused") return Promise.resolve(sourceRefused(caller, source));
           return run(
             caller,
             Effect.gen(function* () {

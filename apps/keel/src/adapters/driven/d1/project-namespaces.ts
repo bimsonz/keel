@@ -117,6 +117,10 @@ export function ProjectNamespacesD1(db: D1Database) {
             held.value.name === name;
           if (!repeated) yield* new ProjectNameTaken({ org: place.namespace, name });
         }),
+      release: (projectId) =>
+        Effect.promise(() =>
+          db.prepare("DELETE FROM projects WHERE id = ?").bind(projectId).run(),
+        ).pipe(Effect.asVoid),
       byId,
       byName: (namespace, name) =>
         Effect.promise(() =>

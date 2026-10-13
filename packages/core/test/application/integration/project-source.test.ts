@@ -18,34 +18,17 @@ const ulidArb = fc.string({
 });
 const projectIdArb = ulidArb.map((ulid) => makeId("prj", ulid));
 
-/**
- * A project's trunk name respelled: each character in either case, the hyphen
- * kept, swapped or dropped, and something or nothing after it. Now and then it
- * is the trunk's own name.
- */
-const respelledArb = fc
-  .tuple(
-    projectIdArb,
-    fc.array(fc.boolean(), { minLength: 30, maxLength: 30 }),
-    fc.constantFrom("-", "-", "_", "/", ""),
-    fc.constantFrom("", "", "-staging", "-guards", "-mirror", "0", " ", "/"),
-  )
-  .map(([projectId, upper, separator, tail]) => ({
-    projectId,
-    text:
-      `prj${separator}${projectId.slice(4)}`
-        .split("")
-        .map((char, i) => (upper[i] === true ? char.toUpperCase() : char.toLowerCase()))
-        .join("") + tail,
-  }));
-
 const UNKNOWN = { _tag: "Unknown" };
 
 describe("a new project's source", () => {
-  it("[project.source-inverse] a project's trunk name reads back as that project", () => {
+  it("[project.source-empty] an empty start is read as one", () => {
+    expect(projectSource({ kind: "empty" })).toEqual({ _tag: "Empty" });
+  });
+
+  it("[project.source-fork] a fork names a project by its id, and reads back as that project", () => {
     fc.assert(
       fc.property(projectIdArb, (projectId) => {
-        expect(projectSource(projectRepos(projectId).trunk.name)).toEqual({
+        expect(projectSource({ kind: "fork", project: projectId })).toEqual({
           _tag: "Project",
           projectId,
         });
@@ -53,40 +36,26 @@ describe("a new project's source", () => {
     );
   });
 
-  it("[project.source-inverse] nothing else a project owns, and no other spelling of its trunk, is a source", () => {
+  it("[project.source-fork] nothing but a project's id is a project: not a repo of its own, its id in another case, or its id with anything around it", () => {
     fc.assert(
       fc.property(projectIdArb, fc.constantFrom("keel-core", "keel-ws-00", "x"), (id, segment) => {
         const repos = projectRepos(id);
-        const trunk = repos.trunk.name;
-        for (const name of [
+        for (const project of [
+          repos.trunk.name,
           repos.staging.name,
           repos.guards.name,
           repos.mirror.name,
-          `${segment}/${trunk}`,
-          `${trunk}/${segment}`,
-          `${trunk}/`,
-          `/${trunk}`,
-          id,
+          `${segment}/${id}`,
+          `${id}/${segment}`,
           id.toLowerCase(),
-          trunk.toUpperCase(),
           `prj-${id.slice(4)}`,
-          ` ${trunk}`,
-          `${trunk} `,
-          `${trunk}0`,
-          trunk.slice(0, -1),
+          ` ${id}`,
+          `${id} `,
+          `${id}0`,
+          id.slice(0, -1),
+          "",
         ])
-          expect([name, projectSource(name)]).toEqual([name, UNKNOWN]);
-      }),
-    );
-  });
-
-  it("[project.source-inverse] a respelling of a trunk's name is that project only when it is the name itself", () => {
-    fc.assert(
-      fc.property(respelledArb, ({ projectId, text }) => {
-        expect([text, projectSource(text)]).toEqual([
-          text,
-          text === projectRepos(projectId).trunk.name ? { _tag: "Project", projectId } : UNKNOWN,
-        ]);
+          expect([project, projectSource({ kind: "fork", project })]).toEqual([project, UNKNOWN]);
       }),
     );
   });
@@ -94,7 +63,10 @@ describe("a new project's source", () => {
   it("[project.source-template] the fixture is the one template, read by its repo's name", () => {
     expect([...PROJECT_TEMPLATES]).toEqual(["fixture-forge-lite"]);
     for (const template of PROJECT_TEMPLATES)
-      expect(projectSource(template)).toEqual({ _tag: "Template", repo: template });
+      expect(projectSource({ kind: "template", name: template })).toEqual({
+        _tag: "Template",
+        repo: template,
+      });
     for (const name of [
       "no-such",
       "keel-core/x",
@@ -102,7 +74,34 @@ describe("a new project's source", () => {
       "",
       "Fixture-Forge-Lite",
     ])
-      expect([name, projectSource(name)]).toEqual([name, UNKNOWN]);
+      expect([name, projectSource({ kind: "template", name })]).toEqual([name, UNKNOWN]);
+  });
+
+  it("[project.source-import] an import is read by Keel's own rules: the URL as it will be recorded, the branch by its short name, and a refusal that names the field and why", () => {
+    expect(projectSource({ kind: "import", url: "https://Git.Example/team/app" })).toEqual({
+      _tag: "Import",
+      url: "https://git.example/team/app",
+    });
+    expect(
+      projectSource({ kind: "import", url: "https://git.example/team/app", ref: "release/1.x" }),
+    ).toEqual({ _tag: "Import", url: "https://git.example/team/app", ref: "release/1.x" });
+    expect(
+      projectSource({ kind: "import", url: "https://user:secret@git.example/team/app" }),
+    ).toEqual({ _tag: "Refused", field: "url", why: "credential" });
+    expect(projectSource({ kind: "import", url: "http://git.example/team/app" })).toEqual({
+      _tag: "Refused",
+      field: "url",
+      why: "not-https",
+    });
+    // A URL that is refused is said first: the branch is not read until the URL is one.
+    expect(
+      projectSource({ kind: "import", url: "https://127.0.0.1/team/app", ref: "refs/heads/x" }),
+    ).toEqual({ _tag: "Refused", field: "url", why: "ip-literal" });
+    for (const ref of ["refs/heads/main", "HEAD", "", "a..b", "-x"])
+      expect([
+        ref,
+        projectSource({ kind: "import", url: "https://git.example/team/app", ref }),
+      ]).toEqual([ref, { _tag: "Refused", field: "ref", why: "not-a-branch" }]);
   });
 });
 

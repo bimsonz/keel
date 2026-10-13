@@ -42,6 +42,13 @@ export class ProjectNamespaces extends Context.Service<
   ProjectNamespaces,
   {
     readonly assign: (place: ProjectPlace) => Effect.Effect<void, ProjectNameTaken>;
+    /**
+     * Gives a project's place back, so its name is free in its namespace
+     * again. For a project that was never made (its start was refused, and
+     * nothing of it exists): a project that exists keeps its place for good.
+     * Releasing a project with no place is a no-op.
+     */
+    readonly release: (projectId: ProjectId) => Effect.Effect<void>;
     readonly byId: (projectId: ProjectId) => Effect.Effect<Option.Option<ProjectPlace>>;
     readonly byName: (
       namespace: NamespaceId,

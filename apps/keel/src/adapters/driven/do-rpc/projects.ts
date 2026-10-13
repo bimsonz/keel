@@ -1,6 +1,6 @@
 import { actorId, eventActorOf } from "@keeltown/core/domain/identity";
 import type { ProjectId } from "@keeltown/core/kernel";
-import { Projects, RepoNotFound } from "@keeltown/core/ports";
+import { ImportRefused, ImportTooLarge, Projects, RepoNotFound } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 import { CreateProjectCommand, ProjectCodecs, PutSettingsCommand } from "../../../rpc/index.ts";
 import { callObject, fingerprintOf } from "./answer.ts";
@@ -20,8 +20,8 @@ const encodePut = Schema.encodeSync(PutSettingsCommand);
  * `Projects` over Durable Object RPC. The project's DO is the one its id
  * names, which the caller derived from the actor and the Idempotency-Key, so a
  * retry reaches the same DO, which replays by key and refuses another body by
- * fingerprint. A missing source crosses as RepoNotFound by shape and is
- * rebuilt as the port's error. `settings` answers the project's settings, or
+ * fingerprint. A start the DO refused crosses by shape and is rebuilt as the
+ * port's error. `settings` answers the project's settings, or
  * ProjectNotFound; `putSettings` replaces them as the actor, whose id the
  * Project DO audits.
  * `liveAnchors` reads the Project DO's live index; a project never created
@@ -50,9 +50,12 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
           return yield* callObject(ProjectCodecs.createProject, () =>
             project(input.projectId).createProject(command),
           ).pipe(
-            Effect.catchTag("RepoNotFound", (missing) =>
-              Effect.fail(new RepoNotFound({ repo: missing.repo })),
-            ),
+            // Each crosses by shape (rule R15) and is rebuilt as the port's own error.
+            Effect.catchTags({
+              RepoNotFound: (missing) => Effect.fail(new RepoNotFound({ repo: missing.repo })),
+              ImportRefused: (refused) => Effect.fail(new ImportRefused(refused)),
+              ImportTooLarge: (large) => Effect.fail(new ImportTooLarge(large)),
+            }),
           );
         }),
       settings: (projectId) =>

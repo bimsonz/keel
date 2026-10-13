@@ -96,7 +96,7 @@ describe("the Keel client", () => {
     await keel.client.createProject({
       namespace: "keel",
       name: "forge",
-      source: "fixture-forge-lite",
+      source: { kind: "template", name: "fixture-forge-lite" },
     });
     const create = keel.sent.find((s) => s.url.endsWith("/v1/projects"));
     expect(create?.headers["idempotency-key"]).toMatch(/^[0-9a-f-]{36}$/);

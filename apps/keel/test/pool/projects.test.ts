@@ -82,7 +82,7 @@ PORTS.Projects.contract("Project DO over RPC", () => {
         const created = yield* projects.create(by, {
           projectId: makeId("prj", ulid()),
           name: "forge",
-          source,
+          source: { _tag: "Template", repo: source },
           idempotencyKey: `key-${crypto.randomUUID()}`,
         });
         yield* projects.putSettings(by, created.id, settings, `req-${crypto.randomUUID()}`);

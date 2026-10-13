@@ -434,6 +434,32 @@ export function describeProjectNamespacesContract(
     );
 
     it.effect(
+      "[ports.project-namespaces-release] gives a project's place back: the project has none, its name is free for another project of the namespace, and no other project's place moves; releasing again, or a project never placed, is a no-op",
+      () =>
+        Effect.gen(function* () {
+          const projects = yield* ProjectNamespaces;
+          const org = orgId();
+          const name = fresh("app");
+          const refused = { projectId: projectId(), namespace: org, name };
+          const kept = { projectId: projectId(), namespace: org, name: fresh("kept") };
+          yield* projects.assign(refused);
+          yield* projects.assign(kept);
+
+          yield* projects.release(refused.projectId);
+          expect(Option.isNone(yield* projects.byId(refused.projectId))).toBe(true);
+          expect(Option.isNone(yield* projects.byName(org, name))).toBe(true);
+          expect(yield* projects.inNamespace(org)).toEqual([kept]);
+
+          yield* projects.release(refused.projectId);
+          yield* projects.release(projectId());
+          const next = { projectId: projectId(), namespace: org, name };
+          yield* projects.assign(next);
+          expect(yield* projects.byName(org, name)).toEqual(Option.some(next));
+          expect(yield* projects.byId(kept.projectId)).toEqual(Option.some(kept));
+        }).pipe(Effect.provide(make())),
+    );
+
+    it.effect(
       "[ports.project-namespaces-taken] refuses a name the namespace holds, in any case, and another place for a placed project, with ProjectNameTaken",
       () =>
         Effect.gen(function* () {

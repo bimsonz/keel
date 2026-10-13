@@ -170,10 +170,16 @@ function describeAs(dir: string, text: string): void {
   writeFileSync(path, after);
 }
 
+/**
+ * The run's agent by that name: enrolled once, and found again by the key on
+ * every later run. The key's last part is its generation: an enrolment is
+ * replayed only while Keel reads the request as it first did, so a deploy
+ * that changes what an enrolment holds needs the next one.
+ */
 async function enrolled(operator: KeelClient, name: string, projectId: string) {
   const agent = await operator.enrolAgent(
     { name, kind: "interactive", scopes: ["agent:read", "agent:work"], projectId },
-    { idempotencyKey: key(`agent:${name}`) },
+    { idempotencyKey: key(`agent:${name}:2`) },
   );
   return new KeelClient({
     baseUrl: keelUrl,
@@ -186,7 +192,7 @@ const dirs: string[] = [];
 try {
   const operator = new KeelClient({ baseUrl: keelUrl, session });
   const project = await operator.createProject(
-    { namespace: ORG, name: PROJECT, source: FIXTURE },
+    { namespace: ORG, name: PROJECT, source: { kind: "template", name: FIXTURE } },
     { idempotencyKey: key("project") },
   );
   await operator.putSettings(project.id, {

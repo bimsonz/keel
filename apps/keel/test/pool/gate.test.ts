@@ -57,7 +57,11 @@ describe("the gate", () => {
           "idempotency-key": "gate-origin-1",
           ...headers,
         },
-        body: JSON.stringify({ namespace: org, name: "app", source: "nowhere" }),
+        body: JSON.stringify({
+          namespace: org,
+          name: "app",
+          source: { kind: "template", name: "nowhere" },
+        }),
       });
     expect(await code(await create({ cookie: jar.header() }))).toEqual([403, "auth.cross_site"]);
     expect(

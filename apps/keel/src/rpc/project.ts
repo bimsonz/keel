@@ -1,5 +1,5 @@
 import { DerivedEffect, Intent, SubjectKey } from "@keeltown/core/domain/coordination";
-import { IdempotencyConflict } from "@keeltown/core/domain/identity";
+import { IdempotencyConflict, QuotaExceeded } from "@keeltown/core/domain/identity";
 import { ProjectNotFound } from "@keeltown/core/domain/integration";
 import {
   Actor,
@@ -55,16 +55,26 @@ export const PutSettingsCommand = Schema.Struct({
  * from the actor and the Idempotency-Key, so a retry reaches the same DO,
  * which replays by `idempotencyKey` and refuses another body (`fingerprint`)
  * with IdempotencyConflict. `by` is the person creating it; the commit's actor
- * is `user:<by>`. Trunk is forked from `source`, a repo in the core
- * namespace; staging is forked from trunk; the per-project mirror is created
- * empty in the workspace namespace and trunk's head is pushed into it; then the
- * pool is configured and trunk is initialised at that head.
+ * is `user:<by>`. Trunk is made by `source`: Keel's own first commit for an
+ * empty project, a public Git repository imported once, another project's
+ * trunk forked, or a template forked. Trunk is initialised at its first
+ * head, with where it came from; staging is forked from trunk; the
+ * per-project mirror is created empty in the workspace namespace and trunk's
+ * head is pushed into it; then the pool is configured.
  */
 export const CreateProjectCommand = Schema.Struct({
   projectId: ProjectId,
   name: Schema.NonEmptyString,
-  /** The repo in the core namespace that trunk is forked from. */
-  source: Schema.NonEmptyString,
+  /** Where trunk starts, as the doorway read it from the request. */
+  source: Schema.Union([
+    Schema.TaggedStruct("Empty", {}),
+    Schema.TaggedStruct("Import", {
+      url: Schema.NonEmptyString,
+      ref: Schema.optional(Schema.NonEmptyString),
+    }),
+    Schema.TaggedStruct("Project", { projectId: ProjectId }),
+    Schema.TaggedStruct("Template", { repo: Schema.NonEmptyString }),
+  ]),
   by: UserId,
   idempotencyKey: Schema.String,
   fingerprint: Schema.String,
@@ -81,6 +91,18 @@ export const ProjectView = Schema.Struct({
  * R15), so the DO answers the port's error as is and the caller rebuilds it.
  */
 export const RepoNotFound = Schema.TaggedStruct("RepoNotFound", { repo: RepoRef });
+
+/** CodeHost's ImportRefused, by shape (rule R15): the code host imported nothing from the URL. */
+export const ImportRefused = Schema.TaggedStruct("ImportRefused", {
+  reason: Schema.Literals(["not-found", "not-git", "unreachable", "too-large", "no-branch"]),
+});
+
+/** The Trunks port's ImportTooLarge, by shape (rule R15): an imported history over what one relay carries. */
+export const ImportTooLarge = Schema.TaggedStruct("ImportTooLarge", {
+  projectId: Schema.String,
+  bytes: Schema.Number,
+  limit: Schema.Number,
+});
 
 /** One live change in the project's index: its current intent and the effects last derived for it. */
 export const LiveChangeView = Schema.Struct({
@@ -100,7 +122,10 @@ export const ProjectCodecs = {
   liveAnchors: exitCodec(Schema.Array(SubjectAnchorsView), Schema.Never),
   settings: exitCodec(ProjectSettings, ProjectNotFound),
   putSettings: exitCodec(ProjectSettings, Schema.Union([ProjectNotFound, IdempotencyConflict])),
-  createProject: exitCodec(ProjectView, Schema.Union([IdempotencyConflict, RepoNotFound])),
+  createProject: exitCodec(
+    ProjectView,
+    Schema.Union([IdempotencyConflict, RepoNotFound, ImportRefused, QuotaExceeded, ImportTooLarge]),
+  ),
 };
 
 /** The Project DO (`project:<id>`): settings and the subject registry. */

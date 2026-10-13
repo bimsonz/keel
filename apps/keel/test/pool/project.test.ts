@@ -1,19 +1,30 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
-import { type AgentId, makeId, type ProjectId } from "@keeltown/core/kernel";
+import { type AgentId, makeId, type ProjectId, type UserId } from "@keeltown/core/kernel";
 import { PROJECT_SETTINGS } from "@keeltown/core/application/integration";
-import { CodeHost, EntityStore, EventOutbox } from "@keeltown/core/ports";
+import { type Actor, QuotaExceeded } from "@keeltown/core/domain/identity";
+import {
+  CodeHost,
+  EntityStore,
+  EventOutbox,
+  ImportRefused,
+  ImportTooLarge,
+  Projects,
+  RELAY_PACK_CAP_BYTES,
+} from "@keeltown/core/ports";
 import {
   CodeHostFixture,
   makeCodeHostMemory,
   makeTrunksMemory,
   makeWorkspacePoolMemory,
   sampleProjectId,
+  type Upstreams,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, ManagedRuntime } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it } from "vitest";
 import { ProjectNamespacesD1 } from "../../src/adapters/driven/d1/project-namespaces.ts";
+import { ProjectsRpc } from "../../src/adapters/driven/do-rpc/projects.ts";
 import type { ProjectDO } from "../../src/adapters/driving/do/project.ts";
 import { backbone } from "../../src/composition/do.ts";
 import { decodeExit, ProjectCodecs } from "../../src/rpc/index.ts";
@@ -40,7 +51,7 @@ async function projectUnderTest() {
   const projectId: ProjectId = makeId("prj", ulid());
   const operator: AgentId = makeId("agt", ulid());
   /** Who replaces the settings: a person, by id. */
-  const maintainer = makeId("usr", ulid());
+  const maintainer: UserId = makeId("usr", ulid());
   const stub = drainAfter(env.PROJECT.get(env.PROJECT.idFromName(`project:${projectId}`)));
   const journal: string[] = [];
   const code = makeCodeHostMemory();
@@ -73,7 +84,7 @@ async function projectUnderTest() {
       await stub.createProject({
         projectId,
         name: "Seed app",
-        source,
+        source: { _tag: "Template", repo: source },
         by: maintainer,
         idempotencyKey: "create-1",
         fingerprint,
@@ -106,11 +117,23 @@ async function projectUnderTest() {
         Effect.map(EventOutbox, (outbox) => outbox.log({ kind: "project", id: projectId })),
       ),
     );
+  /** Who creates the project, as the port takes them. */
+  const creator: Actor = { _tag: "User", userId: maintainer };
+  /** Runs a program against the Projects port over this object's RPC. */
+  const through = <A, E>(
+    program: (projects: (typeof Projects)["Service"]) => Effect.Effect<A, E>,
+  ) =>
+    Effect.runPromiseExit(
+      Effect.flatMap(Projects, program).pipe(Effect.provide(ProjectsRpc(() => stub))),
+    );
   return {
     projectId,
     stub,
     operator,
     maintainer,
+    creator,
+    through,
+    code,
     journal,
     trunks,
     pool,
@@ -147,6 +170,80 @@ describe("the Project DO over real RPC", () => {
 
     expect(Exit.isFailure(missing) && JSON.stringify(missing.cause)).toContain("RepoNotFound");
     expect(p.pool.configured.size).toBe(0);
+  });
+});
+
+/** An import through the port over a fresh Project DO's RPC, whose trunk refuses its head with `refused` when given: what the port failed with, after checking no project and no pool came of it. */
+const importRefusedAs = async (
+  url: (upstreams: Upstreams) => string,
+  refused?: QuotaExceeded | ImportTooLarge,
+) => {
+  const p = await projectUnderTest();
+  if (refused !== undefined) p.trunks.refuse(p.projectId, refused);
+  const upstreams = await Effect.runPromise(p.code.fixture.upstreams);
+  const exit = await p.through((projects) =>
+    Effect.flip(
+      projects.create(p.creator, {
+        projectId: p.projectId,
+        name: "Seed app",
+        source: { _tag: "Import", url: url(upstreams) },
+        idempotencyKey: "create-1",
+      }),
+    ),
+  );
+  expect((await p.log()).map((event) => event.type)).toEqual([]);
+  expect(p.pool.configured.size).toBe(0);
+  return Exit.isSuccess(exit) ? exit.value : undefined;
+};
+
+describe("a project's start over real RPC", () => {
+  it("[project.do.start-empty] an empty project crosses the Project DO's RPC as a start of its own: its trunk is seeded with the project's name, and the project is created", async () => {
+    const p = await projectUnderTest();
+    const made = await p.through((projects) =>
+      projects.create(p.creator, {
+        projectId: p.projectId,
+        name: "Seed app",
+        source: { _tag: "Empty" },
+        idempotencyKey: "create-1",
+      }),
+    );
+    expect(Exit.isSuccess(made) ? made.value : made).toMatchObject({
+      id: p.projectId,
+      name: "Seed app",
+    });
+    expect(p.trunks.seeded.get(p.projectId)?.name).toBe("Seed app");
+    expect(p.trunks.origins.get(p.projectId)).toEqual({ kind: "empty" });
+    expect((await p.log()).map((event) => event.type)).toEqual(["ProjectCreated"]);
+  });
+
+  it("[project.do.start-refused] a start the Project DO refuses crosses its RPC as the port's own error: the code host's ImportRefused, the quota's QuotaExceeded and the trunk's ImportTooLarge, with no project made", async () => {
+    const quota = new QuotaExceeded({
+      kind: "repo-bytes",
+      reason: "limit",
+      limit: 3_999,
+      used: 0,
+      requested: 4_000,
+      nextActions: [],
+    });
+    const nothing = await importRefusedAs((upstreams) => upstreams.missing);
+    expect(nothing).toBeInstanceOf(ImportRefused);
+    expect(nothing).toMatchObject({ reason: "not-found" });
+
+    const full = await importRefusedAs((upstreams) => upstreams.url, quota);
+    expect(full).toBeInstanceOf(QuotaExceeded);
+    expect(full).toMatchObject({ kind: "repo-bytes", limit: 3_999, requested: 4_000 });
+
+    const over = new ImportTooLarge({
+      projectId: "prj_any",
+      bytes: RELAY_PACK_CAP_BYTES + 1,
+      limit: RELAY_PACK_CAP_BYTES,
+    });
+    const tooLarge = await importRefusedAs((upstreams) => upstreams.url, over);
+    expect(tooLarge).toBeInstanceOf(ImportTooLarge);
+    expect(tooLarge).toMatchObject({
+      bytes: RELAY_PACK_CAP_BYTES + 1,
+      limit: RELAY_PACK_CAP_BYTES,
+    });
   });
 });
 

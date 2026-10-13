@@ -77,7 +77,7 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
   Repo_listCommits: (c) => c.commits("prj_1"),
   Repo_getCommit: (c) => c.commit("prj_1", SAMPLE["sha"] ?? ""),
   Operator_createProject: (c) =>
-    c.createProject({ namespace: "keel", name: "p", source: "keel-core/fixture" }),
+    c.createProject({ namespace: "keel", name: "p", source: { kind: "empty" } }),
   Operator_listProjects: (c) => c.projects({ limit: 3 }),
   Namespaces_getNamespace: (c) => c.namespace("keel"),
   Namespaces_getProject: (c) => c.project("keel", "forge-lite"),
