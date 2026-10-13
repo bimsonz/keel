@@ -425,6 +425,37 @@ describe("the Lane", () => {
   );
 
   it.effect(
+    "[t35.lane-holds] a change requeued and parked in one commit leaves the queue under the plan its requeue named, and rejoins at the front when resumed",
+    () => {
+      const w = world();
+      const recompiled = workerAppPlan();
+      return Effect.gen(function* () {
+        yield* w.seeded;
+        yield* queue(w, change(1));
+        yield* queue(w, change(2));
+        const first = yield* toVerifying(w);
+        yield* recordVerdict(
+          LANE,
+          verdict(first.batchId, first.candidateId, first.instanceId, "park"),
+        );
+        yield* requeue(change(1), first.batchId, recompiled.planHash);
+        const requeued = laneOf(yield* EntityStore, LANE);
+        yield* parked(change(1), "awaiting-ruling");
+        const held = laneOf(yield* EntityStore, LANE);
+        yield* resumed(change(1));
+        const back = laneOf(yield* EntityStore, LANE);
+
+        expect(requeued?.queue).toEqual([change(1), change(2)]);
+        expect(held?.queue).toEqual([change(2)]);
+        expect(held?.plans?.find((plan) => plan.changeId === change(1))?.planHash).toBe(
+          recompiled.planHash,
+        );
+        expect(back?.queue).toEqual([change(1), change(2)]);
+      }).pipe(Effect.provide(w.layer));
+    },
+  );
+
+  it.effect(
     "[lane.drops-bounced] a change bounced while queued leaves the queue, and the next step forms the change behind it",
     () => {
       const w = world();

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t t35.park-after-resume
+# kills: t35.park-after-resume
+# why: a resumed change is not parked again, so with another of its conflicts still with a person it sits in the queue as if nothing were asked
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index 0fcd078b..db36fffa 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1691,7 +1691,7 @@ const commandFor = (
+  * read, so the escalation ruled on is never the one it waits for.
+  */
+ const heldAgain = (store: Store, command: ChangeCommand): readonly ChangeCommand[] => {
+-  if (command._tag !== "Resume" && command._tag !== "Requeue") return [];
++  if (command._tag !== "Requeue") return [];
+   const asked = awaitedEscalation(store);
+   return asked === undefined ? [] : [{ _tag: "Park", escalationId: asked }];
+ };

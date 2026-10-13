@@ -921,6 +921,7 @@ describe("the remedy a status read carries", () => {
 const CONFLICT = makeId("cfl", "01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 const OTHER_CONFLICT = makeId("cfl", "01JZ8PT2C4E6G8J0M2N4Q6S8V1");
 const DECISION = makeId("dec", "01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const OTHER_DECISION = makeId("dec", "01JZ8PT2C4E6G8J0M2N4Q6S8V1");
 const escalated = (conflictId: string) =>
   arriving(
     { kind: "conflict", id: conflictId },
@@ -1040,5 +1041,101 @@ describe("a conflict of the change put to a person", () => {
         expect((yield* getChange(changeId)).state).toBe("integrating");
       }).pipe(Effect.provide(layer));
     },
+  );
+
+  it.effect(
+    "[t35.park-after-resume] a party with two conflicts before a person is resumed by the first ruling and parked again in the same commit under the other's escalation, and the second ruling leaves it queued",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* queued;
+        const before = yield* getChange(changeId);
+        yield* receive(escalated(CONFLICT));
+        yield* receive(escalated(OTHER_CONFLICT));
+        const waiting = yield* getChange(changeId);
+        const first = resolved(CONFLICT, DECISION);
+        const reaction = yield* receive(first);
+        const held = yield* getChange(changeId);
+        const again = (yield* EventOutbox).log(changeRef).slice(-2);
+        const second = resolved(OTHER_CONFLICT, OTHER_DECISION);
+        yield* receive(second);
+        const free = yield* getChange(changeId);
+        const last = yield* lastEvent;
+
+        // The second escalation parks nothing more: the change already waits for the first.
+        expect(waiting.escalationId).toBe(escalationIdOf(CONFLICT));
+        expect(reaction?.problem).toBeUndefined();
+        expect(again.map((e) => e.type)).toEqual(["ChangeResumed", "ChangeParked"]);
+        expect(again.map((e) => e.causation)).toEqual([first.eventId, first.eventId]);
+        expect(again[0]?.payload).toMatchObject({ decisionId: DECISION });
+        // Under the escalation still open, never the one just ruled on.
+        expect(again[1]?.payload).toMatchObject({
+          reason: "awaiting-ruling",
+          escalationId: escalationIdOf(OTHER_CONFLICT),
+        });
+        expect(held).toMatchObject({
+          state: "parked",
+          parkReason: "awaiting-ruling",
+          parkedFrom: "queued",
+          escalationId: escalationIdOf(OTHER_CONFLICT),
+          laneId: before.laneId,
+          planHash: before.planHash,
+        });
+        expect(free.state).toBe("queued");
+        expect(free.escalationId).toBeUndefined();
+        expect(last).toMatchObject({
+          type: "ChangeResumed",
+          causation: second.eventId,
+          payload: { decisionId: OTHER_DECISION },
+        });
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[t35.park-after-requeue] a party whose conflict went to a person while it was in a batch is parked in the commit that requeues it, whatever requeued it, and requeued with nothing before a person it is left in the queue",
+    () =>
+      Effect.forEach(
+        [(batchId: string) => failed(batchId, "infra"), bisected, invalidated],
+        (requeueing) => {
+          const { layer } = changeObject();
+          return Effect.gen(function* () {
+            const batchId = yield* batched;
+            yield* receive(escalated(CONFLICT));
+            const inBatch = yield* getChange(changeId);
+            const requeue = requeueing(batchId);
+            const reaction = yield* receive(requeue);
+            const held = yield* getChange(changeId);
+            const committed = (yield* EventOutbox).log(changeRef).slice(-2);
+            yield* receive(resolved(CONFLICT, DECISION));
+            const resumed = yield* getChange(changeId);
+            // Nothing is before a person now: the next requeue leaves it in the queue.
+            const next = freshBatch();
+            yield* receive(formed(next, [changeId]));
+            yield* receive(requeueing(next));
+            const free = yield* getChange(changeId);
+            const last = yield* lastEvent;
+
+            expect(inBatch.state).toBe("integrating");
+            expect(reaction?.problem).toBeUndefined();
+            expect(committed.map((e) => e.type)).toEqual(["ChangeRequeued", "ChangeParked"]);
+            expect(committed.map((e) => e.causation)).toEqual([requeue.eventId, requeue.eventId]);
+            expect(committed[1]?.payload).toMatchObject({
+              reason: "awaiting-ruling",
+              escalationId: escalationIdOf(CONFLICT),
+            });
+            expect(held).toMatchObject({
+              state: "parked",
+              parkedFrom: "queued",
+              escalationId: escalationIdOf(CONFLICT),
+              planHash: inBatch.planHash,
+            });
+            expect(held.batchId).toBeUndefined();
+            expect(resumed.state).toBe("queued");
+            expect(free.state).toBe("queued");
+            expect(last?.type).toBe("ChangeRequeued");
+          }).pipe(Effect.provide(layer));
+        },
+      ),
   );
 });

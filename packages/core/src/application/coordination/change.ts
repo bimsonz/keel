@@ -1683,6 +1683,19 @@ const commandFor = (
   }
 };
 
+/**
+ * What follows a command that puts the change back in the queue. A resume or
+ * a requeue leaves it there while another of its conflicts may still be with
+ * a person: it then parks again in the same commit, as `planCompiled` parks
+ * it on first queuing. The conflict just resolved was heard before this is
+ * read, so the escalation ruled on is never the one it waits for.
+ */
+const heldAgain = (store: Store, command: ChangeCommand): readonly ChangeCommand[] => {
+  if (command._tag !== "Resume" && command._tag !== "Requeue") return [];
+  const asked = awaitedEscalation(store);
+  return asked === undefined ? [] : [{ _tag: "Park", escalationId: asked }];
+};
+
 /** What a reaction to the change's batch commits, and anything wrong with it worth an alert. */
 export interface BatchReaction {
   readonly drafts: readonly EventDraft[];
@@ -1697,7 +1710,9 @@ export interface BatchReaction {
  * next actions; BatchFailed `infra`, CandidateBisected or CandidateInvalidated
  * → ChangeRequeued. A conflict it is a party to, put to a person →
  * ChangeParked where the machine parks a change, and that escalation's ruling
- * → ChangeResumed. The cause is the delivery's dedupe key, so a redelivery is
+ * → ChangeResumed. A change resumed or requeued while another of its
+ * conflicts is with a person → ChangeParked again, in the same commit. The
+ * cause is the delivery's dedupe key, so a redelivery is
  * a no-op. A refusal by the machine commits nothing and is reported as a
  * `problem`: a reaction never fails the delivery, which would be redelivered
  * forever. Undefined when the event is none of these.
@@ -1713,7 +1728,10 @@ export const reactToBatch = (
   if (reacting === undefined) return { drafts: [] };
   if (reacting.command === undefined)
     return { drafts: [], ...(reacting.problem === undefined ? {} : { problem: reacting.problem }) };
-  const decided = transition(tx, changeId, REACTION_REFUSALS, [reacting.command]);
+  const decided = transition(tx, changeId, REACTION_REFUSALS, [
+    reacting.command,
+    ...heldAgain(tx.store, reacting.command),
+  ]);
   if (Result.isFailure(decided))
     return reacting.refusable === true && decided.failure._tag === "ChangeStateRefused"
       ? { drafts: [] }
