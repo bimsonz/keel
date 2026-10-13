@@ -22,21 +22,7 @@ for (const namespace of ["keel-core", "keel-ws-00"]) {
   }
 }
 
-// Exception 2: the Vectorize index for decision recall (no provider resource).
-const index = `keel-${environment}-recall`;
-const indexes = namesIn(await cloudflare("GET", "/vectorize/v2/indexes"), "name");
-if (indexes.includes(index)) {
-  console.log(`vectorize index ${index}: exists`);
-} else {
-  // 768 dimensions: @cf/baai/bge-base-en-v1.5, the embedding model recall uses.
-  await cloudflare("POST", "/vectorize/v2/indexes", {
-    name: index,
-    config: { dimensions: 768, metric: "cosine" },
-  });
-  console.log(`vectorize index ${index}: created`);
-}
-
-// Exception 3: the Queues event subscription that tells the jobs queue a
+// Exception 2: the Queues event subscription that tells the jobs queue a
 // keel-verify-batch instance errored or was terminated (no provider resource;
 // REST POST /event_subscriptions/subscriptions). It is created when the
 // Workflow has none. One that exists and differs is named and left as it is:

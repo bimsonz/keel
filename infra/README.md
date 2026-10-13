@@ -39,7 +39,6 @@ State is meant to live in the R2 bucket `keel-tfstate`, through Terraform's S3 b
 | Resource | Why not Terraform |
 |---|---|
 | Artifacts namespaces `keel-core`, `keel-ws-00` | No provider resource; REST `POST /artifacts/namespaces` |
-| Vectorize index `keel-<env>-recall` | No provider resource; REST `POST /vectorize/v2/indexes` |
 | Queues event subscription: the Workflow `keel-verify-batch`'s `instance.errored` and `instance.terminated`, to the queue `keel-<env>-jobs` | No provider resource; REST `POST /event_subscriptions/subscriptions` |
 
 The subscription is found by its Workflow, whatever it is called, and is only ever created. One that is there and differs (other events, another queue, not enabled, or a second one from the same Workflow) stops `provision.ts` with what it found and changes nothing: put it right by hand, then run it again. It names a Workflow that `wrangler deploy` creates, so on a new environment run `provision.ts` once more after the first deploy. `wrangler queues subscription list keel-<env>-jobs` (from `apps/keel`) shows it.
