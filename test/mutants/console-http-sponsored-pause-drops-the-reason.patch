@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsored.test.ts
+# kills: sponsored.calls
+# why: a pause is sent with no reason, which Keel refuses: the sponsor's emergency stop does nothing
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 18bc2a58..e363ff97 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -216,7 +216,7 @@ export function createHttpSponsorship(options: HttpOptions = {}): KeelSponsorshi
+         "idempotency-key": `console:pause:${crypto.randomUUID()}`,
+         reason,
+       };
+-      return moved("POST", `${encodeURIComponent(named)}/suspend`, key, body);
++      return moved("POST", `${encodeURIComponent(named)}/suspend`, key);
+     },
+     unpause(agentId) {
+       const { agentId: named, "idempotency-key": key }: Operator_reinstateAgentInput = {

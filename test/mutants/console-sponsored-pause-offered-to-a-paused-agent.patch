@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsored.test.ts
+# kills: sponsored.controls
+# why: a paused agent's sponsor is offered Pause again and no way to let it work: the one control that undoes a pause is never shown
+diff --git a/apps/console/src/account/sponsored.ts b/apps/console/src/account/sponsored.ts
+index dd38adce..6e194f26 100644
+--- a/apps/console/src/account/sponsored.ts
++++ b/apps/console/src/account/sponsored.ts
+@@ -24,7 +24,7 @@ export function controlsOf(state: AgentProfile["state"]): Control[] {
+     case "active":
+       return ["pause", "end"];
+     case "suspended":
+-      return ["unpause", "end"];
++      return ["pause", "end"];
+     default:
+       return ["end"];
+   }

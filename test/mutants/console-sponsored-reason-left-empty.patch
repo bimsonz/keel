@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsored.test.ts
+# kills: sponsored.reason
+# why: a pause with no reason typed is sent with an empty one, so Keel's record of the pause says nothing of whose it was
+diff --git a/apps/console/src/account/sponsored.ts b/apps/console/src/account/sponsored.ts
+index dd38adce..5cbed1b1 100644
+--- a/apps/console/src/account/sponsored.ts
++++ b/apps/console/src/account/sponsored.ts
+@@ -12,7 +12,7 @@ export const PAUSED_BY_SPONSOR = "Paused by its sponsor";
+ 
+ /** The reason a pause carries: what the sponsor typed, or that sentence where they typed nothing. */
+ export const reasonOf = (typed: string): string =>
+-  typed.trim() === "" ? PAUSED_BY_SPONSOR : typed.trim();
++  typed.trim();
+ 
+ /**
+  * The controls an agent's standing leaves its sponsor. An active agent is paused and a paused one unpaused.

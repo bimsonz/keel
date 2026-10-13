@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsored.test.ts
+# kills: sponsored.list
+# why: the stand-in for Keel lists every sponsored agent to whoever asks, where Keel lists a person the agents they stand behind: a page that showed another person's agents would pass
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 671ed9a8..4cca3bea 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -418,7 +418,7 @@ export function createFakeKeel(
+         if (reader === null) return problem(401, "auth.required");
+         return Response.json({
+           items: [...agents.values()]
+-            .filter((agent) => reader.id !== undefined && behind.get(agent.id) === reader.id)
++            .filter((agent) => behind.has(agent.id))
+             .map(profileOf),
+         } satisfies SponsoredAgents);
+       }

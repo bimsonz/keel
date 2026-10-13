@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsored.test.ts
+# kills: sponsored.stale
+# why: the stand-in for Keel takes a sponsor's move from a session of any age, where Keel wants a passkey sign-in of the last ten minutes: the page's second touch would be tested against nothing
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 671ed9a8..0544727b 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -469,7 +469,6 @@ export function createFakeKeel(
+         const known = agents.get(agentId);
+         if (known === undefined || reader.id === undefined || behind.get(agentId) !== reader.id)
+           return gone();
+-        if (reader.fresh !== true) return staleSignIn();
+         const stands = standing.get(agentId) ?? "active";
+         if (
+           (command === "Suspend" && stands !== "active") ||

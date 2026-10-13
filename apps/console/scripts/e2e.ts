@@ -2228,6 +2228,15 @@ const passkeysOn = (shown: Page) => shown.getByRole("region", { name: "Passkeys"
 const passkeysSaid = async (shown: Page): Promise<string> =>
   `${(await passkeysOn(shown).getByRole("alert").count()) === 0 ? "no refusal" : squash(await passkeysOn(shown).getByRole("alert").innerText())} | ${await passkeysOn(shown).getByRole("button", { name: SIGN_IN_AGAIN }).count()} offered | ${await shown.getByRole("list", { name: "Your passkeys" }).getByRole("listitem").count()} kept`;
 await person.getByText("You have no passkey yet.").waitFor();
+await person
+  .getByText("You stand behind no agent.")
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "sponsored: someone who stands behind no agent is told so, and is shown no control",
+  `${await person.getByText("You stand behind no agent.").count()} | ${await person.getByRole("region", { name: "Agents you stand behind" }).getByRole("button").count()} controls`,
+  "1 | 0 controls",
+);
 const sessionsHeld = async (): Promise<number> =>
   (await lobby.cookies()).filter((cookie) => cookie.name.endsWith("session_token")).length;
 /** Ada signs in by a code sent to her address, on the sign-in page she is at, and is then at her settings. */
@@ -3297,6 +3306,114 @@ expectEqual(
   "sponsor: a visitor's one tap signs them in and stands them behind the agent, and the frame says who they are",
   `${squash(await newcomer.getByRole("heading", { level: 1 }).innerText())} | ${sponsoring.sponsorOf(GAMMA.id) === turing?.id ? "turing" : String(sponsoring.sponsorOf(GAMMA.id))} | ${squash(await newcomer.locator("header").first().innerText())}`,
   "You stand behind gamma | turing | Keel turing",
+);
+
+// ── The agents a person stands behind, on their settings ──
+// Turing stands behind beta and gamma, and signed in by a passkey a moment ago. The page after a yes links to
+// the settings, which list what Keel lists: each agent as it declared itself, and as it stands.
+const sponsoredOn = (shown: Page) => shown.getByRole("region", { name: "Agents you stand behind" });
+const sponsoredRows = async (shown: Page): Promise<string> =>
+  (
+    await sponsoredOn(shown)
+      .getByRole("listitem")
+      .evaluateAll((rows) =>
+        rows.map((row) =>
+          row.firstElementChild instanceof HTMLElement
+            ? row.firstElementChild.innerText.replaceAll(/\s+/g, " ").trim()
+            : "",
+        ),
+      )
+  ).join(" | ");
+const control = (shown: Page, name: string) =>
+  sponsoredOn(shown).getByRole("button", { name, exact: true });
+/** Waits for a control to be offered, and goes on without it: what the page then says is read either way. */
+const offered = (shown: Page, name: string): Promise<void> =>
+  control(shown, name)
+    .waitFor({ timeout: 10_000 })
+    .catch(() => undefined);
+const toSettings = newcomer.getByRole("link", { name: "See the agents you stand behind" });
+if ((await toSettings.count()) > 0) await toSettings.click();
+else await newcomer.goto(`${built}/settings`, { waitUntil: "domcontentloaded" });
+await offered(newcomer, "Pause gamma");
+await shot(newcomer, "settings-sponsored");
+expectEqual(
+  "sponsored: the page after a yes links to the settings, which list the agents Keel says the person stands behind, each as it declared itself and as it stands",
+  `${new URL(newcomer.url()).pathname} | ${await sponsoredRows(newcomer)}`,
+  "/settings | beta declared as hosted · Active | gamma declared as interactive · Active",
+);
+// A pause on a fresh sign-in is one click. It carries the reason typed, and the row then says Keel's answer.
+await sponsoredOn(newcomer)
+  .getByLabel("Why pause beta (optional, kept in Keel's record)")
+  .fill("It pushed to the wrong branch");
+if ((await control(newcomer, "Pause beta").count()) > 0)
+  await control(newcomer, "Pause beta").click();
+await offered(newcomer, "Unpause beta");
+expectEqual(
+  "sponsored: a pause is one click on a fresh sign-in, carries the reason typed, and the row then says what Keel answered and offers what a paused agent allows",
+  `${await sponsoredRows(newcomer)} | ${sponsoring.standingOf(BETA.id)} | ${sponsoring.pausedFor(BETA.id) ?? "no reason"} | ${(await sponsoredOn(newcomer).getByRole("listitem").first().getByRole("button").allInnerTexts()).join(" ")}`,
+  "beta declared as hosted · Paused | gamma declared as interactive · Active | suspended | It pushed to the wrong branch | Unpause End",
+);
+// With no reason typed the pause says whose it is: Keel keeps a reason with every pause.
+if ((await control(newcomer, "Pause gamma").count()) > 0)
+  await control(newcomer, "Pause gamma").click();
+await offered(newcomer, "Unpause gamma");
+expectEqual(
+  "sponsored: a pause with no reason typed says it is its sponsor's",
+  `${sponsoring.standingOf(GAMMA.id)} | ${sponsoring.pausedFor(GAMMA.id) ?? "no reason"}`,
+  "suspended | Paused by its sponsor",
+);
+// Ten minutes on, Keel takes no move from this sign-in: it says so and how to go on, and the page offers the
+// passkey touch that answers it.
+await passkeysAlone.age();
+if ((await control(newcomer, "Unpause beta").count()) > 0)
+  await control(newcomer, "Unpause beta").click();
+await sponsoredOn(newcomer)
+  .getByRole("alert")
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+const touchAgain = sponsoredOn(newcomer).getByRole("button", { name: SIGN_IN_AGAIN });
+expectEqual(
+  "sponsored: a move from a sign-in that is not fresh is refused in Keel's sentence with its way forward, a passkey touch is offered, and nothing has changed",
+  `${(await sponsoredOn(newcomer).getByRole("alert").count()) === 0 ? "no refusal" : squash(await sponsoredOn(newcomer).getByRole("alert").innerText())} | ${await touchAgain.count()} offered | ${sponsoring.standingOf(BETA.id)}`,
+  "This needs a fresh sign-in: a passkey sign-in from the last ten minutes. Sign in again with your passkey, then retry | 1 offered | suspended",
+);
+// One touch signs in afresh and asks again what Keel refused.
+if ((await touchAgain.count()) > 0) await touchAgain.click();
+await offered(newcomer, "Pause beta");
+expectEqual(
+  "sponsored: one touch signs in afresh and asks again what Keel refused",
+  `${await sponsoredRows(newcomer)} | ${sponsoring.standingOf(BETA.id)} | ${await sponsoredOn(newcomer).getByRole("alert").count()} refusal`,
+  "beta declared as hosted · Active | gamma declared as interactive · Paused | active | 0 refusal",
+);
+// At a phone's width every control is whole on the screen.
+await newcomer.setViewportSize({ width: 390, height: 800 });
+expectEqual(
+  "sponsored: at a phone's width every control is whole on the screen",
+  (
+    await sponsoredOn(newcomer)
+      .locator("button, input")
+      .evaluateAll((controls) =>
+        controls.map(
+          (one) =>
+            one.getBoundingClientRect().left >= 0 &&
+            one.getBoundingClientRect().right <= window.innerWidth,
+        ),
+      )
+  ).join(" "),
+  "true true true true true",
+);
+await shot(newcomer, "settings-sponsored-phone");
+await newcomer.setViewportSize({ width: 1280, height: 900 });
+// Ending is one click. The agent is then nobody's, its row is gone, and Keel has reinstated it.
+if ((await control(newcomer, "End gamma").count()) > 0)
+  await control(newcomer, "End gamma").click();
+await control(newcomer, "End gamma")
+  .waitFor({ state: "detached", timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "sponsored: ending is one click, the row is gone, and Keel says nobody stands behind the agent and that it is active again",
+  `${await sponsoredRows(newcomer)} | ${sponsoring.sponsorOf(GAMMA.id) ?? "nobody"} | ${sponsoring.standingOf(GAMMA.id)}`,
+  "beta declared as hosted · Active | nobody | active",
 );
 expectEqual(
   "sponsor: the page sent Keel no Authorization",

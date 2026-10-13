@@ -28,6 +28,7 @@ import type {
   ProjectSettings,
   ProjectView,
   SponsorRequest,
+  SponsoredAgents,
   RepoBlob,
   RepoCommitDiff,
   RepoCommitPage,
@@ -130,6 +131,10 @@ export interface FakeKeel {
   askSponsor(agentId: string): SponsorRequest;
   /** Who stands behind an agent, by the id its reader was known by; nobody, where it has no sponsor. */
   sponsorOf(agentId: string): string | undefined;
+  /** How an agent stands: `suspended` while its sponsor has it paused. */
+  standingOf(agentId: string): NonNullable<AgentProfile["state"]>;
+  /** The reason an agent's pause was given, while it is paused. */
+  pausedFor(agentId: string): string | undefined;
 }
 
 /** How long an agent's code is good for. */
@@ -354,6 +359,21 @@ export function createFakeKeel(
   /** Each agent's live request for a sponsor, and who stands behind each: the link, as Keel's handler keeps it. */
   const asks = new Map<string, { code: string; until: number }>();
   const behind = new Map<string, string>();
+  /** How each agent stands, where it is not active, and the reason its pause was given. */
+  const standing = new Map<string, NonNullable<AgentProfile["state"]>>();
+  const pauses = new Map<string, string>();
+  /** An agent as Keel answers its sponsor: its `agentProfile`. */
+  const profileOf = (known: AgentCard): AgentProfile => ({
+    id: known.id,
+    projectId: project.id,
+    name: known.name,
+    kind: known.kind,
+    scopes: [],
+    ...(behind.has(known.id) ? { sponsor: behind.get(known.id) ?? "" } : {}),
+    revocationEpoch: 0,
+    state: standing.get(known.id) ?? "active",
+    createdAt: created.at,
+  });
 
   return {
     calls,
@@ -372,6 +392,8 @@ export function createFakeKeel(
       };
     },
     sponsorOf: (agentId) => behind.get(agentId),
+    standingOf: (agentId) => standing.get(agentId) ?? "active",
+    pausedFor: (agentId) => pauses.get(agentId),
     async fetch(request) {
       const url = new URL(request.url);
       const sent = request.method === "GET" ? "" : await request.text();
@@ -390,6 +412,16 @@ export function createFakeKeel(
       /** The project is shown to its namespace's members, and to anyone where it is public. To the rest it is not there. */
       const visible = member || project.visibility === "public";
       const gone = (): Response => problem(404, "resource.not_found");
+
+      // The agents a person stands behind, Keel lists to that person and to nobody else: `listSponsored`.
+      if (url.pathname === "/v1/agents/sponsored" && request.method === "GET") {
+        if (reader === null) return problem(401, "auth.required");
+        return Response.json({
+          items: [...agents.values()]
+            .filter((agent) => reader.id !== undefined && behind.get(agent.id) === reader.id)
+            .map(profileOf),
+        } satisfies SponsoredAgents);
+      }
 
       // Who an agent is, Keel answers anyone: its card, and never who stands behind it.
       const card = /^\/v1\/agents\/([^/]+)$/.exec(url.pathname);
@@ -419,17 +451,54 @@ export function createFakeKeel(
         if (behind.has(agentId)) return sponsorHeld(agentId);
         asks.delete(agentId);
         behind.set(agentId, reader.id ?? "");
-        return Response.json({
-          id: known.id,
-          projectId: project.id,
-          name: known.name,
-          kind: known.kind,
-          scopes: [],
-          sponsor: reader.id ?? "",
-          revocationEpoch: 0,
-          state: "active",
-          createdAt: new Date(now()).toISOString(),
-        } satisfies AgentProfile);
+        return Response.json(profileOf(known));
+      }
+
+      // A sponsor's moves on an agent: pause it, unpause it, end the link. Keel's policy answers first, and to
+      // anyone but the sponsor the agent is not there; then the fresh sign-in; then whether the agent, as it
+      // stands, allows the move (`standingError`). Ending the link reinstates a paused agent.
+      const stood = /^\/v1\/agents\/([^/]+)\/(suspend|reinstate)$/.exec(url.pathname);
+      const ending = link !== null && request.method === "DELETE";
+      if ((stood !== null && request.method === "POST") || ending) {
+        if (reader === null) return problem(401, "auth.required");
+        const agentId = decodeURIComponent((stood ?? link)?.[1] ?? "");
+        const command = ending ? "Unsponsor" : stood?.[2] === "suspend" ? "Suspend" : "Reinstate";
+        const reason = fields(sent).get("reason");
+        if (command === "Suspend" && typeof reason !== "string")
+          return problem(400, "request.invalid");
+        const known = agents.get(agentId);
+        if (known === undefined || reader.id === undefined || behind.get(agentId) !== reader.id)
+          return gone();
+        if (reader.fresh !== true) return staleSignIn();
+        const stands = standing.get(agentId) ?? "active";
+        if (
+          (command === "Suspend" && stands !== "active") ||
+          (command === "Reinstate" && stands !== "suspended")
+        )
+          return problem(
+            409,
+            "agent.state_refused",
+            stands === "suspended"
+              ? [
+                  {
+                    kind: "call",
+                    title: "Reinstate the agent first",
+                    operationId: "Operator_reinstateAgent",
+                    args: { agentId },
+                  },
+                ]
+              : [],
+            `${agentId} is ${stands}, where ${command} is not allowed.`,
+          );
+        if (command === "Suspend") {
+          standing.set(agentId, "suspended");
+          pauses.set(agentId, typeof reason === "string" ? reason : "");
+        } else {
+          standing.delete(agentId);
+          pauses.delete(agentId);
+        }
+        if (ending) behind.delete(agentId);
+        return Response.json(profileOf(known));
       }
 
       // Whose a handle is, Keel answers anyone: that a handle is someone's is no secret, and what it holds is.

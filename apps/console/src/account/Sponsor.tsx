@@ -5,6 +5,7 @@
 import { Button } from "@cloudflare/kumo";
 import { useEffect, useRef, useState } from "react";
 import type { AgentCard } from "../contract/keel/index.ts";
+import { hrefOf } from "../places.ts";
 import type { KeelSponsorship } from "../source/types.ts";
 import type { Account, Who } from "./account.ts";
 import { Card, Refusal, useAsking } from "./parts.tsx";
@@ -95,8 +96,8 @@ export function Sponsor({
         title={`You stand behind ${agent.name}`}
         lede={`Its questions come to you, ${called(stood)}. You can pause it, or end this, at any time.`}
       >
-        <a className="a-link" href="/">
-          Go to your home
+        <a className="a-link" href={hrefOf({ at: "settings" })}>
+          See the agents you stand behind
         </a>
       </Card>
     );

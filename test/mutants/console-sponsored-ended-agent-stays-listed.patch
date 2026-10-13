@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsored.test.ts
+# kills: sponsored.after
+# why: an agent whose link the reader ended stays in their list with its controls, though Keel no longer names them its sponsor
+diff --git a/apps/console/src/account/sponsored.ts b/apps/console/src/account/sponsored.ts
+index dd38adce..67f025af 100644
+--- a/apps/console/src/account/sponsored.ts
++++ b/apps/console/src/account/sponsored.ts
+@@ -55,6 +55,6 @@ export function afterMove(
+ ): AgentProfile[] {
+   return listed.flatMap((agent) => {
+     if (agent.id !== answered.id) return [agent];
+-    return answered.sponsor === reader ? [answered] : [];
++    return [answered];
+   });
+ }

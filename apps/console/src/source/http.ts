@@ -19,7 +19,9 @@ import { EVENT_TYPES } from "../contract/envelope.ts";
 import type { AnyEvent } from "../contract/events.ts";
 import type {
   AgentCard,
+  AgentProfile,
   Agents_approveSponsorInput,
+  Agents_endSponsorshipInput,
   EscalationPage,
   EscalationView,
   EventPage,
@@ -30,6 +32,8 @@ import type {
   Operator_giveRulingInput,
   Operator_listEscalationsInput,
   Operator_putSettingsInput,
+  Operator_reinstateAgentInput,
+  Operator_suspendAgentInput,
   ProjectPage,
   ProjectSettings,
   ProjectView,
@@ -39,6 +43,7 @@ import type {
   RepoCommitDiff,
   RepoCommitPage,
   RepoTree,
+  SponsoredAgents,
   Repo_getBlobInput,
   Repo_getTreeInput,
   Repo_listCommitsInput,
@@ -150,6 +155,27 @@ export function createHttpSponsorship(options: HttpOptions = {}): KeelSponsorshi
   const read = reader(options);
   const request = options.fetch ?? fetch;
   const origin = options.origin ?? "";
+  /**
+   * One of a sponsor's moves on an agent: Keel's own operation at its own address, with a key made for the one
+   * attempt and nothing of the page's beside it. Keel answers the agent as it then stands.
+   */
+  const moved = async (
+    method: "DELETE" | "POST",
+    path: string,
+    key: string,
+    body?: object,
+  ): Promise<AgentProfile> => {
+    const response = await request(`${origin}/v1/agents/${path}`, {
+      method,
+      headers: {
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
+        "idempotency-key": key,
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    if (!response.ok) throw await refusalOf(response);
+    return answered<AgentProfile>(response);
+  };
   return {
     async findAgent(agentId, signal) {
       const response = await read(`/v1/agents/${encodeURIComponent(agentId)}`, signal);
@@ -174,6 +200,37 @@ export function createHttpSponsorship(options: HttpOptions = {}): KeelSponsorshi
         body: JSON.stringify(body),
       });
       if (!response.ok) throw await refusalOf(response);
+    },
+    async listSponsored(signal) {
+      const response = await read("/v1/agents/sponsored", signal);
+      if (!response.ok) throw await refusalOf(response);
+      return (await answered<SponsoredAgents>(response)).items;
+    },
+    pause(agentId, reason) {
+      const {
+        agentId: named,
+        "idempotency-key": key,
+        ...body
+      }: Operator_suspendAgentInput = {
+        agentId,
+        "idempotency-key": `console:pause:${crypto.randomUUID()}`,
+        reason,
+      };
+      return moved("POST", `${encodeURIComponent(named)}/suspend`, key, body);
+    },
+    unpause(agentId) {
+      const { agentId: named, "idempotency-key": key }: Operator_reinstateAgentInput = {
+        agentId,
+        "idempotency-key": `console:unpause:${crypto.randomUUID()}`,
+      };
+      return moved("POST", `${encodeURIComponent(named)}/reinstate`, key);
+    },
+    end(agentId) {
+      const { agentId: named, "idempotency-key": key }: Agents_endSponsorshipInput = {
+        agentId,
+        "idempotency-key": `console:end:${crypto.randomUUID()}`,
+      };
+      return moved("DELETE", `${encodeURIComponent(named)}/sponsor`, key);
     },
   };
 }

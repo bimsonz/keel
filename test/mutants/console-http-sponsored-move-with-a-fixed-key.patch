@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/sponsored.test.ts
+# kills: sponsored.calls
+# why: ending a link is sent with the same key every time, so Keel answers a second ending, of a later link to the same agent, with the first one's answer and ends nothing
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 18bc2a58..ce60f8de 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -228,7 +228,7 @@ export function createHttpSponsorship(options: HttpOptions = {}): KeelSponsorshi
+     end(agentId) {
+       const { agentId: named, "idempotency-key": key }: Agents_endSponsorshipInput = {
+         agentId,
+-        "idempotency-key": `console:end:${crypto.randomUUID()}`,
++        "idempotency-key": "console:end",
+       };
+       return moved("DELETE", `${encodeURIComponent(named)}/sponsor`, key);
+     },

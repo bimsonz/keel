@@ -162,6 +162,14 @@ export interface KeelSponsorship {
   findAgent(agentId: string, signal?: AbortSignal): Promise<Keel.AgentCard | null>;
   /** Stands behind the agent with the code it showed. The code rides in the body of this one call, and nowhere else. */
   approve(agentId: string, code: string): Promise<void>;
+  /** The agents Keel names the reader the sponsor of, oldest first: `GET /v1/agents/sponsored`. */
+  listSponsored(signal?: AbortSignal): Promise<Keel.AgentProfile[]>;
+  /** Pauses an agent, with the reason Keel keeps. Each of these three answers the agent as it then stands. */
+  pause(agentId: string, reason: string): Promise<Keel.AgentProfile>;
+  /** Lets a paused agent work again. */
+  unpause(agentId: string): Promise<Keel.AgentProfile>;
+  /** Ends the link: the reader no longer stands behind the agent. */
+  end(agentId: string): Promise<Keel.AgentProfile>;
 }
 
 export class KeelRefused extends Error {

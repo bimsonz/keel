@@ -14,6 +14,7 @@ import {
 } from "react";
 import { type OrgTab, type Place, hrefOf, nextOf, sentFrom } from "../places.ts";
 import { createHttpDirectory, createHttpSponsorship } from "../source/http.ts";
+import type { KeelSponsorship } from "../source/types.ts";
 import { applyMode } from "../theme/mode.ts";
 import { Switch } from "../views/Switch.tsx";
 import {
@@ -32,6 +33,7 @@ import { wayToFresh } from "./fresh.ts";
 import { Invite, NamespacePages, NamespacePublic, NewOrg } from "./OrgPages.tsx";
 import { Card, HANDLE, Refusal, type Said, go, saidOf, useAsking } from "./parts.tsx";
 import { Sponsor } from "./Sponsor.tsx";
+import { Sponsored } from "./Sponsored.tsx";
 import { type SponsorLink, takeLink } from "./sponsorLink.ts";
 // oxlint-disable-next-line import/no-unassigned-import -- a stylesheet
 import "../views/tokens.css";
@@ -460,7 +462,15 @@ function Passkeys({ account, who }: { account: Account; who: Who }) {
   );
 }
 
-function Settings({ account, who }: { account: Account; who: Who }) {
+function Settings({
+  account,
+  sponsorship,
+  who,
+}: {
+  account: Account;
+  sponsorship: KeelSponsorship;
+  who: Who;
+}) {
   const { busy, refused, ask } = useAsking();
   const [ended, setEnded] = useState(false);
   return (
@@ -472,6 +482,7 @@ function Settings({ account, who }: { account: Account; who: Who }) {
         </p>
       </header>
       <Passkeys account={account} who={who} />
+      <Sponsored account={account} sponsorship={sponsorship} who={who} />
       <section className="a-panel flex flex-col gap-3 p-4" aria-label="Sessions">
         <h2 className="a-h">Sessions</h2>
         <p className="text-sm text-kumo-subtle">
@@ -783,7 +794,7 @@ export function AccountApp({ place, link }: { place: Place; link: SponsorLink | 
   else if (reader.is === "user" && place.at === "signup")
     page = <ChooseHandle account={account} who={reader.who} />;
   else if (reader.is === "user" && place.at === "settings")
-    page = <Settings account={account} who={reader.who} />;
+    page = <Settings account={account} sponsorship={sponsorship} who={reader.who} />;
   else if (reader.is === "user" && place.at === "device")
     page = <Device account={account} who={reader.who} userCode={place.userCode} />;
   else if (reader.is === "user" && place.at === "new-org") page = <NewOrg account={account} />;
