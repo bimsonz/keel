@@ -1,4 +1,4 @@
-import { BatchId, CandidateId, ContentHash, OrgId, ProjectId } from "@keeltown/core/kernel";
+import { BatchId, CandidateId, ContentHash, NamespaceId, ProjectId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 
 /** The source-control provider id KeelVerify's runs carry: candidates come from bundles, never from git. */
@@ -13,7 +13,7 @@ export const KEEL_BUNDLE_PROVIDER = "keel-bundle";
  */
 export const KeelVerifyJob = Schema.Struct({
   projectId: ProjectId,
-  namespace: OrgId,
+  namespace: NamespaceId,
   jobId: Schema.NonEmptyString,
   laneId: Schema.NonEmptyString,
   candidateId: CandidateId,

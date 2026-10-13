@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { Actor } from "@keeltown/core/domain/identity";
-import { AgentId, OrgId, ProjectId, UserId } from "@keeltown/core/kernel";
+import { AgentId, NamespaceId, ProjectId, UserId } from "@keeltown/core/kernel";
 import { AgentDirectory, Enrolments, Sponsorships, Standings } from "@keeltown/core/ports";
 import { Effect, type Layer, Option, Schema } from "effect";
 
@@ -34,7 +34,7 @@ const enrolled = (by: UserActor) =>
         kind: "interactive",
         scopes: ["agent:read", "agent:work"],
         projectId: Schema.decodeUnknownSync(ProjectId)(`prj_${ulid()}`),
-        org: Schema.decodeUnknownSync(OrgId)(`org_${ulid()}`),
+        org: Schema.decodeUnknownSync(NamespaceId)(`org_${ulid()}`),
         sponsor: by.userId,
         idempotencyKey: `enrol-${crypto.randomUUID()}`,
       }),

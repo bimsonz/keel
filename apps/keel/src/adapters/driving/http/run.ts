@@ -12,9 +12,9 @@ import type {
   Inbox,
   Memberships,
   Notifier,
-  Orgs,
+  Namespaces,
   ProbeStore,
-  ProjectOrgs,
+  ProjectNamespaces,
   Projects,
   ProjectViews,
   Sessions,
@@ -49,8 +49,8 @@ export type IsolateServices =
   | Standings
   | Users
   | Memberships
-  | Orgs
-  | ProjectOrgs;
+  | Namespaces
+  | ProjectNamespaces;
 
 /** What a request answers with when its effect dies rather than failing with a declared error. */
 export type DefectResult =

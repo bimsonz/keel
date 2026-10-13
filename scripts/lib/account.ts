@@ -18,8 +18,6 @@ export interface AccountSession {
   /** The account's own namespace, by handle: what its own projects are created in. */
   readonly namespace: string;
   readonly userId: string;
-  /** The id of the org named by its handle. */
-  readonly org: string;
   /** Sent as `Authorization: Bearer <token>`. */
   readonly token: string;
   readonly expiresAt: string;
@@ -105,14 +103,7 @@ async function sessionOf(
   fetcher: Fetcher,
 ): Promise<AccountSession> {
   const session = expectOk("the session", await site("/get-session", { jar }));
-  const orgs = expectOk("its orgs", await site("/organization/list", { jar }));
-  const listed: unknown = orgs.json;
-  const own = field(
-    (Array.isArray(listed) ? listed : []).find((org: unknown) => field(org, "slug") === handle),
-    "id",
-  );
-  if (session.json?.user?.username !== handle || typeof own !== "string")
-    throw new Error(`the session is not ${handle}'s`);
+  if (session.json?.user?.username !== handle) throw new Error(`the session is not ${handle}'s`);
   const token = tokenOf(jar);
   const gate = await whoIs(keelUrl, token, fetcher);
   if (gate.status !== 200 || gate.handle !== handle || gate.userId !== session.json.user.id)
@@ -122,7 +113,6 @@ async function sessionOf(
     handle,
     namespace: handle,
     userId: session.json.user.id,
-    org: own,
     token,
     expiresAt: new Date(session.json.session.expiresAt).toISOString(),
   };

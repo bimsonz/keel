@@ -11,7 +11,7 @@ import {
   type EventEnvelope,
   Instant,
   makeId,
-  type OrgId,
+  type NamespaceId,
   type UserId,
 } from "@keeltown/core/kernel";
 import {
@@ -32,8 +32,11 @@ import { ulid } from "./probe-ledger.ts";
  */
 export interface EscalationsHarness {
   readonly layer: Layer.Layer<Escalations | HumanGate>;
-  readonly settled: (namespace: OrgId) => Effect.Effect<void>;
-  readonly log: (namespace: OrgId, entity: EntityRef) => Effect.Effect<readonly EventEnvelope[]>;
+  readonly settled: (namespace: NamespaceId) => Effect.Effect<void>;
+  readonly log: (
+    namespace: NamespaceId,
+    entity: EntityRef,
+  ) => Effect.Effect<readonly EventEnvelope[]>;
 }
 
 const types = (log: readonly EventEnvelope[]) => log.map((event) => event.type);
@@ -53,7 +56,7 @@ const ask = (conflictId: string, question = "Which holds?"): EscalationAsk => ({
 });
 
 /** A raise for a fresh conflict in a fresh project of `namespace`, asking `sponsor` first. */
-function raiseIn(namespace: OrgId, sponsor?: UserId): RaiseRequest {
+function raiseIn(namespace: NamespaceId, sponsor?: UserId): RaiseRequest {
   const conflictId = makeId("cfl", ulid());
   return {
     namespace,
@@ -354,7 +357,7 @@ export function describeEscalationsContract(
           const raisedAt = first.escalation.raisedAt;
           const idsFor = (
             userId: UserId,
-            maintains: readonly OrgId[],
+            maintains: readonly NamespaceId[],
             after: number,
           ): Effect.Effect<readonly string[]> =>
             escalations

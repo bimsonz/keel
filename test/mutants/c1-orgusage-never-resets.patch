@@ -2,10 +2,10 @@
 # kills: orgusage.contract.daily-reset
 # why: A daily count never resets, so an org that used its container-minutes once is refused for good
 diff --git a/packages/core/src/application/identity/org-usage.ts b/packages/core/src/application/identity/org-usage.ts
-index 94a206b..6e1be91 100644
+index a84af00..db39ee3 100644
 --- a/packages/core/src/application/identity/org-usage.ts
 +++ b/packages/core/src/application/identity/org-usage.ts
-@@ -38,7 +38,7 @@ const usedAt = (store: Store, org: OrgId, kind: QuotaKind, now: Instant): number
+@@ -65,7 +65,7 @@ const usedAt = (store: Store, org: NamespaceId, kind: QuotaKind, now: Instant):
    const stored = store.get(COUNT, countId(org, kind));
    if (stored === undefined) return 0;
    const count = decodeCount(stored);
@@ -13,4 +13,4 @@ index 94a206b..6e1be91 100644
 +  return count.used;
  };
  
- const putUsed = (store: Store, org: OrgId, kind: QuotaKind, used: number, now: Instant): void => {
+ const putUsed = (

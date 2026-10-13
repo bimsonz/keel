@@ -22,7 +22,7 @@ import {
   ProbeStore,
 } from "../../../src/application/ports/index.ts";
 import { Proposition } from "../../../src/domain/coordination/index.ts";
-import { ContentHash, OrgId } from "../../../src/domain/kernel/index.ts";
+import { ContentHash, NamespaceId } from "../../../src/domain/kernel/index.ts";
 import {
   type FlowWorld,
   ModelAbstained,
@@ -43,7 +43,7 @@ const WORLDS: Readonly<Record<FlowWorld, ContentHash>> = {
 const A_NOOP = hash(14);
 
 /** The namespace every call names, and the only one the stores below keep anything for. */
-const NAMESPACE = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const NAMESPACE = Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 
 /** A's revoke, as S-1's a.patch adds it: what the slots name for A-noop. */
 const REVOKE_PATH = "src/routes/collaborators.ts";

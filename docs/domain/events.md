@@ -39,7 +39,7 @@ The AgentSession DO (`agent:<id>`) is the source of truth for an agent. D1's `Ag
 
 | Event | Emitter | Payload | `affected[]` | `notified[]` | Reactions |
 |---|---|---|---|---|---|
-| `AgentEnrolled` | AgentSession DO (operator command) | `agentId, projectId, name, kind: interactive\|hosted\|human\|synthetic, scopes[], org?`, `sponsor?: UserId` (the user who minted the credential; optional only for agents enrolled before tenancy) | — | Projector | Catalog row created |
+| `AgentEnrolled` | AgentSession DO (operator command) | `agentId, projectId, name, kind: interactive\|hosted\|human\|synthetic, scopes[], org?: NamespaceId` (the namespace the agent works in, an org's or a person's own: the field keeps the name the log already holds), `sponsor?: UserId` (the user who minted the credential; optional only for agents enrolled before tenancy) | — | Projector | Catalog row created |
 | `AgentSuspended` | AgentSession DO (operator command) | `agentId, reason, by` | the agent's open changes | the agent's AgentSession DO, Projector | Token exchange and every call refused until reinstated; its leases stop renewing |
 | `AgentReinstated` | AgentSession DO (operator command) | `agentId, by` | — | the agent's AgentSession DO, Projector | Calls accepted again |
 | `AgentRevoked` | AgentSession DO (operator command) | `agentId, revocationEpoch, by` | the agent's open changes, its leases | the agent's AgentSession DO, Projector | Revocation epoch bumped, so every token minted before it is rejected; its changes park for adoption |

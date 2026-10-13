@@ -20,16 +20,23 @@ import {
   type HumanGate,
   type Ids,
   ProbeLedger,
-  type ProjectOrgs,
+  type ProjectNamespaces,
   type SubjectRef,
 } from "@keeltown/core/ports";
 import { Effect, Layer } from "effect";
 import { makeEscalationsMemory } from "./escalations.ts";
 import { makeEventOutboxMemory, makeManualClock } from "./event-outbox.ts";
 import { makeAgentDirectoryMemory, makeIdsMemory } from "./identity.ts";
-import { makeProjectOrgsMemory } from "./tenancy.ts";
+import { makeProjectNamespacesMemory } from "./tenancy.ts";
 
-type Hosted = Clock | EntityStore | EventOutbox | Ids | HumanGate | AgentDirectory | ProjectOrgs;
+type Hosted =
+  | Clock
+  | EntityStore
+  | EventOutbox
+  | Ids
+  | HumanGate
+  | AgentDirectory
+  | ProjectNamespaces;
 
 /**
  * ProbeLedger and ConflictMoves in memory: one object per Subject DO address,
@@ -46,7 +53,7 @@ export function makeProbeLedgerMemory() {
   const clock = makeManualClock();
   const escalations = makeEscalationsMemory(clock);
   const directory = makeAgentDirectoryMemory();
-  const orgs = makeProjectOrgsMemory();
+  const orgs = makeProjectNamespacesMemory();
   const objects = new Map<string, Layer.Layer<Hosted>>();
   const objectAt = (at: SubjectRef) => {
     const address = subjectAddress(at.projectId, at.key);

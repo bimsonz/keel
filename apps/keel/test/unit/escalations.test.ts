@@ -20,7 +20,7 @@ import {
   EventEnvelope,
   Instant,
   makeId,
-  type OrgId,
+  type NamespaceId,
   type UserId,
 } from "@keeltown/core/kernel";
 import {
@@ -243,7 +243,7 @@ describe("the question a conflict is put to a person with", () => {
   );
 });
 
-const recordAt = (namespace: OrgId, raisedAt: number, sponsor?: UserId): EscalationRecord => {
+const recordAt = (namespace: NamespaceId, raisedAt: number, sponsor?: UserId): EscalationRecord => {
   const conflictId = nextId("cfl");
   return {
     escalation: {
@@ -332,7 +332,7 @@ function ruled() {
   const { memory, at, conflictId, holder, other } = viewAt(true, "admitted");
   const namespace = nextId("org");
   const by = nextId("usr");
-  memory.orgs.places.set(at.projectId, { projectId: at.projectId, org: namespace, name: "p" });
+  memory.orgs.places.set(at.projectId, { projectId: at.projectId, namespace, name: "p" });
   const program = Effect.gen(function* () {
     yield* (yield* ConflictMoves).resolve(at, {
       conflictId,

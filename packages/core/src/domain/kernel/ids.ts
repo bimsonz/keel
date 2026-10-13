@@ -88,6 +88,16 @@ export type UserId = typeof UserId.Type;
 export const OrgId = prefixed("org").pipe(Schema.brand("OrgId"));
 export type OrgId = typeof OrgId.Type;
 /**
+ * A namespace: a handle that owns projects. Its id is its account's
+ * id, a user's, an agent's or an org's, so there is no id space of its own.
+ */
+export const NamespaceId = Schema.Union([UserId, AgentId, OrgId]);
+export type NamespaceId = typeof NamespaceId.Type;
+/** What a namespace is: a person's own, an agent's own, or an org with members and roles. */
+export const NamespaceKind = Schema.Literals(["user", "agent", "org"]);
+export type NamespaceKind = typeof NamespaceKind.Type;
+
+/**
  * A credential in an org's store, named and never held: the id is minted when
  * the secret is stored, so a record that carries one carries no secret.
  */
@@ -143,4 +153,11 @@ export function makeId<P extends IdPrefix>(prefix: P, ulid: string): IdOf[P] {
 /** Whether `value` is an id of the given prefix. */
 export function isId<P extends IdPrefix>(prefix: P, value: string): value is IdOf[P] {
   return idPattern(prefix).test(value);
+}
+
+/** A namespace's kind, read from its id: the id is its account's, so its prefix says which. */
+export function namespaceKind(id: NamespaceId): NamespaceKind {
+  if (isId("usr", id)) return "user";
+  if (isId("agt", id)) return "agent";
+  return "org";
 }

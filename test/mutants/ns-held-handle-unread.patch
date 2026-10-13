@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/namespaces.test.ts
+# kills: ns.own-handle
+# why: a held handle is never refused by the read, so a person choosing their own handle again is answered as if they had just taken it, and a passkey sign-up is offered a handle it can never have
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 2db5ad4..6ccec70 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -136,8 +136,6 @@ async function nameUnavailable(db: D1Database, name: string): Promise<NameRefusa
+   const held = await db.prepare(HANDLE_HOLDER).bind(lowered).first<{ holder: string }>();
+   const refusal = nameRefusal(name);
+   if (refusal !== undefined) return { refused: "NAME_REFUSED", message: refusal };
+-  if (held !== null)
+-    return { refused: "NAME_TAKEN", message: `"${lowered}" is taken: ${ONE_HOLDER}` };
+   return undefined;
+ }
+ 

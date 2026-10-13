@@ -7,3 +7,4 @@
 export { OPENAPI_DOCUMENT_PATH, openApiDocument } from "./document.gen.ts";
 export type * from "./generated/requests.gen.ts";
 export { SPEC_VOCABULARIES } from "./generated/vocabularies.gen.ts";
+export * from "./reserved.ts";

@@ -8,7 +8,7 @@ index 2e4391eb..3bdd0bdc 100644
 @@ -490,7 +490,7 @@ export function memoryProbeRunnerHarness(): ProbeRunnerHarness {
  
  /** Where the memory ProbeStore keeps a namespace's probe: the key the R2 adapter keeps its bundle at. */
- const probeKeyOf = (namespace: OrgId, hash: ContentHash) =>
+ const probeKeyOf = (namespace: NamespaceId, hash: ContentHash) =>
 -  namespaceKey(namespace, "bundles", hash.slice("sha256:".length));
 +  namespaceKey("org_00000000000000000000000000", "bundles", hash.slice("sha256:".length));
  

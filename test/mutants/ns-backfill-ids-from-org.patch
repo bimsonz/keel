@@ -1,0 +1,23 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/namespaces.test.ts
+# kills: ns.backfill
+# why: the migration leaves each personal org's projects under the org's id and then deletes the org, so every project a person had is under a namespace that no longer exists and is found by nobody
+diff --git a/apps/keel/migrations/0010_namespaces.sql b/apps/keel/migrations/0010_namespaces.sql
+index fef8911..5aa87cb 100644
+--- a/apps/keel/migrations/0010_namespaces.sql
++++ b/apps/keel/migrations/0010_namespaces.sql
+@@ -44,15 +44,6 @@ DROP INDEX projects_by_org_name;
+ CREATE UNIQUE INDEX projects_by_namespace_name ON projects (namespace_id, name);
+ 
+ -- A personal org's projects and agents become its person's own.
+-UPDATE projects
+-SET namespace_id = (
+-  SELECT u.id FROM organization o JOIN "user" u ON u.username = o.slug
+-  WHERE o.id = projects.namespace_id
+-)
+-WHERE namespace_id IN (
+-  SELECT o.id FROM organization o JOIN "user" u ON u.username = o.slug
+-);
+-
+ UPDATE agents
+ SET namespace_id = (
+   SELECT u.id FROM organization o JOIN "user" u ON u.username = o.slug

@@ -54,7 +54,7 @@ import {
   Inbox,
   type LabelledEscalation,
   ProbeStore,
-  type ProjectOrgs,
+  type ProjectNamespaces,
   ProjectViews,
   type RulingCommand,
   type RulingRefusal,
@@ -417,7 +417,7 @@ const NO_FILES: ProbeSource["files"] = [];
 export const readProbeSource: (
   scope: ProjectScope,
   probeId: ProbeId,
-) => Effect.Effect<ProbeSource, ProbeNotFound, ProjectViews | ProbeStore | ProjectOrgs> = (
+) => Effect.Effect<ProbeSource, ProbeNotFound, ProjectViews | ProbeStore | ProjectNamespaces> = (
   scope,
   probeId,
 ) =>

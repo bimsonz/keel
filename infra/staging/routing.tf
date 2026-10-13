@@ -31,10 +31,11 @@ resource "cloudflare_workers_route" "mcp" {
   script  = "keel"
 }
 
-# Keel's allowed-signers file (/.well-known/keel/allowed-signers), which stock
+# Everything under /.well-known/ is Keel's to answer, never the console's page:
+# today its allowed-signers file (/.well-known/keel/allowed-signers), which stock
 # git verifies a landed commit against.
 resource "cloudflare_workers_route" "well_known" {
   zone_id = data.cloudflare_zone.site.zone_id
-  pattern = "${var.host}/.well-known/keel/*"
+  pattern = "${var.host}/.well-known/*"
   script  = "keel"
 }

@@ -42,6 +42,8 @@ export default defineProject({
           // whatever is set here. Composition serves keel-ws-00 from TEST_ARTIFACTS when it is
           // bound, so the real CodeHost adapter runs inside the WorkspacePool DO against a fake.
           serviceBindings: { TEST_ARTIFACTS: "fake-artifacts" },
+          // An empty database beside DB, for running a migration over rows written before it.
+          d1Databases: { TEST_BACKFILL_DB: "keel-backfill" },
           // keel-verify is another deployable; tests bind VERIFIER to a fake of it.
           workers: [
             {

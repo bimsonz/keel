@@ -5,7 +5,7 @@ import {
   type CommitSha,
   ContentHash,
   NextAction,
-  type OrgId,
+  type NamespaceId,
   type ProjectId,
   type VerdictId,
 } from "../../domain/kernel/index.ts";
@@ -447,7 +447,7 @@ export const refuseSubmission = Effect.fn("verification/refuseSubmission")(funct
  * content-addressed, so a replay stores the same plan again.
  */
 export const recordPlan = Effect.fn("verification/recordPlan")(function* (
-  namespace: OrgId,
+  namespace: NamespaceId,
   submission: PrecheckSubmission,
   decision: Extract<PrecheckDecision, { _tag: "Compile" }>,
 ) {

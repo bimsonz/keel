@@ -1,7 +1,15 @@
 import { DerivedEffect, Intent, SubjectKey } from "@keeltown/core/domain/coordination";
 import { IdempotencyConflict } from "@keeltown/core/domain/identity";
 import { ProjectNotFound } from "@keeltown/core/domain/integration";
-import { Actor, Anchor, ChangeId, Glob, InstantSchema, ProjectId } from "@keeltown/core/kernel";
+import {
+  Actor,
+  Anchor,
+  ChangeId,
+  Glob,
+  InstantSchema,
+  ProjectId,
+  UserId,
+} from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import type { EventReceiverRpc } from "./events.ts";
 import { exitCodec, type ExitJson } from "./exit.ts";
@@ -46,8 +54,8 @@ export const PutSettingsCommand = Schema.Struct({
  * Create the project this DO is named for. The isolate derives `projectId`
  * from the actor and the Idempotency-Key, so a retry reaches the same DO,
  * which replays by `idempotencyKey` and refuses another body (`fingerprint`)
- * with IdempotencyConflict. `by` is the actor's id; the commit's actor is
- * `operator:<by>`. Trunk is forked from `source`, a repo in the core
+ * with IdempotencyConflict. `by` is the person creating it; the commit's actor
+ * is `user:<by>`. Trunk is forked from `source`, a repo in the core
  * namespace; staging is forked from trunk; the per-project mirror is created
  * empty in the workspace namespace and trunk's head is pushed into it; then the
  * pool is configured and trunk is initialised at that head.
@@ -57,7 +65,7 @@ export const CreateProjectCommand = Schema.Struct({
   name: Schema.NonEmptyString,
   /** The repo in the core namespace that trunk is forked from. */
   source: Schema.NonEmptyString,
-  by: Schema.NonEmptyString,
+  by: UserId,
   idempotencyKey: Schema.String,
   fingerprint: Schema.String,
 });

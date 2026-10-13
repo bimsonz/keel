@@ -212,11 +212,11 @@ describe("[authz.agent-foreign] an agent outside its own project", () => {
     const sibling = await project();
     const foreign = await elsewhere();
 
-    const inOrg = await call(`/v1/changes?project=${sibling.projectId}`, { token: agent });
+    const inNamespace = await call(`/v1/changes?project=${sibling.projectId}`, { token: agent });
     const outOfOrg = await call(`/v1/changes?project=${foreign}`, { token: agent });
     const missing = await call(`/v1/changes?project=${makeId("prj", ulid())}`, { token: agent });
 
-    expect([inOrg.status, inOrg.body["code"], inOrg.body["detail"]]).toEqual([
+    expect([inNamespace.status, inNamespace.body["code"], inNamespace.body["detail"]]).toEqual([
       403,
       "auth.forbidden",
       "Refused: foreign-project.",
@@ -378,7 +378,7 @@ describe("[authz.r6] a project by its org's name and its own, and who the user i
     const p = await project();
     const reader = await member();
     const stranger = await outsider();
-    const path = `/v1/orgs/POOL/projects/${p.projectId.toUpperCase()}`;
+    const path = `/v1/namespaces/POOL/projects/${p.projectId.toUpperCase()}`;
 
     const inside = await call(path, { token: reader.token });
     const hidden = await call(path, { token: stranger.token });
@@ -389,7 +389,7 @@ describe("[authz.r6] a project by its org's name and its own, and who the user i
       status: 200,
       body: {
         id: p.projectId,
-        org: "pool",
+        namespace: { handle: "pool", kind: "org" },
         name: p.projectId.toLowerCase(),
         visibility: "private",
         viewer: { role: "member" },
@@ -400,14 +400,14 @@ describe("[authz.r6] a project by its org's name and its own, and who the user i
       status: 200,
       body: {
         id: p.projectId,
-        org: "pool",
+        namespace: { handle: "pool", kind: "org" },
         name: p.projectId.toLowerCase(),
         visibility: "public",
       },
     });
   });
 
-  it("[authz.r6] GET /v1/users/me answers the user's handle and its orgs with its role in each", async () => {
+  it("[authz.r6] GET /v1/users/me answers the user's handle, its own namespace and its orgs with its role in each", async () => {
     const user = await seedUser(uniqueHandle("me"), { role: "maintainer" });
     const alone = await seedUser(uniqueHandle("alone-me"), { role: null });
     expect(await call("/v1/users/me", { token: user.token })).toEqual({
@@ -415,12 +415,18 @@ describe("[authz.r6] a project by its org's name and its own, and who the user i
       body: {
         userId: user.userId,
         handle: user.handle,
+        namespace: { handle: user.handle, kind: "user" },
         orgs: [{ id: POOL_ORG, name: "pool", role: "maintainer" }],
       },
     });
     expect(await call("/v1/users/me", { token: alone.token })).toEqual({
       status: 200,
-      body: { userId: alone.userId, handle: alone.handle, orgs: [] },
+      body: {
+        userId: alone.userId,
+        handle: alone.handle,
+        namespace: { handle: alone.handle, kind: "user" },
+        orgs: [],
+      },
     });
   });
 });
@@ -441,7 +447,7 @@ describe("[authz.create-project] creating a project in an org", () => {
       token,
       method: "POST",
       key: `create-${ulid()}`,
-      body: { org, name, source: SOURCE },
+      body: { namespace: org, name, source: SOURCE },
     });
 
   it("[authz.create-project] a member creates one in its org; the same name in another case is taken; an outsider lacks the role", async () => {
@@ -457,7 +463,7 @@ describe("[authz.create-project] creating a project in an org", () => {
       status: 201,
       body: {
         id: expect.stringMatching(/^prj_/),
-        org: "pool",
+        namespace: { handle: "pool", kind: "org" },
         name,
         visibility: "private",
         createdAt: expect.any(String),

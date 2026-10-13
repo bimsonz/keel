@@ -6,7 +6,7 @@ import {
   DecisionId,
   type EntityRef,
   EscalationId,
-  OrgId,
+  NamespaceId,
   userActor,
 } from "../../domain/kernel/index.ts";
 import {
@@ -53,13 +53,13 @@ export const decisionIdOf = (escalationId: EscalationId): DecisionId =>
   DecisionId.make(`dec_${hashedIdBody(escalationId)}`);
 
 const ADDRESS = "ns:";
-const isNamespace = Schema.is(OrgId);
+const isNamespace = Schema.is(NamespaceId);
 
 /** Where a namespace's object lives: `ns:<id>`. It hosts the escalations of the namespace's projects. */
-export const namespaceAddress = (namespace: OrgId): string => `${ADDRESS}${namespace}`;
+export const namespaceAddress = (namespace: NamespaceId): string => `${ADDRESS}${namespace}`;
 
 /** The namespace an object answers for, from its address; any other name throws. */
-export const namespaceAt = (address: string | undefined): OrgId => {
+export const namespaceAt = (address: string | undefined): NamespaceId => {
   const namespace = address?.startsWith(ADDRESS) ? address.slice(ADDRESS.length) : undefined;
   if (!isNamespace(namespace)) throw new Error("a namespace's object is addressed as ns:<id>");
   return namespace;

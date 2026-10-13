@@ -79,7 +79,8 @@ export const SPEC_ACTIONS = {
 
   Operator_listProjects: rule("Org", "read"),
   Operator_createProject: rule("Org", "member"),
-  Orgs_getProject: rule("Project", "read"),
+  Namespaces_getNamespace: rule("Org", "read"),
+  Namespaces_getProject: rule("Project", "read"),
 
   Changes_listChanges: rule("Project", "read"),
   change: rule("Project", "read"),
@@ -193,6 +194,14 @@ const READ: ReadonlySet<Right> = new Set(["read"]);
 const roleIn = (memberships: readonly Membership[], org: string): Role | undefined =>
   memberships.find((m) => m.org === org)?.role;
 
+/**
+ * A user's role in a namespace: `owner` of the one whose id is its own, by
+ * identity and by no membership, so it holds whatever the gate filled; in an
+ * org, the role its membership names.
+ */
+export const roleOf = (user: UserPrincipal, namespace: string): Role | undefined =>
+  namespace === user.userId ? "owner" : roleIn(user.memberships, namespace);
+
 /** Rights from a role in the resource's org, else a public read. */
 const rightsByRole = (role: Role | undefined, resource: Resource): ReadonlySet<Right> => {
   switch (resource._tag) {
@@ -274,10 +283,7 @@ export const rightsOf = (principal: Principal, resource: Resource): ReadonlySet<
     case "User": {
       if (principal.suspended || principal.handle === undefined) return NONE;
       const org = orgOf(resource);
-      return rightsByRole(
-        org === undefined ? undefined : roleIn(principal.memberships, org),
-        resource,
-      );
+      return rightsByRole(org === undefined ? undefined : roleOf(principal, org), resource);
     }
     case "Agent":
       return agentRights(principal, resource);
@@ -375,7 +381,7 @@ const lacksRole = (need: "member" | "maintain" | "own"): Decision =>
  */
 const insideOrg = (principal: UserPrincipal | AgentPrincipal, org: string): boolean =>
   principal._tag === "User"
-    ? roleIn(principal.memberships, org) !== undefined
+    ? roleOf(principal, org) !== undefined
     : principal.org === org && principal.standing._tag !== "None";
 
 /**
@@ -561,6 +567,16 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
 };
 
 /**
+ * The actions that are there on an org alone: a person's or an agent's own
+ * namespace has no members, and goes only with its account.
+ */
+const ORG_ONLY: ReadonlySet<Action> = new Set(["ManageMembers", "ManageOwners", "DeleteOrg"]);
+
+/** Whether `action` is asked of a namespace that is no org, where it is asked of nothing. */
+const orgOnly = (action: Action, resource: Resource): boolean =>
+  ORG_ONLY.has(action) && resource._tag === "Org" && resource.kind !== "org";
+
+/**
  * The one authorization policy: whether `principal` may take `action` on
  * `resource`. It decides from its arguments alone;
  * the gate fills them from the request and the Memberships port, and never
@@ -575,6 +591,10 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
  * - 403 `AccessRefused`: the caller sees the resource but may not do this, with
  *   a reason and next actions. A private project of the agent's org that its
  *   token is not for is `foreign-project`; one in another org is NotVisible.
+ *
+ * A person owns the namespace whose id is their own, by identity. Inviting,
+ * removing, making an owner and deleting are asked of an org alone: of a
+ * person's or an agent's own namespace they are NotVisible.
  *
  * Work is agents' only. Governance is people's wherever a person owns: an agent
  * governs only its own namespace, or an org it created that no person owns, and
@@ -595,13 +615,14 @@ export const authorize = <A extends Action>(
   resource: ResourceFor<A>,
 ): Decision => {
   const { need } = ACTIONS[action];
+  const on: Resource = orgOnly(action, resource) ? { _tag: "Missing" } : resource;
   switch (principal._tag) {
     case "Anonymous":
-      return anonymous(need, resource);
+      return anonymous(need, on);
     case "User":
-      return user(principal, need, resource);
+      return user(principal, need, on);
     case "Agent":
-      return agent(principal, need, resource);
+      return agent(principal, need, on);
     default: {
       const unreachable: never = principal;
       return unreachable;

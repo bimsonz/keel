@@ -1,5 +1,5 @@
 import { Context, type Effect } from "effect";
-import type { EscalationId, OrgId, ProjectId, UserId } from "../../domain/kernel/index.ts";
+import type { EscalationId, NamespaceId, ProjectId, UserId } from "../../domain/kernel/index.ts";
 import type { EscalationCommand, InvalidEscalation } from "../../domain/verification/index.ts";
 import type { EscalationRecord } from "./escalations.ts";
 
@@ -8,7 +8,7 @@ export type EscalationAsk = Omit<Extract<EscalationCommand, { _tag: "Raise" }>, 
 
 export interface RaiseRequest {
   /** The namespace that owns the project: its object (`ns:<id>`) hosts the escalation. */
-  readonly namespace: OrgId;
+  readonly namespace: NamespaceId;
   /** Derived from what the question is about, so a repeated raise is the same escalation. */
   readonly escalationId: EscalationId;
   readonly project: ProjectId;

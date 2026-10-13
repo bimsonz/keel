@@ -1,5 +1,5 @@
 import { ProbeOutcome, VerifierUnavailable, World } from "@keeltown/core/domain/verification";
-import { ContentHash, OrgId } from "@keeltown/core/kernel";
+import { ContentHash, NamespaceId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { exitCodec } from "./exit.ts";
 
@@ -12,7 +12,7 @@ import { exitCodec } from "./exit.ts";
 
 /** One Tier 1 probe run (the ProbeRunner port's request): a namespace's probe bundle against one of its world bundles. */
 export const ProbeRunRequest = Schema.Struct({
-  namespace: OrgId,
+  namespace: NamespaceId,
   probe: ContentHash,
   world: World,
   worldBundle: ContentHash,

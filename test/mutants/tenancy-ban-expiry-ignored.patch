@@ -2,15 +2,15 @@
 # kills: ports.users-ban-lapsed, ports.memberships-ban-lapsed
 # why: a ban that has ended still suspends its user, though the notice promises the suspension ends
 diff --git a/packages/core/src/domain/identity/tenancy.ts b/packages/core/src/domain/identity/tenancy.ts
-index d074105..8c26d08 100644
+index 6000065..21befbc 100644
 --- a/packages/core/src/domain/identity/tenancy.ts
 +++ b/packages/core/src/domain/identity/tenancy.ts
-@@ -33,7 +33,7 @@ export const strongestRole = (names: readonly string[]): Role | undefined =>
+@@ -43,7 +43,7 @@ export const strongestRole = (names: readonly string[]): Role | undefined =>
   * an end (`banExpires`), and a user whose ban has ended is no longer suspended.
   */
  export const banHolds = (banned: boolean, banExpires: Date | undefined, now: number): boolean =>
 -  banned && (banExpires === undefined || banExpires.getTime() > now);
 +  banned;
  
- /** One of a user's memberships, as the Memberships port reads it from D1. */
- export interface Membership {
+ /**
+  * One of a user's memberships in an org, as the Users port reads it from D1.

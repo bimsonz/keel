@@ -1,6 +1,6 @@
 import { Effect, Result } from "effect";
 import type { Proposition } from "../../domain/coordination/index.ts";
-import type { ContentHash, OrgId } from "../../domain/kernel/index.ts";
+import type { ContentHash, NamespaceId } from "../../domain/kernel/index.ts";
 import {
   ADMISSION_RUNS,
   admit,
@@ -185,7 +185,7 @@ const identicalFailure = (cells: readonly MatrixCell[]): string | undefined => {
  * cannot run at all fails, for the caller to retry.
  */
 export const draftProbe = <S, R>(
-  namespace: OrgId,
+  namespace: NamespaceId,
   template: ProbeTemplate<S>,
   context: DraftContext,
   worlds: Readonly<Record<FlowWorld, ContentHash>>,

@@ -24,7 +24,7 @@ import {
   Enrolments,
   type IssuedToken,
   type OpenSessionInput,
-  ProjectOrgs,
+  ProjectNamespaces,
   Sessions,
   type StandingInput,
   Standings,
@@ -110,15 +110,18 @@ export type EnrolAgentInput = Omit<EnrolInput, "org" | "sponsor">;
 export const enrolAgent: (
   sponsor: UserId,
   input: EnrolAgentInput,
-) => Effect.Effect<Enrolment, IdempotencyConflict | ProjectNotFound, Enrolments | ProjectOrgs> =
-  Effect.fn("identity/enrolAgent")(function* (sponsor: UserId, input: EnrolAgentInput) {
-    const place = yield* (yield* ProjectOrgs).byId(input.projectId);
-    if (Option.isNone(place)) return yield* new ProjectNotFound({ projectId: input.projectId });
-    return yield* (yield* Enrolments).enrol(
-      { _tag: "User", userId: sponsor },
-      { ...input, org: place.value.org, sponsor },
-    );
-  });
+) => Effect.Effect<
+  Enrolment,
+  IdempotencyConflict | ProjectNotFound,
+  Enrolments | ProjectNamespaces
+> = Effect.fn("identity/enrolAgent")(function* (sponsor: UserId, input: EnrolAgentInput) {
+  const place = yield* (yield* ProjectNamespaces).byId(input.projectId);
+  if (Option.isNone(place)) return yield* new ProjectNotFound({ projectId: input.projectId });
+  return yield* (yield* Enrolments).enrol(
+    { _tag: "User", userId: sponsor },
+    { ...input, org: place.value.namespace, sponsor },
+  );
+});
 
 /**
  * Suspends, reinstates or revokes an agent in its AgentSession DO, which

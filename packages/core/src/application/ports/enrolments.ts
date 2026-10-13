@@ -6,7 +6,7 @@ import type {
   IdempotencyConflict,
   Scope,
 } from "../../domain/identity/index.ts";
-import type { OrgId, ProjectId, UserId } from "../../domain/kernel/index.ts";
+import type { NamespaceId, ProjectId, UserId } from "../../domain/kernel/index.ts";
 
 export interface EnrolInput {
   readonly name: string;
@@ -15,7 +15,7 @@ export interface EnrolInput {
   /** The project the agent works in. */
   readonly projectId: ProjectId;
   /** The agent's org: its project's. */
-  readonly org: OrgId;
+  readonly org: NamespaceId;
   /** The user minting the agent's credential, who becomes its sponsor. */
   readonly sponsor: UserId;
   readonly idempotencyKey: string;

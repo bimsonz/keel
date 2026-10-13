@@ -1,5 +1,5 @@
 import { Context, type Effect } from "effect";
-import type { OrgId } from "../../domain/kernel/index.ts";
+import type { NamespaceId } from "../../domain/kernel/index.ts";
 import type {
   StepResult,
   VerificationJob,
@@ -15,7 +15,7 @@ export class VerifierRuntime extends Context.Service<
   VerifierRuntime,
   {
     readonly run: (
-      namespace: OrgId,
+      namespace: NamespaceId,
       job: VerificationJob,
     ) => Effect.Effect<readonly StepResult[], VerifierUnavailable>;
   }

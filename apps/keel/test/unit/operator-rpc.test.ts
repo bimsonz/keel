@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { type Actor, Agent, IdempotencyConflict } from "@keeltown/core/domain/identity";
-import { OrgId, ProjectId, UserId } from "@keeltown/core/kernel";
+import { NamespaceId, ProjectId, UserId } from "@keeltown/core/kernel";
 import { type EnrolInput, Enrolments, Projects, RepoNotFound } from "@keeltown/core/ports";
 import { Effect, Exit, Schema } from "effect";
 import { derivedUlid, sha256Of } from "../../src/adapters/driven/do-rpc/answer.ts";
@@ -149,7 +149,7 @@ function agentObjects() {
   return { sent, layer };
 }
 
-const ORG = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const ORG = Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 
 /** The AgentSession DO an actor's enrolment under `key` reaches. */
 const derived = (actor: string, key: string) =>
@@ -210,7 +210,7 @@ describe("Enrolments over Durable Object RPC", () => {
     "[tenancy.enrol-rpc] sends the project's org and the sponsoring user, fingerprinted",
     () => {
       const { sent, layer } = agentObjects();
-      const another = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V1");
+      const another = Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V1");
       return Effect.gen(function* () {
         const enrolments = yield* Enrolments;
         const tenant = yield* enrolments.enrol(alice, enrolling());

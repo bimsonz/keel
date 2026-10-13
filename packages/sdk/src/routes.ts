@@ -130,7 +130,8 @@ export const ROUTES = {
     query: ["cursor", "limit"],
   },
   Operator_listProjects: { method: "GET", path: "/projects", query: ["cursor", "limit"] },
-  Orgs_getProject: { method: "GET", path: "/orgs/{org}/projects/{name}" },
+  Namespaces_getNamespace: { method: "GET", path: "/namespaces/{handle}" },
+  Namespaces_getProject: { method: "GET", path: "/namespaces/{handle}/projects/{name}" },
   Users_me: { method: "GET", path: "/users/me" },
   Operator_suspendAgent: {
     method: "POST",

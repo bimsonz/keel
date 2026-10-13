@@ -1,5 +1,5 @@
 import { namespaceKey } from "@keeltown/core/application/verification";
-import { OrgId } from "@keeltown/core/kernel";
+import { NamespaceId } from "@keeltown/core/kernel";
 import { bundleUrlSigned } from "@keeltown/runner-protocol";
 import { Schema } from "effect";
 import { CiSandbox } from "./ci-sandbox.js";
@@ -14,7 +14,7 @@ export const BUNDLE_HOSTS = "*.keel.internal";
 /** A bundle's address on the host: `/<namespace id>/<sha256 hex>`, and nothing else. */
 const BUNDLE_PATH = /^\/([^/]+)\/([0-9a-f]{64})$/;
 
-const isNamespace = Schema.is(OrgId);
+const isNamespace = Schema.is(NamespaceId);
 
 /**
  * One bundle read as the handler saw it, logged when its stream ends: what R2

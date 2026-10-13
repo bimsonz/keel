@@ -2,11 +2,12 @@
 # kills: a11b.fingerprint
 # why: every body fingerprints alike, so a reused key with another body replays instead of conflicting
 diff --git a/apps/keel/src/adapters/driven/do-rpc/projects.ts b/apps/keel/src/adapters/driven/do-rpc/projects.ts
+index a457a04..2863ba3 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/projects.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/projects.ts
-@@ -31,7 +31,7 @@
-       create: (actor, input) =>
-         Effect.gen(function* () {
+@@ -37,7 +37,7 @@ export function ProjectsRpc(project: (projectId: ProjectId) => ProjectStub): Lay
+           if (actor._tag !== "User")
+             return yield* Effect.die(new Error("a project is created by a person"));
            const fingerprint = yield* Effect.promise(() =>
 -            fingerprintOf({ name: input.name, source: input.source }),
 +            fingerprintOf({}),

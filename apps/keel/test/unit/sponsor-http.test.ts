@@ -19,10 +19,10 @@ import {
   makeInboxMemory,
   makeManualClock,
   makeMembershipsMemory,
-  makeOrgsMemory,
+  makeNamespacesMemory,
   makeProbeLedgerMemory,
   makeProbeStoreMemory,
-  makeProjectOrgsMemory,
+  makeProjectNamespacesMemory,
   makeProjectsMemory,
   makeProjectViewsMemory,
   makeSessionsMemory,
@@ -89,14 +89,14 @@ function world() {
   const sponsorships = makeSponsorshipsMemory();
   const inbox = makeInboxMemory();
   const projects = makeProjectsMemory();
-  const places = makeProjectOrgsMemory();
+  const places = makeProjectNamespacesMemory();
   projects.setSettings(LEDGER, {
     protectedPaths: [],
     maxBatchSize: 1,
     verification: "required",
     visibility: "private",
   });
-  places.places.set(LEDGER, { projectId: LEDGER, org: ACME, name: "ledger" });
+  places.places.set(LEDGER, { projectId: LEDGER, namespace: ACME, name: "ledger" });
   const rows = makeBetterAuthMemory({ orgs: [{ id: ACME, slug: "acme" }] });
   const runtime = ManagedRuntime.make(
     Layer.mergeAll(
@@ -120,7 +120,7 @@ function world() {
       makeCodeHostMemory().layer,
       makeUsersMemory(rows).layer,
       makeMembershipsMemory(rows).layer,
-      makeOrgsMemory(rows).layer,
+      makeNamespacesMemory(rows).layer,
       places.layer,
     ),
   );

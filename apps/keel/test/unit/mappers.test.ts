@@ -19,8 +19,8 @@ import {
   makeIdsMemory,
   makeInboxMemory,
   makeMembershipsMemory,
-  makeOrgsMemory,
-  makeProjectOrgsMemory,
+  makeNamespacesMemory,
+  makeProjectNamespacesMemory,
   makeProjectsMemory,
   makeProbeLedgerMemory,
   makeProbeStoreMemory,
@@ -119,10 +119,10 @@ function grantedSurface() {
     verification: "required",
     visibility: "private",
   });
-  const places = makeProjectOrgsMemory();
+  const places = makeProjectNamespacesMemory();
   places.places.set(sampleProjectId, {
     projectId: sampleProjectId,
-    org: sampleOrgId,
+    namespace: sampleOrgId,
     name: "stubs",
   });
   const rows = makeBetterAuthMemory({ orgs: [{ id: sampleOrgId, slug: "stubs" }] });
@@ -147,7 +147,7 @@ function grantedSurface() {
       makeCodeHostMemory().layer,
       makeUsersMemory(rows).layer,
       makeMembershipsMemory(rows).layer,
-      makeOrgsMemory(rows).layer,
+      makeNamespacesMemory(rows).layer,
       places.layer,
     ),
   );

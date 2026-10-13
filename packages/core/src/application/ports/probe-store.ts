@@ -1,5 +1,5 @@
 import { Context, type Effect } from "effect";
-import type { ContentHash, OrgId } from "../../domain/kernel/index.ts";
+import type { ContentHash, NamespaceId } from "../../domain/kernel/index.ts";
 import type { BundleMissing } from "../../domain/verification/index.ts";
 import type { ProbeFile } from "../verification/index.ts";
 
@@ -12,10 +12,13 @@ import type { ProbeFile } from "../verification/index.ts";
 export class ProbeStore extends Context.Service<
   ProbeStore,
   {
-    readonly put: (namespace: OrgId, files: readonly ProbeFile[]) => Effect.Effect<ContentHash>;
+    readonly put: (
+      namespace: NamespaceId,
+      files: readonly ProbeFile[],
+    ) => Effect.Effect<ContentHash>;
     /** The files kept under a hash, by path, for a reader of the probe's source. BundleMissing when nothing is kept there. */
     readonly get: (
-      namespace: OrgId,
+      namespace: NamespaceId,
       hash: ContentHash,
     ) => Effect.Effect<readonly ProbeFile[], BundleMissing>;
   }

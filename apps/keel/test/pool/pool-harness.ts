@@ -8,22 +8,22 @@
 import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { PushRejected } from "@keeltown/core/domain/integration";
-import type { CommitSha, OrgId, ProjectId } from "@keeltown/core/kernel";
+import type { CommitSha, NamespaceId, ProjectId } from "@keeltown/core/kernel";
 import { CodeHost, Trunks, WorkspaceRefresher } from "@keeltown/core/ports";
-import { makeProjectOrgsMemory } from "@keeltown/testing";
+import { makeProjectNamespacesMemory } from "@keeltown/testing";
 import { Effect, Layer } from "effect";
 import type { WorkspacePoolDO } from "../../src/adapters/driving/do/workspace-pool.ts";
 import { codeHostLayer, type PoolServices } from "../../src/composition/do.ts";
 import { POOL_ORG } from "./helpers.ts";
 
 /**
- * A ProjectOrgs in memory that holds `projectId`'s place in `org`, as
+ * A ProjectNamespaces in memory that holds `projectId`'s place in `org`, as
  * creating the project writes it before its trunk exists. A Trunk object run
  * on memory adapters takes its layer: a project with no place has no trunk.
  */
-export function placedIn(projectId: ProjectId, org: OrgId = POOL_ORG) {
-  const places = makeProjectOrgsMemory();
-  places.places.set(projectId, { projectId, org, name: projectId.toLowerCase() });
+export function placedIn(projectId: ProjectId, org: NamespaceId = POOL_ORG) {
+  const places = makeProjectNamespacesMemory();
+  places.places.set(projectId, { projectId, namespace: org, name: projectId.toLowerCase() });
   return places;
 }
 

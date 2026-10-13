@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/token-endpoint.test.ts
+# kills: tenancy.token-exchange
+# why: the token carries the agent's namespace under the old claim name, which verifying no longer reads, so every placed agent's fresh token is for no namespace and each of its requests is refused
+diff --git a/apps/keel/src/adapters/driven/jose/token-issuer.ts b/apps/keel/src/adapters/driven/jose/token-issuer.ts
+index 3b7a25b..c945899 100644
+--- a/apps/keel/src/adapters/driven/jose/token-issuer.ts
++++ b/apps/keel/src/adapters/driven/jose/token-issuer.ts
+@@ -54,7 +54,7 @@ export function TokenIssuerJose(options: TokenIssuerOptions) {
+                 prj: principal.projectId,
+                 scope: principal.scopes.join(" "),
+                 epoch: principal.revocationEpoch,
+-                ...(principal.org === undefined ? {} : { ns: principal.org }),
++                ...(principal.org === undefined ? {} : { org: principal.org }),
+                 ...(principal.sponsor === undefined ? {} : { obo: principal.sponsor }),
+               })
+                 .setProtectedHeader({ alg: "EdDSA", kid, typ: "JWT" })

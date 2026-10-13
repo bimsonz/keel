@@ -4,7 +4,7 @@
 // puts no credential of its own on anything. A reader with no session is a
 // visitor, and Keel reads a visitor what is public.
 //
-// A project is found by its org and its name (`GET /v1/orgs/{org}/projects/
+// A project is found by its org and its name (`GET /v1/namespaces/{handle}/projects/
 // {name}`), and everything after is read by the id Keel answered: its log by
 // cursor, long-polling at the tail, its repository, a verdict's evidence. A
 // ruling is Keel's own operation, and Keel decides whether this reader may
@@ -141,7 +141,7 @@ export function createHttpDirectory(options: HttpOptions = {}): KeelDirectory {
   return {
     async findProject(org, name, signal) {
       const response = await read(
-        `/v1/orgs/${encodeURIComponent(org)}/projects/${encodeURIComponent(name)}`,
+        `/v1/namespaces/${encodeURIComponent(org)}/projects/${encodeURIComponent(name)}`,
         signal,
       );
       // Keel answers a project it does not show this reader as it answers one that is not there.

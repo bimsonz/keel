@@ -16,7 +16,7 @@ import {
   AgentId,
   ChangeId,
   InstantSchema,
-  OrgId,
+  NamespaceId,
   ProjectId,
   UserId,
 } from "@keeltown/core/kernel";
@@ -79,7 +79,7 @@ export const EnrolCommand = Schema.Struct({
   kind: AgentKind,
   scopes: Schema.Array(Scope),
   /** The agent's org. */
-  org: Schema.optional(OrgId),
+  org: Schema.optional(NamespaceId),
   /** The user minting the credential, who becomes the agent's sponsor. */
   sponsor: Schema.optional(UserId),
   clientId: Schema.NonEmptyString,

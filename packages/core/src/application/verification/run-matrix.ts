@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import type { ContentHash, Json, OrgId } from "../../domain/kernel/index.ts";
+import type { ContentHash, Json, NamespaceId } from "../../domain/kernel/index.ts";
 import { ADMISSION_RUNS, type ProbeCell, type World } from "../../domain/verification/index.ts";
 import { EvidenceStore, ProbeRunner } from "../ports/index.ts";
 import { MATRIX_WORLDS } from "./world-matrix.ts";
@@ -24,7 +24,7 @@ export const cellEvidence = (cell: MatrixCell): Json => ({
 
 /** Stores a cell's evidence and answers its hash, the `resultRef` the cell's ProbeRan cites. */
 export const storeCell = Effect.fn("verification/storeCell")(function* (
-  namespace: OrgId,
+  namespace: NamespaceId,
   cell: MatrixCell,
 ) {
   return yield* (yield* EvidenceStore).put(namespace, cellEvidence(cell));
@@ -45,7 +45,7 @@ export interface MatrixHarnessError {
  * so a broken probe can never complete a run, let alone be admitted.
  */
 export const runMatrix = Effect.fn("verification/runMatrix")(function* (
-  namespace: OrgId,
+  namespace: NamespaceId,
   probe: ContentHash,
   worlds: Readonly<Record<World, ContentHash>>,
   runs: number = ADMISSION_RUNS,

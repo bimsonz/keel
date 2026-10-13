@@ -1,6 +1,6 @@
 import { Effect, Option, Schema } from "effect";
-import { OrgId, ProjectId } from "../../domain/kernel/index.ts";
-import { ProjectOrgs } from "../ports/index.ts";
+import { NamespaceId, ProjectId } from "../../domain/kernel/index.ts";
+import { ProjectNamespaces } from "../ports/index.ts";
 
 /** The project has no place, so it belongs to no namespace: nothing of it can be stored or read. */
 export class ProjectUnplaced extends Schema.TaggedError<ProjectUnplaced>()("ProjectUnplaced", {
@@ -10,7 +10,7 @@ export class ProjectUnplaced extends Schema.TaggedError<ProjectUnplaced>()("Proj
 /** A job names one namespace and its project belongs to another: it would read and write the wrong namespace's objects. */
 export class NamespaceMisnamed extends Schema.TaggedError<NamespaceMisnamed>()(
   "NamespaceMisnamed",
-  { projectId: ProjectId, named: OrgId, namespace: OrgId },
+  { projectId: ProjectId, named: NamespaceId, namespace: NamespaceId },
 ) {}
 
 /**
@@ -21,9 +21,9 @@ export class NamespaceMisnamed extends Schema.TaggedError<NamespaceMisnamed>()(
 export const projectNamespace = Effect.fn("verification/projectNamespace")(function* (
   projectId: ProjectId,
 ) {
-  const place = yield* (yield* ProjectOrgs).byId(projectId);
+  const place = yield* (yield* ProjectNamespaces).byId(projectId);
   if (Option.isNone(place)) return yield* new ProjectUnplaced({ projectId });
-  return place.value.org;
+  return place.value.namespace;
 });
 
 /**
@@ -33,7 +33,7 @@ export const projectNamespace = Effect.fn("verification/projectNamespace")(funct
  */
 export const jobNamespace = Effect.fn("verification/jobNamespace")(function* (
   projectId: ProjectId,
-  named: OrgId,
+  named: NamespaceId,
 ) {
   const namespace = yield* projectNamespace(projectId);
   if (namespace !== named) return yield* new NamespaceMisnamed({ projectId, named, namespace });

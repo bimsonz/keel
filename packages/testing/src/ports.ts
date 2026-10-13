@@ -95,8 +95,8 @@ import {
 import { describeProjectsContract, type ProjectsHarness } from "./contracts/projects.ts";
 import {
   describeMembershipsContract,
-  describeOrgsContract,
-  describeProjectOrgsContract,
+  describeNamespacesContract,
+  describeProjectNamespacesContract,
   describeUsersContract,
   type TenancyHarness,
 } from "./contracts/tenancy.ts";
@@ -133,7 +133,7 @@ import type {
   Inbox,
   LiveChanges,
   Memberships,
-  Orgs,
+  Namespaces,
   ProbeChanges,
   ProbeLedger,
   NoopWorlds,
@@ -357,7 +357,7 @@ function memoryConflictMovesHarness(): ConflictMovesHarness {
       Effect.sync(() => {
         memory.orgs.places.set(projectId, {
           projectId,
-          org: namespace,
+          namespace: namespace,
           name: projectId.toLowerCase(),
         });
       }),
@@ -517,9 +517,9 @@ export const PORTS = {
     Sponsorships | Standings | Enrolments | AgentDirectory,
     SponsorshipsHarness
   >(memorySponsorshipsHarness, describeSponsorshipsContract),
-  Orgs: harnessed<Orgs, TenancyHarness<Orgs>>(
-    memoryTenancyHarness(tenancy.makeOrgsMemory),
-    describeOrgsContract,
+  Namespaces: harnessed<Namespaces, TenancyHarness<Namespaces>>(
+    memoryTenancyHarness(tenancy.makeNamespacesMemory),
+    describeNamespacesContract,
   ),
   Users: harnessed<Users, TenancyHarness<Users>>(
     memoryTenancyHarness(tenancy.makeUsersMemory),
@@ -529,7 +529,10 @@ export const PORTS = {
     memoryTenancyHarness(tenancy.makeMembershipsMemory),
     describeMembershipsContract,
   ),
-  ProjectOrgs: port(() => tenancy.makeProjectOrgsMemory().layer, describeProjectOrgsContract),
+  ProjectNamespaces: port(
+    () => tenancy.makeProjectNamespacesMemory().layer,
+    describeProjectNamespacesContract,
+  ),
   EntityStore: port(() => storage.makeEntityStoreMemory().layer, describeEntityStoreContract),
   EventOutbox: eventOutbox,
   EventFeed: harnessed<EventFeed, EventFeedHarness>(

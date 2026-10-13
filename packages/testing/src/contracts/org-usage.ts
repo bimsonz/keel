@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { DEFAULT_QUOTAS, type QuotaKind } from "@keeltown/core/domain/identity";
-import { type Instant, OrgId } from "@keeltown/core/kernel";
+import { type Instant, NamespaceId } from "@keeltown/core/kernel";
 import { OrgUsage, type UsageSettings } from "@keeltown/core/ports";
 import { Effect, Exit, type Layer, Schema } from "effect";
 
@@ -11,7 +11,7 @@ import { Effect, Exit, type Layer, Schema } from "effect";
  */
 export interface OrgUsageHarness {
   readonly layer: Layer.Layer<OrgUsage>;
-  readonly org: () => Effect.Effect<OrgId>;
+  readonly org: () => Effect.Effect<NamespaceId>;
   readonly now: Effect.Effect<Instant>;
   readonly advance: (ms: number) => Effect.Effect<void>;
 }
@@ -21,17 +21,17 @@ const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const ulid = () =>
   [...crypto.getRandomValues(new Uint8Array(26))].map((b) => CROCKFORD[b % 32] ?? "0").join("");
 /** A fresh org id, for a harness whose adapter needs no preparing. */
-export const freshOrg = (): OrgId => Schema.decodeUnknownSync(OrgId)(`org_${ulid()}`);
+export const freshOrg = (): NamespaceId => Schema.decodeUnknownSync(NamespaceId)(`org_${ulid()}`);
 
 const key = () => `key-${crypto.randomUUID()}`;
-const admit = (org: OrgId, kind: QuotaKind, amount: number, k = key()) =>
+const admit = (org: NamespaceId, kind: QuotaKind, amount: number, k = key()) =>
   Effect.flatMap(OrgUsage, (usage) => usage.admit(org, kind, amount, k));
-const record = (org: OrgId, kind: QuotaKind, amount: number, k = key()) =>
+const record = (org: NamespaceId, kind: QuotaKind, amount: number, k = key()) =>
   Effect.flatMap(OrgUsage, (usage) => usage.record(org, kind, amount, k));
 
-const configure = (org: OrgId, settings: UsageSettings) =>
+const configure = (org: NamespaceId, settings: UsageSettings) =>
   Effect.flatMap(OrgUsage, (usage) => usage.configure(org, settings));
-const settingsOf = (org: OrgId) => Effect.flatMap(OrgUsage, (usage) => usage.settings(org));
+const settingsOf = (org: NamespaceId) => Effect.flatMap(OrgUsage, (usage) => usage.settings(org));
 
 /** The kinds a halt stops: what verification spends. */
 const SPEND: readonly QuotaKind[] = ["container-minutes", "model-calls", "concurrent-containers"];

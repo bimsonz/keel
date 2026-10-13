@@ -74,7 +74,7 @@ describe("Mission Control's views through the doorway", () => {
 
     const listed = await get(agent, "/v1/changes");
     const named = await get(agent, `/v1/changes?project=${mine.project}`);
-    const inOrg = await get(agent, `/v1/changes?project=${sibling.project}`);
+    const inNamespace = await get(agent, `/v1/changes?project=${sibling.project}`);
     const other = await get(agent, `/v1/changes?project=${theirs.project}`);
     const missing = await get(agent, `/v1/changes?project=${makeId("prj", ulid())}`);
     const otherSnapshot = await get(agent, `/v1/events/snapshot?project=${theirs.project}`);
@@ -82,7 +82,7 @@ describe("Mission Control's views through the doorway", () => {
     expect([listed.status, named.status]).toEqual([200, 200]);
     expect((await listed.json<ListBody>()).items).toMatchObject([{ changeId: own, number: 1 }]);
     expect((await named.json<ListBody>()).items).toMatchObject([{ changeId: own, number: 1 }]);
-    expect([inOrg.status, (await inOrg.json<ProblemBody>()).detail]).toEqual([
+    expect([inNamespace.status, (await inNamespace.json<ProblemBody>()).detail]).toEqual([
       403,
       "Refused: foreign-project.",
     ]);

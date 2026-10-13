@@ -27,7 +27,7 @@ function fakeLog(pageSize: number) {
   const created = log.events.find((event) => event.type === "ProjectCreated");
   const project: ProjectView = {
     id: created?.payload.projectId ?? "",
-    org: "acme",
+    namespace: { handle: "acme", kind: "org" },
     name: "demo",
     visibility: "private",
     createdAt: created?.at ?? "",
@@ -217,9 +217,15 @@ describe("who the page reads as", () => {
     expect(await shut.directory.findProject("acme", "no-such")).toBeNull();
 
     const open = await opened("visitor", "public");
-    expect(open.found).toMatchObject({ org: "acme", name: "demo", visibility: "public" });
+    expect(open.found).toMatchObject({
+      namespace: { handle: "acme" },
+      name: "demo",
+      visibility: "public",
+    });
     expect(open.found.viewer).toBeUndefined();
-    expect(await open.directory.listProjects()).toMatchObject([{ org: "acme", name: "demo" }]);
+    expect(await open.directory.listProjects()).toMatchObject([
+      { namespace: { handle: "acme" }, name: "demo" },
+    ]);
     await open.player.load();
     await settled();
     open.player.seek(open.player.end);

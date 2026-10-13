@@ -60,7 +60,7 @@ const readPasskey = (handle: string): SavedPasskey =>
 function keep(handle: string, session: AccountSession): void {
   writePrivate(sessionFile(handle), session);
   console.log(
-    `ok   ${handle}: ${session.userId}, org ${session.org}, session until ${session.expiresAt} in ${sessionFile(handle)}`,
+    `ok   ${handle}: ${session.userId}, namespace ${session.namespace}, session until ${session.expiresAt} in ${sessionFile(handle)}`,
   );
 }
 

@@ -11,8 +11,8 @@ import {
   makeInboxMemory,
   makeIdsMemory,
   makeMembershipsMemory,
-  makeOrgsMemory,
-  makeProjectOrgsMemory,
+  makeNamespacesMemory,
+  makeProjectNamespacesMemory,
   makeProjectsMemory,
   makeSessionsMemory,
   makeSponsorshipsMemory,
@@ -48,8 +48,8 @@ const runtime = ManagedRuntime.make(
     makeCodeHostMemory().layer,
     makeUsersMemory().layer,
     makeMembershipsMemory().layer,
-    makeOrgsMemory().layer,
-    makeProjectOrgsMemory().layer,
+    makeNamespacesMemory().layer,
+    makeProjectNamespacesMemory().layer,
   ),
 );
 const run = makeRunner(runtime);

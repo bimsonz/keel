@@ -1,0 +1,24 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/namespaces.test.ts
+# kills: ns.unique
+# why: a handle lost to another account between the read and the write is never recognised, so the loser of two sign-ups or org creations in the same moment gets a server error instead of being told the handle is taken
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 2db5ad4..ef1b634 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -155,15 +155,7 @@ async function claimable(db: D1Database, name: string): Promise<void> {
+  * column, whichever the statement met first). Nothing was made, and the answer
+  * is the one the read would have given.
+  */
+-export const lostHandle = (error: unknown): boolean => {
+-  if (error instanceof APIError) return error.body?.code === "USERNAME_IS_ALREADY_TAKEN";
+-  return (
+-    error instanceof Error &&
+-    /UNIQUE constraint failed: (namespaces\.handle|user\.username|organization\.slug)/.test(
+-      `${error.message} ${String(error.cause)}`,
+-    )
+-  );
+-};
++export const lostHandle = (_error: unknown): boolean => false;
+ 
+ /** The refusal a lost handle answers: the code the read before it would have given. */
+ const lostRace = () => refuse("NAME_TAKEN", `That handle was taken a moment ago: ${ONE_HOLDER}`);

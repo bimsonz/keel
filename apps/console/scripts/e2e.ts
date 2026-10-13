@@ -1991,14 +1991,17 @@ expectEqual(
         call.path
           .replace(/\/v1\/verdicts\/.+/, "/v1/verdicts/{id}")
           .replace(/\/v1\/probes\/[^/]+\/source$/, "/v1/probes/{id}/source")
-          .replace(/\/v1\/orgs\/[^/]+\/projects\/[^/]+$/, "/v1/orgs/{org}/projects/{name}")
+          .replace(
+            /\/v1\/namespaces\/[^/]+\/projects\/[^/]+$/,
+            "/v1/namespaces/{handle}/projects/{name}",
+          )
           .replace(/\/v1\/projects\/[^/]+\//, "/v1/projects/{id}/"),
       ),
     ),
   ]
     .toSorted()
     .join(" "),
-  "/v1/events /v1/lattices /v1/orgs/{org}/projects/{name} /v1/probes/{id}/source /v1/projects /v1/projects/{id}/repo/blob /v1/projects/{id}/repo/commits /v1/projects/{id}/repo/tree /v1/verdicts/{id}",
+  "/v1/events /v1/lattices /v1/namespaces/{handle}/projects/{name} /v1/probes/{id}/source /v1/projects /v1/projects/{id}/repo/blob /v1/projects/{id}/repo/commits /v1/projects/{id}/repo/tree /v1/verdicts/{id}",
 );
 // The page put nothing of its own on anything it asked: no token, no key. A visitor's browser holds no session.
 expectEqual(

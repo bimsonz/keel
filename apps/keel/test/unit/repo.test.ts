@@ -19,8 +19,8 @@ import {
   makeIdsMemory,
   makeInboxMemory,
   makeMembershipsMemory,
-  makeOrgsMemory,
-  makeProjectOrgsMemory,
+  makeNamespacesMemory,
+  makeProjectNamespacesMemory,
   makeProjectsMemory,
   makeProbeLedgerMemory,
   makeProbeStoreMemory,
@@ -49,7 +49,7 @@ const directory = makeAgentDirectoryMemory().layer;
 const inbox = makeInboxMemory();
 const codeHost = makeCodeHostMemory();
 const projects = makeProjectsMemory();
-const places = makeProjectOrgsMemory();
+const places = makeProjectNamespacesMemory();
 const rows = makeBetterAuthMemory({ orgs: [{ id: sampleOrgId, slug: "forge" }] });
 const runtime = ManagedRuntime.make(
   Layer.mergeAll(
@@ -72,7 +72,7 @@ const runtime = ManagedRuntime.make(
     codeHost.layer,
     makeUsersMemory(rows).layer,
     makeMembershipsMemory(rows).layer,
-    makeOrgsMemory(rows).layer,
+    makeNamespacesMemory(rows).layer,
     places.layer,
   ),
 );
@@ -95,7 +95,11 @@ for (const [projectId, visibility] of [
   [DIFFS, "private"],
 ] as const) {
   projects.setSettings(projectId, settings(visibility));
-  places.places.set(projectId, { projectId, org: sampleOrgId, name: projectId.toLowerCase() });
+  places.places.set(projectId, {
+    projectId,
+    namespace: sampleOrgId,
+    name: projectId.toLowerCase(),
+  });
 }
 
 /** Commits `files` as the whole tree on a project's trunk `main`, creating the trunk first. */

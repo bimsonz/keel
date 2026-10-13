@@ -8,7 +8,7 @@ import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { projectIdFor } from "@keeltown/core/application/coordination";
 import { projectRepos } from "@keeltown/core/application/integration";
-import { makeId, type OrgId, type ProjectId, UserId } from "@keeltown/core/kernel";
+import { makeId, type NamespaceId, type ProjectId, UserId } from "@keeltown/core/kernel";
 import { CodeHost, type RepoRef } from "@keeltown/core/ports";
 import { makeCodeHostMemory, makeTrunksMemory, makeWorkspacePoolMemory } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
@@ -40,13 +40,13 @@ interface Problem {
 }
 interface Made {
   readonly id: ProjectId;
-  readonly org: string;
+  readonly namespace: { readonly handle: string; readonly kind: string };
   readonly name: string;
   readonly visibility: string;
   readonly viewer?: { readonly role: string };
 }
 interface Creating {
-  readonly org: string;
+  readonly namespace: string;
   readonly name: string;
   readonly source: string;
 }
@@ -68,7 +68,7 @@ const placed = async (projectId: ProjectId) =>
   (await env.DB.prepare(`SELECT id FROM projects WHERE id = ?`).bind(projectId).first()) !== null;
 
 /** Makes a user a member of another org too, as Better Auth writes a membership. */
-const joins = async (userId: string, org: OrgId) => {
+const joins = async (userId: string, org: NamespaceId) => {
   await env.DB.prepare(
     `INSERT INTO member (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, 'member', ?)`,
   )
@@ -181,7 +181,7 @@ function sourceApp(options: { readonly template?: boolean } = {}) {
      */
     source: async (token: string) => {
       const made = await create(token, {
-        org: "pool",
+        namespace: "pool",
         name: uniqueHandle("src"),
         source: TEMPLATE,
       });
@@ -218,7 +218,7 @@ describe("a new project's source", () => {
 
     // Anyone who signs up, creating in the org that is theirs, naming the trunk by the project's id.
     const stranger = await world.signUp("stranger");
-    const wanted = { org: stranger.handle, name: "copied", source: secret.trunk };
+    const wanted = { namespace: stranger.handle, name: "copied", source: secret.trunk };
     const asked = key();
     const refused = await world.create(stranger.token, wanted, asked);
     expect([refused.status, blank(refused.body)]).toEqual([404, { ...NOT_FOUND, nextActions: [] }]);
@@ -244,7 +244,7 @@ describe("a new project's source", () => {
     const carried = key();
     const across = await world.create(
       member.token,
-      { org: "elsewhere", name: "carried", source: secret.trunk },
+      { namespace: "elsewhere", name: "carried", source: secret.trunk },
       carried,
     );
     expect([across.status, blank(across.body)]).toEqual([
@@ -279,11 +279,11 @@ describe("a new project's source", () => {
 
     const member = await seedUser(uniqueHandle("member"));
     const within = await world.create(member.token, {
-      org: "pool",
+      namespace: "pool",
       name: uniqueHandle("fork"),
       source: source.trunk,
     });
-    expect([within.status, within.body.org, within.body.viewer]).toEqual([
+    expect([within.status, within.body.namespace.handle, within.body.viewer]).toEqual([
       201,
       "pool",
       { role: "member" },
@@ -292,16 +292,16 @@ describe("a new project's source", () => {
 
     // Someone outside the org: refused while the project is private, and forks it once it is public.
     const anyone = await world.signUp("anyone");
-    const theirs = { org: anyone.handle, name: "theirs", source: source.trunk };
+    const theirs = { namespace: anyone.handle, name: "theirs", source: source.trunk };
     expect((await world.create(anyone.token, theirs)).status).toBe(404);
     await world.open(owner.token, source.id);
     const forked = await world.create(anyone.token, theirs);
-    expect([forked.status, forked.body.org, forked.body.name, forked.body.visibility]).toEqual([
-      201,
-      anyone.handle,
-      "theirs",
-      "private",
-    ]);
+    expect([
+      forked.status,
+      forked.body.namespace.handle,
+      forked.body.name,
+      forked.body.visibility,
+    ]).toEqual([201, anyone.handle, "theirs", "private"]);
     expect(await world.head(forked.body.id)).toBe(source.head);
   });
 
@@ -327,7 +327,11 @@ describe("a new project's source", () => {
       `keel-core/${source.trunk}`,
     ]) {
       const asked = key();
-      const answer = await world.create(owner.token, { org: "pool", name, source: unknown }, asked);
+      const answer = await world.create(
+        owner.token,
+        { namespace: "pool", name, source: unknown },
+        asked,
+      );
       expect([unknown, answer.status, blank(answer.body)]).toEqual([
         unknown,
         404,
@@ -339,7 +343,7 @@ describe("a new project's source", () => {
               kind: "call",
               title: `Create the project from the template ${TEMPLATE}`,
               operationId: "Operator_createProject",
-              args: { org: "pool", name, source: TEMPLATE },
+              args: { namespace: "pool", name, source: TEMPLATE },
             },
           ],
         },
@@ -347,14 +351,14 @@ describe("a new project's source", () => {
       expect([unknown, await placed(wouldBe(owner.userId, asked))]).toEqual([unknown, false]);
     }
     // No refusal took the name: the next action's own arguments make the project.
-    const made = await world.create(owner.token, { org: "pool", name, source: TEMPLATE });
+    const made = await world.create(owner.token, { namespace: "pool", name, source: TEMPLATE });
     expect([made.status, made.body.name]).toEqual([201, name]);
   });
 
   it("[project.source-absent] a template the core namespace does not hold answers 404, naming its repo", async () => {
     const world = sourceApp({ template: false });
     const missing = await world.create((await maintainer()).token, {
-      org: "pool",
+      namespace: "pool",
       name: uniqueHandle("early"),
       source: TEMPLATE,
     });

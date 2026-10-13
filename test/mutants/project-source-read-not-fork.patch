@@ -10,7 +10,7 @@ index cc4aead..7d91c2c 100644
    source: ProjectResource | MissingResource,
    target: OrgResource,
 -): Decision => authorize(principal, "Operator_forkProject", { _tag: "Fork", source, target });
-+): Decision => authorize(principal, "Orgs_getProject", source);
++): Decision => authorize(principal, "Namespaces_getProject", source);
  
  /**
   * The one authorization policy, in front of every operation: each operation's

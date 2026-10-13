@@ -6,7 +6,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "@effect/vitest";
 import { USAGE_KEY_TTL_MS, usageAddress } from "@keeltown/core/application/identity";
 import { DEFAULT_QUOTAS, type QuotaKind } from "@keeltown/core/domain/identity";
-import type { OrgId } from "@keeltown/core/kernel";
+import type { NamespaceId } from "@keeltown/core/kernel";
 import { OrgUsage } from "@keeltown/core/ports";
 import {
   freshOrg,
@@ -30,14 +30,15 @@ import { backbone } from "../../src/composition/do.ts";
 const WAIT = { timeout: 20_000, interval: 25 };
 const LIMIT = DEFAULT_QUOTAS.projects;
 
-const usageStub = (org: OrgId) => env.ORG_USAGE.get(env.ORG_USAGE.idFromName(usageAddress(org)));
+const usageStub = (org: NamespaceId) =>
+  env.ORG_USAGE.get(env.ORG_USAGE.idFromName(usageAddress(org)));
 
 /**
  * Runs the org's object on `clock` instead of the system's. Test-only: it
  * replaces the instance's runtime from inside the object, which shares the
  * test's isolate, so the clock the test moves is the one the object reads.
  */
-const onClock = (org: OrgId, clock: ManualClock) =>
+const onClock = (org: NamespaceId, clock: ManualClock) =>
   runInDurableObject(usageStub(org), (instance: OrgUsageDO, state) => {
     Reflect.set(
       instance,

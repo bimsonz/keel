@@ -2,15 +2,15 @@
 # kills: project.create-heals
 # why: each create mints a fresh project id, so a retry after a crash finds its own name taken instead of finishing the project it placed
 diff --git a/packages/core/src/application/coordination/projects.ts b/packages/core/src/application/coordination/projects.ts
-index 4044db3..0fbe141 100644
+index 29b1b34..66af32f 100644
 --- a/packages/core/src/application/coordination/projects.ts
 +++ b/packages/core/src/application/coordination/projects.ts
 @@ -63,7 +63,7 @@ export const createProject: (
-   Projects | ProjectOrgs
+   Projects | ProjectNamespaces
  > = Effect.fn("coordination/createProject")(function* (actor: Actor, input: NewProject) {
-   const { org, idempotencyKey } = input;
+   const { namespace, idempotencyKey } = input;
 -  const projectId = projectIdFor(actor, idempotencyKey);
 +  const projectId = projectIdFor(actor, crypto.randomUUID());
    const name = input.name.toLowerCase();
-   const places = yield* ProjectOrgs;
+   const places = yield* ProjectNamespaces;
    const placed = yield* places.byId(projectId);

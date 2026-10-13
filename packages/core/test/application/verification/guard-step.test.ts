@@ -18,7 +18,7 @@ import {
   ContentHash,
   contentHashOf,
   type Json,
-  OrgId,
+  NamespaceId,
 } from "../../../src/domain/kernel/index.ts";
 import {
   coerce,
@@ -34,7 +34,7 @@ const CANDIDATE = hash(7);
 const PINNED = hash(42);
 
 /** The namespace every call names, and the only one the stores below keep anything for. */
-const NAMESPACE = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const NAMESPACE = Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 
 /** The js-ts pack's plan for a change: its one step, the suite. */
 const SUITE_PLAN = Result.getOrThrow(

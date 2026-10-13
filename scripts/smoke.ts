@@ -56,23 +56,20 @@ interface Seeded {
 }
 
 /**
- * Two agents written straight into D1, placed in the seed user's org and
+ * Two agents written straight into D1, placed in the seed user's own namespace and
  * sponsored by it (the gate refuses an agent with neither), in a project of
  * their own that is placed there too and holds nothing else.
  */
-async function seed(
-  name: string,
-  owner: { readonly userId: string; readonly org: string },
-): Promise<Seeded> {
+async function seed(name: string, owner: { readonly userId: string }): Promise<Seeded> {
   const id = `agt_${ulid()}`;
   const clientId = `smoke-${crypto.randomUUID()}`;
   const clientSecret = crypto.randomUUID() + crypto.randomUUID();
-  if (!/^usr_[0-9A-Z]{26}$/.test(owner.userId) || !/^org_[0-9A-Z]{26}$/.test(owner.org))
-    throw new Error("the seed user's ids are malformed: run the seed again");
+  if (!/^usr_[0-9A-Z]{26}$/.test(owner.userId))
+    throw new Error("the seed user's id is malformed: run the seed again");
   // Every value is generated here or checked above, so inlining is safe.
   d1(
-    `INSERT OR IGNORE INTO projects (id, org_id, name, created_at) VALUES ('${SMOKE_PROJECT}', '${owner.org}', 'smoke', ${Date.now()});` +
-      ` INSERT INTO agents (id, project_id, name, kind, scopes, state, revocation_epoch, created_at, org_id, sponsor_user) VALUES ('${id}', '${SMOKE_PROJECT}', '${name}', 'interactive', '["agent:read","agent:work"]', 'active', 0, ${Date.now()}, '${owner.org}', '${owner.userId}');` +
+    `INSERT OR IGNORE INTO projects (id, namespace_id, name, created_at) VALUES ('${SMOKE_PROJECT}', '${owner.userId}', 'smoke', ${Date.now()});` +
+      ` INSERT INTO agents (id, project_id, name, kind, scopes, state, revocation_epoch, created_at, namespace_id, sponsor_user) VALUES ('${id}', '${SMOKE_PROJECT}', '${name}', 'interactive', '["agent:read","agent:work"]', 'active', 0, ${Date.now()}, '${owner.userId}', '${owner.userId}');` +
       ` INSERT INTO credentials (client_id, agent_id, secret_hash) VALUES ('${clientId}', '${id}', '${await sha256(clientSecret)}');`,
   );
   return { id, clientId, clientSecret };

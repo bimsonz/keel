@@ -25,7 +25,7 @@ import {
   type FailedDraft,
   HumanGate,
   type ProbeCell,
-  ProjectOrgs,
+  ProjectNamespaces,
   type ResolveCommand,
   type SubjectRef,
 } from "../ports/index.ts";
@@ -90,7 +90,7 @@ export const escalateUnprovable = Effect.fn("coordination/escalateUnprovable")(f
   const store = yield* EntityStore;
   const view = viewOf(store, conflictId);
   if (view === undefined || !awaitsEscalation(view, yield* (yield* Clock).now)) return;
-  const place = yield* (yield* ProjectOrgs).byId(at.projectId);
+  const place = yield* (yield* ProjectNamespaces).byId(at.projectId);
   if (Option.isNone(place)) {
     yield* Effect.logWarning(
       `${conflictId} is unprovable and ${at.projectId} belongs to no namespace: nobody is asked`,
@@ -106,7 +106,7 @@ export const escalateUnprovable = Effect.fn("coordination/escalateUnprovable")(f
   const escalationId = escalationIdOf(conflictId);
   yield* (yield* HumanGate)
     .raise({
-      namespace: place.value.org,
+      namespace: place.value.namespace,
       escalationId,
       project: at.projectId,
       sponsor: agent?.sponsor,
@@ -187,7 +187,7 @@ export const resolveConflict = Effect.fn("coordination/resolveConflict")(functio
   const now = yield* (yield* Clock).now;
   if (Result.isFailure(decideConflict(view.conflict, escalate, { now, conflictId })))
     return yield* refused(conflictId, `a ${view.conflict.state} conflict cannot be escalated`);
-  const place = yield* (yield* ProjectOrgs).byId(at.projectId);
+  const place = yield* (yield* ProjectNamespaces).byId(at.projectId);
   if (Option.isNone(place))
     return yield* refused(
       conflictId,
@@ -195,7 +195,7 @@ export const resolveConflict = Effect.fn("coordination/resolveConflict")(functio
     );
   yield* (yield* HumanGate)
     .raise({
-      namespace: place.value.org,
+      namespace: place.value.namespace,
       escalationId,
       project: at.projectId,
       sponsor: command.sponsor,

@@ -2,15 +2,15 @@
 # kills: authz.org-isolation
 # why: a membership is matched without its org, so a member of one org reads another org's private projects
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 91a2965..e82eb5c 100644
+index d9b9395..e7dcd5c 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -180,7 +180,7 @@ const NONE: ReadonlySet<Right> = new Set();
+@@ -176,7 +176,7 @@ const NONE: ReadonlySet<Right> = new Set();
  const READ: ReadonlySet<Right> = new Set(["read"]);
  
  const roleIn = (memberships: readonly Membership[], org: string): Role | undefined =>
 -  memberships.find((m) => m.org === org)?.role;
 +  memberships[0]?.role;
  
- /** Rights from a role in the resource's org, else a public read. */
- const rightsByRole = (role: Role | undefined, resource: Resource): ReadonlySet<Right> => {
+ /**
+  * A user's role in a namespace: `owner` of the one whose id is its own, by

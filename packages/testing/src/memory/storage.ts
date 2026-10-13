@@ -5,7 +5,7 @@ import {
 } from "@keeltown/core/application/verification";
 import { BundleMissing } from "@keeltown/core/domain/verification";
 import { SecretMissing } from "@keeltown/core/domain/delivery";
-import type { ContentHash, EventEnvelope, OrgId, SessionId } from "@keeltown/core/kernel";
+import type { ContentHash, EventEnvelope, NamespaceId, SessionId } from "@keeltown/core/kernel";
 import {
   canonicalJson,
   ContentHash as ContentHashSchema,
@@ -106,11 +106,11 @@ const hex = (bytes: ArrayBuffer): string =>
 const hexOf = (hash: ContentHash): string => hash.slice("sha256:".length);
 
 /** Where each memory store keeps a namespace's object: the key its R2 adapter builds. */
-const bundleKeyOf = (namespace: OrgId, hash: ContentHash) =>
+const bundleKeyOf = (namespace: NamespaceId, hash: ContentHash) =>
   namespaceKey(namespace, "bundles", hexOf(hash));
-const evidenceKeyOf = (namespace: OrgId, hash: ContentHash) =>
+const evidenceKeyOf = (namespace: NamespaceId, hash: ContentHash) =>
   namespaceKey(namespace, "evidence", hexOf(hash));
-const planKeyOf = (namespace: OrgId, hash: ContentHash) =>
+const planKeyOf = (namespace: NamespaceId, hash: ContentHash) =>
   namespaceKey(namespace, "plans", hexOf(hash));
 
 /** Bundles in a Map, under the key the R2 adapter keeps them at: a namespace's bundles, by hash. */
@@ -259,7 +259,7 @@ export function makePlanStoreMemory() {
   const plans = new Map<string, string>();
   return {
     plans,
-    plant: (namespace: OrgId, hash: ContentHash, text: string) =>
+    plant: (namespace: NamespaceId, hash: ContentHash, text: string) =>
       Effect.sync(() => void plans.set(planKeyOf(namespace, hash), text)),
     layer: Layer.succeed(
       PlanStore,

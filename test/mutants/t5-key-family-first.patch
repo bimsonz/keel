@@ -8,6 +8,6 @@ index 35791314..0bfee024 100644
 @@ -11,4 +11,4 @@ export type KeyFamily = "bundles" | "deps" | "evidence" | "plans";
   * any other way can read across namespaces (guard: r2-namespace-keys).
   */
- export const namespaceKey = (namespace: OrgId, family: KeyFamily, hex: string): string =>
+ export const namespaceKey = (namespace: NamespaceId, family: KeyFamily, hex: string): string =>
 -  `ns/${namespace}/${family}/${hex}`;
 +  `ns/${family}/${namespace}/${hex}`;

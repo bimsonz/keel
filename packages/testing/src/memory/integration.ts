@@ -8,7 +8,7 @@ import {
   type ChangeId,
   CommitSha,
   ContentHash,
-  type OrgId,
+  type NamespaceId,
   type ProjectId,
 } from "@keeltown/core/kernel";
 import {
@@ -319,7 +319,7 @@ export function makeLanesMemory(options: { readonly journal?: string[] } = {}) {
  */
 export function makeCandidateBundlesMemory(options: { readonly refuse?: readonly string[] } = {}) {
   const bundled: CommitSha[] = [];
-  const namespaces: OrgId[] = [];
+  const namespaces: NamespaceId[] = [];
   return {
     bundled,
     namespaces,

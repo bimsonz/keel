@@ -50,6 +50,12 @@ const githubTokens = async (userId: string) =>
       .all()
   ).results;
 
+/** A handle's row in `namespaces`: whose it is and of which kind, or null while nobody holds it. */
+const namespaceRow = (handle: string) =>
+  env.DB.prepare(`SELECT id, kind FROM namespaces WHERE handle = ?`)
+    .bind(handle)
+    .first<{ id: string; kind: string }>();
+
 /**
  * Adds a passkey with a session a moment old, is refused once the session is
  * eleven minutes old, and adds one again after signing in afresh. Answers how
@@ -251,7 +257,7 @@ describe("Better Auth at /v1/auth", () => {
     }
   });
 
-  it("[ba.handle-first] a user without a handle may only choose one or sign out; the handle makes its personal org", async () => {
+  it("[ba.handle-first] a user without a handle may only choose one or sign out; the handle makes its namespace and no org", async () => {
     const { jar, userId } = await signUpByCode("first@example.com");
     const org = await call("/organization/create", { body: { name: "Mine", slug: "mine" }, jar });
     answered(org, 403);
@@ -266,11 +272,9 @@ describe("Better Auth at /v1/auth", () => {
     answered(set, 200);
     const orgs = await call("/organization/list", { jar });
     answered(orgs, 200);
-    expect(orgs.json.map((o: { slug: string }) => o.slug)).toEqual(["first"]);
-    expect(orgs.json[0].id).toMatch(/^org_[0-9A-HJKMNP-TV-Z]{26}$/);
-    const full = await call("/organization/get-full-organization?organizationSlug=first", { jar });
-    expect(full.json.members).toEqual([expect.objectContaining({ userId, role: "owner" })]);
+    expect(orgs.json).toEqual([]);
     expect(userId).toMatch(/^usr_[0-9A-HJKMNP-TV-Z]{26}$/);
+    expect(await namespaceRow("first")).toEqual({ id: userId, kind: "user" });
   });
 
   it("[ba.handle-immutable] a handle, once chosen, never changes", async () => {
@@ -310,12 +314,12 @@ describe("Better Auth at /v1/auth", () => {
       200,
     );
 
-    // Bea's handle made her personal org, so the name is taken twice over.
+    // Bea's handle holds the name: no org takes it.
     const handle = await call("/organization/create", {
       body: { name: "Bea", slug: "bea" },
       jar: ada.jar,
     });
-    expect(handle.status).toBe(400);
+    expect([handle.status, handle.json.code]).toEqual([400, "NAME_TAKEN"]);
     const path = await call("/organization/create", {
       body: { name: "S", slug: "Settings" },
       jar: ada.jar,
@@ -329,15 +333,9 @@ describe("Better Auth at /v1/auth", () => {
     });
     expect(renamed.status).toBe(400);
     expect(renamed.json.code).toBe("NAME_IMMUTABLE");
-    const personal = (await call("/organization/list", { jar: ada.jar })).json.find(
-      (o: { slug: string }) => o.slug === "ada",
-    );
-    const deleted = await call("/organization/delete", {
-      body: { organizationId: personal.id },
-      jar: ada.jar,
-    });
-    expect(deleted.status).toBe(400);
-    expect(deleted.json.code).toBe("PERSONAL_ORG");
+    // A person's own namespace is no org: Ada's list holds the two she made and nothing by her handle.
+    const listed = await call("/organization/list", { jar: ada.jar });
+    expect(listed.json.map((o: { slug: string }) => o.slug).toSorted()).toEqual(["acme", "keel"]);
   });
 
   it("[ba.passkey-first] signs up with a handle and a passkey alone, then signs in with the passkey", async () => {
@@ -350,7 +348,8 @@ describe("Better Auth at /v1/auth", () => {
       emailVerified: false,
     });
     const orgs = await site("/organization/list", { jar });
-    expect(orgs.json.map((o: { slug: string }) => o.slug)).toEqual(["cy"]);
+    expect(orgs.json).toEqual([]);
+    expect(await namespaceRow("cy")).toMatchObject({ kind: "user" });
 
     const fresh = new Jar();
     const challenge = await site("/passkey/generate-authenticate-options", { jar: fresh });

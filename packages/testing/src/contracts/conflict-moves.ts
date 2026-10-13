@@ -6,7 +6,7 @@ import {
   type EntityRef,
   type EventEnvelope,
   makeId,
-  type OrgId,
+  type NamespaceId,
   type ProjectId,
 } from "@keeltown/core/kernel";
 import {
@@ -34,8 +34,8 @@ export interface ConflictMovesHarness {
     suspect: Extract<ConflictCommand, { _tag: "Suspect" }>,
   ) => Effect.Effect<ConflictView, unknown>;
   readonly log: (at: SubjectRef, entity: EntityRef) => Effect.Effect<readonly EventEnvelope[]>;
-  readonly place: (projectId: ProjectId, namespace: OrgId) => Effect.Effect<void>;
-  readonly settled: (at: SubjectRef, namespace: OrgId) => Effect.Effect<void>;
+  readonly place: (projectId: ProjectId, namespace: NamespaceId) => Effect.Effect<void>;
+  readonly settled: (at: SubjectRef, namespace: NamespaceId) => Effect.Effect<void>;
 }
 
 /** Drafts the conflict's probe and runs it three times discriminating: the probe is admitted and the conflict proven. */

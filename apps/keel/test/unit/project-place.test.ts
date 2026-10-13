@@ -2,13 +2,13 @@ import { describe, expect, it } from "@effect/vitest";
 import { createProject, projectIdFor } from "@keeltown/core/application/coordination";
 import { createProject as bootstrap, projectRepos } from "@keeltown/core/application/integration";
 import { type Actor, actorId } from "@keeltown/core/domain/identity";
-import { isId, OrgId, type ProjectId, UserId } from "@keeltown/core/kernel";
+import { isId, NamespaceId, type ProjectId, UserId } from "@keeltown/core/kernel";
 import {
   type Clock,
   CodeHost,
   type EntityStore,
   EventOutbox,
-  ProjectOrgs,
+  ProjectNamespaces,
   type ProjectPlace,
   Projects,
   Trunks,
@@ -19,13 +19,13 @@ import {
   makeCodeHostMemory,
   makeEventOutboxMemory,
   makeManualClock,
-  makeProjectOrgsMemory,
+  makeProjectNamespacesMemory,
   makeTrunksMemory,
   makeWorkspacePoolMemory,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, Option, Schema } from "effect";
 
-const ORG = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const ORG = Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 const user = (id: string): Actor => ({
   _tag: "User",
   userId: Schema.decodeUnknownSync(UserId)(id),
@@ -42,14 +42,14 @@ const SOURCE = { namespace: "keel-core", name: "seed-app" };
  */
 function world(options: { readonly failSyncOnce?: boolean } = {}) {
   const journal: string[] = [];
-  const places = makeProjectOrgsMemory();
+  const places = makeProjectNamespacesMemory();
   const seen = new Map<ProjectId, Option.Option<ProjectPlace>>();
   const code = makeCodeHostMemory();
   const outbox = makeEventOutboxMemory();
   const placed = Layer.effect(
-    ProjectOrgs,
-    Effect.map(ProjectOrgs, (inner) =>
-      ProjectOrgs.of({
+    ProjectNamespaces,
+    Effect.map(ProjectNamespaces, (inner) =>
+      ProjectNamespaces.of({
         ...inner,
         assign: (place) =>
           Effect.tap(inner.assign(place), () =>
@@ -62,7 +62,7 @@ function world(options: { readonly failSyncOnce?: boolean } = {}) {
     Trunks,
     Effect.gen(function* () {
       const inner = yield* Trunks;
-      const orgs = yield* ProjectOrgs;
+      const orgs = yield* ProjectNamespaces;
       return Trunks.of({
         ...inner,
         initialize: (projectId, head, by) =>
@@ -85,7 +85,7 @@ function world(options: { readonly failSyncOnce?: boolean } = {}) {
             bootstrap(
               {
                 ...input,
-                by: actorId(actor),
+                by: creatorOf(actor),
                 fingerprint: JSON.stringify([input.name, input.source]),
               },
               2,
@@ -118,8 +118,14 @@ const seedSource = Effect.gen(function* () {
 
 const TEMPLATE = { _tag: "Template", repo: SOURCE.name } as const;
 
+/** The person creating a project: only a person does, as the Project object's adapter holds. */
+const creatorOf = (actor: Actor): UserId => {
+  if (actor._tag !== "User") throw new Error("a project is created by a person");
+  return actor.userId;
+};
+
 const creating = (actor: Actor, name: string, idempotencyKey: string) =>
-  createProject(actor, { org: ORG, name, source: TEMPLATE, idempotencyKey });
+  createProject(actor, { namespace: ORG, name, source: TEMPLATE, idempotencyKey });
 
 /** The head of a project's trunk on the code host. */
 const trunkHead = (projectId: ProjectId) =>
@@ -146,8 +152,10 @@ describe("createProject", () => {
           `sync ${id}`,
           `configure ${id}`,
         ]);
-        expect(seen.get(id)).toEqual(Option.some({ projectId: id, org: ORG, name: "seed-app" }));
-        expect(yield* created(id)).toMatchObject([{ actor: `operator:${actorId(alice)}` }]);
+        expect(seen.get(id)).toEqual(
+          Option.some({ projectId: id, namespace: ORG, name: "seed-app" }),
+        );
+        expect(yield* created(id)).toMatchObject([{ actor: `user:${actorId(alice)}` }]);
       }).pipe(Effect.provide(layer));
     },
   );
@@ -161,13 +169,15 @@ describe("createProject", () => {
         const id = projectIdFor(alice, "create-1");
         const crashed = yield* Effect.exit(creating(alice, "forge", "create-1"));
         expect(Exit.isFailure(crashed)).toBe(true);
-        expect(places.places.get(id)).toEqual({ projectId: id, org: ORG, name: "forge" });
+        expect(places.places.get(id)).toEqual({ projectId: id, namespace: ORG, name: "forge" });
         expect(yield* created(id)).toEqual([]);
 
         const healed = yield* creating(alice, "forge", "create-1");
         expect(healed.id).toBe(id);
         expect(yield* creating(alice, "forge", "create-1")).toEqual(healed);
-        expect([...places.places.values()]).toEqual([{ projectId: id, org: ORG, name: "forge" }]);
+        expect([...places.places.values()]).toEqual([
+          { projectId: id, namespace: ORG, name: "forge" },
+        ]);
         expect(yield* created(id)).toHaveLength(1);
       }).pipe(Effect.provide(layer));
     },
@@ -204,7 +214,7 @@ describe("createProject", () => {
       expect(renamed).toMatchObject({ _tag: "IdempotencyConflict", idempotencyKey: "create-1" });
       const moved = yield* Effect.flip(
         createProject(alice, {
-          org: Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V1"),
+          namespace: Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V1"),
           name: "forge",
           source: TEMPLATE,
           idempotencyKey: "create-1",
@@ -228,7 +238,7 @@ describe("createProject", () => {
           { "PLAN.md": "ours" },
         );
         const fork = yield* createProject(bob, {
-          org: ORG,
+          namespace: ORG,
           name: "anvil",
           source: { _tag: "Project", projectId: first.id },
           idempotencyKey: "create-1",

@@ -67,7 +67,7 @@ async function projectUnderTest() {
         projectId,
         name: "Seed app",
         source,
-        by: operator,
+        by: maintainer,
         idempotencyKey: "create-1",
         fingerprint,
       }),

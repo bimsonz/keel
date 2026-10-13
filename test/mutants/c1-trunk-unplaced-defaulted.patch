@@ -9,7 +9,7 @@ index 8690d5f6..57f88f84 100644
    CommitSha,
    EntityRef,
    EventEnvelope,
-+  OrgId,
++  NamespaceId,
    ProjectId,
  } from "../../domain/kernel/index.ts";
  import {
@@ -20,7 +20,7 @@ index 8690d5f6..57f88f84 100644
 -      Effect.die(
 -        new Error(`project ${projectId} has no place: its trunk has no org to count against`),
 -      ),
-+      Effect.succeed("org_00000000000000000000000000" as OrgId),
++      Effect.succeed("org_00000000000000000000000000" as NamespaceId),
      ),
    );
  

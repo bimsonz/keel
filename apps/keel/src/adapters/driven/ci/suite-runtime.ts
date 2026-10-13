@@ -15,7 +15,7 @@ import {
   type TypecheckJudgement,
   WORKER_APP_TYPECHECK,
 } from "@keeltown/core/application/verification";
-import type { ContentHash, Json, OrgId } from "@keeltown/core/kernel";
+import type { ContentHash, Json, NamespaceId } from "@keeltown/core/kernel";
 import type { PlanStep, StepResult } from "@keeltown/core/domain/verification";
 import { EvidenceStore, VerifierRuntime } from "@keeltown/core/ports";
 import { BUNDLE_URL_TTL_SECONDS, HYDRATE_SH, signedBundleUrl } from "@keeltown/runner-protocol";
@@ -292,7 +292,7 @@ export const SuiteRuntimeCi = (deps: {
     VerifierRuntime,
     Effect.gen(function* () {
       const evidence = yield* EvidenceStore;
-      const runStep = (namespace: OrgId, bundle: ContentHash) => (step: PlanStep) =>
+      const runStep = (namespace: NamespaceId, bundle: ContentHash) => (step: PlanStep) =>
         Effect.gen(function* () {
           const tier2 = TIER2_RUNNERS[step.id];
           if (tier2 === undefined || step.tier.tier !== 2) return abstained(step);

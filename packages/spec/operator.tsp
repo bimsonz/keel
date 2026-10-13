@@ -7,14 +7,14 @@ using Http;
 
 namespace Keel;
 
-/** A project and where it lives: `/<org>/<name>`. */
+/** A project and where it lives: `/<namespace>/<name>`. */
 model ProjectView {
   id: ProjectId;
 
-  /** The project's org, by name. */
-  org: string;
+  /** The namespace the project belongs to: a person's own, an agent's own or an org. */
+  `namespace`: NamespaceRef;
 
-  /** The project's name in its org, lower-case. */
+  /** The project's name in its namespace, lower-case. */
   name: string;
 
   visibility: "private" | "public";
@@ -22,23 +22,23 @@ model ProjectView {
   /** When the project was created: answered on creation. */
   createdAt?: utcDateTime;
 
-  /** The reader's role in the project's org; absent for anyone who is not a member of it. */
+  /** The reader's role in the project's namespace: its owner's in their own, a member's in an org; absent for anyone else. */
   viewer?: Viewer;
 }
 
 model CreateProjectRequest {
-  /** The org the project is created in, by name; the caller must be a member of it. */
+  /** The namespace the project is created in, by its handle: the caller's own, or an org the caller is a member of. */
   @minLength(1)
-  org: string;
+  `namespace`: string;
 
-  /** The project's name in its org, unique there in any case. */
+  /** The project's name in its namespace, unique there in any case. */
   @minLength(1)
   name: string;
 
   /**
    * What trunk is forked from: a template's name, or the trunk of a project the caller may fork, named by that
-   * project's id in lower case with a hyphen (`prj-01…`). A public project forks into any org the caller is a
-   * member of; a private one only into its own org.
+   * project's id in lower case with a hyphen (`prj-01…`). A public project forks into the caller's own namespace
+   * or any org the caller is a member of; a private one only into its own namespace.
    */
   @minLength(1)
   source: string;

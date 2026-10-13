@@ -1,5 +1,5 @@
 import { Clock, Effect } from "effect";
-import type { ContentHash, OrgId } from "../../domain/kernel/index.ts";
+import type { ContentHash, NamespaceId } from "../../domain/kernel/index.ts";
 import type { PlanStep, StepReport } from "../../domain/verification/index.ts";
 import { EvidenceStore, ProbeRunner } from "../ports/index.ts";
 import type { StepRunner } from "./run-plan.ts";
@@ -20,7 +20,7 @@ import type { StepRunner } from "./run-plan.ts";
  */
 export const withGuards =
   <R>(
-    namespace: OrgId,
+    namespace: NamespaceId,
     candidate: ContentHash,
     otherwise: StepRunner<R>,
   ): StepRunner<R | ProbeRunner | EvidenceStore> =>

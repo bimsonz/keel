@@ -8,7 +8,7 @@ import type {
   ContentHash,
   GuardId,
   Instant,
-  OrgId,
+  NamespaceId,
   ProbeId,
   ProjectId,
 } from "../../domain/kernel/index.ts";
@@ -60,7 +60,7 @@ import { trunkCheckPlan, worldCheckInstanceId, worldCheckJobs } from "./world-ch
 /** The conflict a Probe instance is drafting for, and where it reports. */
 export interface ProbeCall {
   /** The namespace the project belongs to, as the instance's `namespace` step read it: every bundle, probe, plan and evidence document of this conflict is kept under it. */
-  readonly namespace: OrgId;
+  readonly namespace: NamespaceId;
   readonly projectId: ProjectId;
   /** The subject whose Subject DO hosts the conflict. */
   readonly key: SubjectKey;
@@ -274,7 +274,7 @@ export type DraftAnswer = { readonly _tag: "Drafted"; readonly outcome: DraftOut
  * never be complete, so the draft is incomplete.
  */
 export const draftConflict = (
-  namespace: OrgId,
+  namespace: NamespaceId,
   parties: ProbeParties,
   plan: ProbeWorldPlan,
   worlds: Readonly<Record<FlowWorld, ContentHash>>,

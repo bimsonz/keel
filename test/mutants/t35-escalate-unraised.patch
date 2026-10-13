@@ -2,7 +2,7 @@
 # kills: t35.resolve-escalate
 # why: a party's escalate marks the conflict escalated without raising its escalation, so the conflict waits on a ruling nobody can give
 diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
-index 23f9e41..3202180 100644
+index 9074637..c4bbf93 100644
 --- a/packages/core/src/application/coordination/conflict-moves.ts
 +++ b/packages/core/src/application/coordination/conflict-moves.ts
 @@ -193,16 +193,6 @@ export const resolveConflict = Effect.fn("coordination/resolveConflict")(functio
@@ -11,7 +11,7 @@ index 23f9e41..3202180 100644
      );
 -  yield* (yield* HumanGate)
 -    .raise({
--      namespace: place.value.org,
+-      namespace: place.value.namespace,
 -      escalationId,
 -      project: at.projectId,
 -      sponsor: command.sponsor,

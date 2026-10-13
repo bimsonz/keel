@@ -1,5 +1,5 @@
 import { noopTree, type TextCodec } from "@keeltown/core/application/verification";
-import { CommitSha, contentHashOf, type OrgId } from "@keeltown/core/kernel";
+import { CommitSha, contentHashOf, type NamespaceId } from "@keeltown/core/kernel";
 import { NoopWorlds, ObjectNotFound, ProbeSources, type RepoRef } from "@keeltown/core/ports";
 import { Effect, Layer, Result } from "effect";
 
@@ -105,7 +105,7 @@ export function makeProbeSourcesMemory() {
 }
 
 /** Where the memory NoopWorlds keeps a namespace's world: one namespace's hash is never another's. */
-const worldKeyOf = (namespace: OrgId, hash: string) => `${namespace}\u0000${hash}`;
+const worldKeyOf = (namespace: NamespaceId, hash: string) => `${namespace}\u0000${hash}`;
 
 /**
  * NoopWorlds in memory: world bundles stored as whole trees, for a namespace,
@@ -123,7 +123,7 @@ export function makeNoopWorldsMemory() {
         .map(([path, file]) => [path, typeof file === "string" ? file : [...file]]),
     );
   return {
-    world: (namespace: OrgId, files: MemoryTree) =>
+    world: (namespace: NamespaceId, files: MemoryTree) =>
       Effect.sync(() => {
         const hash = hashOf(files);
         worlds.set(worldKeyOf(namespace, hash), files);

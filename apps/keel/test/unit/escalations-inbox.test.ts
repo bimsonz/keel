@@ -5,7 +5,13 @@ import {
 } from "@keeltown/core/application/coordination";
 import { MAINTAINERS_AFTER_MS } from "@keeltown/core/application/memory";
 import type { Principal, Role } from "@keeltown/core/domain/identity";
-import { makeId, type OrgId, type ProjectId, type UserId } from "@keeltown/core/kernel";
+import {
+  makeId,
+  type NamespaceId,
+  type OrgId,
+  type ProjectId,
+  type UserId,
+} from "@keeltown/core/kernel";
 import { HumanGate, type RaiseRequest } from "@keeltown/core/ports";
 import {
   makeAgentDirectoryMemory,
@@ -19,10 +25,10 @@ import {
   makeInboxMemory,
   makeManualClock,
   makeMembershipsMemory,
-  makeOrgsMemory,
+  makeNamespacesMemory,
   makeProbeLedgerMemory,
   makeProbeStoreMemory,
-  makeProjectOrgsMemory,
+  makeProjectNamespacesMemory,
   makeProjectsMemory,
   makeProjectViewsMemory,
   makeSessionsMemory,
@@ -63,7 +69,7 @@ function world() {
   const directory = makeAgentDirectoryMemory().layer;
   const inbox = makeInboxMemory();
   const projects = makeProjectsMemory();
-  const places = makeProjectOrgsMemory();
+  const places = makeProjectNamespacesMemory();
   for (const [projectId, org, name] of [
     [LEDGER, ACME, "ledger"],
     [ATLAS, BETA, "atlas"],
@@ -75,7 +81,7 @@ function world() {
       verification: "required",
       visibility: "private",
     });
-    places.places.set(projectId, { projectId, org, name });
+    places.places.set(projectId, { projectId, namespace: org, name });
   }
   const rows = makeBetterAuthMemory({
     orgs: [
@@ -106,7 +112,7 @@ function world() {
       makeCodeHostMemory().layer,
       makeUsersMemory(rows).layer,
       makeMembershipsMemory(rows).layer,
-      makeOrgsMemory(rows).layer,
+      makeNamespacesMemory(rows).layer,
       places.layer,
     ),
   );
@@ -116,7 +122,12 @@ function world() {
     { origin: "https://keel.test", fresh: () => true },
   );
   /** Raises a question about a fresh conflict of `project`, asking `sponsor` first. */
-  const raise = async (namespace: OrgId, project: ProjectId, sponsor: UserId, question: string) => {
+  const raise = async (
+    namespace: NamespaceId,
+    project: ProjectId,
+    sponsor: UserId,
+    question: string,
+  ) => {
     const conflictId = makeId("cfl", ulid());
     const request: RaiseRequest = {
       namespace,
@@ -159,7 +170,7 @@ const user = (userId: UserId, memberships: readonly (readonly [OrgId, Role])[]):
     suspended: false,
     memberships: memberships.map(([org, role]) => ({ org, role })),
   });
-const agentOf = (org: OrgId, projectId: ProjectId, sponsor: UserId): Caller =>
+const agentOf = (org: NamespaceId, projectId: ProjectId, sponsor: UserId): Caller =>
   callerAs(
     {
       _tag: "Agent",

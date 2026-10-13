@@ -49,17 +49,32 @@ const only = (requests: { url: string; init: RequestInit }[]) => {
 };
 
 describe("keeltown", () => {
-  it("[cli.session] a user's session governs: project create sends its org under the session as a bearer, and enrol needs its project", async () => {
+  it("[cli.session] a user's session governs: project create sends its namespace under the session as a bearer, and enrol needs its project", async () => {
     const keel = fakeKeel(() =>
       Response.json(
-        { id: "prj_1", org: "keel", name: "forge", visibility: "private" },
+        {
+          id: "prj_1",
+          namespace: { handle: "keel", kind: "org" },
+          name: "forge",
+          visibility: "private",
+        },
         { status: 201 },
       ),
     );
     const session = { ...keel.io, env: { KEEL_URL: "https://keel.test", KEEL_SESSION: "sess-1" } };
     expect(
       await run(
-        ["project", "create", "--org", "keel", "--name", "forge", "--source", "fixture", "--json"],
+        [
+          "project",
+          "create",
+          "--namespace",
+          "keel",
+          "--name",
+          "forge",
+          "--source",
+          "fixture",
+          "--json",
+        ],
         session,
       ),
     ).toBe(0);
@@ -67,7 +82,7 @@ describe("keeltown", () => {
     expect([sent.url, sent.headers.get("authorization"), sent.body]).toEqual([
       "https://keel.test/v1/projects",
       "Bearer sess-1",
-      { org: "keel", name: "forge", source: "fixture" },
+      { namespace: "keel", name: "forge", source: "fixture" },
     ]);
     expect(await run(["agent", "enrol", "--name", "a1", "--scope", "agent:work"], session)).toBe(2);
     expect(keel.err.join("\n")).toContain("--project");

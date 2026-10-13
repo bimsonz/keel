@@ -4,8 +4,8 @@ import { ACTIONS, SPEC_ACTIONS } from "@keeltown/core/domain/identity";
 import {
   makeAgentDirectoryMemory,
   makeChangesMemory,
-  makeOrgsMemory,
-  makeProjectOrgsMemory,
+  makeNamespacesMemory,
+  makeProjectNamespacesMemory,
   makeProjectsMemory,
 } from "@keeltown/testing";
 import { Effect, Layer } from "effect";
@@ -19,8 +19,8 @@ import type { Runner } from "../../src/adapters/driving/http/run.ts";
 import type { Operations } from "../../src/generated/http/app.gen.ts";
 
 const layer = Layer.mergeAll(
-  makeProjectOrgsMemory().layer,
-  makeOrgsMemory().layer,
+  makeProjectNamespacesMemory().layer,
+  makeNamespacesMemory().layer,
   makeProjectsMemory().layer,
   makeChangesMemory().layer,
   makeAgentDirectoryMemory().layer,

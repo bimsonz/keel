@@ -1,0 +1,25 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/namespaces.test.ts
+# kills: ns.sign-up, ns.kind
+# why: a person's namespace is written as an org's, so their handle is looked up among the orgs, where no org has their id, and reads as nobody's: they cannot create a project under their own name
+diff --git a/apps/keel/migrations/0010_namespaces.sql b/apps/keel/migrations/0010_namespaces.sql
+index fef8911..37ea02f 100644
+--- a/apps/keel/migrations/0010_namespaces.sql
++++ b/apps/keel/migrations/0010_namespaces.sql
+@@ -88,7 +88,7 @@ AFTER INSERT ON "user"
+ WHEN NEW.username IS NOT NULL
+ BEGIN
+   INSERT INTO namespaces (id, handle, kind, created_at)
+-  VALUES (NEW.id, NEW.username, 'user', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
++  VALUES (NEW.id, NEW.username, 'org', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
+ END;
+ 
+ CREATE TRIGGER namespaces_user_took_handle
+@@ -96,7 +96,7 @@ AFTER UPDATE OF username ON "user"
+ WHEN NEW.username IS NOT NULL AND OLD.username IS NULL
+ BEGIN
+   INSERT INTO namespaces (id, handle, kind, created_at)
+-  VALUES (NEW.id, NEW.username, 'user', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
++  VALUES (NEW.id, NEW.username, 'org', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
+ END;
+ 
+ CREATE TRIGGER namespaces_org_created

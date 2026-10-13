@@ -20,7 +20,7 @@ import type {
   ProbeRunner,
   ProbeSources,
   ProbeStore,
-  ProjectOrgs,
+  ProjectNamespaces,
   Projects,
   SyntaxSource,
   Trunks,
@@ -39,7 +39,7 @@ import { AdmittedGuardsCodeHost } from "../adapters/driven/gitcore/admitted-guar
 import { FlowSpecSourceCodeHost } from "../adapters/driven/gitcore/flow-spec-source.ts";
 import { SyntaxSourceTreeSitter } from "../adapters/driven/syntax/syntax-source.ts";
 import { SYNTAX_WASM } from "../adapters/driven/syntax/wasm.ts";
-import { ProjectOrgsD1 } from "../adapters/driven/d1/project-orgs.ts";
+import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
 import { ChangePrecheckRpc } from "../adapters/driven/do-rpc/change-precheck.ts";
 import { ProbeChangesRpc } from "../adapters/driven/do-rpc/probe-changes.ts";
 import { ProbeLedgerRpc } from "../adapters/driven/do-rpc/probe-ledger.ts";
@@ -96,7 +96,7 @@ export function keelVerifyRuntime(
   | VerifierRuntime
   | PlanStore
   | ProbeRunner
-  | ProjectOrgs,
+  | ProjectNamespaces,
   never
 > {
   const durable: Durable = (name, effect) =>
@@ -115,7 +115,7 @@ export function keelVerifyRuntime(
       evidence,
       BatchVerdictsRpc(lanes),
       PlanStoreR2(env.ARCHIVE),
-      ProjectOrgsD1(env.DB),
+      ProjectNamespacesD1(env.DB),
       ProbeRunnerRpc(verifierEntrypoint(env.VERIFIER)),
       SuiteRuntimeCi({
         runner: engine.runner,
@@ -158,7 +158,7 @@ export function precheckRuntime(
   | SyntaxSource
   | PlanStore
   | EvidenceStore
-  | ProjectOrgs,
+  | ProjectNamespaces,
   never
 > {
   const project = (projectId: string) =>
@@ -176,7 +176,7 @@ export function precheckRuntime(
       ).pipe(Layer.provide(code)),
       PlanStoreR2(env.ARCHIVE),
       EvidenceStoreR2(env.ARCHIVE),
-      ProjectOrgsD1(env.DB),
+      ProjectNamespacesD1(env.DB),
     ),
   );
 }
@@ -220,7 +220,7 @@ export type ProbeServices =
   | FlowSpecSource
   | PlanStore
   | WorldChecks
-  | ProjectOrgs;
+  | ProjectNamespaces;
 
 /**
  * The Probe Workflow's composition root, per run: the conflict's ledger on
@@ -253,7 +253,7 @@ export function probeRuntime(env: Env): ManagedRuntime.ManagedRuntime<ProbeServi
       FlowSpecSourceCodeHost.pipe(Layer.provide(code)),
       PlanStoreR2(env.ARCHIVE),
       WorldChecksWorkflow(env.WORLD_CHECK),
-      ProjectOrgsD1(env.DB),
+      ProjectNamespacesD1(env.DB),
     ),
   );
 }
@@ -275,7 +275,7 @@ export function worldCheckRuntime(
   | PlanStore
   | ProbeLedger
   | ProbeChanges
-  | ProjectOrgs,
+  | ProjectNamespaces,
   never
 > {
   const durable: Durable = (name, effect) =>
@@ -288,7 +288,7 @@ export function worldCheckRuntime(
       SystemLive,
       evidence,
       PlanStoreR2(env.ARCHIVE),
-      ProjectOrgsD1(env.DB),
+      ProjectNamespacesD1(env.DB),
       ProbeLedgerRpc((address) => env.SUBJECT.get(env.SUBJECT.idFromName(address))),
       ProbeChangesRpc((changeId) =>
         env.CHANGE.get(env.CHANGE.idFromName(`change:${changeId}`)),

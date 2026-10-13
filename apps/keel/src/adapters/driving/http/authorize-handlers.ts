@@ -6,6 +6,7 @@ import {
   type Decision,
   type MissingResource,
   type OrgResource,
+  personOwns,
   type Principal,
   type ProjectResource,
   type Resource,
@@ -13,13 +14,20 @@ import {
   SPEC_ACTIONS,
   type SpecAction,
 } from "@keeltown/core/domain/identity";
-import { AgentId, ChangeId, EscalationId, ProjectId, type UserId } from "@keeltown/core/kernel";
+import {
+  AgentId,
+  ChangeId,
+  EscalationId,
+  namespaceKind,
+  ProjectId,
+  type UserId,
+} from "@keeltown/core/kernel";
 import {
   AgentDirectory,
   Changes,
   Escalations,
-  Orgs,
-  ProjectOrgs,
+  Namespaces,
+  ProjectNamespaces,
   Projects,
 } from "@keeltown/core/ports";
 import { Effect, Option, Result, Schema } from "effect";
@@ -45,7 +53,13 @@ export interface PerItem {
 }
 const PER_ITEM: PerItem = { _tag: "PerItem" };
 
-type ResolverServices = ProjectOrgs | Orgs | Projects | Changes | AgentDirectory | Escalations;
+type ResolverServices =
+  | ProjectNamespaces
+  | Namespaces
+  | Projects
+  | Changes
+  | AgentDirectory
+  | Escalations;
 
 /** How an operation finds the resource it is decided on, from its input and its caller. */
 export type Resolver<A extends Operation> = (
@@ -62,36 +76,42 @@ const self = () => Effect.succeed({ _tag: "Self" } as const);
 const perItem = () => Effect.succeed(PER_ITEM);
 
 /**
- * A project as the policy needs it: its org (from its place), whether that org
- * is suspended, and its visibility (from its settings). A project with no place
- * or no settings is missing.
+ * A project as the policy needs it: its namespace (from its place), whether
+ * that namespace is suspended, and its visibility (from its settings). A
+ * project with no place or no settings is missing.
  *
- * `personOwned` is true of every org today: only a signed-in person makes one,
- * and an org keeps its last owner. Whoever lets an agent own a namespace reads
- * it from the namespace's owners here and in `orgNamed`.
+ * `personOwned` is read from the namespace's kind, here and in
+ * `namespaceNamed`: a person's own and an org are people's, an agent's own is
+ * the agent's. An org keeps its last owner, and only a signed-in person makes
+ * one.
  */
 export const projectResource = (
   projectId: ProjectId,
   sponsor?: UserId,
-): Effect.Effect<ProjectResource | MissingResource, never, ProjectOrgs | Orgs | Projects> =>
+): Effect.Effect<
+  ProjectResource | MissingResource,
+  never,
+  ProjectNamespaces | Namespaces | Projects
+> =>
   Effect.gen(function* () {
-    const place = yield* ProjectOrgs.use((places) => places.byId(projectId));
+    const place = yield* ProjectNamespaces.use((places) => places.byId(projectId));
     if (Option.isNone(place)) return MISSING;
-    const org = yield* Orgs.use((orgs) => orgs.byId(place.value.org));
+    const { namespace } = place.value;
+    const record = yield* Namespaces.use((namespaces) => namespaces.byId(namespace));
     const settings = yield* Projects.use((projects) => projects.settings(projectId)).pipe(
       Effect.option,
     );
     if (Option.isNone(settings)) return MISSING;
     return {
       _tag: "Project",
-      org: place.value.org,
+      org: namespace,
       projectId,
       visibility: settings.value.visibility,
-      orgSuspended: Option.match(org, {
+      orgSuspended: Option.match(record, {
         onNone: () => false,
-        onSome: (record) => record.suspended,
+        onSome: (found) => found.suspended,
       }),
-      personOwned: true,
+      personOwned: personOwns(namespaceKind(namespace)),
       ...(sponsor === undefined ? {} : { sponsor }),
     } satisfies ProjectResource;
   });
@@ -187,25 +207,31 @@ const escalationProject = (id: unknown) =>
       ),
   });
 
-/** An org by its name, in any case. */
-const orgNamed = (name: string) =>
-  Orgs.use((orgs) => orgs.byName(name)).pipe(
+/** A namespace by its handle, in any case: a person's own, an agent's own or an org. */
+const namespaceNamed = (handle: string) =>
+  Namespaces.use((namespaces) => namespaces.byHandle(handle)).pipe(
     Effect.map(
       Option.match({
         onNone: () => MISSING,
-        onSome: (org) =>
-          ({ _tag: "Org", org: org.org, suspended: org.suspended, personOwned: true }) as const,
+        onSome: (found) =>
+          ({
+            _tag: "Org",
+            org: found.namespace,
+            kind: found.kind,
+            suspended: found.suspended,
+            personOwned: personOwns(found.kind),
+          }) as const,
       }),
     ),
   );
 
-/** A project by its org's name and its own, as `/<org>/<project>` names it. */
-const projectByName = (orgName: string, name: string) =>
-  Orgs.use((orgs) => orgs.byName(orgName)).pipe(
+/** A project by its namespace's handle and its own name, as `/<namespace>/<project>` names it. */
+const projectByName = (handle: string, name: string) =>
+  Namespaces.use((namespaces) => namespaces.byHandle(handle)).pipe(
     Effect.flatMap(
       Option.match({
         onNone: () => Effect.succeed(Option.none()),
-        onSome: (org) => ProjectOrgs.use((places) => places.byName(org.org, name)),
+        onSome: (found) => ProjectNamespaces.use((places) => places.byName(found.namespace, name)),
       }),
     ),
     Effect.flatMap(
@@ -241,8 +267,9 @@ export const RESOLVERS: Resolvers = {
   Agents_getAgent: (input) => agentAccount(input.agentId),
 
   Operator_listProjects: perItem,
-  Operator_createProject: (input) => orgNamed(input.org),
-  Orgs_getProject: (input) => projectByName(input.org, input.name),
+  Operator_createProject: (input) => namespaceNamed(input.namespace),
+  Namespaces_getNamespace: (input) => namespaceNamed(input.handle),
+  Namespaces_getProject: (input) => projectByName(input.handle, input.name),
 
   Changes_listChanges: (input, caller) => projectOrOwn(input.project, caller),
   change: (input) => changeProject(input.changeId),
@@ -369,7 +396,7 @@ export function agentsOnly(requestId: string): {
 export const decideEach = (
   principal: Principal,
   resource: ProjectResource | MissingResource,
-): Decision => authorize(principal, "Orgs_getProject", resource);
+): Decision => authorize(principal, "Namespaces_getProject", resource);
 
 /**
  * The policy's decision on forking `source` into a new project of `target`,

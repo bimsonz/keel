@@ -1,16 +1,16 @@
-# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/tenancy-d1.test.ts -t ports.project-orgs-assign
-# kills: ports.project-orgs-assign
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/tenancy-d1.test.ts -t ports.project-namespaces-assign
+# kills: ports.project-namespaces-assign
 # why: a project's name is looked up in the case asked, so /acme/App misses the project named app
-diff --git a/apps/keel/src/adapters/driven/d1/project-orgs.ts b/apps/keel/src/adapters/driven/d1/project-orgs.ts
-index ba491bc..ef8d3f1 100644
---- a/apps/keel/src/adapters/driven/d1/project-orgs.ts
-+++ b/apps/keel/src/adapters/driven/d1/project-orgs.ts
-@@ -56,7 +56,7 @@ export function ProjectOrgsD1(db: D1Database) {
+diff --git a/apps/keel/src/adapters/driven/d1/project-namespaces.ts b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+index 7f90490..cb0b0ec 100644
+--- a/apps/keel/src/adapters/driven/d1/project-namespaces.ts
++++ b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+@@ -58,7 +58,7 @@ export function ProjectNamespacesD1(db: D1Database) {
          Effect.promise(() =>
            db
-             .prepare(`${SELECT} WHERE org_id = ? AND name = ?`)
--            .bind(org, name.toLowerCase())
-+            .bind(org, name)
+             .prepare(`${SELECT} WHERE namespace_id = ? AND name = ?`)
+-            .bind(namespace, name.toLowerCase())
++            .bind(namespace, name)
              .first(),
          ).pipe(Effect.map((row) => (row === null ? Option.none() : Option.some(toPlace(row))))),
-       inOrg: (org) =>
+       inNamespace: (namespace) =>

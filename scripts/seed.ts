@@ -5,9 +5,9 @@
 //    commit. A repo already at that commit is left alone; one at any other
 //    commit stops the seed rather than being overwritten.
 // 2. The seed's automation user, `keel-seed`, signs up with a passkey as any
-//    visitor does, which makes its personal org of that name. Its session is
+//    visitor does: its handle is its own namespace. Its session is
 //    kept while it still works, and its passkey signs in again after that.
-// 3. That user creates forge-lite and forge-lite-control in its org and puts
+// 3. That user creates forge-lite and forge-lite-control in its namespace and puts
 //    each one's declared settings: verification off in the control project
 //    only (S-0's negative control); both private. The seed is staging's
 //    declared state, so a second run restores it rather than keeping
@@ -180,22 +180,19 @@ function previousCredentials(): Map<string, Credential> {
 }
 const previous = previousCredentials();
 
-/** The seed's automation user: its handle names its org too. */
+/** The seed's automation user: its handle is its own namespace, where the seed's projects live. */
 const SEED_HANDLE = "keel-seed";
 
 interface SeedUser {
   readonly userId: string;
   readonly handle: string;
-  readonly org: string;
   readonly token: string;
 }
 
 const isSeedUser = (value: unknown): value is SeedUser =>
   typeof value === "object" &&
   value !== null &&
-  ["userId", "handle", "org", "token"].every(
-    (field) => typeof Reflect.get(value, field) === "string",
-  );
+  ["userId", "handle", "token"].every((field) => typeof Reflect.get(value, field) === "string");
 
 /** What an earlier seed wrote, without the operator and observer credentials tenancy retired. */
 function withoutRetired(seeded: Record<string, unknown>): Record<string, unknown> {
@@ -233,11 +230,11 @@ async function automationUser(): Promise<{ seedUser: SeedUser; seedPasskey?: Sav
       seedPasskey === undefined
         ? await signUp(keelUrl, SEED_HANDLE, { keep: keepPasskey })
         : await signIn(keelUrl, SEED_HANDLE, seedPasskey);
-    const { userId, handle, org, token } = account.session;
+    const { userId, handle, token } = account.session;
     console.log(
-      `ok   ${SEED_HANDLE}: ${userId} in org ${org} (${seedPasskey === undefined ? "signed up" : "signed in again"})`,
+      `ok   ${SEED_HANDLE}: ${userId} (${seedPasskey === undefined ? "signed up" : "signed in again"})`,
     );
-    return { seedUser: { userId, handle, org, token }, seedPasskey: account.passkey };
+    return { seedUser: { userId, handle, token }, seedPasskey: account.passkey };
   } catch (error) {
     if (error instanceof AccountRefused && error.code === "NAME_TAKEN")
       throw new Error(
@@ -269,7 +266,7 @@ async function enrol(
   request: Parameters<KeelClient["enrolAgent"]>[0],
 ): Promise<Credential> {
   const kept = previous.get(role);
-  // A credential is kept only for the project it was enrolled in: the seed's projects moved to its own org.
+  // A credential is kept only for the project it was enrolled in: the seed's projects live in its own namespace.
   if (kept !== undefined && kept.projectId === request.projectId && (await stillWorks(kept))) {
     console.log(`ok   ${role}: ${kept.agentId} in ${kept.projectId} (credential kept)`);
     return kept;
@@ -293,7 +290,7 @@ try {
   const projects: Record<string, { id: string; verification: string; agents: Credential[] }> = {};
   for (const [name, declared] of Object.entries(PROJECTS)) {
     const project = await asSeed.createProject(
-      { org: SEED_HANDLE, name, source: FIXTURE },
+      { namespace: SEED_HANDLE, name, source: FIXTURE },
       { idempotencyKey: key(`project:${name}`) },
     );
     console.log(`ok   project ${name}: ${project.id}`);

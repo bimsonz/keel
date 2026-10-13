@@ -8,6 +8,7 @@ import {
   type ACTIONS,
   type Action,
   authorize,
+  personOwns,
   type Role,
   type UserPrincipal,
 } from "@keeltown/core/domain/identity";
@@ -51,8 +52,9 @@ export function decideAsRole(role: Role, action: OrgAction) {
   return authorize(member, action, {
     _tag: "Org",
     org: SOME_ORG,
+    kind: "org",
     suspended: false,
-    personOwned: true,
+    personOwned: personOwns("org"),
   });
 }
 

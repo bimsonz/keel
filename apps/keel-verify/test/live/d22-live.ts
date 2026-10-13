@@ -273,7 +273,7 @@ try {
   operator = operatorClient();
   const admin = operator;
   const project = await admin.createProject(
-    { org: ORG, name: PROJECT, source: FIXTURE },
+    { namespace: ORG, name: PROJECT, source: FIXTURE },
     { idempotencyKey: `live:${PROJECT}:project` },
   );
   console.log(`     project ${PROJECT}: ${project.id}`);

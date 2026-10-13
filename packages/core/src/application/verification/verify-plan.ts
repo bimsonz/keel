@@ -1,5 +1,5 @@
 import { Effect, Result, Schema } from "effect";
-import type { ContentHash, NextAction, OrgId } from "../../domain/kernel/index.ts";
+import type { ContentHash, NextAction, NamespaceId } from "../../domain/kernel/index.ts";
 import {
   type FlowWorld,
   type PlanStep,
@@ -27,7 +27,7 @@ export type ResolvedPlan = typeof ResolvedPlan.Type;
 
 /** The plan stored under the job's hash, or why it is not there: missing, or not the plan it names. */
 export const resolvePlan = Effect.fn("verification/resolvePlan")(function* (
-  namespace: OrgId,
+  namespace: NamespaceId,
   planHash: ContentHash,
 ) {
   return yield* (yield* PlanStore).get(namespace, planHash).pipe(
@@ -122,7 +122,7 @@ const abstainUnrun = (step: PlanStep, world: FlowWorld | undefined): StepReport 
  */
 export const candidateRunner =
   (
-    namespace: OrgId,
+    namespace: NamespaceId,
     job: Omit<VerificationJob, "steps">,
     durable: DurableReport,
   ): StepRunner<ProbeRunner | VerifierRuntime | EvidenceStore> =>

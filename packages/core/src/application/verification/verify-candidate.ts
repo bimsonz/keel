@@ -3,7 +3,7 @@ import {
   type CandidateId,
   ContentHash,
   NextAction,
-  type OrgId,
+  type NamespaceId,
   VerdictId,
 } from "../../domain/kernel/index.ts";
 import {
@@ -33,7 +33,7 @@ import { citeDiagnostic } from "./typecheck.ts";
 
 /** The results of every step in the job. An unavailable verifier abstains every step; it never passes one. */
 export const runJob = Effect.fn("verification/runJob")(function* (
-  namespace: OrgId,
+  namespace: NamespaceId,
   job: VerificationJob,
 ) {
   const runtime = yield* VerifierRuntime;
@@ -151,7 +151,7 @@ const describe = (r: StepResult): string =>
  * and an ops error is logged, so a lost document never wedges the lane.
  */
 export const settleVerdict = Effect.fn("verification/settleVerdict")(function* (
-  namespace: OrgId,
+  namespace: NamespaceId,
   plan: FlowPlan,
   reports: readonly StepReport[],
 ) {

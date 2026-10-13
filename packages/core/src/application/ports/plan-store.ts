@@ -1,5 +1,5 @@
 import { Context, type Effect, Schema } from "effect";
-import { ContentHash, type OrgId } from "../../domain/kernel/index.ts";
+import { ContentHash, type NamespaceId } from "../../domain/kernel/index.ts";
 import type { FlowPlan } from "../../domain/verification/index.ts";
 
 /** Nothing is stored under this plan hash. */
@@ -25,9 +25,9 @@ export class PlanCorrupt extends Schema.TaggedError<PlanCorrupt>()("PlanCorrupt"
 export class PlanStore extends Context.Service<
   PlanStore,
   {
-    readonly put: (namespace: OrgId, plan: FlowPlan) => Effect.Effect<ContentHash>;
+    readonly put: (namespace: NamespaceId, plan: FlowPlan) => Effect.Effect<ContentHash>;
     readonly get: (
-      namespace: OrgId,
+      namespace: NamespaceId,
       hash: ContentHash,
     ) => Effect.Effect<FlowPlan, PlanMissing | PlanCorrupt>;
   }

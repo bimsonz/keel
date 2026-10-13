@@ -15,7 +15,7 @@ const SAMPLE: Readonly<Record<string, string>> = {
   projectId: "prj_1",
   agentId: "agt_1",
   escalationId: "esc_1",
-  org: "keel",
+  handle: "keel",
   name: "forge-lite",
   sha: "a".repeat(40),
 };
@@ -77,9 +77,10 @@ const INVOKE: Readonly<Record<RoutedOperation, (client: KeelClient) => Promise<u
   Repo_listCommits: (c) => c.commits("prj_1"),
   Repo_getCommit: (c) => c.commit("prj_1", SAMPLE["sha"] ?? ""),
   Operator_createProject: (c) =>
-    c.createProject({ org: "keel", name: "p", source: "keel-core/fixture" }),
+    c.createProject({ namespace: "keel", name: "p", source: "keel-core/fixture" }),
   Operator_listProjects: (c) => c.projects({ limit: 3 }),
-  Orgs_getProject: (c) => c.project("keel", "forge-lite"),
+  Namespaces_getNamespace: (c) => c.namespace("keel"),
+  Namespaces_getProject: (c) => c.project("keel", "forge-lite"),
   Users_me: (c) => c.me(),
   Operator_getSettings: (c) => c.settings("prj_1"),
   Operator_putSettings: (c) => c.putSettings("prj_1", { protectedPaths: [], maxBatchSize: 1 }),

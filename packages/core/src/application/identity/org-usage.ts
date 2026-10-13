@@ -6,7 +6,7 @@ import {
   type QuotaKind,
   resetAt,
 } from "../../domain/identity/index.ts";
-import { type Instant, InstantSchema, OrgId } from "../../domain/kernel/index.ts";
+import { type Instant, InstantSchema, NamespaceId } from "../../domain/kernel/index.ts";
 import { Clock, EntityStore, UsageSettings } from "../ports/index.ts";
 
 /** The EntityStore kind holding an org's count of one quota kind, keyed `<org>/<kind>`. */
@@ -39,36 +39,42 @@ type Store = (typeof EntityStore)["Service"];
 /** An org with no settings of its own: the instance's limits, and nothing stopped. */
 const UNSET: UsageSettings = { overrides: {}, halted: false };
 
-const settingsOf = (store: Store, org: OrgId): UsageSettings => {
+const settingsOf = (store: Store, org: NamespaceId): UsageSettings => {
   const stored = store.get(SETTINGS, org);
   return stored === undefined ? UNSET : decodeSettings(stored);
 };
 
 const ADDRESS = "usage:";
-const isOrg = Schema.is(OrgId);
+const isOrg = Schema.is(NamespaceId);
 
 /** Where an org's usage object lives: `usage:<orgId>`. */
-export const usageAddress = (org: OrgId): string => `${ADDRESS}${org}`;
+export const usageAddress = (org: NamespaceId): string => `${ADDRESS}${org}`;
 
 /** The org a usage object counts for, from its address; any other name throws. */
-export const usageOrg = (address: string | undefined): OrgId => {
+export const usageOrg = (address: string | undefined): NamespaceId => {
   const org = address?.startsWith(ADDRESS) ? address.slice(ADDRESS.length) : undefined;
   if (!isOrg(org)) throw new Error("an org's usage object is addressed as usage:<orgId>");
   return org;
 };
 
 /** Where an org's count of one kind is kept. */
-const countId = (org: OrgId, kind: QuotaKind): string => `${org}/${kind}`;
+const countId = (org: NamespaceId, kind: QuotaKind): string => `${org}/${kind}`;
 
 /** The org's count of `kind` in the window `now` falls in: a daily kind counted before its reset is zero again. */
-const usedAt = (store: Store, org: OrgId, kind: QuotaKind, now: Instant): number => {
+const usedAt = (store: Store, org: NamespaceId, kind: QuotaKind, now: Instant): number => {
   const stored = store.get(COUNT, countId(org, kind));
   if (stored === undefined) return 0;
   const count = decodeCount(stored);
   return count.resetsAt !== undefined && now >= count.resetsAt ? 0 : count.used;
 };
 
-const putUsed = (store: Store, org: OrgId, kind: QuotaKind, used: number, now: Instant): void => {
+const putUsed = (
+  store: Store,
+  org: NamespaceId,
+  kind: QuotaKind,
+  used: number,
+  now: Instant,
+): void => {
   const resetsAt = resetAt(kind, now);
   store.put(
     COUNT,
@@ -86,7 +92,7 @@ const putUsed = (store: Store, org: OrgId, kind: QuotaKind, used: number, now: I
  * spend kinds are refused.
  */
 export const admitUsage = Effect.fn("identity/admitUsage")(function* (
-  org: OrgId,
+  org: NamespaceId,
   kind: QuotaKind,
   amount: number,
   key: string,
@@ -128,7 +134,7 @@ export const admitUsage = Effect.fn("identity/admitUsage")(function* (
  * credit. An amount that is not a finite number is a defect.
  */
 export const recordUsage = Effect.fn("identity/recordUsage")(function* (
-  org: OrgId,
+  org: NamespaceId,
   kind: QuotaKind,
   amount: number,
   key: string,
@@ -158,7 +164,7 @@ export const pruneUsageKeys = Effect.fn("identity/pruneUsageKeys")(function* () 
 });
 
 /** `OrgUsage.settings` over this object's own store: the org's settings, or none of its own. */
-export const usageSettings = Effect.fn("identity/usageSettings")(function* (org: OrgId) {
+export const usageSettings = Effect.fn("identity/usageSettings")(function* (org: NamespaceId) {
   return settingsOf(yield* EntityStore, org);
 });
 
@@ -168,7 +174,7 @@ export const usageSettings = Effect.fn("identity/usageSettings")(function* (org:
  * finite throws there, a defect, and what was stored stays.
  */
 export const configureUsage = Effect.fn("identity/configureUsage")(function* (
-  org: OrgId,
+  org: NamespaceId,
   settings: UsageSettings,
 ) {
   const store = yield* EntityStore;

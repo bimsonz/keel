@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { addedLines } from "@keeltown/core/application/verification";
-import { CommitSha, type ContentHash, type OrgId } from "@keeltown/core/kernel";
+import { CommitSha, type ContentHash, type NamespaceId } from "@keeltown/core/kernel";
 import { NoopWorlds, ProbeSources, type RepoRef } from "@keeltown/core/ports";
 import { Effect, Exit, type Layer } from "effect";
 import { otherNamespace, sampleNamespace } from "../namespaces.ts";
@@ -19,7 +19,7 @@ export type ProbeSourcesHarness = TreeHarness<ProbeSources>;
 /** NoopWorlds, and a way to store a whole tree as a namespace's world bundle, as the Probe's worlds step builds A's. */
 export interface NoopWorldsHarness {
   readonly layer: Layer.Layer<NoopWorlds>;
-  readonly world: (namespace: OrgId, files: ContractTree) => Effect.Effect<ContentHash>;
+  readonly world: (namespace: NamespaceId, files: ContractTree) => Effect.Effect<ContentHash>;
 }
 
 const NOT_UTF8 = new Uint8Array([0xff, 0xfe, 0x00, 0x80]);

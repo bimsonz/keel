@@ -1,8 +1,8 @@
 // The live proof of a rebase against a deployed Keel:
-//   KEEL_URL=<keel> KEEL_SESSION=<token> KEEL_ORG=<org> node e2e/src/c14.ts <run>
+//   KEEL_URL=<keel> KEEL_SESSION=<token> KEEL_NAMESPACE=<handle> node e2e/src/c14.ts <run>
 //
 // KEEL_SESSION is a user's bearer session, read and never printed. That user
-// creates the project in KEEL_ORG (an org it may create projects in: its own
+// creates the project in KEEL_NAMESPACE (a namespace it may create projects in: its own
 // is named by its handle), sets it up, and sponsors its two agents. In a
 // project of its own (c14-rebase, forked from the fixture repo, so S-0's
 // projects are untouched), two agents rewrite the same line:
@@ -44,13 +44,13 @@ const needed = (name: string): string => {
   const value = process.env[name];
   if (value === undefined)
     throw new Error(
-      `${name} is not set: c14 needs KEEL_URL, KEEL_SESSION (a user's session) and KEEL_ORG (the project's org)`,
+      `${name} is not set: c14 needs KEEL_URL, KEEL_SESSION (a user's session) and KEEL_NAMESPACE (the project's namespace, by handle)`,
     );
   return value;
 };
 const keelUrl = needed("KEEL_URL");
 const session = needed("KEEL_SESSION");
-const ORG = needed("KEEL_ORG");
+const ORG = needed("KEEL_NAMESPACE");
 const FIXTURE = "fixture-forge-lite";
 const PROJECT = "c14-rebase";
 const SETTLE_MS = 15 * 60_000;
@@ -186,7 +186,7 @@ const dirs: string[] = [];
 try {
   const operator = new KeelClient({ baseUrl: keelUrl, session });
   const project = await operator.createProject(
-    { org: ORG, name: PROJECT, source: FIXTURE },
+    { namespace: ORG, name: PROJECT, source: FIXTURE },
     { idempotencyKey: key("project") },
   );
   await operator.putSettings(project.id, {

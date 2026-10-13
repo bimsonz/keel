@@ -48,6 +48,7 @@ import {
   authorize,
   GrantableScope,
   type ProjectResource,
+  roleOf,
 } from "@keeltown/core/domain/identity";
 import {
   ConflictId,
@@ -58,8 +59,8 @@ import {
 import {
   AgentDirectory,
   type EscalationReader,
-  Orgs,
-  ProjectOrgs,
+  Namespaces,
+  ProjectNamespaces,
   type Projects,
   Sponsorships,
 } from "@keeltown/core/ports";
@@ -234,16 +235,14 @@ const scopeOf = (caller: Caller): { readonly project: ProjectId; readonly audien
   audience: caller.audience ?? "public",
 });
 
-/** The reader's role in an org, when it is a member there. */
-const roleIn = (principal: Caller["principal"], org: string) =>
-  principal._tag === "User"
-    ? principal.memberships.find((membership) => membership.org === org)?.role
-    : undefined;
+/** The reader's role in a namespace: its owner's in their own, a member's in an org. */
+const roleIn = (principal: Caller["principal"], namespace: string) =>
+  principal._tag === "User" ? roleOf(principal, namespace) : undefined;
 
 const decodeScopes = Schema.decodeUnknownOption(Schema.Array(GrantableScope));
 
 type ProjectViewBody = Extract<
-  Awaited<ReturnType<Operations<Caller>["Orgs_getProject"]>>,
+  Awaited<ReturnType<Operations<Caller>["Namespaces_getProject"]>>,
   { readonly status: 200 }
 >["body"];
 
@@ -251,19 +250,20 @@ const decodeCursor = (cursor: string) => Schema.decodeUnknownOption(ProjectIdSch
 
 /**
  * A project as the caller may read it, decided by the policy (the project's
- * read rule), with its org's name and the reader's role there; undefined when
- * the caller may not see it.
+ * read rule), with its namespace's handle and kind and the reader's role
+ * there; undefined when the caller may not see it, or its namespace is gone.
  */
 const readableView = (caller: Caller, projectId: ProjectId, name: string) =>
   Effect.gen(function* () {
     const resource = yield* projectResource(projectId);
     if (resource._tag !== "Project" || Result.isFailure(decideEach(caller.principal, resource)))
       return undefined;
-    const org = yield* Orgs.use((orgs) => orgs.byId(resource.org));
+    const namespace = yield* Namespaces.use((namespaces) => namespaces.byId(resource.org));
+    if (Option.isNone(namespace)) return undefined;
     const role = roleIn(caller.principal, resource.org);
     return {
       id: projectId,
-      org: Option.match(org, { onNone: () => resource.org, onSome: (record) => record.name }),
+      namespace: { handle: namespace.value.handle, kind: namespace.value.kind },
       name,
       visibility: resource.visibility,
       ...(role === undefined ? {} : { viewer: { role } }),
@@ -273,14 +273,14 @@ const readableView = (caller: Caller, projectId: ProjectId, name: string) =>
 /** Where a project is, as a reader is shown it: its namespace's handle and its own name. Nothing for a project with no place. */
 const placeOf = (project: ProjectId) =>
   Effect.gen(function* () {
-    const place = yield* ProjectOrgs.use((places) => places.byId(project));
+    const place = yield* ProjectNamespaces.use((places) => places.byId(project));
     if (Option.isNone(place)) return undefined;
-    const namespace = yield* Orgs.use((orgs) => orgs.byId(place.value.org));
+    const namespace = yield* Namespaces.use((namespaces) => namespaces.byId(place.value.namespace));
     return {
       id: project,
       namespace: Option.match(namespace, {
-        onNone: () => place.value.org,
-        onSome: (record) => record.name,
+        onNone: () => place.value.namespace,
+        onSome: (record) => record.handle,
       }),
       name: place.value.name,
     } satisfies ProjectRef;
@@ -311,16 +311,20 @@ const escalationPlaces = (caller: Caller) => {
 
 /**
  * Whose list of escalations a caller reads: an agent, its own project's; a
- * person, their inbox, with the namespaces they maintain or own.
+ * person, their inbox, with the namespaces they maintain or own, their own
+ * among them once they have a handle.
  */
 const escalationReader = (caller: Caller): EscalationReader =>
   caller.principal._tag === "User"
     ? {
         _tag: "User",
         userId: caller.principal.userId,
-        maintains: caller.principal.memberships
-          .filter((membership) => membership.role !== "member")
-          .map((membership) => membership.org),
+        maintains: [
+          ...(caller.principal.handle === undefined ? [] : [caller.principal.userId]),
+          ...caller.principal.memberships
+            .filter((membership) => membership.role !== "member")
+            .map((membership) => membership.org),
+        ],
       }
     : { _tag: "Project", project: projectOf(caller).projectId };
 
@@ -491,10 +495,12 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
               if (Option.isNone(agent)) return cardNotFound(caller);
               const { org } = agent.value;
               const place =
-                org === undefined ? Option.none() : yield* Orgs.use((orgs) => orgs.byId(org));
+                org === undefined
+                  ? Option.none()
+                  : yield* Namespaces.use((namespaces) => namespaces.byId(org));
               return cardOk(
                 agent.value,
-                Option.match(place, { onNone: () => undefined, onSome: (record) => record.name }),
+                Option.match(place, { onNone: () => undefined, onSome: (record) => record.handle }),
               );
             }),
           ),
@@ -732,7 +738,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
           return run(
             caller,
             Effect.gen(function* () {
-              const services = yield* Effect.context<ProjectOrgs | Orgs | Projects>();
+              const services = yield* Effect.context<ProjectNamespaces | Namespaces | Projects>();
               const decided = new Map<ProjectId, Audience | undefined>();
               const audienceOf = (project: ProjectId) =>
                 decided.has(project)
@@ -822,7 +828,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
               let exhausted = false;
               // Read pages until `limit` projects the caller may read are found, or none are left.
               while (items.length < limit && !exhausted) {
-                const page = yield* ProjectOrgs.use((places) => places.all(cursor, limit));
+                const page = yield* ProjectNamespaces.use((places) => places.all(cursor, limit));
                 exhausted = page.length < limit;
                 for (const place of page) {
                   cursor = place.projectId;
@@ -841,7 +847,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             }),
           );
         },
-        // The org was decided before this ran. The source is a second resource, named in the body:
+        // The namespace was decided before this ran. The source is a second resource, named in the body:
         // it is read and, when it is a project, decided as a fork before anything is made.
         Operator_createProject: (caller: Caller, input: Input<"Operator_createProject">) => {
           const source = projectSource(input.source);
@@ -852,7 +858,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
               const actor = yield* actorOf(caller);
               const target = caller.resource?._tag === "Org" ? caller.resource : undefined;
               if (target === undefined)
-                return yield* Effect.die(new Error("createProject ran without its org"));
+                return yield* Effect.die(new Error("createProject ran without its namespace"));
               if (source._tag === "Project") {
                 const from = yield* projectResource(source.projectId);
                 const decided = decideFork(caller.principal, from, target);
@@ -865,7 +871,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                   );
               }
               return yield* createProject(actor, {
-                org: target.org,
+                namespace: target.org,
                 name: input.name,
                 source,
                 idempotencyKey: input["idempotency-key"],
@@ -873,7 +879,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                 Effect.map((project) =>
                   createProjectOk(
                     project,
-                    input.org.toLowerCase(),
+                    { handle: input.namespace.toLowerCase(), kind: target.kind },
                     roleIn(caller.principal, target.org),
                   ),
                 ),
@@ -882,7 +888,25 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             }),
           );
         },
-        Orgs_getProject: (caller: Caller, input: Input<"Orgs_getProject">) =>
+        Namespaces_getNamespace: (caller: Caller, input: Input<"Namespaces_getNamespace">) =>
+          run(
+            caller,
+            Namespaces.use((namespaces) => namespaces.byHandle(input.handle)).pipe(
+              Effect.map(
+                Option.match({
+                  onNone: () => ({
+                    status: 404 as const,
+                    body: problem(404, "resource.not_found", caller.requestId),
+                  }),
+                  onSome: (found) => ({
+                    status: 200 as const,
+                    body: { id: found.namespace, handle: found.handle, kind: found.kind },
+                  }),
+                }),
+              ),
+            ),
+          ),
+        Namespaces_getProject: (caller: Caller, input: Input<"Namespaces_getProject">) =>
           run(
             caller,
             readableView(caller, projectOf(caller).projectId, input.name.toLowerCase()).pipe(
@@ -903,10 +927,13 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
           return run(
             caller,
             Effect.forEach(principal.memberships, (membership) =>
-              Orgs.use((orgs) => orgs.byId(membership.org)).pipe(
+              Namespaces.use((namespaces) => namespaces.byId(membership.org)).pipe(
                 Effect.map((org) => ({
                   id: membership.org,
-                  name: Option.match(org, { onNone: () => membership.org, onSome: (o) => o.name }),
+                  name: Option.match(org, {
+                    onNone: () => membership.org,
+                    onSome: (found) => found.handle,
+                  }),
                   role: membership.role,
                 })),
               ),
@@ -915,7 +942,12 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                 status: 200 as const,
                 body: {
                   userId: principal.userId,
-                  ...(principal.handle === undefined ? {} : { handle: principal.handle }),
+                  ...(principal.handle === undefined
+                    ? {}
+                    : {
+                        handle: principal.handle,
+                        namespace: { handle: principal.handle, kind: "user" as const },
+                      }),
                   orgs,
                 },
               })),

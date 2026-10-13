@@ -11,7 +11,7 @@ import {
   ContentHash,
   contentHashOf,
   makeId,
-  type OrgId,
+  type NamespaceId,
   type ProjectId,
   weakest,
 } from "@keeltown/core/kernel";
@@ -148,7 +148,7 @@ export function describeEvidenceStoreContract(adapter: string, make: LayerFactor
 export interface PlanStoreHarness {
   readonly layer: Layer.Layer<PlanStore>;
   /** Files raw text under a plan hash in a namespace, as storage at rest might hold it. */
-  readonly plant: (namespace: OrgId, hash: ContentHash, text: string) => Effect.Effect<void>;
+  readonly plant: (namespace: NamespaceId, hash: ContentHash, text: string) => Effect.Effect<void>;
 }
 
 /** A worker-app plan on a fresh base, so no two tests share a hash. */
@@ -264,7 +264,7 @@ export interface ProbeStoreHarness {
   readonly layer: Layer.Layer<ProbeStore>;
   /** The files stored under a hash for a namespace, as a VerifierDO would read them back; none when nothing is. */
   readonly read: (
-    namespace: OrgId,
+    namespace: NamespaceId,
     hash: ContentHash,
   ) => Effect.Effect<readonly ProbeFile[] | undefined>;
 }

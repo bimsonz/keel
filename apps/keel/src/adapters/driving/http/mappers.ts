@@ -35,7 +35,7 @@ export function agentProfile(agent: Agent) {
     name: agent.name,
     kind: agent.kind,
     scopes: [...agent.scopes],
-    ...(agent.org === undefined ? {} : { org: agent.org }),
+    ...(agent.org === undefined ? {} : { namespace: agent.org }),
     ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
     revocationEpoch: agent.revocationEpoch,
     state: agent.state,

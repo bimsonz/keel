@@ -1,7 +1,13 @@
 import { Effect, Result, Schema } from "effect";
 import { IdempotencyConflict } from "../../domain/identity/index.ts";
 import { ProjectCreated } from "../../domain/integration/index.ts";
-import { type EntityRef, InstantSchema, ProjectId } from "../../domain/kernel/index.ts";
+import {
+  type EntityRef,
+  InstantSchema,
+  ProjectId,
+  userActor,
+  type UserId,
+} from "../../domain/kernel/index.ts";
 import {
   type Clock,
   CodeHost,
@@ -33,8 +39,8 @@ export interface CreateProject {
   readonly projectId: ProjectId;
   readonly name: string;
   readonly source: string;
-  /** Who creates it, by id: the events' `by`, and the commit's actor `operator:<by>`. */
-  readonly by: string;
+  /** The person who creates it: the events' `by`, and the commit's actor `user:<by>`. */
+  readonly by: UserId;
   readonly idempotencyKey: string;
   readonly fingerprint: string;
 }
@@ -124,7 +130,7 @@ export const createProject: (
       entity,
       cause: command.idempotencyKey,
       fingerprint: command.fingerprint,
-      actor: `operator:${command.by}`,
+      actor: userActor(command.by),
       project: projectId,
     },
     (tx) => {

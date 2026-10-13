@@ -4,12 +4,12 @@ import {
   storedPlanText,
 } from "@keeltown/core/application/verification";
 import type { FlowPlan } from "@keeltown/core/domain/verification";
-import type { ContentHash, OrgId } from "@keeltown/core/kernel";
+import type { ContentHash, NamespaceId } from "@keeltown/core/kernel";
 import { PlanCorrupt, PlanMissing, PlanStore } from "@keeltown/core/ports";
 import { Effect, Layer, Result } from "effect";
 
 /** Where a namespace's plan lives in the bucket, by its planHash. */
-export const planKey = (namespace: OrgId, hash: ContentHash): string =>
+export const planKey = (namespace: NamespaceId, hash: ContentHash): string =>
   namespaceKey(namespace, "plans", hash.slice("sha256:".length));
 
 /**

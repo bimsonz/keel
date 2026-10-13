@@ -6,11 +6,11 @@ import {
   type ProjectNameTaken,
 } from "../../domain/identity/index.ts";
 import type { ProjectNotFound } from "../../domain/integration/index.ts";
-import { type OrgId, ProjectId } from "../../domain/kernel/index.ts";
+import { type NamespaceId, ProjectId } from "../../domain/kernel/index.ts";
 import { projectRepos, type ProjectSource } from "../integration/index.ts";
 import {
   type ProjectRecord,
-  ProjectOrgs,
+  ProjectNamespaces,
   Projects,
   type ProjectSettings,
   type PutProjectSettings,
@@ -19,12 +19,12 @@ import {
 import { hashedIdBody } from "./hashed-id.ts";
 
 /**
- * A new project in an org: trunk is forked from `source`, a template or the
- * trunk of a project the doorway let the actor fork.
+ * A new project in a namespace: trunk is forked from `source`, a template or
+ * the trunk of a project the doorway let the actor fork.
  */
 export interface NewProject {
-  readonly org: OrgId;
-  /** Its name in the org, held lower-case. */
+  readonly namespace: NamespaceId;
+  /** Its name in the namespace, held lower-case. */
   readonly name: string;
   /** Never a repo's name as the caller wrote it: `projectSource` reads that first. */
   readonly source: ProjectSource;
@@ -43,16 +43,16 @@ export const projectIdFor = (actor: Actor, idempotencyKey: string): ProjectId =>
   ProjectId.make(`prj_${hashedIdBody(`${actorId(actor)}\u0000${idempotencyKey}`)}`);
 
 /**
- * Creates a project in `input.org`, which the doorway authorised the actor in,
- * from `input.source`, which the doorway let the actor fork when it is a
- * project. Its place comes first: the name, lower-case, must be free in the org
+ * Creates a project in `input.namespace`, which the doorway authorised the
+ * actor in, from `input.source`, which the doorway let the actor fork when it
+ * is a project. Its place comes first: the name, lower-case, must be free there
  * (ProjectNameTaken otherwise) before anything is made. Then its Project DO
  * forks trunk from the source, makes staging, the workspace mirror and pool,
  * and initialises trunk at the source's head, which reads the place. The id is
  * derived from the actor and the key, so a retry reaches the same place (a
  * no-op) and the same DO, which replays by key: a retry finishes a project
- * whose DO failed after its place was taken. The key reused for another org
- * or name is IdempotencyConflict.
+ * whose DO failed after its place was taken. The key reused for another
+ * namespace or name is IdempotencyConflict.
  */
 export const createProject: (
   actor: Actor,
@@ -60,16 +60,16 @@ export const createProject: (
 ) => Effect.Effect<
   ProjectRecord,
   IdempotencyConflict | ProjectNameTaken | RepoNotFound,
-  Projects | ProjectOrgs
+  Projects | ProjectNamespaces
 > = Effect.fn("coordination/createProject")(function* (actor: Actor, input: NewProject) {
-  const { org, idempotencyKey } = input;
+  const { namespace, idempotencyKey } = input;
   const projectId = projectIdFor(actor, idempotencyKey);
   const name = input.name.toLowerCase();
-  const places = yield* ProjectOrgs;
+  const places = yield* ProjectNamespaces;
   const placed = yield* places.byId(projectId);
-  if (Option.isSome(placed) && (placed.value.org !== org || placed.value.name !== name))
+  if (Option.isSome(placed) && (placed.value.namespace !== namespace || placed.value.name !== name))
     return yield* new IdempotencyConflict({ idempotencyKey });
-  yield* places.assign({ projectId, org, name });
+  yield* places.assign({ projectId, namespace, name });
   const source = sourceRepo(input.source);
   return yield* (yield* Projects).create(actor, { projectId, name, source, idempotencyKey });
 });

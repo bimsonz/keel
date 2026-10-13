@@ -67,7 +67,7 @@ describe("whoami", () => {
     expect(tool["structuredContent"]).toEqual(rest);
   });
 
-  it("[tenancy.whoami] answers the agent's org and sponsoring user, the MCP tool equal to REST", async () => {
+  it("[tenancy.whoami] answers the agent's namespace and sponsoring user, the MCP tool equal to REST", async () => {
     const org = makeId("org", ulid());
     const sponsor = makeId("usr", ulid());
     const token = await tokenFor(await seedAgent({ org, sponsor }));
@@ -75,8 +75,9 @@ describe("whoami", () => {
       await exports.default.fetch(`${BASE}/v1/agents/me`, {
         headers: { authorization: `Bearer ${token}` },
       })
-    ).json<{ result: { agent: { org?: string; sponsor?: string } } }>();
-    expect([rest.result.agent.org, rest.result.agent.sponsor]).toEqual([org, sponsor]);
+    ).json<{ result: { agent: { namespace?: string; org?: string; sponsor?: string } } }>();
+    expect([rest.result.agent.namespace, rest.result.agent.sponsor]).toEqual([org, sponsor]);
+    expect(rest.result.agent.org).toBeUndefined();
     const tool = await mcpResult(
       await mcp(token, "tools/call", { name: "whoami", arguments: {} }, "whoami"),
     );

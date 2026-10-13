@@ -1,5 +1,5 @@
 import { Context, type Effect, Schema } from "effect";
-import { ContentHash, type Json, type OrgId } from "../../domain/kernel/index.ts";
+import { ContentHash, type Json, type NamespaceId } from "../../domain/kernel/index.ts";
 
 /** Nothing is stored under this hash. */
 export class EvidenceMissing extends Schema.TaggedError<EvidenceMissing>()("EvidenceMissing", {
@@ -17,7 +17,10 @@ export class EvidenceMissing extends Schema.TaggedError<EvidenceMissing>()("Evid
 export class EvidenceStore extends Context.Service<
   EvidenceStore,
   {
-    readonly put: (namespace: OrgId, document: Json) => Effect.Effect<ContentHash>;
-    readonly get: (namespace: OrgId, hash: ContentHash) => Effect.Effect<Json, EvidenceMissing>;
+    readonly put: (namespace: NamespaceId, document: Json) => Effect.Effect<ContentHash>;
+    readonly get: (
+      namespace: NamespaceId,
+      hash: ContentHash,
+    ) => Effect.Effect<Json, EvidenceMissing>;
   }
 >()("keel/EvidenceStore") {}

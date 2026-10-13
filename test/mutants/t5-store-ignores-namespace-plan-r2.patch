@@ -8,7 +8,7 @@ index 617392f1..6896039c 100644
 @@ -10,7 +10,7 @@ import { Effect, Layer, Result } from "effect";
  
  /** Where a namespace's plan lives in the bucket, by its planHash. */
- export const planKey = (namespace: OrgId, hash: ContentHash): string =>
+ export const planKey = (namespace: NamespaceId, hash: ContentHash): string =>
 -  namespaceKey(namespace, "plans", hash.slice("sha256:".length));
 +  namespaceKey("org_00000000000000000000000000", "plans", hash.slice("sha256:".length));
  

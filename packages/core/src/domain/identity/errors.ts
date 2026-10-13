@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { AgentId, NextAction, OrgId } from "../kernel/index.ts";
+import { AgentId, NextAction, NamespaceId } from "../kernel/index.ts";
 import { AgentState } from "./agent.ts";
 
 /** No agent has this id. */
@@ -117,7 +117,7 @@ export type RefusalReason = typeof RefusalReason.Type;
  * already has another place: a project never moves.
  */
 export class ProjectNameTaken extends Schema.TaggedError<ProjectNameTaken>()("ProjectNameTaken", {
-  org: OrgId,
+  org: NamespaceId,
   name: Schema.String,
 }) {}
 

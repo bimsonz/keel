@@ -163,7 +163,7 @@ try {
   if (session === undefined) throw new Error("set KEEL_SESSION to the maintainer's session");
   const operator = new KeelClient({ baseUrl: KEEL_URL, session });
   const project = await operator.createProject(
-    { org: process.env["KEEL_ORG"] ?? "keel", name: PROJECT, source: FIXTURE },
+    { namespace: process.env["KEEL_ORG"] ?? "keel", name: PROJECT, source: FIXTURE },
     { idempotencyKey: key("project") },
   );
   console.log(`     project ${PROJECT}: ${project.id}`);

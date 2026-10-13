@@ -33,8 +33,8 @@ model AgentProfile {
   kind: AgentKind;
   scopes: RecordedScope[];
 
-  /** The agent's org. Absent only for agents enrolled before tenancy. */
-  org?: OrgId;
+  /** The namespace the agent works in: its project's. Absent only for agents enrolled before tenancy. */
+  `namespace`?: NamespaceId;
 
   /** The user who minted the agent's credential: its sponsor, accountable for it. */
   sponsor?: UserId;

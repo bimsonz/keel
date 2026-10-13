@@ -14,7 +14,7 @@ import {
   type EventEnvelope,
   EventEnvelope as Envelope,
   makeId,
-  type OrgId,
+  type NamespaceId,
 } from "@keeltown/core/kernel";
 import { ProbeStore } from "@keeltown/core/ports";
 import { Effect, Schema } from "effect";
@@ -110,7 +110,7 @@ const SOURCE = [
 ];
 
 /** Keeps a probe's files in the real bucket for a namespace, as the Probe Workflow's store does, and answers their hash. */
-const kept = (namespace: OrgId, files: typeof SOURCE): Promise<ContentHash> =>
+const kept = (namespace: NamespaceId, files: typeof SOURCE): Promise<ContentHash> =>
   Effect.runPromise(
     ProbeStore.use((store) => store.put(namespace, files)).pipe(
       Effect.provide(ProbeStoreR2(env.BUNDLES)),

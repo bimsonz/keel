@@ -26,7 +26,7 @@ import {
   EventEnvelope,
   Instant,
   makeId,
-  type OrgId,
+  type NamespaceId,
   type ProjectId,
 } from "@keeltown/core/kernel";
 import { DEFAULT_QUOTAS } from "@keeltown/core/domain/identity";
@@ -37,7 +37,7 @@ import {
   makeEventOutboxMemory,
   makeManualClock,
   makeOrgUsageMemory,
-  makeProjectOrgsMemory,
+  makeProjectNamespacesMemory,
   makeTrunkWriterMemory,
 } from "@keeltown/testing";
 import { Cause, Effect, Exit, Layer, Schema } from "effect";
@@ -49,15 +49,16 @@ const seed = process.env["FC_SEED"];
 fc.configureGlobal({ numRuns: 50, ...(seed === undefined ? {} : { seed: Number(seed) }) });
 
 const PROJECT: ProjectId = makeId("prj", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
-const ORG: OrgId = makeId("org", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
+const ORG: NamespaceId = makeId("org", "01J9ZZZZZZZZZZZZZZZZZZZZZZ");
 const sha = (c: string) => Schema.decodeUnknownSync(CommitSha)(c.repeat(40));
 
 /** Puts the project in ORG, as creating it does before its trunk exists: its trunk is weighed, and counted into ORG's repo bytes. */
-const place = (places: ReturnType<typeof makeProjectOrgsMemory>) =>
-  places.places.set(PROJECT, { projectId: PROJECT, org: ORG, name: "keel" });
+const place = (places: ReturnType<typeof makeProjectNamespacesMemory>) =>
+  places.places.set(PROJECT, { projectId: PROJECT, namespace: ORG, name: "keel" });
 
 /** Takes the project's place away, which nothing in Keel does: what its trunk then does is the defect's own test. */
-const unplace = (places: ReturnType<typeof makeProjectOrgsMemory>) => places.places.delete(PROJECT);
+const unplace = (places: ReturnType<typeof makeProjectNamespacesMemory>) =>
+  places.places.delete(PROJECT);
 
 /** What a program that died said, or undefined for one that did not die. */
 const defectOf = <A, E, R>(program: Effect.Effect<A, E, R>) =>
@@ -67,7 +68,7 @@ const defectOf = <A, E, R>(program: Effect.Effect<A, E, R>) =>
 
 /** The outbox and a clock, a trunk writer at `a`, and the project placed in ORG. */
 const ports = () => {
-  const places = makeProjectOrgsMemory();
+  const places = makeProjectNamespacesMemory();
   place(places);
   const writer = makeTrunkWriterMemory(sha("a"));
   return {
@@ -219,7 +220,7 @@ function promotion() {
   const outbox = makeEventOutboxMemory();
   const clock = makeManualClock();
   const writer = makeTrunkWriterMemory(sha("0"));
-  const places = makeProjectOrgsMemory();
+  const places = makeProjectNamespacesMemory();
   place(places);
   const usage = makeOrgUsageMemory();
   /** Everything but the trunk's writer, for a test that wraps the writer. */

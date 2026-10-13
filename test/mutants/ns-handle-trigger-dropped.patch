@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/namespaces.test.ts
+# kills: ns.sign-up
+# why: a person who signs up by code and then chooses a handle gets no namespace row, so their handle resolves to nobody and they have nowhere to create a project
+diff --git a/apps/keel/migrations/0010_namespaces.sql b/apps/keel/migrations/0010_namespaces.sql
+index fef8911..543ddf1 100644
+--- a/apps/keel/migrations/0010_namespaces.sql
++++ b/apps/keel/migrations/0010_namespaces.sql
+@@ -91,14 +91,6 @@ BEGIN
+   VALUES (NEW.id, NEW.username, 'user', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
+ END;
+ 
+-CREATE TRIGGER namespaces_user_took_handle
+-AFTER UPDATE OF username ON "user"
+-WHEN NEW.username IS NOT NULL AND OLD.username IS NULL
+-BEGIN
+-  INSERT INTO namespaces (id, handle, kind, created_at)
+-  VALUES (NEW.id, NEW.username, 'user', CAST(strftime('%s', 'now') AS INTEGER) * 1000);
+-END;
+-
+ CREATE TRIGGER namespaces_org_created
+ AFTER INSERT ON organization
+ BEGIN

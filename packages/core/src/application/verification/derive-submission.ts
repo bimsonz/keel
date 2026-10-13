@@ -15,7 +15,7 @@ import {
   CommitSha,
   type ContentHash,
   type Json,
-  type OrgId,
+  type NamespaceId,
 } from "../../domain/kernel/index.ts";
 import {
   ChangePrecheck,
@@ -163,7 +163,7 @@ const recorded = (reading: Reading): RecordedReading =>
  * defect, and the step retries.
  */
 export const deriveSubmission = Effect.fn("verification/deriveSubmission")(function* (
-  namespace: OrgId,
+  namespace: NamespaceId,
   workspace: PrecheckWorkspace,
   submission: PrecheckSubmission,
   base: CommitSha,
@@ -221,7 +221,7 @@ export const deriveSubmission = Effect.fn("verification/deriveSubmission")(funct
  * answered the hash.
  */
 export const commitDerivation = Effect.fn("verification/commitDerivation")(function* (
-  namespace: OrgId,
+  namespace: NamespaceId,
   submission: PrecheckSubmission,
   derivationRef: ContentHash,
 ) {

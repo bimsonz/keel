@@ -6,7 +6,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { OrgId } from "@keeltown/core/kernel";
+import { NamespaceId } from "@keeltown/core/kernel";
 import { type BundleFile, sha256Hex, writeBundle } from "@keeltown/runner-protocol";
 import { Schema } from "effect";
 
@@ -18,8 +18,8 @@ const FIXTURE = "fixtures/forge-lite";
  * KEEL_NAMESPACE_ID: an R2 key holds a namespace's id (`org_…`), never its
  * handle, and a run in one namespace reads nothing kept for another.
  */
-export const harnessNamespace = (): OrgId => {
-  const id = Schema.decodeUnknownOption(OrgId)(process.env["KEEL_NAMESPACE_ID"]);
+export const harnessNamespace = (): NamespaceId => {
+  const id = Schema.decodeUnknownOption(NamespaceId)(process.env["KEEL_NAMESPACE_ID"]);
   if (id._tag === "None")
     throw new Error("set KEEL_NAMESPACE_ID to the id of the namespace the run's project is in");
   return id.value;

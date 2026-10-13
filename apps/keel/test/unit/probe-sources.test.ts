@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { OrgId } from "@keeltown/core/kernel";
+import type { NamespaceId } from "@keeltown/core/kernel";
 import type { RepoRef } from "@keeltown/core/ports";
 import { BundleStore, CodeHost, NoopWorlds } from "@keeltown/core/ports";
 import { readBundle, writeBundle } from "@keeltown/runner-protocol";
@@ -45,7 +45,7 @@ const noops = () => {
   return {
     bundles,
     layer: NoopWorldsBundles.pipe(Layer.provide(bundles.layer)),
-    world: (namespace: OrgId, files: ContractTree) =>
+    world: (namespace: NamespaceId, files: ContractTree) =>
       Effect.gen(function* () {
         const bytes = yield* Effect.promise(() =>
           writeBundle(

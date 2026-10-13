@@ -5,10 +5,10 @@ diff --git a/packages/testing/src/memory/storage.ts b/packages/testing/src/memor
 index ca607737..957d2ec1 100644
 --- a/packages/testing/src/memory/storage.ts
 +++ b/packages/testing/src/memory/storage.ts
-@@ -111,7 +111,7 @@ const bundleKeyOf = (namespace: OrgId, hash: ContentHash) =>
- const evidenceKeyOf = (namespace: OrgId, hash: ContentHash) =>
+@@ -111,7 +111,7 @@ const bundleKeyOf = (namespace: NamespaceId, hash: ContentHash) =>
+ const evidenceKeyOf = (namespace: NamespaceId, hash: ContentHash) =>
    namespaceKey(namespace, "evidence", hexOf(hash));
- const planKeyOf = (namespace: OrgId, hash: ContentHash) =>
+ const planKeyOf = (namespace: NamespaceId, hash: ContentHash) =>
 -  namespaceKey(namespace, "plans", hexOf(hash));
 +  namespaceKey("org_00000000000000000000000000", "plans", hexOf(hash));
  

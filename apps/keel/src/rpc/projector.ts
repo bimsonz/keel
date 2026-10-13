@@ -26,7 +26,7 @@ import {
   GuardId,
   InstantSchema,
   NextAction,
-  OrgId,
+  NamespaceId,
   ProbeId,
   ProjectId,
   UserId,
@@ -203,7 +203,7 @@ export const EscalationsRead = Schema.Struct({
     Schema.Struct({
       _tag: Schema.Literal("User"),
       userId: UserId,
-      maintains: Schema.Array(OrgId),
+      maintains: Schema.Array(NamespaceId),
     }),
   ]),
   now: InstantSchema,

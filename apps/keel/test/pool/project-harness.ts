@@ -55,7 +55,7 @@ export async function project() {
         projectId,
         name: "Seed app",
         source: SOURCE.name,
-        by: makeId("agt", ulid()),
+        by: makeId("usr", ulid()),
         idempotencyKey: "create-1",
         fingerprint: "body-1",
       }),

@@ -8,7 +8,7 @@ import {
   IdempotencyConflict,
   type Scope,
 } from "../../domain/identity/index.ts";
-import type { AgentId, OrgId, ProjectId, UserId } from "../../domain/kernel/index.ts";
+import type { AgentId, NamespaceId, ProjectId, UserId } from "../../domain/kernel/index.ts";
 import {
   AgentDirectory,
   type Clock,
@@ -29,7 +29,7 @@ export interface EnrolAgent {
   readonly kind: AgentKind;
   readonly scopes: readonly Scope[];
   /** The agent's org, when the enrolment names one. */
-  readonly org?: OrgId | undefined;
+  readonly org?: NamespaceId | undefined;
   /** The user minting the credential, when the enrolment names one. */
   readonly sponsor?: UserId | undefined;
   readonly clientId: string;

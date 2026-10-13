@@ -47,7 +47,7 @@ describe("the gate", () => {
   });
 
   it("[gate.origin] a request the cookie signs in may change something only from Keel's own origin, and a bearer needs none", async () => {
-    // Each user creates in an org of its own: the passkey user's personal org, the seeded user's `pool`.
+    // Each user creates where it may: the passkey user in its own namespace, the seeded user in the org `pool`.
     const { jar } = await signUpByPasskey("gate-origin");
     const create = (headers: Record<string, string>, org = "gate-origin") =>
       call("/v1/projects", {
@@ -57,7 +57,7 @@ describe("the gate", () => {
           "idempotency-key": "gate-origin-1",
           ...headers,
         },
-        body: JSON.stringify({ org, name: "app", source: "nowhere" }),
+        body: JSON.stringify({ namespace: org, name: "app", source: "nowhere" }),
       });
     expect(await code(await create({ cookie: jar.header() }))).toEqual([403, "auth.cross_site"]);
     expect(

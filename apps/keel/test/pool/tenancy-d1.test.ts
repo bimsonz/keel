@@ -2,8 +2,8 @@ import { env } from "cloudflare:workers";
 import { type BetterAuthRows, PORTS } from "@keeltown/testing";
 import { Effect } from "effect";
 import { MembershipsD1 } from "../../src/adapters/driven/d1/memberships.ts";
-import { OrgsD1 } from "../../src/adapters/driven/d1/orgs.ts";
-import { ProjectOrgsD1 } from "../../src/adapters/driven/d1/project-orgs.ts";
+import { NamespacesD1 } from "../../src/adapters/driven/d1/namespaces.ts";
+import { ProjectNamespacesD1 } from "../../src/adapters/driven/d1/project-namespaces.ts";
 import { UsersD1 } from "../../src/adapters/driven/d1/users.ts";
 
 /**
@@ -44,7 +44,7 @@ const seed = (rows: BetterAuthRows) =>
   });
 
 // The tenancy ports on D1 pass the in-memory adapters' suites, over the tables migrations 0006 and 0008 make.
-PORTS.Orgs.contract("d1", () => ({ layer: OrgsD1(env.DB), seed }));
+PORTS.Namespaces.contract("d1", () => ({ layer: NamespacesD1(env.DB), seed }));
 PORTS.Users.contract("d1", () => ({ layer: UsersD1(env.DB), seed }));
 PORTS.Memberships.contract("d1", () => ({ layer: MembershipsD1(env.DB), seed }));
-PORTS.ProjectOrgs.contract("d1", () => ProjectOrgsD1(env.DB));
+PORTS.ProjectNamespaces.contract("d1", () => ProjectNamespacesD1(env.DB));

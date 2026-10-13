@@ -1,14 +1,14 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
 # kills: ba.handle-immutable
-# why: a handle can be changed, leaving its personal org and every URL under the old name
+# why: a handle can be changed, leaving its namespace and every URL under the old name
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index dcf6d35..7ab981d 100644
+index cadcbd7..8ee5278 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -241,7 +241,7 @@ export function authOptions(config: AuthConfig) {
+@@ -311,7 +311,7 @@ export function authOptions(config: AuthConfig) {
          maxUsernameLength: 39,
          usernameValidator: (name) => nameRefusal(name) === undefined,
-         // The handle is the personal org's slug, so it never changes.
+         // The handle is the first segment of every address in its namespace, so it never changes.
 -        immutableUsername: true,
 +        immutableUsername: false,
        }),

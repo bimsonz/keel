@@ -15,27 +15,31 @@ const decodeRole = Schema.decodeUnknownSync(RoleRow);
 /**
  * A sponsor's standing on Better Auth's `user` and `member` tables in D1, both
  * read in one batch: the strongest role any of the user's rows in the org
- * names, and its ban.
+ * names, and its ban. In the namespace whose id is the user's own it is the
+ * owner, by identity, for as long as the user is there: a member row naming a
+ * person's namespace is never read.
  */
 export function MembershipsD1(db: D1Database) {
   return Layer.succeed(
     Memberships,
     Memberships.of({
-      standing: (userId, org) =>
+      standing: (userId, namespace) =>
         Effect.promise(() =>
           db.batch([
             db.prepare(`SELECT banned, banExpires FROM "user" WHERE id = ?`).bind(userId),
             db
               .prepare("SELECT role FROM member WHERE userId = ? AND organizationId = ?")
-              .bind(userId, org),
+              .bind(userId, namespace),
           ]),
         ).pipe(
           Effect.zip(Clock.currentTimeMillis),
           Effect.map(([[users, members], now]) => {
             const user = users?.results[0];
-            const role = strongestRole(
+            const inOrg = strongestRole(
               (members?.results ?? []).flatMap((member) => roleNames(decodeRole(member).role)),
             );
+            const own = user === undefined ? undefined : ("owner" as const);
+            const role = namespace === userId ? own : inOrg;
             return {
               userId,
               ...(role === undefined ? {} : { role }),

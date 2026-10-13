@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/namespaces.test.ts
+# kills: ns.backfill
+# why: the migration deletes every org, not only the personal ones, so a real org is gone with its members and invitations and its projects are left under a handle that resolves to nobody
+diff --git a/apps/keel/migrations/0010_namespaces.sql b/apps/keel/migrations/0010_namespaces.sql
+index fef8911..16c99c7 100644
+--- a/apps/keel/migrations/0010_namespaces.sql
++++ b/apps/keel/migrations/0010_namespaces.sql
+@@ -79,8 +79,7 @@ WHERE organizationId IN (
+   SELECT o.id FROM organization o JOIN "user" u ON u.username = o.slug
+ );
+ 
+-DELETE FROM organization
+-WHERE slug IN (SELECT username FROM "user" WHERE username IS NOT NULL);
++DELETE FROM organization;
+ 
+ -- From here on the rows are written with their accounts.
+ CREATE TRIGGER namespaces_user_signed_up

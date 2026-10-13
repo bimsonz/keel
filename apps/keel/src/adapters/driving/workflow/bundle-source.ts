@@ -1,4 +1,4 @@
-import { ContentHash, OrgId } from "@keeltown/core/kernel";
+import { ContentHash, NamespaceId } from "@keeltown/core/kernel";
 import { BUNDLE_URL_TTL_SECONDS, signedBundleUrl } from "@keeltown/runner-protocol";
 import { Schema } from "effect";
 import { KEEL_BUNDLE_PROVIDER } from "../../../rpc/index.ts";
@@ -9,7 +9,7 @@ import type {
   SourceControlSource,
 } from "./ci.js";
 
-const ProviderData = Schema.Struct({ namespace: OrgId, bundle: ContentHash });
+const ProviderData = Schema.Struct({ namespace: NamespaceId, bundle: ContentHash });
 
 /** The one secret a checkout needs from keel's env: the key bundle URLs are signed with. */
 const SigningEnv = Schema.Struct({ BUNDLE_URL_SIGNING_KEY: Schema.NonEmptyString });

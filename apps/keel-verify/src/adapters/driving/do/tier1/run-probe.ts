@@ -1,5 +1,5 @@
 import { namespaceKey, type ProbeRun, readProbeRun } from "@keeltown/core/application/verification";
-import type { ContentHash, OrgId } from "@keeltown/core/kernel";
+import type { ContentHash, NamespaceId } from "@keeltown/core/kernel";
 import {
   BundleUnreadable,
   type BundleFile,
@@ -34,7 +34,7 @@ export interface Tier1 {
 
 /** One run: a namespace's probe bundle against one of its world bundles. */
 export interface Tier1Request {
-  readonly namespace: OrgId;
+  readonly namespace: NamespaceId;
   readonly probe: ContentHash;
   readonly worldBundle: ContentHash;
 }
@@ -68,7 +68,7 @@ const hexOf = (hash: ContentHash): string => hash.slice("sha256:".length);
 /** A namespace's bundle from the store, checked against the hash it is keyed by. */
 async function fetchVerified(
   env: Tier1Env,
-  namespace: OrgId,
+  namespace: NamespaceId,
   hex: string,
   what: string,
 ): Promise<BundleFile[]> {
@@ -95,7 +95,7 @@ async function fetchVerified(
  */
 async function depsFor(
   env: Tier1Env,
-  namespace: OrgId,
+  namespace: NamespaceId,
   world: readonly BundleFile[],
 ): Promise<BundleFile[] | undefined> {
   const need = await depsNeed(world);

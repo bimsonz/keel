@@ -33,7 +33,7 @@ const USAGE = `keeltown <command> [options]
   abandon <chg_…> [--reason <text>] [--lease <lse_…>] [--key <idempotency-key>]
   inbox [--cursor <cursor>] [--wait <0-30>]
   events [--cursor <cursor>] [--wait <0-30>] [--limit <1-500>]
-  project create --org <org> --name <name> --source <repo> [--key <idempotency-key>]
+  project create --namespace <handle> --name <name> --source <repo> [--key <idempotency-key>]
   agent enrol --project <prj_…> --name <name> --scope <scope>... [--kind interactive|hosted|human|synthetic] [--key <idempotency-key>]
 
 A premise is a proposition as JSON: {"subject", "predicate", "relation", "value", …}.
@@ -55,7 +55,7 @@ const OPTIONS = {
   cursor: { type: "string" },
   limit: { type: "string" },
   name: { type: "string" },
-  org: { type: "string" },
+  namespace: { type: "string" },
   source: { type: "string" },
   scope: { type: "string", multiple: true },
   kind: { type: "string" },
@@ -176,7 +176,7 @@ async function dispatch(
     case "project create":
       return client.createProject(
         {
-          org: required(values.org, "org"),
+          namespace: required(values.namespace, "namespace"),
           name: required(values.name, "name"),
           source: required(values.source, "source"),
         },

@@ -597,21 +597,29 @@ export class KeelClient {
     );
   }
 
-  /** A project by its org's name and its own, as `/<org>/<project>` names them, with the reader's role there. */
-  project(
-    org: string,
-    name: string,
+  /** Whose a handle is: a person's, an agent's or an org's, with the namespace's id. */
+  namespace(
+    handle: string,
     options?: CallOptions,
-  ): Promise<WireOutputs["Orgs_getProject"]> {
-    return this.call("Orgs_getProject", { org, name }, options);
+  ): Promise<WireOutputs["Namespaces_getNamespace"]> {
+    return this.call("Namespaces_getNamespace", { handle }, options);
   }
 
-  /** The signed-in user: its handle, whether it is the instance admin, and its orgs with its role in each. */
+  /** A project by its namespace's handle and its own name, as `/<namespace>/<project>` names them, with the reader's role there. */
+  project(
+    handle: string,
+    name: string,
+    options?: CallOptions,
+  ): Promise<WireOutputs["Namespaces_getProject"]> {
+    return this.call("Namespaces_getProject", { handle, name }, options);
+  }
+
+  /** The signed-in user: its handle, its own namespace, and its orgs with its role in each. */
   me(options?: CallOptions): Promise<WireOutputs["Users_me"]> {
     return this.call("Users_me", {}, options);
   }
 
-  /** The projects the caller may read, each with its org and the reader's role there; pass a page's `nextCursor` for the next. */
+  /** The projects the caller may read, each with its namespace and the reader's role there; pass a page's `nextCursor` for the next. */
   projects(
     options: CallOptions & { readonly cursor?: string; readonly limit?: number } = {},
   ): Promise<WireOutputs["Operator_listProjects"]> {

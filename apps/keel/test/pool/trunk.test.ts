@@ -10,7 +10,7 @@ import {
   CommitSha,
   EventEnvelope,
   makeId,
-  type OrgId,
+  type NamespaceId,
   type ProjectId,
 } from "@keeltown/core/kernel";
 import { Changes, CodeHost, EventOutbox, OrgUsage, Trunks } from "@keeltown/core/ports";
@@ -137,7 +137,7 @@ describe("the Trunk DO", () => {
  * its trunk is initialized: `placed` names that org and what its history
  * weighs, for a test that reads the org's count.
  */
-async function promoting(placed?: { readonly org: OrgId; readonly history: number }) {
+async function promoting(placed?: { readonly org: NamespaceId; readonly history: number }) {
   const projectId: ProjectId = makeId("prj", ulid());
   const stub = trunkStub(projectId);
   const staging = projectRepos(projectId).staging;

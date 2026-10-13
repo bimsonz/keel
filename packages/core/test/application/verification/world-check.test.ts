@@ -18,7 +18,7 @@ import {
   PlanStore,
 } from "../../../src/application/ports/index.ts";
 import { SubjectKey } from "../../../src/domain/coordination/index.ts";
-import { CommitSha, ContentHash, makeId, OrgId } from "../../../src/domain/kernel/index.ts";
+import { CommitSha, ContentHash, makeId, NamespaceId } from "../../../src/domain/kernel/index.ts";
 import {
   compile,
   type FlowPlan,
@@ -32,7 +32,7 @@ const hash = (n: number) =>
   Schema.decodeUnknownSync(ContentHash)(`sha256:${String(n).padStart(64, "0")}`);
 
 /** The namespace every call names, and the only one the stores below keep anything for. */
-const NAMESPACE = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const NAMESPACE = Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 
 /** The worker-app pack's plan: two proof steps in Tier 2, the suite and the typecheck. */
 const PLAN = Result.getOrThrow(

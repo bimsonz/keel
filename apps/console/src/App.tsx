@@ -218,13 +218,13 @@ function Console({
   const source = { mode: player.source.descriptor.mode, seed, unread: player.unread };
   const projects = siblings.map((project) => ({
     name: project.name,
-    href: href(project.org, project.name, HOME, carriedParams()),
+    href: href(project.namespace.handle, project.name, HOME, carriedParams()),
     note: project.visibility,
   }));
   // A page read from the log has nothing to draw until the log has been read. The code waits for none of it.
   const waiting = !player.loaded && !UNLOGGED.has(route.at) && route.at !== "missing";
   return (
-    <WhereProvider org={found.org} project={found.name} route={route}>
+    <WhereProvider org={found.namespace.handle} project={found.name} route={route}>
       <NamesProvider>
         <Frame
           source={source}
@@ -237,7 +237,7 @@ function Console({
         >
           {waiting ? null : (
             <Page
-              key={pageOf(route, href(found.org, found.name, route))}
+              key={pageOf(route, href(found.namespace.handle, found.name, route))}
               route={route}
               mode={mode}
               project={found}
@@ -320,7 +320,7 @@ function Project({
     // The org's other projects, for the frame's switcher. The page does not wait for them.
     const others = async (): Promise<void> => {
       const listed = await reading.directory.listProjects(stop.signal).catch(() => []);
-      if (here) setSiblings(listed.filter((project) => project.org === org));
+      if (here) setSiblings(listed.filter((project) => project.namespace.handle === org));
     };
     void others();
     return () => {

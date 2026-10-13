@@ -1,6 +1,6 @@
 import { Context, type Effect, Schema } from "effect";
 import { type QuotaAdmitted, type QuotaExceeded, QuotaKind } from "../../domain/identity/index.ts";
-import type { OrgId } from "../../domain/kernel/index.ts";
+import type { NamespaceId } from "../../domain/kernel/index.ts";
 
 /**
  * An org's own quota settings, kept beside its counts: the limits that take
@@ -35,7 +35,7 @@ export class OrgUsage extends Context.Service<
      * nothing.
      */
     readonly admit: (
-      org: OrgId,
+      org: NamespaceId,
       kind: QuotaKind,
       amount: number,
       key: string,
@@ -46,18 +46,18 @@ export class OrgUsage extends Context.Service<
      * bytes, a failed fork's), and a count never falls below zero.
      */
     readonly record: (
-      org: OrgId,
+      org: NamespaceId,
       kind: QuotaKind,
       amount: number,
       key: string,
     ) => Effect.Effect<void>;
     /** The org's settings; no overrides and not halted until it is configured. */
-    readonly settings: (org: OrgId) => Effect.Effect<UsageSettings>;
+    readonly settings: (org: NamespaceId) => Effect.Effect<UsageSettings>;
     /**
      * Replaces the org's settings whole; every admission after it is decided
      * under them. What was counted, and what a key was already answered,
      * stays. A limit that is negative or not finite is a defect.
      */
-    readonly configure: (org: OrgId, settings: UsageSettings) => Effect.Effect<void>;
+    readonly configure: (org: NamespaceId, settings: UsageSettings) => Effect.Effect<void>;
   }
 >()("keel/OrgUsage") {}

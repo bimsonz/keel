@@ -52,7 +52,7 @@
       "name": "Operator"
     },
     {
-      "name": "Orgs"
+      "name": "Namespaces"
     },
     {
       "name": "Users"
@@ -4508,39 +4508,68 @@
         ]
       }
     },
-    "/oauth/token": {
-      "post": {
-        "operationId": "Auth_exchangeToken",
-        "summary": "Exchange client credentials for a token",
-        "description": "Exchange client credentials for a short-lived bearer token.",
-        "parameters": [],
+    "/namespaces/{handle}": {
+      "get": {
+        "operationId": "Namespaces_getNamespace",
+        "summary": "Get a namespace by its handle",
+        "description": "Whose a handle is: a person's, an agent's or an org's. Handles are public, and one is found in any case.",
+        "parameters": [
+          {
+            "name": "handle",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "The request has succeeded.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TokenResponse"
+                  "$ref": "#/components/schemas/NamespaceView"
                 }
               }
             }
           },
           "400": {
-            "description": "The token endpoint answers errors in OAuth 2.0's own shape (RFC 6749 §5.2),\nwhich every OAuth client already reads, rather than as problem details.",
+            "description": "The server could not understand the request due to invalid syntax.",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OAuthError"
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
           },
           "401": {
-            "description": "The token endpoint answers errors in OAuth 2.0's own shape (RFC 6749 §5.2),\nwhich every OAuth client already reads, rather than as problem details.",
+            "description": "Access is unauthorized.",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OAuthError"
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access is forbidden.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The server cannot find the requested resource.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -4595,31 +4624,29 @@
           }
         },
         "tags": [
-          "Auth"
+          "Namespaces"
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "$ref": "#/components/schemas/TokenRequest"
-              }
-            }
-          }
-        },
         "security": [
-          {}
+          {},
+          {
+            "OAuth2Auth": [
+              "agent:read"
+            ]
+          },
+          {
+            "BearerAuth": []
+          }
         ]
       }
     },
-    "/orgs/{org}/projects/{name}": {
+    "/namespaces/{handle}/projects/{name}": {
       "get": {
-        "operationId": "Orgs_getProject",
-        "summary": "Get a project by its org and name",
-        "description": "A project by its org's name and its own, as `/<org>/<project>` names them; either name in any case.\nA private project reads as missing to anyone outside its org.",
+        "operationId": "Namespaces_getProject",
+        "summary": "Get a project by its namespace and name",
+        "description": "A project by its namespace's handle and its own name, as `/<namespace>/<project>` names them; either in any case.\nA private project reads as missing to anyone outside its namespace.",
         "parameters": [
           {
-            "name": "org",
+            "name": "handle",
             "in": "path",
             "required": true,
             "schema": {
@@ -4736,7 +4763,7 @@
           }
         },
         "tags": [
-          "Orgs"
+          "Namespaces"
         ],
         "security": [
           {},
@@ -4748,6 +4775,110 @@
           {
             "BearerAuth": []
           }
+        ]
+      }
+    },
+    "/oauth/token": {
+      "post": {
+        "operationId": "Auth_exchangeToken",
+        "summary": "Exchange client credentials for a token",
+        "description": "Exchange client credentials for a short-lived bearer token.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The token endpoint answers errors in OAuth 2.0's own shape (RFC 6749 §5.2),\nwhich every OAuth client already reads, rather than as problem details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The token endpoint answers errors in OAuth 2.0's own shape (RFC 6749 §5.2),\nwhich every OAuth client already reads, rather than as problem details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Client error",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable.",
+            "headers": {
+              "retry-after": {
+                "required": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {}
         ]
       }
     },
@@ -6670,7 +6801,7 @@
       "get": {
         "operationId": "Users_me",
         "summary": "Who am I, as a user?",
-        "description": "The signed-in user: its handle, and its orgs with its role in each.",
+        "description": "The signed-in user: its handle, its own namespace, and its orgs with its role in each.",
         "parameters": [],
         "responses": {
           "200": {
@@ -7616,10 +7747,10 @@
           "org": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/OrgId"
+                "$ref": "#/components/schemas/NamespaceId"
               }
             ],
-            "description": "The agent's org. Optional only so agents enrolled before tenancy still decode."
+            "description": "The namespace the agent works in: its project's. Optional only so agents enrolled before tenancy still decode."
           },
           "sponsor": {
             "allOf": [
@@ -7682,13 +7813,13 @@
               "$ref": "#/components/schemas/RecordedScope"
             }
           },
-          "org": {
+          "namespace": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/OrgId"
+                "$ref": "#/components/schemas/NamespaceId"
               }
             ],
-            "description": "The agent's org. Absent only for agents enrolled before tenancy."
+            "description": "The namespace the agent works in: its project's. Absent only for agents enrolled before tenancy."
           },
           "sponsor": {
             "allOf": [
@@ -10073,25 +10204,25 @@
       "CreateProjectRequest": {
         "type": "object",
         "required": [
-          "org",
+          "namespace",
           "name",
           "source"
         ],
         "properties": {
-          "org": {
+          "namespace": {
             "type": "string",
             "minLength": 1,
-            "description": "The org the project is created in, by name; the caller must be a member of it."
+            "description": "The namespace the project is created in, by its handle: the caller's own, or an org the caller is a member of."
           },
           "name": {
             "type": "string",
             "minLength": 1,
-            "description": "The project's name in its org, unique there in any case."
+            "description": "The project's name in its namespace, unique there in any case."
           },
           "source": {
             "type": "string",
             "minLength": 1,
-            "description": "What trunk is forked from: a template's name, or the trunk of a project the caller may fork, named by that\nproject's id in lower case with a hyphen (`prj-01…`). A public project forks into any org the caller is a\nmember of; a private one only into its own org."
+            "description": "What trunk is forked from: a template's name, or the trunk of a project the caller may fork, named by that\nproject's id in lower case with a hyphen (`prj-01…`). A public project forks into the caller's own namespace\nor any org the caller is a member of; a private one only into its own namespace."
           }
         },
         "additionalProperties": {
@@ -14454,6 +14585,71 @@
         ],
         "description": "What a suggested move rests on."
       },
+      "NamespaceId": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/UserId"
+          },
+          {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          {
+            "$ref": "#/components/schemas/OrgId"
+          }
+        ],
+        "description": "A namespace's id is its account's: a user's, an agent's or an org's."
+      },
+      "NamespaceKind": {
+        "type": "string",
+        "enum": [
+          "user",
+          "agent",
+          "org"
+        ],
+        "description": "What a namespace is: a person's own, an agent's own, or an org with members and roles."
+      },
+      "NamespaceRef": {
+        "type": "object",
+        "required": [
+          "handle",
+          "kind"
+        ],
+        "properties": {
+          "handle": {
+            "$ref": "#/components/schemas/Handle"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NamespaceKind"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A namespace as an address names it: its handle, the first segment of `/<namespace>/<project>`, and its kind."
+      },
+      "NamespaceView": {
+        "type": "object",
+        "required": [
+          "id",
+          "handle",
+          "kind"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/NamespaceId"
+          },
+          "handle": {
+            "$ref": "#/components/schemas/Handle"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NamespaceKind"
+          }
+        },
+        "additionalProperties": {
+          "not": {}
+        },
+        "description": "A namespace: a handle that owns projects. Its id is its account's."
+      },
       "Nearby": {
         "type": "object",
         "required": [
@@ -15888,7 +16084,7 @@
         "type": "object",
         "required": [
           "id",
-          "org",
+          "namespace",
           "name",
           "visibility"
         ],
@@ -15896,13 +16092,17 @@
           "id": {
             "$ref": "#/components/schemas/ProjectId"
           },
-          "org": {
-            "type": "string",
-            "description": "The project's org, by name."
+          "namespace": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NamespaceRef"
+              }
+            ],
+            "description": "The namespace the project belongs to: a person's own, an agent's own or an org."
           },
           "name": {
             "type": "string",
-            "description": "The project's name in its org, lower-case."
+            "description": "The project's name in its namespace, lower-case."
           },
           "visibility": {
             "type": "string",
@@ -15922,13 +16122,13 @@
                 "$ref": "#/components/schemas/Viewer"
               }
             ],
-            "description": "The reader's role in the project's org; absent for anyone who is not a member of it."
+            "description": "The reader's role in the project's namespace: its owner's in their own, a member's in an org; absent for anyone else."
           }
         },
         "additionalProperties": {
           "not": {}
         },
-        "description": "A project and where it lives: `/<org>/<name>`."
+        "description": "A project and where it lives: `/<namespace>/<name>`."
       },
       "PromotionComposed": {
         "type": "object",
@@ -18004,14 +18204,22 @@
                 "$ref": "#/components/schemas/Handle"
               }
             ],
-            "description": "Absent until the user chooses one; its personal org takes the same name."
+            "description": "Absent until the user chooses one; it never changes."
+          },
+          "namespace": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NamespaceRef"
+              }
+            ],
+            "description": "The user's own namespace, where their own projects live: present once they have a handle. It has no members."
           },
           "orgs": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/UserOrg"
             },
-            "description": "The orgs the user belongs to, in org id order."
+            "description": "The orgs the user is a member of, in org id order: never their own namespace."
           }
         },
         "additionalProperties": {

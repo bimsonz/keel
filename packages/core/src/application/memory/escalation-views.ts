@@ -4,7 +4,7 @@ import {
   type EscalationId,
   type EventEnvelope,
   type Instant,
-  OrgId,
+  NamespaceId,
   UserId,
 } from "../../domain/kernel/index.ts";
 import { DecisionRecorded } from "../../domain/memory/index.ts";
@@ -50,7 +50,7 @@ const encodeRecord = Schema.encodeSync(EscalationRecord);
 const decodeEscalationEvent = Schema.decodeUnknownOption(EscalationEvent);
 const decodeRecorded = Schema.decodeUnknownOption(DecisionRecorded);
 const decodeChosen = Schema.decodeUnknownSync(DecisionChosen);
-const decodeNamespace = Schema.decodeUnknownOption(OrgId);
+const decodeNamespace = Schema.decodeUnknownOption(NamespaceId);
 const decodeUser = Schema.decodeUnknownOption(UserId);
 const asStored = (encoded: unknown): Stored => JSON.parse(JSON.stringify(encoded));
 

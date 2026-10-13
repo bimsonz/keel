@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.org-only
+# why: inviting, removing, making an owner and deleting are decided on a person's own namespace as on an org, so a person is granted them on a namespace that has no members and goes only with their account
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index d9b9395..e7f7d59 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -573,7 +573,7 @@ export const authorize = <A extends Action>(
+   resource: ResourceFor<A>,
+ ): Decision => {
+   const { need } = ACTIONS[action];
+-  const on: Resource = orgOnly(action, resource) ? { _tag: "Missing" } : resource;
++  const on: Resource = resource;
+   switch (principal._tag) {
+     case "Anonymous":
+       return anonymous(need, on);

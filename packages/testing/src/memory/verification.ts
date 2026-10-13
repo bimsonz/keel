@@ -4,7 +4,7 @@ import {
   CommitSha,
   ContentHash,
   makeId,
-  type OrgId,
+  type NamespaceId,
   type VerdictId,
 } from "@keeltown/core/kernel";
 import {
@@ -118,7 +118,7 @@ export function makeVerifierRuntimeMemory(
   outcome?: (step: VerificationJob["steps"][number]) => StepResult["outcome"],
 ) {
   const jobs: VerificationJob[] = [];
-  const namespaces: OrgId[] = [];
+  const namespaces: NamespaceId[] = [];
   return {
     jobs,
     /** The namespace each job was run for, in the order of `jobs`. */
@@ -489,7 +489,7 @@ export function memoryProbeRunnerHarness(): ProbeRunnerHarness {
 }
 
 /** Where the memory ProbeStore keeps a namespace's probe: the key the R2 adapter keeps its bundle at. */
-const probeKeyOf = (namespace: OrgId, hash: ContentHash) =>
+const probeKeyOf = (namespace: NamespaceId, hash: ContentHash) =>
   namespaceKey(namespace, "bundles", hash.slice("sha256:".length));
 
 /**

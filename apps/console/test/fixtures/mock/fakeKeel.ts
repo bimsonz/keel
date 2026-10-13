@@ -233,7 +233,7 @@ export function createFakeKeel(
   if (created === undefined) throw new Error("scenario 1 creates no project");
   const project: ProjectView = {
     id: created.payload.projectId,
-    org: options.org ?? "acme",
+    namespace: { handle: options.org ?? "acme", kind: "org" },
     name: created.payload.name,
     visibility: options.visibility ?? "private",
     createdAt: created.at,
@@ -265,7 +265,7 @@ export function createFakeKeel(
   const viewOf = (asked: NonNullable<ReturnType<typeof raised>>): EscalationView => ({
     id: asked.payload.escalationId,
     label: asked.label ?? "E-1",
-    project: { id: project.id, namespace: project.org, name: project.name },
+    project: { id: project.id, namespace: project.namespace.handle, name: project.name },
     question: asked.payload.question,
     options: asked.payload.options,
     about: asked.payload.about,
@@ -300,10 +300,10 @@ export function createFakeKeel(
       const visible = member || project.visibility === "public";
       const gone = (): Response => problem(404, "resource.not_found");
 
-      const named = /^\/v1\/orgs\/([^/]+)\/projects\/([^/]+)$/.exec(url.pathname);
+      const named = /^\/v1\/namespaces\/([^/]+)\/projects\/([^/]+)$/.exec(url.pathname);
       if (named !== null && request.method === "GET") {
         const [, org = "", name = ""] = named.map((part) => decodeURIComponent(part));
-        if (!visible || org !== project.org || name !== project.name) return gone();
+        if (!visible || org !== project.namespace.handle || name !== project.name) return gone();
         return Response.json({
           ...project,
           ...(reader?.role === undefined ? {} : { viewer: { role: reader.role } }),
@@ -505,7 +505,10 @@ export function createFakeKeel(
         if (request.headers.get("origin") !== url.origin) return problem(403, "auth.cross_site");
         if (!member)
           return problem(403, "auth.forbidden", [
-            { kind: "escalate", title: `Ask an owner of ${project.org} to make you a member` },
+            {
+              kind: "escalate",
+              title: `Ask an owner of ${project.namespace.handle} to make you a member`,
+            },
           ]);
         if (asking !== escalationId) return noQuestion(asking);
         // A ruling is the person's the question was put to first, or a maintainer's: Keel's `sponsorOrMaintain`.

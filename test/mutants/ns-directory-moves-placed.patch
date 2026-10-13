@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/directory-org.test.ts
+# kills: ns.directory-keeps
+# why: an enrolment replayed by its key moves a placed agent to the namespace the replay names, a personal org the migration has since deleted, so the agent is in no namespace that exists and is refused
+diff --git a/apps/keel/src/adapters/driven/d1/agent-directory.ts b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+index ea6103b..40c0523 100644
+--- a/apps/keel/src/adapters/driven/d1/agent-directory.ts
++++ b/apps/keel/src/adapters/driven/d1/agent-directory.ts
+@@ -133,7 +133,7 @@ export function AgentDirectoryD1(db: D1Database) {
+               .prepare(
+                 `INSERT INTO agents (id, project_id, name, kind, scopes, namespace_id, sponsor_user, state, revocation_epoch, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  ON CONFLICT (id) DO UPDATE SET project_id = excluded.project_id, name = excluded.name, kind = excluded.kind, scopes = excluded.scopes,
+-                   namespace_id = COALESCE(agents.namespace_id, excluded.namespace_id),
++                   namespace_id = COALESCE(excluded.namespace_id, agents.namespace_id),
+                    sponsor_user = CASE WHEN agents.sponsor_seq > 0 THEN agents.sponsor_user ELSE COALESCE(excluded.sponsor_user, agents.sponsor_user) END,
+                    state = excluded.state,
+                    revocation_epoch = excluded.revocation_epoch`,

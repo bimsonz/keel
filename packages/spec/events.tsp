@@ -660,8 +660,8 @@ model AgentEnrolled {
   kind: AgentKind;
   scopes: RecordedScope[];
 
-  /** The agent's org. Optional only so agents enrolled before tenancy still decode. */
-  org?: OrgId;
+  /** The namespace the agent works in: its project's. Optional only so agents enrolled before tenancy still decode. */
+  org?: NamespaceId;
 
   /** The user who minted the agent's credential: its sponsor, accountable for it. */
   sponsor?: UserId;

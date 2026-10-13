@@ -7,7 +7,12 @@ import {
   runMatrix,
   storeCell,
 } from "../../../src/application/verification/index.ts";
-import { ContentHash, contentHashOf, type Json, OrgId } from "../../../src/domain/kernel/index.ts";
+import {
+  ContentHash,
+  contentHashOf,
+  type Json,
+  NamespaceId,
+} from "../../../src/domain/kernel/index.ts";
 import { admit, type ProbeOutcome, type World } from "../../../src/domain/verification/index.ts";
 import {
   EvidenceMissing,
@@ -22,7 +27,7 @@ const hash = (n: number) =>
 const PROBE = hash(1);
 
 /** The namespace every call names, and the only one the stores below keep anything for. */
-const NAMESPACE = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const NAMESPACE = Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 const BUNDLES: Readonly<Record<World, ContentHash>> = {
   trunk: hash(10),
   A: hash(11),

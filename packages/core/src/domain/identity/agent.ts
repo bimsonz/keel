@@ -2,7 +2,7 @@ import { Schema } from "effect";
 import {
   AgentId,
   InstantSchema,
-  OrgId,
+  NamespaceId,
   ProjectId,
   type SessionId,
   UserId,
@@ -37,7 +37,7 @@ export const Agent = Schema.Struct({
   kind: AgentKind,
   scopes: Schema.Array(Scope),
   /** The agent's org. Optional only for agents enrolled before tenancy. */
-  org: Schema.optional(OrgId),
+  org: Schema.optional(NamespaceId),
   /**
    * The person who stands behind the agent: the member who enrolled it, or
    * whoever approved its ask. At most one, and the link carries no rights.
@@ -58,7 +58,7 @@ export interface AgentToken {
   readonly scopes: readonly Scope[];
   readonly revocationEpoch: number;
   /** The agent's org, carried in the token's `org` claim. */
-  readonly org?: OrgId;
+  readonly org?: NamespaceId;
   /** The user who minted the agent's credential: its sponsor, carried in the token's `obo` claim. */
   readonly sponsor?: UserId;
 }

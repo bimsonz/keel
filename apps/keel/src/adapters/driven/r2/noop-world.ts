@@ -4,7 +4,7 @@ import {
   noopTree,
   type TextCodec,
 } from "@keeltown/core/application/verification";
-import type { ContentHash, OrgId } from "@keeltown/core/kernel";
+import type { ContentHash, NamespaceId } from "@keeltown/core/kernel";
 import { BundleStore, NoopWorlds } from "@keeltown/core/ports";
 import { type BundleFile, readBundle, writeBundle } from "@keeltown/runner-protocol";
 import { Effect, Layer, Result } from "effect";
@@ -34,7 +34,7 @@ export const BUNDLE_TEXT: TextCodec<BundleFile> = {
  * so a refusal of them is a defect.
  */
 export const noopWorld =
-  (namespace: OrgId, a: readonly BundleFile[]) =>
+  (namespace: NamespaceId, a: readonly BundleFile[]) =>
   (recipe: NoopRecipe): Effect.Effect<ContentHash, NoNoop, BundleStore> =>
     Effect.gen(function* () {
       const tree = noopTree(a, recipe, BUNDLE_TEXT);

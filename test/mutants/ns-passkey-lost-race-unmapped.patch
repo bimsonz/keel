@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/namespaces.test.ts
+# kills: ns.unique
+# why: a passkey sign-up that loses its handle to another account in the same moment answers the passkey plugin's server error, so the person is told registration failed instead of that the handle is taken
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 2db5ad4..b05ce12 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -388,10 +388,7 @@ export function authOptions(config: AuthConfig) {
+                   displayUsername: handle,
+                 },
+                 { method: "passkey" },
+-              )
+-              .catch((error: unknown) => {
+-                throw lostHandle(error) ? lostRace() : error;
+-              });
++              );
+             return { userId: created.id };
+           },
+         },

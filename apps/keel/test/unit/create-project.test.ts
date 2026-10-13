@@ -82,7 +82,7 @@ describe("createProject", () => {
         });
         expect(yield* projectEvents).toEqual(["ProjectCreated"]);
         const [created] = (yield* EventOutbox).log({ kind: "project", id: projectId });
-        expect(created).toMatchObject({ actor: `operator:${creator}`, payload: { by: creator } });
+        expect(created).toMatchObject({ actor: `user:${creator}`, payload: { by: creator } });
       }).pipe(Effect.provide(layer));
     },
   );

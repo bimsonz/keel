@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/namespaces.test.ts
+# kills: ns.handle-once
+# why: a namespace is answered from its row alone, which outlives its account, so a deleted org's handle still resolves to an org that is gone and its page is served for an org nobody can enter
+diff --git a/apps/keel/src/adapters/driven/d1/namespaces.ts b/apps/keel/src/adapters/driven/d1/namespaces.ts
+index 0d212b7..c5a8663 100644
+--- a/apps/keel/src/adapters/driven/d1/namespaces.ts
++++ b/apps/keel/src/adapters/driven/d1/namespaces.ts
+@@ -22,7 +22,6 @@ const decodeRow = Schema.decodeUnknownSync(NamespaceRow);
+ 
+ function toRecord(row: unknown, now: number): Option.Option<NamespaceRecord> {
+   const r = decodeRow(row);
+-  if (r.held === 0) return Option.none();
+   return Option.some({
+     namespace: r.id,
+     handle: r.handle,

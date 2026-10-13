@@ -4,7 +4,12 @@ import { publicOnly, shownAgent } from "../../../src/engine/audience.ts";
 import { funnelOf } from "../../../src/engine/funnel.ts";
 import { World } from "../../../src/engine/world.ts";
 
-const project: ProjectView = { id: "prj_1", org: "acme", name: "demo", visibility: "public" };
+const project: ProjectView = {
+  id: "prj_1",
+  namespace: { handle: "acme", kind: "org" },
+  name: "demo",
+  visibility: "public",
+};
 
 /** The funnel's last stage, where a person is asked, on a log that holds nothing yet. */
 const stage = (people: boolean) =>

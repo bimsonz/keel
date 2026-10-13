@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/namespaces.test.ts
+# kills: ns.reserved
+# why: the refusal of a reserved handle names keel.town as the host, so a Keel served anywhere else tells its people that another site serves the path
+diff --git a/apps/keel/src/adapters/driven/better-auth/names.ts b/apps/keel/src/adapters/driven/better-auth/names.ts
+index ea6561e8..8d040d4c 100644
+--- a/apps/keel/src/adapters/driven/better-auth/names.ts
++++ b/apps/keel/src/adapters/driven/better-auth/names.ts
+@@ -16,7 +16,8 @@ export const HANDLE = /^[a-z0-9](?:-?[a-z0-9]){0,38}$/;
+ /** Why `name` can't be a handle, or undefined when it can. Case never matters. */
+ export function nameRefusal(name: string): string | undefined {
+   const lowered = name.toLowerCase();
+-  if (RESERVED_NAMES.has(lowered)) return `"${name}" is reserved`;
++  if (RESERVED_NAMES.has(lowered))
++    return `"${name}" is reserved: keel.town serves /${lowered} itself`;
+   if (!HANDLE.test(lowered))
+     return `"${name}" must be letters, digits and single hyphens, starting and ending with a letter or digit, at most 39 characters`;
+   return undefined;

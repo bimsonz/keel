@@ -4,7 +4,7 @@ import {
   DecisionId,
   type EscalationId,
   type Instant,
-  OrgId,
+  NamespaceId,
   ProjectId,
   UserId,
 } from "../../domain/kernel/index.ts";
@@ -23,7 +23,7 @@ import {
  */
 export const EscalationRecord = Schema.Struct({
   escalation: Escalation,
-  namespace: OrgId,
+  namespace: NamespaceId,
   project: ProjectId,
   sponsor: Schema.optional(UserId),
   decisionId: Schema.optional(DecisionId),
@@ -51,7 +51,7 @@ export type DecisionChosen = typeof DecisionChosen.Type;
  */
 export type EscalationReader =
   | { readonly _tag: "Project"; readonly project: ProjectId }
-  | { readonly _tag: "User"; readonly userId: UserId; readonly maintains: readonly OrgId[] };
+  | { readonly _tag: "User"; readonly userId: UserId; readonly maintains: readonly NamespaceId[] };
 
 export interface EscalationListRead {
   readonly reader: EscalationReader;

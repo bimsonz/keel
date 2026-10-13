@@ -16,8 +16,8 @@ import {
   makeProjectViewsMemory,
   makeInboxMemory,
   makeMembershipsMemory,
-  makeOrgsMemory,
-  makeProjectOrgsMemory,
+  makeNamespacesMemory,
+  makeProjectNamespacesMemory,
   makeProjectsMemory,
   makeSessionsMemory,
   makeSponsorshipsMemory,
@@ -91,8 +91,8 @@ async function serve(seeded: Agent, clock: Layer.Layer<Clock>) {
       makeSponsorshipsMemory().layer.pipe(Layer.provide(directory.layer)),
       makeUsersMemory().layer,
       makeMembershipsMemory().layer,
-      makeOrgsMemory().layer,
-      makeProjectOrgsMemory().layer,
+      makeNamespacesMemory().layer,
+      makeProjectNamespacesMemory().layer,
     ),
   );
   const handlers = makeHandlers(
@@ -142,6 +142,6 @@ describe("the token endpoint", () => {
       org: sampleOrgId,
       sponsor: sampleSponsorId,
     });
-    expect(decodeJwt(token)).toMatchObject({ org: sampleOrgId, obo: sampleSponsorId });
+    expect(decodeJwt(token)).toMatchObject({ ns: sampleOrgId, obo: sampleSponsorId });
   });
 });

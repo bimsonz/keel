@@ -31,7 +31,7 @@ export interface Page<Item> {
 }
 
 /**
- * Keel's projects, as it names them to whoever asks: its answer to `GET /v1/orgs/{org}/projects/{name}` and
+ * Keel's projects, as it names them to whoever asks: its answer to `GET /v1/namespaces/{handle}/projects/{name}` and
  * each entry of `GET /v1/projects`, in Keel's own model. A reader with no session is named the public ones.
  */
 export interface KeelDirectory {

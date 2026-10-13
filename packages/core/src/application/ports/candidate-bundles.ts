@@ -1,5 +1,5 @@
 import { Context, type Effect, Schema } from "effect";
-import type { CommitSha, ContentHash, OrgId } from "../../domain/kernel/index.ts";
+import type { CommitSha, ContentHash, NamespaceId } from "../../domain/kernel/index.ts";
 import type { RepoRef } from "./code-host.ts";
 
 /** A candidate's tree holds something the bundle format cannot carry (a symlink, a submodule, an unsafe path). */
@@ -20,7 +20,7 @@ export class CandidateBundles extends Context.Service<
   CandidateBundles,
   {
     readonly bundle: (
-      namespace: OrgId,
+      namespace: NamespaceId,
       staging: RepoRef,
       commit: CommitSha,
     ) => Effect.Effect<ContentHash, BundleRefused>;

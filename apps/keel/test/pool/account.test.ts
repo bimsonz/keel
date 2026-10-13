@@ -38,7 +38,7 @@ describe("automation accounts, made as any visitor's", () => {
       status: 200,
       handle,
       userId: account.session.userId,
-      orgs: { [handle]: "owner" },
+      orgs: {},
     });
     expect((await whoIs(BASE, `${account.session.token}x`, fetcher)).status).toBe(401);
     // The handle is taken now, and the refusal carries its code and nothing of an answer's body.

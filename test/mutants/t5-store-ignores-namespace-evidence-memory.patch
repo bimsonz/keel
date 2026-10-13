@@ -14,11 +14,11 @@ index ca607737..101d3c66 100644
  /**
   * A Durable Object's storage, in a Map. `transaction` snapshots the map and
 @@ -109,7 +110,7 @@ const hexOf = (hash: ContentHash): string => hash.slice("sha256:".length);
- const bundleKeyOf = (namespace: OrgId, hash: ContentHash) =>
+ const bundleKeyOf = (namespace: NamespaceId, hash: ContentHash) =>
    namespaceKey(namespace, "bundles", hexOf(hash));
- const evidenceKeyOf = (namespace: OrgId, hash: ContentHash) =>
+ const evidenceKeyOf = (namespace: NamespaceId, hash: ContentHash) =>
 -  namespaceKey(namespace, "evidence", hexOf(hash));
 +  namespaceKey(sampleNamespace, "evidence", hexOf(hash));
- const planKeyOf = (namespace: OrgId, hash: ContentHash) =>
+ const planKeyOf = (namespace: NamespaceId, hash: ContentHash) =>
    namespaceKey(namespace, "plans", hexOf(hash));
  

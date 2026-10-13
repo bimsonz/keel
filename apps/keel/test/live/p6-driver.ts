@@ -14,7 +14,7 @@ import {
 } from "@keeltown/core/application/verification";
 import { Proposition } from "@keeltown/core/domain/coordination";
 import { FlowWorld } from "@keeltown/core/domain/verification";
-import { ContentHash, OrgId } from "@keeltown/core/kernel";
+import { ContentHash, NamespaceId } from "@keeltown/core/kernel";
 import { Effect, Schema } from "effect";
 import { BundleStoreR2 } from "../../src/adapters/driven/r2/bundle-store.ts";
 import { noopWorld } from "../../src/adapters/driven/r2/noop-world.ts";
@@ -29,7 +29,7 @@ interface DriverEnv {
 
 const DraftRequest = Schema.Struct({
   /** The namespace the worlds are kept for, where the probe and A-noop are kept too. */
-  namespace: OrgId,
+  namespace: NamespaceId,
   pins: Schema.Unknown,
   context: Schema.Struct({
     premise: Proposition,

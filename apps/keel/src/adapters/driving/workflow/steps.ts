@@ -7,8 +7,8 @@ import {
   projectNamespace,
   type StepPolicy,
 } from "@keeltown/core/application/verification";
-import { OrgId, type ProjectId } from "@keeltown/core/kernel";
-import type { ProjectOrgs } from "@keeltown/core/ports";
+import { NamespaceId, type ProjectId } from "@keeltown/core/kernel";
+import type { ProjectNamespaces } from "@keeltown/core/ports";
 import { Effect, Option, Result, Schema } from "effect";
 
 /** Reads and ledger writes retry quickly; a draft calls the model up to four times, so it is given long and tried twice. */
@@ -32,10 +32,10 @@ const POLICIES: Readonly<Record<StepPolicy, WorkflowStepConfig>> = {
  */
 export async function namespaceStep(
   step: WorkflowStep,
-  run: <A>(effect: Effect.Effect<A, never, ProjectOrgs>) => Promise<A>,
+  run: <A>(effect: Effect.Effect<A, never, ProjectNamespaces>) => Promise<A>,
   projectId: ProjectId,
-  named?: OrgId,
-): Promise<OrgId> {
+  named?: NamespaceId,
+): Promise<NamespaceId> {
   const kept = await step.do("namespace", POLICIES.quick, async (): Promise<string> => {
     const read = await run(
       Effect.result(
@@ -45,7 +45,7 @@ export async function namespaceStep(
     if (Result.isFailure(read)) throw new NonRetryableError(describeNoNamespace(read.failure));
     return read.success;
   });
-  return Schema.decodeUnknownSync(OrgId)(kept);
+  return Schema.decodeUnknownSync(NamespaceId)(kept);
 }
 
 /**
@@ -57,13 +57,13 @@ export async function namespaceStep(
  */
 export async function placedStep(
   step: WorkflowStep,
-  run: <A>(effect: Effect.Effect<A, never, ProjectOrgs>) => Promise<A>,
+  run: <A>(effect: Effect.Effect<A, never, ProjectNamespaces>) => Promise<A>,
   projectId: ProjectId,
-): Promise<OrgId | undefined> {
+): Promise<NamespaceId | undefined> {
   const kept = await step.do("namespace", POLICIES.quick, async (): Promise<string | null> =>
     Option.getOrNull(await run(Effect.option(projectNamespace(projectId)))),
   );
-  return kept === null ? undefined : Schema.decodeUnknownSync(OrgId)(kept);
+  return kept === null ? undefined : Schema.decodeUnknownSync(NamespaceId)(kept);
 }
 
 /** A waitForEvent that ran out: the platform throws, and the program reads it as no event. */

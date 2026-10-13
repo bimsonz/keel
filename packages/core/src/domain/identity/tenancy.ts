@@ -3,6 +3,8 @@ import {
   type AgentId,
   agentActor,
   type Actor as EventActor,
+  type NamespaceId,
+  type NamespaceKind,
   type OrgId,
   type ProjectId,
   userActor,
@@ -43,7 +45,11 @@ export const strongestRole = (names: readonly string[]): Role | undefined =>
 export const banHolds = (banned: boolean, banExpires: Date | undefined, now: number): boolean =>
   banned && (banExpires === undefined || banExpires.getTime() > now);
 
-/** One of a user's memberships, as the Memberships port reads it from D1. */
+/**
+ * One of a user's memberships in an org, as the Users port reads it from D1.
+ * A user's own namespace is never among them: it has no members, and its
+ * owner holds it by identity.
+ */
 export interface Membership {
   readonly org: OrgId;
   readonly role: Role;
@@ -105,7 +111,7 @@ export type AgentStanding =
 export interface AgentPrincipal {
   readonly _tag: "Agent";
   readonly agentId: AgentId;
-  readonly org: OrgId;
+  readonly org: NamespaceId;
   readonly projectId?: ProjectId;
   readonly scopes: readonly Scope[];
   readonly paused: boolean;
@@ -143,12 +149,21 @@ export interface SelfResource {
 }
 
 /**
- * An org. `personOwned` says a person is among its owners: no agent governs
+ * Whether a person owns a namespace of this kind: a person's own and an org
+ * are people's, an agent's own is the agent's.
+ */
+export const personOwns = (kind: NamespaceKind): boolean => kind !== "agent";
+
+/**
+ * A namespace: a person's own, an agent's own, or an org (`kind`). Only an org
+ * has members, so the actions on members and on deleting it are decided on an
+ * org alone. `personOwned` says a person is among its owners: no agent governs
  * there, whatever its standing says.
  */
 export interface OrgResource {
   readonly _tag: "Org";
-  readonly org: OrgId;
+  readonly org: NamespaceId;
+  readonly kind: NamespaceKind;
   readonly suspended: boolean;
   readonly personOwned: boolean;
 }
@@ -160,7 +175,7 @@ export interface OrgResource {
  */
 export interface ProjectResource {
   readonly _tag: "Project";
-  readonly org: OrgId;
+  readonly org: NamespaceId;
   readonly projectId: ProjectId;
   readonly visibility: Visibility;
   readonly orgSuspended: boolean;

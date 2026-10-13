@@ -13,7 +13,7 @@ import {
   DecisionId,
   EntityRef,
   EscalationId,
-  OrgId,
+  NamespaceId,
   ProjectId,
   UserId,
 } from "@keeltown/core/kernel";
@@ -24,7 +24,7 @@ import { exitCodec, type ExitJson } from "./exit.ts";
 /** An escalation with where it belongs and the decision its ruling recorded (the port's `EscalationRecord`). */
 export const EscalationRecord = Schema.Struct({
   escalation: Escalation,
-  namespace: OrgId,
+  namespace: NamespaceId,
   project: ProjectId,
   sponsor: Schema.optional(UserId),
   decisionId: Schema.optional(DecisionId),

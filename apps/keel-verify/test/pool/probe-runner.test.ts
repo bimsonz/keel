@@ -1,6 +1,6 @@
 import { env, exports } from "cloudflare:workers";
 import { ProbeRunner, ProbeRunnerUnavailable } from "@keeltown/core/ports";
-import { ContentHash, OrgId } from "@keeltown/core/kernel";
+import { ContentHash, NamespaceId } from "@keeltown/core/kernel";
 import { probeWorkerFiles, Semaphore } from "@keeltown/runner-protocol";
 import { describeProbeRunnerContract } from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
@@ -43,7 +43,7 @@ const request = (
   probe: ContentHash,
   worldBundle: ContentHash,
   run = 1,
-  namespace: OrgId = NAMESPACE,
+  namespace: NamespaceId = NAMESPACE,
 ): ProbeRunRequest => ({
   namespace,
   probe,
@@ -53,8 +53,8 @@ const request = (
 });
 
 /** The namespace the bundles below are kept for, and another that holds none of them. */
-const NAMESPACE = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
-const OTHER = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V1");
+const NAMESPACE = Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const OTHER = Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V1");
 
 const answered = async (r: ProbeRunRequest) => {
   const exit = await viaEntrypoint(r);

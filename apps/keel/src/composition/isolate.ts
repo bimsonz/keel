@@ -26,8 +26,8 @@ import {
 } from "../adapters/driven/better-auth/auth.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
 import { MembershipsD1 } from "../adapters/driven/d1/memberships.ts";
-import { OrgsD1 } from "../adapters/driven/d1/orgs.ts";
-import { ProjectOrgsD1 } from "../adapters/driven/d1/project-orgs.ts";
+import { NamespacesD1 } from "../adapters/driven/d1/namespaces.ts";
+import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
 import { UsersD1 } from "../adapters/driven/d1/users.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { ConflictMovesRpc } from "../adapters/driven/do-rpc/conflict-moves.ts";
@@ -88,8 +88,8 @@ export function isolateLayer(
     directory,
     UsersD1(env.DB),
     MembershipsD1(env.DB),
-    OrgsD1(env.DB),
-    ProjectOrgsD1(env.DB),
+    NamespacesD1(env.DB),
+    ProjectNamespacesD1(env.DB),
     // The repo read API reads trunks, which live in the core namespace alone.
     overrides.codeHost ?? CodeHostArtifacts({ "keel-core": env.ARTIFACTS }),
     TokenIssuerJose({ privateJwk: env.KEEL_SIGNING_KEY, issuer: env.KEEL_HOST }).pipe(

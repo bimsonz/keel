@@ -1,5 +1,5 @@
 import { type AgentToken, Scope, TokenRejected } from "@keeltown/core/domain/identity";
-import { AgentId, Instant, OrgId, ProjectId, UserId } from "@keeltown/core/kernel";
+import { AgentId, Instant, NamespaceId, ProjectId, UserId } from "@keeltown/core/kernel";
 import { Clock, TokenIssuer } from "@keeltown/core/ports";
 import { Effect, Layer, Schema } from "effect";
 import { errors, importJWK, type JWK, jwtVerify, SignJWT } from "jose";
@@ -16,8 +16,8 @@ const Claims = Schema.Struct({
   prj: ProjectId,
   scope: Schema.String,
   epoch: Schema.Int,
-  /** The agent's org. */
-  org: Schema.optional(OrgId),
+  /** The namespace the token is for: the agent's. */
+  ns: Schema.optional(NamespaceId),
   /** The user who sponsors the agent: the principal's `sponsor`. */
   obo: Schema.optional(UserId),
 });
@@ -54,7 +54,7 @@ export function TokenIssuerJose(options: TokenIssuerOptions) {
                 prj: principal.projectId,
                 scope: principal.scopes.join(" "),
                 epoch: principal.revocationEpoch,
-                ...(principal.org === undefined ? {} : { org: principal.org }),
+                ...(principal.org === undefined ? {} : { ns: principal.org }),
                 ...(principal.sponsor === undefined ? {} : { obo: principal.sponsor }),
               })
                 .setProtectedHeader({ alg: "EdDSA", kid, typ: "JWT" })
@@ -101,7 +101,7 @@ export function TokenIssuerJose(options: TokenIssuerOptions) {
               projectId: claims.prj,
               scopes,
               revocationEpoch: claims.epoch,
-              ...(claims.org === undefined ? {} : { org: claims.org }),
+              ...(claims.ns === undefined ? {} : { org: claims.ns }),
               ...(claims.obo === undefined ? {} : { sponsor: claims.obo }),
             };
           }),

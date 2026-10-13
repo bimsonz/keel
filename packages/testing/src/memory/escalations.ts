@@ -11,7 +11,7 @@ import {
   recordFeed,
 } from "@keeltown/core/application/memory";
 import { EscalationNotFound } from "@keeltown/core/domain/verification";
-import type { EntityRef, EscalationId, EventEnvelope, OrgId } from "@keeltown/core/kernel";
+import type { EntityRef, EscalationId, EventEnvelope, NamespaceId } from "@keeltown/core/kernel";
 import {
   type Clock,
   type EntityStore,
@@ -39,7 +39,7 @@ export function makeEscalationsMemory(clock: ManualClock = makeManualClock()) {
   const objects = new Map<string, ReturnType<typeof makeEventOutboxMemory>>();
   const views = makeEntityStoreMemory().service;
   const folded = new Set<string>();
-  const objectAt = (namespace: OrgId) => {
+  const objectAt = (namespace: NamespaceId) => {
     const address = namespaceAddress(namespace);
     let object = objects.get(address);
     if (object === undefined) {
@@ -48,12 +48,12 @@ export function makeEscalationsMemory(clock: ManualClock = makeManualClock()) {
     }
     return object;
   };
-  const on = <A, E>(namespace: OrgId, program: Effect.Effect<A, E, Hosted>) =>
+  const on = <A, E>(namespace: NamespaceId, program: Effect.Effect<A, E, Hosted>) =>
     Effect.provide(program, Layer.mergeAll(objectAt(namespace).layer, clock.layer));
-  const log = (namespace: OrgId, entity: EntityRef): readonly EventEnvelope[] =>
+  const log = (namespace: NamespaceId, entity: EntityRef): readonly EventEnvelope[] =>
     objectAt(namespace).service.log(entity);
   /** Folds what the namespace's object has committed on an escalation and its decision, in commit order. */
-  const project = (namespace: OrgId, escalationId: EscalationId) => {
+  const project = (namespace: NamespaceId, escalationId: EscalationId) => {
     const events = [
       ...log(namespace, { kind: "escalation", id: escalationId }),
       ...log(namespace, { kind: "decision", id: decisionIdOf(escalationId) }),

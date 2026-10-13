@@ -5,13 +5,13 @@ import {
   ProjectNameTaken,
   strongestRole,
 } from "@keeltown/core/domain/identity";
-import type { OrgId, UserId } from "@keeltown/core/kernel";
+import type { NamespaceId, OrgId, UserId } from "@keeltown/core/kernel";
 import {
   Memberships,
-  type OrgRecord,
-  Orgs,
+  type NamespaceRecord,
+  Namespaces,
   type ProjectPlace,
-  ProjectOrgs,
+  ProjectNamespaces,
   Users,
 } from "@keeltown/core/ports";
 import { Clock, Effect, Layer, Option, Schema } from "effect";
@@ -33,7 +33,7 @@ export interface BetterAuthOrg {
   readonly suspended?: boolean;
 }
 
-/** A `member` row: `role` may name several roles, comma-separated. */
+/** A `member` row: `role` may name several roles, comma-separated. Its org is an organization's id alone, as the table's foreign key holds it. */
 export interface BetterAuthMember {
   readonly organizationId: OrgId;
   readonly userId: UserId;
@@ -77,7 +77,8 @@ export function makeBetterAuthMemory(rows: BetterAuthRows = {}) {
       .filter((member) => member.userId === userId)
       .flatMap((member) => {
         const role = strongestRole(rolesOf(member.role));
-        return role === undefined ? [] : [{ org: member.organizationId, role }];
+        const org = member.organizationId;
+        return role === undefined ? [] : [{ org, role }];
       })
       .toSorted((a, b) => binary(a.org, b.org));
   return { users, orgs, members, seed, membershipsOf };
@@ -85,29 +86,44 @@ export function makeBetterAuthMemory(rows: BetterAuthRows = {}) {
 
 export type BetterAuthMemory = ReturnType<typeof makeBetterAuthMemory>;
 
-const recordOf = (org: BetterAuthOrg): OrgRecord => ({
-  org: org.id,
-  name: org.slug,
-  suspended: org.suspended === true,
-});
+/**
+ * Every namespace the rows make, as the `namespaces` table holds them: one for
+ * each user with a handle, by the user's id, and one for each org, by its id.
+ */
+const namespacesOf = (rows: BetterAuthMemory, now: number): readonly NamespaceRecord[] => [
+  ...[...rows.users.values()].flatMap((user): NamespaceRecord[] =>
+    user.username === undefined
+      ? []
+      : [
+          {
+            namespace: user.id,
+            handle: decodeHandle(user.username),
+            kind: "user",
+            suspended: banHolds(user.banned === true, user.banExpires, now),
+          },
+        ],
+  ),
+  ...[...rows.orgs.values()].map((org): NamespaceRecord => ({
+    namespace: org.id,
+    handle: decodeHandle(org.slug),
+    kind: "org",
+    suspended: org.suspended === true,
+  })),
+];
 
-/** Orgs over Better Auth's rows in memory. */
-export function makeOrgsMemory(rows: BetterAuthMemory = makeBetterAuthMemory()) {
+/** Namespaces over Better Auth's rows in memory. */
+export function makeNamespacesMemory(rows: BetterAuthMemory = makeBetterAuthMemory()) {
+  const find = (matches: (record: NamespaceRecord) => boolean) =>
+    Effect.map(Clock.currentTimeMillis, (now) =>
+      Option.fromNullishOr(namespacesOf(rows, now).find(matches)),
+    );
   return {
     seed: rows.seed,
     layer: Layer.succeed(
-      Orgs,
-      Orgs.of({
-        byId: (org) =>
-          Effect.sync(() => Option.map(Option.fromNullishOr(rows.orgs.get(org)), recordOf)),
-        byName: (name) =>
-          Effect.sync(() => {
-            const lowered = name.toLowerCase();
-            return Option.map(
-              Option.fromNullishOr([...rows.orgs.values()].find((org) => org.slug === lowered)),
-              recordOf,
-            );
-          }),
+      Namespaces,
+      Namespaces.of({
+        byId: (namespace) => find((record) => record.namespace === namespace),
+        byHandle: (handle) => find((record) => record.handle === handle.toLowerCase()),
       }),
     ),
   };
@@ -142,10 +158,14 @@ export function makeMembershipsMemory(rows: BetterAuthMemory = makeBetterAuthMem
     layer: Layer.succeed(
       Memberships,
       Memberships.of({
-        standing: (userId, org) =>
+        standing: (userId, namespace) =>
           Effect.map(Clock.currentTimeMillis, (now) => {
-            const role = rows.membershipsOf(userId).find((m) => m.org === org)?.role;
             const user = rows.users.get(userId);
+            const own = user === undefined ? undefined : ("owner" as const);
+            const role =
+              namespace === userId
+                ? own
+                : rows.membershipsOf(userId).find((m) => m.org === namespace)?.role;
             return {
               userId,
               ...(role === undefined ? {} : { role }),
@@ -157,36 +177,39 @@ export function makeMembershipsMemory(rows: BetterAuthMemory = makeBetterAuthMem
   };
 }
 
-/** A project's org and name, in any case: what the `projects` table holds unique. */
-const nameKey = (org: OrgId, name: string) => `${org}\u0000${name.toLowerCase()}`;
+/** A project's namespace and name, in any case: what the `projects` table holds unique. */
+const nameKey = (namespace: NamespaceId, name: string) => `${namespace}\u0000${name.toLowerCase()}`;
 
-/** Projects' places in a map, with the `projects` table's unique (org, name). */
-export function makeProjectOrgsMemory() {
+/** Projects' places in a map, with the `projects` table's unique (namespace, name). */
+export function makeProjectNamespacesMemory() {
   const places = new Map<string, ProjectPlace>();
-  const byName = (org: OrgId, name: string) =>
-    [...places.values()].find((place) => nameKey(place.org, place.name) === nameKey(org, name));
+  const byName = (namespace: NamespaceId, name: string) =>
+    [...places.values()].find(
+      (place) => nameKey(place.namespace, place.name) === nameKey(namespace, name),
+    );
   return {
     places,
     layer: Layer.succeed(
-      ProjectOrgs,
-      ProjectOrgs.of({
+      ProjectNamespaces,
+      ProjectNamespaces.of({
         assign: (place) =>
           Effect.suspend(() => {
             const name = place.name.toLowerCase();
-            const taken = Effect.fail(new ProjectNameTaken({ org: place.org, name }));
+            const taken = Effect.fail(new ProjectNameTaken({ org: place.namespace, name }));
             const held = places.get(place.projectId);
             if (held !== undefined)
-              return held.org === place.org && held.name === name ? Effect.void : taken;
-            if (byName(place.org, name) !== undefined) return taken;
+              return held.namespace === place.namespace && held.name === name ? Effect.void : taken;
+            if (byName(place.namespace, name) !== undefined) return taken;
             places.set(place.projectId, { ...place, name });
             return Effect.void;
           }),
         byId: (projectId) => Effect.sync(() => Option.fromNullishOr(places.get(projectId))),
-        byName: (org, name) => Effect.sync(() => Option.fromNullishOr(byName(org, name))),
-        inOrg: (org) =>
+        byName: (namespace, name) =>
+          Effect.sync(() => Option.fromNullishOr(byName(namespace, name))),
+        inNamespace: (namespace) =>
           Effect.sync(() =>
             [...places.values()]
-              .filter((place) => place.org === org)
+              .filter((place) => place.namespace === namespace)
               .toSorted((a, b) => binary(a.name, b.name)),
           ),
         all: (after, limit) =>

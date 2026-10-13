@@ -93,7 +93,11 @@ describe("the Keel client", () => {
 
   it("mints an Idempotency-Key when none is given", async () => {
     const keel = fakeKeel(() => ok());
-    await keel.client.createProject({ org: "keel", name: "forge", source: "fixture-forge-lite" });
+    await keel.client.createProject({
+      namespace: "keel",
+      name: "forge",
+      source: "fixture-forge-lite",
+    });
     const create = keel.sent.find((s) => s.url.endsWith("/v1/projects"));
     expect(create?.headers["idempotency-key"]).toMatch(/^[0-9a-f-]{36}$/);
   });

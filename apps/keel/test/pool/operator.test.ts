@@ -35,14 +35,14 @@ function operatorApp() {
 
 interface Body {
   readonly id: string;
-  readonly org: string;
+  readonly namespace: { readonly handle: string; readonly kind: string };
   readonly name: string;
   readonly viewer?: { readonly role: string };
   readonly agent: {
     readonly id: string;
     readonly projectId: string;
     readonly scopes: string[];
-    readonly org?: string;
+    readonly namespace?: string;
     readonly sponsor?: string;
   };
   readonly clientId: string;
@@ -106,7 +106,7 @@ const maintainer = async () =>
 const projectName = (what: string) => uniqueHandle(what);
 
 describe("project bootstrap", () => {
-  it("[a11b.enrol] a person who signs up by passkey creates a project in their own org and enrols an agent there whose credential exchanges at once", async () => {
+  it("[a11b.enrol] a person who signs up by passkey creates a project in their own namespace and enrols an agent there whose credential exchanges at once", async () => {
     const { via } = operatorApp();
     const handle = uniqueHandle("first");
     const { session } = await signUp(BASE, handle, {
@@ -118,11 +118,15 @@ describe("project bootstrap", () => {
       user,
       "POST",
       "/projects",
-      { org: handle, name: "forge", source: SOURCE },
+      { namespace: handle, name: "forge", source: SOURCE },
       key("prj"),
     );
     expect(project.status).toBe(201);
-    expect(project.body).toMatchObject({ org: handle, name: "forge", viewer: { role: "owner" } });
+    expect(project.body).toMatchObject({
+      namespace: { handle, kind: "user" },
+      name: "forge",
+      viewer: { role: "owner" },
+    });
     const agent = await call(
       via,
       user,
@@ -150,6 +154,66 @@ describe("project bootstrap", () => {
     });
   });
 
+  it("[ns.own-project] a person owns the namespace that is their own by being that person: they create there, their agent works there under their id, and nobody else creates there", async () => {
+    const { via } = operatorApp();
+    const handle = uniqueHandle("own");
+    const { session } = await signUp(BASE, handle, {
+      fetcher: (request) => via(request.url, request),
+    });
+    const project = await call(
+      via,
+      session.token,
+      "POST",
+      "/projects",
+      { namespace: handle.toUpperCase(), name: "mine", source: SOURCE },
+      key("prj"),
+    );
+    expect(project.status).toBe(201);
+    expect(project.body).toMatchObject({
+      namespace: { handle, kind: "user" },
+      viewer: { role: "owner" },
+    });
+    const read = await call(via, session.token, "GET", `/namespaces/${handle}/projects/mine`);
+    expect([read.status, read.body.id]).toEqual([200, project.body.id]);
+
+    const agent = await call(
+      via,
+      session.token,
+      "POST",
+      "/agents",
+      { ...agentRequest, name: "own-worker", projectId: project.body.id },
+      key("agt"),
+    );
+    expect(agent.status).toBe(201);
+    expect(agent.body.agent).toMatchObject({
+      namespace: session.userId,
+      sponsor: session.userId,
+    });
+    const me = await call(
+      via,
+      await tokenOf(agent.body.clientId, agent.body.clientSecret),
+      "GET",
+      "/agents/me",
+    );
+    // Each app in this file counts its agents from one, so the directory's row for this id may be an
+    // earlier case's, whose namespace it keeps: the enrolment's own answer above is what names it.
+    expect(me.status).toBe(200);
+
+    // A member of an org is nobody in a person's namespace, and a person's namespace takes no members.
+    const other = await maintainer();
+    const theirs = await call(
+      via,
+      other,
+      "POST",
+      "/projects",
+      { namespace: handle, name: "theirs", source: SOURCE },
+      key("prj"),
+    );
+    expect([theirs.status, theirs.body.code]).toEqual([403, "auth.forbidden"]);
+    const hidden = await call(via, other, "GET", `/namespaces/${handle}/projects/mine`);
+    expect(hidden.status).toBe(404);
+  });
+
   it("[a11b.create] creates a project once per key: a retry answers the same project", async () => {
     const { via, projects } = operatorApp();
     const user = await maintainer();
@@ -160,13 +224,13 @@ describe("project bootstrap", () => {
       user,
       "POST",
       "/projects",
-      { org: "pool", name, source: SOURCE },
+      { namespace: "pool", name, source: SOURCE },
       reused,
     );
     expect(first.status).toBe(201);
     expect(first.body).toMatchObject({
       id: expect.stringMatching(/^prj_/),
-      org: "pool",
+      namespace: { handle: "pool", kind: "org" },
       name,
       viewer: { role: "maintainer" },
     });
@@ -175,7 +239,7 @@ describe("project bootstrap", () => {
       user,
       "POST",
       "/projects",
-      { org: "pool", name, source: SOURCE },
+      { namespace: "pool", name, source: SOURCE },
       reused,
     );
     expect(again).toEqual(first);
@@ -191,7 +255,7 @@ describe("project bootstrap", () => {
       user,
       "POST",
       "/projects",
-      { org: "pool", name: projectName("forge"), source: SOURCE },
+      { namespace: "pool", name: projectName("forge"), source: SOURCE },
       projectKey,
     );
     const project = await call(
@@ -199,7 +263,7 @@ describe("project bootstrap", () => {
       user,
       "POST",
       "/projects",
-      { org: "pool", name: projectName("other"), source: SOURCE },
+      { namespace: "pool", name: projectName("other"), source: SOURCE },
       projectKey,
     );
     expect(project.status).toBe(409);
@@ -226,7 +290,7 @@ describe("project bootstrap", () => {
       await maintainer(),
       "POST",
       "/projects",
-      { org: "pool", name: projectName("forge"), source: "no-such-repo" },
+      { namespace: "pool", name: projectName("forge"), source: "no-such-repo" },
       key("prj"),
     );
     expect(missing.status).toBe(404);
@@ -245,7 +309,7 @@ describe("project bootstrap", () => {
       user,
       "POST",
       "/projects",
-      { org: "pool", name: projectName("load"), source: SOURCE },
+      { namespace: "pool", name: projectName("load"), source: SOURCE },
       key("prj"),
     );
     const enrolled = await call(
@@ -281,7 +345,7 @@ describe("project bootstrap", () => {
       agent,
       "POST",
       "/projects",
-      { org: "pool", name: projectName("forge"), source: SOURCE },
+      { namespace: "pool", name: projectName("forge"), source: SOURCE },
       key("prj"),
     );
     expect([project.status, project.body.detail]).toEqual([403, "Refused: users-only."]);
@@ -290,7 +354,7 @@ describe("project bootstrap", () => {
       await maintainer(),
       "POST",
       "/projects",
-      { org: "pool", name: projectName("forge"), source: SOURCE },
+      { namespace: "pool", name: projectName("forge"), source: SOURCE },
       key("prj"),
     );
     expect(made.status).toBe(201);

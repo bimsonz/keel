@@ -2,7 +2,7 @@
 # kills: a11b.derive
 # why: the project id ignores the Idempotency-Key, so every create by one actor reaches one project
 diff --git a/packages/core/src/application/coordination/projects.ts b/packages/core/src/application/coordination/projects.ts
-index 4044db3..f7b1b5a 100644
+index 29b1b34..16e0189 100644
 --- a/packages/core/src/application/coordination/projects.ts
 +++ b/packages/core/src/application/coordination/projects.ts
 @@ -40,7 +40,7 @@ const sourceRepo = (source: ProjectSource): string =>
@@ -13,4 +13,4 @@ index 4044db3..f7b1b5a 100644
 +  ProjectId.make(`prj_${hashedIdBody(actorId(actor))}`);
  
  /**
-  * Creates a project in `input.org`, which the doorway authorised the actor in,
+  * Creates a project in `input.namespace`, which the doorway authorised the

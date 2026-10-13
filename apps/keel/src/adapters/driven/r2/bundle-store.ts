@@ -1,12 +1,12 @@
 import { BundleMissing } from "@keeltown/core/domain/verification";
 import { namespaceKey } from "@keeltown/core/application/verification";
-import { ContentHash, type OrgId } from "@keeltown/core/kernel";
+import { ContentHash, type NamespaceId } from "@keeltown/core/kernel";
 import { BundleStore } from "@keeltown/core/ports";
 import { sha256Hex } from "@keeltown/runner-protocol";
 import { Effect, Layer } from "effect";
 
 /** Where a namespace's bundle lives: keel-verify's outbound handler and its VerifierDOs read exactly this key. */
-export const bundleKey = (namespace: OrgId, hash: ContentHash): string =>
+export const bundleKey = (namespace: NamespaceId, hash: ContentHash): string =>
   namespaceKey(namespace, "bundles", hash.slice("sha256:".length));
 
 /**

@@ -23,13 +23,16 @@ function ProjectRows({ label, projects }: { label: string; projects: readonly Pr
           mark={<BookBookmarkIcon size={18} aria-hidden />}
           title={
             <span className="flex items-baseline gap-1.5">
-              <a href={`/${encodeURIComponent(project.org)}`} className="hover:underline">
-                {project.org}
+              <a
+                href={`/${encodeURIComponent(project.namespace.handle)}`}
+                className="hover:underline"
+              >
+                {project.namespace.handle}
               </a>
               <span className="text-kumo-inactive">/</span>
               <Anchor
                 href={href(
-                  project.org,
+                  project.namespace.handle,
                   project.name,
                   { at: "code", kind: "tree", ref: TRUNK, path: "" },
                   carriedParams(),
@@ -198,8 +201,8 @@ export function HomePage({
     return <Notice title="Keel did not list its projects">{projects.failed}.</Notice>;
   // A person needs no org: their own namespace is theirs, and only what they made or joined is listed as an org.
   const joined = orgsOf(orgs, { handle });
-  const mine = projects.filter((project) => project.org === handle);
-  const rest = projects.filter((project) => project.org !== handle);
+  const mine = projects.filter((project) => project.namespace.handle === handle);
+  const rest = projects.filter((project) => project.namespace.handle !== handle);
   if (handle === undefined && projects.length === 0 && orgs.length === 0) {
     return (
       <Notice title="Keel has no project to show you yet">

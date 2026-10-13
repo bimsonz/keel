@@ -28,7 +28,7 @@ import {
 import {
   makeProbeLedgerMemory,
   makePlacedProject,
-  makeProjectOrgsMemory,
+  makeProjectNamespacesMemory,
   makeProbeStoreMemory,
   makeProjectViewsMemory,
   otherNamespace,
@@ -721,7 +721,9 @@ describe("[t5.probe-source.unplaced] a probe's source, for a project with no pla
           yield* readProbeSource({ project: mine.project, audience: "public" }, probeId),
         ).toEqual({ probeId, bundleHash: kept, files: [] });
       }).pipe(
-        Effect.provide(Layer.mergeAll(views.layer, store.layer, makeProjectOrgsMemory().layer)),
+        Effect.provide(
+          Layer.mergeAll(views.layer, store.layer, makeProjectNamespacesMemory().layer),
+        ),
       );
     },
   );

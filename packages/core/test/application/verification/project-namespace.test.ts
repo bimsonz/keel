@@ -7,32 +7,32 @@ import {
   projectNamespace,
   ProjectUnplaced,
 } from "../../../src/application/verification/index.ts";
-import { ProjectOrgs } from "../../../src/application/ports/index.ts";
-import { OrgId, ProjectId } from "../../../src/domain/kernel/index.ts";
+import { ProjectNamespaces } from "../../../src/application/ports/index.ts";
+import { NamespaceId, ProjectId } from "../../../src/domain/kernel/index.ts";
 
-const NAMESPACE = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
-const OTHER = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V1");
+const NAMESPACE = Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const OTHER = Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V1");
 const PLACED = Schema.decodeUnknownSync(ProjectId)("prj_01JZ8PT2C4E6G8J0M2N4Q6S8V2");
 const UNPLACED = Schema.decodeUnknownSync(ProjectId)("prj_01JZ8PT2C4E6G8J0M2N4Q6S8V3");
 
 /** The projects' places with one project placed, in NAMESPACE: every other project has no place. */
 const places = Layer.succeed(
-  ProjectOrgs,
-  ProjectOrgs.of({
+  ProjectNamespaces,
+  ProjectNamespaces.of({
     assign: () => Effect.die("unused"),
     byId: (projectId) =>
       Effect.succeed(
         projectId === PLACED
-          ? Option.some({ projectId, org: NAMESPACE, name: "forge" })
+          ? Option.some({ projectId, namespace: NAMESPACE, name: "forge" })
           : Option.none(),
       ),
     byName: () => Effect.die("unused"),
-    inOrg: () => Effect.die("unused"),
+    inNamespace: () => Effect.die("unused"),
     all: () => Effect.die("unused"),
   }),
 );
 
-const read = <A, E>(effect: Effect.Effect<A, E, ProjectOrgs>) =>
+const read = <A, E>(effect: Effect.Effect<A, E, ProjectNamespaces>) =>
   Effect.runSync(Effect.result(effect).pipe(Effect.provide(places)));
 
 /** What a read was refused with: one that answered a namespace fails the test. */

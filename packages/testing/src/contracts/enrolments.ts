@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { Actor } from "@keeltown/core/domain/identity";
-import { OrgId, ProjectId, UserId } from "@keeltown/core/kernel";
+import { NamespaceId, ProjectId, UserId } from "@keeltown/core/kernel";
 import { AgentDirectory, type EnrolInput, Enrolments } from "@keeltown/core/ports";
 import { Effect, type Layer, Option, Schema } from "effect";
 
@@ -29,7 +29,7 @@ const request = (sponsor: UserId, overrides: Partial<EnrolInput> = {}): EnrolInp
   kind: "interactive",
   scopes: ["agent:read", "agent:work"],
   projectId: projectId(),
-  org: Schema.decodeUnknownSync(OrgId)(`org_${ulid()}`),
+  org: Schema.decodeUnknownSync(NamespaceId)(`org_${ulid()}`),
   sponsor,
   idempotencyKey: `key-${crypto.randomUUID()}`,
   ...overrides,

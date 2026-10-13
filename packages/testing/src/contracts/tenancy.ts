@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { Membership } from "@keeltown/core/domain/identity";
 import { OrgId, ProjectId, UserId } from "@keeltown/core/kernel";
-import { Memberships, Orgs, ProjectOrgs, Users } from "@keeltown/core/ports";
+import { Memberships, Namespaces, ProjectNamespaces, Users } from "@keeltown/core/ports";
 import { Clock, Effect, type Layer, Option, Schema } from "effect";
 import type { BetterAuthRows } from "../memory/tenancy.ts";
 
@@ -28,33 +28,95 @@ const fresh = (stem: string) => `${stem}-${ulid().slice(0, 10).toLowerCase()}`;
 const byOrg = (memberships: readonly Membership[]) =>
   memberships.toSorted((a, b) => (a.org < b.org ? -1 : a.org > b.org ? 1 : 0));
 
-export function describeOrgsContract(adapter: string, make: () => TenancyHarness<Orgs>) {
-  describe(`Orgs contract: ${adapter}`, () => {
-    it.effect("[ports.orgs-unknown] finds no org by an id or a name it was not given", () => {
-      const harness = make();
-      return Effect.gen(function* () {
-        const orgs = yield* Orgs;
-        expect(Option.isNone(yield* orgs.byId(orgId()))).toBe(true);
-        expect(Option.isNone(yield* orgs.byName(fresh("nobody")))).toBe(true);
-      }).pipe(Effect.provide(harness.layer));
-    });
+export function describeNamespacesContract(
+  adapter: string,
+  make: () => TenancyHarness<Namespaces>,
+) {
+  describe(`Namespaces contract: ${adapter}`, () => {
+    it.effect(
+      "[ports.namespaces-unknown] finds no namespace by an id or a handle it was not given",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const namespaces = yield* Namespaces;
+          expect(Option.isNone(yield* namespaces.byId(orgId()))).toBe(true);
+          expect(Option.isNone(yield* namespaces.byId(userId()))).toBe(true);
+          expect(Option.isNone(yield* namespaces.byHandle(fresh("nobody")))).toBe(true);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
 
     it.effect(
-      "[ports.orgs-name] finds an org by its id and by its name in any case, with its suspension",
+      "[ports.namespaces-org] finds an org by its id and by its handle in any case, of kind org, with its suspension",
       () => {
         const harness = make();
         return Effect.gen(function* () {
           const active = { id: orgId(), slug: fresh("acme") };
           const suspended = { id: orgId(), slug: fresh("shut"), suspended: true };
           yield* harness.seed({ orgs: [active, suspended] });
-          const orgs = yield* Orgs;
-          const record = { org: active.id, name: active.slug, suspended: false };
-          expect(yield* orgs.byId(active.id)).toEqual(Option.some(record));
-          expect(yield* orgs.byName(active.slug)).toEqual(Option.some(record));
-          expect(yield* orgs.byName(active.slug.toUpperCase())).toEqual(Option.some(record));
-          expect(yield* orgs.byName(suspended.slug)).toEqual(
-            Option.some({ org: suspended.id, name: suspended.slug, suspended: true }),
+          const namespaces = yield* Namespaces;
+          const record = {
+            namespace: active.id,
+            handle: active.slug,
+            kind: "org",
+            suspended: false,
+          };
+          expect(yield* namespaces.byId(active.id)).toEqual(Option.some(record));
+          expect(yield* namespaces.byHandle(active.slug)).toEqual(Option.some(record));
+          expect(yield* namespaces.byHandle(active.slug.toUpperCase())).toEqual(
+            Option.some(record),
           );
+          expect(yield* namespaces.byHandle(suspended.slug)).toEqual(
+            Option.some({
+              namespace: suspended.id,
+              handle: suspended.slug,
+              kind: "org",
+              suspended: true,
+            }),
+          );
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[ports.namespaces-user] a person with a handle is a namespace of kind user under their own id, suspended while their ban holds; one with no handle is none",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const now = yield* Clock.currentTimeMillis;
+          const ada = { id: userId(), username: fresh("ada") };
+          const banned = { id: userId(), username: fresh("bad"), banned: true };
+          const lapsed = {
+            id: userId(),
+            username: fresh("back"),
+            banned: true,
+            banExpires: new Date(now - 60_000),
+          };
+          const unnamed = { id: userId() };
+          yield* harness.seed({ users: [ada, banned, lapsed, unnamed] });
+          const namespaces = yield* Namespaces;
+          const record = {
+            namespace: ada.id,
+            handle: ada.username,
+            kind: "user",
+            suspended: false,
+          };
+          expect(yield* namespaces.byId(ada.id)).toEqual(Option.some(record));
+          expect(yield* namespaces.byHandle(ada.username.toUpperCase())).toEqual(
+            Option.some(record),
+          );
+          expect(yield* namespaces.byHandle(banned.username)).toEqual(
+            Option.some({
+              namespace: banned.id,
+              handle: banned.username,
+              kind: "user",
+              suspended: true,
+            }),
+          );
+          expect(Option.map(yield* namespaces.byId(lapsed.id), (found) => found.suspended)).toEqual(
+            Option.some(false),
+          );
+          expect(Option.isNone(yield* namespaces.byId(unnamed.id))).toBe(true);
         }).pipe(Effect.provide(harness.layer));
       },
     );
@@ -219,6 +281,31 @@ export function describeMembershipsContract(
     );
 
     it.effect(
+      "[ports.memberships-own] a person is the owner of the namespace whose id is their own, by no member row, and nobody else has a role there",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const ada = { id: userId(), username: fresh("ada") };
+          const guest = { id: userId(), username: fresh("guest") };
+          // No member row can name her namespace: the member table's foreign key takes an organization's id alone.
+          yield* harness.seed({ users: [ada, guest] });
+          const memberships = yield* Memberships;
+          expect(yield* memberships.standing(ada.id, ada.id)).toEqual({
+            userId: ada.id,
+            role: "owner",
+            suspended: false,
+          });
+          const visiting = yield* memberships.standing(guest.id, ada.id);
+          expect(visiting).toEqual({ userId: guest.id, suspended: false });
+          expect("role" in visiting).toBe(false);
+          // A person who is gone owns nothing: their own id gives them no role.
+          const gone = userId();
+          expect("role" in (yield* memberships.standing(gone, gone))).toBe(false);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
       "[ports.memberships-ban-lapsed] a sponsor's ban suspends it until the ban ends",
       () => {
         const harness = make();
@@ -270,52 +357,55 @@ export function describeMembershipsContract(
   });
 }
 
-export function describeProjectOrgsContract(adapter: string, make: () => Layer.Layer<ProjectOrgs>) {
-  describe(`ProjectOrgs contract: ${adapter}`, () => {
+export function describeProjectNamespacesContract(
+  adapter: string,
+  make: () => Layer.Layer<ProjectNamespaces>,
+) {
+  describe(`ProjectNamespaces contract: ${adapter}`, () => {
     it.effect(
-      "[ports.project-orgs-unknown] finds no place for a project or a name it was not given, and none in an empty org",
+      "[ports.project-namespaces-unknown] finds no place for a project or a name it was not given, and none in an empty namespace",
       () =>
         Effect.gen(function* () {
-          const projects = yield* ProjectOrgs;
+          const projects = yield* ProjectNamespaces;
           const org = orgId();
           expect(Option.isNone(yield* projects.byId(projectId()))).toBe(true);
           expect(Option.isNone(yield* projects.byName(org, fresh("app")))).toBe(true);
-          expect(yield* projects.inOrg(org)).toEqual([]);
+          expect(yield* projects.inNamespace(org)).toEqual([]);
         }).pipe(Effect.provide(make())),
     );
 
     it.effect(
-      "[ports.project-orgs-assign] places a project, found by id and by its name in any case, and assigning that place again succeeds",
+      "[ports.project-namespaces-assign] places a project, found by id and by its name in any case, and assigning that place again succeeds",
       () =>
         Effect.gen(function* () {
-          const projects = yield* ProjectOrgs;
+          const projects = yield* ProjectNamespaces;
           const name = fresh("app");
-          const asked = { projectId: projectId(), org: orgId(), name: name.toUpperCase() };
+          const asked = { projectId: projectId(), namespace: userId(), name: name.toUpperCase() };
           yield* projects.assign(asked);
           const place = { ...asked, name };
           expect(yield* projects.byId(asked.projectId)).toEqual(Option.some(place));
-          expect(yield* projects.byName(asked.org, name)).toEqual(Option.some(place));
-          expect(yield* projects.byName(asked.org, asked.name)).toEqual(Option.some(place));
+          expect(yield* projects.byName(asked.namespace, name)).toEqual(Option.some(place));
+          expect(yield* projects.byName(asked.namespace, asked.name)).toEqual(Option.some(place));
           yield* projects.assign(asked);
           yield* projects.assign(place);
-          expect(yield* projects.inOrg(asked.org)).toEqual([place]);
+          expect(yield* projects.inNamespace(asked.namespace)).toEqual([place]);
         }).pipe(Effect.provide(make())),
     );
 
     it.effect(
-      "[ports.project-orgs-taken] refuses a name the org holds, in any case, and another place for a placed project, with ProjectNameTaken",
+      "[ports.project-namespaces-taken] refuses a name the namespace holds, in any case, and another place for a placed project, with ProjectNameTaken",
       () =>
         Effect.gen(function* () {
-          const projects = yield* ProjectOrgs;
+          const projects = yield* ProjectNamespaces;
           const org = orgId();
-          const elsewhere = orgId();
+          const elsewhere = userId();
           const name = fresh("app");
-          const placed = { projectId: projectId(), org, name };
+          const placed = { projectId: projectId(), namespace: org, name };
           yield* projects.assign(placed);
           const rival = projectId();
           expect(
             yield* Effect.flip(
-              projects.assign({ projectId: rival, org, name: name.toUpperCase() }),
+              projects.assign({ projectId: rival, namespace: org, name: name.toUpperCase() }),
             ),
           ).toMatchObject({ _tag: "ProjectNameTaken", org, name });
           const renamed = fresh("renamed");
@@ -324,48 +414,52 @@ export function describeProjectOrgsContract(adapter: string, make: () => Layer.L
             org,
             name: renamed,
           });
-          expect(yield* Effect.flip(projects.assign({ ...placed, org: elsewhere }))).toMatchObject({
+          expect(
+            yield* Effect.flip(projects.assign({ ...placed, namespace: elsewhere })),
+          ).toMatchObject({
             _tag: "ProjectNameTaken",
             org: elsewhere,
             name,
           });
           expect(yield* projects.byId(placed.projectId)).toEqual(Option.some(placed));
           expect(Option.isNone(yield* projects.byId(rival))).toBe(true);
-          // The same name in another org is another project's to take.
-          yield* projects.assign({ projectId: rival, org: elsewhere, name });
+          // The same name in another namespace, here a person's own, is another project's to take.
+          yield* projects.assign({ projectId: rival, namespace: elsewhere, name });
           expect(yield* projects.byName(elsewhere, name)).toEqual(
-            Option.some({ projectId: rival, org: elsewhere, name }),
+            Option.some({ projectId: rival, namespace: elsewhere, name }),
           );
         }).pipe(Effect.provide(make())),
     );
 
-    it.effect("[ports.project-orgs-in-org] lists an org's projects by name, and only its own", () =>
-      Effect.gen(function* () {
-        const projects = yield* ProjectOrgs;
-        const org = orgId();
-        const stem = fresh("p");
-        const places = ["b", "c", "a"].map((suffix) => ({
-          projectId: projectId(),
-          org,
-          name: `${stem}-${suffix}`,
-        }));
-        for (const place of places) yield* projects.assign(place);
-        yield* projects.assign({ projectId: projectId(), org: orgId(), name: `${stem}-a` });
-        expect((yield* projects.inOrg(org)).map((place) => place.name)).toEqual(
-          ["a", "b", "c"].map((suffix) => `${stem}-${suffix}`),
-        );
-      }).pipe(Effect.provide(make())),
+    it.effect(
+      "[ports.project-namespaces-in-namespace] lists a namespace's projects by name, and only its own",
+      () =>
+        Effect.gen(function* () {
+          const projects = yield* ProjectNamespaces;
+          const org = orgId();
+          const stem = fresh("p");
+          const places = ["b", "c", "a"].map((suffix) => ({
+            projectId: projectId(),
+            namespace: org,
+            name: `${stem}-${suffix}`,
+          }));
+          for (const place of places) yield* projects.assign(place);
+          yield* projects.assign({ projectId: projectId(), namespace: orgId(), name: `${stem}-a` });
+          expect((yield* projects.inNamespace(org)).map((place) => place.name)).toEqual(
+            ["a", "b", "c"].map((suffix) => `${stem}-${suffix}`),
+          );
+        }).pipe(Effect.provide(make())),
     );
 
     it.effect(
-      "[ports.project-orgs-all] pages every org's projects by id, after a cursor and up to a limit",
+      "[ports.project-namespaces-all] pages every namespace's projects by id, after a cursor and up to a limit",
       () =>
         Effect.gen(function* () {
-          const projects = yield* ProjectOrgs;
+          const projects = yield* ProjectNamespaces;
           const stem = fresh("all");
           const places = [orgId(), orgId(), orgId()].map((org, i) => ({
             projectId: projectId(),
-            org,
+            namespace: org,
             name: `${stem}-${i}`,
           }));
           for (const place of places) yield* projects.assign(place);

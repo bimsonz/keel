@@ -1,6 +1,6 @@
 import { SubjectKey } from "@keeltown/core/domain/coordination";
 import { FlowWorld, WorldCheck } from "@keeltown/core/domain/verification";
-import { ChangeId, ConflictId, ContentHash, OrgId, ProjectId } from "@keeltown/core/kernel";
+import { ChangeId, ConflictId, ContentHash, NamespaceId, ProjectId } from "@keeltown/core/kernel";
 import { Schema } from "effect";
 import { KEEL_BUNDLE_PROVIDER } from "./keel-verify.ts";
 
@@ -18,7 +18,7 @@ export const CheckPlan = Schema.Union([
  * `world-<conflictId>-<world>`.
  */
 export const WorldCheckJob = Schema.Struct({
-  namespace: OrgId,
+  namespace: NamespaceId,
   projectId: ProjectId,
   key: SubjectKey,
   conflictId: ConflictId,

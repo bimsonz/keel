@@ -64,7 +64,8 @@ const DISABLED: ReadonlySet<string> = new Set(DISABLED_PATHS);
 
 /**
  * What a user without a handle may do: set it, sign out, or sign in again. The
- * handle names the personal org, so nothing else waits on it.
+ * handle is the user's namespace, where its projects live, so everything else
+ * waits on it.
  */
 const BEFORE_HANDLE = new Set([
   "/get-session",
@@ -159,53 +160,59 @@ export interface NameRefusal {
   readonly message: string;
 }
 
+/** Who holds a handle: the one read `nameUnavailable` makes, of the table that holds every handle. */
+export const HANDLE_HOLDER = `SELECT id AS holder FROM namespaces WHERE handle = ?1`;
+
+const ONE_HOLDER = "a handle is one person's, one agent's or one org's";
+
 /**
- * Why `name` can't be a handle or an org's name, the two sharing one
- * namespace, or undefined when it can. A name is never taken from its own
- * holder, so a user's handle still names its personal org.
+ * Why `name` can't be a person's handle or an org's, or undefined when it
+ * can: the two, and an agent's, are one space, held unique by the
+ * `namespaces` table. A held handle is taken whoever asks: a person's own is
+ * no org's name, and is not chosen twice. This read is only the friendly
+ * answer: the table's unique handle decides, in the statement that writes the
+ * user or the org (`lostHandle`).
  */
-async function nameUnavailable(
-  db: D1Database,
-  name: string,
-  creator?: string,
-): Promise<NameRefusal | undefined> {
+async function nameUnavailable(db: D1Database, name: string): Promise<NameRefusal | undefined> {
   const lowered = name.toLowerCase();
-  const holder = await db
-    .prepare(
-      `SELECT id AS holder FROM user WHERE username = ?1 UNION ALL SELECT 'org' FROM organization WHERE slug = ?1 LIMIT 1`,
-    )
-    .bind(lowered)
-    .first<{ holder: string }>();
-  const own = holder !== null && holder.holder === creator;
+  const held = await db.prepare(HANDLE_HOLDER).bind(lowered).first<{ holder: string }>();
   const refusal = nameRefusal(name);
   if (refusal !== undefined) return { refused: "NAME_REFUSED", message: refusal };
-  if (holder !== null && !own)
-    return { refused: "NAME_TAKEN", message: `"${lowered}" is already a handle or an org's name` };
+  if (held !== null)
+    return { refused: "NAME_TAKEN", message: `"${lowered}" is taken: ${ONE_HOLDER}` };
   return undefined;
 }
 
 /** Refuses a name `nameUnavailable` refuses, with its code. */
-async function claimable(db: D1Database, name: string, creator?: string): Promise<void> {
-  const unavailable = await nameUnavailable(db, name, creator);
+async function claimable(db: D1Database, name: string): Promise<void> {
+  const unavailable = await nameUnavailable(db, name);
   if (unavailable !== undefined) throw refuse(unavailable.refused, unavailable.message);
 }
+
+/**
+ * Whether a handle went to another account between `nameUnavailable`'s read
+ * and the write: a sign-up or a chosen handle that Better Auth's own later
+ * read of usernames refused, or a user or an org that the database refused on
+ * a unique handle (the `namespaces` table's, or the user's or the org's own
+ * column, whichever the statement met first). Nothing was made, and the answer
+ * is the one the read would have given.
+ */
+export const lostHandle = (error: unknown): boolean => {
+  if (error instanceof APIError) return error.body?.code === "USERNAME_IS_ALREADY_TAKEN";
+  return (
+    error instanceof Error &&
+    /UNIQUE constraint failed: (namespaces\.handle|user\.username|organization\.slug)/.test(
+      `${error.message} ${String(error.cause)}`,
+    )
+  );
+};
+
+/** The refusal a lost handle answers: the code the read before it would have given. */
+const lostRace = () => refuse("NAME_TAKEN", `That handle was taken a moment ago: ${ONE_HOLDER}`);
 
 export function authOptions(config: AuthConfig) {
   const origin = `https://${config.host}`;
   const { db } = config;
-
-  /** Every user's personal org, made when its handle is first set, owned by it. */
-  const personalOrg = async (user: { id: string; username?: string | null }) => {
-    if (user.username === undefined || user.username === null) return;
-    const exists = await db
-      .prepare(`SELECT 1 AS one FROM organization WHERE slug = ?1`)
-      .bind(user.username)
-      .first();
-    if (exists !== null) return;
-    await auth.api.createOrganization({
-      body: { name: user.username, slug: user.username, userId: user.id },
-    });
-  };
 
   /**
    * The session a request carries, by cookie or by bearer. Better Auth hands
@@ -265,6 +272,12 @@ export function authOptions(config: AuthConfig) {
     trustedOrigins: [origin],
     disabledPaths: [...DISABLED_PATHS],
     telemetry: { enabled: false },
+    // A handle lost to another account in the same moment is NAME_TAKEN, as the read before it answers.
+    onAPIError: {
+      onError: (error: unknown) => {
+        if (lostHandle(error)) throw lostRace();
+      },
+    },
     // Keel limits each IP at its mount with the Workers Rate Limiting binding.
     rateLimit: { enabled: false },
     // How each session was signed in (fresh.ts), written as the session is made and by nothing else.
@@ -305,8 +318,7 @@ export function authOptions(config: AuthConfig) {
         if (BEFORE_HANDLE.has(ctx.path) || SIGN_IN.test(ctx.path)) {
           const name: unknown = ctx.body?.username;
           if (ctx.path === "/update-user" && typeof name === "string") {
-            const session = await sessionOf(ctx);
-            await claimable(db, name, session?.user.id);
+            await claimable(db, name);
           } else if (ctx.path === "/update-user") {
             const session = await sessionOf(ctx);
             if (session !== null && !session.user["username"])
@@ -318,17 +330,17 @@ export function authOptions(config: AuthConfig) {
         if (session !== null && !session.user["username"])
           throw APIError.from("FORBIDDEN", {
             code: "HANDLE_REQUIRED",
-            message: "Choose a handle first: it names your personal org",
+            message: "Choose a handle first: it is your namespace, where your projects live",
           });
+        // Before Better Auth's own read of org slugs, which answers a held one with a code of its own.
+        const slug: unknown = ctx.body?.slug;
+        if (ctx.path === "/organization/create" && typeof slug === "string")
+          await claimable(db, slug);
         return beforeOrg(ctx);
       }),
       after: createAuthMiddleware(orgAfter(db, sessionOf)),
     },
     databaseHooks: {
-      user: {
-        create: { after: personalOrg },
-        update: { after: personalOrg },
-      },
       // The endpoint making a session says how it was signed in; nothing a request sends does.
       session: {
         create: {
@@ -349,7 +361,7 @@ export function authOptions(config: AuthConfig) {
         minUsernameLength: 1,
         maxUsernameLength: 39,
         usernameValidator: (name) => nameRefusal(name) === undefined,
-        // The handle is the personal org's slug, so it never changes.
+        // The handle is the first segment of every address in its namespace, so it never changes.
         immutableUsername: true,
       }),
       organization({
@@ -374,18 +386,13 @@ export function authOptions(config: AuthConfig) {
           },
         },
         organizationHooks: {
-          beforeCreateOrganization: async ({ organization: org, user }) => {
+          beforeCreateOrganization: async ({ organization: org }) => {
             if (typeof org.slug !== "string") throw refuse("NAME_REFUSED", "An org needs a name");
-            await claimable(db, org.slug, user.id);
             return { data: { ...org, slug: org.slug.toLowerCase() } };
           },
           beforeUpdateOrganization: async ({ organization: org }) => {
             if (org.slug !== undefined)
               throw refuse("NAME_IMMUTABLE", "An org's name is its address and never changes");
-          },
-          beforeDeleteOrganization: async ({ organization: org, user }) => {
-            if (org.slug === user["username"])
-              throw refuse("PERSONAL_ORG", "Your personal org goes only with your account");
           },
         },
       }),
@@ -412,16 +419,21 @@ export function authOptions(config: AuthConfig) {
             if (typeof context !== "string") throw refuse("HANDLE_REQUIRED", "Choose a handle");
             await claimable(db, context);
             const handle = context.toLowerCase();
-            const created = await ctx.context.internalAdapter.createUser(
-              {
-                email: `${handle}@${PLACEHOLDER_EMAIL_DOMAIN}`,
-                emailVerified: false,
-                name: handle,
-                username: handle,
-                displayUsername: handle,
-              },
-              { method: "passkey" },
-            );
+            // The passkey plugin answers any error but a refusal as its own 500, so a lost handle is refused here.
+            const created = await ctx.context.internalAdapter
+              .createUser(
+                {
+                  email: `${handle}@${PLACEHOLDER_EMAIL_DOMAIN}`,
+                  emailVerified: false,
+                  name: handle,
+                  username: handle,
+                  displayUsername: handle,
+                },
+                { method: "passkey" },
+              )
+              .catch((error: unknown) => {
+                throw lostHandle(error) ? lostRace() : error;
+              });
             return { userId: created.id };
           },
         },

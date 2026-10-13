@@ -9,8 +9,8 @@ index 01376ecf..77d2bf5d 100644
    const kept = await step.do("namespace", POLICIES.quick, async (): Promise<string | null> =>
      Option.getOrNull(await run(Effect.option(projectNamespace(projectId)))),
    );
--  return kept === null ? undefined : Schema.decodeUnknownSync(OrgId)(kept);
-+  return Schema.decodeUnknownSync(OrgId)(kept ?? "org_00000000000000000000000000");
+-  return kept === null ? undefined : Schema.decodeUnknownSync(NamespaceId)(kept);
++  return Schema.decodeUnknownSync(NamespaceId)(kept ?? "org_00000000000000000000000000");
  }
  
  /** A waitForEvent that ran out: the platform throws, and the program reads it as no event. */

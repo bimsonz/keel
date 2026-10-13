@@ -72,6 +72,26 @@ scalar UserId extends string;
 @pattern("^org_[0-9A-HJKMNP-TV-Z]{26}$")
 scalar OrgId extends string;
 
+/** A namespace's id is its account's: a user's, an agent's or an org's. */
+union NamespaceId {
+  UserId,
+  AgentId,
+  OrgId,
+}
+
+/** What a namespace is: a person's own, an agent's own, or an org with members and roles. */
+union NamespaceKind {
+  user: "user",
+  agent: "agent",
+  org: "org",
+}
+
+/** A namespace as an address names it: its handle, the first segment of `/<namespace>/<project>`, and its kind. */
+model NamespaceRef {
+  handle: Handle;
+  kind: NamespaceKind;
+}
+
 /** A credential in an org's store, named and never held: the id is minted when the secret is stored. */
 @pattern("^crd_[0-9A-HJKMNP-TV-Z]{26}$")
 scalar CredentialId extends string;

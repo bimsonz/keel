@@ -1,5 +1,5 @@
 import { usageAddress } from "@keeltown/core/application/identity";
-import type { OrgId } from "@keeltown/core/kernel";
+import type { NamespaceId } from "@keeltown/core/kernel";
 import { OrgUsage } from "@keeltown/core/ports";
 import { Layer } from "effect";
 import { OrgUsageCodecs } from "../../../rpc/index.ts";
@@ -12,7 +12,7 @@ import { callObject } from "./answer.ts";
  * takes no location hint and is placed near its first caller.
  */
 export function OrgUsageRpc(objects: Env["ORG_USAGE"]): Layer.Layer<OrgUsage> {
-  const usage = (org: OrgId) => objects.get(objects.idFromName(usageAddress(org)));
+  const usage = (org: NamespaceId) => objects.get(objects.idFromName(usageAddress(org)));
 
   return Layer.succeed(
     OrgUsage,

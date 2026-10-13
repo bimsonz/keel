@@ -80,7 +80,7 @@ export async function fixtureDirectory(source: MockSource): Promise<KeelDirector
   const listed = (): ProjectView[] =>
     named.list.map((project) => ({
       id: project.id,
-      org: FIXTURE_ORG,
+      namespace: { handle: FIXTURE_ORG, kind: "org" },
       name: project.name,
       visibility: project.visibility,
       createdAt: createdAt.get(project.id) ?? "",

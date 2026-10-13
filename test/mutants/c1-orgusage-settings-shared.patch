@@ -8,7 +8,7 @@ index e064dbd..1cbe6b4 100644
 @@ -40,7 +40,7 @@ type Store = (typeof EntityStore)["Service"];
  const UNSET: UsageSettings = { overrides: {}, halted: false };
  
- const settingsOf = (store: Store, org: OrgId): UsageSettings => {
+ const settingsOf = (store: Store, org: NamespaceId): UsageSettings => {
 -  const stored = store.get(SETTINGS, org);
 +  const stored = store.get(SETTINGS, "every-org");
    return stored === undefined ? UNSET : decodeSettings(stored);

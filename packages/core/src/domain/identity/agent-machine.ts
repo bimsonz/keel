@@ -6,7 +6,7 @@ import {
   type Committed,
   IllegalTransition,
   type Instant,
-  type OrgId,
+  type NamespaceId,
   type ProjectId,
   userActor,
   type UserId,
@@ -31,7 +31,7 @@ export type AgentCommand =
       readonly name: string;
       readonly kind: AgentKind;
       readonly scopes: readonly Scope[];
-      readonly org?: OrgId;
+      readonly org?: NamespaceId;
       /** The user minting the credential, who becomes the agent's sponsor. */
       readonly sponsor?: UserId;
     }

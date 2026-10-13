@@ -142,7 +142,7 @@ function useProjects(directory: KeelDirectory, org: string): readonly ProjectVie
     const read = async (): Promise<void> => {
       // A list Keel would not give is no list: the page says there is nothing to show.
       const listed = await directory.listProjects(stop.signal).catch(() => []);
-      if (here) setProjects(listed.filter((project) => project.org === org));
+      if (here) setProjects(listed.filter((project) => project.namespace.handle === org));
     };
     void read();
     return () => {
@@ -160,7 +160,7 @@ function ProjectList({ projects }: { projects: readonly ProjectView[] }) {
         <li key={project.id} className="flex items-center justify-between gap-3 text-sm">
           <a
             className="font-semibold text-kumo-strong hover:underline"
-            href={href(project.org, project.name, {
+            href={href(project.namespace.handle, project.name, {
               at: "code",
               kind: "tree",
               ref: TRUNK,

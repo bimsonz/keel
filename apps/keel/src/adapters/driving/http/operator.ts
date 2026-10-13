@@ -148,17 +148,17 @@ export function putSettingsError(
   }
 }
 
-/** A new project as its creator reads it: private until its settings say otherwise, in the org named. */
+/** A new project as its creator reads it: private until its settings say otherwise, in the namespace named. */
 export function createProjectOk(
   project: ProjectRecord,
-  org: string,
+  namespace: { readonly handle: string; readonly kind: "user" | "agent" | "org" },
   role: "owner" | "maintainer" | "member" | undefined,
 ): Operator_createProjectResult {
   return {
     status: 201,
     body: {
       id: project.id,
-      org,
+      namespace,
       name: project.name,
       visibility: "private",
       createdAt: iso(project.createdAt),
@@ -235,7 +235,7 @@ export function sourceNotFound(
         kind: "call" as const,
         title: `Create the project from the template ${template}`,
         operationId: "Operator_createProject",
-        args: { org: input.org, name: input.name, source: template },
+        args: { namespace: input.namespace, name: input.name, source: template },
       })),
     }),
   };

@@ -1,5 +1,5 @@
 import { Context, type Effect, Schema } from "effect";
-import type { ContentHash, OrgId } from "../../domain/kernel/index.ts";
+import type { ContentHash, NamespaceId } from "../../domain/kernel/index.ts";
 import type { World } from "../../domain/verification/index.ts";
 import type { ProbeRun } from "../verification/index.ts";
 
@@ -11,7 +11,7 @@ export class ProbeRunnerUnavailable extends Schema.TaggedError<ProbeRunnerUnavai
 
 /** One probe run: the probe's bundle, run against one world's tree, on calibration run `run`. Both bundles are the namespace's. */
 export interface ProbeRunRequest {
-  readonly namespace: OrgId;
+  readonly namespace: NamespaceId;
   readonly probe: ContentHash;
   readonly world: World;
   readonly worldBundle: ContentHash;

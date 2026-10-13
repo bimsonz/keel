@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.own-namespace
+# why: a person has a role only where a member row names them, so in their own namespace they are an outsider: they cannot create a project there or read their own private ones
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index d9b9395..c9c42b5 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -184,7 +184,7 @@ const roleIn = (memberships: readonly Membership[], org: string): Role | undefin
+  * org, the role its membership names.
+  */
+ export const roleOf = (user: UserPrincipal, namespace: string): Role | undefined =>
+-  namespace === user.userId ? "owner" : roleIn(user.memberships, namespace);
++  roleIn(user.memberships, namespace);
+ 
+ /** Rights from a role in the resource's org, else a public read. */
+ const rightsByRole = (role: Role | undefined, resource: Resource): ReadonlySet<Right> => {

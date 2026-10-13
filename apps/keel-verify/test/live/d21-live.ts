@@ -229,7 +229,7 @@ try {
   );
   operator = operatorClient();
   const project = await operator.createProject(
-    { org: ORG, name: PROJECT, source: FIXTURE },
+    { namespace: ORG, name: PROJECT, source: FIXTURE },
     { idempotencyKey: `live:${PROJECT}:project` },
   );
   console.log(`     project ${PROJECT}: ${project.id}`);

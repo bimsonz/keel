@@ -6,7 +6,7 @@ import {
   usageOrg,
   usageSettings,
 } from "@keeltown/core/application/identity";
-import type { OrgId } from "@keeltown/core/kernel";
+import type { NamespaceId } from "@keeltown/core/kernel";
 import { Effect, Schema } from "effect";
 import {
   OrgUsageCodecs,
@@ -36,7 +36,7 @@ const decodeSettings = Schema.decodeUnknownEffect(OrgUsageSettings);
  * held.
  */
 export class OrgUsageDO extends KeelObject implements OrgUsageRpc {
-  private get org(): OrgId {
+  private get org(): NamespaceId {
     return usageOrg(this.ctx.id.name);
   }
 

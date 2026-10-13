@@ -1,5 +1,5 @@
 import { Context, type Effect } from "effect";
-import type { CommitSha, ContentHash, OrgId } from "../../domain/kernel/index.ts";
+import type { CommitSha, ContentHash, NamespaceId } from "../../domain/kernel/index.ts";
 import type { NoNoop, NoopRecipe } from "../verification/index.ts";
 import type { ObjectNotFound, RepoNotFound, RepoRef } from "./code-host.ts";
 
@@ -49,7 +49,7 @@ export class NoopWorlds extends Context.Service<
   NoopWorlds,
   {
     readonly build: (
-      namespace: OrgId,
+      namespace: NamespaceId,
       world: ContentHash,
       recipe: NoopRecipe,
     ) => Effect.Effect<ContentHash, NoNoop>;

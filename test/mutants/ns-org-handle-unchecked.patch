@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/namespaces.test.ts apps/keel/test/pool/auth.test.ts
+# kills: ns.reserved, ba.names
+# why: an org's name is not checked before it is made, so someone can create an org named settings or api and take a path keel.town serves itself
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 2db5ad4..5837c51 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -290,10 +290,6 @@ export function authOptions(config: AuthConfig) {
+             code: "HANDLE_REQUIRED",
+             message: "Choose a handle first: it is your namespace, where your projects live",
+           });
+-        // Before Better Auth's own read of org slugs, which answers a held one with a code of its own.
+-        const slug: unknown = ctx.body?.slug;
+-        if (ctx.path === "/organization/create" && typeof slug === "string")
+-          await claimable(db, slug);
+         return beforeOrg(ctx);
+       }),
+       after: createAuthMiddleware(orgAfter(db, sessionOf)),

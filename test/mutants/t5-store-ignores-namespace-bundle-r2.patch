@@ -8,7 +8,7 @@ index c316ac18..d4dbb606 100644
 @@ -7,7 +7,7 @@ import { Effect, Layer } from "effect";
  
  /** Where a namespace's bundle lives: keel-verify's outbound handler and its VerifierDOs read exactly this key. */
- export const bundleKey = (namespace: OrgId, hash: ContentHash): string =>
+ export const bundleKey = (namespace: NamespaceId, hash: ContentHash): string =>
 -  namespaceKey(namespace, "bundles", hash.slice("sha256:".length));
 +  namespaceKey("org_00000000000000000000000000", "bundles", hash.slice("sha256:".length));
  

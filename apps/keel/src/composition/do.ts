@@ -12,7 +12,7 @@ import {
   type HumanGate,
   type Ids,
   type OrgUsage,
-  type ProjectOrgs,
+  type ProjectNamespaces,
   type Projects,
   type StagingWriter,
   type TrunkWriter,
@@ -28,7 +28,7 @@ import { Layer, ManagedRuntime } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
 import { ArtifactsObjects } from "../adapters/driven/artifacts/objects.ts";
 import { AgentDirectoryD1 } from "../adapters/driven/d1/agent-directory.ts";
-import { ProjectOrgsD1 } from "../adapters/driven/d1/project-orgs.ts";
+import { ProjectNamespacesD1 } from "../adapters/driven/d1/project-namespaces.ts";
 import { ChangesRpc } from "../adapters/driven/do-rpc/changes.ts";
 import { FanOutRpc } from "../adapters/driven/do-rpc/fan-out.ts";
 import { OrgUsageRpc } from "../adapters/driven/do-rpc/org-usage.ts";
@@ -79,7 +79,7 @@ export function agentSessionServices(env: Env): Layer.Layer<AgentSessionServices
 }
 
 /** The Subject DO's driven adapters beyond the backbone: what it needs to put a conflict to a person. */
-export type SubjectServices = HumanGate | AgentDirectory | ProjectOrgs;
+export type SubjectServices = HumanGate | AgentDirectory | ProjectNamespaces;
 
 /**
  * The Subject DO raises an escalation on the object of the namespace its
@@ -91,7 +91,7 @@ export function subjectServices(env: Env): Layer.Layer<SubjectServices> {
   return Layer.mergeAll(
     HumanGateRpc((address) => env.NAMESPACE.get(env.NAMESPACE.idFromName(address))),
     AgentDirectoryD1(env.DB),
-    ProjectOrgsD1(env.DB),
+    ProjectNamespacesD1(env.DB),
   );
 }
 
@@ -152,7 +152,7 @@ export function poolServices(env: Env): Layer.Layer<PoolServices> {
 }
 
 /** The Trunk DO's driven adapters beyond the backbone: the one writer of its project's trunk, and what counts each landing against the project's org. */
-export type TrunkServices = TrunkWriter | CodeHost | OrgUsage | ProjectOrgs;
+export type TrunkServices = TrunkWriter | CodeHost | OrgUsage | ProjectNamespaces;
 
 /**
  * The Trunk DO writes and syncs its project's trunk through GitCore over the
@@ -168,7 +168,7 @@ export function trunkServices(env: Env, projectId: () => ProjectId): Layer.Layer
       host,
       TrunkWriterGitCore(projectRepos(projectId())).pipe(Layer.provide(host)),
       OrgUsageRpc(env.ORG_USAGE),
-      ProjectOrgsD1(env.DB),
+      ProjectNamespacesD1(env.DB),
     );
   });
 }
@@ -182,7 +182,7 @@ export type LaneServices =
   | BatchVerification
   | StagingWriter
   | Projects
-  | ProjectOrgs;
+  | ProjectNamespaces;
 
 /**
  * The Lane DO reads its members from their Change DOs and its project's
@@ -207,7 +207,7 @@ export function laneServices(env: Env, projectId: () => ProjectId): Layer.Layer<
       host,
       ChangesRpc({ change, agentSession }),
       ProjectsRpc(project),
-      ProjectOrgsD1(env.DB),
+      ProjectNamespacesD1(env.DB),
       CandidateComposerGitCore(objects, commitSigning(env)).pipe(Layer.provide(host)),
       CandidateBundlesGitCore(objects).pipe(Layer.provide(BundleStoreR2(env.BUNDLES))),
       BatchVerificationWorkflow(env.CI_WORKFLOW),

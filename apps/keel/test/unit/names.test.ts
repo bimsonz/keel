@@ -14,6 +14,7 @@ const SITE_PATHS = [
   "logout",
   "device",
   "invite",
+  "sponsor",
   "settings",
   "new",
   "orgs",

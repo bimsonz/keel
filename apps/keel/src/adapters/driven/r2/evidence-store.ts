@@ -4,13 +4,13 @@ import {
   type ContentHash,
   contentHashOf,
   type Json,
-  type OrgId,
+  type NamespaceId,
 } from "@keeltown/core/kernel";
 import { EvidenceMissing, EvidenceStore } from "@keeltown/core/ports";
 import { Effect, Layer } from "effect";
 
 /** Where a namespace's evidence document lives in the bucket. */
-export const evidenceKey = (namespace: OrgId, hash: ContentHash): string =>
+export const evidenceKey = (namespace: NamespaceId, hash: ContentHash): string =>
   namespaceKey(namespace, "evidence", hash.slice("sha256:".length));
 
 /**

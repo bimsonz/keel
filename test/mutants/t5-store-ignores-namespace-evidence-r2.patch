@@ -8,7 +8,7 @@ index 87cdf884..749f0c71 100644
 @@ -11,7 +11,7 @@ import { Effect, Layer } from "effect";
  
  /** Where a namespace's evidence document lives in the bucket. */
- export const evidenceKey = (namespace: OrgId, hash: ContentHash): string =>
+ export const evidenceKey = (namespace: NamespaceId, hash: ContentHash): string =>
 -  namespaceKey(namespace, "evidence", hash.slice("sha256:".length));
 +  namespaceKey("org_00000000000000000000000000", "evidence", hash.slice("sha256:".length));
  

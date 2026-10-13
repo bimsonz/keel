@@ -8,13 +8,13 @@ import {
   contentHashOf,
   type Json,
   makeId,
-  OrgId,
+  NamespaceId,
 } from "../../../src/domain/kernel/index.ts";
 import { compile, type StepReport } from "../../../src/domain/verification/index.ts";
 import { fc } from "../../support/fast-check.ts";
 
 /** The namespace every call names, and the only one the stores below keep anything for. */
-const NAMESPACE = Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
+const NAMESPACE = Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V0");
 
 /** The worker-app pack's plan: two proof steps in Tier 2, the suite and the typecheck. */
 const PLAN = Result.getOrThrow(

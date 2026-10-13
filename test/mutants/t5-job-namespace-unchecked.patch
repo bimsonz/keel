@@ -6,7 +6,7 @@ index ea0d604c..5b53e8c6 100644
 --- a/packages/core/src/application/verification/project-namespace.ts
 +++ b/packages/core/src/application/verification/project-namespace.ts
 @@ -36,7 +36,6 @@ export const jobNamespace = Effect.fn("verification/jobNamespace")(function* (
-   named: OrgId,
+   named: NamespaceId,
  ) {
    const namespace = yield* projectNamespace(projectId);
 -  if (namespace !== named) return yield* new NamespaceMisnamed({ projectId, named, namespace });

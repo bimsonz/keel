@@ -3,7 +3,7 @@ import { exports } from "cloudflare:workers";
 import { env } from "cloudflare:workers";
 import { type Agent, type Role, type Scope } from "@keeltown/core/domain/identity";
 import { PROJECT, ProjectRecord } from "@keeltown/core/application/integration";
-import { Instant, makeId, OrgId, type ProjectId, UserId } from "@keeltown/core/kernel";
+import { Instant, makeId, NamespaceId, type ProjectId, UserId } from "@keeltown/core/kernel";
 import { ulid } from "ulid";
 import { hashSecret, sampleProjectId } from "@keeltown/testing";
 import { Effect, Schema } from "effect";
@@ -26,11 +26,11 @@ export interface SeededAgent {
  * The tenant pool agents live in unless a test says otherwise: org `pool`,
  * owned by the user who sponsors them, as the cutover leaves every agent.
  */
-export const POOL_ORG = Schema.decodeSync(OrgId)("org_01M4P00000000000000000000A");
+export const POOL_ORG = Schema.decodeSync(NamespaceId)("org_01M4P00000000000000000000A");
 export const POOL_SPONSOR = Schema.decodeSync(UserId)("usr_01M4P00000000000000000000S");
 
 /** A second tenant, org `elsewhere`, for what a caller outside org `pool` sees. */
-export const OTHER_ORG = Schema.decodeSync(OrgId)("org_01M4P00000000000000000000B");
+export const OTHER_ORG = Schema.decodeSync(NamespaceId)("org_01M4P00000000000000000000B");
 export const OTHER_SPONSOR = Schema.decodeSync(UserId)("usr_01M4P00000000000000000000T");
 
 /** Better Auth's rows for a user, as its D1 adapter writes them (dates as ISO text). */
@@ -46,7 +46,7 @@ async function insertUser(userId: string, handle: string): Promise<void> {
 
 /** An org and a member of it, written as Better Auth writes them; each is kept if already there. */
 export async function seedOrg(
-  org: OrgId,
+  org: NamespaceId,
   slug: string,
   owner: UserId,
   ownerHandle: string,
@@ -66,10 +66,10 @@ export async function seedOrg(
 /** A project's place in an org, as project creation (or the cutover's move) writes it. */
 export async function placeProject(
   projectId: ProjectId | string,
-  org: OrgId = POOL_ORG,
+  org: NamespaceId = POOL_ORG,
 ): Promise<void> {
   await env.DB.prepare(
-    `INSERT OR IGNORE INTO projects (id, org_id, name, created_at) VALUES (?, ?, ?, 0)`,
+    `INSERT OR IGNORE INTO projects (id, namespace_id, name, created_at) VALUES (?, ?, ?, 0)`,
   )
     .bind(projectId, org, projectId.toLowerCase())
     .run();
@@ -170,7 +170,7 @@ export async function seedUser(
   handle: string,
   options: {
     readonly role?: Role | null;
-    readonly org?: OrgId;
+    readonly org?: NamespaceId;
     /** How the session was signed in, made now: `passkey` is what a fresh sign-in is. Unrecorded when absent. */
     readonly signedInBy?: string;
   } = {},
