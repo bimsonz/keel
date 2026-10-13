@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/gate.test.ts
+# kills: gate.challenge-none
+# why: the 401 the policy answers a request with no credential carries no WWW-Authenticate, so an agent that arrives with only a key is not told where the document that says how to sign up is
+diff --git a/apps/keel/src/adapters/driving/http/route-deps.ts b/apps/keel/src/adapters/driving/http/route-deps.ts
+index 91ede4e3..b55f7f7f 100644
+--- a/apps/keel/src/adapters/driving/http/route-deps.ts
++++ b/apps/keel/src/adapters/driving/http/route-deps.ts
+@@ -58,8 +58,6 @@ export function routeDeps(gate: BoundGate): RouteDeps<AppEnv, Caller> {
+       await next();
+       c.res.headers.append("server-timing", gated.timing);
+       // The policy's 401 (no credential at all) says where a client finds how to get one, as the gate's own do.
+-      if (c.res.status === 401 && !c.res.headers.has("www-authenticate"))
+-        c.res.headers.set("www-authenticate", gated.challenge);
+       return undefined;
+     },
+     context: (c) => {

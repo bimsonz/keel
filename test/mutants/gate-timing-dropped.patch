@@ -2,13 +2,14 @@
 # kills: gate.timing
 # why: the gate's cost never reaches Server-Timing, so the session read's per-request price cannot be measured before a cookie cache is considered
 diff --git a/apps/keel/src/adapters/driving/http/route-deps.ts b/apps/keel/src/adapters/driving/http/route-deps.ts
+index 91ede4e3..2c2bc99d 100644
 --- a/apps/keel/src/adapters/driving/http/route-deps.ts
 +++ b/apps/keel/src/adapters/driving/http/route-deps.ts
-@@ -56,7 +56,6 @@
+@@ -56,7 +56,6 @@ export function routeDeps(gate: BoundGate): RouteDeps<AppEnv, Caller> {
        if (gated instanceof Response) return gated;
        ADMITTED.set(c.req.raw, gated.admitted);
        await next();
 -      c.res.headers.append("server-timing", gated.timing);
-       return undefined;
-     },
-     context: (c) => {
+       // The policy's 401 (no credential at all) says where a client finds how to get one, as the gate's own do.
+       if (c.res.status === 401 && !c.res.headers.has("www-authenticate"))
+         c.res.headers.set("www-authenticate", gated.challenge);

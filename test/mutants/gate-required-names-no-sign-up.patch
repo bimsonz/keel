@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/gate.test.ts
+# kills: gate.challenge-none
+# why: a request with no credential is told only to sign in or exchange a client secret, so an agent with only a key is never told it can sign up with it
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index bcd3b8eb..d27171a3 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -354,7 +354,7 @@ const SIGN_IN: NextAction = {
+ };
+ 
+ const unauthenticated = (): Decision =>
+-  Result.fail(new AuthenticationRequired({ nextActions: [SIGN_UP, SIGN_IN] }));
++  Result.fail(new AuthenticationRequired({ nextActions: [SIGN_IN] }));
+ 
+ const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
+   "user-suspended": {

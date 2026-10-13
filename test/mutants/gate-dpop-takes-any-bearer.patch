@@ -2,10 +2,10 @@
 # kills: gate.agent-token
 # why: a session or a token of the secret exchange is taken under the DPoP scheme, which promises a key binding neither has
 diff --git a/apps/keel/src/adapters/driving/http/gate.ts b/apps/keel/src/adapters/driving/http/gate.ts
-index 7fd2d651..5c355050 100644
+index 86baabc6..4f3fa0e9 100644
 --- a/apps/keel/src/adapters/driving/http/gate.ts
 +++ b/apps/keel/src/adapters/driving/http/gate.ts
-@@ -214,8 +214,7 @@ export async function gate(
+@@ -221,8 +221,7 @@ export async function gate(
            deps.challenge(door, answer),
          );
        credential = { _tag: "Claims", claims: answer };

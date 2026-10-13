@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/gate.test.ts
+# kills: gate.challenge-none
+# why: every refusal carries the challenge, so a caller who is signed in and may not do something is asked for a credential it already gave
+diff --git a/apps/keel/src/adapters/driving/http/route-deps.ts b/apps/keel/src/adapters/driving/http/route-deps.ts
+index 91ede4e3..1226d2fa 100644
+--- a/apps/keel/src/adapters/driving/http/route-deps.ts
++++ b/apps/keel/src/adapters/driving/http/route-deps.ts
+@@ -58,7 +58,7 @@ export function routeDeps(gate: BoundGate): RouteDeps<AppEnv, Caller> {
+       await next();
+       c.res.headers.append("server-timing", gated.timing);
+       // The policy's 401 (no credential at all) says where a client finds how to get one, as the gate's own do.
+-      if (c.res.status === 401 && !c.res.headers.has("www-authenticate"))
++      if (c.res.status >= 400 && !c.res.headers.has("www-authenticate"))
+         c.res.headers.set("www-authenticate", gated.challenge);
+       return undefined;
+     },
