@@ -15,6 +15,7 @@ import { type InboxStreams, registerInboxStreams } from "./inbox-streams.ts";
 import { problemResponse } from "./problems.ts";
 import { type BoundGate, routeDeps } from "./route-deps.ts";
 import { registerSigners } from "./signers.ts";
+import { registerWellKnown, type WellKnown } from "./well-known.ts";
 
 export interface AppOptions {
   readonly handlers: Handlers;
@@ -25,6 +26,8 @@ export interface AppOptions {
   readonly auth: AuthMount;
   /** The token endpoint's limiter: whether this key may exchange again now (the Workers Rate Limiting binding). */
   readonly tokens: { readonly admit: (key: string) => Promise<boolean> };
+  /** The discovery documents at the origin's root (RFC 8414, RFC 9728). */
+  readonly wellKnown: WellKnown;
   /** The agent's live inbox: SSE and WebSocket, outside the spec until the emitter upgrade. */
   readonly streams: InboxStreams;
   /** Keel's allowed-signers file, as it reads now: the keys its commits verify against. */
@@ -74,6 +77,7 @@ export function makeApp(options: AppOptions) {
   app.get(DOCUMENT_PATH, (c) => c.json(openApiDocument));
   registerSigners(app, options.signers);
   app.all("/mcp", (c) => options.mcp(c.req.raw));
+  registerWellKnown(app, options.wellKnown);
   const deps = routeDeps(options.gate);
   registerInboxStreams(app, deps, options.streams);
 

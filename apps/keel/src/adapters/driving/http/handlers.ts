@@ -78,6 +78,7 @@ import {
   RESOLVERS,
 } from "./authorize-handlers.ts";
 import type { Caller, AgentToken } from "./caller.ts";
+import { specRoute } from "./spec-routes.ts";
 import {
   latticesOk,
   registeredOk,
@@ -371,8 +372,8 @@ export interface Doorway {
   >;
 }
 
-/** Where an agent signs up: the path its proof must name. */
-export const REGISTER_PATH = "/v1/oauth/register";
+/** Where an agent signs up, as the spec has it: the path its proof must name. */
+export const REGISTER_PATH = specRoute("Auth_registerClient");
 
 export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorway) {
   /** A person's move that wants a fresh sign-in: refused here, before its port is called. */

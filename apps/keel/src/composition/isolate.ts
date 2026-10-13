@@ -19,6 +19,10 @@ import { Effect, Layer, ManagedRuntime, Option, Schema } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
 import type { AgentAccess } from "../adapters/driven/better-auth/agents.ts";
 import {
+  authorizationServerDocument,
+  protectedResourceDocument,
+} from "../adapters/driven/better-auth/discovery.ts";
+import {
   AUTH_BASE_PATH,
   type AuthConfig,
   makeAuth,
@@ -51,7 +55,7 @@ import { makeApp } from "../adapters/driving/http/app.ts";
 import { gate, type GateDeps } from "../adapters/driving/http/gate.ts";
 import type { BoundGate } from "../adapters/driving/http/route-deps.ts";
 import type { InboxStreams } from "../adapters/driving/http/inbox-streams.ts";
-import { makeHandlers } from "../adapters/driving/http/handlers.ts";
+import { makeHandlers, REGISTER_PATH } from "../adapters/driving/http/handlers.ts";
 import { makeRunner, type IsolateServices } from "../adapters/driving/http/run.ts";
 import { makeMcpEndpoint } from "../adapters/driving/mcp/server.ts";
 import { doorwayOf } from "./doorway.ts";
@@ -228,6 +232,7 @@ export function makeIsolate(
         ),
       ),
   });
+  const origin = `https://${env.KEEL_HOST}`;
   const handlers = makeHandlers(
     makeRunner(runtime),
     signInMethods(authConfig),
@@ -257,6 +262,17 @@ export function makeIsolate(
       admit: async (key) => (await env.AUTH_LIMIT.limit({ key })).success,
     },
     tokens: { admit: async (key) => (await env.TOKEN_LIMIT.limit({ key })).success },
+    wellKnown: {
+      origin,
+      issuerPath: AUTH_BASE_PATH,
+      authorizationServer: (request) =>
+        authorizationServerDocument(
+          auth(),
+          { origin, signUpUrl: `${origin}${REGISTER_PATH}` },
+          request,
+        ),
+      protectedResource: (resource) => protectedResourceDocument(auth(), origin, resource),
+    },
     streams: inboxStreams(env, runtime),
     signers: () => signersFile({ host: env.KEEL_HOST, signers: env.KEEL_COMMIT_SIGNERS }),
     rethrowContractDrift: env.KEEL_ENV === "test",
