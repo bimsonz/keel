@@ -34,6 +34,17 @@ import { AGENT } from "./enrol.ts";
 /** The moves on an agent's standing. */
 export type StandingMove = "suspend" | "reinstate" | "revoke";
 
+/**
+ * The agent as its own AgentSession DO answers a move on its standing or its
+ * sponsor link: without a namespace. The object's row keeps the namespace the
+ * agent was enrolled into and is never told of a later one, so the directory
+ * is the one place a namespace is read from.
+ */
+export const withoutNamespace = (agent: Agent): Agent => {
+  const { org: _kept, ...answered } = agent;
+  return answered;
+};
+
 /** A suspension, reinstatement or revocation, as the isolate sends it. */
 export interface StandingChange {
   /** Who moves it, as the envelope names an actor (`user:<id>`): the events' `by` and the commit's actor. */
@@ -136,7 +147,8 @@ export function sponsorOf(
  * the agent's next request is judged by its new standing and no later write
  * moves the row back; the Projector repeats the write on delivery, which
  * repairs a crash between the commit and the row. A replay writes again and
- * answers the agent as it stands.
+ * answers the agent as it stands. The answer names no namespace
+ * (`withoutNamespace`).
  */
 export const changeStanding: (
   agentId: AgentId,
@@ -192,9 +204,9 @@ export const changeStanding: (
     const moved = standingOf(event);
     if (moved !== undefined) yield* directory.standing(moved.agentId, moved.standing, moved.seq);
   }
-  return committed.duplicate
-    ? decodeAgent((yield* EntityStore).get(AGENT, agentId))
-    : committed.value;
+  return withoutNamespace(
+    committed.duplicate ? decodeAgent((yield* EntityStore).get(AGENT, agentId)) : committed.value,
+  );
 });
 
 /**

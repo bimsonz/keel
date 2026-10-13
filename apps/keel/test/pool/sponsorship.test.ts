@@ -271,3 +271,51 @@ describe("the sponsor link through the real Worker", () => {
     ]);
   });
 });
+
+describe("[run.namespace-read] a sponsor link's profile names the directory's namespace", () => {
+  it("[run.namespace-read] the end of a link and an approval of an agent the directory has placed elsewhere since each answer that namespace, never the one it was enrolled into", async () => {
+    const projectId: ProjectId = makeId("prj", ulid());
+    await placeProject(projectId);
+    await establishProject(projectId);
+    const member = await seedUser(uniqueHandle("member"), { signedInBy: "passkey" });
+    const enrolment = await http(member.token, "POST", "/agents", {
+      name: "moved-agent",
+      kind: "interactive",
+      scopes: ["agent:read", "agent:work"],
+      projectId,
+    });
+    expect(enrolment.status).toBe(201);
+    const agentId = String(Object(enrolment.body["agent"]).id);
+    const enrolledInto = String(Object(enrolment.body["agent"]).namespace);
+    expect(enrolledInto).toMatch(/^org_/);
+
+    // The directory places the agent elsewhere; its own object is told nothing. Its token is asked for after.
+    const elsewhere = makeId("org", ulid());
+    await env.DB.prepare("UPDATE agents SET namespace_id = ? WHERE id = ?")
+      .bind(elsewhere, agentId)
+      .run();
+    const exchanged = await exports.default.fetch(`${BASE}/v1/oauth/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: String(enrolment.body["clientId"]),
+        client_secret: String(enrolment.body["clientSecret"]),
+      }),
+    });
+    const token = (await exchanged.json<{ access_token: string }>()).access_token;
+
+    const left = await http(token, "DELETE", `/agents/${agentId}/sponsor`);
+    expect(left).toMatchObject({ status: 200, body: { id: agentId, namespace: elsewhere } });
+    const asked = await http(token, "POST", "/agents/me/sponsor-request");
+    expect(asked.status).toBe(201);
+    const sponsor = await seedUser(uniqueHandle("sponsor"), { role: null, signedInBy: "passkey" });
+    const approved = await http(sponsor.token, "PUT", `/agents/${agentId}/sponsor`, {
+      code: Object(asked.body["result"]).code,
+    });
+    expect(approved).toMatchObject({
+      status: 200,
+      body: { id: agentId, sponsor: sponsor.userId, namespace: elsewhere },
+    });
+  });
+});

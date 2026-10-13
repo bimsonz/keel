@@ -29,7 +29,7 @@ import {
 } from "../ports/index.ts";
 import { AGENT } from "./enrol.ts";
 import { hearEvent } from "./session.ts";
-import { sponsorOf, standingOf } from "./standing.ts";
+import { sponsorOf, standingOf, withoutNamespace } from "./standing.ts";
 
 /** An agent's live request for a sponsor, one row an agent: its code's hash and when it stops being good. */
 export const SPONSOR_ASK = "sponsor-ask";
@@ -117,7 +117,8 @@ type LinkRefusal = AgentNotKnown | AgentStateRefused | SponsorRequestRefused;
  * then writes the directory row (the sponsor, and the standing when ending
  * the link reinstated the agent) before answering, each guarded by its
  * event's seq; the Projector repeats the writes on delivery. The agent is
- * told, in its own inbox, of a move somebody else made.
+ * told, in its own inbox, of a move somebody else made. The answer names no
+ * namespace (`withoutNamespace`).
  */
 const moveLink = Effect.fn("identity/moveLink")(function* (
   agentId: AgentId,
@@ -170,11 +171,11 @@ const moveLink = Effect.fn("identity/moveLink")(function* (
     const moved = standingOf(event);
     if (moved !== undefined) yield* directory.standing(moved.agentId, moved.standing, moved.seq);
   }
-  if (committed.duplicate) return decodeAgent(store.get(AGENT, agentId));
+  if (committed.duplicate) return withoutNamespace(decodeAgent(store.get(AGENT, agentId)));
   store.transaction(() => {
     for (const event of committed.events) hearEvent(store, agentId, event);
   });
-  return committed.value;
+  return withoutNamespace(committed.value);
 });
 
 /**

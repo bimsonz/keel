@@ -93,6 +93,73 @@ describe("[link.sponsor-inline] a sponsor link is in the directory when its move
   );
 });
 
+describe("[run.namespace-read] an agent's own object answers no namespace", () => {
+  it.effect(
+    "[run.namespace-read] each move on the standing or the sponsor link of an agent the directory has placed elsewhere since answers no namespace, replayed too",
+    () => {
+      const { directory, layer, enrolled } = enrolledAgent();
+      return Effect.gen(function* () {
+        // Its enrolment answers the namespace it was just told.
+        expect((yield* enrolled).org).toBe(sampleOrgId);
+        // The directory places the agent elsewhere, and its own object is told nothing.
+        const elsewhere = makeId("org", ulidOf(44));
+        const held = directory.agents.get(agentId);
+        if (held === undefined) throw new Error("the enrolment wrote no directory row");
+        directory.agents.set(agentId, { ...held, org: elsewhere });
+
+        const by = userActor(first);
+        const suspending = {
+          by,
+          reason: "paused by its sponsor",
+          idempotencyKey: "suspend-1",
+          fingerprint: "suspend-body",
+        };
+        const ending = { by, idempotencyKey: "end-1", fingerprint: "end-body" };
+        const answers = [
+          yield* changeStanding(agentId, "suspend", suspending),
+          yield* changeStanding(agentId, "suspend", suspending),
+          yield* changeStanding(agentId, "reinstate", {
+            by,
+            idempotencyKey: "reinstate-1",
+            fingerprint: "reinstate-body",
+          }),
+          yield* endSponsorship(agentId, ending),
+          yield* endSponsorship(agentId, ending),
+        ];
+        yield* askSponsor(agentId, "sha256:the-code");
+        const approving = {
+          by: second,
+          codeHash: "sha256:the-code",
+          idempotencyKey: "approve-1",
+          fingerprint: "approve-body",
+        };
+        answers.push(
+          yield* approveSponsor(agentId, approving),
+          yield* approveSponsor(agentId, approving),
+          yield* changeStanding(agentId, "revoke", {
+            by,
+            idempotencyKey: "revoke-1",
+            fingerprint: "revoke-body",
+          }),
+        );
+        expect(answers.map((answer) => answer.state)).toEqual([
+          "suspended",
+          "suspended",
+          "active",
+          "active",
+          "active",
+          "active",
+          "active",
+          "revoked",
+        ]);
+        expect(answers.map((answer) => "org" in answer)).toEqual(answers.map(() => false));
+        // The directory keeps where it placed the agent through every write the moves made.
+        expect(directory.agents.get(agentId)).toMatchObject({ org: elsewhere, state: "revoked" });
+      }).pipe(Effect.provide(layer));
+    },
+  );
+});
+
 const HEX_DIGITS = "0123456789abcdef".split("");
 
 describe("[link.code-compare] a code's hash is compared whole", () => {

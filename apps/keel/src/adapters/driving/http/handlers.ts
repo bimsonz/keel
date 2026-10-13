@@ -44,6 +44,7 @@ import {
 } from "@keeltown/core/application/integration";
 import {
   type Actor,
+  type Agent,
   type AgentResource,
   type Audience,
   authorize,
@@ -393,6 +394,19 @@ export interface Doorway {
 /** Where an agent signs up, as the spec has it: the path its proof must name. */
 export const REGISTER_PATH = specRoute("Auth_registerClient");
 
+/**
+ * An agent as its own AgentSession DO answered it, with the namespace the
+ * directory holds for it. The object's answer names none: it is never told
+ * when an agent's namespace moves, so a profile reads it here.
+ */
+const placed = (agent: Agent) =>
+  AgentDirectory.use((directory) => directory.findAgent(agent.id)).pipe(
+    Effect.map((found) => {
+      const namespace = Option.getOrUndefined(found)?.org;
+      return namespace === undefined ? agent : { ...agent, org: namespace };
+    }),
+  );
+
 export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorway) {
   /** A person's move that wants a fresh sign-in: refused here, before its port is called. */
   const touched = <A>(caller: Caller, move: () => A) =>
@@ -410,6 +424,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
       caller,
       actorOf(caller).pipe(
         Effect.flatMap((actor) => move(actor, decoded.success)),
+        Effect.flatMap(placed),
         Effect.match({
           onSuccess: standingOk,
           onFailure: (error) => standingError(caller, operation, error),
@@ -517,6 +532,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                     }),
                   ),
                 ),
+                Effect.flatMap(placed),
                 Effect.match({
                   onSuccess: linkOk,
                   onFailure: (error) => approveError(caller, error),
@@ -534,6 +550,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
                   idempotencyKey: input["idempotency-key"],
                 }),
               ).pipe(
+                Effect.flatMap(placed),
                 Effect.match({
                   onSuccess: linkOk,
                   onFailure: (error) => endError(caller, error),

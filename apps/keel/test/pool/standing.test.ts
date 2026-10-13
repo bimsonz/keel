@@ -26,9 +26,10 @@ interface Answer {
     readonly id?: string;
     readonly state?: string;
     readonly revocationEpoch?: number;
+    readonly namespace?: string;
     readonly code?: string;
     readonly nextActions?: readonly { readonly operationId?: string }[];
-    readonly agent?: { readonly id: string };
+    readonly agent?: { readonly id: string; readonly namespace?: string };
     readonly clientId?: string;
     readonly clientSecret?: string;
   };
@@ -140,6 +141,45 @@ describe("[b11.standing-route] a maintainer's moves on an agent's standing", () 
     expect(replayed).toMatchObject({ status: 200, body: { state: "suspended" } });
     expect(reused).toMatchObject({ status: 409, body: { code: "request.idempotency_conflict" } });
     expect(unknown).toMatchObject({ status: 404, body: { code: "resource.not_found" } });
+  });
+});
+
+describe("[run.namespace-read] a profile's namespace is the directory's", () => {
+  it("[run.namespace-read] a move on the standing of an agent the directory has placed elsewhere since answers that namespace, never the one it was enrolled into", async () => {
+    const { operator, agentId } = await enrolled();
+    const row = () =>
+      env.DB.prepare("SELECT namespace_id FROM agents WHERE id = ?")
+        .bind(agentId)
+        .first<{ namespace_id: string }>();
+    const enrolledInto = (await row())?.namespace_id;
+    expect(enrolledInto).toMatch(/^org_/);
+
+    const suspended = await call(operator, `/agents/${agentId}/suspend`, "suspend-0001", {
+      reason: "runaway retries",
+    });
+    expect(suspended).toMatchObject({
+      status: 200,
+      body: { state: "suspended", namespace: enrolledInto },
+    });
+
+    // The directory places the agent elsewhere; its own object is told nothing.
+    const elsewhere = makeId("org", ulid());
+    await env.DB.prepare("UPDATE agents SET namespace_id = ? WHERE id = ?")
+      .bind(elsewhere, agentId)
+      .run();
+    const replayed = await call(operator, `/agents/${agentId}/suspend`, "suspend-0001", {
+      reason: "runaway retries",
+    });
+    expect(replayed).toMatchObject({
+      status: 200,
+      body: { state: "suspended", namespace: elsewhere },
+    });
+    const reinstated = await call(operator, `/agents/${agentId}/reinstate`, "reinstate-0001");
+    expect(reinstated).toMatchObject({
+      status: 200,
+      body: { state: "active", namespace: elsewhere },
+    });
+    expect((await row())?.namespace_id).toBe(elsewhere);
   });
 });
 
