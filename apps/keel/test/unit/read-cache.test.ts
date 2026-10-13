@@ -128,9 +128,10 @@ describe("the read cache", () => {
   );
 
   it.effect(
-    "[cache.misses-not-kept] a repo that is not there, and a commit a repo lacks, are read again once they are",
+    "[cache.misses-not-kept] a repo that is not there, and a commit a repo lacks, are read again once they are, here and in another isolate",
     () => {
-      const w = cachedHost();
+      const shared = sharedCache();
+      const w = cachedHost({ shared: shared.cache });
       return Effect.gen(function* () {
         const { head } = yield* seeded(w.code, B);
         const host = yield* CodeHost;
@@ -139,6 +140,12 @@ describe("the read cache", () => {
         yield* host.create(A);
         expect(yield* host.hasCommit(A, head)).toBe(false);
         expect((yield* Effect.flip(host.readCommit(A, head)))._tag).toBe("ObjectNotFound");
+        yield* Effect.promise(() => Promise.all(w.background));
+        const other = cachedHost({ shared: shared.cache });
+        const elsewhere = yield* Effect.flatMap(CodeHost, (h) =>
+          Effect.flip(h.hasCommit(A, head)),
+        ).pipe(Effect.provide(other.layer));
+        expect(elsewhere._tag).toBe("RepoNotFound");
         yield* host.delete(A);
         yield* host.fork(B, A);
         yield* host.fork(B, C);
