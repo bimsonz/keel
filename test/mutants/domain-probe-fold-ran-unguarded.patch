@@ -1,0 +1,25 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.fold-table
+# why: the fold takes ProbeRan with its guard gone: `probe.state === "calibrating" && event.probeId === probe.id && event.conflictId === probe.conflictId && !probe.cells.some((c) => sameCell(c, event))`.
+diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
+index 64c72893..b3e3adfc 100644
+--- a/packages/core/src/domain/verification/probe-machine.ts
++++ b/packages/core/src/domain/verification/probe-machine.ts
+@@ -300,15 +300,10 @@ export const evolveProbe = (state: Probe | undefined, committed: Committed<Probe
+     case "ProbeDrafted":
+       return illegal(probe, event);
+     case "ProbeRan":
+-      return probe.state === "calibrating" &&
+-        event.probeId === probe.id &&
+-        event.conflictId === probe.conflictId &&
+-        !probe.cells.some((c) => sameCell(c, event))
+-        ? {
++      return {
+             ...probe,
+             cells: [...probe.cells, { world: event.world, run: event.run, outcome: event.outcome }],
+-          }
+-        : illegal(probe, event);
++          };
+     case "GuardAdmitted":
+       return probe.state === "calibrating" &&
+         event.probeId === probe.id &&

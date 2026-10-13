@@ -1,0 +1,24 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.fold-table
+# why: the fold takes ConflictResolved with its guard gone: `ok`.
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index 80645e25..84d55340 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -409,14 +409,12 @@ export const evolveConflict = (
+       const ok =
+         conflict.state === "proven" ||
+         (conflict.state === "escalated" && event.decisionId !== undefined);
+-      return ok
+-        ? {
++      return {
+             ...conflict,
+             state: "resolved",
+             move: event.move,
+             ...(event.decisionId === undefined ? {} : { decisionId: event.decisionId }),
+-          }
+-        : illegal(conflict, event);
++          };
+     }
+     default: {
+       const unreachable: never = event;

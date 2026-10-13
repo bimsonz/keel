@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/kernel/kernel.test.ts
+# kills: kernel.envelope-run
+# why: an envelope takes anything as its run, so an event can name a run by a label alone, or by another entity's id, and a reader that trusts the id is wrong.
+diff --git a/packages/core/src/domain/kernel/event.ts b/packages/core/src/domain/kernel/event.ts
+index 1b248f6d..726bf704 100644
+--- a/packages/core/src/domain/kernel/event.ts
++++ b/packages/core/src/domain/kernel/event.ts
+@@ -56,7 +56,7 @@ export const EventEnvelope = Schema.Struct({
+    * number at once, and each event says which. Absent when the actor is a user
+    * or the platform, and for an agent's token that names no run.
+    */
+-  run: Schema.optional(RunRef),
++  run: Schema.optional(Schema.Unknown),
+   /** The project the emitting entity belongs to. Absent only for events no project owns. */
+   project: Schema.optional(ProjectId),
+   affected: Schema.Array(EntityRef),

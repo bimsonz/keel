@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.fold-table
+# why: the fold takes ProbeRan without the check `event.probeId === conflict.probeId`.
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index 80645e25..c56af935 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -371,8 +371,7 @@ export const evolveConflict = (
+         ? { ...conflict, state: "probing", probeId: event.probeId }
+         : illegal(conflict, event);
+     case "ProbeRan":
+-      return conflict.state === "probing" && event.probeId === conflict.probeId
+-        ? { ...conflict }
++      return conflict.state === "probing" ? { ...conflict }
+         : illegal(conflict, event);
+     case "WorldCheckRan":
+       return conflict.probeId !== undefined && sameCell(conflict, event) === undefined

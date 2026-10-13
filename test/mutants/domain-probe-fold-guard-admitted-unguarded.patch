@@ -1,0 +1,20 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.fold-table
+# why: the fold takes GuardAdmitted with its guard gone: `probe.state === "calibrating" && event.probeId === probe.id && admit(probe.cells)._tag === "admitted"`.
+diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
+index 64c72893..2e8a7cf2 100644
+--- a/packages/core/src/domain/verification/probe-machine.ts
++++ b/packages/core/src/domain/verification/probe-machine.ts
+@@ -310,11 +310,7 @@ export const evolveProbe = (state: Probe | undefined, committed: Committed<Probe
+           }
+         : illegal(probe, event);
+     case "GuardAdmitted":
+-      return probe.state === "calibrating" &&
+-        event.probeId === probe.id &&
+-        admit(probe.cells)._tag === "admitted"
+-        ? { ...probe, state: "admitted", guardId: event.guardId }
+-        : illegal(probe, event);
++      return { ...probe, state: "admitted", guardId: event.guardId };
+     case "ProbeDiscarded": {
+       const admission = admit(probe.cells);
+       return probe.state === "calibrating" &&

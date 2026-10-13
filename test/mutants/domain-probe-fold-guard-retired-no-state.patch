@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.fold-table
+# why: the fold takes GuardRetired without the check `probe.state === "admitted"`.
+diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
+index 64c72893..318dcc8e 100644
+--- a/packages/core/src/domain/verification/probe-machine.ts
++++ b/packages/core/src/domain/verification/probe-machine.ts
+@@ -325,8 +325,7 @@ export const evolveProbe = (state: Probe | undefined, committed: Committed<Probe
+         : illegal(probe, event);
+     }
+     case "GuardRetired":
+-      return probe.state === "admitted" && event.guardId === probe.guardId
+-        ? { ...probe, state: "retired", retiredBy: event.decisionId }
++      return event.guardId === probe.guardId ? { ...probe, state: "retired", retiredBy: event.decisionId }
+         : illegal(probe, event);
+     default: {
+       const unreachable: never = event;

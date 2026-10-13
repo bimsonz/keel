@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.fold-table
+# why: the fold takes ConflictDismissed with its guard gone: `conflict.state === "suspected" || conflict.state === "probing"`.
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index 80645e25..62dc8782 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -393,9 +393,7 @@ export const evolveConflict = (
+       return ok ? { ...conflict, state: "proven" } : illegal(conflict, event);
+     }
+     case "ConflictDismissed":
+-      return conflict.state === "suspected" || conflict.state === "probing"
+-        ? { ...conflict, state: "dismissed" }
+-        : illegal(conflict, event);
++      return { ...conflict, state: "dismissed" };
+     case "ConflictEscalated": {
+       const ok =
+         event.reason === "unprovable"

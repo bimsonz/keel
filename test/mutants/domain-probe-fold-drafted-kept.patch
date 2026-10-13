@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.fold-table
+# why: the fold passes over a second ProbeDrafted where it is illegal, so a log holding two replays as if it held one.
+diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
+index 64c72893..42df8143 100644
+--- a/packages/core/src/domain/verification/probe-machine.ts
++++ b/packages/core/src/domain/verification/probe-machine.ts
+@@ -298,7 +298,7 @@ export const evolveProbe = (state: Probe | undefined, committed: Committed<Probe
+   const probe = state;
+   switch (event._tag) {
+     case "ProbeDrafted":
+-      return illegal(probe, event);
++      return probe as never;
+     case "ProbeRan":
+       return probe.state === "calibrating" &&
+         event.probeId === probe.id &&

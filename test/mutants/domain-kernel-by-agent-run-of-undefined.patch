@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/kernel/kernel.test.ts
+# kills: kernel.envelope-run
+# why: byAgent gives a token that named no run a `run` key holding undefined, so an absent run and a present one are told apart only by whoever remembers to look inside.
+diff --git a/packages/core/src/domain/kernel/event.ts b/packages/core/src/domain/kernel/event.ts
+index 1b248f6d..4228c93e 100644
+--- a/packages/core/src/domain/kernel/event.ts
++++ b/packages/core/src/domain/kernel/event.ts
+@@ -32,7 +32,7 @@ export const byAgent = (
+   run: RunRef | undefined,
+ ): { readonly actor: Actor; readonly run?: RunRef } => ({
+   actor: agentActor(agentId),
+-  ...(run === undefined ? {} : { run }),
++  run,
+ });
+ 
+ /** The actor a user's own commands commit under: a maintainer's withdrawal, an owner's settings. */

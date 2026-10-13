@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.fold-table
+# why: the fold takes a ConflictResolved on an escalated conflict without the check `event.decisionId !== undefined`, so it resolves with no ruling.
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index 80645e25..63efd81b 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -407,8 +407,7 @@ export const evolveConflict = (
+     }
+     case "ConflictResolved": {
+       const ok =
+-        conflict.state === "proven" ||
+-        (conflict.state === "escalated" && event.decisionId !== undefined);
++conflict.state === "proven" || (conflict.state === "escalated");
+       return ok
+         ? {
+             ...conflict,

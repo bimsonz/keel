@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.fold-table
+# why: the fold passes over an AgentSignedUp for an agent that is there already, so a log holding two sign-ups replays as if it held one.
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index 3c428c89..7968b717 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -224,8 +224,9 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
+   if (event.agentId !== agent.id) return illegal(agent, event);
+   switch (event._tag) {
+     case "AgentEnrolled":
+-    case "AgentSignedUp":
+       return illegal(agent, event);
++    case "AgentSignedUp":
++      return agent;
+     case "AgentSuspended":
+       return agent.state === "active" ? { ...agent, state: "suspended" } : illegal(agent, event);
+     case "AgentReinstated":

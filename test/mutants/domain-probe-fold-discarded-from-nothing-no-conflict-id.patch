@@ -1,0 +1,19 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/probe-machine.test.ts
+# kills: probe.fold-table
+# why: from nothing the fold takes a ProbeDiscarded without the check `event.conflictId !== undefined`, so a probe begins that names no conflict.
+diff --git a/packages/core/src/domain/verification/probe-machine.ts b/packages/core/src/domain/verification/probe-machine.ts
+index 64c72893..db04f498 100644
+--- a/packages/core/src/domain/verification/probe-machine.ts
++++ b/packages/core/src/domain/verification/probe-machine.ts
+@@ -282,10 +282,7 @@ export const evolveProbe = (state: Probe | undefined, committed: Committed<Probe
+         cells: [],
+         createdAt: committed.at,
+       };
+-    return event._tag === "ProbeDiscarded" &&
+-      event.reason === "draft-failed" &&
+-      event.conflictId !== undefined
+-      ? {
++    return event._tag === "ProbeDiscarded" && event.reason === "draft-failed" ? {
+           id: event.probeId,
+           conflictId: event.conflictId,
+           state: "discarded",

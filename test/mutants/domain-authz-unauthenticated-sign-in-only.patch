@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/authorize.test.ts
+# kills: authz.unauthenticated-next
+# why: a caller with no credential is told only to sign in or exchange a secret, so an agent holding nothing but a key is never told it can sign up with it.
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index bd9f562f..327bc52f 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -389,7 +389,7 @@ const SIGN_IN: NextAction = {
+ };
+ 
+ const unauthenticated = (): Decision =>
+-  Result.fail(new AuthenticationRequired({ nextActions: [SIGN_UP, SIGN_IN] }));
++  Result.fail(new AuthenticationRequired({ nextActions: [SIGN_IN] }));
+ 
+ const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
+   "user-suspended": {

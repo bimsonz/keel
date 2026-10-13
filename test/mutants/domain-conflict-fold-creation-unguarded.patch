@@ -1,0 +1,27 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.fold-table
+# why: the fold makes a conflict from any event, where only ConflictSuspected may create one.
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index 80645e25..06fa9567 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -345,8 +345,7 @@ export const evolveConflict = (
+ ): Conflict => {
+   const event = committed.payload;
+   if (state === undefined) {
+-    return event._tag === "ConflictSuspected"
+-      ? {
++    return {
+           id: event.conflictId,
+           kind: event.kind,
+           state: "suspected",
+@@ -358,8 +357,7 @@ export const evolveConflict = (
+           ...(event.premise === undefined ? {} : { premise: event.premise }),
+           ...(event.effect === undefined ? {} : { effect: event.effect }),
+           openedAt: committed.at,
+-        }
+-      : illegal(state, event);
++        };
+   }
+   const conflict = state;
+   if (event.conflictId !== conflict.id) return illegal(conflict, event);

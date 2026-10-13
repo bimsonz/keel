@@ -1,0 +1,18 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/verification/conflict-machine.test.ts
+# kills: conflict.fold-table
+# why: the fold takes a ConflictProven with no probe without the check `provesKind[proof._tag] === conflict.kind`, so a refused merge proves a semantic conflict.
+diff --git a/packages/core/src/domain/verification/conflict-machine.ts b/packages/core/src/domain/verification/conflict-machine.ts
+index 80645e25..2fa2e180 100644
+--- a/packages/core/src/domain/verification/conflict-machine.ts
++++ b/packages/core/src/domain/verification/conflict-machine.ts
+@@ -387,9 +387,7 @@ export const evolveConflict = (
+     case "ConflictProven": {
+       const proof = event.evidence;
+       const ok =
+-        proof._tag === "probe"
+-          ? conflict.state === "probing" && proof.probeId === conflict.probeId
+-          : conflict.state === "suspected" && provesKind[proof._tag] === conflict.kind;
++proof._tag === "probe" ? conflict.state === "probing" && proof.probeId === conflict.probeId : conflict.state === "suspected";
+       return ok ? { ...conflict, state: "proven" } : illegal(conflict, event);
+     }
+     case "ConflictDismissed":
