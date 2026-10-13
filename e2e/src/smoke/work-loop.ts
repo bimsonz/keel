@@ -91,6 +91,38 @@ function withoutGrantToken(answer: unknown): unknown {
 /** Each piggybacked notice rides one answer only, so two reads compare without them. */
 const withoutNotices = (answer: unknown): unknown => ({ ...Object(answer), notices: [] });
 
+/** A field of an answer's `result`, read loosely: the smoke compares bodies, not types. */
+const resultField = (answer: unknown, name: string): unknown =>
+  Reflect.get(Object(Reflect.get(Object(answer), "result")), name);
+
+const submissionOf = (answer: unknown): unknown[] =>
+  ["changeId", "revision", "commitSha"].map((name) => resultField(answer, name));
+
+/**
+ * Whether two answers are of one submission. A replay under the same key answers the
+ * submission as it is now, and the Precheck may start between the first answer and the
+ * replay: the state moves, and the summary, next actions and notices with it. Which
+ * change, which revision and which commit do not.
+ */
+export function sameSubmission(a: unknown, b: unknown): boolean {
+  return (
+    submissionOf(a).every((part) => part !== undefined) && same(submissionOf(a), submissionOf(b))
+  );
+}
+
+/**
+ * Whether two reads of an inbox from one cursor, a moment apart, are of one page. A notice
+ * may land between them, so one page may hold the other and more: they agree as far as
+ * the shorter goes, and two of one length end at one cursor.
+ */
+export function samePageSoFar(a: unknown, b: unknown): boolean {
+  const [one, other] = [resultField(a, "notices"), resultField(b, "notices")];
+  if (!Array.isArray(one) || !Array.isArray(other)) return false;
+  const shared = Math.min(one.length, other.length);
+  if (!same(one.slice(0, shared), other.slice(0, shared))) return false;
+  return one.length !== other.length || same(resultField(a, "cursor"), resultField(b, "cursor"));
+}
+
 export async function workLoopSmoke(
   keelUrl: string,
   agent: KeelClient,
@@ -145,7 +177,7 @@ export async function workLoopSmoke(
     commitSha,
   });
   check(
-    same(withoutNotices(submittedOverMcp), withoutNotices(submitted)),
+    sameSubmission(submittedOverMcp, submitted),
     "submit: the MCP tool replays the REST submit under the same key",
     { rest: submitted, mcp: submittedOverMcp },
   );
@@ -172,7 +204,7 @@ export async function workLoopSmoke(
     mcp: await tool(keelUrl, token, "inbox", { cursor }),
   };
   check(
-    same(withoutNotices(inbox.rest), withoutNotices(inbox.mcp)),
+    samePageSoFar(inbox.rest, inbox.mcp),
     "inbox: REST and MCP read the same page from the same cursor",
     inbox,
   );
