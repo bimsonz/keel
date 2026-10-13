@@ -99,6 +99,21 @@ describe("the questions waiting for someone", () => {
       expect(TURNS.has(turn)).toBe(true);
   });
 
+  it("[waiting.widened] reads the list again when Keel widens a question to its namespace's maintainers", async () => {
+    const feed = scripted([
+      { items: [], nextCursor: "7" },
+      { items: ["EscalationWidened"], nextCursor: "8" },
+    ]);
+    const stop = new AbortController();
+    const again = vi.fn<() => void>();
+    const following = followTurns(feed, again, stop.signal);
+    await vi.waitFor(() => expect(feed.asked).toHaveLength(3));
+    // Once at the head, and once for the widening: a maintainer's open home gains the question at that minute.
+    expect(again).toHaveBeenCalledTimes(2);
+    stop.abort();
+    await following;
+  });
+
   it("[waiting.no-clock] asks for nothing while Keel's log says nothing: no read is made by the clock", async () => {
     vi.useFakeTimers();
     const feed = scripted([

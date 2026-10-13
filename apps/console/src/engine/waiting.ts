@@ -6,9 +6,13 @@
 import type { EscalationView } from "../contract/keel/index.ts";
 import { type KeelDirectory, KeelRefused } from "../source/types.ts";
 
-/** The entries of Keel's log that put a question to a person or close one: after any of them, what Keel lists may differ. */
+/**
+ * The entries of Keel's log that put a question to a person or close one: after any of them, what Keel lists may
+ * differ. `EscalationWidened` is Keel putting a question, at thirty minutes, to its namespace's maintainers too.
+ */
 export const TURNS: ReadonlySet<string> = new Set([
   "EscalationRaised",
+  "EscalationWidened",
   "EscalationWithdrawn",
   "RulingGiven",
   "ConflictResolved",

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/engine/waiting.test.ts
+# kills: waiting.widened
+# why: a question Keel widens to its namespace's maintainers does not make an open home read its list again, so a maintainer is not shown it until something else is written
+diff --git a/apps/console/src/engine/waiting.ts b/apps/console/src/engine/waiting.ts
+index b01a665c..442bf6c4 100644
+--- a/apps/console/src/engine/waiting.ts
++++ b/apps/console/src/engine/waiting.ts
+@@ -12,7 +12,6 @@ import { type KeelDirectory, KeelRefused } from "../source/types.ts";
+  */
+ export const TURNS: ReadonlySet<string> = new Set([
+   "EscalationRaised",
+-  "EscalationWidened",
+   "EscalationWithdrawn",
+   "RulingGiven",
+   "ConflictResolved",
