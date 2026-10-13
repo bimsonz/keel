@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/probe.test.ts
+# kills: d22.pool.probe-rate-limited, d22.pool.probe-rate-limited-out
+# why: One refused model call discards the probe and escalates the conflict, with no wait and no second draft: the other live defect
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 8289f601..62a97709 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -337,10 +337,7 @@ export const draftConflict = (
+ 
+ /** A draft worth drafting again after a wait: the runner could not run it, or the model's rate limit ended it. */
+ const draftsAgain = (drafted: DraftAnswer): boolean =>
+-  drafted._tag === "RunnerUnavailable" ||
+-  (drafted._tag === "Drafted" &&
+-    drafted.outcome._tag === "Abstained" &&
+-    drafted.outcome.reason === "rate-limited");
++  drafted._tag === "RunnerUnavailable";
+ 
+ /** A party as the program left it: its world, or why it has none. */
+ type PartyEnd =

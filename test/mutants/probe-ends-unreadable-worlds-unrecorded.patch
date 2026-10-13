@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.unreadable
+# why: A world's commit missing from staging at the worlds' read ends the instance with nothing recorded
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 8289f601..2ffb71f5 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -555,7 +555,6 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
+       if (worlds._tag === "Built")
+         planned = { sides, plan: plan.success, built: worlds.built, hunks: worlds.hunks };
+       else if (sameRepo(worlds.repo, call.staging)) {
+-        yield* recordHarnessError("worlds-unbuildable");
+         return {
+           outcome: "unreadable",
+           world: worlds.world,

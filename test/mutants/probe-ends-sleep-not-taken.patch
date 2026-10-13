@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/probe.test.ts
+# kills: d22.pool.probe-runner-unavailable, d22.pool.probe-rate-limited, d22.pool.probe-rate-limited-out
+# why: The Workflow's steps answer a sleep at once without asking the engine for one, so the drafts follow each other with no wait
+diff --git a/apps/keel/src/adapters/driving/workflow/steps.ts b/apps/keel/src/adapters/driving/workflow/steps.ts
+index 8496ba6d..d8c2eb73 100644
+--- a/apps/keel/src/adapters/driving/workflow/steps.ts
++++ b/apps/keel/src/adapters/driving/workflow/steps.ts
+@@ -96,5 +96,5 @@ export const workflowSteps = (step: WorkflowStep): ProbeSteps => ({
+         throw error;
+       }
+     }),
+-  sleep: (name, ms) => Effect.promise(() => step.sleep(name, ms)),
++  sleep: () => Effect.void,
+ });

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.errored-party
+# why: A refused read of a party errors the instance with nothing recorded
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 8289f601..3eb09bfa 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -507,7 +507,6 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
+             continue;
+           }
+           if (end._tag === "Errored") {
+-            yield* recordHarnessError("incomplete");
+             return { outcome: "errored", step: end.step, reason: end.reason } satisfies ProbeEnd;
+           }
+           if (end._tag === "Timeout") return yield* failDraft("no-submission", 0);

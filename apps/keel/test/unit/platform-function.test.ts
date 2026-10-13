@@ -53,6 +53,10 @@ const reasonOf = (ai: StreamingAi, c?: PlatformFunctionCall, deadlineMs?: number
 
 const detailOf = (ai: StreamingAi) => Effect.flip(call(ai)).pipe(Effect.map((e) => e.detail));
 
+/** The abstain a call ends with: its reason, and its detail when it has one. */
+const abstainOf = (ai: StreamingAi) =>
+  Effect.flip(call(ai)).pipe(Effect.map((e) => ({ reason: e.reason, detail: e.detail })));
+
 describe("PlatformFunction over Workers AI", () => {
   it.effect(
     "[pf.streams-json] streams the pinned model under the call's schema, and parses what it says",
@@ -109,6 +113,52 @@ describe("PlatformFunction over Workers AI", () => {
         const other = fakeAi(() => Promise.reject(new Error("AiError: 5007: No such model")));
         expect(yield* reasonOf(other.ai)).toBe("unavailable");
       }),
+  );
+
+  it.effect(
+    "[pf.ai-error-detail] an AI error's abstain keeps the error's text: one line, trimmed, and no longer than 200 characters",
+    () =>
+      Effect.gen(function* () {
+        const capacity = fakeAi(() =>
+          Promise.reject(new Error("3040: Capacity temporarily exceeded")),
+        );
+        expect(yield* abstainOf(capacity.ai)).toEqual({
+          reason: "rate-limited",
+          detail: "Error: 3040: Capacity temporarily exceeded",
+        });
+        const spread = fakeAi(() =>
+          Promise.reject(new Error("  5007: No such model\n   at upstream\t(try later)  \n")),
+        );
+        expect(yield* abstainOf(spread.ai)).toEqual({
+          reason: "unavailable",
+          detail: "Error: 5007: No such model at upstream (try later)",
+        });
+        const long = fakeAi(() => Promise.reject(new Error("x".repeat(500))));
+        const kept = yield* detailOf(long.ai);
+        expect(kept).toBe(`Error: ${"x".repeat(193)}`);
+        expect(kept).toHaveLength(200);
+      }),
+  );
+
+  it.effect(
+    "[pf.stream-error-detail] a stream that fails as it is read abstains with the failure's text too",
+    () => {
+      const { ai } = fakeAi(
+        async () =>
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(enc.encode(delta('{"a"')));
+              controller.error(new Error("3040: Capacity temporarily exceeded\nwhile streaming"));
+            },
+          }),
+      );
+      return Effect.gen(function* () {
+        expect(yield* abstainOf(ai)).toEqual({
+          reason: "rate-limited",
+          detail: "Error: 3040: Capacity temporarily exceeded while streaming",
+        });
+      });
+    },
   );
 
   it.effect("[pf.unparseable] abstains as schema on text that is not JSON", () => {

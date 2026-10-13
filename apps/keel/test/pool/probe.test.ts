@@ -1,19 +1,24 @@
 import { introspectWorkflow, introspectWorkflowInstance } from "cloudflare:test";
 import { env } from "cloudflare:workers";
+import { namespaceAddress } from "@keeltown/core/application/coordination";
 import { projectRepos } from "@keeltown/core/application/integration";
 import { abRef } from "@keeltown/core/application/verification";
 import type { ProbeOutcome, World } from "@keeltown/core/domain/verification";
 import { type EventEnvelope, makeId } from "@keeltown/core/kernel";
 import { ulid } from "ulid";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { drainAfter, drainOutbox, POOL_ORG } from "./helpers.ts";
 import {
+  conflictStateOf,
   deliver,
+  discardsOf,
   hash,
   kept,
   logOf,
   ok,
   probeIdOf,
   sha,
+  subjectOf,
   suspected,
   WORKSPACE,
 } from "./probe-harness.ts";
@@ -53,11 +58,33 @@ const BUILT = kept({
   hunks: { A: "", B: "" },
 });
 
-/** Everything from trunk's head to the draft, kept, so an instance reaches the ledger without the code host or the model. */
+/** A draft's kept value when the runner could not run its matrix. */
+const UNAVAILABLE = kept({ _tag: "RunnerUnavailable", reason: "keel-verify did not answer" });
+/** A draft's kept value when Workers AI refused its one model call for capacity. */
+const RATE_LIMITED = kept({
+  _tag: "Drafted",
+  outcome: {
+    _tag: "Abstained",
+    reason: "rate-limited",
+    attempts: 1,
+    detail: "Error: 3040: Capacity temporarily exceeded",
+    feedback: [],
+  },
+});
+
+/**
+ * Everything from trunk's head to the draft, kept, so an instance reaches the
+ * ledger without the code host or the model. `drafts` is what each draft in
+ * turn keeps (`draft`, `draft#2`, `draft#3`); one admitted draft unless given.
+ */
 async function mockWorlds(
   instance: Awaited<ReturnType<typeof introspectWorkflowInstance>>,
-  options: { readonly worldChecks?: "kept" | "started" } = {},
+  options: {
+    readonly worldChecks?: "kept" | "started";
+    readonly drafts?: readonly string[];
+  } = {},
 ) {
+  const drafts = options.drafts ?? [admittedDraft];
   await instance.modify(async (m) => {
     await m.mockStepResult({ name: "trunk" }, kept(sha("0")));
     await m.mockStepResult(
@@ -65,7 +92,11 @@ async function mockWorlds(
       kept({ candidateId: makeId("cnd", ulid()), at: 1_791_709_200_000 }),
     );
     await m.mockStepResult({ name: "worlds" }, BUILT);
-    await m.mockStepResult({ name: "draft" }, admittedDraft);
+    await Promise.all(
+      drafts.map((draft, n) =>
+        m.mockStepResult({ name: n === 0 ? "draft" : `draft#${n + 1}` }, draft),
+      ),
+    );
     // KeelWorldCheck's own pool cases run world checks; here they are started and kept.
     await m.mockStepResult({ name: "trunk plan" }, kept({ _tag: "Unplanned", reason: "pool" }));
     if (options.worldChecks !== "started")
@@ -73,6 +104,21 @@ async function mockWorlds(
     await m.mockStepResult({ name: "guard" }, kept(sha("9")));
   });
 }
+
+/** Every sleep the instance began, in order, as its engine logged it: the step and how long it asked for. */
+async function sleepsOf(id: string) {
+  using events = await (await env.PROBE.get(id)).subscribe({ filter: ["sleep_started"] });
+  const sleeps: { readonly step: string; readonly ms: number }[] = [];
+  // oxlint-disable-next-line no-await-in-loop -- a subscription is read one event after another
+  for (let next = await events.next(); next.done !== true; next = await events.next())
+    if (next.value.type === "sleep_started")
+      sleeps.push({ step: next.value.stepName, ms: next.value.durationMs });
+  return sleeps;
+}
+
+/** The namespace object an unprovable conflict of a pool project is escalated to. */
+const poolNamespace = () =>
+  drainAfter(env.NAMESPACE.get(env.NAMESPACE.idFromName(namespaceAddress(POOL_ORG))));
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -221,6 +267,113 @@ describe("Probe", () => {
     expect(output).toEqual({ outcome: "draft-failed", reason: "no-submission", attempts: 0 });
     const probeId = await probeIdOf(s.projectId, s.conflictId);
     expect(await logOf(s.projectId, { kind: "probe", id: probeId })).toEqual(["ProbeDiscarded"]);
+  });
+
+  it("[d22.pool.probe-runner-unavailable] a runner that can run none of the three drafts ends the instance errored, with the draft recorded incomplete and the conflict escalated", async () => {
+    const s = await suspected();
+    const id = `probe-${s.conflictId}`;
+    const namespace = poolNamespace();
+    await using instance = await introspectWorkflowInstance(env.PROBE, id);
+    await instance.modify(async (m) => {
+      await m.mockStepResult({ name: "party A 1" }, submitted("a"));
+      await m.mockStepResult({ name: "party B 1" }, submitted("b"));
+      await m.disableSleeps();
+    });
+    await mockWorlds(instance, { drafts: [UNAVAILABLE, UNAVAILABLE, UNAVAILABLE] });
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect((await deliver("workflow:Probe", [s.envelope]))._tag).toBe("Success");
+    await instance.waitForStatus("errored");
+    // The engine names no step's error as the instance's; the instance's own ops line says what ended it.
+    expect(errors.mock.calls.flat().join("\n")).toContain(
+      "draft#3: the probe runner could not run any of 3 drafts: keel-verify did not answer",
+    );
+    expect(await sleepsOf(id)).toEqual([
+      { step: "draft wait-1", ms: 30_000 },
+      { step: "draft#2 wait-1", ms: 120_000 },
+    ]);
+    expect(await discardsOf(s.projectId, s.conflictId)).toMatchObject([
+      { reason: "draft-failed", detail: "incomplete", conflictId: s.conflictId },
+    ]);
+    expect(await conflictStateOf(s.projectId, s.conflictId)).toBe("escalated");
+    await drainOutbox(subjectOf(s.projectId));
+    await drainOutbox(namespace);
+  });
+
+  it("[d22.pool.probe-step-died] a step that runs out of tries once the conflict was read as suspected ends the instance errored, with the draft recorded incomplete and the conflict escalated", async () => {
+    const s = await suspected();
+    const id = `probe-${s.conflictId}`;
+    const namespace = poolNamespace();
+    await using instance = await introspectWorkflowInstance(env.PROBE, id);
+    await instance.modify(async (m) => {
+      await m.mockStepResult({ name: "party A 1" }, submitted("a"));
+      await m.mockStepResult({ name: "party B 1" }, submitted("b"));
+      await m.mockStepResult({ name: "trunk" }, kept(sha("0")));
+      await m.mockStepResult(
+        { name: "ab" },
+        kept({ candidateId: makeId("cnd", ulid()), at: 1_791_709_200_000 }),
+      );
+      await m.mockStepResult({ name: "worlds" }, BUILT);
+      // The draft dies on its first try and on its one retry.
+      await m.mockStepError({ name: "draft" }, new Error("the verifier fell over"));
+      await m.disableRetryDelays();
+    });
+    expect((await deliver("workflow:Probe", [s.envelope]))._tag).toBe("Success");
+    await instance.waitForStatus("errored");
+    expect(await discardsOf(s.projectId, s.conflictId)).toMatchObject([
+      { reason: "draft-failed", detail: "incomplete", conflictId: s.conflictId },
+    ]);
+    expect(await conflictStateOf(s.projectId, s.conflictId)).toBe("escalated");
+    await drainOutbox(subjectOf(s.projectId));
+    await drainOutbox(namespace);
+  });
+
+  it("[d22.pool.probe-rate-limited] a model rate-limited for two drafts is waited out, 30 s and then 120 s, and the third draft is admitted", async () => {
+    const s = await suspected();
+    const id = `probe-${s.conflictId}`;
+    await using instance = await introspectWorkflowInstance(env.PROBE, id);
+    await instance.modify(async (m) => {
+      await m.mockStepResult({ name: "party A 1" }, submitted("a"));
+      await m.mockStepResult({ name: "party B 1" }, submitted("b"));
+      await m.disableSleeps();
+    });
+    await mockWorlds(instance, { drafts: [RATE_LIMITED, RATE_LIMITED, admittedDraft] });
+    expect((await deliver("workflow:Probe", [s.envelope]))._tag).toBe("Success");
+    await instance.waitForStatus("complete");
+    const { output } = await (await env.PROBE.get(id)).status();
+    expect(output).toMatchObject({ outcome: "admitted", guardCommit: sha("9") });
+    expect(await sleepsOf(id)).toEqual([
+      { step: "draft wait-1", ms: 30_000 },
+      { step: "draft#2 wait-1", ms: 120_000 },
+    ]);
+    const probeId = await probeIdOf(s.projectId, s.conflictId);
+    expect(await logOf(s.projectId, { kind: "probe", id: probeId })).toContain("GuardAdmitted");
+    await drainOutbox(subjectOf(s.projectId));
+  });
+
+  it("[d22.pool.probe-rate-limited-out] a model rate-limited for all three drafts fails the draft as abstained on its Subject DO", async () => {
+    const s = await suspected();
+    const id = `probe-${s.conflictId}`;
+    const namespace = poolNamespace();
+    await using instance = await introspectWorkflowInstance(env.PROBE, id);
+    await instance.modify(async (m) => {
+      await m.mockStepResult({ name: "party A 1" }, submitted("a"));
+      await m.mockStepResult({ name: "party B 1" }, submitted("b"));
+      await m.disableSleeps();
+    });
+    await mockWorlds(instance, { drafts: [RATE_LIMITED, RATE_LIMITED, RATE_LIMITED] });
+    expect((await deliver("workflow:Probe", [s.envelope]))._tag).toBe("Success");
+    await instance.waitForStatus("complete");
+    const { output } = await (await env.PROBE.get(id)).status();
+    expect(output).toEqual({ outcome: "draft-failed", reason: "abstained", attempts: 1 });
+    expect(await sleepsOf(id)).toEqual([
+      { step: "draft wait-1", ms: 30_000 },
+      { step: "draft#2 wait-1", ms: 120_000 },
+    ]);
+    expect(await discardsOf(s.projectId, s.conflictId)).toMatchObject([
+      { reason: "draft-failed", detail: "abstained", conflictId: s.conflictId },
+    ]);
+    await drainOutbox(subjectOf(s.projectId));
+    await drainOutbox(namespace);
   });
 
   it("[d22.pool.send-finished] an event for an instance that has finished is acknowledged, since nothing waits for it", async () => {

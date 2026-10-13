@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts packages/core/test/application/verification/draft-probe.test.ts
+# kills: draft.abstained-detail, probe.rate-limited-out
+# why: An abstain's outcome forgets what its earlier attempts were told, so what they failed on cannot be read
+diff --git a/packages/core/src/application/verification/draft-probe.ts b/packages/core/src/application/verification/draft-probe.ts
+index 75382433..54675820 100644
+--- a/packages/core/src/application/verification/draft-probe.ts
++++ b/packages/core/src/application/verification/draft-probe.ts
+@@ -231,7 +231,7 @@ export const draftProbe = <S, R>(
+             reason: reply.error.reason,
+             attempts: attempt,
+             ...(reply.error.detail === undefined ? {} : { detail: reply.error.detail }),
+-            feedback,
++            feedback: [],
+           } satisfies DraftOutcome;
+         feedback.push(told);
+         continue;

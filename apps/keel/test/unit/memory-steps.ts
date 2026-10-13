@@ -6,7 +6,7 @@ import { Effect } from "effect";
  * running the program again over the same `kept` replays it; a name used
  * twice in one run is a defect, since the Workflow would answer the first
  * value again. `onWait` decides each wait; `after` runs a hook once a named
- * step has run.
+ * step has run. A sleep takes no time: it is recorded, and kept like a step.
  */
 export function memorySteps(
   options: {
@@ -17,6 +17,7 @@ export function memorySteps(
   const kept = new Map<string, string>();
   const done: string[] = [];
   const waits: { readonly name: string; readonly type: string; readonly timeoutMs: number }[] = [];
+  const sleeps: { readonly name: string; readonly ms: number }[] = [];
   const steps = (): ProbeSteps => {
     const seen = new Set<string>();
     const once = (name: string) =>
@@ -48,7 +49,14 @@ export function memorySteps(
           kept.set(`wait ${name}`, JSON.stringify(heard));
           return heard;
         }),
+      sleep: (name, ms) =>
+        Effect.gen(function* () {
+          yield* once(`sleep ${name}`);
+          if (kept.has(`sleep ${name}`)) return;
+          sleeps.push({ name, ms });
+          kept.set(`sleep ${name}`, JSON.stringify(ms));
+        }),
     };
   };
-  return { kept, ran: done, waits, steps };
+  return { kept, ran: done, waits, sleeps, steps };
 }

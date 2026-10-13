@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.abstained-once
+# why: Every abstain is waited out and drafted again, a timeout among them, where only a rate limit is
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 8289f601..e9f6af79 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -339,8 +339,7 @@ export const draftConflict = (
+ const draftsAgain = (drafted: DraftAnswer): boolean =>
+   drafted._tag === "RunnerUnavailable" ||
+   (drafted._tag === "Drafted" &&
+-    drafted.outcome._tag === "Abstained" &&
+-    drafted.outcome.reason === "rate-limited");
++    drafted.outcome._tag === "Abstained");
+ 
+ /** A party as the program left it: its world, or why it has none. */
+ type PartyEnd =

@@ -74,7 +74,8 @@ const timedOut = (error: unknown) =>
 /**
  * A Workflow's durable steps for a core program: each `step` runs its
  * effect inside `step.do` with the program's services, kept as JSON, so a
- * replay answers what the first run kept; `waitFor` is `step.waitForEvent`.
+ * replay answers what the first run kept; `waitFor` is `step.waitForEvent`,
+ * and `sleep` is `step.sleep`.
  */
 export const workflowSteps = (step: WorkflowStep): ProbeSteps => ({
   step: <A, R>(name: string, effect: Effect.Effect<A, never, R>, policy: StepPolicy = "quick") =>
@@ -95,4 +96,5 @@ export const workflowSteps = (step: WorkflowStep): ProbeSteps => ({
         throw error;
       }
     }),
+  sleep: (name, ms) => Effect.promise(() => step.sleep(name, ms)),
 });

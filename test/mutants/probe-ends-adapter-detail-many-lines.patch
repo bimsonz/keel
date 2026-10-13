@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/platform-function.test.ts
+# kills: pf.ai-error-detail, pf.stream-error-detail
+# why: An AI error's text keeps its line breaks and runs of spaces, so the detail is no longer one line
+diff --git a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+index e3491931..f03a8696 100644
+--- a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
++++ b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+@@ -55,7 +55,7 @@ const DETAIL_CHARS = 200;
+ 
+ /** An AI error's own text, as one trimmed and bounded line. */
+ const detailOf = (error: unknown): string =>
+-  String(error).replace(/\s+/g, " ").trim().slice(0, DETAIL_CHARS).trimEnd();
++  String(error).trim().slice(0, DETAIL_CHARS).trimEnd();
+ 
+ /** An AI failure as an abstain: its reason, and its text as the detail, so whoever reads the abstain sees what the AI said. */
+ const refused = (error: unknown) => abstain(reasonOf(error), detailOf(error));

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/platform-function.test.ts
+# kills: pf.ai-error-detail, pf.stream-error-detail
+# why: An AI error's abstain carries its reason alone, and the error's text is lost again
+diff --git a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+index e3491931..32ce4682 100644
+--- a/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
++++ b/apps/keel/src/adapters/driven/workers-ai/platform-function.ts
+@@ -58,7 +58,7 @@ const detailOf = (error: unknown): string =>
+   String(error).replace(/\s+/g, " ").trim().slice(0, DETAIL_CHARS).trimEnd();
+ 
+ /** An AI failure as an abstain: its reason, and its text as the detail, so whoever reads the abstain sees what the AI said. */
+-const refused = (error: unknown) => abstain(reasonOf(error), detailOf(error));
++const refused = (error: unknown) => abstain(reasonOf(error));
+ 
+ /** The text of one streamed event: an OpenAI-style delta, or Workers AI's `response`. */
+ const pieceOf = (event: unknown): { readonly text: string; readonly finish?: unknown } => {

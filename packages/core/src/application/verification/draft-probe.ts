@@ -71,7 +71,15 @@ export type DraftOutcome =
       /** A probe that ran clean and was not admitted: the probe, its files and its matrix. */
       readonly ran?: DraftRan;
     }
-  | { readonly _tag: "Abstained"; readonly reason: string; readonly attempts: number };
+  | {
+      readonly _tag: "Abstained";
+      readonly reason: string;
+      readonly attempts: number;
+      /** What the model's adapter said of the abstain, when it said anything: an AI error's own text. */
+      readonly detail?: string;
+      /** What every attempt before the abstain was told, in order: what each of them failed on. */
+      readonly feedback: readonly string[];
+    };
 
 const ADMISSION_RULE = `The probe runs in five worlds, each on a fresh isolate with no network: trunk (neither change), A (the
 premise-holder's change alone), B (the other change alone), AB (both), and A-noop (A with the anchored call made a
@@ -128,7 +136,9 @@ export const draftPrompt = <S>(
  * What a repair is told when the model's reply was unusable: a reply that did
  * not parse, or was cut at the token limit, is repaired with the parser's
  * message or the limit. A timeout, a rate limit or an unavailable model ends
- * the draft: nothing deterministic would fix it.
+ * the draft, with what the adapter said of it: no text a repair could be told
+ * would fix it. Whether the conflict is drafted again later is the caller's
+ * to decide.
  */
 const abstainFeedback = (attempt: number, error: ModelAbstained): string | undefined => {
   switch (error.reason) {
@@ -181,8 +191,9 @@ const identicalFailure = (cells: readonly MatrixCell[]): string | undefined => {
  * world is repaired, at most DRAFT_REPAIRS times, from deterministic text
  * only: never from the model's own rationale. An admitted probe ends it; any
  * other matrix result is discarded as admission judged it, a template with no
- * recipe is incomplete, and an abstaining model ends it too. A runner that
- * cannot run at all fails, for the caller to retry.
+ * recipe is incomplete, and an abstaining model ends it too, with the
+ * abstain's detail and the feedback so far. A runner that cannot run at all
+ * fails, for the caller to draft again.
  */
 export const draftProbe = <S, R>(
   namespace: NamespaceId,
@@ -219,6 +230,8 @@ export const draftProbe = <S, R>(
             _tag: "Abstained",
             reason: reply.error.reason,
             attempts: attempt,
+            ...(reply.error.detail === undefined ? {} : { detail: reply.error.detail }),
+            feedback,
           } satisfies DraftOutcome;
         feedback.push(told);
         continue;

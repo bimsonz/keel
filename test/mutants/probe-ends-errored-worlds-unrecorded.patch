@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.errored-worlds
+# why: A workspace gone under every read of the worlds errors the instance with nothing recorded
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 8289f601..b4ab58e7 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -532,7 +532,6 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
+     for (let round = 1; planned === undefined; round++) {
+       const tag = round === 1 ? "" : `#${round}`;
+       if (round > PROBE_WORLD_ROUNDS) {
+-        yield* recordHarnessError("incomplete");
+         return {
+           outcome: "errored",
+           step: `worlds${tag}`,

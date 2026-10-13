@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts
+# kills: probe.first-read
+# why: A refused first read of the conflict tries to record a failed draft on a conflict that is not there
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 8289f601..f49aec2d 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -405,6 +405,8 @@ const failureStep = (
+ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
+   Effect.gen(function* () {
+     const first = yield* conflictStep(call, steps, "conflict");
++    if (first._tag === "Refused")
++      yield* failureStep(call, steps, "draft-failed", "incomplete", 0);
+     if (first._tag === "Refused")
+       return {
+         outcome: "errored",

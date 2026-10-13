@@ -112,6 +112,28 @@ export const probeIdOf = async (projectId: ProjectId, conflictId: ConflictId) =>
     return view.probe.id;
   });
 
+/** The conflict's state, as its ledger holds it. */
+export const conflictStateOf = async (projectId: ProjectId, conflictId: ConflictId) =>
+  runInDurableObject(subjectOf(projectId), async (instance: SubjectDO) => {
+    const view = await instance["runtime"].runPromise(conflictView(conflictId));
+    return view.conflict.state;
+  });
+
+/** Every ProbeDiscarded committed on the conflict's probe, as its payload: why the probe was discarded. */
+export async function discardsOf(projectId: ProjectId, conflictId: ConflictId) {
+  const probeId = await probeIdOf(projectId, conflictId);
+  return runInDurableObject(subjectOf(projectId), (instance: SubjectDO) =>
+    instance["runtime"].runPromise(
+      Effect.map(EventOutbox, (outbox) =>
+        outbox
+          .log({ kind: "probe", id: probeId })
+          .filter((e) => e.type === "ProbeDiscarded")
+          .map((e) => e.payload),
+      ),
+    ),
+  );
+}
+
 export const deliver = (subscriber: string, events: readonly EventEnvelope[]) =>
   Effect.runPromise(Effect.exit(FanOutRpc(env).deliver(subscriber, events)));
 

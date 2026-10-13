@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/probe.test.ts packages/core/test/application/verification/draft-probe.test.ts
+# kills: draft.abstained-detail, probe.rate-limited-out
+# why: An abstain's outcome loses what the adapter said of it, so the AI error's text is nowhere on the draft's kept value
+diff --git a/packages/core/src/application/verification/draft-probe.ts b/packages/core/src/application/verification/draft-probe.ts
+index 75382433..e09995a2 100644
+--- a/packages/core/src/application/verification/draft-probe.ts
++++ b/packages/core/src/application/verification/draft-probe.ts
+@@ -230,7 +230,6 @@ export const draftProbe = <S, R>(
+             _tag: "Abstained",
+             reason: reply.error.reason,
+             attempts: attempt,
+-            ...(reply.error.detail === undefined ? {} : { detail: reply.error.detail }),
+             feedback,
+           } satisfies DraftOutcome;
+         feedback.push(told);

@@ -50,6 +50,16 @@ const abstain = (reason: Reason, detail?: string) =>
 const reasonOf = (error: unknown): Reason =>
   /\b(3040|429)\b|capacity|rate limit/i.test(String(error)) ? "rate-limited" : "unavailable";
 
+/** The most of an AI error's text an abstain keeps: enough to name the error, never a page of it. */
+const DETAIL_CHARS = 200;
+
+/** An AI error's own text, as one trimmed and bounded line. */
+const detailOf = (error: unknown): string =>
+  String(error).replace(/\s+/g, " ").trim().slice(0, DETAIL_CHARS).trimEnd();
+
+/** An AI failure as an abstain: its reason, and its text as the detail, so whoever reads the abstain sees what the AI said. */
+const refused = (error: unknown) => abstain(reasonOf(error), detailOf(error));
+
 /** The text of one streamed event: an OpenAI-style delta, or Workers AI's `response`. */
 const pieceOf = (event: unknown): { readonly text: string; readonly finish?: unknown } => {
   const choice: unknown = Reflect.get(Object(Reflect.get(Object(event), "choices")), 0);
@@ -121,7 +131,7 @@ async function complete(
       stream: true,
     });
   } catch (error) {
-    throw abstain(reasonOf(error));
+    throw refused(error);
   }
   if (!(answer instanceof ReadableStream)) throw abstain("unavailable");
   let read: { readonly text: string; readonly truncated: boolean };
@@ -130,7 +140,7 @@ async function complete(
   } catch (error) {
     throw error instanceof SyntaxError
       ? abstain("schema", `a streamed event: ${error.message}`)
-      : abstain(reasonOf(error));
+      : refused(error);
   }
   if (read.truncated) throw abstain("truncated", String(MAX_TOKENS));
   try {
@@ -148,7 +158,8 @@ async function complete(
  * The reply is constrained by the call's JSON schema and parsed; the caller
  * checks it against its own rules. An unpinned function, an AI error, a
  * stream cut at the token limit, unparseable text or the deadline all
- * abstain, so a caller never mistakes no answer for one.
+ * abstain, so a caller never mistakes no answer for one; an AI error's
+ * abstain keeps the error's text as its detail.
  */
 export const PlatformFunctionWorkersAI = (
   ai: StreamingAi,

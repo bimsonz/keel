@@ -16,7 +16,12 @@ import {
   probeSubscriber,
 } from "@keeltown/core/application/verification";
 import { SubjectKey } from "@keeltown/core/domain/coordination";
-import type { ConflictCommand, ProbeOutcome, World } from "@keeltown/core/domain/verification";
+import {
+  type ConflictCommand,
+  ModelAbstained,
+  type ProbeOutcome,
+  type World,
+} from "@keeltown/core/domain/verification";
 import {
   type ChangeId,
   CommitSha,
@@ -33,6 +38,7 @@ import {
   PlatformFunction,
   ProbeLedger,
   ProbeRunner,
+  ProbeRunnerUnavailable,
   ProbeStore,
   type RepoRef,
 } from "@keeltown/core/ports";
@@ -52,7 +58,7 @@ import {
   makeWorldChecksMemory,
   sampleNamespace,
 } from "@keeltown/testing";
-import { Effect, Layer, Schema } from "effect";
+import { Cause, Effect, Exit, Layer, Schema } from "effect";
 import { FlowSpecSourceCodeHost } from "../../src/adapters/driven/gitcore/flow-spec-source.ts";
 import { ProbeSourcesCodeHost } from "../../src/adapters/driven/gitcore/probe-sources.ts";
 import { memorySteps } from "./memory-steps.ts";
@@ -155,6 +161,14 @@ interface Options {
   readonly effect?: boolean;
   /** AB cannot be composed. */
   readonly refuseCompose?: boolean;
+  /** What the model answers on its n-th call (1-based) in place of the slots: a reply, or the abstain it fails with. */
+  readonly reply?: (call: number) => unknown;
+  /** What the runner does with a run of the n-th probe stored (1-based), in place of running it. */
+  readonly runner?: (probe: number) => Effect.Effect<ProbeRun, ProbeRunnerUnavailable> | undefined;
+  /** Neither party is a change ProbeChanges knows: a read of either is refused. */
+  readonly undeclared?: boolean;
+  /** What recording a failed draft dies with, in place of reaching the ledger. */
+  readonly recordDies?: Error;
 }
 
 /**
@@ -194,9 +208,22 @@ function probeWorld(options: Options = {}) {
     refuse: options.refuseCompose === true ? [A, B] : [],
   });
   const matrix = options.matrix ?? DISCRIMINATING;
+  let modelCalls = 0;
+  let stored = 0;
+  const recordDies = options.recordDies;
+  const ledgerLayer =
+    recordDies === undefined
+      ? ledger.layer
+      : Layer.effect(
+          ProbeLedger,
+          Effect.gen(function* () {
+            const inner = yield* ProbeLedger;
+            return ProbeLedger.of({ ...inner, probeDraftFailed: () => Effect.die(recordDies) });
+          }),
+        ).pipe(Layer.provide(ledger.layer));
   const layer = Layer.mergeAll(
     host.layer,
-    ledger.layer,
+    ledgerLayer,
     changes.layer,
     trunks.layer,
     guards.layer,
@@ -232,12 +259,23 @@ function probeWorld(options: Options = {}) {
           }),
       }),
     ),
-    Layer.succeed(PlatformFunction, PlatformFunction.of({ call: () => Effect.succeed(SLOTS) })),
+    Layer.succeed(
+      PlatformFunction,
+      PlatformFunction.of({
+        call: () =>
+          Effect.suspend(() => {
+            modelCalls += 1;
+            const reply = options.reply?.(modelCalls) ?? SLOTS;
+            return reply instanceof ModelAbstained ? Effect.fail(reply) : Effect.succeed(reply);
+          }),
+      }),
+    ),
     Layer.succeed(
       ProbeStore,
       ProbeStore.of({
         put: (namespace) =>
           Effect.sync(() => {
+            stored += 1;
             named.push({ call: "probe", namespace });
             return hash(7);
           }),
@@ -248,11 +286,15 @@ function probeWorld(options: Options = {}) {
       ProbeRunner,
       ProbeRunner.of({
         run: (request) =>
-          Effect.sync(() => {
-            runs.push({ world: request.world, bundle: request.worldBundle });
-            named.push({ call: "run", namespace: request.namespace });
-            return ran(matrix[request.world]);
-          }),
+          Effect.suspend(
+            () =>
+              options.runner?.(stored) ??
+              Effect.sync(() => {
+                runs.push({ world: request.world, bundle: request.worldBundle });
+                named.push({ call: "run", namespace: request.namespace });
+                return ran(matrix[request.world]);
+              }),
+          ),
       }),
     ),
   );
@@ -297,8 +339,10 @@ function probeWorld(options: Options = {}) {
     const headB = yield* host.fixture.commit(wsB, MAIN, B_TREE);
     trunks.heads.set(projectId, T);
     yield* ledger.suspect(at, conflictId, suspect);
-    yield* changes.declare(A);
-    yield* changes.declare(B);
+    if (options.undeclared !== true) {
+      yield* changes.declare(A);
+      yield* changes.declare(B);
+    }
     return { T, headA, headB };
   }).pipe(Effect.provide(host.layer), Effect.orDie);
   const call = { namespace: sampleNamespace, projectId, key, conflictId, instanceId, staging };
@@ -347,8 +391,35 @@ function probeWorld(options: Options = {}) {
       Effect.gen(function* () {
         return yield* (yield* ProbeLedger).conflict(at, conflictId);
       }).pipe(Effect.provide(layer), Effect.orDie),
+    /** Every ProbeDiscarded the ledger committed for the conflict's probe, as its payload. */
+    discards: () =>
+      Effect.gen(function* () {
+        const probe = (yield* (yield* ProbeLedger).conflict(at, conflictId)).probe;
+        if (probe === undefined) return [];
+        const log = yield* ledger.log(at, { kind: "probe", id: probe.id });
+        return log.filter((e) => e.type === "ProbeDiscarded").map((e) => e.payload);
+      }).pipe(Effect.provide(layer), Effect.orDie),
+    /** Records the conflict's draft as failed from outside the program, so the conflict has moved on and the ledger refuses the program's own record. */
+    recordElsewhere: () =>
+      Effect.gen(function* () {
+        yield* (yield* ProbeLedger).probeDraftFailed(at, {
+          conflictId,
+          attempts: 0,
+          reason: "party-gone",
+        });
+      }).pipe(Effect.provide(ledger.layer), Effect.orDie),
   };
 }
+
+/** The runner as it answers when keel-verify cannot be reached. */
+const UNAVAILABLE = Effect.fail(
+  new ProbeRunnerUnavailable({ reason: "keel-verify did not answer" }),
+);
+/** Workers AI refusing a call for capacity, as its adapter abstains. */
+const RATE_LIMITED = new ModelAbstained({
+  reason: "rate-limited",
+  detail: "Error: 3040: Capacity temporarily exceeded",
+});
 
 const types = (log: readonly { readonly type: string }[]) => log.map((e) => e.type);
 const conflictRef = (conflictId: string): EntityRef => ({ kind: "conflict", id: conflictId });
@@ -583,7 +654,7 @@ describe("probeConflict", () => {
   );
 
   it.effect(
-    "[probe.unreadable] a world's commit missing from staging is a harness error naming it, and no fact is reported",
+    "[probe.unreadable] a world's commit missing from staging is a harness error naming it, recorded first as worlds that could not be built",
     () => {
       const w = probeWorld();
       const s = memorySteps();
@@ -599,8 +670,355 @@ describe("probeConflict", () => {
           commit: missing,
           reason: "ObjectNotFound",
         } satisfies ProbeEnd);
-        expect(types(yield* w.log(conflictRef(w.conflictId)))).toEqual(["ConflictSuspected"]);
+        expect(yield* w.discards()).toMatchObject([
+          { reason: "draft-failed", detail: "worlds-unbuildable", conflictId: w.conflictId },
+        ]);
+        expect(s.ran.at(-1)).toBe("draft-failed");
         expect(w.runs).toHaveLength(0);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.unreadable-draft] trunk's source gone from staging under the draft is the same harness error, recorded the same way",
+    () => {
+      const w = probeWorld();
+      const s = memorySteps({
+        // Staging goes between the worlds' read and the draft's read of trunk's source.
+        after: {
+          worlds: Effect.provide(
+            Effect.gen(function* () {
+              yield* (yield* CodeHost).delete(w.staging);
+            }),
+            w.host.layer,
+          ),
+        },
+      });
+      return Effect.gen(function* () {
+        const heads = yield* w.setup;
+        yield* w.submitBoth(heads);
+        const end = yield* w.run(s.steps());
+        expect(end).toEqual({
+          outcome: "unreadable",
+          world: "trunk",
+          repo: `${w.staging.namespace}/${w.staging.name}`,
+          commit: heads.T,
+          reason: "RepoNotFound",
+        } satisfies ProbeEnd);
+        expect(yield* w.discards()).toMatchObject([
+          { reason: "draft-failed", detail: "worlds-unbuildable", conflictId: w.conflictId },
+        ]);
+        expect(s.ran.slice(-2)).toEqual(["draft", "draft-failed"]);
+        expect(s.sleeps).toEqual([]);
+        expect(w.runs).toHaveLength(0);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.runner-unavailable] a runner that can run none of three drafts is recorded as an incomplete draft, and the instance then errors on the last draft",
+    () => {
+      const w = probeWorld({ runner: () => UNAVAILABLE });
+      const s = memorySteps();
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        const end = yield* w.run(s.steps());
+        expect(end).toEqual({
+          outcome: "errored",
+          step: "draft#3",
+          reason: "the probe runner could not run any of 3 drafts: keel-verify did not answer",
+        } satisfies ProbeEnd);
+        expect(s.ran.slice(-4)).toEqual(["draft", "draft#2", "draft#3", "draft-failed"]);
+        expect(s.sleeps).toEqual([
+          { name: "draft wait", ms: 30_000 },
+          { name: "draft#2 wait", ms: 120_000 },
+        ]);
+        expect(yield* w.discards()).toMatchObject([
+          { reason: "draft-failed", detail: "incomplete", conflictId: w.conflictId },
+        ]);
+        expect(yield* w.view()).toMatchObject({
+          probe: { state: "discarded", discarded: "draft-failed" },
+        });
+        expect(w.runs).toHaveLength(0);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.drafts-again] a runner unavailable for the first draft is waited out for 30 s, and the second draft goes on to its guard",
+    () => {
+      const w = probeWorld({ runner: (probe) => (probe === 1 ? UNAVAILABLE : undefined) });
+      const s = memorySteps();
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        const end = yield* w.run(s.steps());
+        expect(end).toMatchObject({ outcome: "admitted" });
+        expect(s.sleeps).toEqual([{ name: "draft wait", ms: 30_000 }]);
+        expect(s.ran.filter((n) => n.startsWith("draft"))).toEqual(["draft", "draft#2", "drafted"]);
+        expect(JSON.parse(s.kept.get("draft") ?? "null")).toEqual({
+          _tag: "RunnerUnavailable",
+          reason: "keel-verify did not answer",
+        });
+        expect(yield* w.discards()).toEqual([]);
+        expect(w.runs).toHaveLength(15);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.rate-limited] a model rate-limited for two drafts is waited out for 30 s and then 120 s, and the third draft goes on to its guard",
+    () => {
+      const w = probeWorld({ reply: (call) => (call <= 2 ? RATE_LIMITED : undefined) });
+      const s = memorySteps();
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        const end = yield* w.run(s.steps());
+        expect(end).toMatchObject({ outcome: "admitted" });
+        expect(s.sleeps).toEqual([
+          { name: "draft wait", ms: 30_000 },
+          { name: "draft#2 wait", ms: 120_000 },
+        ]);
+        expect(s.ran.filter((n) => n.startsWith("draft"))).toEqual([
+          "draft",
+          "draft#2",
+          "draft#3",
+          "drafted",
+        ]);
+        expect(yield* w.discards()).toEqual([]);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.rate-limited-out] a model rate-limited for all three drafts fails the draft as abstained, and the last draft keeps what the AI said and what its earlier attempt was told",
+    () => {
+      // Each draft: slots the template refuses, then the rate limit.
+      const w = probeWorld({
+        reply: (call) => (call % 2 === 1 ? { ...SLOTS, owner: "Alice" } : RATE_LIMITED),
+      });
+      const s = memorySteps();
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        const end = yield* w.run(s.steps());
+        expect(end).toEqual({ outcome: "draft-failed", reason: "abstained", attempts: 2 });
+        expect(s.ran.slice(-4)).toEqual(["draft", "draft#2", "draft#3", "draft-failed"]);
+        expect(s.sleeps).toEqual([
+          { name: "draft wait", ms: 30_000 },
+          { name: "draft#2 wait", ms: 120_000 },
+        ]);
+        expect(JSON.parse(s.kept.get("draft#3") ?? "null")).toEqual({
+          _tag: "Drafted",
+          outcome: {
+            _tag: "Abstained",
+            reason: "rate-limited",
+            attempts: 2,
+            detail: "Error: 3040: Capacity temporarily exceeded",
+            feedback: ["attempt 1: slots: owner must be a lowercase username"],
+          },
+        });
+        expect(yield* w.discards()).toMatchObject([
+          { reason: "draft-failed", detail: "abstained", conflictId: w.conflictId },
+        ]);
+        expect(w.runs).toHaveLength(0);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.abstained-once] a model that abstains for any other reason ends the draft at once: no wait, no second draft",
+    () => {
+      const w = probeWorld({ reply: () => new ModelAbstained({ reason: "timeout" }) });
+      const s = memorySteps();
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        const end = yield* w.run(s.steps());
+        expect(end).toEqual({ outcome: "draft-failed", reason: "abstained", attempts: 1 });
+        expect(s.sleeps).toEqual([]);
+        expect(s.ran.slice(-2)).toEqual(["draft", "draft-failed"]);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.errored-worlds] a workspace gone under every read of the worlds is recorded as an incomplete draft before the instance errors",
+    () => {
+      const w = probeWorld();
+      const s = memorySteps();
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        // A's workspace is gone and A never lands: every round reads it as submitted, and misses.
+        yield* Effect.provide(
+          Effect.gen(function* () {
+            yield* (yield* CodeHost).delete(w.wsA);
+          }),
+          w.host.layer,
+        );
+        const end = yield* w.run(s.steps());
+        expect(end).toEqual({
+          outcome: "errored",
+          step: "worlds#4",
+          reason: "a party's workspace went away under each of 3 reads of the worlds",
+        } satisfies ProbeEnd);
+        expect(s.ran.filter((n) => n.startsWith("worlds"))).toEqual([
+          "worlds",
+          "worlds#2",
+          "worlds#3",
+        ]);
+        expect(s.ran.at(-1)).toBe("draft-failed");
+        expect(yield* w.discards()).toMatchObject([
+          { reason: "draft-failed", detail: "incomplete", conflictId: w.conflictId },
+        ]);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.errored-party] a party whose read is refused is recorded as an incomplete draft before the instance errors",
+    () => {
+      const w = probeWorld({ undeclared: true });
+      const s = memorySteps();
+      return Effect.gen(function* () {
+        yield* w.setup;
+        const end = yield* w.run(s.steps());
+        expect(end).toEqual({
+          outcome: "errored",
+          step: "party A 1",
+          reason: `${w.A}: ChangeNotFound`,
+        } satisfies ProbeEnd);
+        expect(s.ran).toEqual(["conflict", "started", "party A 1", "draft-failed"]);
+        expect(yield* w.discards()).toMatchObject([
+          { reason: "draft-failed", detail: "incomplete", conflictId: w.conflictId },
+        ]);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.died] a step that dies once the conflict was read as suspected records an incomplete draft, and the instance fails with that same defect",
+    () => {
+      const defect = new Error("the verifier fell over");
+      const w = probeWorld({ runner: () => Effect.die(defect) });
+      const s = memorySteps();
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        const exit = yield* Effect.exit(w.run(s.steps()));
+        expect(Exit.isFailure(exit)).toBe(true);
+        if (!Exit.isFailure(exit)) return;
+        expect(Cause.hasDies(exit.cause)).toBe(true);
+        expect(Cause.squash(exit.cause)).toBe(defect);
+        // The draft never kept a value; the record did.
+        expect(s.ran).not.toContain("draft");
+        expect(s.ran.at(-1)).toBe("incomplete");
+        expect(yield* w.discards()).toMatchObject([
+          { reason: "draft-failed", detail: "incomplete", conflictId: w.conflictId },
+        ]);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.died-record] a record that dies too changes nothing: the instance fails with the first defect, not the record's",
+    () => {
+      const defect = new Error("the verifier fell over");
+      const w = probeWorld({
+        runner: () => Effect.die(defect),
+        recordDies: new Error("the ledger is gone"),
+      });
+      const s = memorySteps();
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        const exit = yield* Effect.exit(w.run(s.steps()));
+        expect(Exit.isFailure(exit)).toBe(true);
+        if (!Exit.isFailure(exit)) return;
+        expect(Cause.squash(exit.cause)).toBe(defect);
+        expect(s.ran).not.toContain("incomplete");
+        expect(yield* w.discards()).toEqual([]);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.interrupted] an interruption is neither a failure nor a defect: nothing is recorded, and the conflict stays suspected",
+    () => {
+      const w = probeWorld();
+      // A has submitted nothing, so the program waits for it, and is interrupted there.
+      const s = memorySteps({ onWait: () => Effect.interrupt });
+      return Effect.gen(function* () {
+        const heads = yield* w.setup;
+        yield* w.changes.submit(w.B, { repo: w.wsB, head: heads.headB, base: heads.T });
+        const exit = yield* Effect.exit(w.run(s.steps()));
+        expect(Exit.isFailure(exit)).toBe(true);
+        if (!Exit.isFailure(exit)) return;
+        expect(Cause.hasInterruptsOnly(exit.cause)).toBe(true);
+        expect(s.waits).toHaveLength(1);
+        expect(s.ran).not.toContain("incomplete");
+        expect(yield* w.discards()).toEqual([]);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.refused-record-unreadable] a record the ledger refuses leaves an unreadable end as it was: the conflict moved on, and nothing more is said of it",
+    () => {
+      const w = probeWorld();
+      const s = memorySteps({ after: { trunk: Effect.suspend(() => w.recordElsewhere()) } });
+      const missing = CommitSha.make("f".repeat(40));
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        w.trunks.heads.set(w.projectId, missing);
+        const end = yield* w.run(s.steps());
+        expect(end).toEqual({
+          outcome: "unreadable",
+          world: "trunk",
+          repo: `${w.staging.namespace}/${w.staging.name}`,
+          commit: missing,
+          reason: "ObjectNotFound",
+        } satisfies ProbeEnd);
+        expect(s.ran.at(-1)).toBe("draft-failed");
+        expect(JSON.parse(s.kept.get("draft-failed") ?? "null")).toMatchObject({ _tag: "Refused" });
+        expect(yield* w.discards()).toMatchObject([
+          { reason: "draft-failed", detail: "party-gone" },
+        ]);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.refused-record-errored] a record the ledger refuses leaves an errored end as it was",
+    () => {
+      const w = probeWorld({ runner: () => UNAVAILABLE });
+      const s = memorySteps({ after: { "draft#3": Effect.suspend(() => w.recordElsewhere()) } });
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        const end = yield* w.run(s.steps());
+        expect(end).toEqual({
+          outcome: "errored",
+          step: "draft#3",
+          reason: "the probe runner could not run any of 3 drafts: keel-verify did not answer",
+        } satisfies ProbeEnd);
+        expect(JSON.parse(s.kept.get("draft-failed") ?? "null")).toMatchObject({ _tag: "Refused" });
+        expect(yield* w.discards()).toMatchObject([
+          { reason: "draft-failed", detail: "party-gone" },
+        ]);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.first-read] a first read of the conflict that is refused errors the instance and records nothing: there is no conflict to record it on",
+    () => {
+      const w = probeWorld();
+      const s = memorySteps();
+      return Effect.gen(function* () {
+        // No setup: the subject holds no such conflict.
+        const end = yield* w.run(s.steps());
+        expect(end).toEqual({
+          outcome: "errored",
+          step: "conflict",
+          reason: `conflict ${w.conflictId} is not on authz.permission-evaluation: ConflictNotFound`,
+        } satisfies ProbeEnd);
+        expect(s.ran).toEqual(["conflict"]);
+        expect(yield* w.log(conflictRef(w.conflictId))).toEqual([]);
       });
     },
   );

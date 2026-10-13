@@ -1,4 +1,4 @@
-import { Effect, Result } from "effect";
+import { Cause, Effect, Result } from "effect";
 import type { SubjectKey } from "../../domain/coordination/index.ts";
 import type {
   CandidateId,
@@ -13,6 +13,7 @@ import type {
   ProjectId,
 } from "../../domain/kernel/index.ts";
 import type {
+  Conflict,
   ConflictState,
   DraftFailure,
   FlowWorld,
@@ -80,6 +81,7 @@ export type StepPolicy = "quick" | "draft";
  * without running it again; a defect throws, and the step is tried again.
  * `waitFor` waits for one event of `type`, answering false once `timeoutMs`
  * passes without one; an event sent before the wait began still counts.
+ * `sleep` waits `ms` once, durably: a replay does not wait again.
  */
 export interface ProbeSteps {
   readonly step: <A, R>(
@@ -88,6 +90,7 @@ export interface ProbeSteps {
     policy?: StepPolicy,
   ) => Effect.Effect<A, never, R>;
   readonly waitFor: (name: string, type: string, timeoutMs: number) => Effect.Effect<boolean>;
+  readonly sleep: (name: string, ms: number) => Effect.Effect<void>;
 }
 
 /** The address a waiting party's next submission is sent to: this instance. */
@@ -107,8 +110,22 @@ export const abRef = (conflictId: ConflictId): string => `refs/heads/probe/${con
 export const PROBE_WORLD_ROUNDS = 3;
 
 /**
+ * How long the program waits before it drafts again, after the first draft
+ * and after the second: a runner that could not run, or a model that was
+ * rate-limited, is given time to come back. Each is one bounded wait between
+ * two tries, never a poll.
+ */
+export const PROBE_DRAFT_WAITS_MS = [30_000, 120_000] as const;
+
+/** The most drafts a conflict is given: the first, and one after each wait. */
+export const PROBE_DRAFTS = 1 + PROBE_DRAFT_WAITS_MS.length;
+
+/**
  * How a Probe instance ended. Only `unreadable` and `errored` are failures:
- * the Workflow ends errored with the reason, loudly, and reports no fact.
+ * the Workflow ends errored with the reason, loudly. Once the conflict was
+ * read as suspected, each of them first records why it has no probe, so it
+ * is never left suspected in silence; only `errored` at the first read of the
+ * conflict reports no fact.
  */
 export type ProbeEnd =
   | {
@@ -263,15 +280,21 @@ export const readProbeWorlds = (
     }).pipe(Effect.catchTag("Unread", (u) => Effect.succeed(u)));
   });
 
-/** A draft's outcome, or the world it could not read. */
-export type DraftAnswer = { readonly _tag: "Drafted"; readonly outcome: DraftOutcome } | Unread;
+/** A draft's outcome, the world it could not read, or why the runner could not run its matrix. */
+export type DraftAnswer =
+  | { readonly _tag: "Drafted"; readonly outcome: DraftOutcome }
+  | { readonly _tag: "RunnerUnavailable"; readonly reason: string }
+  | Unread;
 
 /**
  * Drafts the conflict's probe from its predicate's template: the project's
  * source at the trunk world (in staging), each side's hunks as read with the
  * worlds, and A-noop built from A's world bundle, so no attempt reads a
  * workspace. A predicate with no template has no recipe: its matrix could
- * never be complete, so the draft is incomplete.
+ * never be complete, so the draft is incomplete. A runner that could not run
+ * the matrix is answered as a value, never a defect: the program waits and
+ * drafts afresh, where a step that died would be tried again at once and
+ * then end the instance.
  */
 export const draftConflict = (
   namespace: NamespaceId,
@@ -306,9 +329,18 @@ export const draftConflict = (
     return { _tag: "Drafted", outcome } satisfies DraftAnswer;
   }).pipe(
     Effect.catchTag("Unread", (u) => Effect.succeed(u)),
-    // The VerifierDOs could not take the matrix: a defect, so the step is tried again.
-    Effect.catchTag("ProbeRunnerUnavailable", (e) => Effect.die(e)),
+    // The VerifierDOs could not take the matrix: nothing about the probe, so the program drafts again later.
+    Effect.catchTag("ProbeRunnerUnavailable", (e) =>
+      Effect.succeed({ _tag: "RunnerUnavailable", reason: e.reason } satisfies DraftAnswer),
+    ),
   );
+
+/** A draft worth drafting again after a wait: the runner could not run it, or the model's rate limit ended it. */
+const draftsAgain = (drafted: DraftAnswer): boolean =>
+  drafted._tag === "RunnerUnavailable" ||
+  (drafted._tag === "Drafted" &&
+    drafted.outcome._tag === "Abstained" &&
+    drafted.outcome.reason === "rate-limited");
 
 /** A party as the program left it: its world, or why it has none. */
 type PartyEnd =
@@ -323,49 +355,55 @@ const reportOrder = (cells: readonly MatrixCell[]): readonly MatrixCell[] => [
   ...cells.filter((c) => c.world !== "B"),
 ];
 
+const subjectOf = (call: ProbeCall): SubjectRef => ({ projectId: call.projectId, key: call.key });
+
+/** The conflict as its ledger holds it, read in the step `name`. */
+const conflictStep = (call: ProbeCall, steps: ProbeSteps, name: string) =>
+  ProbeLedger.use((ledger) =>
+    steps.step(
+      name,
+      answer(ledger.conflict(subjectOf(call), call.conflictId), (e) => e._tag),
+    ),
+  );
+
+/** Records, in the step `name`, that the conflict has no probe and why: the ledger's answer, or its refusal. */
+const failureStep = (
+  call: ProbeCall,
+  steps: ProbeSteps,
+  name: string,
+  reason: DraftFailure,
+  attempts: number,
+) =>
+  ProbeLedger.use((ledger) =>
+    steps.step(
+      name,
+      answer(
+        ledger.probeDraftFailed(subjectOf(call), { conflictId: call.conflictId, attempts, reason }),
+        describeRefusal,
+      ),
+    ),
+  );
+
 /**
  * The Probe Workflow's program, one durable step at a time: read the conflict and its parties (A holds the
  * premise, B makes the effect); wait for each party's submission, up to
  * PROBE_SUBMISSION_WAIT_MS in all; plan the worlds from trunk's head (a
  * landed party is its commit on trunk over that commit's first parent); read
- * them; draft; then report the draft to the conflict's ledger, cell by cell,
- * and commit the guard once the ledger admits it. Every end is a fact the
- * ledger recorded, or none at all; a world that cannot be read in staging is
- * a harness error, never a cell.
+ * them; draft, at most PROBE_DRAFTS times, waiting before each further draft
+ * when the runner could not run or the model was rate-limited; then report
+ * the draft to the conflict's ledger, cell by cell, and commit the guard once
+ * the ledger admits it. A world that cannot be read in staging is a harness
+ * error, never a cell.
+ *
+ * Once the conflict has been read as suspected, no end leaves it suspected in
+ * silence: a harness error records why there is no probe before the instance
+ * fails with it, and so, on a best effort, does a step out of tries or a
+ * defect, which then fails as it was going to. Only a refused first read of
+ * the conflict records nothing: there is no conflict to record it on.
  */
 export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
   Effect.gen(function* () {
-    const ledger = yield* ProbeLedger;
-    const changes = yield* ProbeChanges;
-    const clock = yield* Clock;
-    const ids = yield* Ids;
-    const trunks = yield* Trunks;
-    const guards = yield* AdmittedGuards;
-    const checks = yield* WorldChecks;
-    const at: SubjectRef = { projectId: call.projectId, key: call.key };
-    const subscriber = probeSubscriber(call.instanceId);
-
-    const readConflict = (name: string) =>
-      steps.step(
-        name,
-        answer(ledger.conflict(at, call.conflictId), (e) => e._tag),
-      );
-    const failDraft = (reason: DraftFailure, attempts: number) =>
-      Effect.map(
-        steps.step(
-          "draft-failed",
-          answer(
-            ledger.probeDraftFailed(at, { conflictId: call.conflictId, attempts, reason }),
-            describeRefusal,
-          ),
-        ),
-        (r): ProbeEnd =>
-          r._tag === "Refused"
-            ? { outcome: "stale", step: "draft-failed", reason: r.reason }
-            : { outcome: "draft-failed", reason, attempts },
-      );
-
-    const first = yield* readConflict("conflict");
+    const first = yield* conflictStep(call, steps, "conflict");
     if (first._tag === "Refused")
       return {
         outcome: "errored",
@@ -374,7 +412,52 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
       } satisfies ProbeEnd;
     if (first.value.conflict.state !== "suspected")
       return { outcome: "moved-on", state: first.value.conflict.state } satisfies ProbeEnd;
-    const read = partiesOf(first.value.conflict);
+    return yield* probeSuspected(call, steps, first.value.conflict).pipe(
+      // A step out of tries, or a defect: say why the conflict has no probe, then fail as it was
+      // going to. The record is a best effort in a step of its own name, so whatever becomes of
+      // it, the first cause is the one that comes out; a conflict that already has its probe
+      // refuses it. An interruption is neither a failure nor a defect, and records nothing.
+      Effect.catchCauseIf(
+        (cause) => !Cause.hasInterruptsOnly(cause),
+        (cause) =>
+          failureStep(call, steps, "incomplete", "incomplete", 0).pipe(
+            Effect.exit,
+            Effect.andThen(Effect.failCause(cause)),
+          ),
+      ),
+    );
+  });
+
+/** The program from a conflict read as suspected to its end: what `probeConflict` holds its catch around. */
+const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict) =>
+  Effect.gen(function* () {
+    const ledger = yield* ProbeLedger;
+    const changes = yield* ProbeChanges;
+    const clock = yield* Clock;
+    const ids = yield* Ids;
+    const trunks = yield* Trunks;
+    const guards = yield* AdmittedGuards;
+    const checks = yield* WorldChecks;
+    const at = subjectOf(call);
+    const subscriber = probeSubscriber(call.instanceId);
+
+    const readConflict = (name: string) => conflictStep(call, steps, name);
+    const failDraft = (reason: DraftFailure, attempts: number) =>
+      Effect.map(failureStep(call, steps, "draft-failed", reason, attempts), (r): ProbeEnd =>
+        r._tag === "Refused"
+          ? { outcome: "stale", step: "draft-failed", reason: r.reason }
+          : { outcome: "draft-failed", reason, attempts },
+      );
+    /**
+     * What a harness error records before it ends the instance, so the
+     * conflict is not left suspected with no probe and no word. A record the
+     * ledger refuses means the conflict moved on, which changes nothing here:
+     * the end is still the harness error.
+     */
+    const recordHarnessError = (reason: DraftFailure) =>
+      failureStep(call, steps, "draft-failed", reason, 0);
+
+    const read = partiesOf(suspected);
     if (Result.isFailure(read)) return yield* failDraft("no-propositions", 0);
     const parties = read.success;
 
@@ -422,8 +505,10 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
             worlds.push(end.world);
             continue;
           }
-          if (end._tag === "Errored")
+          if (end._tag === "Errored") {
+            yield* recordHarnessError("incomplete");
             return { outcome: "errored", step: end.step, reason: end.reason } satisfies ProbeEnd;
+          }
           if (end._tag === "Timeout") return yield* failDraft("no-submission", 0);
           const again = yield* readConflict(`conflict ${side}${round} gone`);
           if (again._tag === "Ok" && again.value.conflict.state !== "suspected")
@@ -445,12 +530,14 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
       | undefined;
     for (let round = 1; planned === undefined; round++) {
       const tag = round === 1 ? "" : `#${round}`;
-      if (round > PROBE_WORLD_ROUNDS)
+      if (round > PROBE_WORLD_ROUNDS) {
+        yield* recordHarnessError("incomplete");
         return {
           outcome: "errored",
           step: `worlds${tag}`,
           reason: `a party's workspace went away under each of ${PROBE_WORLD_ROUNDS} reads of the worlds`,
         } satisfies ProbeEnd;
+      }
       const sides = yield* bothParties(tag);
       if ("outcome" in sides) return sides;
       const head = yield* steps.step(`trunk${tag}`, trunks.head(call.projectId));
@@ -466,7 +553,8 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
       );
       if (worlds._tag === "Built")
         planned = { sides, plan: plan.success, built: worlds.built, hunks: worlds.hunks };
-      else if (sameRepo(worlds.repo, call.staging))
+      else if (sameRepo(worlds.repo, call.staging)) {
+        yield* recordHarnessError("worlds-unbuildable");
         return {
           outcome: "unreadable",
           world: worlds.world,
@@ -474,17 +562,30 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
           commit: worlds.commit,
           reason: worlds.reason,
         } satisfies ProbeEnd;
+      }
       // Otherwise a workspace went away under the read: its party landed or left, so read the parties again.
     }
 
     const worlds = draftWorlds(planned.built);
     if (Result.isFailure(worlds)) return yield* failDraft(worlds.failure, 0);
-    const drafted = yield* steps.step(
-      "draft",
-      draftConflict(call.namespace, parties, planned.plan, worlds.success, planned.hunks),
-      "draft",
-    );
-    if (drafted._tag === "Unread")
+    // Each draft is its own step, and so is each wait. A draft the runner could not run, or one the
+    // model's rate limit ended, says nothing about the probe, so the conflict is drafted afresh.
+    let draft: { readonly step: string; readonly answer: DraftAnswer } | undefined;
+    for (let n = 1; draft === undefined; n++) {
+      const step = n === 1 ? "draft" : `draft#${n}`;
+      const answered = yield* steps.step(
+        step,
+        draftConflict(call.namespace, parties, planned.plan, worlds.success, planned.hunks),
+        "draft",
+      );
+      const wait = PROBE_DRAFT_WAITS_MS[n - 1];
+      if (n >= PROBE_DRAFTS || wait === undefined || !draftsAgain(answered))
+        draft = { step, answer: answered };
+      else yield* steps.sleep(`${step} wait`, wait);
+    }
+    const drafted = draft.answer;
+    if (drafted._tag === "Unread") {
+      yield* recordHarnessError("worlds-unbuildable");
       return {
         outcome: "unreadable",
         world: drafted.world,
@@ -492,6 +593,15 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
         commit: drafted.commit,
         reason: drafted.reason,
       } satisfies ProbeEnd;
+    }
+    if (drafted._tag === "RunnerUnavailable") {
+      yield* recordHarnessError("incomplete");
+      return {
+        outcome: "errored",
+        step: draft.step,
+        reason: `the probe runner could not run any of ${PROBE_DRAFTS} drafts: ${drafted.reason}`,
+      } satisfies ProbeEnd;
+    }
     const report = reportsOf(drafted.outcome);
     if (report._tag === "DraftFailed") return yield* failDraft(report.reason, report.attempts);
 
@@ -509,12 +619,14 @@ export const probeConflict = (call: ProbeCall, steps: ProbeSteps) =>
     if (recorded._tag === "Refused")
       return { outcome: "stale", step: "drafted", reason: recorded.reason } satisfies ProbeEnd;
     const probeId = recorded.value.probe?.id;
-    if (probeId === undefined)
+    if (probeId === undefined) {
+      yield* recordHarnessError("incomplete");
       return {
         outcome: "errored",
         step: "drafted",
         reason: "the ledger recorded the draft but answered no probe",
       } satisfies ProbeEnd;
+    }
 
     // The world checks: started once the probe is drafted, each recording its own checks.
     // They are evidence for people, not for admission, so the cells never wait for them.

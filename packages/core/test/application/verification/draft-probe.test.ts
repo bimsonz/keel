@@ -350,8 +350,35 @@ describe("draftProbe: template first, repaired from deterministic text only", ()
       () => ABSTAIN,
       (_, world) => discriminates(world),
     );
-    expect(await d.run()).toEqual({ _tag: "Abstained", reason: "timeout", attempts: 1 });
+    expect(await d.run()).toEqual({
+      _tag: "Abstained",
+      reason: "timeout",
+      attempts: 1,
+      feedback: [],
+    });
     expect(d.calls).toHaveLength(1);
+    expect(d.requests).toHaveLength(0);
+  });
+
+  it("[draft.abstained-detail] an abstain's outcome carries what the adapter said of it, and what every earlier attempt was told", async () => {
+    const d = drafting(
+      (n) =>
+        n === 1
+          ? BAD
+          : new ModelAbstained({
+              reason: "rate-limited",
+              detail: "Error: 3040: Capacity temporarily exceeded",
+            }),
+      (_, world) => discriminates(world),
+    );
+    expect(await d.run()).toEqual({
+      _tag: "Abstained",
+      reason: "rate-limited",
+      attempts: 2,
+      detail: "Error: 3040: Capacity temporarily exceeded",
+      feedback: ["attempt 1: slots: owner must be a lowercase username"],
+    });
+    expect(d.calls).toHaveLength(2);
     expect(d.requests).toHaveLength(0);
   });
 

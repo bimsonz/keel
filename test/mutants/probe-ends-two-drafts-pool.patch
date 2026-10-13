@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/probe.test.ts
+# kills: d22.pool.probe-runner-unavailable, d22.pool.probe-rate-limited, d22.pool.probe-rate-limited-out
+# why: The program stops after its second draft, so the second wait is never taken and a third draft never tried
+diff --git a/packages/core/src/application/verification/probe-workflow.ts b/packages/core/src/application/verification/probe-workflow.ts
+index 8289f601..a9c5780c 100644
+--- a/packages/core/src/application/verification/probe-workflow.ts
++++ b/packages/core/src/application/verification/probe-workflow.ts
+@@ -118,7 +118,7 @@ export const PROBE_WORLD_ROUNDS = 3;
+ export const PROBE_DRAFT_WAITS_MS = [30_000, 120_000] as const;
+ 
+ /** The most drafts a conflict is given: the first, and one after each wait. */
+-export const PROBE_DRAFTS = 1 + PROBE_DRAFT_WAITS_MS.length;
++export const PROBE_DRAFTS = PROBE_DRAFT_WAITS_MS.length;
+ 
+ /**
+  * How a Probe instance ended. Only `unreadable` and `errored` are failures:

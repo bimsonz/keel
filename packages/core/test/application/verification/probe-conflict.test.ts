@@ -245,7 +245,9 @@ describe("probe-conflict", () => {
   });
 
   it("[probe-conflict.reports] a draft that ended with no probe to run fails with why", () => {
-    expect(failed({ _tag: "Abstained", reason: "refused", attempts: 1 })).toBe("abstained");
+    expect(failed({ _tag: "Abstained", reason: "refused", attempts: 1, feedback: [] })).toBe(
+      "abstained",
+    );
     expect(failed({ _tag: "Discarded", reason: "incomplete", attempts: 1, feedback: [] })).toBe(
       "incomplete",
     );
