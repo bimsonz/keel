@@ -37,14 +37,16 @@ export function EnrolmentsRpc(
             "agt",
             yield* Effect.promise(() => derivedUlid(actorId(actor), input.idempotencyKey)),
           );
-          const { projectId, org, sponsor } = input;
+          const { projectId, namespace, sponsor } = input;
+          // The fingerprint keeps the key `org` it was first hashed under, so an enrolment replayed
+          // across the rename is still the same command and re-issues its secret.
           const fingerprint = yield* Effect.promise(() =>
             fingerprintOf({
               name: input.name,
               kind: input.kind,
               scopes: input.scopes,
               projectId,
-              org,
+              org: namespace,
               sponsor,
             }),
           );
@@ -58,7 +60,7 @@ export function EnrolmentsRpc(
                 name: input.name,
                 kind: input.kind,
                 scopes: input.scopes,
-                org,
+                namespace,
                 sponsor,
                 clientId,
                 secretHash,

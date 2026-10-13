@@ -40,6 +40,7 @@ import {
   makeEventOutboxMemory,
   makeIdsMemory,
   makeManualClock,
+  sampleOrgId,
   sampleProjectId,
   ulidOf,
 } from "@keeltown/testing";
@@ -70,6 +71,7 @@ const enrolled = (by?: UserId) =>
     name: "session-agent",
     kind: "interactive",
     scopes: ["agent:read", "agent:work"],
+    namespace: sampleOrgId,
     ...(by === undefined ? {} : { sponsor: by }),
     clientId: "client-session-agent",
     secretHash: "sha256:aa",

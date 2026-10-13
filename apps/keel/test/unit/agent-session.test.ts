@@ -13,6 +13,7 @@ import {
   makeEventOutboxMemory,
   makeIdsMemory,
   makeManualClock,
+  sampleOrgId,
   sampleProjectId,
 } from "@keeltown/testing";
 import { Effect, Exit, Layer, Schema } from "effect";
@@ -105,6 +106,7 @@ const enrolling = (idempotencyKey: string, fingerprint: string, secretHash: stri
   name: "pool-agent",
   kind: "interactive" as const,
   scopes: ["agent:read" as const, "agent:work" as const],
+  namespace: sampleOrgId,
   clientId: `client-${agentId.toLowerCase()}`,
   secretHash,
   idempotencyKey,

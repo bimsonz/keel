@@ -14,8 +14,8 @@ export interface EnrolInput {
   readonly scopes: readonly Scope[];
   /** The project the agent works in. */
   readonly projectId: ProjectId;
-  /** The agent's org: its project's. */
-  readonly org: NamespaceId;
+  /** The namespace the agent works in: its project's. */
+  readonly namespace: NamespaceId;
   /** The user minting the agent's credential, who becomes its sponsor. */
   readonly sponsor: UserId;
   readonly idempotencyKey: string;

@@ -28,8 +28,8 @@ export interface EnrolAgent {
   readonly name: string;
   readonly kind: AgentKind;
   readonly scopes: readonly Scope[];
-  /** The agent's org, when the enrolment names one. */
-  readonly org?: NamespaceId | undefined;
+  /** The namespace the agent works in: its project's. */
+  readonly namespace: NamespaceId;
   /** The user minting the credential, when the enrolment names one. */
   readonly sponsor?: UserId | undefined;
   readonly clientId: string;
@@ -76,7 +76,7 @@ export const enrol: (
             name: command.name,
             kind: command.kind,
             scopes: command.scopes,
-            ...(command.org === undefined ? {} : { org: command.org }),
+            org: command.namespace,
             ...(command.sponsor === undefined ? {} : { sponsor: command.sponsor }),
           },
           { now: tx.at, agentId },

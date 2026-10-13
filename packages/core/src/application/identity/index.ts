@@ -101,12 +101,12 @@ export const exchangeToken: (
   return { ...token, scopes, expiresInSeconds: TOKEN_TTL_SECONDS };
 });
 
-/** An enrolment as the doorway hands it over: its org is its project's, and its sponsor the caller. */
-export type EnrolAgentInput = Omit<EnrolInput, "org" | "sponsor">;
+/** An enrolment as the doorway hands it over: its namespace is its project's, and its sponsor the caller. */
+export type EnrolAgentInput = Omit<EnrolInput, "namespace" | "sponsor">;
 
 /**
  * Enrols an agent in a project, sponsored by the user minting its credential,
- * whom the doorway authorised on the project. The agent's org is the project's;
+ * whom the doorway authorised on the project. The agent's namespace is the project's;
  * a project with no place is ProjectNotFound. Its AgentSession DO projects it
  * into the AgentDirectory before answering.
  */
@@ -122,7 +122,7 @@ export const enrolAgent: (
   if (Option.isNone(place)) return yield* new ProjectNotFound({ projectId: input.projectId });
   return yield* (yield* Enrolments).enrol(
     { _tag: "User", userId: sponsor },
-    { ...input, org: place.value.namespace, sponsor },
+    { ...input, namespace: place.value.namespace, sponsor },
   );
 });
 

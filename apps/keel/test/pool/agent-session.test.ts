@@ -5,7 +5,7 @@ import { hashSecret, sampleProjectId } from "@keeltown/testing";
 import { Exit, Schema } from "effect";
 import { ulid } from "ulid";
 import { AgentSessionCodecs, decodeExit } from "../../src/rpc/index.ts";
-import { drainAfter, exchange } from "./helpers.ts";
+import { drainAfter, exchange, POOL_ORG } from "./helpers.ts";
 
 const agentStub = (agentId = makeId("agt", ulid())) =>
   drainAfter(env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)));
@@ -86,6 +86,7 @@ async function enrolOverRpc(agentId: AgentId, idempotencyKey: string, secret: st
       name: "pool-agent",
       kind: "interactive",
       scopes: ["agent:read", "agent:work"],
+      namespace: POOL_ORG,
       clientId,
       secretHash: await hashSecret(secret),
       idempotencyKey,

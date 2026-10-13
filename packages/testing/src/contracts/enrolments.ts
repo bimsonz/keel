@@ -29,7 +29,7 @@ const request = (sponsor: UserId, overrides: Partial<EnrolInput> = {}): EnrolInp
   kind: "interactive",
   scopes: ["agent:read", "agent:work"],
   projectId: projectId(),
-  org: Schema.decodeUnknownSync(NamespaceId)(`org_${ulid()}`),
+  namespace: Schema.decodeUnknownSync(NamespaceId)(`org_${ulid()}`),
   sponsor,
   idempotencyKey: `key-${crypto.randomUUID()}`,
   ...overrides,
@@ -49,7 +49,7 @@ export function describeEnrolmentsContract(adapter: string, make: () => Enrolmen
           scopes: ["agent:read", "agent:work"],
           state: "active",
           projectId: input.projectId,
-          org: input.org,
+          org: input.namespace,
           sponsor,
         });
       }).pipe(Effect.provide(harness.layer));
@@ -112,10 +112,10 @@ export function describeEnrolmentsContract(adapter: string, make: () => Enrolmen
           const { actor, sponsor } = sponsoring();
           const input = request(sponsor);
           const { agent } = yield* enrolments.enrol(actor, input);
-          expect(agent).toMatchObject({ org: input.org, sponsor });
+          expect(agent).toMatchObject({ org: input.namespace, sponsor });
           const found = yield* (yield* AgentDirectory).findAgent(agent.id);
           expect(Option.map(found, (row) => [row.org, row.sponsor])).toEqual(
-            Option.some([input.org, sponsor]),
+            Option.some([input.namespace, sponsor]),
           );
           expect((yield* enrolments.enrol(actor, input)).agent.id).toBe(agent.id);
           const reused = yield* Effect.flip(

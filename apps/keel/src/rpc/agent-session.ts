@@ -81,8 +81,8 @@ export const EnrolCommand = Schema.Struct({
   name: Schema.NonEmptyString,
   kind: AgentKind,
   scopes: Schema.Array(Scope),
-  /** The agent's org. */
-  org: Schema.optional(NamespaceId),
+  /** The namespace the agent works in. A command that names none does not decode, so no agent is enrolled nowhere. */
+  namespace: NamespaceId,
   /** The user minting the credential, who becomes the agent's sponsor. */
   sponsor: Schema.optional(UserId),
   clientId: Schema.NonEmptyString,

@@ -46,7 +46,7 @@ async function enrolled(sponsor?: UserId): Promise<SeededAgent> {
       name: "session-agent",
       kind: "interactive",
       scopes: ["agent:read", "agent:work"],
-      org: POOL_ORG,
+      namespace: POOL_ORG,
       sponsor: by,
       clientId,
       secretHash: await hashSecret(clientSecret),

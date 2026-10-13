@@ -159,7 +159,7 @@ export function makeEnrolmentsMemory(options: { readonly after?: number } = {}) 
           enrol: (actor, input) =>
             Effect.suspend((): Effect.Effect<Enrolment, IdempotencyConflict> => {
               const key = keyOf(actor, input.idempotencyKey);
-              const { projectId, org, sponsor } = input;
+              const { projectId, namespace: org, sponsor } = input;
               const fingerprint = JSON.stringify([
                 input.name,
                 input.kind,

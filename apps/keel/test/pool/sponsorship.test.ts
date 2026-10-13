@@ -60,7 +60,7 @@ describe("the sponsor link on the real AgentSession DO", () => {
           kind: "interactive",
           scopes: ["agent:read", "agent:work"],
           projectId: sampleProjectId,
-          org: makeId("org", ulid()),
+          namespace: makeId("org", ulid()),
           sponsor: first.userId,
           idempotencyKey: `enrol-${ulid()}`,
         }),

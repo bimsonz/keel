@@ -2,14 +2,14 @@ import { describe, expect, it } from "@effect/vitest";
 import { type Actor, Agent, IdempotencyConflict } from "@keeltown/core/domain/identity";
 import { NamespaceId, ProjectId, UserId } from "@keeltown/core/kernel";
 import { type EnrolInput, Enrolments, Projects, RepoNotFound } from "@keeltown/core/ports";
-import { Effect, Exit, Schema } from "effect";
-import { derivedUlid, sha256Of } from "../../src/adapters/driven/do-rpc/answer.ts";
+import { Effect, Exit, Option, Schema } from "effect";
+import { derivedUlid, fingerprintOf, sha256Of } from "../../src/adapters/driven/do-rpc/answer.ts";
 import { EnrolmentsRpc } from "../../src/adapters/driven/do-rpc/enrolments.ts";
 import { ProjectsRpc } from "../../src/adapters/driven/do-rpc/projects.ts";
 import {
   AgentSessionCodecs,
   type CreateProjectCommand,
-  type EnrolCommand,
+  EnrolCommand,
   encodeExit,
   ProjectCodecs,
 } from "../../src/rpc/index.ts";
@@ -136,7 +136,7 @@ function agentObjects() {
             name: command.name,
             kind: command.kind,
             scopes: command.scopes,
-            ...(command.org === undefined ? {} : { org: command.org }),
+            org: command.namespace,
             ...(command.sponsor === undefined ? {} : { sponsor: command.sponsor }),
             state: "active",
             revocationEpoch: 0,
@@ -160,7 +160,7 @@ const enrolling = (overrides: Partial<EnrolInput> = {}): EnrolInput => ({
   kind: "interactive",
   scopes: ["agent:work"],
   projectId: PROJECT,
-  org: ORG,
+  namespace: ORG,
   sponsor: alice.userId,
   idempotencyKey: "key-0001",
   ...overrides,
@@ -207,24 +207,65 @@ describe("Enrolments over Durable Object RPC", () => {
   );
 
   it.effect(
-    "[tenancy.enrol-rpc] sends the project's org and the sponsoring user, fingerprinted",
+    "[tenancy.enrol-rpc] sends the project's namespace and the sponsoring user, fingerprinted",
     () => {
       const { sent, layer } = agentObjects();
       const another = Schema.decodeUnknownSync(NamespaceId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V1");
       return Effect.gen(function* () {
         const enrolments = yield* Enrolments;
         const tenant = yield* enrolments.enrol(alice, enrolling());
-        yield* enrolments.enrol(alice, enrolling({ org: another }));
+        yield* enrolments.enrol(alice, enrolling({ namespace: another }));
         yield* enrolments.enrol(alice, enrolling({ sponsor: bob.userId }));
-        expect(sent.map((s) => [s.command.org, s.command.sponsor])).toEqual([
+        expect(sent.map((s) => [s.command.namespace, s.command.sponsor])).toEqual([
           [ORG, alice.userId],
           [another, alice.userId],
           [ORG, bob.userId],
         ]);
         expect([tenant.agent.org, tenant.agent.sponsor]).toEqual([ORG, alice.userId]);
-        // Another org or sponsor under the same key is another command, so the DO answers IdempotencyConflict.
+        // Another namespace or sponsor under the same key is another command, so the DO answers IdempotencyConflict.
         expect(new Set(sent.map((s) => s.command.fingerprint)).size).toBe(3);
       }).pipe(Effect.provide(layer));
     },
   );
+
+  it.effect(
+    "[enrol.fingerprint-stable] fingerprints an enrolment under the key it was first hashed with, so one replayed across the field's rename is the same command",
+    () => {
+      const { sent, layer } = agentObjects();
+      return Effect.gen(function* () {
+        yield* (yield* Enrolments).enrol(alice, enrolling());
+        const hashed = yield* Effect.promise(() =>
+          fingerprintOf({
+            name: "worker",
+            kind: "interactive",
+            scopes: ["agent:work"],
+            projectId: PROJECT,
+            org: ORG,
+            sponsor: alice.userId,
+          }),
+        );
+        expect(sent.map((s) => s.command.fingerprint)).toEqual([hashed]);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it("[enrol.namespace-required] an enrol command that names no namespace does not decode, under the field's old name either", () => {
+    const decode = Schema.decodeUnknownOption(EnrolCommand);
+    const unplaced = {
+      projectId: PROJECT,
+      name: "worker",
+      kind: "interactive",
+      scopes: ["agent:work"],
+      sponsor: alice.userId,
+      clientId: "client-worker",
+      secretHash: "sha256:aa",
+      idempotencyKey: "key-0001",
+      fingerprint: "sha256:bb",
+    };
+    expect(
+      Option.map(decode({ ...unplaced, namespace: ORG }), (command) => command.namespace),
+    ).toEqual(Option.some(ORG));
+    expect(decode(unplaced)).toEqual(Option.none());
+    expect(decode({ ...unplaced, org: ORG })).toEqual(Option.none());
+  });
 });

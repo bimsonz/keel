@@ -113,7 +113,7 @@ describe("the SDK over the real doorway", () => {
         name: "sdk-session-agent",
         kind: "interactive",
         scopes: ["agent:read", "agent:work"],
-        org: POOL_ORG,
+        namespace: POOL_ORG,
         sponsor,
         clientId,
         secretHash: await hashSecret(clientSecret),

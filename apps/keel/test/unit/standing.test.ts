@@ -6,6 +6,7 @@ import {
   makeAgentDirectoryMemory,
   makeEventOutboxMemory,
   makeManualClock,
+  sampleOrgId,
   sampleProjectId,
   ulidOf,
 } from "@keeltown/testing";
@@ -26,6 +27,7 @@ function enrolledAgent() {
     name: "standing-agent",
     kind: "interactive",
     scopes: ["agent:read", "agent:work"],
+    namespace: sampleOrgId,
     clientId: `client-${agentId.toLowerCase()}`,
     secretHash: "sha256:aa",
     idempotencyKey: "enrol-1",

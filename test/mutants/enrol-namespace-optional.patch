@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/operator-rpc.test.ts
+# kills: enrol.namespace-required
+# why: the enrol command's namespace is optional again, so a caller a version behind enrols an agent nowhere instead of having its call fail
+diff --git a/apps/keel/src/rpc/agent-session.ts b/apps/keel/src/rpc/agent-session.ts
+index 00d3049a..015b2aa4 100644
+--- a/apps/keel/src/rpc/agent-session.ts
++++ b/apps/keel/src/rpc/agent-session.ts
+@@ -82,7 +82,7 @@ export const EnrolCommand = Schema.Struct({
+   kind: AgentKind,
+   scopes: Schema.Array(Scope),
+   /** The namespace the agent works in. A command that names none does not decode, so no agent is enrolled nowhere. */
+-  namespace: NamespaceId,
++  namespace: Schema.optional(NamespaceId),
+   /** The user minting the credential, who becomes the agent's sponsor. */
+   sponsor: Schema.optional(UserId),
+   clientId: Schema.NonEmptyString,

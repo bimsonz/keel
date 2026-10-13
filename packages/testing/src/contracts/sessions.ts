@@ -38,7 +38,7 @@ const enrolled = (sponsor: UserId = userId()) =>
         kind: "interactive",
         scopes: ["agent:read", "agent:work"],
         projectId: projectId(),
-        org: Schema.decodeUnknownSync(NamespaceId)(`org_${ulid()}`),
+        namespace: Schema.decodeUnknownSync(NamespaceId)(`org_${ulid()}`),
         sponsor,
         idempotencyKey: `enrol-${crypto.randomUUID()}`,
       },

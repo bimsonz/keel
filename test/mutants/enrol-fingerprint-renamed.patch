@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/operator-rpc.test.ts
+# kills: enrol.fingerprint-stable
+# why: the enrolment is fingerprinted under the field's new name, so one replayed across the rename is another command and is refused instead of re-issuing its secret
+diff --git a/apps/keel/src/adapters/driven/do-rpc/enrolments.ts b/apps/keel/src/adapters/driven/do-rpc/enrolments.ts
+index 0089506f..d2b2a700 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/enrolments.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/enrolments.ts
+@@ -46,7 +46,7 @@ export function EnrolmentsRpc(
+               kind: input.kind,
+               scopes: input.scopes,
+               projectId,
+-              org: namespace,
++              namespace,
+               sponsor,
+             }),
+           );

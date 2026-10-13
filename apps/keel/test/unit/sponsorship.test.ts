@@ -36,7 +36,7 @@ function enrolledAgent() {
     name: "sponsored-agent",
     kind: "interactive",
     scopes: ["agent:read", "agent:work"],
-    org: sampleOrgId,
+    namespace: sampleOrgId,
     sponsor: first,
     clientId: `client-${agentId.toLowerCase()}`,
     secretHash: "sha256:aa",
