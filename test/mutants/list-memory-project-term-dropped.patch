@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/project-list.test.ts packages/testing/test/ports.test.ts
+# kills: projects.list-narrowed, ports.project-namespaces-shown
+# why: the in-memory page leaves out the audience's one project, so an agent is not shown its own
+diff --git a/packages/testing/src/memory/tenancy.ts b/packages/testing/src/memory/tenancy.ts
+index 177a8ce1..5e78c48b 100644
+--- a/packages/testing/src/memory/tenancy.ts
++++ b/packages/testing/src/memory/tenancy.ts
+@@ -233,7 +233,7 @@ export function makeProjectNamespacesMemory(rows: BetterAuthMemory = makeBetterA
+                 const shown =
+                   visibility === "public" ||
+                   audience.namespaces.includes(place.namespace) ||
+-                  audience.project === place.projectId;
++                  false;
+                 const { handle, kind, suspended } = held;
+                 return shown ? [{ ...place, visibility, handle, kind, suspended }] : [];
+               })

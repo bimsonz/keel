@@ -17,6 +17,7 @@ import {
 } from "@keeltown/testing";
 import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
+import { ProjectNamespacesD1 } from "../../src/adapters/driven/d1/project-namespaces.ts";
 import type { ProjectDO } from "../../src/adapters/driving/do/project.ts";
 import { ProjectsRpc, type ProjectStub } from "../../src/adapters/driven/do-rpc/projects.ts";
 import { backbone } from "../../src/composition/do.ts";
@@ -45,6 +46,7 @@ PORTS.Projects.contract("Project DO over RPC", () => {
               code.layer,
               makeTrunksMemory().layer,
               makeWorkspacePoolMemory().layer,
+              ProjectNamespacesD1(env.DB),
             );
             Reflect.set(
               instance,

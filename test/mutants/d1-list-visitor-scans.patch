@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/tenancy-d1.test.ts
+# kills: d1.projects-shown-rows-read
+# why: a visitor's page is read by the audience's statement, which walks every project's row to find the public ones
+diff --git a/apps/keel/src/adapters/driven/d1/project-namespaces.ts b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+index b34a78f2..d333e174 100644
+--- a/apps/keel/src/adapters/driven/d1/project-namespaces.ts
++++ b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+@@ -131,7 +131,7 @@ export function ProjectNamespacesD1(db: D1Database) {
+         ).pipe(Effect.map(({ results }) => results.map(toPlace))),
+       shownTo: (audience, after, limit) =>
+         Effect.promise(() =>
+-          audience.namespaces.length === 0 && audience.project === undefined
++          audience.namespaces.length < 0
+             ? db
+                 .prepare(PUBLIC)
+                 .bind(after ?? "", limit)

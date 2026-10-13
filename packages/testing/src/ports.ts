@@ -139,6 +139,7 @@ import type {
   NoopWorlds,
   ProbeSources,
   Notifier,
+  ProjectNamespaces,
   Projects,
   ProjectViews,
   WorkspaceRebaser,
@@ -529,8 +530,8 @@ export const PORTS = {
     memoryTenancyHarness(tenancy.makeMembershipsMemory),
     describeMembershipsContract,
   ),
-  ProjectNamespaces: port(
-    () => tenancy.makeProjectNamespacesMemory().layer,
+  ProjectNamespaces: harnessed<ProjectNamespaces, TenancyHarness<ProjectNamespaces>>(
+    memoryTenancyHarness(tenancy.makeProjectNamespacesMemory),
     describeProjectNamespacesContract,
   ),
   EntityStore: port(() => storage.makeEntityStoreMemory().layer, describeEntityStoreContract),

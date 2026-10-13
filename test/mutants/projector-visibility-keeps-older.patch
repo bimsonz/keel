@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/project-list.test.ts
+# kills: projector.visibility-newest
+# why: the Projector notes whichever visibility arrived last, so an older event's replaces a newer one's
+diff --git a/packages/core/src/application/integration/project-visibility.ts b/packages/core/src/application/integration/project-visibility.ts
+index 3ddac3bb..67288c77 100644
+--- a/packages/core/src/application/integration/project-visibility.ts
++++ b/packages/core/src/application/integration/project-visibility.ts
+@@ -45,7 +45,6 @@ export function noteVisibility(store: (typeof EntityStore)["Service"], event: Ev
+   const moved = visibilityOf(event);
+   if (moved === undefined) return;
+   const held = store.get(VISIBILITY_PENDING, moved.projectId);
+-  if (held !== undefined && decodePending(held).seq >= moved.seq) return;
+   store.put(
+     VISIBILITY_PENDING,
+     moved.projectId,

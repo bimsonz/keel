@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/projects-list.test.ts
+# kills: projects.list-mirror
+# why: a settings commit does not write the project's visibility to its place, so the list follows it only when the Projector does
+diff --git a/packages/core/src/application/integration/project-settings.ts b/packages/core/src/application/integration/project-settings.ts
+index 399915fe..17ce5144 100644
+--- a/packages/core/src/application/integration/project-settings.ts
++++ b/packages/core/src/application/integration/project-settings.ts
+@@ -172,7 +172,6 @@ export const changeSettings: (
+   const places = yield* ProjectNamespaces;
+   for (const event of committed.events) {
+     const moved = visibilityOf(event);
+-    if (moved !== undefined) yield* places.visibility(moved.projectId, moved.visibility, moved.seq);
+   }
+   if (!committed.duplicate) return committed.value;
+   return committed.sameCommand ? yield* settingsOf(projectId) : yield* conflict;

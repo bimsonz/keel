@@ -15,6 +15,7 @@ import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it } from "vitest";
 import { signUp } from "../../../../scripts/lib/account.ts";
+import { ProjectNamespacesD1 } from "../../src/adapters/driven/d1/project-namespaces.ts";
 import type { ProjectDO } from "../../src/adapters/driving/do/project.ts";
 import { ProjectsRpc, type ProjectStub } from "../../src/adapters/driven/do-rpc/projects.ts";
 import { backbone } from "../../src/composition/do.ts";
@@ -116,6 +117,7 @@ function sourceApp(options: { readonly template?: boolean } = {}) {
                   code.layer,
                   makeTrunksMemory().layer,
                   makeWorkspacePoolMemory().layer,
+                  ProjectNamespacesD1(env.DB),
                 ),
               ),
             );

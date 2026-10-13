@@ -77,6 +77,7 @@ import {
 } from "./authorize-handlers.ts";
 import type { Caller, AgentToken } from "./caller.ts";
 import { latticesOk, tokenError, tokenOk, whoamiError, whoamiOk } from "./mappers.ts";
+import { listProjects, viewerRole } from "./project-list.ts";
 import {
   createProjectError,
   createProjectOk,
@@ -814,7 +815,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
         Views_getCandidate: notYet,
         Views_listLanes: notYet,
         Views_getTrunk: notYet,
-        // Anyone lists projects: each is decided by the policy, so a visitor sees the public ones.
+        // Anyone lists projects: one page is read for the caller's audience and the policy decides each row, so a visitor sees the public ones.
         Operator_listProjects: (caller: Caller, input: Input<"Operator_listProjects">) => {
           const after = input.cursor === undefined ? undefined : decodeCursor(input.cursor);
           if (after !== undefined && Option.isNone(after))
@@ -822,29 +823,28 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
           const limit = Math.min(input.limit ?? 50, 100);
           return run(
             caller,
-            Effect.gen(function* () {
-              const items: ProjectViewBody[] = [];
-              let cursor = after === undefined ? undefined : Option.getOrUndefined(after);
-              let exhausted = false;
-              // Read pages until `limit` projects the caller may read are found, or none are left.
-              while (items.length < limit && !exhausted) {
-                const page = yield* ProjectNamespaces.use((places) => places.all(cursor, limit));
-                exhausted = page.length < limit;
-                for (const place of page) {
-                  cursor = place.projectId;
-                  const view = yield* readableView(caller, place.projectId, place.name);
-                  if (view !== undefined) items.push(view);
-                  if (items.length === limit) break;
-                }
-              }
-              return {
+            listProjects(
+              caller.principal,
+              after === undefined ? undefined : Option.getOrUndefined(after),
+              limit,
+            ).pipe(
+              Effect.map((page) => ({
                 status: 200 as const,
                 body: {
-                  items,
-                  ...(exhausted || cursor === undefined ? {} : { nextCursor: cursor }),
+                  items: page.items.map((row): ProjectViewBody => {
+                    const role = viewerRole(caller.principal, row);
+                    return {
+                      id: row.projectId,
+                      namespace: { handle: row.handle, kind: row.kind },
+                      name: row.name,
+                      visibility: row.visibility,
+                      ...(role === undefined ? {} : { viewer: { role } }),
+                    };
+                  }),
+                  ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor }),
                 },
-              };
-            }),
+              })),
+            ),
           );
         },
         // The namespace was decided before this ran. The source is a second resource, named in the body:

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/project-list.test.ts
+# kills: projects.list-narrowed, projects.audience
+# why: a person's audience is their own namespace alone, so their list loses their orgs' private projects
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index 2013f126..52b666e5 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -223,7 +223,7 @@ const NO_AUDIENCE: ProjectAudience = { namespaces: [] };
+ export const projectAudience = (principal: Principal): ProjectAudience => {
+   switch (principal._tag) {
+     case "User":
+-      return { namespaces: [principal.userId, ...principal.memberships.map((m) => m.org)] };
++      return { namespaces: [principal.userId] };
+     case "Agent":
+       return principal.projectId === undefined
+         ? NO_AUDIENCE

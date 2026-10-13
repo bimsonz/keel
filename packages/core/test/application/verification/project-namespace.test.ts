@@ -28,7 +28,8 @@ const places = Layer.succeed(
       ),
     byName: () => Effect.die("unused"),
     inNamespace: () => Effect.die("unused"),
-    all: () => Effect.die("unused"),
+    shownTo: () => Effect.die("unused"),
+    visibility: () => Effect.die("unused"),
   }),
 );
 

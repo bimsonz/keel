@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/projects-list.test.ts
+# kills: projects.list-pages
+# why: a page names the next only when it is full of granted items, so the list ends at the first row the policy refused
+diff --git a/apps/keel/src/adapters/driving/http/project-list.ts b/apps/keel/src/adapters/driving/http/project-list.ts
+index f3678452..94a64872 100644
+--- a/apps/keel/src/adapters/driving/http/project-list.ts
++++ b/apps/keel/src/adapters/driving/http/project-list.ts
+@@ -44,7 +44,7 @@ export const listProjects = (
+     );
+     const items = rows.filter((row) => Result.isSuccess(decideEach(principal, resourceOf(row))));
+     const last = rows.at(-1);
+-    return rows.length < limit || last === undefined
++    return items.length < limit || last === undefined
+       ? { items }
+       : { items, nextCursor: last.projectId };
+   });

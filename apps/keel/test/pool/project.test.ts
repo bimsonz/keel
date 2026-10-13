@@ -13,6 +13,7 @@ import {
 import { Effect, Exit, Layer, ManagedRuntime } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it } from "vitest";
+import { ProjectNamespacesD1 } from "../../src/adapters/driven/d1/project-namespaces.ts";
 import type { ProjectDO } from "../../src/adapters/driving/do/project.ts";
 import { backbone } from "../../src/composition/do.ts";
 import { decodeExit, ProjectCodecs } from "../../src/rpc/index.ts";
@@ -50,7 +51,13 @@ async function projectUnderTest() {
       instance,
       "runtime",
       ManagedRuntime.make(
-        Layer.mergeAll(backbone(state.storage), code.layer, trunks.layer, pool.layer),
+        Layer.mergeAll(
+          backbone(state.storage),
+          code.layer,
+          trunks.layer,
+          pool.layer,
+          ProjectNamespacesD1(env.DB),
+        ),
       ),
     );
   });

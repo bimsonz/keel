@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/project-list.test.ts
+# kills: visibility.of-event
+# why: the mirror takes the visibility a settings event changed from, so the row holds the opposite of the project
+diff --git a/packages/core/src/application/integration/project-visibility.ts b/packages/core/src/application/integration/project-visibility.ts
+index 3ddac3bb..7b23d8d9 100644
+--- a/packages/core/src/application/integration/project-visibility.ts
++++ b/packages/core/src/application/integration/project-visibility.ts
+@@ -23,7 +23,7 @@ export function visibilityOf(
+   if (changed._tag === "None") return undefined;
+   const moved = changed.value.changes.find((change) => change.field === "visibility");
+   if (moved === undefined) return undefined;
+-  const visibility = decodeVisibility(moved.to);
++  const visibility = decodeVisibility(moved.from);
+   return visibility._tag === "Some"
+     ? { projectId: changed.value.projectId, visibility: visibility.value, seq: event.seq }
+     : undefined;

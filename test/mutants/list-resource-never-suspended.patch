@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/project-list.test.ts
+# kills: projects.list-narrowed
+# why: a listed row is decided as if its namespace were never suspended
+diff --git a/apps/keel/src/adapters/driving/http/project-list.ts b/apps/keel/src/adapters/driving/http/project-list.ts
+index f3678452..c2974fba 100644
+--- a/apps/keel/src/adapters/driving/http/project-list.ts
++++ b/apps/keel/src/adapters/driving/http/project-list.ts
+@@ -16,7 +16,7 @@ const resourceOf = (row: ListedProject): ProjectResource => ({
+   org: row.namespace,
+   projectId: row.projectId,
+   visibility: row.visibility,
+-  orgSuspended: row.suspended,
++  orgSuspended: false,
+   personOwned: personOwns(row.kind),
+ });
+ 

@@ -2,12 +2,12 @@
 # kills: b12.settings-replay
 # why: a replay is answered by its request id alone, so a reused id with other settings is silently answered as the first PUT
 diff --git a/packages/core/src/application/integration/project-settings.ts b/packages/core/src/application/integration/project-settings.ts
-index a2f353b..b9e9b61 100644
+index 399915fe..9c1bb00c 100644
 --- a/packages/core/src/application/integration/project-settings.ts
 +++ b/packages/core/src/application/integration/project-settings.ts
-@@ -154,5 +154,5 @@ export const changeSettings: (
-     },
-   );
+@@ -175,5 +175,5 @@ export const changeSettings: (
+     if (moved !== undefined) yield* places.visibility(moved.projectId, moved.visibility, moved.seq);
+   }
    if (!committed.duplicate) return committed.value;
 -  return committed.sameCommand ? yield* settingsOf(projectId) : yield* conflict;
 +  return yield* settingsOf(projectId);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { Membership } from "@keeltown/core/domain/identity";
-import { OrgId, ProjectId, UserId } from "@keeltown/core/kernel";
+import type { Membership, ProjectAudience } from "@keeltown/core/domain/identity";
+import { type NamespaceId, OrgId, ProjectId, UserId } from "@keeltown/core/kernel";
 import { Memberships, Namespaces, ProjectNamespaces, Users } from "@keeltown/core/ports";
 import { Clock, Effect, type Layer, Option, Schema } from "effect";
 import type { BetterAuthRows } from "../memory/tenancy.ts";
@@ -357,9 +357,14 @@ export function describeMembershipsContract(
   });
 }
 
+/** The ids of the given places, in the order a list answers them. */
+const ids = (...places: readonly { readonly projectId: string }[]) =>
+  places.map((each) => each.projectId).toSorted();
+const idsOf = (rows: readonly { readonly projectId: string }[]) => rows.map((row) => row.projectId);
+
 export function describeProjectNamespacesContract(
   adapter: string,
-  make: () => Layer.Layer<ProjectNamespaces>,
+  make: () => TenancyHarness<ProjectNamespaces>,
 ) {
   describe(`ProjectNamespaces contract: ${adapter}`, () => {
     it.effect(
@@ -371,7 +376,7 @@ export function describeProjectNamespacesContract(
           expect(Option.isNone(yield* projects.byId(projectId()))).toBe(true);
           expect(Option.isNone(yield* projects.byName(org, fresh("app")))).toBe(true);
           expect(yield* projects.inNamespace(org)).toEqual([]);
-        }).pipe(Effect.provide(make())),
+        }).pipe(Effect.provide(make().layer)),
     );
 
     it.effect(
@@ -389,7 +394,7 @@ export function describeProjectNamespacesContract(
           yield* projects.assign(asked);
           yield* projects.assign(place);
           expect(yield* projects.inNamespace(asked.namespace)).toEqual([place]);
-        }).pipe(Effect.provide(make())),
+        }).pipe(Effect.provide(make().layer)),
     );
 
     it.effect(
@@ -428,7 +433,7 @@ export function describeProjectNamespacesContract(
           expect(yield* projects.byName(elsewhere, name)).toEqual(
             Option.some({ projectId: rival, namespace: elsewhere, name }),
           );
-        }).pipe(Effect.provide(make())),
+        }).pipe(Effect.provide(make().layer)),
     );
 
     it.effect(
@@ -448,34 +453,153 @@ export function describeProjectNamespacesContract(
           expect((yield* projects.inNamespace(org)).map((place) => place.name)).toEqual(
             ["a", "b", "c"].map((suffix) => `${stem}-${suffix}`),
           );
-        }).pipe(Effect.provide(make())),
+        }).pipe(Effect.provide(make().layer)),
     );
 
     it.effect(
-      "[ports.project-namespaces-all] pages every namespace's projects by id, after a cursor and up to a limit",
-      () =>
-        Effect.gen(function* () {
+      "[ports.project-namespaces-shown] shows a visitor the public projects alone, an audience its namespaces' as well, and an agent's audience its one project, each row with its namespace",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
           const projects = yield* ProjectNamespaces;
-          const stem = fresh("all");
-          const places = [orgId(), orgId(), orgId()].map((org, i) => ({
+          const ada = { id: userId(), username: fresh("ada") };
+          const acme = { id: orgId(), slug: fresh("acme") };
+          const globex = { id: orgId(), slug: fresh("globex") };
+          yield* harness.seed({ users: [ada], orgs: [acme, globex] });
+          const stem = fresh("shown");
+          const place = (namespace: NamespaceId, i: number) => ({
             projectId: projectId(),
-            namespace: org,
+            namespace,
+            name: `${stem}-${i}`,
+          });
+          const closed = place(acme.id, 0);
+          const open = place(acme.id, 1);
+          const own = place(ada.id, 2);
+          const far = place(globex.id, 3);
+          const all = [closed, open, own, far];
+          for (const each of all) yield* projects.assign(each);
+          yield* projects.visibility(open.projectId, "public", 1);
+          const shown = (audience: ProjectAudience) =>
+            Effect.map(projects.shownTo(audience, undefined, 10_000), (rows) =>
+              rows.filter((row) => all.some((each) => each.projectId === row.projectId)),
+            );
+
+          const visitor = yield* shown({ namespaces: [] });
+          expect(visitor).toEqual([
+            { ...open, visibility: "public", handle: acme.slug, kind: "org", suspended: false },
+          ]);
+          expect(idsOf(yield* shown({ namespaces: [acme.id] }))).toEqual(ids(closed, open));
+          const hers = yield* shown({ namespaces: [ada.id] });
+          expect(idsOf(hers)).toEqual(ids(open, own));
+          expect(hers.find((row) => row.projectId === own.projectId)).toEqual({
+            ...own,
+            visibility: "private",
+            handle: ada.username,
+            kind: "user",
+            suspended: false,
+          });
+          expect(idsOf(yield* shown({ namespaces: [ada.id, globex.id] }))).toEqual(
+            ids(open, own, far),
+          );
+          expect(idsOf(yield* shown({ namespaces: [], project: far.projectId }))).toEqual(
+            ids(open, far),
+          );
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[ports.project-namespaces-shown-account] says of each row how its namespace stands, and leaves out a project whose namespace has no account",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const projects = yield* ProjectNamespaces;
+          const banned = { id: userId(), username: fresh("banned"), banned: true };
+          const held = { id: orgId(), slug: fresh("held"), suspended: true };
+          yield* harness.seed({ users: [banned], orgs: [held] });
+          const stem = fresh("account");
+          const theirs = { projectId: projectId(), namespace: banned.id, name: `${stem}-0` };
+          const helds = { projectId: projectId(), namespace: held.id, name: `${stem}-1` };
+          const orphan = { projectId: projectId(), namespace: orgId(), name: `${stem}-2` };
+          for (const each of [theirs, helds, orphan]) {
+            yield* projects.assign(each);
+            yield* projects.visibility(each.projectId, "public", 1);
+          }
+          const audience = { namespaces: [banned.id, held.id, orphan.namespace] };
+          for (const rows of [
+            yield* projects.shownTo({ namespaces: [] }, undefined, 10_000),
+            yield* projects.shownTo(audience, undefined, 10_000),
+          ]) {
+            const suspended = (id: string) => rows.find((row) => row.projectId === id)?.suspended;
+            expect(suspended(theirs.projectId)).toBe(true);
+            expect(suspended(helds.projectId)).toBe(true);
+            expect(rows.some((row) => row.projectId === orphan.projectId)).toBe(false);
+          }
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[ports.project-namespaces-shown-pages] pages what an audience is shown by id, after a cursor and up to a limit",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const projects = yield* ProjectNamespaces;
+          const org = { id: orgId(), slug: fresh("pages") };
+          yield* harness.seed({ orgs: [org] });
+          const stem = fresh("page");
+          const places = [0, 1, 2].map((i) => ({
+            projectId: projectId(),
+            namespace: org.id,
             name: `${stem}-${i}`,
           }));
           for (const place of places) yield* projects.assign(place);
-          const ours = (list: readonly { readonly projectId: string }[]) =>
-            list.filter((place) => places.some((p) => p.projectId === place.projectId));
-          const ids = places.map((place) => place.projectId).toSorted();
-          const first = yield* projects.all(undefined, 10_000);
-          expect(ours(first).map((place) => place.projectId)).toEqual(ids);
-          const [one, two] = ids;
-          expect(ours(yield* projects.all(one, 10_000)).map((p) => p.projectId)).toEqual(
-            ids.slice(1),
+          const audience = { namespaces: [org.id] };
+          const ours = (rows: readonly { readonly projectId: string }[]) =>
+            rows
+              .filter((row) => places.some((place) => place.projectId === row.projectId))
+              .map((row) => row.projectId);
+          const sorted = places.map((place) => place.projectId).toSorted();
+          expect(ours(yield* projects.shownTo(audience, undefined, 10_000))).toEqual(sorted);
+          const [one, two] = sorted;
+          expect(ours(yield* projects.shownTo(audience, one, 10_000))).toEqual(sorted.slice(1));
+          expect(yield* projects.shownTo(audience, undefined, 1)).toHaveLength(1);
+          // A real adapter's table holds other cases' public projects, which every audience is shown too.
+          const next = (yield* projects.shownTo(audience, one, 1)).map((row) => row.projectId);
+          expect(next).toHaveLength(1);
+          expect(next.every((id) => one !== undefined && id > one)).toBe(true);
+          expect(next.every((id) => two !== undefined && id <= two)).toBe(true);
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+
+    it.effect(
+      "[ports.project-namespaces-visibility-seq] takes a visibility only from a seq above the one the row holds, and none for a project with no place",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const projects = yield* ProjectNamespaces;
+          const org = { id: orgId(), slug: fresh("seq") };
+          yield* harness.seed({ orgs: [org] });
+          const place = { projectId: projectId(), namespace: org.id, name: fresh("seq") };
+          const mirrored = Effect.map(
+            projects.shownTo({ namespaces: [org.id] }, undefined, 10_000),
+            (rows) => rows.find((row) => row.projectId === place.projectId)?.visibility,
           );
-          const page = yield* projects.all(undefined, 1);
-          expect(page).toHaveLength(1);
-          expect(two).toBeDefined();
-        }).pipe(Effect.provide(make())),
+          yield* projects.visibility(place.projectId, "public", 5);
+          yield* projects.assign(place);
+          expect(yield* mirrored).toBe("private");
+
+          yield* projects.visibility(place.projectId, "public", 2);
+          expect(yield* mirrored).toBe("public");
+          yield* projects.visibility(place.projectId, "private", 1);
+          expect(yield* mirrored).toBe("public");
+          yield* projects.visibility(place.projectId, "private", 2);
+          expect(yield* mirrored).toBe("public");
+          yield* projects.visibility(place.projectId, "private", 3);
+          expect(yield* mirrored).toBe("private");
+        }).pipe(Effect.provide(harness.layer));
+      },
     );
   });
 }

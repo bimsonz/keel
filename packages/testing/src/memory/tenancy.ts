@@ -4,10 +4,12 @@ import {
   type Membership,
   ProjectNameTaken,
   strongestRole,
+  type Visibility,
 } from "@keeltown/core/domain/identity";
 import type { NamespaceId, OrgId, UserId } from "@keeltown/core/kernel";
 import {
   Memberships,
+  type ListedProject,
   type NamespaceRecord,
   Namespaces,
   type ProjectPlace,
@@ -180,15 +182,21 @@ export function makeMembershipsMemory(rows: BetterAuthMemory = makeBetterAuthMem
 /** A project's namespace and name, in any case: what the `projects` table holds unique. */
 const nameKey = (namespace: NamespaceId, name: string) => `${namespace}\u0000${name.toLowerCase()}`;
 
-/** Projects' places in a map, with the `projects` table's unique (namespace, name). */
-export function makeProjectNamespacesMemory() {
+/**
+ * Projects' places in a map, with the `projects` table's unique (namespace,
+ * name), and each one's mirrored visibility with the seq that wrote it. A
+ * list reads the namespaces Better Auth's rows make, as the table's join does.
+ */
+export function makeProjectNamespacesMemory(rows: BetterAuthMemory = makeBetterAuthMemory()) {
   const places = new Map<string, ProjectPlace>();
+  const mirrored = new Map<string, { readonly visibility: Visibility; readonly seq: number }>();
   const byName = (namespace: NamespaceId, name: string) =>
     [...places.values()].find(
       (place) => nameKey(place.namespace, place.name) === nameKey(namespace, name),
     );
   return {
     places,
+    seed: rows.seed,
     layer: Layer.succeed(
       ProjectNamespaces,
       ProjectNamespaces.of({
@@ -212,13 +220,31 @@ export function makeProjectNamespacesMemory() {
               .filter((place) => place.namespace === namespace)
               .toSorted((a, b) => binary(a.name, b.name)),
           ),
-        all: (after, limit) =>
-          Effect.sync(() =>
-            [...places.values()]
+        shownTo: (audience, after, limit) =>
+          Effect.map(Clock.currentTimeMillis, (now) => {
+            const namespaces = namespacesOf(rows, now);
+            return [...places.values()]
               .filter((place) => after === undefined || binary(place.projectId, after) > 0)
               .toSorted((a, b) => binary(a.projectId, b.projectId))
-              .slice(0, limit),
-          ),
+              .flatMap((place): ListedProject[] => {
+                const held = namespaces.find((record) => record.namespace === place.namespace);
+                if (held === undefined) return [];
+                const visibility = mirrored.get(place.projectId)?.visibility ?? "private";
+                const shown =
+                  visibility === "public" ||
+                  audience.namespaces.includes(place.namespace) ||
+                  audience.project === place.projectId;
+                const { handle, kind, suspended } = held;
+                return shown ? [{ ...place, visibility, handle, kind, suspended }] : [];
+              })
+              .slice(0, limit);
+          }),
+        visibility: (projectId, visibility, seq) =>
+          Effect.sync(() => {
+            if (!places.has(projectId)) return;
+            if ((mirrored.get(projectId)?.seq ?? 0) < seq)
+              mirrored.set(projectId, { visibility, seq });
+          }),
       }),
     ),
   };

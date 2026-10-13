@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/tenancy-d1.test.ts
+# kills: ports.project-namespaces-visibility-seq
+# why: the mirror's write takes any seq, so a late or repeated one moves the row back
+diff --git a/apps/keel/src/adapters/driven/d1/project-namespaces.ts b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+index b34a78f2..9f4f1308 100644
+--- a/apps/keel/src/adapters/driven/d1/project-namespaces.ts
++++ b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+@@ -153,7 +153,7 @@ export function ProjectNamespacesD1(db: D1Database) {
+         Effect.promise(() =>
+           db
+             .prepare(
+-              "UPDATE projects SET visibility = ?, visibility_seq = ? WHERE id = ? AND visibility_seq < ?",
++              "UPDATE projects SET visibility = ?, visibility_seq = ? WHERE id = ? AND ? >= 0",
+             )
+             .bind(visibility, seq, projectId, seq)
+             .run(),

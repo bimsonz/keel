@@ -66,11 +66,15 @@ export function backbone(storage: DurableObjectStorage): Layer.Layer<DurableObje
 /** The AgentSession DO's driven adapters beyond the backbone: it writes the directory row its events project. */
 export type AgentSessionServices = AgentDirectory;
 
-/** The Projector repeats each agent standing it hears in the AgentDirectory: the repair after the AgentSession DO's inline write. */
-export type ProjectorServices = AgentDirectory;
+/**
+ * The Projector repeats each agent standing it hears in the AgentDirectory,
+ * and each project's visibility in its place: the repair after the
+ * AgentSession DO's and the Project DO's inline writes.
+ */
+export type ProjectorServices = AgentDirectory | ProjectNamespaces;
 
 export function projectorServices(env: Env): Layer.Layer<ProjectorServices> {
-  return AgentDirectoryD1(env.DB);
+  return Layer.mergeAll(AgentDirectoryD1(env.DB), ProjectNamespacesD1(env.DB));
 }
 
 /** The AgentSession DO writes the AgentDirectory D1 row inline, so enrolment and revocation bind the next request. */
@@ -96,20 +100,23 @@ export function subjectServices(env: Env): Layer.Layer<SubjectServices> {
 }
 
 /** The Project DO's driven adapters beyond the backbone: it bootstraps a project's repos, trunk and pool. */
-export type ProjectServices = CodeHost | Trunks | WorkspacePool;
+export type ProjectServices = CodeHost | Trunks | WorkspacePool | ProjectNamespaces;
 
 /** How many ready workspaces a new project's pool keeps forked, until `vars.POOL_TARGET` is declared. */
 export const DEFAULT_POOL_TARGET = 2;
 
 /**
  * The Project DO forks and creates repos through the code host, initializes
- * and syncs trunk through the Trunk DO, and configures the project's pool.
+ * and syncs trunk through the Trunk DO, and configures the project's pool. It
+ * writes its visibility to its place's D1 row inline, so the next list of
+ * projects is narrowed by it.
  */
 export function projectServices(env: Env): Layer.Layer<ProjectServices> {
   return Layer.mergeAll(
     codeHostLayer(env),
     TrunksRpc(env.TRUNK, artifactsLocationHint(env)),
     WorkspacePoolRpc(env.WORKSPACE_POOL, artifactsLocationHint(env)),
+    ProjectNamespacesD1(env.DB),
   );
 }
 

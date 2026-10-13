@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/projects-list.test.ts apps/keel/test/pool/tenancy-d1.test.ts
+# kills: projects.list-member, ports.project-namespaces-shown
+# why: the audience's statement never matches its namespaces, so a member is shown only what is public
+diff --git a/apps/keel/src/adapters/driven/d1/project-namespaces.ts b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+index b34a78f2..2ebf9bfa 100644
+--- a/apps/keel/src/adapters/driven/d1/project-namespaces.ts
++++ b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+@@ -77,7 +77,7 @@ const PUBLIC = listed("projects p INDEXED BY projects_public", "p.visibility = '
+  */
+ const SHOWN = listed(
+   "projects p",
+-  "(p.visibility = 'public' OR p.namespace_id IN (SELECT value FROM json_each(?)) OR p.id = ?)",
++  "(p.visibility = 'public' OR ? IS NULL OR p.id = ?)",
+ );
+ 
+ /**

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/project-list.test.ts
+# kills: projector.visibility-retry
+# why: the Projector forgets a visibility whose write failed, so the next delivery repairs nothing
+diff --git a/packages/core/src/application/integration/project-visibility.ts b/packages/core/src/application/integration/project-visibility.ts
+index 3ddac3bb..67c55503 100644
+--- a/packages/core/src/application/integration/project-visibility.ts
++++ b/packages/core/src/application/integration/project-visibility.ts
+@@ -66,7 +66,6 @@ export const repairVisibility: Effect.Effect<void, never, EntityStore | ProjectN
+       const written = yield* Effect.exit(
+         places.visibility(Schema.decodeUnknownSync(ProjectId)(id), pending.visibility, pending.seq),
+       );
+-      if (written._tag === "Failure") continue;
+       store.transaction(() => {
+         const now = store.get(VISIBILITY_PENDING, id);
+         if (now !== undefined && decodePending(now).seq === pending.seq)

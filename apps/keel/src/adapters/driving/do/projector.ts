@@ -12,6 +12,7 @@ import {
   viewSnapshot,
 } from "@keeltown/core/application/memory";
 import { noteStanding, repairStandings } from "@keeltown/core/application/identity";
+import { noteVisibility, repairVisibility } from "@keeltown/core/application/integration";
 import type { EventEnvelope } from "@keeltown/core/kernel";
 import { EntityStore, type Stored, type Transaction } from "@keeltown/core/ports";
 import { EscalationNotFound } from "@keeltown/core/domain/verification";
@@ -43,7 +44,7 @@ export const NUDGES = { kind: "projector", id: "nudges" } as const;
  */
 export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements ProjectorRpc {
   constructor(ctx: DurableObjectState, env: Env) {
-    // The directory is for the standing repair: the AgentSession DO writes it inline, and this repeats it.
+    // The directory and the places are for the repairs: the AgentSession and Project DOs write them inline, and this repeats it.
     super(ctx, env, projectorServices(env), { projected: false });
   }
 
@@ -70,12 +71,14 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
     const skipped = foldViews(tx.store, event);
     if (skipped !== undefined) console.warn("projector read model skipped an event", skipped);
     noteStanding(tx.store, event);
+    noteVisibility(tx.store, event);
     return { drafts: [] };
   }
 
-  /** Repeats each agent standing it received in the directory, once the receipt is committed (D1 is outside it). */
+  /** Repeats each agent standing it received in the directory, and each project's visibility in its place, once the receipt is committed (D1 is outside it). */
   protected override async received(): Promise<void> {
     await this.runtime.runPromise(repairStandings);
+    await this.runtime.runPromise(repairVisibility);
   }
 
   async read(request: typeof ProjectorRead.Encoded) {

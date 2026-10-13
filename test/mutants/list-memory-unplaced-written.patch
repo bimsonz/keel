@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/project-list.test.ts packages/testing/test/ports.test.ts
+# kills: ports.project-namespaces-visibility-seq
+# why: the in-memory mirror keeps a visibility for a project with no place, which a later place then shows
+diff --git a/packages/testing/src/memory/tenancy.ts b/packages/testing/src/memory/tenancy.ts
+index 177a8ce1..474db0a3 100644
+--- a/packages/testing/src/memory/tenancy.ts
++++ b/packages/testing/src/memory/tenancy.ts
+@@ -241,7 +241,6 @@ export function makeProjectNamespacesMemory(rows: BetterAuthMemory = makeBetterA
+           }),
+         visibility: (projectId, visibility, seq) =>
+           Effect.sync(() => {
+-            if (!places.has(projectId)) return;
+             if ((mirrored.get(projectId)?.seq ?? 0) < seq)
+               mirrored.set(projectId, { visibility, seq });
+           }),

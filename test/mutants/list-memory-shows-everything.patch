@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/project-list.test.ts packages/testing/test/ports.test.ts
+# kills: ports.project-namespaces-shown
+# why: the in-memory page shows every audience every project, so nothing is narrowed
+diff --git a/packages/testing/src/memory/tenancy.ts b/packages/testing/src/memory/tenancy.ts
+index 177a8ce1..013af84f 100644
+--- a/packages/testing/src/memory/tenancy.ts
++++ b/packages/testing/src/memory/tenancy.ts
+@@ -231,7 +231,7 @@ export function makeProjectNamespacesMemory(rows: BetterAuthMemory = makeBetterA
+                 if (held === undefined) return [];
+                 const visibility = mirrored.get(place.projectId)?.visibility ?? "private";
+                 const shown =
+-                  visibility === "public" ||
++                  true ||
+                   audience.namespaces.includes(place.namespace) ||
+                   audience.project === place.projectId;
+                 const { handle, kind, suspended } = held;

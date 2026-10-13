@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/projects-list.test.ts
+# kills: projects.list-repair
+# why: the Projector does not note the visibility of the settings events it receives
+diff --git a/apps/keel/src/adapters/driving/do/projector.ts b/apps/keel/src/adapters/driving/do/projector.ts
+index 08b433b7..d8afcfe8 100644
+--- a/apps/keel/src/adapters/driving/do/projector.ts
++++ b/apps/keel/src/adapters/driving/do/projector.ts
+@@ -71,7 +71,6 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
+     const skipped = foldViews(tx.store, event);
+     if (skipped !== undefined) console.warn("projector read model skipped an event", skipped);
+     noteStanding(tx.store, event);
+-    noteVisibility(tx.store, event);
+     return { drafts: [] };
+   }
+ 

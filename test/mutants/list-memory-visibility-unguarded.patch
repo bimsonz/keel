@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/project-list.test.ts packages/testing/test/ports.test.ts
+# kills: ports.project-namespaces-visibility-seq
+# why: the in-memory mirror takes a write of any seq, so a late one moves the row back
+diff --git a/packages/testing/src/memory/tenancy.ts b/packages/testing/src/memory/tenancy.ts
+index 177a8ce1..14e2ca79 100644
+--- a/packages/testing/src/memory/tenancy.ts
++++ b/packages/testing/src/memory/tenancy.ts
+@@ -242,7 +242,7 @@ export function makeProjectNamespacesMemory(rows: BetterAuthMemory = makeBetterA
+         visibility: (projectId, visibility, seq) =>
+           Effect.sync(() => {
+             if (!places.has(projectId)) return;
+-            if ((mirrored.get(projectId)?.seq ?? 0) < seq)
++            if (seq >= 0)
+               mirrored.set(projectId, { visibility, seq });
+           }),
+       }),

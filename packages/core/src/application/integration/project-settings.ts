@@ -16,6 +16,7 @@ import {
   EntityStore,
   type EventDraft,
   type EventOutbox,
+  ProjectNamespaces,
   type ProjectSettings,
   type PutProjectSettings,
   type Stored,
@@ -23,6 +24,7 @@ import {
   type Transition,
 } from "../ports/index.ts";
 import { PROJECT } from "./create-project.ts";
+import { visibilityOf } from "./project-visibility.ts";
 
 /** Where the Project DO keeps its settings, keyed by the project id: absent until a PUT first changes one. */
 export const PROJECT_SETTINGS = "project-settings";
@@ -118,13 +120,18 @@ export const settingsOf: (
  * is a no-op by content. The cause is `settings:<requestId>`: a replay of the
  * request answers the settings as they stand, and the same request id with
  * other settings is IdempotencyConflict.
+ *
+ * A change of visibility is written to the project's place before answering,
+ * guarded by the event's seq, so the next list is narrowed by it and no later
+ * write moves the row back; the Projector repeats the write on delivery, which
+ * repairs a crash between the commit and the row. A replay writes again.
  */
 export const changeSettings: (
   command: ChangeSettings,
 ) => Effect.Effect<
   ProjectSettings,
   ProjectNotFound | IdempotencyConflict,
-  Clock | EntityStore | EventOutbox
+  Clock | EntityStore | EventOutbox | ProjectNamespaces
 > = Effect.fn("integration/changeSettings")(function* (command: ChangeSettings) {
   const { projectId, by, actor, requestId } = command;
   const next: ProjectSettings = {
@@ -162,6 +169,11 @@ export const changeSettings: (
       });
     },
   );
+  const places = yield* ProjectNamespaces;
+  for (const event of committed.events) {
+    const moved = visibilityOf(event);
+    if (moved !== undefined) yield* places.visibility(moved.projectId, moved.visibility, moved.seq);
+  }
   if (!committed.duplicate) return committed.value;
   return committed.sameCommand ? yield* settingsOf(projectId) : yield* conflict;
 });

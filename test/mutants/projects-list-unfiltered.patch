@@ -1,16 +1,16 @@
-# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/authz.test.ts -t authz.public-private-missing
-# kills: authz.public-private-missing
-# why: the project list skips the policy, so a visitor's list shows every org's private projects
-diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
-index cc42607..a73566a 100644
---- a/apps/keel/src/adapters/driving/http/handlers.ts
-+++ b/apps/keel/src/adapters/driving/http/handlers.ts
-@@ -225,7 +225,7 @@ const decodeCursor = (cursor: string) => Schema.decodeUnknownOption(ProjectIdSch
- const readableView = (caller: Caller, projectId: ProjectId, name: string) =>
-   Effect.gen(function* () {
-     const resource = yield* projectResource(projectId);
--    if (resource._tag !== "Project" || Result.isFailure(decideEach(caller.principal, resource)))
-+    if (resource._tag !== "Project")
-       return undefined;
-     const namespace = yield* Namespaces.use((namespaces) => namespaces.byId(resource.org));
-     if (Option.isNone(namespace)) return undefined;
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/projects-list.test.ts
+# kills: projects.list-policy
+# why: the project list skips the policy, so a suspended org's public project is listed
+diff --git a/apps/keel/src/adapters/driving/http/project-list.ts b/apps/keel/src/adapters/driving/http/project-list.ts
+index f3678452..603d2640 100644
+--- a/apps/keel/src/adapters/driving/http/project-list.ts
++++ b/apps/keel/src/adapters/driving/http/project-list.ts
+@@ -42,7 +42,7 @@ export const listProjects = (
+     const rows = yield* ProjectNamespaces.use((places) =>
+       places.shownTo(projectAudience(principal), after, limit),
+     );
+-    const items = rows.filter((row) => Result.isSuccess(decideEach(principal, resourceOf(row))));
++    const items = rows;
+     const last = rows.at(-1);
+     return rows.length < limit || last === undefined
+       ? { items }

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/projects-list.test.ts
+# kills: projects.list-repair
+# why: the Projector notes each visibility and never writes it
+diff --git a/apps/keel/src/adapters/driving/do/projector.ts b/apps/keel/src/adapters/driving/do/projector.ts
+index 08b433b7..61b20e56 100644
+--- a/apps/keel/src/adapters/driving/do/projector.ts
++++ b/apps/keel/src/adapters/driving/do/projector.ts
+@@ -78,7 +78,6 @@ export class ProjectorDO extends KeelObjectWith<ProjectorServices> implements Pr
+   /** Repeats each agent standing it received in the directory, and each project's visibility in its place, once the receipt is committed (D1 is outside it). */
+   protected override async received(): Promise<void> {
+     await this.runtime.runPromise(repairStandings);
+-    await this.runtime.runPromise(repairVisibility);
+   }
+ 
+   async read(request: typeof ProjectorRead.Encoded) {

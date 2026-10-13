@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/tenancy-d1.test.ts
+# kills: d1.projects-shown-gone
+# why: the page keeps a project whose org or person was deleted
+diff --git a/apps/keel/src/adapters/driven/d1/project-namespaces.ts b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+index b34a78f2..e9136b2e 100644
+--- a/apps/keel/src/adapters/driven/d1/project-namespaces.ts
++++ b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+@@ -64,7 +64,6 @@ const listed = (from: string, shown: string) => `SELECT p.id, p.namespace_id, p.
+   LEFT JOIN organization o ON n.kind = 'org' AND o.id = n.id
+   LEFT JOIN "user" u ON n.kind = 'user' AND u.id = n.id
+   WHERE ${shown} AND p.id > ?
+-    AND (n.kind = 'agent' OR o.id IS NOT NULL OR u.id IS NOT NULL)
+   ORDER BY p.id LIMIT ?`;
+ 
+ /** A visitor's page: the public projects alone, read from the index that holds only them. */

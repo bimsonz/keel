@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/project-list.test.ts
+# kills: projects.list-narrowed
+# why: the list answers every row its query read and the policy decides none
+diff --git a/apps/keel/src/adapters/driving/http/project-list.ts b/apps/keel/src/adapters/driving/http/project-list.ts
+index f3678452..603d2640 100644
+--- a/apps/keel/src/adapters/driving/http/project-list.ts
++++ b/apps/keel/src/adapters/driving/http/project-list.ts
+@@ -42,7 +42,7 @@ export const listProjects = (
+     const rows = yield* ProjectNamespaces.use((places) =>
+       places.shownTo(projectAudience(principal), after, limit),
+     );
+-    const items = rows.filter((row) => Result.isSuccess(decideEach(principal, resourceOf(row))));
++    const items = rows;
+     const last = rows.at(-1);
+     return rows.length < limit || last === undefined
+       ? { items }

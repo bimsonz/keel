@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/projects-list.test.ts apps/keel/test/pool/tenancy-d1.test.ts
+# kills: ports.project-namespaces-shown-account, projects.list-policy
+# why: a listed row says its namespace is never suspended, so a suspended org's public project is listed
+diff --git a/apps/keel/src/adapters/driven/d1/project-namespaces.ts b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+index b34a78f2..6cdd1c41 100644
+--- a/apps/keel/src/adapters/driven/d1/project-namespaces.ts
++++ b/apps/keel/src/adapters/driven/d1/project-namespaces.ts
+@@ -47,7 +47,7 @@ function toListed(row: unknown, now: number): ListedProject {
+     visibility: r.visibility,
+     handle: r.handle,
+     kind: r.kind,
+-    suspended: r.kind === "user" ? rowBanHolds(r, now) : (r.suspended ?? 0) !== 0,
++    suspended: false,
+   };
+ }
+ 

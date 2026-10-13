@@ -1,5 +1,5 @@
 import { Result } from "effect";
-import type { NextAction } from "../kernel/index.ts";
+import type { NamespaceId, NextAction, ProjectId } from "../kernel/index.ts";
 import { AccessRefused, AuthenticationRequired, NotVisible, type RefusalReason } from "./errors.ts";
 import type {
   AgentPrincipal,
@@ -201,6 +201,41 @@ const roleIn = (memberships: readonly Membership[], org: string): Role | undefin
  */
 export const roleOf = (user: UserPrincipal, namespace: string): Role | undefined =>
   namespace === user.userId ? "owner" : roleIn(user.memberships, namespace);
+
+/**
+ * Whom a list of projects is narrowed for before the policy decides each: the
+ * namespaces the caller may hold a role in, and the one project an agent's
+ * token is for. What is public is shown to every audience.
+ */
+export interface ProjectAudience {
+  readonly namespaces: readonly NamespaceId[];
+  readonly project?: ProjectId;
+}
+
+const NO_AUDIENCE: ProjectAudience = { namespaces: [] };
+
+/**
+ * The audience a principal's list of projects is read for: a person's own
+ * namespace and their orgs, an agent's token project, nothing for a visitor.
+ * It narrows what is read and grants nothing: `authorize` decides every project
+ * read, so it must never leave out one the policy would grant.
+ */
+export const projectAudience = (principal: Principal): ProjectAudience => {
+  switch (principal._tag) {
+    case "User":
+      return { namespaces: [principal.userId, ...principal.memberships.map((m) => m.org)] };
+    case "Agent":
+      return principal.projectId === undefined
+        ? NO_AUDIENCE
+        : { namespaces: [], project: principal.projectId };
+    case "Anonymous":
+      return NO_AUDIENCE;
+    default: {
+      const unreachable: never = principal;
+      return unreachable;
+    }
+  }
+};
 
 /** Rights from a role in the resource's org, else a public read. */
 const rightsByRole = (role: Role | undefined, resource: Resource): ReadonlySet<Right> => {

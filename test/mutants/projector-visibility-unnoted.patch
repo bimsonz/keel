@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/project-list.test.ts
+# kills: projector.visibility-repair
+# why: the Projector notes no visibility, so a failed inline write is never repaired
+diff --git a/packages/core/src/application/integration/project-visibility.ts b/packages/core/src/application/integration/project-visibility.ts
+index 3ddac3bb..edb53034 100644
+--- a/packages/core/src/application/integration/project-visibility.ts
++++ b/packages/core/src/application/integration/project-visibility.ts
+@@ -43,7 +43,7 @@ const decodePending = Schema.decodeUnknownSync(Pending);
+ /** Notes the visibility a project's settings event leaves it with, for `repairVisibility`; any other event is ignored. */
+ export function noteVisibility(store: (typeof EntityStore)["Service"], event: EventEnvelope): void {
+   const moved = visibilityOf(event);
+-  if (moved === undefined) return;
++  if (moved !== undefined) return;
+   const held = store.get(VISIBILITY_PENDING, moved.projectId);
+   if (held !== undefined && decodePending(held).seq >= moved.seq) return;
+   store.put(
