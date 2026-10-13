@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/application/integration/project-source.test.ts
+# kills: source.import-ref
+# why: A full ref name passes as a branch's name, and the code host is asked for a branch called refs/heads/main
+diff --git a/packages/core/src/application/integration/project-source.ts b/packages/core/src/application/integration/project-source.ts
+index 86e65d5..d8defa9 100644
+--- a/packages/core/src/application/integration/project-source.ts
++++ b/packages/core/src/application/integration/project-source.ts
+@@ -114,7 +114,7 @@ const branchSegment = (segment: string) =>
+  */
+ export const importRef = (text: string): string | undefined => {
+   if (text.length === 0 || text.length > REF_MAX) return undefined;
+-  if (text === "HEAD" || text.startsWith("-") || text.startsWith("refs/")) return undefined;
++  if (text === "HEAD" || text.startsWith("-")) return undefined;
+   return text.split("/").every(branchSegment) ? text : undefined;
+ };
+ 
