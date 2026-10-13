@@ -1,19 +1,9 @@
 import { Result, Schema } from "effect";
 import { type AgentId, makeId, ProjectId, type RunId, sha256Hex } from "../kernel/index.ts";
-import type { Agent } from "./agent.ts";
+import { type Agent, RunLabel } from "./agent.ts";
 import { idBody, type KeyThumbprint } from "./agent-key.ts";
 import { AgentNotAdmitted } from "./errors.ts";
 import type { Handle } from "./handle.ts";
-
-/**
- * What an agent calls one of its runs: one word of lower-case
- * letters and digits, joined by `-`, `_` or `.`, at most 64 characters. It is
- * the agent's own claim; Keel proves only that the run is the agent's.
- */
-export const RunLabel = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9._-]{0,63}$/)).pipe(
-  Schema.brand("RunLabel"),
-);
-export type RunLabel = typeof RunLabel.Type;
 
 /** What names a run under its agent: the label it gives, or failing one the key it asks with. */
 export type RunName =
