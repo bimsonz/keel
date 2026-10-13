@@ -2,8 +2,14 @@ import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { readStoredPlan, storedPlanText } from "../../../src/application/verification/index.ts";
 import { compile, type FlowPlan, unionPlans } from "../../../src/domain/verification/index.ts";
-import { emptyDefaults, type FlowCase, guardedCaseArb } from "../../arbitraries/flow.ts";
+import {
+  emptyDefaults,
+  type FlowCase,
+  guardedCaseArb,
+  ruledCaseArb,
+} from "../../arbitraries/flow.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 
 const planOf = (c: FlowCase): FlowPlan =>
   Result.getOrThrow(compile(c.spec, c.facts, emptyDefaults));
@@ -76,5 +82,17 @@ describe("a plan as the plan store keeps it", () => {
         );
       }),
     );
+  });
+
+  it("[plan-codec.ruled] reads back a plan whose guards hold decisions exactly as it was compiled", () => {
+    let ruled = 0;
+    assertReaching(
+      fc.property(ruledCaseArb().map(planOf), (plan) => {
+        if (plan.steps.some((s) => s.guards?.decision !== undefined)) ruled++;
+        const text = Result.getOrThrow(storedPlanText(plan));
+        expect(Result.getOrThrow(readStoredPlan(plan.planHash, text))).toEqual(plan);
+      }),
+    );
+    expect(ruled).toBeGreaterThan(0);
   });
 });

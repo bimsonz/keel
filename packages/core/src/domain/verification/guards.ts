@@ -5,7 +5,7 @@ import {
   subjectsNear,
 } from "../coordination/index.ts";
 import type { GuardId } from "../kernel/index.ts";
-import type { AdmittedGuard, StepSpec } from "./flow.ts";
+import type { AdmittedGuard, HeldDecision, StepSpec } from "./flow.ts";
 
 /** What selects a guard for a change: the subjects it touches or relies on, and the paths it touches. */
 export type GuardExposure = {
@@ -60,6 +60,23 @@ const stepOf = (g: AdmittedGuard): StepSpec => ({
 const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /**
+ * The order rival decisions take wherever one guard's step is planned twice,
+ * by two listings or by two members of a batch: a decision held before none,
+ * the blocking side, then the least id. What is kept then never depends on
+ * which came first. A decision's id names one summary, so the id ends it.
+ */
+export const byHeldDecision = (a: HeldDecision | undefined, b: HeldDecision | undefined): number =>
+  a === undefined || b === undefined
+    ? Number(a === undefined) - Number(b === undefined)
+    : byCodePoint(a.id, b.id);
+
+/** Whether one listing of a guard is kept over another: the least probe hash, then the decision `byHeldDecision` puts first. */
+const precedes = (a: StepSpec, b: StepSpec): boolean =>
+  a.version === b.version
+    ? byHeldDecision(a.guards?.decision, b.guards?.decision) < 0
+    : a.version < b.version;
+
+/**
  * The admitted guards a change runs, with why. A guard is a regression test,
  * so selecting it is test-impact analysis and must never miss: a guard
  * applies whenever the change is exposed to its tenet, siblings and anchored
@@ -75,8 +92,8 @@ export const selectGuards = (
     const because = exposedBy(g.tenet.proposition, change);
     const spec = stepOf(g);
     const seen = byId.get(spec.id);
-    // A guard listed twice runs once; were its listings to disagree, the least probe hash wins, whatever the order.
-    if (because.length > 0 && (seen === undefined || spec.version < seen.spec.version))
+    // A guard listed twice runs once; were its listings to disagree, the one that `precedes` the other wins, whatever the order.
+    if (because.length > 0 && (seen === undefined || precedes(spec, seen.spec)))
       byId.set(spec.id, {
         spec,
         because: [

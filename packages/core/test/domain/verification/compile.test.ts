@@ -32,6 +32,7 @@ import {
   guardedCaseArb,
   otherCommit,
   probeOf,
+  ruledCaseArb,
 } from "../../arbitraries/flow.ts";
 import { fc } from "../../support/fast-check.ts";
 import { assertReaching } from "../../support/reach.ts";
@@ -670,6 +671,62 @@ describe("flow-compiler/2: what a plan's hash covers", () => {
     });
     expect(blocked.steps[0]?.guards).toEqual({ predicate: "freshness", policy: "block", probe });
     expect(blocked.planHash).not.toBe(unset.planHash);
+  });
+
+  it("[flow.guard-ruled] a guard that holds a decision blocks whatever its predicate's policy and its step carries the decision; every other guard is as the policy has it and carries none", () => {
+    const ruledUnder = { block: 0, advise: 0, annotate: 0, unset: 0 };
+    let unruled = 0;
+    assertReaching(
+      fc.property(ruledCaseArb(), (c) => {
+        const plan = ok(c);
+        const specs = new Map(c.spec.steps.map((s) => [s.id, s]));
+        return plan.steps.every((p) => {
+          const guards = specs.get(p.id)?.guards;
+          if (guards === undefined) return p.guards === undefined;
+          const chosen = c.facts.predicatePolicy?.[guards.predicate];
+          if (guards.decision === undefined) {
+            unruled++;
+            return p.guards?.policy === (chosen ?? "advise") && !("decision" in p.guards);
+          }
+          ruledUnder[chosen ?? "unset"]++;
+          return (
+            p.guards?.policy === "block" &&
+            JSON.stringify(p.guards.decision) === JSON.stringify(guards.decision)
+          );
+        });
+      }),
+    );
+    expect(Object.values(ruledUnder).every((n) => n > 0)).toBe(true);
+    expect(unruled).toBeGreaterThan(0);
+
+    const probe = probeOf("guard");
+    const decision = { id: makeId("dec", "1".padStart(26, "0")), summary: "The premise holds" };
+    const annotated = (held?: typeof decision): FlowPlan => {
+      const guards = {
+        predicate: "freshness" as const,
+        probe,
+        ...(held ? { decision: held } : {}),
+      };
+      const one = single([{ ...suiteStep("guard"), guards }]);
+      return ok({
+        spec: one.spec,
+        facts: { ...one.facts, predicatePolicy: { freshness: "annotate" } },
+      });
+    };
+    const ruled = annotated(decision);
+    const other = annotated({ ...decision, id: makeId("dec", "2".padStart(26, "0")) });
+    expect(annotated().steps[0]?.guards).toEqual({
+      predicate: "freshness",
+      policy: "annotate",
+      probe,
+    });
+    expect(ruled.steps[0]?.guards).toEqual({
+      predicate: "freshness",
+      policy: "block",
+      probe,
+      decision,
+    });
+    expect(new Set([annotated().planHash, ruled.planHash, other.planHash]).size).toBe(3);
   });
 
   it("[flow.guard-probe-pinned] a guard step runs the probe its own spec pins, never another guard's", () => {

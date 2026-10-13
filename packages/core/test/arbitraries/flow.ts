@@ -5,6 +5,7 @@ import {
   contentHashOf,
   type EvidenceClass,
   Glob,
+  makeId,
   type PredicatePolicy,
   weakest,
 } from "../../src/domain/kernel/index.ts";
@@ -14,6 +15,7 @@ import type {
   Flow,
   FlowDefaults,
   FlowDefinition,
+  HeldDecision,
   Read,
   StepKind,
   StepOutcome,
@@ -353,4 +355,33 @@ export const guardedCaseArb = (): fc.Arbitrary<FlowCase> =>
           facts: { ...c.facts, predicatePolicy: policy },
         };
       }),
+  );
+
+/** A decision a guard might hold: one of three, so two guards may hold the same one and two listings rival ones. */
+export const heldDecisionArb: fc.Arbitrary<HeldDecision> = fc.constantFrom(1, 2, 3).map((n) => ({
+  id: makeId("dec", String(n).padStart(26, "0")),
+  summary: `ruling ${n}`,
+}));
+
+/**
+ * A guarded case where some of the guard steps hold a decision. The decisions
+ * are drawn after `guardedCaseArb`'s own draws, so every test on that keeps
+ * the cases it had.
+ */
+export const ruledCaseArb = (): fc.Arbitrary<FlowCase> =>
+  guardedCaseArb().chain((c) =>
+    fc
+      .tuple(...c.spec.steps.map(() => fc.option(heldDecisionArb, { nil: undefined })))
+      .map((held) => ({
+        ...c,
+        spec: {
+          ...c.spec,
+          steps: c.spec.steps.map((s, i) => {
+            const decision = held[i];
+            return s.guards === undefined || decision === undefined
+              ? s
+              : { ...s, guards: { ...s.guards, decision } };
+          }),
+        },
+      })),
   );

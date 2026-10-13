@@ -3,6 +3,7 @@ import { type PredicatePolicy, type ContentHash, type Glob, weakest } from "../k
 import { planHashOf } from "./compile.ts";
 import { UnionVersionConflict } from "./errors.ts";
 import type { FlowPlan, PlanPreimage } from "./flow.ts";
+import { byHeldDecision } from "./guards.ts";
 import type { PlanStep, StepOutcome } from "./plan.ts";
 
 const WORLDS = ["trunk", "A", "B", "AB"] as const;
@@ -11,6 +12,15 @@ const OUTCOMES: readonly StepOutcome[] = ["pass", "fail", "escalate", "annotate"
 const STRICTNESS: Readonly<Record<PredicatePolicy, number>> = { annotate: 0, advise: 1, block: 2 };
 
 const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+type PlannedGuard = NonNullable<PlanStep["guards"]>;
+/**
+ * Which of two members' guards a shared step keeps: the stricter policy, then
+ * the decision `byHeldDecision` puts first. Members come in plan-hash order,
+ * so without the second a ruled guard's decision would be kept or lost by a hash.
+ */
+const byStrictness = (a: PlannedGuard, b: PlannedGuard): number =>
+  STRICTNESS[b.policy] - STRICTNESS[a.policy] || byHeldDecision(a.decision, b.decision);
 const sortedUnion = <A extends string>(...lists: readonly (readonly A[])[]): A[] =>
   [...new Set(lists.flat())].toSorted(byCodePoint);
 const inOrder = <A>(order: readonly A[], ...lists: readonly (readonly A[])[]): A[] =>
@@ -37,7 +47,7 @@ const mergeStep = (a: PlanStep, b: PlanStep): PlanStep => {
   const guards =
     a.guards === undefined
       ? b.guards
-      : b.guards === undefined || STRICTNESS[a.guards.policy] >= STRICTNESS[b.guards.policy]
+      : b.guards === undefined || byStrictness(a.guards, b.guards) <= 0
         ? a.guards
         : b.guards;
   return {

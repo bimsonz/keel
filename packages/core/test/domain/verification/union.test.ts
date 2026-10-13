@@ -20,10 +20,12 @@ import {
   emptyDefaults,
   factClasses,
   guardedCaseArb,
+  heldDecisionArb,
   otherCommit,
   policyArb,
 } from "../../arbitraries/flow.ts";
 import { fc } from "../../support/fast-check.ts";
+import { assertReaching } from "../../support/reach.ts";
 
 const changeArb = fc.record({
   touched: fc.subarray(
@@ -69,6 +71,8 @@ const batchArb: fc.Arbitrary<readonly [FlowPlan, ...FlowPlan[]]> = guardedCaseAr
 const asJson = (value: unknown): Json => JSON.parse(JSON.stringify(value));
 const same = (a: FlowPlan, b: FlowPlan): boolean =>
   canonicalJson(asJson(a)) === canonicalJson(asJson(b));
+/** A step's guards in canonical JSON, or `null` for none. */
+const canon = (guards: unknown): string => canonicalJson(asJson(guards ?? null));
 const unionOf = (plans: readonly [FlowPlan, ...FlowPlan[]]): FlowPlan =>
   Result.getOrThrow(unionPlans(plans));
 const distinct = (plans: readonly FlowPlan[]): readonly FlowPlan[] => [
@@ -266,5 +270,41 @@ describe("unionPlans: the plan a batch runs", () => {
       }),
     );
     expect(guarded).toBeGreaterThan(0);
+  });
+
+  it("[union.guard-ruled] a guard step two members share keeps the stricter policy, then the decision either holds, whichever plan's hash sorts first: a decision before none, then the least id", () => {
+    let ruledFirst = 0;
+    let ruledSecond = 0;
+    assertReaching(
+      fc.property(batchArb, heldDecisionArb, heldDecisionArb, (plans, d1, d2) => {
+        const [p] = plans;
+        const step = p.steps.find((s) => s.guards !== undefined);
+        if (step?.guards === undefined) return true;
+        const { predicate, probe } = step.guards;
+        const planned = (guards: NonNullable<FlowPlan["steps"][number]["guards"]>): FlowPlan => {
+          const edited = {
+            ...p,
+            steps: p.steps.map((s) => (s.id === step.id ? { ...s, guards } : s)),
+          };
+          return { ...edited, planHash: planHashOf(edited) };
+        };
+        const keptOf = (a: FlowPlan, b: FlowPlan) =>
+          canon(unionOf([a, b]).steps.find((s) => s.id === step.id)?.guards);
+        const unruled = planned({ predicate, policy: "block", probe });
+        const one = planned({ predicate, policy: "block", probe, decision: d1 });
+        const two = planned({ predicate, policy: "block", probe, decision: d2 });
+        const advised = planned({ predicate, policy: "advise", probe, decision: d1 });
+        if (one.planHash < unruled.planHash) ruledFirst++;
+        else ruledSecond++;
+        const least = d1.id <= d2.id ? d1 : d2;
+        return (
+          keptOf(unruled, one) === canon({ predicate, policy: "block", probe, decision: d1 }) &&
+          keptOf(one, two) === canon({ predicate, policy: "block", probe, decision: least }) &&
+          keptOf(unruled, advised) === canon({ predicate, policy: "block", probe })
+        );
+      }),
+    );
+    expect(ruledFirst).toBeGreaterThan(0);
+    expect(ruledSecond).toBeGreaterThan(0);
   });
 });
