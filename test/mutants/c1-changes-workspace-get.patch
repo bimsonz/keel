@@ -2,15 +2,15 @@
 # kills: changes.workspace
 # why: The workspace is read from the change's get(), which answers the change, not its workspace
 diff --git a/apps/keel/src/adapters/driven/do-rpc/changes.ts b/apps/keel/src/adapters/driven/do-rpc/changes.ts
-index 4b8cdd6..c007fde 100644
+index 2759aeb7..644f3c63 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/changes.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/changes.ts
-@@ -98,7 +98,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
+@@ -203,7 +203,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
          ),
        get: (changeId) => callObject(ChangeCodecs.get, () => objects.change(changeId).get()),
        workspace: (changeId) =>
 -        callObject(ChangeCodecs.workspace, () => objects.change(changeId).workspace()),
 +        callObject(ChangeCodecs.workspace, () => objects.change(changeId).get()),
+       // Held by the change's object, which may restart under it: read again as it stands.
        awaitSubmission: (changeId, waitSeconds) =>
-         callObject(ChangeCodecs.submission, () =>
-           objects.change(changeId).submission(waitSeconds * 1000),
+         callHeldRead(ChangeCodecs.submission, "submission", waitSeconds * 1000, (waitMs) =>

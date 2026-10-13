@@ -1,14 +1,14 @@
 # expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/changes.test.ts
 # why: a status read through the real Change DO never waits, so it answers before the submit moves the change
 diff --git a/apps/keel/src/adapters/driven/do-rpc/changes.ts b/apps/keel/src/adapters/driven/do-rpc/changes.ts
-index 09ffefa..b77abed 100644
+index 2759aeb7..fc8ec6e0 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/changes.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/changes.ts
-@@ -103,7 +103,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
-         callObject(ChangeCodecs.workspace, () => objects.change(changeId).workspace()),
+@@ -207,7 +207,7 @@ export function ChangesRpc(objects: ChangeObjects): Layer.Layer<Changes> {
+       // Held by the change's object, which may restart under it: read again as it stands.
        awaitSubmission: (changeId, waitSeconds) =>
-         callObject(ChangeCodecs.submission, () =>
--          objects.change(changeId).submission(waitSeconds * 1000),
+         callHeldRead(ChangeCodecs.submission, "submission", waitSeconds * 1000, (waitMs) =>
+-          objects.change(changeId).submission(waitMs),
 +          objects.change(changeId).submission(0),
          ),
      }),
