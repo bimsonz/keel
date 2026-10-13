@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t t35.ruling-bounces
+# kills: t35.ruling-bounces
+# why: a ruling that goes against one party bounces the party it favours too
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index f18a29b5..d14b709a 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1654,7 +1654,7 @@ const commandFor = (
+       // takes that from the wait for any ruling and nowhere else. A party it refuses that is still on its
+       // way, in a batch or not yet parked, may land as it is with the ruling against it: that is reported.
+       const gone = OUT_OF_THE_RUNNING.has(change.state);
+-      if (against?.includes(change.id) === true)
++      if (against !== undefined)
+         return {
+           command: {
+             _tag: "Bounce",

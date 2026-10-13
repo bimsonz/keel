@@ -932,7 +932,7 @@ const escalated = (conflictId: string) =>
       reason: "human-class",
     },
   );
-const resolved = (conflictId: string, decisionId?: string) =>
+const resolved = (conflictId: string, decisionId?: string, against?: readonly string[]) =>
   arriving(
     { kind: "conflict", id: conflictId },
     {
@@ -940,8 +940,51 @@ const resolved = (conflictId: string, decisionId?: string) =>
       conflictId,
       move: "escalate",
       ...(decisionId === undefined ? {} : { decisionId }),
+      ...(against === undefined ? {} : { against }),
     },
   );
+const RELIED = {
+  subject: "authz.session",
+  predicate: "freshness",
+  relation: "at-most",
+  value: "per-request",
+};
+/** The two sides of a conflict as a party hears it open: who relies on the premise, and who makes the effect. */
+interface Sides {
+  readonly holder: string;
+  readonly author: string;
+}
+const suspected = (conflictId: string, { holder, author }: Sides) =>
+  arriving(
+    { kind: "conflict", id: conflictId },
+    {
+      _tag: "ConflictSuspected",
+      conflictId,
+      kind: "semantic",
+      parties: [holder, author],
+      premise: { holder, proposition: RELIED },
+      effect: { changeId: author, proposition: RELIED },
+    },
+  );
+/**
+ * A change parked for the ruling on CONFLICT, in a world of its own, after it
+ * hears that conflict resolved against `against`: the ruling, what the change
+ * made of it, the change and its last event. `sides` is the conflict as it
+ * heard it open; without them it never heard it open.
+ */
+const afterRuling = (against: readonly string[], sides?: Sides) =>
+  Effect.gen(function* () {
+    yield* queued;
+    if (sides !== undefined) yield* receive(suspected(CONFLICT, sides));
+    yield* receive(escalated(CONFLICT));
+    const ruling = resolved(CONFLICT, DECISION, against);
+    const reaction = yield* receive(ruling);
+    return { ruling, reaction, change: yield* getChange(changeId), last: yield* lastEvent };
+  }).pipe(Effect.provide(changeObject().layer));
+const REVISE_OR_WITHDRAW = [
+  expect.objectContaining({ operationId: "revise" }),
+  expect.objectContaining({ operationId: "abandon" }),
+];
 const typesOf = Effect.map(EventOutbox, (outbox) => outbox.log(changeRef).map((e) => e.type));
 
 describe("a conflict of the change put to a person", () => {
@@ -992,6 +1035,104 @@ describe("a conflict of the change put to a person", () => {
           causation: ruling.eventId,
           payload: { decisionId: DECISION },
         });
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[t35.ruling-bounces] a party parked for a ruling that goes against it is bounced by the decision, told what the ruling means for it and to revise or withdraw; the party it favours resumes",
+    () =>
+      Effect.gen(function* () {
+        const making: Sides = { holder: otherChange, author: changeId };
+        const relying: Sides = { holder: changeId, author: otherChange };
+        const premiseHeld = yield* afterRuling([changeId], making);
+        const effectStood = yield* afterRuling([changeId], relying);
+        const unsided = yield* afterRuling([changeId]);
+        const favoured = yield* afterRuling([otherChange], relying);
+
+        for (const { ruling, reaction, change, last } of [premiseHeld, effectStood, unsided]) {
+          expect(reaction?.problem).toBeUndefined();
+          expect(change.state).toBe("bounced");
+          expect([change.parkReason, change.escalationId, change.parkedFrom]).toEqual([
+            undefined,
+            undefined,
+            undefined,
+          ]);
+          expect(last).toMatchObject({
+            type: "ChangeBounced",
+            causation: ruling.eventId,
+            project: sampleProjectId,
+            payload: { changeId, decisionId: DECISION, nextActions: REVISE_OR_WITHDRAW },
+          });
+        }
+        // The reason is the consequence of the option the ruling chose, as the person read it.
+        expect(premiseHeld.last?.payload).toMatchObject({
+          reasons: [
+            `${changeId} must change so that it no longer contradicts it; ${otherChange} goes on as declared.`,
+          ],
+        });
+        expect(effectStood.last?.payload).toMatchObject({
+          reasons: [
+            `${changeId} must stop relying on the premise; ${otherChange} goes on as declared.`,
+          ],
+        });
+        // A conflict the change never heard open still says which decision, on which conflict.
+        expect(unsided.last?.payload).toMatchObject({
+          reasons: [expect.stringMatching(new RegExp(`^${DECISION} .* ${CONFLICT}\\.$`))],
+        });
+        expect(favoured.reaction?.problem).toBeUndefined();
+        expect(favoured.change.state).toBe("queued");
+        expect(favoured.last).toMatchObject({
+          type: "ChangeResumed",
+          causation: favoured.ruling.eventId,
+          payload: { decisionId: DECISION },
+        });
+      }),
+  );
+
+  it.effect(
+    "[t35.ruling-bounces] a ruling against a party on a conflict it is not waiting for takes it out of the wait all the same, and a later ruling against it, back with its agent, moves nothing and reports nothing",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* queued;
+        yield* receive(escalated(CONFLICT));
+        yield* receive(escalated(OTHER_CONFLICT));
+        const waiting = yield* getChange(changeId);
+        const against = resolved(OTHER_CONFLICT, OTHER_DECISION, [changeId]);
+        yield* receive(against);
+        const bounced = yield* getChange(changeId);
+        const last = yield* lastEvent;
+        const later = yield* receive(resolved(CONFLICT, DECISION, [changeId]));
+
+        expect(waiting.escalationId).toBe(escalationIdOf(CONFLICT));
+        expect(bounced.state).toBe("bounced");
+        expect(last).toMatchObject({
+          type: "ChangeBounced",
+          causation: against.eventId,
+          payload: { decisionId: OTHER_DECISION, nextActions: REVISE_OR_WITHDRAW },
+        });
+        expect([later?.problem, later?.drafts]).toEqual([undefined, []]);
+        expect((yield* getChange(changeId)).state).toBe("bounced");
+        expect(yield* lastEvent).toEqual(last);
+      }).pipe(Effect.provide(layer));
+    },
+  );
+
+  it.effect(
+    "[t35.ruling-bounces] a party already in a batch when the ruling goes against it is not bounced and finishes its batch, and that is reported by the decision, the change, the conflict and the state",
+    () => {
+      const { layer } = changeObject();
+      return Effect.gen(function* () {
+        yield* batched;
+        yield* receive(escalated(CONFLICT));
+        const reaction = yield* receive(resolved(CONFLICT, DECISION, [changeId]));
+
+        expect(reaction?.problem).toBe(
+          `${DECISION} ruled against ${changeId} on ${CONFLICT} and its bounce was refused in state integrating: it may land as it is`,
+        );
+        expect(reaction?.drafts).toEqual([]);
+        expect((yield* getChange(changeId)).state).toBe("integrating");
       }).pipe(Effect.provide(layer));
     },
   );

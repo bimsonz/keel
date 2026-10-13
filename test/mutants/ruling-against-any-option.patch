@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations.test.ts -t t35.ruling-against
+# kills: t35.ruling-against
+# why: an option that favours neither side is read as the effect standing, so it goes against the premise's holder
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index 5d4f3451..f5fd261c 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -74,7 +74,7 @@ export const EFFECT_STANDS = "effect-stands";
+ 
+ /** The side of a conflict an option lets stand; an option that favours neither names none. */
+ export const standingSide = (option: string): "premise" | "effect" | undefined =>
+-  option === PREMISE_HOLDS ? "premise" : option === EFFECT_STANDS ? "effect" : undefined;
++  option === PREMISE_HOLDS ? "premise" : "effect";
+ 
+ /**
+  * What letting a side stand means for the two changes, `holder` relying on the

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t t35.ruling-bounces
+# kills: t35.ruling-bounces
+# why: a ruling against a change that never heard its conflict open names neither the decision nor the conflict
+diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
+index f18a29b5..e13767a6 100644
+--- a/packages/core/src/application/coordination/change.ts
++++ b/packages/core/src/application/coordination/change.ts
+@@ -1661,7 +1661,7 @@ const commandFor = (
+             decisionId,
+             reasons: [
+               consequenceAgainst(store, conflictId, change.id) ??
+-                `${decisionId} ruled against this change on ${conflictId}.`,
++                "A ruling went against this change.",
+             ],
+             nextActions: [],
+           },

@@ -14,6 +14,7 @@ import {
   type ConflictStateRefused,
   decideConflict,
   MoveRefused,
+  sidesAgainst,
 } from "../../domain/verification/index.ts";
 import { commit, type Transaction, type Transition } from "../ports/commit.ts";
 import {
@@ -30,7 +31,7 @@ import {
   type SubjectRef,
 } from "../ports/index.ts";
 import { subjectAddress } from "./change.ts";
-import { askAbout, escalationIdOf } from "./escalations.ts";
+import { askAbout, escalationIdOf, standingSide } from "./escalations.ts";
 import { changeParties } from "./party-conflicts.ts";
 import {
   conflictRef,
@@ -236,9 +237,12 @@ const decodeConflictId = Schema.decodeUnknownOption(ConflictId);
  * raised, inside the transaction that receives it: the conflict the decision
  * is about resolves with that decision, ConflictResolved on the conflict's
  * own entity, and each party's Change DO hears it. The move is `escalate`:
- * what was ruled is on the decision. Keel resolves nothing a person did not
- * rule on: a decision of another escalation, or of a conflict that is not
- * with a person, commits nothing and is reported.
+ * what was ruled is on the decision. The resolution names the party the
+ * ruling goes against, the side its option did not let stand, so that party
+ * bounces where the other resumes; an option that favours neither side goes
+ * against no one. Keel resolves nothing a person did not rule on: a decision
+ * of another escalation, or of a conflict that is not with a person, commits
+ * nothing and is reported.
  */
 export function hearDecision(
   tx: Transaction,
@@ -247,7 +251,7 @@ export function hearDecision(
 ): SubjectReaction {
   const recorded = decodeRecorded(event.payload);
   if (event.type !== "DecisionRecorded" || Option.isNone(recorded)) return { drafts: [] };
-  const { decisionId, escalationId } = recorded.value;
+  const { decisionId, escalationId, option } = recorded.value;
   const about = event.affected.find((ref) => ref.kind === "conflict");
   const conflictId = Option.getOrUndefined(decodeConflictId(about?.id));
   const conflict = conflictId === undefined ? undefined : storedConflict(tx.store, conflictId);
@@ -258,9 +262,15 @@ export function hearDecision(
       drafts: [],
       problems: [`${decisionId} rules on ${escalationId}, which is not ${conflictId}'s escalation`],
     };
+  const stands = standingSide(option);
   const resolved = ledgerStep(tx, conflictId, {
     _tag: "Conflict",
-    command: { _tag: "Resolve", move: "escalate", decisionId },
+    command: {
+      _tag: "Resolve",
+      move: "escalate",
+      decisionId,
+      against: stands === undefined ? [] : sidesAgainst(conflict, stands),
+    },
   });
   return Result.isFailure(resolved)
     ? {

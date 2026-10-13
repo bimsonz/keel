@@ -116,6 +116,12 @@ export function detailOf(event: EventEnvelope): string | undefined {
         onNone: () => undefined,
         onSome: (p) => (p.decisionId === undefined ? undefined : `decided by ${p.decisionId}`),
       });
+    case "ChangeBounced":
+      return Option.match(decodeEscalation(event.payload), {
+        onNone: () => undefined,
+        onSome: (p) =>
+          p.decisionId === undefined ? undefined : `ruled against by ${p.decisionId}`,
+      });
     case "ChangeParked":
       return Option.match(decodeEscalation(event.payload), {
         onNone: () => undefined,

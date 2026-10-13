@@ -328,7 +328,7 @@ const decisionRef = (conflictId: ConflictId): EntityRef => ({
 });
 
 /** A proven conflict in a placed project, escalated by its premise holder and ruled on: the decision the namespace committed. */
-function ruled() {
+function ruled(option: string = EFFECT_STANDS) {
   const { memory, at, conflictId, holder, other } = viewAt(true, "admitted");
   const namespace = nextId("org");
   const by = nextId("usr");
@@ -344,7 +344,7 @@ function ruled() {
     });
     yield* (yield* Escalations).rule({
       escalationId: escalationIdOf(conflictId),
-      option: EFFECT_STANDS,
+      option,
       by,
       idempotencyKey: "rule-1",
     });
@@ -357,6 +357,21 @@ function ruled() {
 
 const conflictLog = (memory: ReturnType<typeof ruled>["memory"], at: SubjectRef, id: ConflictId) =>
   Effect.runSync(memory.log(at, { kind: "conflict", id }));
+
+/** What a subject commits on hearing a ruling for `option`: heard as the decision recorded, or with its option rewritten. */
+function resolutionOn(option: string, heardAs?: string) {
+  const { memory, at, conflictId, holder, other, decision } = ruled(option);
+  const heard =
+    heardAs === undefined
+      ? decision
+      : Schema.decodeUnknownSync(EventEnvelope)({
+          ...Schema.encodeSync(EventEnvelope)(decision),
+          payload: { ...Object(decision.payload), option: heardAs },
+        });
+  Effect.runSync(memory.hear(at, heard));
+  const last = conflictLog(memory, at, conflictId).at(-1);
+  return { holder, other, type: last?.type, payload: last?.payload };
+}
 
 /** An escalation raised on a memory namespace whose clock the test moves, and what its widening deadline does there. */
 function raisedOn(
@@ -550,7 +565,7 @@ describe("an escalation widening to its namespace's maintainers", () => {
 });
 
 describe("a subject hearing the decision of an escalation it raised", () => {
-  it("[t35.hear-decision] resolves the conflict the decision is about, with that decision and the move escalate, telling both parties, once", () => {
+  it("[t35.hear-decision] resolves the conflict the decision is about, with that decision, the move escalate and the party it goes against, telling both parties, once", () => {
     const { memory, at, conflictId, holder, other, decision } = ruled();
     const before = types(conflictLog(memory, at, conflictId));
     const reaction = Effect.runSync(memory.hear(at, decision));
@@ -569,13 +584,19 @@ describe("a subject hearing the decision of an escalation it raised", () => {
       state: "resolved",
       move: "escalate",
       decisionId: decisionIdOf(escalationIdOf(conflictId)),
+      against: [holder],
     });
     expect(log.filter((event) => event.type === "ConflictResolved")).toHaveLength(1);
     expect(log.at(-1)).toMatchObject({
       type: "ConflictResolved",
       project: at.projectId,
       causation: decision.eventId,
-      payload: { conflictId, move: "escalate", decisionId: view.conflict.decisionId },
+      payload: {
+        conflictId,
+        move: "escalate",
+        decisionId: view.conflict.decisionId,
+        against: [holder],
+      },
       affected: [
         { kind: "change", id: holder },
         { kind: "change", id: other },
@@ -584,6 +605,21 @@ describe("a subject hearing the decision of an escalation it raised", () => {
     // A decision heard again resolves nothing more, and says so.
     expect(again.drafts).toEqual([]);
     expect(again.problems).toHaveLength(1);
+  });
+
+  it("[t35.ruling-against] the resolution names who the ruling goes against: the change making the effect when the premise holds, the premise's holder when the effect stands, and no one for an option that favours neither", () => {
+    const premise = resolutionOn(PREMISE_HOLDS);
+    const effect = resolutionOn(EFFECT_STANDS);
+    const neither = resolutionOn(EFFECT_STANDS, "neither");
+
+    expect([premise, effect, neither].map((each) => each.type)).toEqual([
+      "ConflictResolved",
+      "ConflictResolved",
+      "ConflictResolved",
+    ]);
+    expect(premise.payload).toMatchObject({ against: [premise.other] });
+    expect(effect.payload).toMatchObject({ against: [effect.holder] });
+    expect(neither.payload).not.toHaveProperty("against");
   });
 
   it("[t35.hear-decision] resolves nothing on a decision that is not its conflict's: another escalation's, or one naming no conflict it hosts", () => {
@@ -628,7 +664,7 @@ const arrived = (
   });
 
 describe("what an agent is told of its conflict's escalation", () => {
-  it("[t35.told] a conflict put to a person, and its ruling, each say which escalation or decision, with where to read it; a parked or resumed change says what it waits for or was decided by", () => {
+  it("[t35.told] a conflict put to a person, and its ruling, each say which escalation or decision, with where to read it; a parked or resumed change says what it waits for or was decided by, and a change a ruling bounced says which decision went against it", () => {
     const conflictId = nextId("cfl");
     const escalationId = escalationIdOf(conflictId);
     const decisionId = decisionIdOf(escalationId);
@@ -650,6 +686,18 @@ describe("what an agent is told of its conflict's escalation", () => {
       escalationId,
     });
     const resumed = arrived("ChangeResumed", change, { changeId: change.id, decisionId });
+    const ruledAgainst = arrived("ChangeBounced", change, {
+      changeId: change.id,
+      decisionId,
+      reasons: ["it must change"],
+      nextActions: [],
+    });
+    const failed = arrived("ChangeBounced", change, {
+      changeId: change.id,
+      verdictId: "vdt_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
+      reasons: ["a test failed"],
+      nextActions: [],
+    });
 
     expect([escalated, resolved, parked, resumed].map(detailOf)).toEqual([
       `${conflictId} was put to a person as ${escalationId}: Keel could not prove it either way`,
@@ -662,6 +710,11 @@ describe("what an agent is told of its conflict's escalation", () => {
       [expect.objectContaining({ operationId: "Conflicts_getConflict", args: { conflictId } })],
     ]);
     expect([parked, resumed].map((event) => actionsOf(event))).toEqual([undefined, undefined]);
+    // A bounce of any other cause names no decision.
+    expect([ruledAgainst, failed].map(detailOf)).toEqual([
+      `ruled against by ${decisionId}`,
+      undefined,
+    ]);
   });
 });
 

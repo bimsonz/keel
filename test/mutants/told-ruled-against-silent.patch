@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations.test.ts -t t35.told
+# kills: t35.told
+# why: a change bounced by a ruling is not told which decision went against it
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index e867ebc1..2c4f25b9 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -120,7 +120,7 @@ export function detailOf(event: EventEnvelope): string | undefined {
+       return Option.match(decodeEscalation(event.payload), {
+         onNone: () => undefined,
+         onSome: (p) =>
+-          p.decisionId === undefined ? undefined : `ruled against by ${p.decisionId}`,
++          p.decisionId === undefined ? undefined : undefined,
+       });
+     case "ChangeParked":
+       return Option.match(decodeEscalation(event.payload), {

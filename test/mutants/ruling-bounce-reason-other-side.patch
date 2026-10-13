@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t t35.ruling-bounces
+# kills: t35.ruling-bounces
+# why: the change ruled against is told the other option's consequence: that the other change must give way
+diff --git a/packages/core/src/application/coordination/party-conflicts.ts b/packages/core/src/application/coordination/party-conflicts.ts
+index 33ba6564..1f8d8178 100644
+--- a/packages/core/src/application/coordination/party-conflicts.ts
++++ b/packages/core/src/application/coordination/party-conflicts.ts
+@@ -156,7 +156,7 @@ export function consequenceAgainst(
+   const { holder, author } = partyConflictOf(store, conflictId) ?? {};
+   if (holder === undefined || author === undefined || holder === author) return undefined;
+   if (changeId !== holder && changeId !== author) return undefined;
+-  return consequenceOf(changeId === author ? "premise" : "effect", { holder, other: author });
++  return consequenceOf(changeId === author ? "effect" : "premise", { holder, other: author });
+ }
+ 
+ /**

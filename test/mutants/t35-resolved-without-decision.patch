@@ -2,15 +2,14 @@
 # kills: t35.hear-decision
 # why: the subject resolves on a ruling without naming the decision, which the machine refuses for an escalated conflict, so a ruled conflict stays escalated
 diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
-index 23f9e41..08d1c68 100644
+index 90996504..82d2ebcd 100644
 --- a/packages/core/src/application/coordination/conflict-moves.ts
 +++ b/packages/core/src/application/coordination/conflict-moves.ts
-@@ -260,7 +260,7 @@ export function hearDecision(
-     };
-   const resolved = ledgerStep(tx, conflictId, {
-     _tag: "Conflict",
--    command: { _tag: "Resolve", move: "escalate", decisionId },
-+    command: { _tag: "Resolve", move: "escalate" },
+@@ -268,7 +268,6 @@ export function hearDecision(
+     command: {
+       _tag: "Resolve",
+       move: "escalate",
+-      decisionId,
+       against: stands === undefined ? [] : sidesAgainst(conflict, stands),
+     },
    });
-   return Result.isFailure(resolved)
-     ? {

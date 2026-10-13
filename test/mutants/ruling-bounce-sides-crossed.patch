@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/escalations.test.ts -t t35.park-resume
+# kills: t35.park-resume
+# why: a party keeps its conflict's two sides crossed, so through the real Worker the change ruled against is bounced with the other option's consequence
+diff --git a/packages/core/src/application/coordination/party-conflicts.ts b/packages/core/src/application/coordination/party-conflicts.ts
+index 33ba6564..54170fe9 100644
+--- a/packages/core/src/application/coordination/party-conflicts.ts
++++ b/packages/core/src/application/coordination/party-conflicts.ts
+@@ -108,8 +108,8 @@ export function hearConflict(store: Store, event: EventEnvelope): boolean {
+           conflictId,
+           ...(subjectId === undefined ? {} : { subjectId }),
+           ...(predicate === undefined ? {} : { predicate }),
+-          ...(premise === undefined ? {} : { holder: premise.holder }),
+-          ...(effect === undefined ? {} : { author: effect.changeId }),
++          ...(premise === undefined ? {} : { author: premise.holder }),
++          ...(effect === undefined ? {} : { holder: effect.changeId }),
+           state: "open",
+         }),
+       ),

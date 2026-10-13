@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/change.test.ts -t t35.ruling-bounces
+# kills: t35.ruling-bounces
+# why: a party keeps neither side of its conflict, so a ruling against it cannot say what the ruling means for it
+diff --git a/packages/core/src/application/coordination/party-conflicts.ts b/packages/core/src/application/coordination/party-conflicts.ts
+index 33ba6564..a5a9d49d 100644
+--- a/packages/core/src/application/coordination/party-conflicts.ts
++++ b/packages/core/src/application/coordination/party-conflicts.ts
+@@ -108,8 +108,6 @@ export function hearConflict(store: Store, event: EventEnvelope): boolean {
+           conflictId,
+           ...(subjectId === undefined ? {} : { subjectId }),
+           ...(predicate === undefined ? {} : { predicate }),
+-          ...(premise === undefined ? {} : { holder: premise.holder }),
+-          ...(effect === undefined ? {} : { author: effect.changeId }),
+           state: "open",
+         }),
+       ),

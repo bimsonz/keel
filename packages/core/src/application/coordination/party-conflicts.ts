@@ -17,7 +17,7 @@ import {
 import { Party } from "../../domain/verification/index.ts";
 import type { Transaction } from "../ports/commit.ts";
 import type { Stored } from "../ports/entity-store.ts";
-import { escalationIdOf } from "./escalations.ts";
+import { consequenceOf, escalationIdOf } from "./escalations.ts";
 
 type Store = Transaction["store"];
 type Outbox = Transaction["outbox"];
@@ -38,6 +38,9 @@ const PartyConflict = Schema.Struct({
   conflictId: ConflictId,
   subjectId: Schema.optional(SubjectId),
   predicate: Schema.optional(Predicate),
+  /** The change relying on the premise at stake, and the change making the effect against it: the two a ruling is between. */
+  holder: Schema.optional(ChangeId),
+  author: Schema.optional(ChangeId),
   state: Schema.Literals(["open", "proven", "dismissed", "escalated", "resolved"]),
 });
 export type PartyConflict = typeof PartyConflict.Type;
@@ -51,6 +54,8 @@ const Suspected = Schema.Struct({
   parties: Schema.Array(Party),
   subjectId: Schema.optional(SubjectId),
   predicate: Schema.optional(Predicate),
+  premise: Schema.optional(Schema.Struct({ holder: ChangeId })),
+  effect: Schema.optional(Schema.Struct({ changeId: ChangeId })),
 });
 const Moved = Schema.Struct({ conflictId: ConflictId });
 const decodeSuspected = Schema.decodeUnknownOption(Suspected);
@@ -84,7 +89,8 @@ export const affectingParties = (parties: readonly Party[]): readonly EntityRef[
 
 /**
  * A Change DO records a conflict it is a party to: ConflictSuspected opens it
- * with its subject and predicate, and each later move sets its state. A move
+ * with its subject, its predicate and its two sides, and each later move sets
+ * its state. A move
  * for a conflict never heard opening is kept without a predicate, so it
  * resolves to the default policy. Returns whether the event was a conflict's.
  */
@@ -92,7 +98,7 @@ export function hearConflict(store: Store, event: EventEnvelope): boolean {
   if (event.type === "ConflictSuspected") {
     const suspected = decodeSuspected(event.payload);
     if (Option.isNone(suspected)) return false;
-    const { conflictId, subjectId, predicate } = suspected.value;
+    const { conflictId, subjectId, predicate, premise, effect } = suspected.value;
     if (store.get(PARTY_CONFLICT, conflictId) !== undefined) return true;
     store.put(
       PARTY_CONFLICT,
@@ -102,6 +108,8 @@ export function hearConflict(store: Store, event: EventEnvelope): boolean {
           conflictId,
           ...(subjectId === undefined ? {} : { subjectId }),
           ...(predicate === undefined ? {} : { predicate }),
+          ...(premise === undefined ? {} : { holder: premise.holder }),
+          ...(effect === undefined ? {} : { author: effect.changeId }),
           state: "open",
         }),
       ),
@@ -132,6 +140,23 @@ export const policyFor = (
 export function partyConflictOf(store: Store, conflictId: ConflictId): PartyConflict | undefined {
   const stored = store.get(PARTY_CONFLICT, conflictId);
   return stored === undefined ? undefined : decodeRow(stored);
+}
+
+/**
+ * What a ruling against `changeId` on a conflict means for it, in the words
+ * of the option the ruling chose: against the change making the effect the
+ * premise stood, and against the premise's holder the effect stood. Undefined
+ * for a conflict the change heard without its two sides, or is on neither of.
+ */
+export function consequenceAgainst(
+  store: Store,
+  conflictId: ConflictId,
+  changeId: ChangeId,
+): string | undefined {
+  const { holder, author } = partyConflictOf(store, conflictId) ?? {};
+  if (holder === undefined || author === undefined || holder === author) return undefined;
+  if (changeId !== holder && changeId !== author) return undefined;
+  return consequenceOf(changeId === author ? "premise" : "effect", { holder, other: author });
 }
 
 /**

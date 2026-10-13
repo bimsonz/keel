@@ -246,8 +246,12 @@ export class ChangeDO extends KeelObjectWith<ChangeServices> implements ChangeRp
       const { drafts, project, problem } = reaction;
       if (problem !== undefined)
         console.error(
-          "change reaction",
-          JSON.stringify({ changeId: this.changeId, eventId: event.eventId, problem }),
+          JSON.stringify({
+            ops: "change-reaction",
+            changeId: this.changeId,
+            eventId: event.eventId,
+            problem,
+          }),
         );
       if (drafts.length === 0) return { drafts: [] };
       return {

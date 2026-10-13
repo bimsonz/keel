@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations.test.ts -t t35.ruling-against
+# kills: t35.ruling-against
+# why: the premise holding goes against the premise's own holder and the effect standing against the change making it: the favoured party is the one bounced
+diff --git a/packages/core/src/application/coordination/escalations.ts b/packages/core/src/application/coordination/escalations.ts
+index 5d4f3451..7bf28d80 100644
+--- a/packages/core/src/application/coordination/escalations.ts
++++ b/packages/core/src/application/coordination/escalations.ts
+@@ -74,7 +74,7 @@ export const EFFECT_STANDS = "effect-stands";
+ 
+ /** The side of a conflict an option lets stand; an option that favours neither names none. */
+ export const standingSide = (option: string): "premise" | "effect" | undefined =>
+-  option === PREMISE_HOLDS ? "premise" : option === EFFECT_STANDS ? "effect" : undefined;
++  option === PREMISE_HOLDS ? "effect" : option === EFFECT_STANDS ? "premise" : undefined;
+ 
+ /**
+  * What letting a side stand means for the two changes, `holder` relying on the

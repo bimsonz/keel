@@ -164,7 +164,7 @@ interface Detail {
     readonly reason?: string;
     readonly question?: string;
     readonly state?: string;
-    readonly options?: readonly { readonly id: string }[];
+    readonly options?: readonly { readonly id: string; readonly consequence?: string }[];
     readonly evidence?: readonly { readonly class: string }[];
   };
   readonly decision?: {
@@ -223,7 +223,7 @@ const rule = (token: string, escalationId: string, key: string, option: string) 
   });
 
 describe("[t35.park-resume] a conflict put to a person parks its parties until the ruling", () => {
-  it("[t35.park-resume] [t67.inbox] a party escalates a proven conflict over REST: its sponsor is asked and reads it in their inbox, the queued party parks and the deriving one parks the moment it is queued; the ruling records D-1, resolves the conflict and resumes both, each told", async () => {
+  it("[t35.park-resume] [t67.inbox] a party escalates a proven conflict over REST: its sponsor is asked and reads it in their inbox, the queued party parks and the deriving one parks the moment it is queued; the ruling records D-1 and resolves the conflict against the premise's holder, which bounces by the decision with what the option said of it while the other resumes, each told", async () => {
     await using probes = await inertProbe();
     await using prechecks = await inertPrecheck();
     const projectId = makeId("prj", ulid());
@@ -343,6 +343,8 @@ describe("[t35.park-resume] a conflict put to a person parks its parties until t
       },
     });
     expect(open.escalation?.options?.map((option) => option.id)).toContain(EFFECT_STANDS);
+    const effectStands = open.escalation?.options?.find((option) => option.id === EFFECT_STANDS);
+    expect(effectStands?.consequence).toContain(a.changeId);
     expect(open.escalation?.evidence?.map((evidence) => evidence.class)).toContain("proof");
 
     // [t67.inbox] The inbox through the doorway. The person asked reads the question with Keel's label
@@ -396,7 +398,13 @@ describe("[t35.park-resume] a conflict put to a person parks its parties until t
       const view = await runInDurableObject(subjectOf(projectId), (instance: SubjectDO) =>
         instance["runtime"].runPromise(conflictView(conflictId)),
       );
-      expect(view.conflict).toMatchObject({ state: "resolved", move: "escalate", decisionId });
+      // The effect stands, so the ruling goes against the change that relied on the premise.
+      expect(view.conflict).toMatchObject({
+        state: "resolved",
+        move: "escalate",
+        decisionId,
+        against: [a.changeId],
+      });
     }, WAIT);
     const moves = (await conflictLog(projectId, conflictId)).filter(
       (event) => event.type === "ConflictEscalated" || event.type === "ConflictResolved",
@@ -406,14 +414,33 @@ describe("[t35.park-resume] a conflict put to a person parks its parties until t
       ["ConflictResolved", undefined],
     ]);
 
-    // Both parties resume into the queue, under the decision.
-    for (const party of [a, b]) {
-      await vi.waitFor(async () => expect(await typesOf(party)).toContain("ChangeResumed"), WAIT);
-      const log = await party.log();
-      const parked = log.findIndex((event) => event.type === "ChangeParked");
-      expect(log[parked + 1]).toMatchObject({ type: "ChangeResumed", payload: { decisionId } });
-      expect((await party.current()).state).not.toBe("parked");
-    }
+    // The party ruled against goes back to its agent by the decision, with the chosen option's own
+    // consequence as the reason and revising or withdrawing as its ways on. It never resumes.
+    await vi.waitFor(async () => expect(await typesOf(a)).toContain("ChangeBounced"), WAIT);
+    const logA = await a.log();
+    expect(logA[logA.findIndex((event) => event.type === "ChangeParked") + 1]).toMatchObject({
+      type: "ChangeBounced",
+      payload: {
+        decisionId,
+        reasons: [effectStands?.consequence],
+        nextActions: [
+          expect.objectContaining({ operationId: "revise" }),
+          expect.objectContaining({ operationId: "abandon" }),
+        ],
+      },
+    });
+    expect(await typesOf(a)).not.toContain("ChangeResumed");
+    expect((await a.current()).state).toBe("bounced");
+
+    // The party the ruling favours resumes into the queue, under the decision.
+    await vi.waitFor(async () => expect(await typesOf(b)).toContain("ChangeResumed"), WAIT);
+    const logB = await b.log();
+    expect(logB[logB.findIndex((event) => event.type === "ChangeParked") + 1]).toMatchObject({
+      type: "ChangeResumed",
+      payload: { decisionId },
+    });
+    expect(await typesOf(b)).not.toContain("ChangeBounced");
+    expect((await b.current()).state).not.toBe("parked");
 
     // Each is told: the party that did not escalate hears the escalation too; nobody hears its own move.
     await vi.waitFor(async () => {
@@ -428,9 +455,12 @@ describe("[t35.park-resume] a conflict put to a person parks its parties until t
         ]),
       );
       expect(types(toA)).toEqual(
-        expect.arrayContaining(["ChangeParked", "ConflictResolved", "ChangeResumed"]),
+        expect.arrayContaining(["ChangeParked", "ConflictResolved", "ChangeBounced"]),
       );
       expect(types(toA)).not.toContain("ConflictEscalated");
+      expect(toA.find((notice) => notice.kind === "ChangeBounced")).toMatchObject({
+        detail: `ruled against by ${decisionId}`,
+      });
       expect(toB.find((notice) => notice.kind === "ConflictResolved")).toMatchObject({
         detail: `decided by ${decisionId}`,
       });

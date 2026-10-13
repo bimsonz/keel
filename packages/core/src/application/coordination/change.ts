@@ -96,6 +96,7 @@ import { planStateOf, submissionStateOf } from "../verification/index.ts";
 import { escalationIdOf } from "./escalations.ts";
 import { subjectIdOf } from "./hashed-id.ts";
 import {
+  consequenceAgainst,
   awaitedEscalation,
   blockersOf,
   hearConflict,
@@ -1537,6 +1538,13 @@ const CONFLICT_BOUNCEABLE: ReadonlySet<Change["state"]> = new Set([
   "queued",
 ]);
 
+/** Where a change is back with its agent or gone, so a ruling against it has nothing left to stop. */
+const OUT_OF_THE_RUNNING: ReadonlySet<Change["state"]> = new Set([
+  "bounced",
+  "withdrawn",
+  "superseded",
+]);
+
 const decodeProven = Schema.decodeUnknownOption(ConflictProven);
 const decodeEscalated = Schema.decodeUnknownOption(ConflictEscalated);
 const decodeResolved = Schema.decodeUnknownOption(ConflictResolved);
@@ -1599,6 +1607,8 @@ const commandFor = (
       readonly problem?: string;
       /** The machine may refuse this command where the change stands, and that is expected. */
       readonly refusable?: true;
+      /** What to report when the machine refuses this command, in place of the event and the refusal's name. */
+      readonly refusal?: string;
     }
   | undefined => {
   const ours = (batchId: string) => change.batchId !== undefined && batchId === change.batchId;
@@ -1638,10 +1648,31 @@ const commandFor = (
       hearConflict(store, event);
       const resolved = decodeResolved(event.payload);
       if (Option.isNone(resolved)) return undefined;
-      const { conflictId, decisionId } = resolved.value;
+      const { conflictId, decisionId, against } = resolved.value;
+      if (decisionId === undefined) return undefined;
+      // A ruling against the change sends it back to its agent with what the ruling means for it. The machine
+      // takes that from the wait for any ruling and nowhere else. A party it refuses that is still on its
+      // way, in a batch or not yet parked, may land as it is with the ruling against it: that is reported.
+      const gone = OUT_OF_THE_RUNNING.has(change.state);
+      if (against?.includes(change.id) === true)
+        return {
+          command: {
+            _tag: "Bounce",
+            decisionId,
+            reasons: [
+              consequenceAgainst(store, conflictId, change.id) ??
+                `${decisionId} ruled against this change on ${conflictId}.`,
+            ],
+            nextActions: [],
+          },
+          ...(gone
+            ? { refusable: true as const }
+            : {
+                refusal: `${decisionId} ruled against ${change.id} on ${conflictId} and its bounce was refused in state ${change.state}: it may land as it is`,
+              }),
+        };
       // Only the ruling on the escalation the change waits for resumes it.
-      return decisionId !== undefined &&
-        change.parkReason === "awaiting-ruling" &&
+      return change.parkReason === "awaiting-ruling" &&
         change.escalationId === escalationIdOf(conflictId)
         ? { command: { _tag: "Resume", decisionId }, refusable: true }
         : undefined;
@@ -1735,7 +1766,9 @@ export interface BatchReaction {
  * next actions; BatchFailed `infra`, CandidateBisected or CandidateInvalidated
  * → ChangeRequeued. A conflict it is a party to, put to a person →
  * ChangeParked where the machine parks a change, and that escalation's ruling
- * → ChangeResumed. A change resumed or requeued while another of its
+ * → ChangeResumed, or ChangeBounced by the ruling's decision when the ruling
+ * goes against the change; a ruling against a change that is past the wait
+ * and still on its way is a `problem`. A change resumed or requeued while another of its
  * conflicts is with a person → ChangeParked again, in the same commit. The
  * cause is the delivery's dedupe key, so a redelivery is
  * a no-op. A refusal by the machine commits nothing and is reported as a
@@ -1762,7 +1795,9 @@ export const reactToBatch = (
       ? { drafts: [] }
       : {
           drafts: [],
-          problem: `${event.type} refused with ${decided.failure._tag} in state ${change.state}`,
+          problem:
+            reacting.refusal ??
+            `${event.type} refused with ${decided.failure._tag} in state ${change.state}`,
         };
   return {
     drafts: decided.success.drafts,

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/escalations.test.ts -t t35.ruling-against
+# kills: t35.ruling-against
+# why: a ruling's resolution names no one, so the party it goes against resumes with the other
+diff --git a/packages/core/src/application/coordination/conflict-moves.ts b/packages/core/src/application/coordination/conflict-moves.ts
+index 90996504..8aee34e9 100644
+--- a/packages/core/src/application/coordination/conflict-moves.ts
++++ b/packages/core/src/application/coordination/conflict-moves.ts
+@@ -269,7 +269,7 @@ export function hearDecision(
+       _tag: "Resolve",
+       move: "escalate",
+       decisionId,
+-      against: stands === undefined ? [] : sidesAgainst(conflict, stands),
++      against: [],
+     },
+   });
+   return Result.isFailure(resolved)

@@ -2,16 +2,16 @@
 # kills: t35.park-resume
 # why: a parked change resumes on the decision of any conflict it is a party to, so it leaves the question it waits for unanswered
 diff --git a/packages/core/src/application/coordination/change.ts b/packages/core/src/application/coordination/change.ts
-index 179323f..e1f2e23 100644
+index f18a29b5..f4f12637 100644
 --- a/packages/core/src/application/coordination/change.ts
 +++ b/packages/core/src/application/coordination/change.ts
-@@ -1616,8 +1616,7 @@ const commandFor = (
-       const { conflictId, decisionId } = resolved.value;
+@@ -1672,8 +1672,7 @@ const commandFor = (
+               }),
+         };
        // Only the ruling on the escalation the change waits for resumes it.
-       return decisionId !== undefined &&
--        change.parkReason === "awaiting-ruling" &&
+-      return change.parkReason === "awaiting-ruling" &&
 -        change.escalationId === escalationIdOf(conflictId)
-+        change.parkReason === "awaiting-ruling"
++      return change.parkReason === "awaiting-ruling"
          ? { command: { _tag: "Resume", decisionId }, refusable: true }
          : undefined;
      }

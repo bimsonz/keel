@@ -33,8 +33,11 @@
 //       ConflictEscalated says human-class, and each party still queued parks
 //       awaiting the ruling;
 //   (d) the person finds the question among their open escalations and rules
-//       (POST /v1/escalations/{id}/ruling): RulingGiven, DecisionRecorded,
-//       ConflictResolved carrying that decision, and each parked party resumes.
+//       (POST /v1/escalations/{id}/ruling) that the premise holds: RulingGiven,
+//       DecisionRecorded, and ConflictResolved carrying that decision and
+//       naming B, the change making the effect, as the party it goes against.
+//       B is bounced by the decision, with the chosen option's consequence as
+//       the reason, and does not land; A resumes.
 // The arms that can fail: an escalate under another change's lease is refused;
 // a ruling for an option the question does not offer is refused, and so is a
 // second ruling; and a visitor reads nothing of the private project's feed.
@@ -388,10 +391,11 @@ try {
     { idempotencyKey: key("ruling") },
   );
   check(ruling.state === "ruled", `the ruling answers the escalation as ${ruling.state}`);
+  // The premise holds, so the ruling goes against B, which makes the effect: B bounces and A resumes.
+  const movedBy = (id: string) => of(id === B ? "ChangeBounced" : "ChangeResumed", id);
   await feed.until(
     () =>
-      of("ConflictResolved", conflictId).length > 0 &&
-      parked.every((id) => of("ChangeResumed", id).length > 0),
+      of("ConflictResolved", conflictId).length > 0 && parked.every((id) => movedBy(id).length > 0),
     STEP_MS,
   );
   const given = of("RulingGiven", escalationId)[0];
@@ -403,17 +407,48 @@ try {
     recorded !== undefined && resolved !== undefined,
     `DecisionRecorded ${recorded?.eventId ?? "(none)"}; ConflictResolved ${resolved?.eventId ?? "(none)"} carries ${decisionId}`,
   );
+  const against = resolved === undefined ? undefined : field(resolved, "against");
+  check(
+    Array.isArray(against) && against.length === 1 && against[0] === B,
+    `the resolution names who the ruling goes against: ${JSON.stringify(against)} (B is ${B})`,
+  );
+  check(parked.includes(B), "B was parked for the ruling, so the ruling can bounce it");
+  const consequence = asked?.options.find((option) => option.id === "premise-holds")?.consequence;
   for (const id of parked) {
-    const event = of("ChangeResumed", id)[0];
+    const event = movedBy(id)[0];
+    const state = await stateOf(id);
+    if (id !== B) {
+      check(
+        event !== undefined && field(event, "decisionId") === decisionId,
+        `A resumed on ${decisionId}, and is ${state}`,
+      );
+      continue;
+    }
+    const reasons = event === undefined ? undefined : field(event, "reasons");
+    const next = event === undefined ? undefined : field(event, "nextActions");
     check(
-      event !== undefined && field(event, "decisionId") === decisionId,
-      `${id === A ? "A" : "B"} resumed on ${decisionId}, and is ${await stateOf(id)}`,
+      event !== undefined && field(event, "decisionId") === decisionId && state === "bounced",
+      `B was bounced by ${decisionId}, and is ${state}`,
+    );
+    check(
+      consequence !== undefined && Array.isArray(reasons) && reasons[0] === consequence,
+      `its reason is the chosen option's consequence: ${JSON.stringify(reasons)}`,
+    );
+    check(
+      Array.isArray(next) &&
+        next.map((action) => Reflect.get(Object(action), "operationId")).join() ===
+          "revise,abandon",
+      "its ways on are to revise its intent or to withdraw",
+    );
+    check(
+      of("ChangeResumed", B).length === 0 && of("ChangeLanded", B).length === 0,
+      "B neither resumed nor landed",
     );
   }
   // Each object commits on its own clock and the feed is in the order the events reached it,
   // so the order is read from the commit times, a step never before the one that caused it.
   const parks = parked.map((id) => when(of("ChangeParked", id)[0]));
-  const resumes = parked.map((id) => when(of("ChangeResumed", id)[0]));
+  const resumes = parked.map((id) => when(movedBy(id)[0]));
   // What the escalation follows: the proof, or the discarded probe when Keel escalated by itself.
   const cause = proven ?? of("ProbeDiscarded", conflictId)[0];
   check(
@@ -421,7 +456,7 @@ try {
       parks.every((at) => at >= when(said) && at < when(given)) &&
       when(given) <= when(resolved) &&
       resumes.every((at) => at >= when(resolved)),
-    `by their commit times: ${byKeel ? "discarded" : "proven"}, escalated, parked, ruled, resolved, resumed`,
+    `by their commit times: ${byKeel ? "discarded" : "proven"}, escalated, parked, ruled, resolved, bounced or resumed`,
   );
   check(
     (await refusalOf(() =>
@@ -492,7 +527,7 @@ try {
 if (failures > 0) console.log(`\n${failures} check(s) failed`);
 else if (byKeel)
   console.log(
-    "\nthe ruling and the resume hold on Keel's own escalation; no conflict was proven, so no party's escalate ran",
+    "\nthe ruling, the bounce and the resume hold on Keel's own escalation; no conflict was proven, so no party's escalate ran",
   );
 else console.log("\nall T3.5 live checks hold");
 process.exit(failures > 0 ? 1 : byKeel ? 3 : 0);

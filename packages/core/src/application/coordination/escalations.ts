@@ -72,6 +72,23 @@ export const PREMISE_HOLDS = "premise-holds";
 /** The option that keeps the effect the other change makes. */
 export const EFFECT_STANDS = "effect-stands";
 
+/** The side of a conflict an option lets stand; an option that favours neither names none. */
+export const standingSide = (option: string): "premise" | "effect" | undefined =>
+  option === PREMISE_HOLDS ? "premise" : option === EFFECT_STANDS ? "effect" : undefined;
+
+/**
+ * What letting a side stand means for the two changes, `holder` relying on the
+ * premise and `other` making the effect: the consequence a person reads beside
+ * the option, and the reason the change it goes against is bounced with.
+ */
+export const consequenceOf = (
+  stands: "premise" | "effect",
+  sides: { readonly holder: string; readonly other: string },
+): string =>
+  stands === "premise"
+    ? `${sides.other} must change so that it no longer contradicts it; ${sides.holder} goes on as declared.`
+    : `${sides.holder} must stop relying on the premise; ${sides.other} goes on as declared.`;
+
 /** A proposition as a person reads it: `authz.session freshness at-most per-request`. */
 const said = (p: Proposition): string =>
   `${p.subject} ${p.predicate} ${p.relation} ${String(p.value)}${p.unit === undefined ? "" : ` ${p.unit}`}`;
@@ -149,12 +166,12 @@ export function askAbout(
       {
         id: PREMISE_HOLDS,
         label: `The premise holds: ${sides.premise}`,
-        consequence: `${sides.other} must change so that it no longer contradicts it; ${sides.holder} goes on as declared.`,
+        consequence: consequenceOf("premise", sides),
       },
       {
         id: EFFECT_STANDS,
         label: `The effect stands: ${sides.effect}`,
-        consequence: `${sides.holder} must stop relying on the premise; ${sides.other} goes on as declared.`,
+        consequence: consequenceOf("effect", sides),
       },
     ],
     about,
