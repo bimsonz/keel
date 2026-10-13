@@ -460,7 +460,8 @@ try {
     for (const next of error.nextActions) console.log(`       next: ${next.title}`);
   } else console.log(`FAIL ${error instanceof Error ? error.message : String(error)}`);
 } finally {
-  // A landed change is done, and a parked one awaits a person's ruling: it is left as it is.
+  // A landed change is done, a parked one awaits a person's ruling, and one that is
+  // integrating has left the queue for trunk and cannot be withdrawn: each is left as it is.
   // Anything else the run declared is withdrawn.
   for (const changeId of open) {
     try {
@@ -468,6 +469,10 @@ try {
       if (state === "landed" || state === "withdrawn" || state === "superseded") continue;
       if (state === "parked") {
         console.log(`     left parked, for the person to rule on: ${changeId}`);
+        continue;
+      }
+      if (state === "integrating") {
+        console.log(`     left integrating, on its way to trunk: ${changeId}`);
         continue;
       }
       await operator.abandon(
