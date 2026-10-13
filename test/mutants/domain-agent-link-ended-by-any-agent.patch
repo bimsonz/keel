@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.link-parties
+# why: any agent counts as the agent leaving, so one agent ends another's sponsor link.
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index d3ab3bc9..1a990362 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -130,7 +130,7 @@ export const decideAgent = (
+     case "EndSponsorship": {
+       if (agent.state === "revoked") return refuse();
+       if (agent.sponsor === undefined) return refuse("not-sponsored");
+-      const leaving = command.by === agentActor(agent.id);
++      const leaving = command.by.startsWith("agent:");
+       if (!leaving && command.by !== userActor(agent.sponsor)) return refuse("not-a-party");
+       if (leaving && agent.state === "suspended") return refuse("paused");
+       const ended = AgentUnsponsored.make({

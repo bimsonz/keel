@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.fold-table
+# why: the fold takes an AgentUnsponsored that names somebody who is not the sponsor, so ending one person's link removes another's.
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index d3ab3bc9..4dc354f1 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -194,7 +194,7 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
+         ? { ...agent, sponsor: event.sponsor }
+         : illegal(agent, event);
+     case "AgentUnsponsored": {
+-      if (agent.state !== "active" || agent.sponsor !== event.sponsor) return illegal(agent, event);
++      if (agent.state !== "active") return illegal(agent, event);
+       const { sponsor: _sponsor, ...alone } = agent;
+       return alone;
+     }

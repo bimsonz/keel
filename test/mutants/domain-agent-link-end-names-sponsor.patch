@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.link-parties
+# why: the ended link always names the sponsor as who ended it, so an agent that left its sponsor is recorded as dropped by them.
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index d3ab3bc9..c410f7d5 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -136,7 +136,7 @@ export const decideAgent = (
+       const ended = AgentUnsponsored.make({
+         agentId: agent.id,
+         sponsor: agent.sponsor,
+-        by: command.by,
++        by: userActor(agent.sponsor),
+       });
+       return Result.succeed(
+         agent.state === "suspended"

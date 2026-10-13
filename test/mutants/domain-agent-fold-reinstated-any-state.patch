@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.fold-table
+# why: the fold takes AgentReinstated in any state, so a log that reinstates a revoked agent replays to an active one.
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index d3ab3bc9..908906a6 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -184,7 +184,7 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
+     case "AgentSuspended":
+       return agent.state === "active" ? { ...agent, state: "suspended" } : illegal(agent, event);
+     case "AgentReinstated":
+-      return agent.state === "suspended" ? { ...agent, state: "active" } : illegal(agent, event);
++      return { ...agent, state: "active" };
+     case "AgentRevoked":
+       return agent.state !== "revoked" && event.revocationEpoch === agent.revocationEpoch + 1
+         ? { ...agent, state: "revoked", revocationEpoch: event.revocationEpoch }

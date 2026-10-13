@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.link-parties
+# why: the reinstatement that the sponsor's ending commits names the agent as who reinstated it, so the log says a paused agent lifted its own pause.
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index d3ab3bc9..289e1152 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -140,7 +140,7 @@ export const decideAgent = (
+       });
+       return Result.succeed(
+         agent.state === "suspended"
+-          ? [AgentReinstated.make({ agentId: agent.id, by: command.by }), ended]
++          ? [AgentReinstated.make({ agentId: agent.id, by: agentActor(agent.id) }), ended]
+           : [ended],
+       );
+     }

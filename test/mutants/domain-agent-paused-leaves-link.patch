@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.pause-holds
+# why: a paused agent ends its own sponsor link and is reinstated by it, so the one switch a sponsor has is undone by the agent it was turned on.
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index d3ab3bc9..6047e4f2 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -132,7 +132,6 @@ export const decideAgent = (
+       if (agent.sponsor === undefined) return refuse("not-sponsored");
+       const leaving = command.by === agentActor(agent.id);
+       if (!leaving && command.by !== userActor(agent.sponsor)) return refuse("not-a-party");
+-      if (leaving && agent.state === "suspended") return refuse("paused");
+       const ended = AgentUnsponsored.make({
+         agentId: agent.id,
+         sponsor: agent.sponsor,

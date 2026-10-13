@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.pause-holds
+# why: a person refused as the sponsor of a paused agent is not told that the pause is why.
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index d3ab3bc9..720f9b78 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -125,7 +125,7 @@ export const decideAgent = (
+       if (agent.state === "revoked") return refuse();
+       if (agent.sponsor !== undefined)
+         return agent.sponsor === command.by ? Result.succeed([]) : refuse("sponsor-held");
+-      if (agent.state === "suspended") return refuse("paused");
++      if (agent.state === "suspended") return refuse();
+       return Result.succeed([AgentSponsored.make({ agentId: agent.id, sponsor: command.by })]);
+     case "EndSponsorship": {
+       if (agent.state === "revoked") return refuse();

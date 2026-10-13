@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.link-parties
+# why: an outsider's EndSponsorship is refused with no reason, so it reads as the agent's state forbidding it.
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index d3ab3bc9..4523cd88 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -131,7 +131,7 @@ export const decideAgent = (
+       if (agent.state === "revoked") return refuse();
+       if (agent.sponsor === undefined) return refuse("not-sponsored");
+       const leaving = command.by === agentActor(agent.id);
+-      if (!leaving && command.by !== userActor(agent.sponsor)) return refuse("not-a-party");
++      if (!leaving && command.by !== userActor(agent.sponsor)) return refuse();
+       if (leaving && agent.state === "suspended") return refuse("paused");
+       const ended = AgentUnsponsored.make({
+         agentId: agent.id,

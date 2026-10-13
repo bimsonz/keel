@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/identity/agent-machine.test.ts
+# kills: agent.fold-table
+# why: the fold takes an event that names another agent, so one agent's log moves another's state.
+diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
+index d3ab3bc9..af2b57d0 100644
+--- a/packages/core/src/domain/identity/agent-machine.ts
++++ b/packages/core/src/domain/identity/agent-machine.ts
+@@ -177,7 +177,6 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
+       : illegal(state, event);
+   }
+   const agent = state;
+-  if (event.agentId !== agent.id) return illegal(agent, event);
+   switch (event._tag) {
+     case "AgentEnrolled":
+       return illegal(agent, event);
