@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/projectAgents.test.ts
+# kills: project-agents.key
+# why: the stand-in takes a key that was used for one invitation to a project on other terms
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 6a4c7b9e..f4f6adf8 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -910,7 +910,7 @@ export function createFakeKeel(
+             const cause = `invite ${projectId} ${invitee.id} ${key}`;
+             const done = moves.get(cause);
+             const placed = rows.get(invitee.id);
+-            if (done !== undefined && done !== terms)
++            if (done !== undefined && done === "")
+               return problem(
+                 409,
+                 "request.idempotency_conflict",

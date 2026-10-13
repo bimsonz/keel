@@ -144,6 +144,27 @@ export interface KeelSettings {
 }
 
 /**
+ * The agents a person has invited to one project of their own namespace, as a code host has a repository's
+ * collaborators. Keel reads the project's owner the invitations not yet answered and what each gives; it reads
+ * anyone else who reads the project the agents that have joined. An org's project takes none of its own: an
+ * agent comes into an org. Keel takes an invitation or a removal from the owner alone, and only from a passkey
+ * sign-in of the last ten minutes.
+ */
+export interface KeelProjectAgents {
+  /** Keel's list for this reader, oldest invitation first: `GET /v1/projects/{projectId}/agents`. */
+  listAgents(signal?: AbortSignal): Promise<Keel.ProjectAgent[]>;
+  /** Invites the agent of that handle to read, or to read and work. Answers its row as it then stands. */
+  inviteAgent(agent: string, scopes: readonly Keel.Scope[]): Promise<Keel.ProjectAgent>;
+  /** Takes an agent off the project, or withdraws an invitation it has not answered. Answers the row, ended. */
+  removeAgent(agentId: string): Promise<Keel.ProjectAgent>;
+}
+
+/** A project's source that has Keel's invitations to it: a test fixture's has none. */
+export interface KeelInvited {
+  invited: KeelProjectAgents;
+}
+
+/**
  * What the console may change in a project's log, so it is its own port. Keel decides who may: the reader's own session
  * is all the console sends. A ruling is never applied optimistically: its effect arrives through the log.
  */

@@ -26,6 +26,7 @@ import type {
   NamespaceRef,
   NamespaceView,
   NextAction,
+  ProjectAgents,
   ProbeSource,
   ProjectSettings,
   ProjectView,
@@ -96,6 +97,8 @@ export const MAINTAINERS_AFTER_MS = 30 * 60 * 1000;
 export const MEMBERS_ONLY: ReadonlySet<string> = new Set([
   "AgentInvited",
   "AgentLeftNamespace",
+  "AgentInvitedToProject",
+  "AgentLeftProject",
   "AgentEnrolled",
   "AgentSuspended",
   "AgentReinstated",
@@ -160,6 +163,8 @@ export interface FakeKeel {
    * that has joined. The agent's own three calls are no page's.
    */
   accepts(org: string, agentId: string): void;
+  /** An agent accepts the invitation it has to one project, as its own call to Keel does. */
+  joins(projectId: string, agentId: string): void;
 }
 
 /** An agent's place in an org, as Keel keeps it while its invitation stands: an ended one is in no list. */
@@ -448,6 +453,26 @@ export function createFakeKeel(
   const invited = new Map<string, Map<string, Invited>>();
   const moves = new Map<string, string>();
   const ended = new Map<string, NamespaceAgent>();
+  /** The agents a person has invited to one project of theirs, by the project's id and then by the agent's. */
+  const invitedTo = new Map<string, Map<string, Invited>>();
+  // An agent's place as Keel reads it: who it is, where its invitation stands, and to whoever the place is
+  // (an org's members, a project's owner) what the invitation gives, who made it and when.
+  const rowOf = (
+    row: Invited,
+    members: boolean,
+    state: NamespaceAgent["state"] = row.state,
+  ): NamespaceAgent => {
+    const whom = agents.get(row.agentId);
+    return {
+      id: row.agentId,
+      name: whom?.name ?? row.agentId,
+      ...(whom?.handle === undefined ? {} : { handle: whom.handle }),
+      ...(whom?.kind === undefined ? {} : { kind: whom.kind }),
+      state,
+      ...(members ? { scopes: [...row.scopes], invitedBy: row.by, invitedAt: row.invitedAt } : {}),
+      ...(row.joinedAt === undefined ? {} : { joinedAt: row.joinedAt }),
+    };
+  };
   /**
    * The projects made here, by the key each was made under, with what was asked: Keel's `createProject`. A
    * made project is its maker's to read, and holds a trunk and no entry yet.
@@ -500,6 +525,13 @@ export function createFakeKeel(
       const row = invited.get(org.toLowerCase())?.get(agentId);
       if (row === undefined || row.state !== "invited")
         throw new Error(`${agentId} has no invitation into ${org} to accept`);
+      row.state = "joined";
+      row.joinedAt = new Date(now()).toISOString();
+    },
+    joins(projectId, agentId) {
+      const row = invitedTo.get(projectId)?.get(agentId);
+      if (row === undefined || row.state !== "invited")
+        throw new Error(`${agentId} has no invitation to ${projectId} to accept`);
       row.state = "joined";
       row.joinedAt = new Date(now()).toISOString();
     },
@@ -664,24 +696,6 @@ export function createFakeKeel(
             : ((await options.roleIn?.(reader.id, org)) ??
               (org === project.namespace.handle ? reader.role : undefined));
         const rows = invited.get(org) ?? new Map<string, Invited>();
-        const rowOf = (
-          row: Invited,
-          members: boolean,
-          state: NamespaceAgent["state"] = row.state,
-        ): NamespaceAgent => {
-          const whom = agents.get(row.agentId);
-          return {
-            id: row.agentId,
-            name: whom?.name ?? row.agentId,
-            ...(whom?.handle === undefined ? {} : { handle: whom.handle }),
-            ...(whom?.kind === undefined ? {} : { kind: whom.kind }),
-            state,
-            ...(members
-              ? { scopes: [...row.scopes], invitedBy: row.by, invitedAt: row.invitedAt }
-              : {}),
-            ...(row.joinedAt === undefined ? {} : { joinedAt: row.joinedAt }),
-          };
-        };
         if (agentId === undefined && request.method === "GET") {
           if (kind === undefined) return gone();
           const members = kind === "org" && role !== undefined;
@@ -799,6 +813,149 @@ export function createFakeKeel(
           const cause = `end ${org} ${agentId ?? ""} ${key}`;
           const done = ended.get(cause);
           if (done !== undefined) return Response.json(done);
+          if (placed === undefined) return gone();
+          rows.delete(placed.agentId);
+          const answer = rowOf(placed, true, "ended");
+          ended.set(cause, answer);
+          return Response.json(answer);
+        }
+      }
+
+      // The agents invited to one project: Keel's three operations on a project of a person's own namespace,
+      // decided as its policy and its handlers decide them and in their order. Keel reads the owner the
+      // invitations not yet answered and what each gives; anyone else who reads the project, the agents that
+      // have joined. An org's project has none of its own and takes none: it is not there for the two moves.
+      const invitedHere = /^\/v1\/projects\/([^/]+)\/agents(?:\/([^/]+))?$/.exec(url.pathname);
+      if (invitedHere !== null) {
+        const projectId = decodeURIComponent(invitedHere[1] ?? "");
+        const agentId =
+          invitedHere[2] === undefined ? undefined : decodeURIComponent(invitedHere[2]);
+        const mine = [...made.values()].find((one) => one.view.id === projectId);
+        // The project as this caller is read it, whose it is, and whether the caller is its owner.
+        const here =
+          projectId === project.id
+            ? visible
+              ? { kind: project.namespace.kind, owner: reader?.role === "owner" }
+              : undefined
+            : mine !== undefined && mine.by === reader?.id
+              ? { kind: mine.view.namespace.kind, owner: true }
+              : undefined;
+        const rows = invitedTo.get(projectId) ?? new Map<string, Invited>();
+        if (agentId === undefined && request.method === "GET") {
+          if (here === undefined) return gone();
+          const owner = here.kind === "user" && here.owner;
+          return Response.json({
+            items: [...rows.values()]
+              .filter((row) => owner || row.state === "joined")
+              .map((row) => rowOf(row, owner)),
+          } satisfies ProjectAgents);
+        }
+        const inviting = agentId === undefined && request.method === "POST";
+        const removing = agentId !== undefined && request.method === "DELETE";
+        if (inviting || removing) {
+          if (reader === null || reader.id === undefined) return problem(401, "auth.required");
+          if (request.headers.get("origin") !== url.origin) return problem(403, "auth.cross_site");
+          const key = request.headers.get("idempotency-key") ?? "";
+          const body = fields(sent);
+          const named = body.get("agent");
+          const asked = body.get("scopes") ?? ["agent:read", "agent:work"];
+          if (!keyed128(key)) return problem(400, "request.invalid");
+          if (
+            inviting &&
+            (typeof named !== "string" ||
+              !AGENT_HANDLE.test(named) ||
+              !Array.isArray(asked) ||
+              asked.length < 1 ||
+              asked.length > 2 ||
+              !asked.every((scope) => scope === "agent:read" || scope === "agent:work"))
+          )
+            return problem(400, "request.invalid");
+          // The policy: a project that is not there for the caller, or is no person's own, is not there; then
+          // only its owner does this, and is told so as Keel tells it of a namespace with no members.
+          if (here === undefined || here.kind !== "user") return gone();
+          if (!here.owner)
+            return problem(
+              403,
+              "auth.forbidden",
+              [
+                {
+                  kind: "escalate",
+                  title:
+                    "This is a person's own namespace and has no members: only its owner does this. Use your own namespace, or an org you are a member of",
+                },
+              ],
+              "Refused: role.",
+            );
+          if (reader.fresh !== true) return staleSignIn();
+          if (inviting) {
+            const scopes: Invited["scopes"] = Array.isArray(asked)
+              ? asked.filter((scope) => scope === "agent:read" || scope === "agent:work")
+              : [];
+            if (!scopes.includes("agent:read") || new Set(scopes).size !== scopes.length)
+              return problem(
+                400,
+                "request.invalid",
+                [],
+                "An invitation gives agent:read, or agent:read and agent:work, each named once.",
+              );
+            const invitee = [...agents.values()].find((agent) => agent.handle === named);
+            if (invitee === undefined)
+              return problem(
+                404,
+                "resource.not_found",
+                [],
+                `No agent has the handle ${String(named)}.`,
+              );
+            const terms = [...scopes].toSorted().join(" ");
+            const cause = `invite ${projectId} ${invitee.id} ${key}`;
+            const done = moves.get(cause);
+            const placed = rows.get(invitee.id);
+            if (done !== undefined && done !== terms)
+              return problem(
+                409,
+                "request.idempotency_conflict",
+                [
+                  {
+                    kind: "call",
+                    title: "Call again with a fresh Idempotency-Key",
+                    operationId: "Projects_inviteAgent",
+                  },
+                ],
+                `Idempotency-Key ${key} was used for a different move on this invitation.`,
+              );
+            // The same terms asked again change nothing and are answered the row as it stands; other terms
+            // are refused until the agent is taken off.
+            if (placed !== undefined) {
+              if ([...placed.scopes].toSorted().join(" ") !== terms)
+                return problem(
+                  409,
+                  "invitation.state_refused",
+                  [
+                    {
+                      kind: "read",
+                      title: "Read the agents invited to the project",
+                      operationId: "Projects_listAgents",
+                    },
+                  ],
+                  `${invitee.id} already has an invitation to this project. Take it off first to invite it again or to change what it may do.`,
+                );
+              return Response.json(rowOf(placed, true), { status: 201 });
+            }
+            const row: Invited = {
+              agentId: invitee.id,
+              by: reader.id,
+              scopes,
+              state: "invited",
+              invitedAt: new Date(now()).toISOString(),
+            };
+            invitedTo.set(projectId, rows.set(invitee.id, row));
+            moves.set(cause, terms);
+            return Response.json(rowOf(row, true), { status: 201 });
+          }
+          const cause = `end ${projectId} ${agentId ?? ""} ${key}`;
+          const done = ended.get(cause);
+          if (done !== undefined) return Response.json(done);
+          const placed = rows.get(agentId ?? "");
           if (placed === undefined) return gone();
           rows.delete(placed.agentId);
           const answer = rowOf(placed, true, "ended");

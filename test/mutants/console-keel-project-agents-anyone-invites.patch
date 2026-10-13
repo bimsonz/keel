@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/projectAgents.test.ts
+# kills: project-agents.refused
+# why: the stand-in takes an invitation to a person's project from someone who is not its owner
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 6a4c7b9e..c6e97df9 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -873,7 +873,7 @@ export function createFakeKeel(
+           // The policy: a project that is not there for the caller, or is no person's own, is not there; then
+           // only its owner does this, and is told so as Keel tells it of a namespace with no members.
+           if (here === undefined || here.kind !== "user") return gone();
+-          if (!here.owner)
++          if (!here.owner && reader.id === "")
+             return problem(
+               403,
+               "auth.forbidden",

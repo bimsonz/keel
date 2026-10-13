@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/projectAgents.test.ts
+# kills: project-agents.refused
+# why: the stand-in answers an ask for other scopes as if nothing differed, where Keel refuses it until the agent is taken off
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 6a4c7b9e..6bef3abc 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -926,7 +926,7 @@ export function createFakeKeel(
+             // The same terms asked again change nothing and are answered the row as it stands; other terms
+             // are refused until the agent is taken off.
+             if (placed !== undefined) {
+-              if ([...placed.scopes].toSorted().join(" ") !== terms)
++              if ([...placed.scopes].toSorted().join(" ") === "never")
+                 return problem(
+                   409,
+                   "invitation.state_refused",

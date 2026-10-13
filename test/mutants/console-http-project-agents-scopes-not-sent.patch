@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/projectAgents.test.ts
+# kills: project-agents.calls
+# why: an invitation to a project leaves out the scopes chosen, so Keel gives its default of both
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 2f92149e..8b60449e 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -566,7 +566,6 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+           projectId: project.id,
+           "idempotency-key": `console:invite-agent:${crypto.randomUUID()}`,
+           agent,
+-          scopes: [...scopes],
+         };
+         const response = await request(
+           `${origin}/v1/projects/${encodeURIComponent(projectId)}/agents`,

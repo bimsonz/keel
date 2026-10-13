@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/projectAgents.test.ts
+# kills: project-agents.read
+# why: the stand-in reads a visitor the invitations to a project nobody has answered, which Keel reads its owner alone
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 6a4c7b9e..81534e66 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -846,7 +846,7 @@ export function createFakeKeel(
+           const owner = here.kind === "user" && here.owner;
+           return Response.json({
+             items: [...rows.values()]
+-              .filter((row) => owner || row.state === "joined")
++              .filter(() => true)
+               .map((row) => rowOf(row, owner)),
+           } satisfies ProjectAgents);
+         }

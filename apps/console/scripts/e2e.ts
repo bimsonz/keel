@@ -4943,6 +4943,143 @@ expectEqual(
   `${invitedBy(await orgAgentRows(noether))} | ${(await orgAgentRows(noether)).length} listed | ${await refusalOn(noether)}`,
   "invited by you | 1 listed | no refusal",
 );
+// An agent invited to one project of a person's own namespace, as a code host has a repository's collaborators.
+// The project is Noether's own here, and public, so anyone reads it. She is its owner; Franklin is nobody to it.
+const whoseAmongThem = async (handle: string) =>
+  (await inviting.whose(handle)) ??
+  [OTTER, UNBROKEN]
+    .filter((agent) => agent.handle === handle)
+    .map((agent) => ({ id: agent.id, kind: "agent" as const }))[0];
+const personal = createFakeKeel({
+  namespace: { handle: "noether", kind: "user" },
+  visibility: "public",
+  agents: [OTTER, UNBROKEN],
+  readerOf: async (request) => {
+    const asking = await inviting.reads(request);
+    if (asking === null) return null;
+    return (await inviting.whose("noether"))?.id === asking.id
+      ? { ...asking, role: "owner" as const }
+      : asking;
+  },
+  whose: whoseAmongThem,
+  roleIn: (userId, org) => inviting.roleIn(userId, org),
+});
+// The route put on last is the one that answers: from here Noether's Keel is the one with her own project.
+await asDeployed(noether.context(), { keel: personal, identity: inviting });
+const invitedOn = (shown: Page): Locator =>
+  orgAgentsOn(shown).getByRole("list", { name: "Agents invited to this project" });
+const invitedRows = async (shown: Page): Promise<string[]> =>
+  (await invitedOn(shown).getByRole("listitem").allInnerTexts()).map(squash);
+const lastProjectInvitation = (): string =>
+  personal.calls.findLast(
+    (call) => call.method === "POST" && call.path === `/v1/projects/${personal.project.id}/agents`,
+  )?.body ?? "nothing asked";
+await noether.goto(`${built}/noether/demo/settings`, { waitUntil: "domcontentloaded" });
+await orgAgentsOn(noether)
+  .getByText("No agent has been invited to this project.")
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+if ((await orgAgentsOn(noether).getByLabel("The agent's handle").count()) > 0) {
+  await orgAgentsOn(noether).getByLabel("The agent's handle").fill("tidy-otter");
+  await orgAgentsOn(noether)
+    .getByLabel("What the agent may do on this project")
+    .selectOption({ label: "Read only" });
+  await orgAgentsOn(noether).getByRole("button", { name: "Invite agent" }).click();
+}
+await Promise.race([
+  invitedOn(noether).getByText("Tidy Otter").first().waitFor({ timeout: 10_000 }),
+  orgAgentsOn(noether).getByRole("alert").first().waitFor({ timeout: 10_000 }),
+]).catch(() => undefined);
+await shot(noether, "project-agents");
+expectEqual(
+  "project agents: the owner invites an agent to her own project by its handle, to read alone, and the row says what Keel answered and nothing of who invited",
+  `${(await invitedRows(noether)).join(" | ") || "nothing listed"} | ${lastProjectInvitation()}`,
+  'Tidy Otter reads · invited, not yet accepted Withdraw | {"agent":"tidy-otter","scopes":["agent:read"]}',
+);
+// The agent accepts, which is its own call. Anyone who reads the project is then listed it, on the Agents tab.
+personal.joins(personal.project.id, OTTER.id);
+const bystanding = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+await asDeployed(bystanding, { keel: personal, identity: inviting });
+const bystander = watch(await bystanding.newPage(), "a project's agents, a visitor");
+await bystander.goto(`${built}/noether/demo/agents`, { waitUntil: "domcontentloaded" });
+const invitedSection = bystander.locator('main section[aria-label="Invited to this project"]');
+await bystander
+  .getByRole("main")
+  .getByRole("heading")
+  .first()
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+await invitedSection
+  .getByRole("listitem")
+  .first()
+  .waitFor({ timeout: 6000 })
+  .catch(() => undefined);
+expectEqual(
+  "project agents: a visitor is listed the invited agents that have joined, on the project's Agents tab, each linked to its page",
+  (await invitedSection.count()) === 0
+    ? "no section"
+    : `${(await invitedSection.getByRole("listitem").allInnerTexts()).map(squash).join(" | ")} | ${String(await invitedSection.getByRole("link").first().getAttribute("href"))}`,
+  `Tidy Otter joined ${today} | /tidy-otter`,
+);
+await bystanding.close();
+// Ten minutes on, Keel takes no removal from this sign-in, and the page offers the passkey touch that answers it.
+await inviting.age();
+await noether.goto(`${built}/noether/demo/settings`, { waitUntil: "domcontentloaded" });
+await invitedOn(noether)
+  .getByText("Tidy Otter")
+  .first()
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+const takeOff = invitedOn(noether).getByRole("button", { name: /^(Remove|Withdraw) Tidy Otter$/ });
+if ((await takeOff.count()) > 0) await takeOff.click();
+await orgAgentsOn(noether)
+  .getByRole("alert")
+  .first()
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+const touchForProject = orgAgentsOn(noether).getByRole("button", { name: SIGN_IN_AGAIN });
+expectEqual(
+  "project agents: a removal from a sign-in that is not fresh is refused in Keel's sentence with its way forward, a passkey touch is offered, and the agent is still on the project",
+  `${await refusalOn(noether)} | ${await touchForProject.count()} offered | ${(await invitedRows(noether)).length} listed`,
+  "This needs a fresh sign-in: a passkey sign-in from the last ten minutes. Sign in again with your passkey, then retry | 1 offered | 1 listed",
+);
+if ((await touchForProject.count()) > 0) await touchForProject.click();
+await orgAgentsOn(noether)
+  .getByText("No agent has been invited to this project.")
+  .waitFor({ timeout: 10_000 })
+  .catch(() => undefined);
+expectEqual(
+  "project agents: one touch signs in afresh and asks again what Keel refused, and the agent is off the project",
+  `${(await invitedRows(noether)).length} listed | ${await refusalOn(noether)}`,
+  "0 listed | no refusal",
+);
+// An org's project takes no invitation of its own: its settings say so, and send a maintainer to the org.
+const ofTheOrg = createFakeKeel({
+  namespace: { handle: "symmetry", kind: "org" },
+  visibility: "private",
+  agents: [OTTER, UNBROKEN],
+  readerOf: async (request) => {
+    const asking = await inviting.reads(request);
+    if (asking === null) return null;
+    const role = await inviting.roleIn(asking.id, "symmetry");
+    return role === undefined ? asking : { ...asking, role };
+  },
+  whose: whoseAmongThem,
+  roleIn: (userId, org) => inviting.roleIn(userId, org),
+});
+await asDeployed(noether.context(), { keel: ofTheOrg, identity: inviting });
+await noether.goto(`${built}/symmetry/demo/settings`, { waitUntil: "domcontentloaded" });
+await noether
+  .getByRole("heading", { name: "Who may read this project" })
+  .waitFor({ timeout: 15_000 })
+  .catch(() => undefined);
+expectEqual(
+  "project agents: an org's project offers no invitation of its own, and sends its maintainer to the org's members page",
+  (await orgAgentsOn(noether).count()) === 0
+    ? "no section"
+    : `${await orgAgentsOn(noether).getByRole("button").count()} buttons | ${String(await orgAgentsOn(noether).getByRole("link").first().getAttribute("href"))} | ${String(squash(await orgAgentsOn(noether).innerText()).startsWith("Agents An org's project takes no invitation of its own"))}`,
+  "0 buttons | /orgs/symmetry/members | true",
+);
 await noether.context().close();
 await franklin.context().close();
 

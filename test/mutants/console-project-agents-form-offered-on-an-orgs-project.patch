@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/projectAgents.test.ts
+# kills: project-agents.offered
+# why: the form is offered on an org's project, where Keel takes no invitation to it
+diff --git a/apps/console/src/pages/ProjectAgents.tsx b/apps/console/src/pages/ProjectAgents.tsx
+index dfbfa4d8..ab61e24e 100644
+--- a/apps/console/src/pages/ProjectAgents.tsx
++++ b/apps/console/src/pages/ProjectAgents.tsx
+@@ -38,7 +38,7 @@ function listedBy(invited: KeelProjectAgents): KeelOrgAgents {
+ 
+ /** Whether a project takes an invitation of its own, and from this reader: a person's own, read by its owner. */
+ export function invitesHere(project: ProjectView): boolean {
+-  return project.namespace.kind === "user" && project.viewer?.role === "owner";
++  return project.viewer?.role === "owner";
+ }
+ 
+ export function ProjectAgents({

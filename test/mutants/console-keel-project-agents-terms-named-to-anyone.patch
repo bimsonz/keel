@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/projectAgents.test.ts
+# kills: project-agents.read
+# why: the stand-in names what an agent was given on a project, and by whom, to a reader who is not its owner
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 6a4c7b9e..7c64a2a5 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -847,7 +847,7 @@ export function createFakeKeel(
+           return Response.json({
+             items: [...rows.values()]
+               .filter((row) => owner || row.state === "joined")
+-              .map((row) => rowOf(row, owner)),
++              .map((row) => rowOf(row, true)),
+           } satisfies ProjectAgents);
+         }
+         const inviting = agentId === undefined && request.method === "POST";

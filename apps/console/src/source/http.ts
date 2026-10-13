@@ -44,6 +44,11 @@ import type {
   ProjectSettings,
   ProjectView,
   Probes_getProbeSourceInput,
+  ProjectAgent,
+  ProjectAgents,
+  Projects_inviteAgentInput,
+  Projects_listAgentsInput,
+  Projects_removeAgentInput,
   ProbeSource,
   RepoBlob,
   RepoCommitDiff,
@@ -61,6 +66,7 @@ import {
   type KeelAgents,
   type KeelCommands,
   type KeelDirectory,
+  type KeelInvited,
   type KeelOrgAgents,
   type KeelSponsorship,
   type KeelEventSource,
@@ -85,6 +91,7 @@ export type HttpSource = KeelEventSource &
   KeelRepository &
   KeelCommands &
   KeelSettings &
+  KeelInvited &
   KeelAgents;
 
 const KNOWN: ReadonlySet<string> = new Set(EVENT_TYPES);
@@ -537,6 +544,58 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
         },
       );
       if (!response.ok) throw await refusalOf(response);
+    },
+    // The agents invited to this one project: Keel's own three operations at the project's own address. Each
+    // move carries a key made for the one attempt and nothing of the page's beside it.
+    invited: {
+      async listAgents(signal) {
+        const input: Projects_listAgentsInput = { projectId: project.id };
+        const response = await read(
+          `/v1/projects/${encodeURIComponent(input.projectId)}/agents`,
+          signal,
+        );
+        if (!response.ok) throw await refusalOf(response);
+        return (await answered<ProjectAgents>(response)).items;
+      },
+      async inviteAgent(agent, scopes) {
+        const {
+          projectId,
+          "idempotency-key": key,
+          ...body
+        }: Projects_inviteAgentInput = {
+          projectId: project.id,
+          "idempotency-key": `console:invite-agent:${crypto.randomUUID()}`,
+          agent,
+          scopes: [...scopes],
+        };
+        const response = await request(
+          `${origin}/v1/projects/${encodeURIComponent(projectId)}/agents`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json", "idempotency-key": key },
+            body: JSON.stringify(body),
+          },
+        );
+        if (!response.ok) throw await refusalOf(response);
+        return answered<ProjectAgent>(response);
+      },
+      async removeAgent(agentId) {
+        const {
+          projectId,
+          agentId: named,
+          "idempotency-key": key,
+        }: Projects_removeAgentInput = {
+          projectId: project.id,
+          agentId,
+          "idempotency-key": `console:remove-agent:${crypto.randomUUID()}`,
+        };
+        const response = await request(
+          `${origin}/v1/projects/${encodeURIComponent(projectId)}/agents/${encodeURIComponent(named)}`,
+          { method: "DELETE", headers: { "idempotency-key": key } },
+        );
+        if (!response.ok) throw await refusalOf(response);
+        return answered<ProjectAgent>(response);
+      },
     },
     async getSettings(signal?: AbortSignal): Promise<ProjectSettings> {
       const response = await read(

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/projectAgents.test.ts
+# kills: project-agents.calls
+# why: every invitation to a project rides one key, so a second is answered as the first
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 2f92149e..6addfe41 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -564,7 +564,7 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+           ...body
+         }: Projects_inviteAgentInput = {
+           projectId: project.id,
+-          "idempotency-key": `console:invite-agent:${crypto.randomUUID()}`,
++          "idempotency-key": "console:invite-agent:the-same-key",
+           agent,
+           scopes: [...scopes],
+         };

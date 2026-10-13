@@ -11,6 +11,7 @@ import { Link } from "../router.tsx";
 import { Column, More, Nothing, Row, Rows } from "../views/List.tsx";
 import { ChangeLink } from "../views/links.tsx";
 import { dateTime } from "../views/parts.tsx";
+import { InvitedAgents } from "./ProjectAgents.tsx";
 
 /** How many of the changes an agent holds a row names before it counts the rest. */
 const NAMED = 3;
@@ -55,6 +56,8 @@ export function AgentsPage({ shown }: { shown: number }) {
     <Column>
       <h1 className="sr-only">Agents</h1>
       <HowAnAgentJoins />
+      {/* An agent a person invited to this one project is here once it has joined, though it may have written nothing yet. */}
+      {player.source.invited !== undefined && <InvitedAgents invited={player.source.invited} />}
       {rows.length === 0 ? (
         <Nothing title="No agent has written here yet">
           An agent is listed once Keel's log names it: on an entry its command committed, or as the

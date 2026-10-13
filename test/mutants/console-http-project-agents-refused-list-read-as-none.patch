@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/projectAgents.test.ts
+# kills: project-agents.unseen
+# why: Keel's refusal to list a project's agents is shown as a project with none
+diff --git a/apps/console/src/source/http.ts b/apps/console/src/source/http.ts
+index 2f92149e..cd5176f4 100644
+--- a/apps/console/src/source/http.ts
++++ b/apps/console/src/source/http.ts
+@@ -554,7 +554,7 @@ export function createHttpSource(project: ProjectView, options: HttpOptions = {}
+           `/v1/projects/${encodeURIComponent(input.projectId)}/agents`,
+           signal,
+         );
+-        if (!response.ok) throw await refusalOf(response);
++        if (!response.ok) return [];
+         return (await answered<ProjectAgents>(response)).items;
+       },
+       async inviteAgent(agent, scopes) {

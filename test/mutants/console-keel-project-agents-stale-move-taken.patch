@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/projectAgents.test.ts
+# kills: project-agents.refused
+# why: the stand-in takes an invitation to a project, or a removal from it, from a sign-in that is not fresh
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 6a4c7b9e..79bb870d 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -886,7 +886,6 @@ export function createFakeKeel(
+               ],
+               "Refused: role.",
+             );
+-          if (reader.fresh !== true) return staleSignIn();
+           if (inviting) {
+             const scopes: Invited["scopes"] = Array.isArray(asked)
+               ? asked.filter((scope) => scope === "agent:read" || scope === "agent:work")

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/projectAgents.test.ts
+# kills: project-agents.remove
+# why: the stand-in keeps listing an agent taken off a project, where Keel's ended row is in no list
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 6a4c7b9e..1bf6059f 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -957,7 +957,6 @@ export function createFakeKeel(
+           if (done !== undefined) return Response.json(done);
+           const placed = rows.get(agentId ?? "");
+           if (placed === undefined) return gone();
+-          rows.delete(placed.agentId);
+           const answer = rowOf(placed, true, "ended");
+           ended.set(cause, answer);
+           return Response.json(answer);

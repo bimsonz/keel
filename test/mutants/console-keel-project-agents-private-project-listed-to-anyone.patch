@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/projectAgents.test.ts
+# kills: project-agents.unseen
+# why: the stand-in lists the agents of a private project to someone it is not read to
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 6a4c7b9e..2cce0700 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -834,9 +834,7 @@ export function createFakeKeel(
+         // The project as this caller is read it, whose it is, and whether the caller is its owner.
+         const here =
+           projectId === project.id
+-            ? visible
+-              ? { kind: project.namespace.kind, owner: reader?.role === "owner" }
+-              : undefined
++            ? { kind: project.namespace.kind, owner: reader?.role === "owner" }
+             : mine !== undefined && mine.by === reader?.id
+               ? { kind: mine.view.namespace.kind, owner: true }
+               : undefined;

@@ -36,7 +36,7 @@ async function listing(agents: KeelOrgAgents, org: string, signal?: AbortSignal)
 }
 
 /** Keel's list of an org's agents for this reader: read when the page opens and when its tab comes back into view. */
-function useListed(agents: KeelOrgAgents, org: string) {
+export function useListed(agents: KeelOrgAgents, org: string) {
   const [listed, setListed] = useState<readonly NamespaceAgent[] | null>(null);
   const [unread, setUnread] = useState<ReturnType<typeof saidOf> | null>(null);
   const read = useCallback(async (): Promise<void> => {
@@ -67,7 +67,7 @@ function useListed(agents: KeelOrgAgents, org: string) {
 }
 
 /** An agent by its name, linked to its own page where Keel's row has its handle. */
-function Named({ agent }: { agent: NamespaceAgent }) {
+export function Named({ agent }: { agent: NamespaceAgent }) {
   return agent.handle === undefined ? (
     <span className="font-semibold text-kumo-strong [overflow-wrap:anywhere]">{agent.name}</span>
   ) : (
@@ -80,10 +80,11 @@ function Named({ agent }: { agent: NamespaceAgent }) {
   );
 }
 
-const said = (parts: readonly string[]): string => parts.filter((part) => part !== "").join(" · ");
+export const said = (parts: readonly string[]): string =>
+  parts.filter((part) => part !== "").join(" · ");
 
 /** What an agent declared itself as, where Keel's row says. */
-const declared = (agent: NamespaceAgent): string =>
+export const declared = (agent: NamespaceAgent): string =>
   agent.kind === undefined ? "" : `declared as ${agent.kind}`;
 
 export function OrgAgents({

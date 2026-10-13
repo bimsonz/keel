@@ -12,6 +12,7 @@ import type { Visibility } from "../engine/projects.ts";
 import { maintains, mayPublish, readBy } from "../engine/settings.ts";
 import { Notice } from "../views/Frame.tsx";
 import { Column } from "../views/List.tsx";
+import { AgentsOfTheOrg, ProjectAgents, invitesHere } from "./ProjectAgents.tsx";
 
 /** Who reads a project of each kind, in a sentence. An org's is its members'; a person's or an agent's is theirs. */
 function readers(visibility: Visibility, namespace: NamespaceRef): string {
@@ -184,6 +185,13 @@ export function SettingsPage({ project }: { project: ProjectView }) {
         )}
         <Refusal said={refused} />
       </section>
+      {/* A person's own project takes an invitation of its own, from its owner. An org's sends them to the org. */}
+      {source.invited !== undefined && invitesHere(project) && (
+        <ProjectAgents project={project} invited={source.invited} />
+      )}
+      {project.namespace.kind === "org" && maintains(project) && (
+        <AgentsOfTheOrg org={project.namespace.handle} />
+      )}
       <Held settings={held} />
     </Column>
   );

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/projectAgents.test.ts
+# kills: project-agents.apart
+# why: the stand-in's card of an agent names a project it joined among its orgs, where Keel's card names orgs only
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 6a4c7b9e..f1c23d2f 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -530,6 +530,7 @@ export function createFakeKeel(
+     },
+     joins(projectId, agentId) {
+       const row = invitedTo.get(projectId)?.get(agentId);
++      if (row !== undefined) invited.set(projectId, new Map([[agentId, row]]));
+       if (row === undefined || row.state !== "invited")
+         throw new Error(`${agentId} has no invitation to ${projectId} to accept`);
+       row.state = "joined";

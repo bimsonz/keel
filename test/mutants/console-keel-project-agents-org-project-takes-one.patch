@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/console/test/unit/account/projectAgents.test.ts
+# kills: project-agents.unseen
+# why: the stand-in decides an invitation to an org's project, which Keel reads as not there
+diff --git a/apps/console/test/fixtures/mock/fakeKeel.ts b/apps/console/test/fixtures/mock/fakeKeel.ts
+index 6a4c7b9e..3ffdfbf2 100644
+--- a/apps/console/test/fixtures/mock/fakeKeel.ts
++++ b/apps/console/test/fixtures/mock/fakeKeel.ts
+@@ -872,7 +872,7 @@ export function createFakeKeel(
+             return problem(400, "request.invalid");
+           // The policy: a project that is not there for the caller, or is no person's own, is not there; then
+           // only its owner does this, and is told so as Keel tells it of a namespace with no members.
+-          if (here === undefined || here.kind !== "user") return gone();
++          if (here === undefined) return gone();
+           if (!here.owner)
+             return problem(
+               403,

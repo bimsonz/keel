@@ -9,6 +9,7 @@ import type { Observation } from "../contract/observations.ts";
 import type {
   KeelAgents,
   KeelCommands,
+  KeelInvited,
   KeelSettings,
   KeelEventSource,
   KeelResources,
@@ -26,6 +27,7 @@ export type ConsoleSource = KeelEventSource &
   KeelCommands &
   // A fixture's source holds no settings and no agent's card: only Keel does.
   Partial<KeelSettings> &
+  Partial<KeelInvited> &
   Partial<KeelAgents> & {
     /** The question a scripted story is holding at, if the source knows of one. */
     openGate?(): { escalationId: string; t: number } | undefined;
