@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fresh.test.ts
+# kills: fresh.unreadable
+# why: a session whose time of making can't be read counts as just made
+diff --git a/apps/keel/src/adapters/driven/better-auth/fresh.ts b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+index 7333b67..1e8a042 100644
+--- a/apps/keel/src/adapters/driven/better-auth/fresh.ts
++++ b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+@@ -54,7 +54,7 @@ const OWN_SIGN_INS: ReadonlySet<string> = new Set<SignInMethod>(["passkey", "ema
+ 
+ /** Whether the session was made within the last ten minutes. One whose time of making can't be read was not. */
+ const recent = (session: SignedIn, now: Date): boolean =>
+-  now.getTime() - session.createdAt.getTime() <= FRESH_FOR_MS;
++  !(now.getTime() - session.createdAt.getTime() > FRESH_FOR_MS);
+ 
+ /**
+  * Whether a session may change how its account signs in at `now`. A session

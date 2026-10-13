@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fresh.test.ts
+# kills: fresh.window
+# why: a sign-in stays fresh for an hour, six times as long as the rule says
+diff --git a/apps/keel/src/adapters/driven/better-auth/fresh.ts b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+index 7333b67..e8c6bdc 100644
+--- a/apps/keel/src/adapters/driven/better-auth/fresh.ts
++++ b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+@@ -14,7 +14,7 @@
+ export type SignInMethod = "passkey" | "email-otp" | "github" | "device" | "other";
+ 
+ /** How long after its passkey sign-in a session stays fresh. */
+-export const FRESH_FOR_MS = 600_000;
++export const FRESH_FOR_MS = 3_600_000;
+ 
+ /**
+  * How a session is signed in, by the path of the Better Auth endpoint making

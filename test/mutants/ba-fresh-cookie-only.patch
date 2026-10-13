@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
+# kills: ba.fresh-sign-in
+# why: the fresh sign-in check reads the cookie alone, so keeltown's bearer adds a passkey at any age
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 02891af..623a4e2 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -234,7 +234,7 @@ export function authOptions(config: AuthConfig) {
+    * way forward it has.
+    */
+   const freshSignIn = async (ctx: Parameters<SessionOf>[0]): Promise<void> => {
+-    const carried = await sessionOf(ctx);
++    const carried = await getSessionFromCtx(ctx);
+     if (carried === null) return;
+     const by: unknown = carried.session["signedInBy"];
+     const signedIn = {

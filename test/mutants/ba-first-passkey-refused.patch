@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-credentials.test.ts
+# kills: ba.first-passkey
+# why: an account with no passkey is held to the passkey rule, so one that signed up by a code or GitHub can never add one
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 02891af..ef374c0 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -245,7 +245,6 @@ export function authOptions(config: AuthConfig) {
+     if (isFresh(signedIn, now)) return;
+     const none = !(await holdsPasskey(db, carried.user.id));
+     const first = none && ADDS_PASSKEY.has(ctx.path);
+-    if (first && mayAddFirstPasskey(signedIn, now)) return;
+     throw APIError.from("FORBIDDEN", {
+       code: "FRESH_SIGN_IN_REQUIRED",
+       message: first

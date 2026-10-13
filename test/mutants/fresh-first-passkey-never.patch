@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fresh.test.ts
+# kills: fresh.first-passkey
+# why: only a passkey's session adds a first passkey, which an account with none can't make
+diff --git a/apps/keel/src/adapters/driven/better-auth/fresh.ts b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+index 7333b67..62d2e04 100644
+--- a/apps/keel/src/adapters/driven/better-auth/fresh.ts
++++ b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+@@ -50,7 +50,7 @@ export interface SignedIn {
+  * grant is not one: any session of the account approves it, at any age, so
+  * its session is only as much the person's as the one that approved it.
+  */
+-const OWN_SIGN_INS: ReadonlySet<string> = new Set<SignInMethod>(["passkey", "email-otp", "github"]);
++const OWN_SIGN_INS: ReadonlySet<string> = new Set<SignInMethod>(["passkey"]);
+ 
+ /** Whether the session was made within the last ten minutes. One whose time of making can't be read was not. */
+ const recent = (session: SignedIn, now: Date): boolean =>

@@ -101,6 +101,8 @@ export class KeelClient {
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: form.toString(),
     });
+    // A limited exchange is no refusal of the credentials: it is a problem like any other call's, and says how long to wait.
+    if (response.status === 429) throw await KeelProblem.from(response);
     const body: unknown = await response.json().catch(() => undefined);
     if (!response.ok) {
       const refusal = typeof body === "object" && body !== null ? body : {};

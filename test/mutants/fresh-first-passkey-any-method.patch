@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fresh.test.ts
+# kills: fresh.first-passkey-own
+# why: a first passkey takes any recent session, a device grant's and one with no recorded sign-in among them
+diff --git a/apps/keel/src/adapters/driven/better-auth/fresh.ts b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+index 7333b67..396ae75 100644
+--- a/apps/keel/src/adapters/driven/better-auth/fresh.ts
++++ b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+@@ -72,6 +72,5 @@ export function isFresh(session: SignedIn, now: Date): boolean {
+  * of an account that holds no passkey.
+  */
+ export function mayAddFirstPasskey(session: SignedIn, now: Date): boolean {
+-  if (typeof session.signedInBy !== "string" || !OWN_SIGN_INS.has(session.signedInBy)) return false;
+   return recent(session, now);
+ }

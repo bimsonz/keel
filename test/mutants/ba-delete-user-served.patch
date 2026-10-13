@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-credentials.test.ts
+# kills: ba.no-passwords, ba.no-passwords-sweep
+# why: Better Auth's account deletion is served, which asks for a password and leaves the account's namespace and projects behind
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 02891af..cd18cea 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -50,7 +50,6 @@ export const DISABLED_PATHS = [
+   "/email-otp/request-password-reset",
+   "/email-otp/reset-password",
+   "/forget-password/email-otp",
+-  "/delete-user",
+   "/delete-user/callback",
+ ] as const;
+ 

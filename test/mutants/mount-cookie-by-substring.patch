@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/auth-mount.test.ts
+# kills: mount.cookie-named
+# why: any cookie whose text holds the session cookie's name is taken out, another app's cookie on the same site among them
+diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
+index 103a009..8e2182a 100644
+--- a/apps/keel/src/adapters/driving/http/auth-mount.ts
++++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
+@@ -64,7 +64,7 @@ export function oneCredential(request: Request): Request {
+   const kept = cookie
+     .split(";")
+     .map((part) => part.trim())
+-    .filter((part) => part !== "" && !part.startsWith(`${SESSION_COOKIE}=`))
++    .filter((part) => part !== "" && !part.includes(`${SESSION_COOKIE}`))
+     .join("; ");
+   const headers = new Headers(request.headers);
+   if (kept === "") headers.delete("cookie");

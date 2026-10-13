@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   FRESH_FOR_MS,
   isFresh,
+  mayAddFirstPasskey,
   signInMethod,
 } from "../../src/adapters/driven/better-auth/fresh.ts";
 
@@ -53,5 +54,32 @@ describe("a fresh sign-in", () => {
 
   it("[fresh.unreadable] is never a session whose time of making can't be read", () => {
     expect(isFresh({ signedInBy: "passkey", createdAt: new Date("never") }, NOW)).toBe(false);
+  });
+
+  it("[fresh.first-passkey] a first passkey takes a sign-in of the person's own from the last ten minutes: a passkey, a code or GitHub", () => {
+    for (const method of ["passkey", "email-otp", "github"]) {
+      expect([method, mayAddFirstPasskey(made(0, method), NOW)]).toEqual([method, true]);
+      expect([method, mayAddFirstPasskey(made(FRESH_FOR_MS, method), NOW)]).toEqual([method, true]);
+    }
+  });
+
+  it("[fresh.first-passkey-window] a first passkey takes no sign-in older than ten minutes, or one whose time can't be read", () => {
+    for (const method of ["passkey", "email-otp", "github"]) {
+      expect([method, mayAddFirstPasskey(made(FRESH_FOR_MS + 1, method), NOW)]).toEqual([
+        method,
+        false,
+      ]);
+      expect([
+        method,
+        mayAddFirstPasskey({ signedInBy: method, createdAt: new Date("never") }, NOW),
+      ]).toEqual([method, false]);
+    }
+  });
+
+  it("[fresh.first-passkey-own] a first passkey takes no session the person did not sign in themselves: a device grant's, or one that says no way", () => {
+    for (const method of ["device", "other", "", "GitHub", "email-otp ", "toString"])
+      expect([method, mayAddFirstPasskey(made(0, method), NOW)]).toEqual([method, false]);
+    expect(mayAddFirstPasskey(made(0, null), NOW)).toBe(false);
+    expect(mayAddFirstPasskey(made(0), NOW)).toBe(false);
   });
 });

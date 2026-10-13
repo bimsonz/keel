@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/fresh.test.ts
+# kills: fresh.first-passkey-window
+# why: a first passkey takes a sign-in of any age
+diff --git a/apps/keel/src/adapters/driven/better-auth/fresh.ts b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+index 7333b67..4fab738 100644
+--- a/apps/keel/src/adapters/driven/better-auth/fresh.ts
++++ b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+@@ -73,5 +73,5 @@ export function isFresh(session: SignedIn, now: Date): boolean {
+  */
+ export function mayAddFirstPasskey(session: SignedIn, now: Date): boolean {
+   if (typeof session.signedInBy !== "string" || !OWN_SIGN_INS.has(session.signedInBy)) return false;
+-  return recent(session, now);
++  return true;
+ }

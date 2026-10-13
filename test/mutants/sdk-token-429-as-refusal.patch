@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/client.test.ts
+# kills: sdk.token-429
+# why: a limited token exchange is thrown as refused credentials, so a caller gives up or re-enrols where it should wait
+diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
+index 718c536..75b540c 100644
+--- a/packages/sdk/src/client.ts
++++ b/packages/sdk/src/client.ts
+@@ -102,7 +102,6 @@ export class KeelClient {
+       body: form.toString(),
+     });
+     // A limited exchange is no refusal of the credentials: it is a problem like any other call's, and says how long to wait.
+-    if (response.status === 429) throw await KeelProblem.from(response);
+     const body: unknown = await response.json().catch(() => undefined);
+     if (!response.ok) {
+       const refusal = typeof body === "object" && body !== null ? body : {};

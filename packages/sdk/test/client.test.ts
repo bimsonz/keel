@@ -17,6 +17,21 @@ const problem = (status: number, code: string, extra: object = {}) =>
     { status, headers: { "content-type": "application/problem+json" } },
   );
 
+/** What a call gets when its token exchange is limited: the thrown value. */
+const limited = (extra: object, headers: Record<string, string>) =>
+  createKeelClient({
+    baseUrl: "https://keel.test",
+    clientId: "client-a",
+    clientSecret: "right",
+    fetch: async () => {
+      const refused = problem(429, "rate.limited", extra);
+      for (const [name, value] of Object.entries(headers)) refused.headers.set(name, value);
+      return refused;
+    },
+  })
+    .whoami()
+    .catch((e: unknown) => e);
+
 describe("the Keel client", () => {
   it("[sdk.token] exchanges once and reuses the token, then refreshes once on a 401 and retries under the same key", async () => {
     const keel = fakeKeel((request, call) =>
@@ -93,6 +108,28 @@ describe("the Keel client", () => {
     const error = await client.whoami().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(KeelTokenError);
     expect(error).toMatchObject({ error: "invalid_client", status: 401 });
+  });
+
+  it("[sdk.token-429] reads a limited token exchange as rate limiting, with how long to wait, never as refused credentials", async () => {
+    // As Keel answers: the wait in the body, and in the header beside it.
+    const named = await limited({ retryAfterMs: 60_000 }, { "retry-after": "60" });
+    expect(named).toBeInstanceOf(KeelProblem);
+    expect(named).not.toBeInstanceOf(KeelTokenError);
+    expect(named).toMatchObject({ status: 429, code: "rate.limited", retryAfterMs: 60_000 });
+  });
+
+  it("[sdk.retry-after] a wait the body does not name is read from Retry-After, in seconds, and the body's own is taken before it", async () => {
+    expect(await limited({}, { "retry-after": "30" })).toMatchObject({
+      code: "rate.limited",
+      retryAfterMs: 30_000,
+    });
+    expect(await limited({ retryAfterMs: 5_000 }, { "retry-after": "30" })).toMatchObject({
+      retryAfterMs: 5_000,
+    });
+    const unnamed = await limited({}, {});
+    expect(unnamed).toBeInstanceOf(KeelProblem);
+    expect(unnamed).toMatchObject({ code: "rate.limited", retryAfterMs: undefined });
+    expect(await limited({}, { "retry-after": "soon" })).toMatchObject({ retryAfterMs: undefined });
   });
 
   it("[sdk.public] a client with no credentials sends no token, never asks for one, and is refused as itself", async () => {

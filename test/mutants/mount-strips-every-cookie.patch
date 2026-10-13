@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/auth-mount.test.ts
+# kills: mount.one-credential
+# why: a bearer's request loses every cookie, so a passkey ceremony begun with a bearer never finds its challenge
+diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
+index 103a009..3423ee4 100644
+--- a/apps/keel/src/adapters/driving/http/auth-mount.ts
++++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
+@@ -64,7 +64,7 @@ export function oneCredential(request: Request): Request {
+   const kept = cookie
+     .split(";")
+     .map((part) => part.trim())
+-    .filter((part) => part !== "" && !part.startsWith(`${SESSION_COOKIE}=`))
++    .filter(() => false)
+     .join("; ");
+   const headers = new Headers(request.headers);
+   if (kept === "") headers.delete("cookie");

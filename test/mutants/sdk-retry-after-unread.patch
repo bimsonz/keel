@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/client.test.ts
+# kills: sdk.retry-after
+# why: a wait named only in Retry-After is lost, so a caller retries at once
+diff --git a/packages/sdk/src/problem.ts b/packages/sdk/src/problem.ts
+index 9f00502..006f6c7 100644
+--- a/packages/sdk/src/problem.ts
++++ b/packages/sdk/src/problem.ts
+@@ -73,7 +73,7 @@ export class KeelProblem extends Error {
+     }
+     const seconds = Number(response.headers.get("retry-after") ?? "");
+     const wait =
+-      response.headers.has("retry-after") && Number.isFinite(seconds) && seconds >= 0
++      false
+         ? { retryAfterMs: seconds * 1000 }
+         : {};
+     if (isProblem(parsed)) return new KeelProblem({ ...wait, ...parsed });

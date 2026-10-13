@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-credentials.test.ts
+# kills: ba.first-passkey-routes
+# why: an account with no passkey changes its address or unlinks a provider with any fresh sign-in
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 02891af..bcda913 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -244,7 +244,7 @@ export function authOptions(config: AuthConfig) {
+     const now = new Date();
+     if (isFresh(signedIn, now)) return;
+     const none = !(await holdsPasskey(db, carried.user.id));
+-    const first = none && ADDS_PASSKEY.has(ctx.path);
++    const first = none;
+     if (first && mayAddFirstPasskey(signedIn, now)) return;
+     throw APIError.from("FORBIDDEN", {
+       code: "FRESH_SIGN_IN_REQUIRED",

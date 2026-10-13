@@ -1,5 +1,6 @@
 import { createExecutionContext } from "cloudflare:test";
 import { env } from "cloudflare:workers";
+import { createKeelClient, KeelProblem } from "@keeltown/sdk";
 import { describe, expect, it } from "vitest";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
 import {
@@ -28,6 +29,39 @@ const exchangeFrom = (
   });
 
 describe("the token endpoint's rate limit", () => {
+  it("[oauth.rate-limit-sdk] the SDK reads Keel's own 429 as rate limiting, a minute to wait", async () => {
+    const isolate = makeIsolate(
+      { ...env, TOKEN_LIMIT: { limit: async () => ({ success: false }) } },
+      isolateLayer(env),
+    );
+    const seeded = await seedAgent();
+    const client = createKeelClient({
+      baseUrl: BASE,
+      clientId: seeded.clientId,
+      clientSecret: seeded.clientSecret,
+      fetch: async (url, init) =>
+        isolate.app.fetch(new Request(url, init), env, createExecutionContext()),
+    });
+    const refused = await client.token().catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(KeelProblem);
+    expect(refused).toMatchObject({ status: 429, code: "rate.limited", retryAfterMs: 60_000 });
+  });
+
+  it("[oauth.rate-limit-wait] a limited exchange says how long to wait in its body, beside the header", async () => {
+    const isolate = makeIsolate(
+      { ...env, TOKEN_LIMIT: { limit: async () => ({ success: false }) } },
+      isolateLayer(env),
+    );
+    const limited: Fetch = async (url, init) =>
+      isolate.app.fetch(new Request(url, init), env, createExecutionContext());
+    const refused = await exchangeFrom(limited, "192.0.2.9", {
+      clientId: "nobody",
+      clientSecret: "not-a-secret",
+    });
+    expect([refused.status, refused.headers.get("retry-after")]).toEqual([429, "60"]);
+    expect(await refused.json()).toMatchObject({ code: "rate.limited", retryAfterMs: 60_000 });
+  });
+
   it("[oauth.rate-limit] asks the limiter about each exchange, keyed by address alone, and refuses what it refuses ahead of the exchange", async () => {
     // A fixed allowance stands in for the binding's window, which a slow run could straddle.
     const asked: string[] = [];

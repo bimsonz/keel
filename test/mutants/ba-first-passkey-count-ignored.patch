@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-credentials.test.ts
+# kills: ba.first-passkey
+# why: every account takes the first-passkey rule, so a fresh email code adds a passkey to an account that already holds one
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 02891af..bf1171c 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -243,7 +243,7 @@ export function authOptions(config: AuthConfig) {
+     };
+     const now = new Date();
+     if (isFresh(signedIn, now)) return;
+-    const none = !(await holdsPasskey(db, carried.user.id));
++    const none = true;
+     const first = none && ADDS_PASSKEY.has(ctx.path);
+     if (first && mayAddFirstPasskey(signedIn, now)) return;
+     throw APIError.from("FORBIDDEN", {

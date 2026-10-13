@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 import type { AppEnv } from "../../../generated/http/runtime.gen.ts";
+import { SESSION_COOKIE } from "./gate.ts";
 import { problemResponse } from "./problems.ts";
 
 /** Better Auth's mount: outside the TypeSpec document and problem+json, like the token endpoint. */
@@ -49,6 +50,28 @@ function stripTokens(value: unknown): unknown {
   );
 }
 
+/**
+ * The request as Better Auth is to read it: with one credential, as the gate
+ * reads one (gate.ts). A request that presents an `Authorization` header is
+ * that credential's alone, so its session cookie is taken out. Better Auth's
+ * handlers do not agree on which of the two they act for, and Keel's checks
+ * read one session. Every other cookie stays: a passkey ceremony's challenge
+ * rides in one.
+ */
+export function oneCredential(request: Request): Request {
+  const cookie = request.headers.get("cookie");
+  if (cookie === null || request.headers.get("authorization") === null) return request;
+  const kept = cookie
+    .split(";")
+    .map((part) => part.trim())
+    .filter((part) => part !== "" && !part.startsWith(`${SESSION_COOKIE}=`))
+    .join("; ");
+  const headers = new Headers(request.headers);
+  if (kept === "") headers.delete("cookie");
+  else headers.set("cookie", kept);
+  return new Request(request, { headers });
+}
+
 /** Mounts Better Auth under its base path, each IP limited on everything but reads. */
 export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
   app.all(`${mount.basePath}/*`, async (c) => {
@@ -61,6 +84,6 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
         });
     }
     const path = new URL(request.url).pathname.slice(mount.basePath.length);
-    return withoutSessionTokens(path, await mount.handler(request));
+    return withoutSessionTokens(path, await mount.handler(oneCredential(request)));
   });
 }

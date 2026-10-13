@@ -64,6 +64,7 @@ export function makeApp(options: AppOptions) {
     if (await options.tokens.admit(`token:${ip}`)) return next();
     const refused = problemResponse(429, "rate.limited", c.get("requestId"), {
       detail: "Too many token requests from this address; wait a minute.",
+      retryAfterMs: TOKEN_WINDOW_SECONDS * 1000,
     });
     refused.headers.set("retry-after", String(TOKEN_WINDOW_SECONDS));
     return refused;

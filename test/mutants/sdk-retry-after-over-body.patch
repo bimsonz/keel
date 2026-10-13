@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/sdk/test/client.test.ts
+# kills: sdk.retry-after
+# why: the header's wait replaces the one the problem itself names
+diff --git a/packages/sdk/src/problem.ts b/packages/sdk/src/problem.ts
+index 9f00502..d8709ae 100644
+--- a/packages/sdk/src/problem.ts
++++ b/packages/sdk/src/problem.ts
+@@ -76,7 +76,7 @@ export class KeelProblem extends Error {
+       response.headers.has("retry-after") && Number.isFinite(seconds) && seconds >= 0
+         ? { retryAfterMs: seconds * 1000 }
+         : {};
+-    if (isProblem(parsed)) return new KeelProblem({ ...wait, ...parsed });
++    if (isProblem(parsed)) return new KeelProblem({ ...parsed, ...wait });
+     return new KeelProblem({
+       type: "about:blank",
+       title: response.statusText || "Unexpected response",

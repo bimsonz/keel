@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-credentials.test.ts
+# kills: ba.one-credential, ba.one-credential-fresh
+# why: a bearer's request reaches Better Auth with another session's cookie beside it, and its handlers act for the cookie while Keel's answer names the bearer
+diff --git a/apps/keel/src/adapters/driving/http/auth-mount.ts b/apps/keel/src/adapters/driving/http/auth-mount.ts
+index 103a009..06e99ff 100644
+--- a/apps/keel/src/adapters/driving/http/auth-mount.ts
++++ b/apps/keel/src/adapters/driving/http/auth-mount.ts
+@@ -84,6 +84,6 @@ export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
+         });
+     }
+     const path = new URL(request.url).pathname.slice(mount.basePath.length);
+-    return withoutSessionTokens(path, await mount.handler(oneCredential(request)));
++    return withoutSessionTokens(path, await mount.handler(request));
+   });
+ }

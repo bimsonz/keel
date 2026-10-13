@@ -58,7 +58,11 @@ export class KeelProblem extends Error {
     this.body = body;
   }
 
-  /** The problem in a response, or a stand-in when the body is not one (a proxy's page, say). */
+  /**
+   * The problem in a response, or a stand-in when the body is not one (a
+   * proxy's page, say). A wait the body does not name is read from the
+   * `Retry-After` header, in seconds.
+   */
   static async from(response: Response): Promise<KeelProblem> {
     const text = await response.text();
     let parsed: unknown;
@@ -67,7 +71,12 @@ export class KeelProblem extends Error {
     } catch {
       parsed = undefined;
     }
-    if (isProblem(parsed)) return new KeelProblem(parsed);
+    const seconds = Number(response.headers.get("retry-after") ?? "");
+    const wait =
+      response.headers.has("retry-after") && Number.isFinite(seconds) && seconds >= 0
+        ? { retryAfterMs: seconds * 1000 }
+        : {};
+    if (isProblem(parsed)) return new KeelProblem({ ...wait, ...parsed });
     return new KeelProblem({
       type: "about:blank",
       title: response.statusText || "Unexpected response",
@@ -76,6 +85,7 @@ export class KeelProblem extends Error {
       detail: text.slice(0, 500),
       requestId: response.headers.get("x-request-id") ?? "",
       nextActions: [],
+      ...wait,
     });
   }
 }

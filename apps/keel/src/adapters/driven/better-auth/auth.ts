@@ -7,7 +7,7 @@ import { emailOTP } from "better-auth/plugins/email-otp";
 import { organization } from "better-auth/plugins/organization";
 import { username } from "better-auth/plugins/username";
 import { monotonicFactory } from "ulid";
-import { isFresh, signInMethod } from "./fresh.ts";
+import { isFresh, mayAddFirstPasskey, signInMethod } from "./fresh.ts";
 import { nameRefusal } from "./names.ts";
 import { orgAfter, orgBefore, type SessionOf } from "./org.ts";
 import { ORG_ROLES, orgAccess } from "./roles.ts";
@@ -31,9 +31,36 @@ export const PLACEHOLDER_EMAIL_DOMAIN = "users.keel.invalid";
 /**
  * Better Auth's routes Keel does not serve. A session list answers every
  * session's token and revoking one takes it, so the console offers only "sign
- * out everywhere else".
+ * out everywhere else". Keel has no passwords: every route that takes, sets,
+ * checks or resets one is off, the email code's among them (it would set a
+ * password with no session, and a handle would then sign in with it), and so
+ * is Better Auth's account deletion, which asks for one.
  */
-export const DISABLED_PATHS = ["/list-sessions", "/revoke-session"] as const;
+export const DISABLED_PATHS = [
+  "/list-sessions",
+  "/revoke-session",
+  "/sign-in/email",
+  "/sign-up/email",
+  "/sign-in/username",
+  "/change-password",
+  "/verify-password",
+  "/request-password-reset",
+  "/reset-password",
+  "/reset-password/:token",
+  "/email-otp/request-password-reset",
+  "/email-otp/reset-password",
+  "/forget-password/email-otp",
+  "/delete-user",
+  "/delete-user/callback",
+] as const;
+
+/**
+ * Better Auth matches `disabledPaths` against the path a request asks for, so
+ * a route declared with a parameter (`/reset-password/:token`) is still served
+ * by it. The before-hook refuses every disabled route by the path it is
+ * declared with.
+ */
+const DISABLED: ReadonlySet<string> = new Set(DISABLED_PATHS);
 
 /**
  * What a user without a handle may do: set it, sign out, or sign in again. The
@@ -67,6 +94,21 @@ const CHANGES_SIGN_IN = new Set([
   "/email-otp/request-email-change",
   "/email-otp/change-email",
 ]);
+
+/** Both steps of adding a passkey: all of them an account with no passkey may take (fresh.ts). */
+const ADDS_PASSKEY = new Set([
+  "/passkey/generate-register-options",
+  "/passkey/verify-registration",
+]);
+
+/** Whether the account holds a passkey. */
+async function holdsPasskey(db: D1Database, userId: string): Promise<boolean> {
+  const held = await db
+    .prepare(`SELECT 1 AS one FROM passkey WHERE userId = ?1 LIMIT 1`)
+    .bind(userId)
+    .first();
+  return held !== null;
+}
 
 /** Delivers a one-time code. Keel offers email codes only once it can send them. */
 export type OtpSender = (message: {
@@ -182,38 +224,36 @@ export function authOptions(config: AuthConfig) {
   const beforeOrg = orgBefore(db, sessionOf);
 
   /**
-   * Refuses a request to change how an account signs in unless every session
-   * it carries is fresh. One that carries none is left as it is: for the
-   * passkey routes that is passkey-first sign-up. A request may carry a cookie
-   * and a bearer at once, and Better Auth's handlers don't agree on which they
-   * act for: most take the session a hook read first, the cookie's, while
-   * those that read it again for sensitive work (`/change-email` among them)
-   * take the bearer's. So both are read here, where `sessionOf` answers one
-   * ([ba.fresh-carriers]).
+   * Refuses a request to change how an account signs in unless its session is
+   * fresh. One that carries none is left as it is: for the passkey routes that
+   * is passkey-first sign-up. A request reaches Better Auth with one
+   * credential (the mount takes the session cookie out from beside a bearer),
+   * so the session read here is the one every handler acts for
+   * ([ba.one-credential-fresh]). An account that holds no passkey adds its
+   * first with its own sign-in from the last ten minutes, and is told which
+   * way forward it has.
    */
   const freshSignIn = async (ctx: Parameters<SessionOf>[0]): Promise<void> => {
-    const headers = ctx.headers ?? new Headers();
-    const carried: Awaited<ReturnType<SessionOf>>[] = [
-      await getSessionFromCtx(ctx),
-      BEARER.test(headers.get("authorization") ?? "")
-        ? await auth.api.getSession({ headers })
-        : null,
-    ];
+    const carried = await sessionOf(ctx);
+    if (carried === null) return;
+    const by: unknown = carried.session["signedInBy"];
+    const signedIn = {
+      signedInBy: typeof by === "string" ? by : null,
+      createdAt: new Date(carried.session.createdAt),
+    };
     const now = new Date();
-    for (const one of carried) {
-      if (one === null) continue;
-      const by: unknown = one.session["signedInBy"];
-      const signedIn = {
-        signedInBy: typeof by === "string" ? by : null,
-        createdAt: new Date(one.session.createdAt),
-      };
-      if (!isFresh(signedIn, now))
-        throw APIError.from("FORBIDDEN", {
-          code: "FRESH_SIGN_IN_REQUIRED",
-          message:
-            "Sign in again with your passkey, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes",
-        });
-    }
+    if (isFresh(signedIn, now)) return;
+    const none = !(await holdsPasskey(db, carried.user.id));
+    const first = none && ADDS_PASSKEY.has(ctx.path);
+    if (first && mayAddFirstPasskey(signedIn, now)) return;
+    throw APIError.from("FORBIDDEN", {
+      code: "FRESH_SIGN_IN_REQUIRED",
+      message: first
+        ? "Sign in again, then retry: adding your first passkey needs a sign-in of your own from the last ten minutes"
+        : none
+          ? "Add a passkey first, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes"
+          : "Sign in again with your passkey, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes",
+    });
   };
 
   const options = {
@@ -259,6 +299,8 @@ export function authOptions(config: AuthConfig) {
         }),
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (DISABLED.has(ctx.path))
+          throw APIError.from("NOT_FOUND", { code: "NOT_FOUND", message: "Not found" });
         if (CHANGES_SIGN_IN.has(ctx.path)) await freshSignIn(ctx);
         if (BEFORE_HANDLE.has(ctx.path) || SIGN_IN.test(ctx.path)) {
           const name: unknown = ctx.body?.username;
