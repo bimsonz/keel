@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/repo.test.ts -t "views.lanes.path-project"
+# kills: views.lanes.path-project
+# why: the lanes read is decided on the caller's own project whatever its path names, so a person is answered nothing and an agent is shown a project it was never checked against
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index f17c43a2..dced044e 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -325,7 +325,7 @@ export const RESOLVERS: Resolvers = {
+   Repo_listCommits: (input) => projectNamed(input.projectId),
+   Repo_getCommit: (input) => projectNamed(input.projectId),
+   Views_getTrunk: (input) => projectNamed(input.projectId),
+-  Views_listLanes: (input) => projectNamed(input.projectId),
++  Views_listLanes: ownProject,
+   Views_getVerdict: ownProject,
+   Conflicts_listConflicts: (input, caller) => projectOrOwn(input.project, caller),
+   Conflicts_getConflict: (input, caller) => projectOrOwn(input.project, caller),

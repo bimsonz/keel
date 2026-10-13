@@ -2,13 +2,13 @@
 # kills: trunk.origin
 # why: The trunk folds TrunkInitialized without its origin, so the Trunk answers none for a trunk whose event has one
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index 33e84f91..cdb403ed 100644
+index 5cfb16f7..653b4287 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -461,7 +461,6 @@ export const evolvePromotion = (
-           queue: [],
+@@ -464,7 +464,6 @@ export const evolvePromotion = (
            promoted: [],
            height: 0,
+           advancedAt: committed.at,
 -          ...(event.origin === undefined ? {} : { origin: event.origin }),
          }
        : illegal(state, event);

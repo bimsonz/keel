@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/trunk.test.ts -t "trunk.do.view-legacy"
+# kills: trunk.do.view-legacy
+# why: a trunk stored before the time was kept is not read from its log, so every trunk on a deployed Keel answers a defect until it next advances
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index a427a4bd..d05d5cf5 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -132,7 +132,7 @@ export const trunkStanding = Effect.fn("integration/trunkStanding")(function* (
+   const trunk = trunkOf(yield* EntityStore, projectId);
+   if (trunk === undefined) return Option.none<TrunkStanding>();
+   const advancedAt =
+-    trunk.advancedAt ?? headChangedAt((yield* EventOutbox).log({ kind: "trunk", id: projectId }));
++    trunk.advancedAt ?? (yield* EventOutbox).log({ kind: "trunk", id: "none" }).at(-1)?.at;
+   if (advancedAt === undefined)
+     return yield* Effect.die(
+       new Error(`trunk ${projectId} has a head and no event that put it there`),

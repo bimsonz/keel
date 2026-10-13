@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.advanced-at.event-time"
+# kills: trunk.advanced-at.event-time
+# why: a promotion folds its events at a clock read of its own and not at the transaction's instant, so the stored time is not the time its event carries
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index a427a4bd..0061c19a 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -226,7 +226,7 @@ export const promote = Effect.fn("integration/promote")(function* (
+         (events) => {
+           const after = events.reduce<Trunk | undefined>(
+             // The instant the events are stamped with: trunk's `advancedAt` is its event's own time.
+-            (trunk, payload) => evolvePromotion(trunk, { at: tx.at, payload }),
++            (trunk, payload) => evolvePromotion(trunk, { at: now, payload }),
+             trunkOf(tx.store, projectId),
+           );
+           if (after !== undefined) tx.store.put(TRUNK, projectId, encodeTrunk(after));

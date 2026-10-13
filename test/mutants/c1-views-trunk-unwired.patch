@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/repo.test.ts -t "views.trunk.wired"
+# kills: views.trunk.wired
+# why: the trunk's route answers 503 again, the stub the contract no longer has a reason for
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 79f0135b..d7130f6d 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -953,6 +953,7 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+           return run(caller, Effect.map(readLanes(projectId.success), lanesOk));
+         },
+         Views_getTrunk: (caller: Caller, input: Input<"Views_getTrunk">) => {
++          if (input.projectId !== "") return notYet(caller);
+           const projectId = settingsProject(input.projectId);
+           if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+           return run(

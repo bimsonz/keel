@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/lane.test.ts -t "lane.do.status"
+# kills: lane.do.status
+# why: the Lanes adapter hands the object's two counts over the wrong way round, so a lane's queue reads as its batch
+diff --git a/apps/keel/src/adapters/driven/do-rpc/lanes.ts b/apps/keel/src/adapters/driven/do-rpc/lanes.ts
+index 0d289777..b610de82 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/lanes.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/lanes.ts
+@@ -30,7 +30,7 @@ export function LanesRpc(
+         callObject(LaneCodecs.destroy, () => lane(mainLane(projectId)).destroy(by)),
+       view: (projectId) =>
+         callObject(LaneCodecs.status, () => lane(mainLane(projectId)).status()).pipe(
+-          Effect.map((standing) => [{ id: mainLane(projectId), ...standing }]),
++          Effect.map((standing) => [{ id: mainLane(projectId), queued: standing.inFlight, inFlight: standing.queued }]),
+           Effect.orDie,
+         ),
+       verificationEnded: (laneId, instanceId) =>

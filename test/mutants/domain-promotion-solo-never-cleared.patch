@@ -2,15 +2,15 @@
 # kills: promotion.push-refused-solo
 # why: once a push lands, grouping resumes
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index 5f25f53..0c15072 100644
+index 5cfb16f7..ceb90649 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -565,7 +565,7 @@ export const evolvePromotion = (
+@@ -581,7 +581,7 @@ export const evolvePromotion = (
          ? {
              // An advance without a height (an older Trunk DO's) leaves the height unknown.
              // A push landed: grouping resumes.
 -            ...without(trunk, "wal", "height", "solo"),
 +            ...without(trunk, "wal", "height"),
              head: event.to,
+             advancedAt: committed.at,
              promoted: [...trunk.promoted, ...event.landings.map((l) => l.changeId)],
-             phase: settled(trunk.queue),

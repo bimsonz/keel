@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/repo.test.ts -t "views.trunk"
+# kills: views.trunk
+# why: the trunk's view never says frozen, so a reader cannot tell a stopped promotion from a quiet one
+diff --git a/packages/core/src/application/integration/views.ts b/packages/core/src/application/integration/views.ts
+index 03aafe67..d7d7f843 100644
+--- a/packages/core/src/application/integration/views.ts
++++ b/packages/core/src/application/integration/views.ts
+@@ -27,7 +27,7 @@ export const readTrunk = (
+       projectId,
+       head: trunk.head,
+       advancedAt: trunk.advancedAt,
+-      frozen: trunk.phase === "frozen",
++      frozen: false,
+     })),
+   );
+ 

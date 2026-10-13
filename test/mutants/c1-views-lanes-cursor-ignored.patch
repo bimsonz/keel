@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/repo.test.ts -t "views.lanes"
+# kills: views.lanes
+# why: a cursor Keel never gave out is taken and answered the one page again, so a client that pages never reaches an end it was told of
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index 79f0135b..7fab28d2 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -948,8 +948,6 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+         Views_listLanes: (caller: Caller, input: Input<"Views_listLanes">) => {
+           const projectId = settingsProject(input.projectId);
+           if (Result.isFailure(projectId)) return invalid(caller, projectId.failure);
+-          if (input.cursor !== undefined)
+-            return invalid(caller, [{ path: ["cursor"], message: "Not a cursor Keel gave out" }]);
+           return run(caller, Effect.map(readLanes(projectId.success), lanesOk));
+         },
+         Views_getTrunk: (caller: Caller, input: Input<"Views_getTrunk">) => {

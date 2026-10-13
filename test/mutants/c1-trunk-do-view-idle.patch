@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/trunk.test.ts -t "trunk.do.view"
+# kills: trunk.do.view
+# why: the object shows every trunk idle, so a frozen promotion is never seen through the port
+diff --git a/apps/keel/src/adapters/driving/do/trunk.ts b/apps/keel/src/adapters/driving/do/trunk.ts
+index 8ebc03b8..ea5ea63d 100644
+--- a/apps/keel/src/adapters/driving/do/trunk.ts
++++ b/apps/keel/src/adapters/driving/do/trunk.ts
+@@ -116,7 +116,7 @@ export class TrunkDO extends KeelObjectWith<TrunkServices> implements TrunkRpc {
+   async view() {
+     const program = Effect.map(
+       trunkStanding(this.projectId),
+-      Option.match({ onNone: () => ({}), onSome: (trunk) => ({ trunk }) }),
++      Option.match({ onNone: () => ({}), onSome: (trunk) => ({ trunk: { ...trunk, phase: "idle" as const } }) }),
+     );
+     return this.answer(TrunkCodecs.view, program);
+   }

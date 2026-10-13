@@ -159,6 +159,22 @@ describe("the repo read API's doorway", () => {
       });
   });
 
+  it("[views.candidate-removed] a candidate's own route is no operation: its path answers 404 as any unknown path does", async () => {
+    const { via } = await repoApp();
+    const own = await tokenFor(await seedAgent({ projectId: PRIVATE }));
+    const answers = await Promise.all(
+      ["/candidates/cnd_01JZ8PT2C4E6G8J0M2N4Q6S8V0", "/no-such-operation"].map((path) =>
+        via(`${BASE}/v1${path}`, { headers: { authorization: `Bearer ${own}` } }).then(
+          async (r) => [r.status, (await r.json<{ code?: string }>()).code],
+        ),
+      ),
+    );
+    expect(answers).toEqual([
+      [404, "resource.not_found"],
+      [404, "resource.not_found"],
+    ]);
+  });
+
   it("[repo.http-exchange] the anonymous-only token exchange still ignores an Authorization header", async () => {
     const seeded = await seedAgent();
     const response = await worker(`${BASE}/v1/oauth/token`, {

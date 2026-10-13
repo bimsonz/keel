@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "trunks.contract.view"
+# kills: trunks.contract.view
+# why: the in-memory Trunks dies for a trunk with no head, which the real one never does: a test of the route's 404 would see a defect
+diff --git a/packages/testing/src/memory/integration.ts b/packages/testing/src/memory/integration.ts
+index 124bde38..ed604be0 100644
+--- a/packages/testing/src/memory/integration.ts
++++ b/packages/testing/src/memory/integration.ts
+@@ -355,7 +355,8 @@ export function makeTrunksMemory(
+           Effect.sync(() => {
+             const head = heads.get(projectId);
+             const standing = standings.get(projectId);
+-            return head === undefined || standing === undefined
++            if (head === undefined) throw new Error(`${projectId} has no trunk yet`);
++            return standing === undefined
+               ? Option.none()
+               : Option.some({ head, ...standing });
+           }),

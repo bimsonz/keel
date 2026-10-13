@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts -t "trunk.advanced-at"
+# kills: trunk.advanced-at
+# why: a resume at another head changes trunk's head and not its time, so the view shows a head with a time from before that commit was trunk's
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5cfb16f7..91bda36a 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -613,9 +613,6 @@ export const evolvePromotion = (
+             ...without(trunk, "wal", "frozen"),
+             head: event.head ?? trunk.head,
+             // A resume at another head changed trunk's head, whoever wrote that commit.
+-            ...(event.head === undefined || event.head === trunk.head
+-              ? {}
+-              : { advancedAt: committed.at }),
+             phase: settled(trunk.queue),
+           }
+         : illegal(trunk, event);

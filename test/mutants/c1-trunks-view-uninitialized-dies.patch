@@ -1,0 +1,17 @@
+# expect-red: pnpm vitest run --project pool:keel apps/keel/test/pool/trunk.test.ts -t "trunks.contract.view"
+# kills: trunks.contract.view
+# why: the Trunk dies when asked to show a trunk with no head, as its status does, so the trunk route of a project still being made answers a defect
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index a427a4bd..855bcaf3 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -130,7 +130,8 @@ export const trunkStanding = Effect.fn("integration/trunkStanding")(function* (
+   projectId: ProjectId,
+ ) {
+   const trunk = trunkOf(yield* EntityStore, projectId);
+-  if (trunk === undefined) return Option.none<TrunkStanding>();
++  if (trunk === undefined)
++    return yield* Effect.die(new Error(`trunk ${projectId} is not initialized`));
+   const advancedAt =
+     trunk.advancedAt ?? headChangedAt((yield* EventOutbox).log({ kind: "trunk", id: projectId }));
+   if (advancedAt === undefined)

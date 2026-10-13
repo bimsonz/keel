@@ -2,15 +2,15 @@
 # kills: trunk.do.origin
 # why: The Trunk DO answers its status and its start without the origin it keeps, so the port reads every trunk as one that kept none
 diff --git a/apps/keel/src/adapters/driving/do/trunk.ts b/apps/keel/src/adapters/driving/do/trunk.ts
-index 0b186648..4ae664e4 100644
+index 8ebc03b8..6d22726e 100644
 --- a/apps/keel/src/adapters/driving/do/trunk.ts
 +++ b/apps/keel/src/adapters/driving/do/trunk.ts
-@@ -49,7 +49,7 @@ const projectOfName = (name: string | undefined): ProjectId => {
+@@ -56,7 +56,7 @@ const projectOfName = (name: string | undefined): ProjectId => {
  
  /** Where a trunk started, as it is answered: nothing for one with no head yet, or one that kept no origin. */
  const startOf = (trunk: Trunk | undefined) =>
 -  trunk?.origin === undefined ? {} : { origin: trunk.origin };
 +  trunk?.origin === undefined ? {} : {};
  
- /** What the RPC answers for a trunk. No Auditor runs before L4, so nothing is red yet. */
+ /** What the RPC answers for a trunk. */
  const statusOf = (trunk: Trunk) => ({

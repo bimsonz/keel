@@ -1,0 +1,20 @@
+# expect-red: pnpm vitest run --project unit packages/testing/test/ports.test.ts -t "lanes.contract.view"
+# kills: lanes.contract.view
+# why: the in-memory Lanes shows no lane for a project none was used in, where the real one shows its one lane holding nothing
+diff --git a/packages/testing/src/memory/integration.ts b/packages/testing/src/memory/integration.ts
+index 124bde38..c5d6d41a 100644
+--- a/packages/testing/src/memory/integration.ts
++++ b/packages/testing/src/memory/integration.ts
+@@ -410,9 +410,9 @@ export function makeLanesMemory(options: { readonly journal?: string[] } = {}) {
+             options.journal?.push(`destroy lanes ${projectId}`);
+           }),
+         view: (projectId) =>
+-          Effect.sync(() => [
+-            { id: mainLane(projectId), ...(held.get(projectId) ?? { queued: 0, inFlight: 0 }) },
+-          ]),
++          Effect.sync(() =>
++            held.has(projectId) ? [{ id: mainLane(projectId), ...held.get(projectId)! }] : [],
++          ),
+         verificationEnded: (laneId, instanceId) =>
+           Effect.sync(() => {
+             ended.push({ laneId, instanceId });

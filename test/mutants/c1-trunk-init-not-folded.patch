@@ -2,11 +2,11 @@
 # kills: trunk.init
 # why: Initialize commits its event but never stores the folded trunk, so the next command finds no trunk
 diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
-index eb48b95..35951c0 100644
+index a427a4bd..9ea91ee3 100644
 --- a/packages/core/src/application/integration/trunk.ts
 +++ b/packages/core/src/application/integration/trunk.ts
-@@ -68,7 +68,7 @@ export const promote = Effect.fn("integration/promote")(function* (
-             (trunk, payload) => evolvePromotion(trunk, { at: now, payload }),
+@@ -229,7 +229,7 @@ export const promote = Effect.fn("integration/promote")(function* (
+             (trunk, payload) => evolvePromotion(trunk, { at: tx.at, payload }),
              trunkOf(tx.store, projectId),
            );
 -          if (after !== undefined) tx.store.put(TRUNK, projectId, encodeTrunk(after));

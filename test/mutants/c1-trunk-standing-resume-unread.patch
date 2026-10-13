@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.standing"
+# kills: trunk.standing
+# why: a legacy trunk's log is read without its resumes, so one resumed at another head is shown the time of the advance before it
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index a427a4bd..558551e7 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -96,7 +96,7 @@ export const trunkOf = (
+ /** The head an event of the trunk's own log names as trunk's from then on, if it names one. */
+ const headAfter = (event: EventEnvelope): unknown => {
+   const field =
+-    event.type === "TrunkInitialized" || event.type === "PromotionResumed"
++    event.type === "TrunkInitialized"
+       ? "head"
+       : event.type === "TrunkAdvanced"
+         ? "to"

@@ -1,0 +1,16 @@
+# expect-red: pnpm vitest run --project unit apps/keel/test/unit/trunk.test.ts -t "trunk.standing"
+# kills: trunk.standing
+# why: a trunk stored before the time was kept is shown the first time its head was set, so every advance since is invisible in it
+diff --git a/packages/core/src/application/integration/trunk.ts b/packages/core/src/application/integration/trunk.ts
+index a427a4bd..a51bbeec 100644
+--- a/packages/core/src/application/integration/trunk.ts
++++ b/packages/core/src/application/integration/trunk.ts
+@@ -112,7 +112,7 @@ const headChangedAt = (log: readonly EventEnvelope[]): Instant | undefined => {
+   let at: Instant | undefined;
+   for (const event of log) {
+     const next = headAfter(event);
+-    if (next !== undefined && next !== head) {
++    if (next !== undefined && next !== head && at === undefined) {
+       head = next;
+       at = event.at;
+     }

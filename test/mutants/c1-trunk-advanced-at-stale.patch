@@ -1,0 +1,15 @@
+# expect-red: pnpm vitest run --project unit packages/core/test/domain/integration/promotion-machine.test.ts -t "trunk.advanced-at"
+# kills: trunk.advanced-at
+# why: an advance leaves the time trunk's head last changed where it was, so a trunk that has landed changes is shown the time it was initialized
+diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
+index 5cfb16f7..c38a4528 100644
+--- a/packages/core/src/domain/integration/promotion-machine.ts
++++ b/packages/core/src/domain/integration/promotion-machine.ts
+@@ -583,7 +583,6 @@ export const evolvePromotion = (
+             // A push landed: grouping resumes.
+             ...without(trunk, "wal", "height", "solo"),
+             head: event.to,
+-            advancedAt: committed.at,
+             promoted: [...trunk.promoted, ...event.landings.map((l) => l.changeId)],
+             phase: settled(trunk.queue),
+             ...(event.height === undefined ? {} : { height: event.height }),

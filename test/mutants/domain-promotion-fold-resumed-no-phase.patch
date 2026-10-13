@@ -2,10 +2,10 @@
 # kills: promotion.fold-table
 # why: the fold takes PromotionResumed without the check `trunk.phase === "frozen"`.
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index d5224caa..69a61618 100644
+index 5cfb16f7..29d47c9e 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -591,8 +591,7 @@ export const evolvePromotion = (
+@@ -608,8 +608,7 @@ export const evolvePromotion = (
      }
  
      case "PromotionResumed":
@@ -14,4 +14,4 @@ index d5224caa..69a61618 100644
 +      return (wal === undefined || wal.batches.length === 0) ? {
              ...without(trunk, "wal", "frozen"),
              head: event.head ?? trunk.head,
-             phase: settled(trunk.queue),
+             // A resume at another head changed trunk's head, whoever wrote that commit.

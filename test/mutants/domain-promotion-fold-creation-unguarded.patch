@@ -2,10 +2,10 @@
 # kills: promotion.fold-table
 # why: the fold makes a trunk from any event, where only TrunkInitialized may create one.
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index 33e84f91..30840cf6 100644
+index 5cfb16f7..58a6cd44 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -453,8 +453,7 @@ export const evolvePromotion = (
+@@ -455,8 +455,7 @@ export const evolvePromotion = (
  ): Trunk => {
    const event = committed.payload;
    if (state === undefined) {
@@ -15,9 +15,9 @@ index 33e84f91..30840cf6 100644
            projectId: event.projectId,
            phase: "idle",
            head: event.head,
-@@ -462,8 +461,7 @@ export const evolvePromotion = (
-           promoted: [],
+@@ -465,8 +464,7 @@ export const evolvePromotion = (
            height: 0,
+           advancedAt: committed.at,
            ...(event.origin === undefined ? {} : { origin: event.origin }),
 -        }
 -      : illegal(state, event);

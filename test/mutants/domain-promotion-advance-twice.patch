@@ -2,16 +2,17 @@
 # kills: promotion.group-resolves-once
 # why: Advancing trunk leaves the group open, so it can advance again
 diff --git a/packages/core/src/domain/integration/promotion-machine.ts b/packages/core/src/domain/integration/promotion-machine.ts
-index 5f25f53..994f949 100644
+index 5cfb16f7..e3192975 100644
 --- a/packages/core/src/domain/integration/promotion-machine.ts
 +++ b/packages/core/src/domain/integration/promotion-machine.ts
-@@ -565,10 +565,10 @@ export const evolvePromotion = (
+@@ -581,11 +581,11 @@ export const evolvePromotion = (
          ? {
              // An advance without a height (an older Trunk DO's) leaves the height unknown.
              // A push landed: grouping resumes.
 -            ...without(trunk, "wal", "height", "solo"),
 +            ...trunk,
              head: event.to,
+             advancedAt: committed.at,
              promoted: [...trunk.promoted, ...event.landings.map((l) => l.changeId)],
 -            phase: settled(trunk.queue),
 +            phase: "promoting" as const,

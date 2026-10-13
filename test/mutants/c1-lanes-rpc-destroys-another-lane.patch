@@ -2,7 +2,7 @@
 # kills: lane.do.destroy
 # why: The Lanes adapter addresses a lane the project does not have, so the project's own lane is never destroyed
 diff --git a/apps/keel/src/adapters/driven/do-rpc/lanes.ts b/apps/keel/src/adapters/driven/do-rpc/lanes.ts
-index c13f7cf..37a76e1 100644
+index 0d289777..ce7db052 100644
 --- a/apps/keel/src/adapters/driven/do-rpc/lanes.ts
 +++ b/apps/keel/src/adapters/driven/do-rpc/lanes.ts
 @@ -27,7 +27,7 @@ export function LanesRpc(
@@ -11,6 +11,6 @@ index c13f7cf..37a76e1 100644
        destroy: (projectId, by) =>
 -        callObject(LaneCodecs.destroy, () => lane(mainLane(projectId)).destroy(by)),
 +        callObject(LaneCodecs.destroy, () => lane(`lane:${projectId}:other`).destroy(by)),
-       verificationEnded: (laneId, instanceId) =>
-         callObject(LaneCodecs.verificationEnded, () =>
-           lane(laneId).verificationEnded({ instanceId }),
+       view: (projectId) =>
+         callObject(LaneCodecs.status, () => lane(mainLane(projectId)).status()).pipe(
+           Effect.map((standing) => [{ id: mainLane(projectId), ...standing }]),
