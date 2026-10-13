@@ -76,7 +76,12 @@ export function SponsorshipsRpc(
           const fingerprint = yield* Effect.promise(() => fingerprintOf({ end: by }));
           return yield* callObject(AgentSessionCodecs.endSponsorship, () =>
             agentSession(ending.agentId).endSponsorship(
-              encodeEnd({ by, idempotencyKey: ending.idempotencyKey, fingerprint }),
+              encodeEnd({
+                by,
+                ...(ending.run === undefined ? {} : { run: ending.run }),
+                idempotencyKey: ending.idempotencyKey,
+                fingerprint,
+              }),
             ),
           );
         }),

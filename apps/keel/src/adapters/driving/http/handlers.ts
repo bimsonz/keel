@@ -569,12 +569,15 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
             );
           }),
         Agents_endSponsorship: (caller: Caller, input: Input<"Agents_endSponsorship">) => {
+          // An agent's token names the run it ends its own link in: the link's events carry it.
+          const inRun = caller.token?.run;
           const end = () =>
             run(
               caller,
               Sponsorships.use((links) =>
                 links.end(linkActorOf(caller), {
                   agentId: accountOf(caller).agentId,
+                  ...(inRun === undefined ? {} : { run: inRun }),
                   idempotencyKey: input["idempotency-key"],
                 }),
               ).pipe(

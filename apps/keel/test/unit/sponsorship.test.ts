@@ -7,7 +7,8 @@ import {
   enrol,
   sameHash,
 } from "@keeltown/core/application/identity";
-import { makeId, userActor } from "@keeltown/core/kernel";
+import { agentActor, makeId, RunRef, userActor } from "@keeltown/core/kernel";
+import { EventOutbox } from "@keeltown/core/ports";
 import {
   makeAgentDirectoryMemory,
   makeEventOutboxMemory,
@@ -16,7 +17,7 @@ import {
   sampleProjectId,
   ulidOf,
 } from "@keeltown/testing";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import * as fc from "fast-check";
 
 const agentId = makeId("agt", ulidOf(41));
@@ -155,6 +156,67 @@ describe("[run.namespace-read] an agent's own object answers no namespace", () =
         expect(answers.map((answer) => "org" in answer)).toEqual(answers.map(() => false));
         // The directory keeps where it placed the agent through every write the moves made.
         expect(directory.agents.get(agentId)).toMatchObject({ org: elsewhere, state: "revoked" });
+      }).pipe(Effect.provide(layer));
+    },
+  );
+});
+
+/** `by` becomes the agent's sponsor: the agent asks, and that person approves with the code. */
+const sponsoredBy = (by: typeof first, n: number) =>
+  Effect.gen(function* () {
+    yield* askSponsor(agentId, `sha256:code-${n}`);
+    yield* approveSponsor(agentId, {
+      by,
+      codeHash: `sha256:code-${n}`,
+      idempotencyKey: `approve-${n}`,
+      fingerprint: `approve-body-${n}`,
+    });
+  });
+
+describe("[run.link-end] the run an agent ends its own sponsor link in", () => {
+  const LANE = Schema.decodeUnknownSync(RunRef)({
+    id: "run_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
+    label: "run-c",
+  });
+
+  /** Each end of the link on the agent's own log: who ended it, and under which run. */
+  const ends = Effect.map(EventOutbox, (outbox) =>
+    outbox
+      .log({ kind: "agent", id: agentId })
+      .filter((event) => event.type === "AgentUnsponsored")
+      .map((event) => ({ actor: event.actor, run: event.run })),
+  );
+
+  it.effect(
+    "[run.link-end] an agent that leaves its sponsor in a run names that run on AgentUnsponsored; leaving under no run, and a sponsor's own end, name none",
+    () => {
+      const { layer, enrolled } = enrolledAgent();
+      return Effect.gen(function* () {
+        yield* enrolled;
+        const itself = agentActor(agentId);
+        yield* endSponsorship(agentId, {
+          by: itself,
+          run: LANE,
+          idempotencyKey: "end-1",
+          fingerprint: "end-body-1",
+        });
+        yield* sponsoredBy(second, 1);
+        yield* endSponsorship(agentId, {
+          by: itself,
+          idempotencyKey: "end-2",
+          fingerprint: "end-body-2",
+        });
+        yield* sponsoredBy(first, 2);
+        yield* endSponsorship(agentId, {
+          by: userActor(first),
+          idempotencyKey: "end-3",
+          fingerprint: "end-body-3",
+        });
+        expect(yield* ends).toStrictEqual([
+          { actor: itself, run: LANE },
+          { actor: itself, run: undefined },
+          { actor: userActor(first), run: undefined },
+        ]);
       }).pipe(Effect.provide(layer));
     },
   );

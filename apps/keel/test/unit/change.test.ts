@@ -11,6 +11,7 @@ import {
   precheckStarted,
   escalationIdOf,
   reactToBatch,
+  rely,
   revise,
   submissionStatus,
   submit,
@@ -44,6 +45,7 @@ import {
   PlanCompiledCommand,
   PrecheckRefusedCommand,
   PrecheckStartedCommand,
+  RelyCommand,
   ReviseCommand,
   SubmitCommand,
 } from "../../src/rpc/index.ts";
@@ -1295,7 +1297,7 @@ describe("the run an agent's command names", () => {
   );
 
   it.effect(
-    "[run.commands] declare, revise, submit and a withdrawal under the lease each name their run on every event they commit, and the platform's events name none",
+    "[run.commands] declare, revise, rely, submit and a withdrawal under the lease each name their run on every event they commit, and the platform's events name none",
     () => {
       const { layer } = changeObject();
       return Effect.gen(function* () {
@@ -1313,6 +1315,21 @@ describe("the run an agent's command names", () => {
             premisesAdded: [],
             premisesRetracted: [],
             idempotencyKey: "revise-1",
+          }),
+        );
+        yield* rely(
+          changeId,
+          Schema.decodeUnknownSync(RelyCommand)({
+            agentId,
+            run: LANE,
+            leaseId,
+            premise: {
+              subject: "migrate",
+              predicate: "ordering",
+              relation: "before",
+              value: "deploy",
+            },
+            idempotencyKey: "rely-1",
           }),
         );
         const sha = yield* pushToWorkspace;
@@ -1345,6 +1362,8 @@ describe("the run an agent's command names", () => {
             "ChangeWithdrawn",
           ]),
         );
+        // The revision and the rely each commit an IntentRevised of the agent's.
+        expect(agents.filter((event) => event.type === "IntentRevised")).toHaveLength(2);
         expect(agents.filter((event) => event.run?.label !== "run-c")).toEqual([]);
         expect(agents.every((event) => event.run?.id === LANE.id)).toBe(true);
         expect(

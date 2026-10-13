@@ -153,10 +153,12 @@ export const ApproveSponsorCommand = Schema.Struct({
 
 /**
  * The sponsor link ends: `by` is the sponsor or the agent itself, the events'
- * `by` and the commit's actor. The commit's cause is `unsponsor:<idempotencyKey>`.
+ * `by` and the commit's actor, and `run` the run an agent ends it in, from its
+ * token. The commit's cause is `unsponsor:<idempotencyKey>`.
  */
 export const EndSponsorCommand = Schema.Struct({
   by: Actor,
+  run: Schema.optional(RunRef),
   idempotencyKey: Schema.String,
   fingerprint: Schema.String,
 });

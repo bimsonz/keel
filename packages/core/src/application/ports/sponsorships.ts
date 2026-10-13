@@ -7,7 +7,7 @@ import type {
   IdempotencyConflict,
   SponsorRequestRefused,
 } from "../../domain/identity/index.ts";
-import type { AgentId, Instant, UserId } from "../../domain/kernel/index.ts";
+import type { AgentId, Instant, RunRef, UserId } from "../../domain/kernel/index.ts";
 
 /** An agent's request for a sponsor: the code it shows a person, and when it stops being good. */
 export interface SponsorRequest {
@@ -35,6 +35,8 @@ export interface SponsorApproval {
 
 export interface SponsorEnding {
   readonly agentId: AgentId;
+  /** The run an agent ends its own link in, from its token. A person names none. */
+  readonly run?: RunRef | undefined;
   readonly idempotencyKey: string;
 }
 
@@ -51,7 +53,8 @@ export interface SponsorEnding {
  *   SponsorRequestRefused, whoever the agent is sponsored by. The same person
  *   approving again answers the agent as it stands.
  * - `end`: by the sponsor or by the agent itself, which the doorway decides.
- *   Ending the link while the agent is paused reinstates it.
+ *   Ending the link while the agent is paused reinstates it. An agent's own
+ *   end is committed in the run its token names.
  *
  * Each writes the agent's directory row before it answers. The same
  * Idempotency-Key and body answers the agent again; another body is an

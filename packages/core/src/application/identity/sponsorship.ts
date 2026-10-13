@@ -14,6 +14,7 @@ import {
   type AgentId,
   type Actor as EventActor,
   Instant,
+  type RunRef,
   type UserId,
   userActor,
 } from "../../domain/kernel/index.ts";
@@ -103,9 +104,10 @@ export interface ApproveSponsor {
   readonly fingerprint: string;
 }
 
-/** The link's end, as the isolate sends it: `by` is the sponsor or the agent itself. */
+/** The link's end, as the isolate sends it: `by` is the sponsor or the agent itself, `run` the run an agent ends it in. */
 export interface EndSponsor {
   readonly by: EventActor;
+  readonly run?: RunRef | undefined;
   readonly idempotencyKey: string;
   readonly fingerprint: string;
 }
@@ -122,7 +124,12 @@ type LinkRefusal = AgentNotKnown | AgentStateRefused | SponsorRequestRefused;
  */
 const moveLink = Effect.fn("identity/moveLink")(function* (
   agentId: AgentId,
-  spec: { readonly cause: string; readonly fingerprint: string; readonly actor: EventActor },
+  spec: {
+    readonly cause: string;
+    readonly fingerprint: string;
+    readonly actor: EventActor;
+    readonly run?: RunRef | undefined;
+  },
   idempotencyKey: string,
   command: AgentCommand,
   admit: (tx: Transaction) => SponsorRequestRefused | undefined,
@@ -137,6 +144,7 @@ const moveLink = Effect.fn("identity/moveLink")(function* (
       cause: spec.cause,
       fingerprint: spec.fingerprint,
       actor: spec.actor,
+      ...(spec.run === undefined ? {} : { run: spec.run }),
       ...(project === undefined ? {} : { project }),
     },
     (tx) => {
@@ -233,6 +241,7 @@ export const endSponsorship: (
       cause: `unsponsor:${command.idempotencyKey}`,
       fingerprint: command.fingerprint,
       actor: command.by,
+      ...(command.run === undefined ? {} : { run: command.run }),
     },
     command.idempotencyKey,
     { _tag: "EndSponsorship", by: command.by },

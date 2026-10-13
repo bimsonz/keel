@@ -14,7 +14,7 @@ import {
 } from "@keeltown/core/application/coordination";
 import { projectRepos } from "@keeltown/core/application/integration";
 import { LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
-import { AgentId, ChangeId, type CommitSha, LeaseId } from "@keeltown/core/kernel";
+import { AgentId, ChangeId, type CommitSha, LeaseId, RunRef } from "@keeltown/core/kernel";
 import { PushRejected } from "@keeltown/core/domain/integration";
 import {
   CodeHost,
@@ -132,6 +132,27 @@ describe("rebase", () => {
             baseSha: landed,
             grantedSha: base,
           });
+        }).pipe(Effect.provide(w.layerFor(base)));
+      });
+    },
+  );
+
+  it.effect(
+    "[run.commands] a rebase names its run on the ChangeRebased it commits, as the agent's own",
+    () => {
+      const w = world();
+      const lane = Schema.decodeUnknownSync(RunRef)({
+        id: "run_01JZ8PT2C4E6G8J0M2N4Q6S8V0",
+        label: "run-c",
+      });
+      return Effect.gen(function* () {
+        const { base } = yield* w.seeded;
+        return yield* Effect.gen(function* () {
+          const { lease } = yield* declared;
+          yield* rebase(changeId, { ...rebasing(lease), run: lane });
+          expect(
+            (yield* rebasedEvents).map((event) => ({ actor: event.actor, run: event.run })),
+          ).toStrictEqual([{ actor: `agent:${agentId}`, run: lane }]);
         }).pipe(Effect.provide(w.layerFor(base)));
       });
     },

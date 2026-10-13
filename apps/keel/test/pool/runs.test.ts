@@ -3,6 +3,7 @@
 // read (the inbox, a tool result's notices, whoami's session, the stream and
 // the socket) is that run's. Every read goes token, gate, handler, port,
 // object; the run is only ever the one the token names.
+import { runInDurableObject } from "cloudflare:test";
 import { env } from "cloudflare:workers";
 import { IntentDeclared, LEASE_TTL_MS } from "@keeltown/core/domain/coordination";
 import { agentIdOf, runIdOf } from "@keeltown/core/domain/identity";
@@ -19,11 +20,20 @@ import {
 import { Schema } from "effect";
 import { ulid } from "ulid";
 import { describe, expect, it, vi } from "vitest";
+import type { AgentSessionDO } from "../../src/adapters/driving/do/agent-session.ts";
 import type { SocketFrame } from "../../src/adapters/driving/notices.ts";
 import { ChangeCodecs, decodeExit, RUN_HEADER } from "../../src/rpc/index.ts";
 import { freshAddress, granted, newKey, proofBy, requestToken } from "./agent-keys.ts";
 import { type ChangeUnderTest, changeUnderTest, ok } from "./change-harness.ts";
-import { BASE, drainAfter, establishProject, placeProject, worker } from "./helpers.ts";
+import {
+  BASE,
+  drainAfter,
+  establishProject,
+  placeProject,
+  seedUser,
+  uniqueHandle,
+  worker,
+} from "./helpers.ts";
 
 /** How long a test waits for something the objects do by themselves (a flush, a delivery). */
 const WAIT = { timeout: 15_000, interval: 25 };
@@ -333,6 +343,74 @@ async function connect(token: string, headers: Record<string, string> = {}) {
   return { socket, frames };
 }
 
+/** The token's run relies on a premise under the lease it holds, through the Worker. */
+async function rely(token: string, c: ChangeUnderTest, key: string): Promise<void> {
+  const response = await asAgent(token, `/v1/changes/${c.changeId}/premises`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "keel-lease": (await c.current()).lease.id,
+      "idempotency-key": key,
+    },
+    body: JSON.stringify({
+      premise: { subject: "migrate", predicate: "ordering", relation: "before", value: "deploy" },
+    }),
+  });
+  if (response.status !== 200)
+    throw new Error(`the rely answered ${response.status}: ${await response.text()}`);
+}
+
+/** What the agent's own commands committed on the change: each event's type and the run it names. */
+const committedBy = async (agentId: AgentId, c: ChangeUnderTest) =>
+  (await c.log())
+    .filter((event) => event.actor === agentActor(agentId))
+    .map((event) => [event.type, event.run]);
+
+/** Somebody just signed in becomes the agent's sponsor: the agent asks with `token`, and that person approves with the code. */
+async function sponsored(agentId: AgentId, token: string): Promise<void> {
+  const asked = await asAgent(token, "/v1/agents/me/sponsor-request", {
+    method: "POST",
+    headers: { "idempotency-key": `ask-${ulid()}` },
+  });
+  if (asked.status !== 201)
+    throw new Error(`the ask answered ${asked.status}: ${await asked.text()}`);
+  const { code } = (await asked.json<{ result: { code: string } }>()).result;
+  const person = await seedUser(uniqueHandle("sponsor"), { role: null, signedInBy: "passkey" });
+  const approved = await worker(`${BASE}/v1/agents/${agentId}/sponsor`, {
+    method: "PUT",
+    headers: {
+      authorization: `Bearer ${person.token}`,
+      "content-type": "application/json",
+      "idempotency-key": `approve-${ulid()}`,
+    },
+    body: JSON.stringify({ code }),
+  });
+  if (approved.status !== 200)
+    throw new Error(`the approval answered ${approved.status}: ${await approved.text()}`);
+}
+
+/** The agent ends its own sponsor link with `token`. */
+const leave = async (agentId: AgentId, token: string) =>
+  (
+    await asAgent(token, `/v1/agents/${agentId}/sponsor`, {
+      method: "DELETE",
+      headers: { "idempotency-key": `leave-${ulid()}` },
+    })
+  ).status;
+
+/** Each end of the agent's sponsor link as its own object committed it: who ended it, and under which run. */
+const linkEnds = (agentId: AgentId) =>
+  runInDurableObject(agentStub(agentId), (_instance: AgentSessionDO, state) =>
+    state.storage.sql
+      .exec<{ envelope: string }>(
+        "SELECT envelope FROM keel_events WHERE entity_kind = 'agent' ORDER BY seq",
+      )
+      .toArray()
+      .map((row) => Schema.decodeUnknownSync(EventEnvelope)(JSON.parse(row.envelope)))
+      .filter((event) => event.type === "AgentUnsponsored")
+      .map((event) => ({ actor: event.actor, run: event.run })),
+  );
+
 describe("an agent's two runs, each with its own token", () => {
   it("[run.pool-inbox] the inbox by REST is the reading run's: what another does to a change it holds, never what it did itself, and what is for every run", async () => {
     const agent = await keyAgent();
@@ -421,6 +499,37 @@ describe("an agent's two runs, each with its own token", () => {
     expect((await changeOf(agent.b.token, held)).run).toEqual(agent.b.run);
     expect(await adopt(agent.plain, loose, "views-adopt-000n")).not.toHaveProperty("run");
     expect(await changeOf(agent.plain, loose)).not.toHaveProperty("run");
+  });
+
+  it("[run.pool-commands] a work command through the Worker is committed in its token's run: an adoption and a rely under the lease it took, and under none with a token that names none", async () => {
+    const agent = await keyAgent();
+    const [held, loose] = [await lapsed(agent.projectId), await lapsed(agent.projectId)];
+    await adopt(agent.b.token, held, "cmds-adopt-0000b");
+    await rely(agent.b.token, held, "cmds-rely-00000b");
+    await adopt(agent.plain, loose, "cmds-adopt-0000n");
+    await rely(agent.plain, loose, "cmds-rely-00000n");
+    expect(await committedBy(agent.agentId, held)).toStrictEqual([
+      ["ChangeAdopted", agent.b.run],
+      ["IntentRevised", agent.b.run],
+      ["PreflightIssued", agent.b.run],
+    ]);
+    expect(await committedBy(agent.agentId, loose)).toStrictEqual([
+      ["ChangeAdopted", undefined],
+      ["IntentRevised", undefined],
+      ["PreflightIssued", undefined],
+    ]);
+  });
+
+  it("[run.pool-link-end] an agent that leaves its sponsor is committed in its token's run, and under none with a token that names none", async () => {
+    const agent = await keyAgent();
+    await sponsored(agent.agentId, agent.a.token);
+    expect(await leave(agent.agentId, agent.a.token)).toBe(200);
+    await sponsored(agent.agentId, agent.plain);
+    expect(await leave(agent.agentId, agent.plain)).toBe(200);
+    expect(await linkEnds(agent.agentId)).toStrictEqual([
+      { actor: agentActor(agent.agentId), run: agent.a.run },
+      { actor: agentActor(agent.agentId), run: undefined },
+    ]);
   });
 
   it("[run.pool-stream] the SSE stream carries the reading run's notices only, those waiting and those that arrive", async () => {
