@@ -57,6 +57,9 @@ export function routeDeps(gate: BoundGate): RouteDeps<AppEnv, Caller> {
       ADMITTED.set(c.req.raw, gated.admitted);
       await next();
       c.res.headers.append("server-timing", gated.timing);
+      // The policy's 401 (no credential at all) says where a client finds how to get one, as the gate's own do.
+      if (c.res.status === 401 && !c.res.headers.has("www-authenticate"))
+        c.res.headers.set("www-authenticate", gated.challenge);
       return undefined;
     },
     context: (c) => {

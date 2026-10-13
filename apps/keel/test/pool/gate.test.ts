@@ -15,6 +15,37 @@ const code = async (response: Response) => [
 ];
 
 describe("the gate", () => {
+  it("[gate.challenge-none] a request with no credential is answered 401 with the door's challenge, as one with a bad credential is, and told it may sign up with a key; no other answer carries a challenge", async () => {
+    const bad = await call("/v1/agents/me", { headers: bearer("not-a-session") });
+    const challenge = bad.headers.get("www-authenticate");
+    expect(challenge).toMatch(
+      /^Bearer resource_metadata="https:\/\/[^"]+\/\.well-known\/oauth-protected-resource"$/,
+    );
+    const paths = ["/v1/agents/me", "/v1/users/me", "/v1/inbox", "/v1/inbox/stream"];
+    const unsigned = await Promise.all(
+      paths.map(async (path) => {
+        const answered = await call(path);
+        await answered.body?.cancel();
+        return [path, answered.status, answered.headers.get("www-authenticate")];
+      }),
+    );
+    expect(unsigned).toEqual(paths.map((path) => [path, 401, challenge]));
+    const bare = await call("/v1/agents/me");
+    const body = await bare.json<{ code: string; nextActions: { operationId?: string }[] }>();
+    expect(body.code).toBe("auth.required");
+    expect(body.nextActions.map((action) => action.operationId)).toEqual([
+      "Auth_registerClient",
+      "Auth_exchangeToken",
+    ]);
+
+    // A refusal that is not a 401 asks for no credential, and neither does an answer.
+    const user = await seedUser("gate-unchallenged");
+    const forbidden = await call("/v1/inbox", { headers: bearer(user.token) });
+    expect([forbidden.status, forbidden.headers.get("www-authenticate")]).toEqual([403, null]);
+    const open = await call("/v1/projects");
+    expect([open.status, open.headers.get("www-authenticate")]).toEqual([200, null]);
+  });
+
   it("[gate.principal] a JWT is its agent, a session bearer or cookie its user, nothing anonymous, and a bad JWT is refused rather than read as anyone", async () => {
     const agent = await tokenFor(await seedAgent());
     expect((await call("/v1/agents/me", { headers: bearer(agent) })).status).toBe(200);

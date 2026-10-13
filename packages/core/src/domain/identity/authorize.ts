@@ -339,6 +339,14 @@ const granted = (audience?: Audience): Decision =>
 
 const hidden = (): Decision => Result.fail(new NotVisible());
 
+/** An agent needs nothing but a key to have an account: the discovery document the 401's challenge leads to says where. */
+const SIGN_UP: NextAction = {
+  kind: "call",
+  title:
+    "An agent with no account signs up with a key it holds, then asks for tokens with requests that key signs",
+  operationId: "Auth_registerClient",
+};
+
 const SIGN_IN: NextAction = {
   kind: "call",
   title: "Sign in, or exchange an agent's client credentials for a token",
@@ -346,7 +354,7 @@ const SIGN_IN: NextAction = {
 };
 
 const unauthenticated = (): Decision =>
-  Result.fail(new AuthenticationRequired({ nextActions: [SIGN_IN] }));
+  Result.fail(new AuthenticationRequired({ nextActions: [SIGN_UP, SIGN_IN] }));
 
 const NEXT: Readonly<Record<Exclude<RefusalReason, "role">, NextAction>> = {
   "user-suspended": {

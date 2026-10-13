@@ -26,7 +26,10 @@ describe("the published contract, through the Worker's fetch handler", () => {
     expect(response.headers.get("content-type")).toBe("application/problem+json");
     const body = await response.json<{ code: string; nextActions: { operationId?: string }[] }>();
     expect(body.code).toBe("auth.required");
-    expect(body.nextActions.map((a) => a.operationId)).toEqual(["Auth_exchangeToken"]);
+    expect(body.nextActions.map((a) => a.operationId)).toEqual([
+      "Auth_registerClient",
+      "Auth_exchangeToken",
+    ]);
   });
 
   it("names the offending field when a request breaks the contract", async () => {

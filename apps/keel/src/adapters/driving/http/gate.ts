@@ -63,6 +63,11 @@ export interface GateDeps {
 export interface Gated {
   readonly admitted: Admitted;
   readonly timing: string;
+  /**
+   * The door's challenge, for a 401 the policy makes after the gate: a request
+   * with no credential is admitted as anonymous, and refused there.
+   */
+  readonly challenge: string;
 }
 
 const SAFE_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -158,7 +163,9 @@ function refusal(answer: GateRefusal, requestId: string): Response {
  * bearer or, bound to a key, under the `DPoP` scheme with a proof made by that
  * key for this request (RFC 9449). The identity adapter checks it for the door
  * the request came in by, and the core gate is handed its claims. Every 401
- * names the door's metadata in `WWW-Authenticate`.
+ * names the door's metadata in `WWW-Authenticate`: the gate's own, and the one
+ * the policy answers a request with no credential, which carries the
+ * challenge the gate hands on (`Gated.challenge`).
  *
  * A session is admitted with how and when it was signed in, so an operation
  * that wants a fresh sign-in can ask it of its caller. A paused agent is
@@ -238,5 +245,6 @@ export async function gate(
   return {
     admitted: answer.admitted,
     timing: `gate;dur=${Date.now() - started}, session;dur=${sessionMs}`,
+    challenge: deps.challenge(door),
   };
 }
