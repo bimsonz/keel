@@ -2,12 +2,12 @@
 # kills: lease.adopt-iff-lapsed, lease.stale-refused
 # why: Adoption keeps the lapsed lease's token, so the old holder is never fenced
 diff --git a/packages/core/src/domain/coordination/change-machine.ts b/packages/core/src/domain/coordination/change-machine.ts
-index 8b58b69..d39469a 100644
+index 6c4d56bd..cbe63fd9 100644
 --- a/packages/core/src/domain/coordination/change-machine.ts
 +++ b/packages/core/src/domain/coordination/change-machine.ts
-@@ -761,7 +761,7 @@ export const evolveChange = (
-         ...change,
+@@ -1020,7 +1020,7 @@ export const evolveChange = (
          agentId: event.agentId,
+         ...(event.run === undefined ? {} : { run: event.run }),
          lease: {
 -          id: event.leaseId,
 +          id: change.lease.id,

@@ -2,13 +2,13 @@
 # kills: agent.fold-table
 # why: the fold passes over a second AgentEnrolled where it is illegal, so a log holding two enrolments replays as if it held one.
 diff --git a/packages/core/src/domain/identity/agent-machine.ts b/packages/core/src/domain/identity/agent-machine.ts
-index d3ab3bc9..433552a3 100644
+index 3c428c89..a313a4d0 100644
 --- a/packages/core/src/domain/identity/agent-machine.ts
 +++ b/packages/core/src/domain/identity/agent-machine.ts
-@@ -180,7 +180,7 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
-   if (event.agentId !== agent.id) return illegal(agent, event);
+@@ -225,7 +225,7 @@ export const evolveAgent = (state: Agent | undefined, committed: Committed<Agent
    switch (event._tag) {
      case "AgentEnrolled":
+     case "AgentSignedUp":
 -      return illegal(agent, event);
 +      return agent;
      case "AgentSuspended":

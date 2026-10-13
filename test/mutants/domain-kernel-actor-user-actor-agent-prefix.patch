@@ -2,11 +2,11 @@
 # kills: kernel.actor-shape
 # why: userActor writes `agent:<user id>`, which no envelope takes, and which reads as an agent to anything that only looks at the prefix.
 diff --git a/packages/core/src/domain/kernel/event.ts b/packages/core/src/domain/kernel/event.ts
-index aabcd50..09f0fdd 100644
+index 1b248f6d..ee402c3e 100644
 --- a/packages/core/src/domain/kernel/event.ts
 +++ b/packages/core/src/domain/kernel/event.ts
-@@ -23,7 +23,7 @@ export type Actor = typeof Actor.Type;
- export const agentActor = (agentId: AgentId): Actor => `agent:${agentId}`;
+@@ -36,7 +36,7 @@ export const byAgent = (
+ });
  
  /** The actor a user's own commands commit under: a maintainer's withdrawal, an owner's settings. */
 -export const userActor = (userId: UserId): Actor => `user:${userId}`;
