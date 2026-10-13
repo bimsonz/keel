@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sessions.test.ts
+# kills: sessions.shown
+# why: a session's last use is answered as the time it was made
+diff --git a/apps/keel/src/adapters/driven/better-auth/sessions.ts b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+index fbb05704..de4d3c25 100644
+--- a/apps/keel/src/adapters/driven/better-auth/sessions.ts
++++ b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+@@ -70,7 +70,7 @@ export function shownSession(row: SessionRow, asking: string): OwnSession {
+     signedInBy: isWay(row.signedInBy) ? row.signedInBy : "other",
+     userAgent: typeof row.userAgent === "string" && row.userAgent !== "" ? row.userAgent : null,
+     createdAt: at(row.createdAt),
+-    lastUsedAt: at(row.updatedAt),
++    lastUsedAt: at(row.createdAt),
+     expiresAt: at(row.expiresAt),
+   };
+ }

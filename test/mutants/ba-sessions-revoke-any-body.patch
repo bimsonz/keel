@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-sessions.test.ts
+# kills: ba.sessions-revoke-body
+# why: ending a session takes whatever body it is sent, so an id that is no string reaches the database's query as it came
+diff --git a/apps/keel/src/adapters/driven/better-auth/sessions.ts b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+index fbb05704..128f2a58 100644
+--- a/apps/keel/src/adapters/driven/better-auth/sessions.ts
++++ b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+@@ -99,7 +99,7 @@ export const ownSessions = () =>
+       ),
+       revokeOwnSession: createAuthEndpoint(
+         "/sessions/revoke",
+-        { method: "POST", body: Ending, use: [sessionMiddleware] },
++        { method: "POST", use: [sessionMiddleware] },
+         async (ctx) => {
+           const ended = await ctx.context.adapter.deleteMany({
+             model: "session",

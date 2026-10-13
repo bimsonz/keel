@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sessions.test.ts
+# kills: sessions.shown-current
+# why: a session is the one asking when its id begins the asker's, so two sessions can both read as this one
+diff --git a/apps/keel/src/adapters/driven/better-auth/sessions.ts b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+index fbb05704..b55e939c 100644
+--- a/apps/keel/src/adapters/driven/better-auth/sessions.ts
++++ b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+@@ -66,7 +66,7 @@ const at = (time: Date | string): string => new Date(time).toISOString();
+ export function shownSession(row: SessionRow, asking: string): OwnSession {
+   return {
+     id: row.id,
+-    current: row.id === asking,
++    current: asking.startsWith(row.id),
+     signedInBy: isWay(row.signedInBy) ? row.signedInBy : "other",
+     userAgent: typeof row.userAgent === "string" && row.userAgent !== "" ? row.userAgent : null,
+     createdAt: at(row.createdAt),

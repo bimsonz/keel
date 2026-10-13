@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-sessions.test.ts
+# kills: ba.sessions-list
+# why: the list reads every person's sessions, so anyone signed in is shown everyone's
+diff --git a/apps/keel/src/adapters/driven/better-auth/sessions.ts b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+index fbb05704..e8f8edef 100644
+--- a/apps/keel/src/adapters/driven/better-auth/sessions.ts
++++ b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+@@ -88,7 +88,6 @@ export const ownSessions = () =>
+           const rows = await ctx.context.adapter.findMany<SessionRow>({
+             model: "session",
+             where: [
+-              { field: "userId", value: session.userId },
+               { field: "expiresAt", operator: "gt", value: new Date() },
+             ],
+             select: [...SHOWN],

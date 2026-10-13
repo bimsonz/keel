@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sessions.test.ts
+# kills: sessions.shown-way
+# why: whatever a row says of its sign-in is answered as it stands, so a row no method wrote names a way Keel has none of
+diff --git a/apps/keel/src/adapters/driven/better-auth/sessions.ts b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+index fbb05704..0026787e 100644
+--- a/apps/keel/src/adapters/driven/better-auth/sessions.ts
++++ b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+@@ -67,7 +67,7 @@ export function shownSession(row: SessionRow, asking: string): OwnSession {
+   return {
+     id: row.id,
+     current: row.id === asking,
+-    signedInBy: isWay(row.signedInBy) ? row.signedInBy : "other",
++    signedInBy: (row.signedInBy ?? "other") as SignInMethod,
+     userAgent: typeof row.userAgent === "string" && row.userAgent !== "" ? row.userAgent : null,
+     createdAt: at(row.createdAt),
+     lastUsedAt: at(row.updatedAt),

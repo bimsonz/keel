@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-sessions.test.ts
+# kills: ba.sessions-own
+# why: a session is ended by its id alone, so anyone signed in ends any session whose id they hold
+diff --git a/apps/keel/src/adapters/driven/better-auth/sessions.ts b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+index fbb05704..38b3e7f7 100644
+--- a/apps/keel/src/adapters/driven/better-auth/sessions.ts
++++ b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+@@ -105,7 +105,6 @@ export const ownSessions = () =>
+             model: "session",
+             where: [
+               { field: "id", value: ctx.body.id },
+-              { field: "userId", value: ctx.context.session.session.userId },
+             ],
+           });
+           // One answer for a session that is someone else's and one that was never there.

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-sessions.test.ts
+# kills: ba.sessions-signed-in
+# why: the list is served to a request with no session, which has no person to list for
+diff --git a/apps/keel/src/adapters/driven/better-auth/sessions.ts b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+index fbb05704..8dc35ebc 100644
+--- a/apps/keel/src/adapters/driven/better-auth/sessions.ts
++++ b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+@@ -82,7 +82,7 @@ export const ownSessions = () =>
+     endpoints: {
+       listOwnSessions: createAuthEndpoint(
+         "/sessions",
+-        { method: "GET", use: [sessionMiddleware] },
++        { method: "GET" },
+         async (ctx) => {
+           const { session } = ctx.context.session;
+           const rows = await ctx.context.adapter.findMany<SessionRow>({

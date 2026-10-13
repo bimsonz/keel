@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-sessions.test.ts
+# kills: ba.sessions-no-token
+# why: the list reads each session's whole row, its token among the columns, where it answers six of them
+diff --git a/apps/keel/src/adapters/driven/better-auth/sessions.ts b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+index fbb05704..f7af8031 100644
+--- a/apps/keel/src/adapters/driven/better-auth/sessions.ts
++++ b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+@@ -91,7 +91,6 @@ export const ownSessions = () =>
+               { field: "userId", value: session.userId },
+               { field: "expiresAt", operator: "gt", value: new Date() },
+             ],
+-            select: [...SHOWN],
+             sortBy: { field: "updatedAt", direction: "desc" },
+           });
+           return ctx.json({ sessions: rows.map((row) => shownSession(row, session.id)) });

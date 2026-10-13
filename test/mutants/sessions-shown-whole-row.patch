@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sessions.test.ts
+# kills: sessions.shown
+# why: a shown session carries everything its row holds, so a row read whole answers its token
+diff --git a/apps/keel/src/adapters/driven/better-auth/sessions.ts b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+index fbb05704..9e2a6ec6 100644
+--- a/apps/keel/src/adapters/driven/better-auth/sessions.ts
++++ b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+@@ -65,6 +65,7 @@ const at = (time: Date | string): string => new Date(time).toISOString();
+ /** A session's row as its person is shown it, `asking` being the id of the session that asked. */
+ export function shownSession(row: SessionRow, asking: string): OwnSession {
+   return {
++    ...row,
+     id: row.id,
+     current: row.id === asking,
+     signedInBy: isWay(row.signedInBy) ? row.signedInBy : "other",

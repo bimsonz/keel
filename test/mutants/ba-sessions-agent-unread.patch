@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth-sessions.test.ts
+# kills: ba.sessions-device
+# why: the list never reads what signed in said it was, so every session reads as a browser that said nothing
+diff --git a/apps/keel/src/adapters/driven/better-auth/sessions.ts b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+index fbb05704..f7733d83 100644
+--- a/apps/keel/src/adapters/driven/better-auth/sessions.ts
++++ b/apps/keel/src/adapters/driven/better-auth/sessions.ts
+@@ -22,7 +22,7 @@ import type { SignInMethod } from "./fresh.ts";
+ export const SESSION_WRITE_SECONDS = 60 * 60;
+ 
+ /** The columns of a session's row the list reads: all it answers, and never the token. */
+-const SHOWN = ["id", "createdAt", "updatedAt", "expiresAt", "userAgent", "signedInBy"] as const;
++const SHOWN = ["id", "createdAt", "updatedAt", "expiresAt", "signedInBy"] as const;
+ 
+ /** What ending a session is asked with: the id the list names it by. */
+ const Ending = Schema.toStandardSchemaV1(Schema.Struct({ id: Schema.String }));
