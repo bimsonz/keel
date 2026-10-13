@@ -1,0 +1,14 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
+# kills: ba.fresh-sign-in
+# why: a new session is fresh however it was signed in, so an email code or the device grant is enough to add a passkey
+diff --git a/apps/keel/src/adapters/driven/better-auth/fresh.ts b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+index 60ba603..f50006b 100644
+--- a/apps/keel/src/adapters/driven/better-auth/fresh.ts
++++ b/apps/keel/src/adapters/driven/better-auth/fresh.ts
+@@ -43,6 +43,5 @@ export function isFresh(
+   session: { readonly signedInBy?: string | null; readonly createdAt: Date },
+   now: Date,
+ ): boolean {
+-  if (session.signedInBy !== "passkey") return false;
+   return now.getTime() - session.createdAt.getTime() <= FRESH_FOR_MS;
+ }

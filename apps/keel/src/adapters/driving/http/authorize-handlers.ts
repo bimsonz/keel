@@ -4,6 +4,7 @@ import {
   authorize,
   type Decision,
   type MissingResource,
+  type OrgResource,
   type Principal,
   type ProjectResource,
   type Resource,
@@ -337,6 +338,18 @@ export const decideEach = (
   principal: Principal,
   resource: ProjectResource | MissingResource,
 ): Decision => authorize(principal, "Orgs_getProject", resource);
+
+/**
+ * The policy's decision on forking `source` into a new project of `target`,
+ * for the one operation that names a second resource in its body: the caller
+ * must read the source and be a member of the target, and a private project
+ * forks only into its own org.
+ */
+export const decideFork = (
+  principal: Principal,
+  source: ProjectResource | MissingResource,
+  target: OrgResource,
+): Decision => authorize(principal, "Operator_forkProject", { _tag: "Fork", source, target });
 
 /**
  * The one authorization policy, in front of every operation: each operation's

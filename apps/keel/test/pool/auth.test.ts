@@ -4,7 +4,7 @@ import { getMigrations } from "better-auth/db/migration";
 import { describe, expect, it, vi } from "vitest";
 import { authOptions } from "../../src/adapters/driven/better-auth/auth.ts";
 import { isolateLayer, makeIsolate } from "../../src/composition/isolate.ts";
-import { type Answer, caller, Jar, SESSION_COOKIE } from "./auth-harness.ts";
+import { type Answer, Authenticator, caller, Jar, SESSION_COOKIE } from "./auth-harness.ts";
 import {
   answered,
   call,
@@ -36,6 +36,147 @@ const githubTokens = async (userId: string) =>
       .bind(userId)
       .all()
   ).results;
+
+/** The jar's session as a bearer: its token, as the cookie carries it before its signature. */
+const bearerOf = (jar: Jar) => ({ authorization: `Bearer ${tokenOf(jar)}` });
+
+/**
+ * What carries a session on a request: its cookie, or its token as a bearer
+ * beside a jar that holds a passkey ceremony's challenge and nothing else.
+ */
+interface Carried {
+  readonly jar: Jar;
+  readonly headers?: Record<string, string>;
+}
+const byCookie = (session: Jar): Carried => ({ jar: session });
+const byBearer = (session: Jar): Carried => ({ jar: new Jar(), headers: bearerOf(session) });
+
+/** Refused for want of a fresh sign-in, and told the way forward. */
+function stale(answer: Answer) {
+  expect([answer.status, answer.json?.code, answer.text]).toEqual([
+    403,
+    "FRESH_SIGN_IN_REQUIRED",
+    expect.stringMatching(/sign in again with your passkey/i),
+  ]);
+}
+
+/** Sets a session's row back in D1, as if it had been signed in `minutes` ago. */
+async function aged(session: Jar, minutes: number) {
+  const made = new Date(Date.now() - minutes * 60_000).toISOString();
+  const { meta } = await env.DB.prepare(`UPDATE session SET createdAt = ?1 WHERE token = ?2`)
+    .bind(made, tokenOf(session))
+    .run();
+  expect(meta.changes).toBe(1);
+}
+
+/** How a session's row in D1 says it was signed in. */
+const signedInBy = async (token: string) =>
+  (
+    await env.DB.prepare(`SELECT signedInBy FROM session WHERE token = ?1`)
+      .bind(token)
+      .first<{ signedInBy: string | null }>()
+  )?.signedInBy;
+
+/** How many passkeys the user with a handle has. */
+const passkeysOf = async (handle: string) =>
+  (
+    await env.DB.prepare(
+      `SELECT count(*) AS n FROM passkey p JOIN user u ON u.id = p.userId WHERE u.username = ?1`,
+    )
+      .bind(handle)
+      .first<{ n: number }>()
+  )?.n;
+
+/** The first step of adding a passkey to a session's account: the options, with their challenge. */
+const passkeyOptions = (by: Carried, via = site) => via("/passkey/generate-register-options", by);
+
+/** The second step: a new credential, made against a challenge. */
+const registerPasskey = async (by: Carried, challenge: string, via = site) =>
+  via("/passkey/verify-registration", {
+    body: { response: await new Authenticator().create(challenge) },
+    ...by,
+  });
+
+/** Signs in with a passkey already registered, answering the new session's jar. */
+async function signInByPasskey(device: Authenticator) {
+  const jar = new Jar();
+  const challenge = await site("/passkey/generate-authenticate-options", { jar });
+  answered(challenge, 200);
+  const asserted = await site("/passkey/verify-authentication", {
+    body: { response: await device.get(challenge.json.challenge) },
+    jar,
+  });
+  answered(asserted, 200);
+  return jar;
+}
+
+/** `keeltown login`: a device grant the jar's session approves, then the code's own token. */
+async function keeltownLogin(jar: Jar) {
+  const code = await site("/device/code", { body: { client_id: "keeltown" } });
+  answered(code, 200);
+  const claimed = await site(`/device?user_code=${encodeURIComponent(code.json.user_code)}`, {
+    jar,
+  });
+  answered(claimed, 200);
+  const approved = await site("/device/approve", { body: { userCode: code.json.user_code }, jar });
+  answered(approved, 200);
+  // RFC 8628: poll no faster than the interval the server named.
+  await new Promise((resolve) => setTimeout(resolve, (code.json.interval ?? 5) * 1000 + 250));
+  const token = await site("/device/token", {
+    body: {
+      grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+      device_code: code.json.device_code,
+      client_id: "keeltown",
+    },
+  });
+  answered(token, 200);
+  return { code, token };
+}
+
+/**
+ * Adds a passkey with a session a moment old, is refused once the session is
+ * eleven minutes old, and adds one again after signing in afresh. Answers how
+ * many passkeys the account ends with.
+ */
+async function addsPasskeysOnlyWhileFresh(handle: string, carry: (session: Jar) => Carried) {
+  // Passkey-first sign-up carries no session, and stays as it was.
+  const { jar, device } = await signUpByPasskey(handle);
+  const first = carry(jar);
+  const options = await passkeyOptions(first);
+  answered(options, 200);
+  answered(await registerPasskey(first, options.json.challenge), 200);
+  expect(await passkeysOf(handle)).toBe(2);
+  expect(first.jar.cookies.has(SESSION_COOKIE)).toBe(first.headers === undefined);
+
+  // Eleven minutes on, neither step: not the options, and not a challenge taken while fresh.
+  const held = await passkeyOptions(first);
+  answered(held, 200);
+  await aged(jar, 11);
+  stale(await passkeyOptions(first));
+  stale(await registerPasskey(first, held.json.challenge));
+  expect(await passkeysOf(handle)).toBe(2);
+
+  // Signing in again with the first passkey makes a session that may; the old one still may not.
+  const again = carry(await signInByPasskey(device));
+  const renewed = await passkeyOptions(again);
+  answered(renewed, 200);
+  answered(await registerPasskey(again, renewed.json.challenge), 200);
+  stale(await passkeyOptions(first));
+  return passkeysOf(handle);
+}
+
+/**
+ * Better Auth's other routes that add or remove a way into an account, each
+ * with a body its handler would take. The passkey to delete is filled in by the test.
+ */
+const WAYS_IN = (passkeyId: string): [path: string, body: unknown][] => [
+  ["/passkey/delete-passkey", { id: passkeyId }],
+  ["/link-social", { provider: "github" }],
+  ["/unlink-account", { accountId: "none" }],
+  ["/change-email", { newEmail: "moved@example.com" }],
+  ["/email-otp/request-email-change", { newEmail: "moved@example.com" }],
+  ["/email-otp/change-email", { newEmail: "moved@example.com", otp: "000000" }],
+];
 
 describe("Better Auth at /v1/auth", () => {
   it("[ba.schema] migration 0006 holds every table and column Keel's auth options need", async () => {
@@ -344,29 +485,8 @@ describe("Better Auth at /v1/auth", () => {
     const stranger = await site("/device/code", { body: { client_id: "other-cli" } });
     expect(stranger.status).toBe(400);
 
-    const code = await site("/device/code", { body: { client_id: "keeltown" } });
-    answered(code, 200);
+    const { code, token } = await keeltownLogin(jar);
     expect(code.json.verification_uri).toBe(`https://${env.KEEL_HOST}/device`);
-    const claimed = await site(`/device?user_code=${encodeURIComponent(code.json.user_code)}`, {
-      jar,
-    });
-    answered(claimed, 200);
-    const approved = await site("/device/approve", {
-      body: { userCode: code.json.user_code },
-      jar,
-    });
-    answered(approved, 200);
-
-    // RFC 8628: poll no faster than the interval the server named.
-    await new Promise((resolve) => setTimeout(resolve, (code.json.interval ?? 5) * 1000 + 250));
-    const token = await site("/device/token", {
-      body: {
-        grant_type: "urn:ietf:params:oauth:grant-type:device_code",
-        device_code: code.json.device_code,
-        client_id: "keeltown",
-      },
-    });
-    answered(token, 200);
     expect(token.json.access_token).toEqual(expect.any(String));
     const bearer = await site("/get-session", {
       headers: { authorization: `Bearer ${token.json.access_token}` },
@@ -375,6 +495,113 @@ describe("Better Auth at /v1/auth", () => {
     expect(bearer.json.user.username).toBe("eve");
     holdsNoToken(bearer, token.json.access_token);
   }, 30_000);
+
+  it("[ba.fresh-sign-in] by cookie: a session adds a passkey only within ten minutes of its own passkey sign-in", async () => {
+    // The one it signed up with, one while fresh, and one after signing in again.
+    expect(await addsPasskeysOnlyWhileFresh("gail", byCookie)).toBe(3);
+  });
+
+  it("[ba.fresh-sign-in] by bearer: a session adds a passkey only within ten minutes of its own passkey sign-in", async () => {
+    expect(await addsPasskeysOnlyWhileFresh("gwen", byBearer)).toBe(3);
+  });
+
+  it("[ba.fresh-sign-in] a session no passkey signed in adds none, though it is seconds old", async () => {
+    // An email code's session, by cookie.
+    const coded = await handled("gil@example.com", "gil");
+    expect(await signedInBy(tokenOf(coded.jar))).toBe("email-otp");
+    stale(await passkeyOptions(byCookie(coded.jar), call));
+    stale(await registerPasskey(byCookie(coded.jar), "none", call));
+    expect(await passkeysOf("gil")).toBe(0);
+
+    // keeltown's own, by bearer: the device grant's, though a fresh passkey session approved it.
+    const { jar } = await signUpByPasskey("gus");
+    const { token } = await keeltownLogin(jar);
+    const cli: Carried = {
+      jar: new Jar(),
+      headers: { authorization: `Bearer ${token.json.access_token}` },
+    };
+    expect(await signedInBy(token.json.access_token)).toBe("device");
+    expect((await site("/get-session", cli)).json.user.username).toBe("gus");
+    stale(await passkeyOptions(cli));
+    stale(await registerPasskey(cli, "none"));
+    // The session that approved it is a passkey's, and still may.
+    answered(await passkeyOptions(byCookie(jar)), 200);
+
+    // A session from before its sign-in was recorded says no way at all.
+    const { meta } = await env.DB.prepare(`UPDATE session SET signedInBy = NULL WHERE token = ?1`)
+      .bind(tokenOf(jar))
+      .run();
+    expect(meta.changes).toBe(1);
+    stale(await passkeyOptions(byCookie(jar)));
+    expect(await passkeysOf("gus")).toBe(1);
+  }, 30_000);
+
+  it("[ba.fresh-routes] every other route that adds or removes a way in refuses a session that isn't fresh", async () => {
+    const { jar } = await signUpByPasskey("ivy");
+    const options = await passkeyOptions(byCookie(jar));
+    const spare = await registerPasskey(byCookie(jar), options.json.challenge);
+    answered(spare, 200);
+
+    // Fresh, each is left to Better Auth, which answers for its own reasons.
+    for (const [path, body] of WAYS_IN("none")) {
+      const answer = await call(path, { body, jar });
+      expect([path, answer.json?.code]).not.toEqual([path, "FRESH_SIGN_IN_REQUIRED"]);
+    }
+
+    await aged(jar, 11);
+    for (const [path, body] of WAYS_IN(spare.json.id)) {
+      stale(await call(path, { body, jar }));
+      stale(await call(path, { body, headers: bearerOf(jar) }));
+    }
+    expect(await passkeysOf("ivy")).toBe(2);
+  });
+
+  it("[ba.fresh-carriers] a request that carries two sessions is held to both", async () => {
+    const own = await signUpByPasskey("jay");
+    const leaked = await signUpByPasskey("jem");
+    const spare = await registerPasskey(
+      byCookie(leaked.jar),
+      (await passkeyOptions(byCookie(leaked.jar))).json.challenge,
+    );
+    answered(spare, 200);
+
+    // Both fresh, the two together are refused nothing here.
+    const both = { jar: own.jar, headers: bearerOf(leaked.jar) };
+    answered(await passkeyOptions(both, call), 200);
+    for (const [path, body] of WAYS_IN("none")) {
+      const answer = await call(path, { body, ...both });
+      expect([path, answer.json?.code]).not.toEqual([path, "FRESH_SIGN_IN_REQUIRED"]);
+    }
+
+    // Someone else's stale session beside one's own fresh one, either way round.
+    await aged(leaked.jar, 11);
+    for (const mixed of [both, { jar: leaked.jar, headers: bearerOf(own.jar) }]) {
+      stale(await passkeyOptions(mixed, call));
+      stale(await registerPasskey(mixed, "none", call));
+      for (const [path, body] of WAYS_IN(spare.json.id))
+        stale(await call(path, { body, ...mixed }));
+    }
+    expect(await passkeysOf("jem")).toBe(2);
+  });
+
+  it("[ba.session-method] a session's row says how it was signed in, and no client says so for it", async () => {
+    const { jar, device } = await signUpByPasskey("hal");
+    expect(await signedInBy(tokenOf(jar))).toBe("passkey");
+    const again = await signInByPasskey(device);
+    expect(tokenOf(again)).not.toBe(tokenOf(jar));
+    expect(await signedInBy(tokenOf(again))).toBe("passkey");
+
+    // An email code's session can't call itself a passkey's.
+    const coded = await handled("hope@example.com", "hope");
+    expect(await signedInBy(tokenOf(coded.jar))).toBe("email-otp");
+    const claimed = await call("/update-session", {
+      body: { signedInBy: "passkey" },
+      jar: coded.jar,
+    });
+    expect([claimed.status, claimed.json?.code]).toEqual([400, "FIELD_NOT_ALLOWED"]);
+    expect(await signedInBy(tokenOf(coded.jar))).toBe("email-otp");
+    stale(await passkeyOptions(byCookie(coded.jar), call));
+  });
 
   it("[ba.disabled] serves no session list: its answers would carry every session's token", async () => {
     const { jar } = await signUpByPasskey("fay");

@@ -1,4 +1,5 @@
 import type { EnrolAgentInput } from "@keeltown/core/application/identity";
+import { PROJECT_TEMPLATES } from "@keeltown/core/application/integration";
 import type {
   Enrolment,
   ProjectRecord,
@@ -215,6 +216,29 @@ export function createProjectError(
       return unmapped;
     }
   }
+}
+
+/**
+ * A source that names no template and no project's trunk. Nothing in the core
+ * namespace is looked up by it, so it reads the same whatever repo is there.
+ * Each template is offered, with the org and the name the caller asked for.
+ */
+export function sourceNotFound(
+  caller: Caller,
+  input: Input<"Operator_createProject">,
+): Extract<Operator_createProjectResult, { readonly status: 404 }> {
+  return {
+    status: 404,
+    body: problem(404, "resource.not_found", caller.requestId, {
+      detail: `No template or readable project has the name "${input.source}".`,
+      nextActions: Array.from(PROJECT_TEMPLATES, (template) => ({
+        kind: "call" as const,
+        title: `Create the project from the template ${template}`,
+        operationId: "Operator_createProject",
+        args: { org: input.org, name: input.name, source: template },
+      })),
+    }),
+  };
 }
 
 export function enrolAgentOk(enrolment: Enrolment): Operator_enrolAgentResult {

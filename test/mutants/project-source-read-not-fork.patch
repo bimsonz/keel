@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project-source.test.ts
+# kills: project.source-private
+# why: the source is decided as a read of it alone, so a member of a private project's org copies it into any other org they belong to
+diff --git a/apps/keel/src/adapters/driving/http/authorize-handlers.ts b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+index cc4aead..7d91c2c 100644
+--- a/apps/keel/src/adapters/driving/http/authorize-handlers.ts
++++ b/apps/keel/src/adapters/driving/http/authorize-handlers.ts
+@@ -340,7 +340,7 @@ export const decideFork = (
+   principal: Principal,
+   source: ProjectResource | MissingResource,
+   target: OrgResource,
+-): Decision => authorize(principal, "Operator_forkProject", { _tag: "Fork", source, target });
++): Decision => authorize(principal, "Orgs_getProject", source);
+ 
+ /**
+  * The one authorization policy, in front of every operation: each operation's

@@ -22,6 +22,8 @@ export interface AppOptions {
   readonly mcp: (request: Request) => Promise<Response>;
   /** Users, sessions, orgs and the device grant (Better Auth), at `/v1/auth/*`. */
   readonly auth: AuthMount;
+  /** The token endpoint's limiter: whether this key may exchange again now (the Workers Rate Limiting binding). */
+  readonly tokens: { readonly admit: (key: string) => Promise<boolean> };
   /** The agent's live inbox: SSE and WebSocket, outside the spec until the emitter upgrade. */
   readonly streams: InboxStreams;
   /** Tests rethrow contract drift so it fails loudly; production logs it and answers 500. */
@@ -30,6 +32,12 @@ export interface AppOptions {
 
 /** The OpenAPI document, under /v1 so keel.town routes it to Keel ahead of the console. */
 export const DOCUMENT_PATH = "/v1/openapi.json";
+
+/** The spec's `Auth_exchangeToken`: open to anyone, so each address is limited ahead of it. */
+const TOKEN_PATH = "/v1/oauth/token";
+
+/** The limiter's window (`TOKEN_LIMIT`'s period in wrangler.jsonc): the longest a refused address waits. */
+const TOKEN_WINDOW_SECONDS = 60;
 
 /** The HTTP doorway: middleware, the generated routes, the agent's inbox streams, the MCP endpoint, Better Auth and the document. */
 export function makeApp(options: AppOptions) {
@@ -47,6 +55,16 @@ export function makeApp(options: AppOptions) {
         }),
     }),
   );
+  // By address alone: a key that named the client would let anyone lock an agent out with its public client id.
+  app.use(TOKEN_PATH, async (c, next) => {
+    const ip = c.req.header("cf-connecting-ip") ?? "unknown";
+    if (await options.tokens.admit(`token:${ip}`)) return next();
+    const refused = problemResponse(429, "rate.limited", c.get("requestId"), {
+      detail: "Too many token requests from this address; wait a minute.",
+    });
+    refused.headers.set("retry-after", String(TOKEN_WINDOW_SECONDS));
+    return refused;
+  });
 
   app.get("/healthz", (c) => c.json({ ok: true, service: "keel" }));
   app.get(DOCUMENT_PATH, (c) => c.json(openApiDocument));

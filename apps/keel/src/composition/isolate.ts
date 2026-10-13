@@ -225,6 +225,7 @@ export function makeIsolate(
       handler: (request) => auth().handler(request),
       admit: async (key) => (await env.AUTH_LIMIT.limit({ key })).success,
     },
+    tokens: { admit: async (key) => (await env.TOKEN_LIMIT.limit({ key })).success },
     streams: inboxStreams(env, runtime),
     rethrowContractDrift: env.KEEL_ENV === "test",
   });

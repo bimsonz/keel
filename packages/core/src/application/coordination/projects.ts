@@ -7,6 +7,7 @@ import {
 } from "../../domain/identity/index.ts";
 import type { ProjectNotFound } from "../../domain/integration/index.ts";
 import { type OrgId, ProjectId } from "../../domain/kernel/index.ts";
+import { projectRepos, type ProjectSource } from "../integration/index.ts";
 import {
   type ProjectRecord,
   ProjectOrgs,
@@ -17,14 +18,22 @@ import {
 } from "../ports/index.ts";
 import { hashedIdBody } from "./hashed-id.ts";
 
-/** A new project in an org: trunk is forked from `source`, a repo in the core namespace. */
+/**
+ * A new project in an org: trunk is forked from `source`, a template or the
+ * trunk of a project the doorway let the actor fork.
+ */
 export interface NewProject {
   readonly org: OrgId;
   /** Its name in the org, held lower-case. */
   readonly name: string;
-  readonly source: string;
+  /** Never a repo's name as the caller wrote it: `projectSource` reads that first. */
+  readonly source: ProjectSource;
   readonly idempotencyKey: string;
 }
+
+/** The repo in the core namespace a source names: the template's own, or the project's trunk. */
+const sourceRepo = (source: ProjectSource): string =>
+  source._tag === "Template" ? source.repo : projectRepos(source.projectId).trunk.name;
 
 /**
  * The project an actor's Idempotency-Key creates: derived from both, so a retry
@@ -34,8 +43,9 @@ export const projectIdFor = (actor: Actor, idempotencyKey: string): ProjectId =>
   ProjectId.make(`prj_${hashedIdBody(`${actorId(actor)}\u0000${idempotencyKey}`)}`);
 
 /**
- * Creates a project in `input.org`, which the doorway authorised the actor in.
- * Its place comes first: the name, lower-case, must be free in the org
+ * Creates a project in `input.org`, which the doorway authorised the actor in,
+ * from `input.source`, which the doorway let the actor fork when it is a
+ * project. Its place comes first: the name, lower-case, must be free in the org
  * (ProjectNameTaken otherwise) before anything is made. Then its Project DO
  * forks trunk from the source, makes staging, the workspace mirror and pool,
  * and initialises trunk at the source's head, which reads the place. The id is
@@ -52,7 +62,7 @@ export const createProject: (
   IdempotencyConflict | ProjectNameTaken | RepoNotFound,
   Projects | ProjectOrgs
 > = Effect.fn("coordination/createProject")(function* (actor: Actor, input: NewProject) {
-  const { org, source, idempotencyKey } = input;
+  const { org, idempotencyKey } = input;
   const projectId = projectIdFor(actor, idempotencyKey);
   const name = input.name.toLowerCase();
   const places = yield* ProjectOrgs;
@@ -60,6 +70,7 @@ export const createProject: (
   if (Option.isSome(placed) && (placed.value.org !== org || placed.value.name !== name))
     return yield* new IdempotencyConflict({ idempotencyKey });
   yield* places.assign({ projectId, org, name });
+  const source = sourceRepo(input.source);
   return yield* (yield* Projects).create(actor, { projectId, name, source, idempotencyKey });
 });
 

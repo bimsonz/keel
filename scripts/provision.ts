@@ -3,6 +3,7 @@
 // move it into infra/ when the provider gains the resource. Idempotent.
 //   node scripts/provision.ts staging
 import { cloudflare, namesIn } from "./env.ts";
+import { ensure, everyPage, queueIdIn, verifyEnded } from "./lib/event-subscription.ts";
 
 const environment = process.argv[2] ?? "staging";
 
@@ -33,4 +34,35 @@ if (indexes.includes(index)) {
     config: { dimensions: 768, metric: "cosine" },
   });
   console.log(`vectorize index ${index}: created`);
+}
+
+// Exception 3: the Queues event subscription that tells the jobs queue a
+// keel-verify-batch instance errored or was terminated (no provider resource;
+// REST POST /event_subscriptions/subscriptions). It is created when the
+// Workflow has none. One that exists and differs is named and left as it is:
+// nothing here updates or replaces a subscription.
+const wanted = verifyEnded(environment);
+const subscription = `event subscription ${wanted.workflow} to ${wanted.queue}`;
+const queueId = queueIdIn(await cloudflare("GET", `/queues?name=${wanted.queue}`), wanted.queue);
+if (queueId === undefined)
+  throw new Error(
+    `${subscription}: no queue ${wanted.queue}; run \`node scripts/tf.ts ${environment} apply\``,
+  );
+// The list covers the whole account, 100 a page at most.
+const subscriptions = await everyPage(
+  (page) => cloudflare("GET", `/event_subscriptions/subscriptions?page=${page}&per_page=100`),
+  100,
+);
+const step = ensure(wanted, queueId, subscriptions);
+if (step.action === "keep") {
+  console.log(`${subscription}: exists`);
+} else if (step.action === "create") {
+  await cloudflare("POST", "/event_subscriptions/subscriptions", step.request);
+  console.log(`${subscription}: created`);
+} else {
+  throw new Error(
+    `${subscription}: wanted ${wanted.events.join(", ")}, enabled, to queue ${queueId}, and found\n` +
+      `${step.differing.map((line) => `  ${line}`).join("\n")}\n` +
+      "Nothing was changed. Put it right or delete it by hand, then run this again.",
+  );
 }

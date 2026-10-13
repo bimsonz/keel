@@ -36,6 +36,7 @@ import {
 } from "@keeltown/core/application/identity";
 import {
   listRepoCommits,
+  projectSource,
   readRepoBlob,
   readRepoCommit,
   readRepoTree,
@@ -60,7 +61,9 @@ import {
   agentsOnly,
   authorizeHandlers,
   decideEach,
+  decideFork,
   projectResource,
+  refusalResult,
   RESOLVERS,
 } from "./authorize-handlers.ts";
 import type { Caller, AgentToken } from "./caller.ts";
@@ -76,6 +79,7 @@ import {
   settingsError,
   settingsOk,
   settingsProject,
+  sourceNotFound,
   type StandingOperation,
   standingError,
   standingInput,
@@ -707,32 +711,47 @@ export function makeHandlers(run: Runner, signIn: SignInMethods) {
             }),
           );
         },
-        Operator_createProject: (caller: Caller, input: Input<"Operator_createProject">) =>
-          run(
+        // The org was decided before this ran. The source is a second resource, named in the body:
+        // it is read and, when it is a project, decided as a fork before anything is made.
+        Operator_createProject: (caller: Caller, input: Input<"Operator_createProject">) => {
+          const source = projectSource(input.source);
+          if (source._tag === "Unknown") return sourceNotFound(caller, input);
+          return run(
             caller,
-            actorOf(caller).pipe(
-              Effect.flatMap((actor) => {
-                const org = caller.resource?._tag === "Org" ? caller.resource.org : undefined;
-                if (org === undefined)
-                  return Effect.die(new Error("createProject ran without its org"));
-                return createProject(actor, {
-                  org,
-                  name: input.name,
-                  source: input.source,
-                  idempotencyKey: input["idempotency-key"],
-                }).pipe(
-                  Effect.map((project) =>
-                    createProjectOk(
-                      project,
-                      input.org.toLowerCase(),
-                      roleIn(caller.principal, org),
-                    ),
+            Effect.gen(function* () {
+              const actor = yield* actorOf(caller);
+              const target = caller.resource?._tag === "Org" ? caller.resource : undefined;
+              if (target === undefined)
+                return yield* Effect.die(new Error("createProject ran without its org"));
+              if (source._tag === "Project") {
+                const from = yield* projectResource(source.projectId);
+                const decided = decideFork(caller.principal, from, target);
+                if (Result.isFailure(decided))
+                  return refusalResult(
+                    "Operator_forkProject",
+                    input,
+                    caller.requestId,
+                    decided.failure,
+                  );
+              }
+              return yield* createProject(actor, {
+                org: target.org,
+                name: input.name,
+                source,
+                idempotencyKey: input["idempotency-key"],
+              }).pipe(
+                Effect.map((project) =>
+                  createProjectOk(
+                    project,
+                    input.org.toLowerCase(),
+                    roleIn(caller.principal, target.org),
                   ),
-                );
-              }),
-              Effect.catch((error) => Effect.succeed(createProjectError(caller, error))),
-            ),
-          ),
+                ),
+                Effect.catch((error) => Effect.succeed(createProjectError(caller, error))),
+              );
+            }),
+          );
+        },
         Orgs_getProject: (caller: Caller, input: Input<"Orgs_getProject">) =>
           run(
             caller,

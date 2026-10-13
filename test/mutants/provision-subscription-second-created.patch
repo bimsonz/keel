@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/event-subscription.test.ts -t "provision.subscription-drift"
+# kills: provision.subscription-drift
+# why: a subscription from the Workflow that differs from the wanted one is passed over, so provision creates a second beside it and the queue hears each event it shares twice
+diff --git a/scripts/lib/event-subscription.ts b/scripts/lib/event-subscription.ts
+index 788ed1e..8911a3f 100644
+--- a/scripts/lib/event-subscription.ts
++++ b/scripts/lib/event-subscription.ts
+@@ -123,7 +123,8 @@ export function ensure(
+     const source = field(subscription, "source");
+     return (
+       field(source, "type") === WORKFLOW_SOURCE &&
+-      field(source, "workflow_name") === wanted.workflow
++      field(source, "workflow_name") === wanted.workflow &&
++      differences(wanted, queueId, subscription).length === 0
+     );
+   });
+   if (found.length === 0)

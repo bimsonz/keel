@@ -40,9 +40,11 @@
       "BUNDLE_URL_SIGNING_KEY",
     ],
   },
-  // Workers Rate Limiting: each IP's writes to /v1/auth/* (sign-in, codes, sign-up).
+  // Workers Rate Limiting, each keyed by IP: writes to /v1/auth/* (sign-in, codes, sign-up),
+  // and token exchanges at /v1/oauth/token.
   "ratelimits": [
     { "name": "AUTH_LIMIT", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } },
+    { "name": "TOKEN_LIMIT", "namespace_id": "1002", "simple": { "limit": 60, "period": 60 } },
   ],
 
   // Every id below is a sentinel. scripts/deploy.ts writes a gitignored

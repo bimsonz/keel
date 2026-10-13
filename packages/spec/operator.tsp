@@ -35,7 +35,11 @@ model CreateProjectRequest {
   @minLength(1)
   name: string;
 
-  /** The repository in Keel's core namespace that trunk is forked from. It must already hold the code. */
+  /**
+   * What trunk is forked from: a template's name, or the trunk of a project the caller may fork, named by that
+   * project's id in lower case with a hyphen (`prj-01…`). A public project forks into any org the caller is a
+   * member of; a private one only into its own org.
+   */
   @minLength(1)
   source: string;
 }

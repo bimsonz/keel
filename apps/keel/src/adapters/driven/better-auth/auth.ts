@@ -7,6 +7,7 @@ import { emailOTP } from "better-auth/plugins/email-otp";
 import { organization } from "better-auth/plugins/organization";
 import { username } from "better-auth/plugins/username";
 import { monotonicFactory } from "ulid";
+import { isFresh, signInMethod } from "./fresh.ts";
 import { nameRefusal } from "./names.ts";
 import { orgAfter, orgBefore, type SessionOf } from "./org.ts";
 import { ORG_ROLES, orgAccess } from "./roles.ts";
@@ -49,6 +50,23 @@ const BEFORE_HANDLE = new Set([
 const BEARER = /^bearer /i;
 const SIGN_IN =
   /^\/(sign-in|email-otp|passkey\/(generate-authenticate-options|verify-authentication))(\/|$)/;
+
+/**
+ * Better Auth's routes that change how an account signs in, as it names them:
+ * both steps of adding a passkey, removing one, linking or unlinking a
+ * provider, and changing the address, by link or by code. Each needs a fresh
+ * sign-in (fresh.ts).
+ */
+const CHANGES_SIGN_IN = new Set([
+  "/passkey/generate-register-options",
+  "/passkey/verify-registration",
+  "/passkey/delete-passkey",
+  "/link-social",
+  "/unlink-account",
+  "/change-email",
+  "/email-otp/request-email-change",
+  "/email-otp/change-email",
+]);
 
 /** Delivers a one-time code. Keel offers email codes only once it can send them. */
 export type OtpSender = (message: {
@@ -163,6 +181,41 @@ export function authOptions(config: AuthConfig) {
 
   const beforeOrg = orgBefore(db, sessionOf);
 
+  /**
+   * Refuses a request to change how an account signs in unless every session
+   * it carries is fresh. One that carries none is left as it is: for the
+   * passkey routes that is passkey-first sign-up. A request may carry a cookie
+   * and a bearer at once, and Better Auth's handlers don't agree on which they
+   * act for: most take the session a hook read first, the cookie's, while
+   * those that read it again for sensitive work (`/change-email` among them)
+   * take the bearer's. So both are read here, where `sessionOf` answers one
+   * ([ba.fresh-carriers]).
+   */
+  const freshSignIn = async (ctx: Parameters<SessionOf>[0]): Promise<void> => {
+    const headers = ctx.headers ?? new Headers();
+    const carried: Awaited<ReturnType<SessionOf>>[] = [
+      await getSessionFromCtx(ctx),
+      BEARER.test(headers.get("authorization") ?? "")
+        ? await auth.api.getSession({ headers })
+        : null,
+    ];
+    const now = new Date();
+    for (const one of carried) {
+      if (one === null) continue;
+      const by: unknown = one.session["signedInBy"];
+      const signedIn = {
+        signedInBy: typeof by === "string" ? by : null,
+        createdAt: new Date(one.session.createdAt),
+      };
+      if (!isFresh(signedIn, now))
+        throw APIError.from("FORBIDDEN", {
+          code: "FRESH_SIGN_IN_REQUIRED",
+          message:
+            "Sign in again with your passkey, then retry: changing how you sign in needs a passkey sign-in from the last ten minutes",
+        });
+    }
+  };
+
   const options = {
     appName: "Keel",
     database: db,
@@ -174,6 +227,12 @@ export function authOptions(config: AuthConfig) {
     telemetry: { enabled: false },
     // Keel limits each IP at its mount with the Workers Rate Limiting binding.
     rateLimit: { enabled: false },
+    // How each session was signed in (fresh.ts), written as the session is made and by nothing else.
+    session: {
+      additionalFields: {
+        signedInBy: { type: "string", required: false, input: false },
+      },
+    },
     advanced: {
       cookiePrefix: COOKIE_PREFIX,
       useSecureCookies: true,
@@ -200,6 +259,7 @@ export function authOptions(config: AuthConfig) {
         }),
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (CHANGES_SIGN_IN.has(ctx.path)) await freshSignIn(ctx);
         if (BEFORE_HANDLE.has(ctx.path) || SIGN_IN.test(ctx.path)) {
           const name: unknown = ctx.body?.username;
           if (ctx.path === "/update-user" && typeof name === "string") {
@@ -226,6 +286,14 @@ export function authOptions(config: AuthConfig) {
       user: {
         create: { after: personalOrg },
         update: { after: personalOrg },
+      },
+      // The endpoint making a session says how it was signed in; nothing a request sends does.
+      session: {
+        create: {
+          before: async (session, context) => ({
+            data: { ...session, signedInBy: signInMethod(context?.path ?? "") },
+          }),
+        },
       },
       // keel.town's privacy notice promises GitHub's token is never kept: Keel reads
       // the profile with it at sign-in and never again, so no account row holds it.

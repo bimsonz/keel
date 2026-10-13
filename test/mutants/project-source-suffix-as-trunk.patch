@@ -1,0 +1,19 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/project-source.test.ts
+# kills: project.source-unknown
+# why: the name of a project's staging or guards repo is taken for the project, so a create that names one forks the trunk where it should be refused
+diff --git a/packages/core/src/application/integration/project-source.ts b/packages/core/src/application/integration/project-source.ts
+index 40b17f4..a5bd830 100644
+--- a/packages/core/src/application/integration/project-source.ts
++++ b/packages/core/src/application/integration/project-source.ts
+@@ -42,8 +42,9 @@ const UNKNOWN: UnknownSource = { _tag: "Unknown" };
+ export const projectSource = (source: string): ProjectSource | UnknownSource => {
+   if (PROJECT_TEMPLATES.has(source)) return { _tag: "Template", repo: source };
+   // The project whose trunk this would be, if it is one: spelling its trunk again decides.
+-  const projectId = decodeProjectId(`prj_${source.slice("prj-".length).toUpperCase()}`);
+-  return Option.isSome(projectId) && projectRepos(projectId.value).trunk.name === source
++  const trunk = source.replace(/-(staging|guards)$/, "");
++  const projectId = decodeProjectId(`prj_${trunk.slice("prj-".length).toUpperCase()}`);
++  return Option.isSome(projectId) && projectRepos(projectId.value).trunk.name === trunk
+     ? { _tag: "Project", projectId: projectId.value }
+     : UNKNOWN;
+ };

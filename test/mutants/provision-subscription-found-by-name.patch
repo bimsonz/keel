@@ -1,0 +1,22 @@
+# expect-red: pnpm exec vitest run --project unit packages/tooling/test/event-subscription.test.ts -t "provision.subscription-kept"
+# kills: provision.subscription-kept
+# why: a subscription is looked for by its name, so the Workflow's own under another name is missed and a second is made beside it, and another source's under the wanted name is taken for it
+diff --git a/scripts/lib/event-subscription.ts b/scripts/lib/event-subscription.ts
+index 788ed1e..f765865 100644
+--- a/scripts/lib/event-subscription.ts
++++ b/scripts/lib/event-subscription.ts
+@@ -119,13 +119,7 @@ export function ensure(
+   queueId: string,
+   listed: readonly unknown[],
+ ): Ensured {
+-  const found = listed.filter((subscription) => {
+-    const source = field(subscription, "source");
+-    return (
+-      field(source, "type") === WORKFLOW_SOURCE &&
+-      field(source, "workflow_name") === wanted.workflow
+-    );
+-  });
++  const found = listed.filter((subscription) => field(subscription, "name") === wanted.name);
+   if (found.length === 0)
+     return {
+       action: "create",

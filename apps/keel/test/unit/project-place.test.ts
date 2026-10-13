@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { createProject, projectIdFor } from "@keeltown/core/application/coordination";
-import { createProject as bootstrap } from "@keeltown/core/application/integration";
+import { createProject as bootstrap, projectRepos } from "@keeltown/core/application/integration";
 import { type Actor, actorId } from "@keeltown/core/domain/identity";
 import { isId, OrgId, type ProjectId, UserId } from "@keeltown/core/kernel";
 import {
@@ -116,8 +116,14 @@ const seedSource = Effect.gen(function* () {
   yield* (yield* CodeHostFixture).commit(SOURCE, "refs/heads/main", { "README.md": "seed" });
 });
 
+const TEMPLATE = { _tag: "Template", repo: SOURCE.name } as const;
+
 const creating = (actor: Actor, name: string, idempotencyKey: string) =>
-  createProject(actor, { org: ORG, name, source: SOURCE.name, idempotencyKey });
+  createProject(actor, { org: ORG, name, source: TEMPLATE, idempotencyKey });
+
+/** The head of a project's trunk on the code host. */
+const trunkHead = (projectId: ProjectId) =>
+  CodeHost.use((host) => host.head(projectRepos(projectId).trunk, "refs/heads/main"));
 
 const created = (projectId: ProjectId) =>
   Effect.map(EventOutbox, (outbox) =>
@@ -200,7 +206,7 @@ describe("createProject", () => {
         createProject(alice, {
           org: Schema.decodeUnknownSync(OrgId)("org_01JZ8PT2C4E6G8J0M2N4Q6S8V1"),
           name: "forge",
-          source: SOURCE.name,
+          source: TEMPLATE,
           idempotencyKey: "create-1",
         }),
       );
@@ -208,6 +214,31 @@ describe("createProject", () => {
       expect(journal).toHaveLength(steps);
     }).pipe(Effect.provide(layer));
   });
+
+  it.effect(
+    "[project.source-fork] a project as the source forks that project's trunk, at the head it has by then",
+    () => {
+      const { layer } = world();
+      return Effect.gen(function* () {
+        yield* seedSource;
+        const first = yield* creating(alice, "forge", "create-1");
+        const moved = yield* (yield* CodeHostFixture).commit(
+          projectRepos(first.id).trunk,
+          "refs/heads/main",
+          { "PLAN.md": "ours" },
+        );
+        const fork = yield* createProject(bob, {
+          org: ORG,
+          name: "anvil",
+          source: { _tag: "Project", projectId: first.id },
+          idempotencyKey: "create-1",
+        });
+        const fromTemplate = yield* creating(bob, "tongs", "create-2");
+        expect(yield* trunkHead(fork.id)).toBe(moved);
+        expect(yield* trunkHead(fromTemplate.id)).not.toBe(moved);
+      }).pipe(Effect.provide(layer));
+    },
+  );
 
   it("[a11b.derive] derives one project id per actor and key", () => {
     const id = projectIdFor(alice, "create-1");

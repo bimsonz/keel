@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/auth.test.ts
+# kills: ba.fresh-carriers
+# why: only the cookie's session is held to a fresh sign-in, so a stale session sent as a bearer beside someone's fresh cookie still changes how its account signs in
+diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
+index 12627ae..1770895 100644
+--- a/apps/keel/src/adapters/driven/better-auth/auth.ts
++++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
+@@ -193,12 +193,7 @@ export function authOptions(config: AuthConfig) {
+    */
+   const freshSignIn = async (ctx: Parameters<SessionOf>[0]): Promise<void> => {
+     const headers = ctx.headers ?? new Headers();
+-    const carried: Awaited<ReturnType<SessionOf>>[] = [
+-      await getSessionFromCtx(ctx),
+-      BEARER.test(headers.get("authorization") ?? "")
+-        ? await auth.api.getSession({ headers })
+-        : null,
+-    ];
++    const carried: Awaited<ReturnType<SessionOf>>[] = [await getSessionFromCtx(ctx)];
+     const now = new Date();
+     for (const one of carried) {
+       if (one === null) continue;

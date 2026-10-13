@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/token-limit.test.ts
+# kills: oauth.rate-limit
+# why: every address spends one shared allowance, so one caller's exchanges shut every agent out of the token endpoint
+diff --git a/apps/keel/src/adapters/driving/http/app.ts b/apps/keel/src/adapters/driving/http/app.ts
+index 49c4606..2e6b692 100644
+--- a/apps/keel/src/adapters/driving/http/app.ts
++++ b/apps/keel/src/adapters/driving/http/app.ts
+@@ -58,7 +58,7 @@ export function makeApp(options: AppOptions) {
+   // By address alone: a key that named the client would let anyone lock an agent out with its public client id.
+   app.use(TOKEN_PATH, async (c, next) => {
+     const ip = c.req.header("cf-connecting-ip") ?? "unknown";
+-    if (await options.tokens.admit(`token:${ip}`)) return next();
++    if (await options.tokens.admit("token")) return next();
+     const refused = problemResponse(429, "rate.limited", c.get("requestId"), {
+       detail: "Too many token requests from this address; wait a minute.",
+     });

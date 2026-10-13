@@ -9347,7 +9347,7 @@
           "source": {
             "type": "string",
             "minLength": 1,
-            "description": "The repository in Keel's core namespace that trunk is forked from. It must already hold the code."
+            "description": "What trunk is forked from: a template's name, or the trunk of a project the caller may fork, named by that\nproject's id in lower case with a hyphen (`prj-01…`). A public project forks into any org the caller is a\nmember of; a private one only into its own org."
           }
         },
         "additionalProperties": {

@@ -2,14 +2,14 @@
 # kills: ba.handle-first
 # why: choosing a handle after sign-up makes no personal org
 diff --git a/apps/keel/src/adapters/driven/better-auth/auth.ts b/apps/keel/src/adapters/driven/better-auth/auth.ts
-index cd76c83..350533d 100644
+index 12627ae..45a3f27 100644
 --- a/apps/keel/src/adapters/driven/better-auth/auth.ts
 +++ b/apps/keel/src/adapters/driven/better-auth/auth.ts
-@@ -222,7 +222,6 @@ export function authOptions(config: AuthConfig) {
+@@ -285,7 +285,6 @@ export function authOptions(config: AuthConfig) {
      databaseHooks: {
        user: {
          create: { after: personalOrg },
 -        update: { after: personalOrg },
        },
-       // keel.town's privacy notice promises GitHub's token is never kept: Keel reads
-       // the profile with it at sign-in and never again, so no account row holds it.
+       // The endpoint making a session says how it was signed in; nothing a request sends does.
+       session: {

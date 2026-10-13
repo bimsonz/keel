@@ -14,6 +14,7 @@ export * from "./create-project.ts";
 export * from "./lane.ts";
 export * from "./project-repos.ts";
 export * from "./project-settings.ts";
+export * from "./project-source.ts";
 export * from "./repo.ts";
 export * from "./trunk.ts";
 
