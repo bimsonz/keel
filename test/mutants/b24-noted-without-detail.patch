@@ -2,12 +2,12 @@
 # kills: b24.notice-detail
 # why: a conflict noted on the change says nothing of the evidence it rests on
 diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
-index ee422de..c1db997 100644
+index d347ef5c..3f970f14 100644
 --- a/packages/core/src/application/identity/inbox.ts
 +++ b/packages/core/src/application/identity/inbox.ts
-@@ -70,7 +70,7 @@ const decodeLandedSameIntent = Schema.decodeUnknownOption(
- export function detailOf(event: EventEnvelope): string | undefined {
-   switch (event.type) {
+@@ -114,7 +114,7 @@ export function detailOf(event: EventEnvelope): string | undefined {
+           `Keel suspects a conflict between ${p.parties.join(" and ")}${p.subjectKey === undefined ? "" : ` on ${p.subjectKey}`} and is proving it: nothing is asked of you until it has`,
+       });
      case "ConflictNoted":
 -      return Option.getOrUndefined(decodeNoted(event.payload))?.evidenceRef;
 +      return undefined;
