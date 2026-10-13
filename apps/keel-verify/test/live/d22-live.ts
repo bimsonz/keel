@@ -27,21 +27,32 @@
 // abandoned at the end. KEEL_URL overrides keel.town; KEEL_ARCHIVE_BUCKET names
 // the bucket the plans are stored in when it is not the committed config's.
 import { execFileSync, spawn } from "node:child_process";
-import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { namespaceKey } from "@keeltown/core/application/verification";
-import { cloneWorkspace, commitAndPush } from "../../../../e2e/src/lib/git.ts";
+import {
+  ANCHORED,
+  applyPatch,
+  brief,
+  type Declared,
+  declareS1,
+  declareWhenPooled,
+  type EventRecord,
+  feedOf,
+  field,
+  FIXTURE,
+  pushAndSubmit,
+  scenarioPatch,
+  SUBJECT,
+  tagOf,
+} from "../../../../e2e/src/lib/s1.ts";
 import { KeelClient, KeelProblem } from "../../../../packages/sdk/src/index.ts";
 import { harnessNamespace } from "./bundles.ts";
 
 const ROOT = join(import.meta.dirname, "../../../..");
 const KEEL = join(ROOT, "apps/keel");
-const SCENARIO = join(ROOT, "fixtures/forge-lite/scenarios/s1");
 const KEEL_URL = process.env["KEEL_URL"] ?? "https://keel.town";
-const FIXTURE = "fixture-forge-lite";
-const SUBJECT = "authz.permission-evaluation";
-const ANCHORED = "src/authz/require-permission.ts";
 const WORLDS = ["trunk", "A", "B", "AB", "A-noop"] as const;
 /** S26's matrix: what S-1's freshness probe answers in each world, on every run. */
 const S26: Readonly<Record<string, string>> = {
@@ -81,57 +92,6 @@ const wrangler = (...args: string[]) =>
 /** The maintainer: it creates the project, puts its settings and enrols its agents, which it sponsors. */
 function operatorClient(): KeelClient {
   return new KeelClient({ baseUrl: KEEL_URL, session: session ?? "" });
-}
-
-type EventRecord = Awaited<ReturnType<KeelClient["events"]>>["items"][number];
-const tagOf = (e: EventRecord): string => e.payload._tag;
-const field = (e: EventRecord, key: string): unknown => Reflect.get(e.payload, key);
-const brief = (value: unknown, max = 300): string => JSON.stringify(value)?.slice(0, max) ?? "";
-
-/** The project's feed from its start, read forward on demand. */
-function feedOf(reader: KeelClient) {
-  const seen: EventRecord[] = [];
-  let at: string | undefined;
-  const read = async (wait: number) => {
-    const page = await reader.events({
-      ...(at === undefined ? {} : { cursor: at }),
-      limit: 500,
-      wait,
-    });
-    at = page.nextCursor;
-    seen.push(...page.items);
-  };
-  /** Reads until `done` holds or `ms` passes; the feed is in projection order, so one more page follows. */
-  const until = async (done: () => boolean, ms: number): Promise<boolean> => {
-    const deadline = Date.now() + ms;
-    while (!done() && Date.now() < deadline) await read(20);
-    await read(5);
-    return done();
-  };
-  return { seen, until };
-}
-
-/** Declares, waiting out a pool that is still forking (a new project's) under the same key. */
-async function declareWhenPooled(
-  client: KeelClient,
-  intent: Parameters<KeelClient["declare"]>[0],
-  idempotencyKey: string,
-): Promise<Awaited<ReturnType<KeelClient["declare"]>>> {
-  const deadline = Date.now() + SETTLE_MS;
-  for (;;) {
-    try {
-      return await client.declare(intent, { idempotencyKey });
-    } catch (error) {
-      if (
-        !(error instanceof KeelProblem) ||
-        error.code !== "workspace.pool_exhausted" ||
-        Date.now() > deadline
-      )
-        throw error;
-      console.log(`     pool still forking; retrying in ${error.retryAfterMs ?? 5_000} ms`);
-      await new Promise((r) => setTimeout(r, error.retryAfterMs ?? 5_000));
-    }
-  }
 }
 
 interface Step {
@@ -226,23 +186,6 @@ function tail(worker: string): { file: string; stop: () => { versions: string[];
   };
 }
 
-/** A scenario patch, and the footprint it edits. */
-function patch(name: "a" | "b") {
-  const file = join(SCENARIO, `${name}.patch`);
-  const footprint = [
-    ...readFileSync(file, "utf8").matchAll(/^diff --git a\/(\S+) b\/\S+\n(new file mode)?/gm),
-  ].map((m) => ({
-    path: m[1] ?? "",
-    op: m[2] === undefined ? ("edit" as const) : ("create" as const),
-  }));
-  return { file, footprint };
-}
-
-/** Applies a scenario patch in a workspace's clone. */
-const apply = (file: string) => (dir: string) => {
-  execFileSync("git", ["apply", file], { cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
-};
-
 const archiveBucket = (): string => {
   const named = process.env["KEEL_ARCHIVE_BUCKET"];
   if (named !== undefined) return named;
@@ -250,6 +193,19 @@ const archiveBucket = (): string => {
   const found = /"binding":\s*"ARCHIVE",\s*"bucket_name":\s*"([^"]+)"/.exec(config)?.[1];
   if (found === undefined) throw new Error("wrangler.jsonc names no ARCHIVE bucket");
   return found;
+};
+
+const stepsOf = (e: EventRecord | undefined) => (e === undefined ? undefined : field(e, "steps"));
+
+/** The role cache's effect, as B's code makes it: freshness is per-session on the permission check. */
+const perSession = (effect: unknown): boolean => {
+  const proposition = Object(Reflect.get(Object(effect), "proposition"));
+  return (
+    Reflect.get(proposition, "subject") === SUBJECT &&
+    Reflect.get(proposition, "predicate") === "freshness" &&
+    Reflect.get(proposition, "relation") === "is" &&
+    Reflect.get(proposition, "value") === "per-session"
+  );
 };
 
 let failures = 0;
@@ -303,66 +259,34 @@ try {
   const about = (changeId: string, tag: string) =>
     feed.seen.find((e) => tagOf(e) === tag && field(e, "changeId") === changeId);
 
-  const anchor = (path: string, symbol: string) => ({ path, symbol, commit: base });
-  const freshness = (
-    relation: "at-most" | "is",
-    value: string,
-    anchors: ReturnType<typeof anchor>[],
-  ) => ({ subject: SUBJECT, predicate: "freshness" as const, relation, value, anchors });
-  const patches = { a: patch("a"), b: patch("b") };
+  const patches = { a: scenarioPatch("a"), b: scenarioPatch("b") };
 
   /** Applies `write` in the change's workspace, pushes it and submits the commit. */
-  const work = async (
+  const work = (
     agent: KeelClient,
-    declared: Awaited<ReturnType<KeelClient["declare"]>>,
+    declared: Declared,
     name: string,
     write: (dir: string) => void,
-  ): Promise<string> => {
-    const { change, workspace, lease } = declared.result;
-    if (workspace.token === undefined) throw new Error("declare answered no workspace token");
-    const dir = cloneWorkspace(workspace.remote, workspace.token);
-    let commitSha: string;
-    try {
-      write(dir);
-      commitSha = commitAndPush(dir, workspace.token, name, `D2.2 live ${run}: ${name}`);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-    await agent.submit(
-      { changeId: change.id, commitSha },
-      { lease: lease.id, idempotencyKey: `d22:${run}:${name}:submit` },
+  ): Promise<string> =>
+    pushAndSubmit(
+      agent,
+      declared,
+      {
+        author: name,
+        message: `probe ${run}: ${name}`,
+        idempotencyKey: `d22:${run}:${name}:submit`,
+      },
+      write,
     );
-    console.log(`     ${name}: change ${change.id} submitted at ${commitSha.slice(0, 12)}`);
-    return commitSha;
-  };
 
   console.log("\n[conflict] A relies on freshness at most per-request; B declares per-session");
-  const a = await declareWhenPooled(
-    agentA,
-    {
-      goal: "Owners can revoke collaborators, effective immediately",
-      footprint: patches.a.footprint,
-      premises: [
-        freshness("at-most", "per-request", [
-          anchor(ANCHORED, "requirePermission"),
-          anchor("src/routes/collaborators.ts", "store.removeCollaborator"),
-        ]),
-      ],
-    },
-    `d22:${run}:a`,
+  const { a, b } = await declareS1(
+    { a: agentA, b: agentB },
+    base,
+    (party) => `d22:${run}:${party}`,
+    SETTLE_MS,
+    (changeId) => open.push(changeId),
   );
-  open.push(a.result.change.id);
-  const b = await declareWhenPooled(
-    agentB,
-    {
-      goal: "Speed up permission checks with a per-session role cache",
-      footprint: patches.b.footprint,
-      premises: [],
-      declaredEffects: [freshness("is", "per-session", [anchor(ANCHORED, "requirePermission")])],
-    },
-    `d22:${run}:b`,
-  );
-  open.push(b.result.change.id);
   const [A, B] = [a.result.change.id, b.result.change.id];
   console.log(`     A ${A}; B ${B}`);
   console.log(
@@ -396,8 +320,8 @@ try {
     feed.seen.filter((e) => tagOf(e) === tag && field(e, "conflictId") === conflictId);
 
   const submittedAt = Date.now();
-  await work(agentA, a, "d22-a", apply(patches.a.file));
-  await work(agentB, b, "d22-b", apply(patches.b.file));
+  await work(agentA, a, "d22-a", applyPatch(patches.a.file));
+  await work(agentB, b, "d22-b", applyPatch(patches.b.file));
 
   const DECIDING = ["GuardAdmitted", "ProbeDiscarded", "ConflictEscalated", "ConflictDismissed"];
   const decided = await feed.until(
@@ -525,6 +449,7 @@ try {
       premises: [],
     },
     `d22:${run}:c`,
+    SETTLE_MS,
   );
   const C = c.result.change.id;
   open.push(C);
@@ -540,7 +465,6 @@ try {
     b: about(B, "PlanCompiled"),
     c: about(C, "PlanCompiled"),
   };
-  const stepsOf = (e: EventRecord | undefined) => (e === undefined ? undefined : field(e, "steps"));
   console.log(
     `     PlanCompiled steps: A ${String(stepsOf(compiled.a))}, B ${String(stepsOf(compiled.b))}, C ${String(stepsOf(compiled.c))}`,
   );
@@ -661,16 +585,6 @@ try {
     if (Array.isArray(effects)) derived[name].push(...effects);
     console.log(`     ${name} derived ${derived[name].length} effect(s): ${brief(effects, 900)}`);
   }
-  /** The role cache's effect, as B's code makes it: freshness is per-session on the permission check. */
-  const perSession = (effect: unknown): boolean => {
-    const proposition = Object(Reflect.get(Object(effect), "proposition"));
-    return (
-      Reflect.get(proposition, "subject") === SUBJECT &&
-      Reflect.get(proposition, "predicate") === "freshness" &&
-      Reflect.get(proposition, "relation") === "is" &&
-      Reflect.get(proposition, "value") === "per-session"
-    );
-  };
   const cache = derived.B.filter(perSession);
   check(
     cache.length > 0,
