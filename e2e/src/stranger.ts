@@ -433,11 +433,16 @@ async function clonesFromATerminal(): Promise<void> {
       `(3b) private: git with no helper is refused the clone: exit ${bare.code}`,
     );
     const helped = await clones("helped", config);
-    const head = helped.code === 0 ? git(join(dir, "helped"), ["rev-parse", "HEAD"]) : "no clone";
-    const trunk = (await stranger.client.trunk(projectId)).head;
     check(
-      helped.code === 0 && head === trunk,
-      `(3b) private: git, asking keeltown, clones it with nothing pasted, at trunk's head: exit ${helped.code}, ${head === trunk ? "the same commit" : "another commit"}`,
+      helped.code === 0,
+      `(3b) private: git, asking keeltown, clones it with nothing pasted: exit ${helped.code}`,
+    );
+    // Trunk's head as the API's own list of commits names it: the newest first.
+    const [newest] = (await stranger.client.commits(projectId, { limit: 1 })).items;
+    const head = helped.code === 0 ? git(join(dir, "helped"), ["rev-parse", "HEAD"]) : "no clone";
+    check(
+      newest !== undefined && head === newest.sha,
+      `(3b) and what it cloned is trunk's newest commit: ${head === newest?.sha ? "the same" : "another"}`,
     );
 
     const out = await keeltown(["logout"]);
@@ -561,7 +566,8 @@ for (const part of [arrives, standsBehind, keepsAndShows, clonesFromATerminal, f
     await part();
   } catch (error) {
     if (error instanceof KeelProblem) {
-      console.log(`FAIL ${part.name}: ${error.status} ${error.code}`);
+      // The request's id is how the refusal is found in Keel's own logs.
+      console.log(`FAIL ${part.name}: ${error.status} ${error.code} (request ${error.requestId})`);
       for (const next of error.nextActions) console.log(`       next: ${next.title}`);
     } else if (error instanceof AccountRefused) console.log(`FAIL ${part.name}: ${error.message}`);
     else console.log(`FAIL ${part.name}: ${error instanceof Error ? error.name : "an error"}`);
