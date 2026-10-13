@@ -428,7 +428,7 @@ describe("who the page reads as", () => {
     expect(await tried(r, { namespace: "acme", name: "Demo", source: empty })).toEqual({
       status: 409,
       code: "project.name_taken",
-      said: 'acme already has a project named "demo", in some case.',
+      said: 'acme already has a project named "demo" (names ignore letter case).',
       next: ["Choose another name"],
     });
     // An address no public repository answers at: a private one reads the same.

@@ -3630,7 +3630,7 @@ await makeIt.click();
 expectEqual(
   "new project: a name that is taken is refused in what Keel said, with its way forward, and nothing is made",
   `${await refusedOn(person)} | ${pathOf(person)}`,
-  'ada already has a project named "notes", in some case. Choose another name | /new',
+  'ada already has a project named "notes" (names ignore letter case). Choose another name | /new',
 );
 // An address no public repository answers at. Asked again as it was, the attempt keeps its key.
 await person.getByLabel("Name").fill("forge");
@@ -3719,7 +3719,7 @@ await forkIt.click({ timeout: 5_000 }).catch(() => undefined);
 expectEqual(
   "fork: Keel's refusal of a fork is said in its words, with its way forward, and nothing is made",
   `${await refusedOn(person)} | ${pathOf(person)}`,
-  'ada already has a project named "demo", in some case. Choose another name | /ada/demo/fork',
+  'ada already has a project named "demo" (names ignore letter case). Choose another name | /ada/demo/fork',
 );
 // Under a name of its own it is made, in the source's own namespace, which is where a private project forks.
 await person
