@@ -78,6 +78,7 @@ function guarded(answer: (r: ProbeRunRequest) => ProbeRun | "unavailable") {
   const layer = Layer.succeed(
     ProbeRunner,
     ProbeRunner.of({
+      ready: () => Effect.succeed({ _tag: "Ready" }),
       run: (request) =>
         Effect.suspend(() => {
           requests.push(request);

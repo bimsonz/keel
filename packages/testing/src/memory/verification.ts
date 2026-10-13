@@ -42,6 +42,7 @@ import {
   ProbeRunnerUnavailable,
   ProbeStore,
   VerifierRuntime,
+  type WorldReadiness,
 } from "@keeltown/core/ports";
 import {
   guardFileText,
@@ -430,10 +431,12 @@ export function makeChangePrecheckMemory() {
 /**
  * Probe runs answered from a script: what the probe reports for each request,
  * or `unavailable` for a runner that could not run it. Every request is kept,
- * so a test can see which worlds and runs were asked for.
+ * so a test can see which worlds and runs were asked for. A world bundle is
+ * ready unless `unready` names why not.
  */
 export function makeProbeRunnerMemory(
   answer: (request: ProbeRunRequest) => ProbeRun | "unavailable",
+  unready: (worldBundle: ContentHash) => string | undefined = () => undefined,
 ) {
   const requests: ProbeRunRequest[] = [];
   return {
@@ -441,6 +444,11 @@ export function makeProbeRunnerMemory(
     layer: Layer.succeed(
       ProbeRunner,
       ProbeRunner.of({
+        ready: ({ worldBundle }) =>
+          Effect.sync((): WorldReadiness => {
+            const reason = unready(worldBundle);
+            return reason === undefined ? { _tag: "Ready" } : { _tag: "Unready", reason };
+          }),
         run: (request) =>
           Effect.suspend(() => {
             requests.push(request);

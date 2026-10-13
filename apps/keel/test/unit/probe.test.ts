@@ -41,6 +41,7 @@ import {
   ProbeRunnerUnavailable,
   ProbeStore,
   type RepoRef,
+  type WorldReadiness,
 } from "@keeltown/core/ports";
 import {
   type FixtureFiles,
@@ -165,6 +166,10 @@ interface Options {
   readonly reply?: (call: number) => unknown;
   /** What the runner does with a run of the n-th probe stored (1-based), in place of running it. */
   readonly runner?: (probe: number) => Effect.Effect<ProbeRun, ProbeRunnerUnavailable> | undefined;
+  /** What the runner answers the n-th time (1-based) it is asked whether a probe could run against a world, in place of ready. */
+  readonly ready?: (
+    asked: number,
+  ) => Effect.Effect<WorldReadiness, ProbeRunnerUnavailable> | undefined;
   /** Neither party is a change ProbeChanges knows: a read of either is refused. */
   readonly undeclared?: boolean;
   /** What recording a failed draft dies with, in place of reaching the ledger. */
@@ -201,6 +206,8 @@ function probeWorld(options: Options = {}) {
   const named: { readonly call: string; readonly namespace: string }[] = [];
   const evidence = makeEvidenceStoreMemory();
   const runs: { readonly world: World; readonly bundle: ContentHash }[] = [];
+  /** The world bundles the runner was asked about before any draft, in order. */
+  const asked: ContentHash[] = [];
   const bundles = makeCandidateBundlesMemory();
   const worldChecks = makeWorldChecksMemory();
   const plans = makePlanStoreMemory();
@@ -285,6 +292,12 @@ function probeWorld(options: Options = {}) {
     Layer.succeed(
       ProbeRunner,
       ProbeRunner.of({
+        ready: (request) =>
+          Effect.suspend(() => {
+            asked.push(request.worldBundle);
+            named.push({ call: "ready", namespace: request.namespace });
+            return options.ready?.(asked.length) ?? Effect.succeed({ _tag: "Ready" });
+          }),
         run: (request) =>
           Effect.suspend(
             () =>
@@ -366,6 +379,8 @@ function probeWorld(options: Options = {}) {
     composed,
     noops,
     runs,
+    asked,
+    modelCalls: () => modelCalls,
     named,
     bundledFor: bundles.namespaces,
     evidenceKeys: () => [...evidence.documents.keys()],
@@ -459,6 +474,14 @@ describe("probeConflict", () => {
         const NAMESPACE = "org_01JZ8PT2C4E6G8J0M2N4Q6S8V0";
         expect(w.bundledFor).toEqual([NAMESPACE, NAMESPACE, NAMESPACE, NAMESPACE]);
         expect(w.named.filter((n) => n.call === "run")).toHaveLength(15);
+        // [probe.runner-asked] Before the draft, the runner is asked about each world the draft
+        // then runs in, trunk first, by the bundle its runs name.
+        expect(w.asked).toEqual(
+          (["trunk", "A", "B", "AB"] as const).map(
+            (world) => w.runs.find((r) => r.world === world)?.bundle,
+          ),
+        );
+        expect(s.ran.indexOf("runner")).toBe(s.ran.indexOf("draft") - 1);
         expect(w.named.map((n) => n.call)).toContain("noop");
         expect(w.named.map((n) => n.call)).toContain("probe");
         expect(new Set(w.named.map((n) => n.namespace))).toEqual(new Set([NAMESPACE]));
@@ -740,6 +763,67 @@ describe("probeConflict", () => {
           probe: { state: "discarded", discarded: "draft-failed" },
         });
         expect(w.runs).toHaveLength(0);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.runner-unready] a world no probe could run against is recorded as an incomplete draft before any draft: no model call, no wait",
+    () => {
+      // The third world asked about is B.
+      const w = probeWorld({
+        ready: (asked) =>
+          asked === 3
+            ? Effect.succeed({
+                _tag: "Unready",
+                reason: "lockfile-diverged: no deps bundle for pnpm-lock.yaml 5ca1ab1e",
+              })
+            : undefined,
+      });
+      const s = memorySteps();
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        const end = yield* w.run(s.steps());
+        expect(end).toEqual({
+          outcome: "errored",
+          step: "runner",
+          reason:
+            "the probe runner cannot run in world B: lockfile-diverged: no deps bundle for pnpm-lock.yaml 5ca1ab1e",
+        } satisfies ProbeEnd);
+        expect(s.ran.slice(-3)).toEqual(["worlds", "runner", "draft-failed"]);
+        expect(s.sleeps).toEqual([]);
+        expect(w.modelCalls()).toBe(0);
+        expect(w.asked).toHaveLength(3);
+        expect(JSON.parse(s.kept.get("runner") ?? "null")).toEqual({
+          _tag: "Unready",
+          world: "B",
+          reason: "lockfile-diverged: no deps bundle for pnpm-lock.yaml 5ca1ab1e",
+        });
+        expect(yield* w.discards()).toMatchObject([
+          { reason: "draft-failed", detail: "incomplete", conflictId: w.conflictId },
+        ]);
+        expect(yield* w.view()).toMatchObject({
+          probe: { state: "discarded", discarded: "draft-failed" },
+        });
+        expect(w.runs).toHaveLength(0);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe.runner-silent] a runner that does not answer whether a world is ready has said nothing of it: the draft goes on to its guard",
+    () => {
+      const w = probeWorld({ ready: () => UNAVAILABLE });
+      const s = memorySteps();
+      return Effect.gen(function* () {
+        yield* w.submitBoth(yield* w.setup);
+        const end = yield* w.run(s.steps());
+        expect(end).toMatchObject({ outcome: "admitted" });
+        expect(w.asked).toHaveLength(4);
+        expect(JSON.parse(s.kept.get("runner") ?? "null")).toEqual({ _tag: "Ready" });
+        expect(s.sleeps).toEqual([]);
+        expect(yield* w.discards()).toEqual([]);
+        expect(w.runs).toHaveLength(15);
       });
     },
   );

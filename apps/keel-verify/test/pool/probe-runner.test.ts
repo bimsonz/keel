@@ -13,6 +13,7 @@ import {
 } from "../../src/adapters/driving/do/tier1/run-probe.ts";
 import { decodeExit, ProbeRunRequest, VerifierCodecs, verifierName } from "../../src/rpc/index.ts";
 import {
+  askWorldReady,
   egress,
   FLAG_WORLD,
   PROBES,
@@ -87,6 +88,14 @@ describeProbeRunnerContract("VerifierDO through keel-verify's runProbe", () => (
   layer: Layer.succeed(
     ProbeRunner,
     ProbeRunner.of({
+      ready: (r) =>
+        Effect.promise(() => askWorldReady(r.worldBundle, r.namespace)).pipe(
+          Effect.flatMap((exit) =>
+            Exit.isSuccess(exit)
+              ? Effect.succeed(exit.value)
+              : Effect.fail(new ProbeRunnerUnavailable({ reason: JSON.stringify(exit.cause) })),
+          ),
+        ),
       run: (r) =>
         Effect.promise(() => viaEntrypoint(r)).pipe(
           Effect.flatMap((exit) =>

@@ -3,7 +3,9 @@ import { stripTypeScriptTypes } from "node:module";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
 import { makeBundleUrlKeys } from "@keeltown/testing/bundle-url-keys";
 import { makeCommitSigningKeys } from "@keeltown/testing/commit-signing-keys";
+import { Exit } from "effect";
 import { defineProject } from "vitest/config";
+import { encodeExit, VerifierCodecs } from "../keel-verify/src/rpc/index.ts";
 
 /** A fresh Ed25519 signing key per test run, in the JWK form the KEEL_SIGNING_KEY secret holds. */
 async function testSigningKey(): Promise<string> {
@@ -12,6 +14,24 @@ async function testSigningKey(): Promise<string> {
   const jwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
   return JSON.stringify(Object.assign(jwk, { kid: "test" }));
 }
+
+/**
+ * The fake keel-verify's answers to `worldReady`, in keel-verify's own
+ * encoding: every world is ready but the one whose bundle hash is all d's,
+ * which has no deps bundle for its lockfile.
+ */
+const worldReadiness = {
+  ready: JSON.stringify(encodeExit(VerifierCodecs.worldReady, Exit.succeed({ _tag: "Ready" }))),
+  unready: JSON.stringify(
+    encodeExit(
+      VerifierCodecs.worldReady,
+      Exit.succeed({
+        _tag: "Unready",
+        reason: "lockfile-diverged: no deps bundle for pnpm-lock.yaml 0ddba11",
+      }),
+    ),
+  ),
+};
 
 /** The fake Artifacts namespace, typechecked as TypeScript and served as plain JavaScript. */
 const fakeArtifacts = stripTypeScriptTypes(
@@ -57,9 +77,16 @@ export default defineProject({
               modules: true,
               compatibilityDate: "2026-10-01",
               script: [
-                `import { DurableObject } from "cloudflare:workers";`,
+                `import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";`,
                 `export class KeelSandbox extends DurableObject {}`,
-                `export default { fetch() { return Response.json({ fake: "keel-verify" }); } };`,
+                `export default class extends WorkerEntrypoint {`,
+                `  fetch() { return Response.json({ fake: "keel-verify" }); }`,
+                `  worldReady(request) {`,
+                `    return request.worldBundle === "sha256:" + "d".repeat(64)`,
+                `      ? ${worldReadiness.unready}`,
+                `      : ${worldReadiness.ready};`,
+                `  }`,
+                `}`,
               ].join("\n"),
               durableObjects: { SANDBOX: { className: "KeelSandbox", useSQLite: true } },
             },

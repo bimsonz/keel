@@ -32,6 +32,7 @@ import {
   NoopWorlds,
   ProbeChanges,
   ProbeLedger,
+  ProbeRunner,
   ProbeSources,
   type RepoRef,
   type SubjectRef,
@@ -335,6 +336,38 @@ export const draftConflict = (
     ),
   );
 
+/** The worlds a draft runs in besides A-noop, in the order the runner is asked about them. */
+const RUNNER_WORLDS: readonly FlowWorld[] = ["trunk", "A", "B", "AB"];
+
+/** Every world a draft runs in can take a probe, or the first that cannot and why. */
+export type RunnerAnswer =
+  | { readonly _tag: "Ready" }
+  | { readonly _tag: "Unready"; readonly world: FlowWorld; readonly reason: string };
+
+/**
+ * Asks the runner, before any draft, whether a probe could run against each
+ * world as the namespace's store stands. A world whose lockfile has no deps
+ * bundle refuses every run of every draft, so drafting for it would spend
+ * each model call and each wait to learn what one read tells. A runner that
+ * does not answer has said nothing of the world: the drafts meet it, with
+ * their waits.
+ */
+export const probeRunnerReady = (
+  namespace: NamespaceId,
+  worlds: Readonly<Record<FlowWorld, ContentHash>>,
+) =>
+  Effect.gen(function* () {
+    const runner = yield* ProbeRunner;
+    for (const world of RUNNER_WORLDS) {
+      const asked = yield* runner
+        .ready({ namespace, worldBundle: worlds[world] })
+        .pipe(Effect.catchTag("ProbeRunnerUnavailable", () => Effect.succeed(undefined)));
+      if (asked?._tag === "Unready")
+        return { _tag: "Unready", world, reason: asked.reason } satisfies RunnerAnswer;
+    }
+    return { _tag: "Ready" } satisfies RunnerAnswer;
+  });
+
 /** A draft worth drafting again after a wait: the runner could not run it, or the model's rate limit ended it. */
 const draftsAgain = (drafted: DraftAnswer): boolean =>
   drafted._tag === "RunnerUnavailable" ||
@@ -389,8 +422,9 @@ const failureStep = (
  * premise, B makes the effect); wait for each party's submission, up to
  * PROBE_SUBMISSION_WAIT_MS in all; plan the worlds from trunk's head (a
  * landed party is its commit on trunk over that commit's first parent); read
- * them; draft, at most PROBE_DRAFTS times, waiting before each further draft
- * when the runner could not run or the model was rate-limited; then report
+ * them; ask the runner whether a probe could run in each; draft, at most
+ * PROBE_DRAFTS times, waiting before each further draft when the runner
+ * could not run or the model was rate-limited; then report
  * the draft to the conflict's ledger, cell by cell, and commit the guard once
  * the ledger admits it. A world that cannot be read in staging is a harness
  * error, never a cell.
@@ -568,6 +602,17 @@ const probeSuspected = (call: ProbeCall, steps: ProbeSteps, suspected: Conflict)
 
     const worlds = draftWorlds(planned.built);
     if (Result.isFailure(worlds)) return yield* failDraft(worlds.failure, 0);
+    // Asked before any draft: a world no probe could run against is the namespace's store as it
+    // stands, which no later draft changes, so it ends here with no model call and no wait.
+    const runner = yield* steps.step("runner", probeRunnerReady(call.namespace, worlds.success));
+    if (runner._tag === "Unready") {
+      yield* recordHarnessError("incomplete");
+      return {
+        outcome: "errored",
+        step: "runner",
+        reason: `the probe runner cannot run in world ${runner.world}: ${runner.reason}`,
+      } satisfies ProbeEnd;
+    }
     // Each draft is its own step, and so is each wait. A draft the runner could not run, or one the
     // model's rate limit ended, says nothing about the probe, so the conflict is drafted afresh.
     let draft: { readonly step: string; readonly answer: DraftAnswer } | undefined;

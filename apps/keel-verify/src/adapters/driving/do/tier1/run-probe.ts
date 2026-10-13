@@ -116,6 +116,36 @@ async function depsFor(
   return deps;
 }
 
+/** Whether a probe could run against a world as the namespace's store stands, and why not. */
+export type WorldReadiness =
+  | { readonly _tag: "Ready" }
+  | { readonly _tag: "Unready"; readonly reason: string };
+
+/**
+ * Whether a probe could run against this world as the namespace's store
+ * stands: the world bundle is read and its deps bundle found and checked,
+ * the reads `build` makes before it bundles, so what is unready here is what
+ * every run would be refused for. Nothing is bundled and no isolate runs.
+ */
+export async function worldReady(
+  env: Tier1Env,
+  request: Pick<Tier1Request, "namespace" | "worldBundle">,
+): Promise<WorldReadiness> {
+  try {
+    const world = await fetchVerified(
+      env,
+      request.namespace,
+      hexOf(request.worldBundle),
+      "world bundle",
+    );
+    await depsFor(env, request.namespace, world);
+    return { _tag: "Ready" };
+  } catch (error) {
+    if (error instanceof Unavailable) return { _tag: "Unready", reason: error.message };
+    throw error;
+  }
+}
+
 async function build(env: Tier1Env, request: Tier1Request): Promise<BundledProbe> {
   const [probe, world] = await Promise.all([
     fetchVerified(env, request.namespace, hexOf(request.probe), "probe bundle"),

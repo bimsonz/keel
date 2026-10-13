@@ -1,14 +1,23 @@
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { VerifierUnavailable } from "@keeltown/core/domain/verification";
 import { Exit, Schema } from "effect";
-import { encodeExit, ProbeRunRequest, VerifierCodecs, verifierName } from "../rpc/index.ts";
+import { worldReady } from "../adapters/driving/do/tier1/run-probe.ts";
+import {
+  encodeExit,
+  ProbeRunRequest,
+  VerifierCodecs,
+  verifierName,
+  WorldReadyRequest,
+} from "../rpc/index.ts";
 
 const decodeProbeRun = Schema.decodeUnknownExit(ProbeRunRequest);
+const decodeWorldReady = Schema.decodeUnknownExit(WorldReadyRequest);
 
 /**
  * keel-verify's front door, which keel reaches over its VERIFIER service
- * binding: /healthz, and `runProbe`, which routes a probe run to the
- * VerifierDO for its (namespace, probe, world).
+ * binding: /healthz, `runProbe`, which routes a probe run to the VerifierDO
+ * for its (namespace, probe, world), and `worldReady`, which answers from the
+ * bundle store whether a probe could run against a world at all.
  */
 export class KeelVerifyEntrypoint extends WorkerEntrypoint<Env> {
   override async fetch(request: Request): Promise<Response> {
@@ -25,5 +34,20 @@ export class KeelVerifyEntrypoint extends WorkerEntrypoint<Env> {
         Exit.fail(new VerifierUnavailable({ reason: "the probe run request did not decode" })),
       );
     return this.env.VERIFIER.getByName(verifierName(decoded.value)).runProbe(request);
+  }
+
+  async worldReady(request: unknown) {
+    const decoded = decodeWorldReady(request);
+    if (Exit.isFailure(decoded))
+      return encodeExit(
+        VerifierCodecs.worldReady,
+        Exit.fail(
+          new VerifierUnavailable({ reason: "the world readiness request did not decode" }),
+        ),
+      );
+    return encodeExit(
+      VerifierCodecs.worldReady,
+      Exit.succeed(await worldReady(this.env, decoded.value)),
+    );
   }
 }

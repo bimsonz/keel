@@ -5,25 +5,33 @@ import {
   ProbeRunRequest,
   VerifierCodecs,
   type VerifierEntrypoint,
+  WorldReadyRequest,
 } from "../../../rpc/index.ts";
 
 const encodeRequest = Schema.encodeSync(ProbeRunRequest);
+const encodeReadyRequest = Schema.encodeSync(WorldReadyRequest);
 
 /**
  * keel-verify's entrypoint behind the VERIFIER service binding, which
  * wrangler types as a plain Fetcher though RPC reaches its methods. A binding
- * that serves no `runProbe` stops the composition.
+ * that serves no `runProbe` or no `worldReady` stops the composition.
  */
 export const verifierEntrypoint = (binding: Fetcher): VerifierEntrypoint => {
-  const runProbe: unknown = Reflect.get(binding, "runProbe");
-  if (typeof runProbe !== "function") throw new Error("VERIFIER serves no runProbe");
-  return {
-    runProbe: async (request) => {
-      const answer: unknown = await Reflect.apply(runProbe, binding, [request]);
+  const method = (name: keyof VerifierEntrypoint) => {
+    const served: unknown = Reflect.get(binding, name);
+    if (typeof served !== "function") throw new Error(`VERIFIER serves no ${name}`);
+    return async (request: unknown) => {
+      const answer: unknown = await Reflect.apply(served, binding, [request]);
       return answer;
-    },
+    };
   };
+  return { runProbe: method("runProbe"), worldReady: method("worldReady") };
 };
+
+const didNotAnswer = (error: unknown) =>
+  new ProbeRunnerUnavailable({
+    reason: `keel-verify did not answer: ${error instanceof Error ? error.message : String(error)}`,
+  });
 
 /**
  * ProbeRunner over keel-verify's entrypoint (the VERIFIER service binding),
@@ -32,6 +40,11 @@ export const verifierEntrypoint = (binding: Fetcher): VerifierEntrypoint => {
  * missing or forged, a world with no deps bundle) and a call that never
  * reached it are both ProbeRunnerUnavailable, for the caller to retry or
  * report; a harness error comes back as the run it is, never a cell.
+ *
+ * `ready` is keel-verify's `worldReady`, answered from its bundle store with
+ * no VerifierDO and no isolate: its answer is the world's readiness, and
+ * anything else (a call that never reached it, a request it did not decode)
+ * is ProbeRunnerUnavailable, which says nothing of the world.
  */
 export const ProbeRunnerRpc = (verifier: VerifierEntrypoint) =>
   Layer.succeed(
@@ -40,14 +53,25 @@ export const ProbeRunnerRpc = (verifier: VerifierEntrypoint) =>
       run: (request) =>
         Effect.tryPromise({
           try: () => verifier.runProbe(encodeRequest(request)),
-          catch: (error) =>
-            new ProbeRunnerUnavailable({
-              reason: `keel-verify did not answer: ${error instanceof Error ? error.message : String(error)}`,
-            }),
+          catch: didNotAnswer,
         }).pipe(
           Effect.flatMap((raw) => {
             const exit = decodeExit(VerifierCodecs.runProbe, raw);
             if (Exit.isSuccess(exit)) return Effect.succeed(exit.value.run);
+            const failure = Cause.findErrorOption(exit.cause);
+            return Option.isSome(failure)
+              ? Effect.fail(new ProbeRunnerUnavailable({ reason: failure.value.reason }))
+              : Effect.die(Cause.squash(exit.cause));
+          }),
+        ),
+      ready: (request) =>
+        Effect.tryPromise({
+          try: () => verifier.worldReady(encodeReadyRequest(request)),
+          catch: didNotAnswer,
+        }).pipe(
+          Effect.flatMap((raw) => {
+            const exit = decodeExit(VerifierCodecs.worldReady, raw);
+            if (Exit.isSuccess(exit)) return Effect.succeed(exit.value);
             const failure = Cause.findErrorOption(exit.cause);
             return Option.isSome(failure)
               ? Effect.fail(new ProbeRunnerUnavailable({ reason: failure.value.reason }))

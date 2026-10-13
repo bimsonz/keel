@@ -1,6 +1,7 @@
-import { env } from "cloudflare:workers";
+import { env, exports } from "cloudflare:workers";
 import type { ContentHash } from "@keeltown/core/kernel";
 import { sha256Hex, signedBundleUrl, writeBundle } from "@keeltown/runner-protocol";
+import { decodeExit, VerifierCodecs } from "../../../src/rpc/index.ts";
 
 const enc = new TextEncoder();
 
@@ -44,6 +45,19 @@ export async function putDeps(
     `ns/${namespace}/deps/${await sha256Hex(enc.encode(lockfile))}`,
     bundle.slice("sha256:".length),
   );
+}
+
+/**
+ * keel-verify's `worldReady` through its own front door, as keel's VERIFIER
+ * service binding reaches it: whether a probe could run against a world
+ * bundle of the namespace's.
+ */
+export async function askWorldReady(worldBundle: string, namespace: string = NAMESPACE) {
+  const entry: unknown = exports.default;
+  const served: unknown = Reflect.get(Object(entry), "worldReady");
+  if (typeof served !== "function") throw new Error("keel-verify's entrypoint has no worldReady");
+  const raw: unknown = await Reflect.apply(served, entry, [{ namespace, worldBundle }]);
+  return decodeExit(VerifierCodecs.worldReady, raw);
 }
 
 /** What keel-verify sent out so far, as the pool's outbound recorder saw it (vitest.config.ts). */

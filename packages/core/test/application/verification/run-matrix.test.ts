@@ -50,6 +50,7 @@ const matrix = (answer: (world: World, run: number) => Answer) => {
   const layer = Layer.succeed(
     ProbeRunner,
     ProbeRunner.of({
+      ready: () => Effect.succeed({ _tag: "Ready" }),
       run: (request) =>
         Effect.sync(() => {
           requests.push(request);

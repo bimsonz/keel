@@ -9,6 +9,8 @@ import {
   type ProbeRunReply,
   ProbeRunRequest as VerifierProbeRunRequest,
   VerifierCodecs as KeelVerifyCodecs,
+  type WorldReadiness,
+  WorldReadyRequest as VerifierWorldReadyRequest,
 } from "../../../keel-verify/src/rpc/index.ts";
 import {
   ProbeRunnerRpc,
@@ -25,10 +27,15 @@ const REQUEST: ProbeRunRequest = {
 };
 
 /** keel-verify's entrypoint, answering with keel-verify's own codec: the other copy of the contract. */
-function verifier(answer: () => Exit.Exit<ProbeRunReply, VerifierUnavailable> | "throw") {
+function verifier(
+  answer: () => Exit.Exit<ProbeRunReply, VerifierUnavailable> | "throw",
+  readiness: () => Exit.Exit<WorldReadiness, VerifierUnavailable> | "throw" = () => "throw",
+) {
   const received: unknown[] = [];
+  const asked: unknown[] = [];
   return {
     received,
+    asked,
     entrypoint: {
       runProbe: async (request: unknown) => {
         received.push(request);
@@ -36,13 +43,29 @@ function verifier(answer: () => Exit.Exit<ProbeRunReply, VerifierUnavailable> | 
         if (exit === "throw") throw new Error("Network connection lost.");
         return encodeVerifierExit(KeelVerifyCodecs.runProbe, exit);
       },
+      worldReady: async (request: unknown) => {
+        asked.push(request);
+        const exit = readiness();
+        if (exit === "throw") throw new Error("Network connection lost.");
+        return encodeVerifierExit(KeelVerifyCodecs.worldReady, exit);
+      },
     },
   };
 }
 
-const run = (entrypoint: { runProbe(request: unknown): Promise<unknown> }) =>
+type Entrypoint = ReturnType<typeof verifier>["entrypoint"];
+
+const run = (entrypoint: Entrypoint) =>
   Effect.gen(function* () {
     return yield* (yield* ProbeRunner).run(REQUEST);
+  }).pipe(Effect.provide(ProbeRunnerRpc(entrypoint)));
+
+const ready = (entrypoint: Entrypoint) =>
+  Effect.gen(function* () {
+    return yield* (yield* ProbeRunner).ready({
+      namespace: REQUEST.namespace,
+      worldBundle: REQUEST.worldBundle,
+    });
   }).pipe(Effect.provide(ProbeRunnerRpc(entrypoint)));
 
 describe("ProbeRunner over keel-verify's runProbe", () => {
@@ -113,7 +136,62 @@ describe("ProbeRunner over keel-verify's runProbe", () => {
     });
   });
 
-  it("[probe-runner.entrypoint] reaches runProbe on the VERIFIER binding, and refuses a binding without it", async () => {
+  it.effect(
+    "[probe-runner.rpc-ready] asks keel-verify, in a request it decodes, and answers the world ready",
+    () => {
+      const v = verifier(
+        () => "throw",
+        () => Exit.succeed({ _tag: "Ready" }),
+      );
+      return Effect.gen(function* () {
+        expect(yield* ready(v.entrypoint)).toEqual({ _tag: "Ready" });
+        expect(Schema.decodeUnknownSync(VerifierWorldReadyRequest)(v.asked[0])).toEqual({
+          namespace: REQUEST.namespace,
+          worldBundle: REQUEST.worldBundle,
+        });
+        expect(v.received).toEqual([]);
+      });
+    },
+  );
+
+  it.effect(
+    "[probe-runner.rpc-unready] answers a world keel-verify could run no probe against as unready, with its reason",
+    () => {
+      const v = verifier(
+        () => "throw",
+        () => Exit.succeed({ _tag: "Unready", reason: "lockfile-diverged: no deps bundle" }),
+      );
+      return Effect.gen(function* () {
+        expect(yield* ready(v.entrypoint)).toEqual({
+          _tag: "Unready",
+          reason: "lockfile-diverged: no deps bundle",
+        });
+      });
+    },
+  );
+
+  it.effect(
+    "[probe-runner.rpc-ready-unavailable] is unavailable, never unready, when keel-verify did not answer the question or did not decode it",
+    () => {
+      const silent = verifier(() => "throw");
+      const undecoded = verifier(
+        () => "throw",
+        () => Exit.fail(new VerifierUnavailable({ reason: "the request did not decode" })),
+      );
+      return Effect.gen(function* () {
+        expect(yield* Effect.flip(ready(silent.entrypoint))).toMatchObject({
+          _tag: "ProbeRunnerUnavailable",
+          reason: "keel-verify did not answer: Network connection lost.",
+        });
+        expect(yield* Effect.flip(ready(undecoded.entrypoint))).toMatchObject({
+          _tag: "ProbeRunnerUnavailable",
+          reason: "the request did not decode",
+        });
+      });
+    },
+  );
+
+  it("[probe-runner.entrypoint] reaches runProbe and worldReady on the VERIFIER binding, and refuses a binding without either", async () => {
     const calls: unknown[] = [];
     const binding = {
       fetch: async () => new Response(null),
@@ -124,11 +202,22 @@ describe("ProbeRunner over keel-verify's runProbe", () => {
         calls.push(r);
         return "answered";
       },
+      worldReady: async (r: unknown) => {
+        calls.push(r);
+        return "ready";
+      },
     };
     expect(await verifierEntrypoint(binding).runProbe("r")).toBe("answered");
-    expect(calls).toEqual(["r"]);
+    expect(await verifierEntrypoint(binding).worldReady("w")).toBe("ready");
+    expect(calls).toEqual(["r", "w"]);
     expect(() => verifierEntrypoint({ fetch: binding.fetch, connect: binding.connect })).toThrow(
       /serves no runProbe/,
     );
+    const probesOnly = {
+      fetch: binding.fetch,
+      connect: binding.connect,
+      runProbe: binding.runProbe,
+    };
+    expect(() => verifierEntrypoint(probesOnly)).toThrow(/serves no worldReady/);
   });
 });

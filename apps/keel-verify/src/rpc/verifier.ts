@@ -43,9 +43,24 @@ export const ProbeRunReply = Schema.Struct({
 });
 export type ProbeRunReply = typeof ProbeRunReply.Type;
 
+/** The question asked before any probe is drafted: could one run against this world bundle of the namespace's? */
+export const WorldReadyRequest = Schema.Struct({
+  namespace: NamespaceId,
+  worldBundle: ContentHash,
+});
+export type WorldReadyRequest = typeof WorldReadyRequest.Type;
+
+/** Ready, or why every run against the world would be refused as the namespace's store stands. */
+export const WorldReadiness = Schema.Union([
+  Schema.Struct({ _tag: Schema.Literal("Ready") }),
+  Schema.Struct({ _tag: Schema.Literal("Unready"), reason: Schema.String }),
+]);
+export type WorldReadiness = typeof WorldReadiness.Type;
+
 export const VerifierCodecs = {
   run: exitCodec(JobReport, VerifierUnavailable),
   runProbe: exitCodec(ProbeRunReply, VerifierUnavailable),
+  worldReady: exitCodec(WorldReadiness, VerifierUnavailable),
 };
 
 /**
@@ -66,6 +81,10 @@ export const verifierName = (request: ProbeRunRequest): string =>
  *   `ProbeRunReply`, or `VerifierUnavailable` when it could not run the probe
  *   at all (a bundle missing or not matching its hash, no deps bundle for the
  *   world's lockfile, a bundler that would install).
+ *
+ * The entrypoint alone serves `worldReady(request)`: it takes a
+ * `WorldReadyRequest`, encoded, reads the bundle store as a run would, and
+ * answers `WorldReadiness`. No VerifierDO is reached and nothing runs.
  */
 export interface VerifierRpc {
   run(job: unknown): Promise<ExitJson>;

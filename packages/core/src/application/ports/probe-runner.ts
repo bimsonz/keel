@@ -18,15 +18,29 @@ export interface ProbeRunRequest {
   readonly run: number;
 }
 
+/** Whether a probe could run against a world as the namespace's store stands, and why not. */
+export type WorldReadiness =
+  | { readonly _tag: "Ready" }
+  | { readonly _tag: "Unready"; readonly reason: string };
+
 /**
  * Runs a probe in Tier 1 against one world (VerifierDO, spike S14): a fresh
  * isolate per run, no outbound network, a deadline. It answers what the
  * probe's runner reported, read against the exit-code and JSON-line contract
  * (`readProbeRun`); a broken probe is a harness error, never a cell.
+ *
+ * `ready` asks, before any probe exists, whether one could run against a
+ * world bundle. Unready is the namespace's store as it stands (no deps bundle
+ * for the world's lockfile, a bundle missing or forged), which no retry
+ * changes; a runner that did not answer fails as unavailable, which says
+ * nothing of the world.
  */
 export class ProbeRunner extends Context.Service<
   ProbeRunner,
   {
     readonly run: (request: ProbeRunRequest) => Effect.Effect<ProbeRun, ProbeRunnerUnavailable>;
+    readonly ready: (
+      request: Pick<ProbeRunRequest, "namespace" | "worldBundle">,
+    ) => Effect.Effect<WorldReadiness, ProbeRunnerUnavailable>;
   }
 >()("keel/ProbeRunner") {}

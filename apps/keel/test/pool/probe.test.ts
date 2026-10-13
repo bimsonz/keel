@@ -299,6 +299,46 @@ describe("Probe", () => {
     await drainOutbox(namespace);
   });
 
+  it("[d22.pool.probe-runner-unready] a world keel-verify holds no deps bundle for ends the instance errored before any draft, with the draft recorded incomplete and the conflict escalated", async () => {
+    const s = await suspected();
+    const id = `probe-${s.conflictId}`;
+    const namespace = poolNamespace();
+    await using instance = await introspectWorkflowInstance(env.PROBE, id);
+    await instance.modify(async (m) => {
+      await m.mockStepResult({ name: "party A 1" }, submitted("a"));
+      await m.mockStepResult({ name: "party B 1" }, submitted("b"));
+      await m.mockStepResult({ name: "trunk" }, kept(sha("0")));
+      await m.mockStepResult(
+        { name: "ab" },
+        kept({ candidateId: makeId("cnd", ulid()), at: 1_791_709_200_000 }),
+      );
+      // B's world is the one the pool's keel-verify answers as unready (vitest.config.ts). The
+      // `runner` step is not mocked: it asks keel-verify over the VERIFIER binding. Nor is any
+      // draft, so an instance that went on to draft would not end as this one does.
+      await m.mockStepResult(
+        { name: "worlds" },
+        kept({
+          _tag: "Built",
+          built: { trunk: hash("1"), A: hash("2"), B: hash("d"), AB: hash("4") },
+          hunks: { A: "", B: "" },
+        }),
+      );
+    });
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect((await deliver("workflow:Probe", [s.envelope]))._tag).toBe("Success");
+    await instance.waitForStatus("errored");
+    expect(errors.mock.calls.flat().join("\n")).toContain(
+      "runner: the probe runner cannot run in world B: lockfile-diverged: no deps bundle for pnpm-lock.yaml 0ddba11",
+    );
+    expect(await sleepsOf(id)).toEqual([]);
+    expect(await discardsOf(s.projectId, s.conflictId)).toMatchObject([
+      { reason: "draft-failed", detail: "incomplete", conflictId: s.conflictId },
+    ]);
+    expect(await conflictStateOf(s.projectId, s.conflictId)).toBe("escalated");
+    await drainOutbox(subjectOf(s.projectId));
+    await drainOutbox(namespace);
+  });
+
   it("[d22.pool.probe-step-died] a step that runs out of tries once the conflict was read as suspected ends the instance errored, with the draft recorded incomplete and the conflict escalated", async () => {
     const s = await suspected();
     const id = `probe-${s.conflictId}`;

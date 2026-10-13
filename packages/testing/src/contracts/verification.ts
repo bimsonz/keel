@@ -480,6 +480,18 @@ export function describeProbeRunnerContract(adapter: string, make: () => ProbeRu
       },
     );
     it.effect(
+      "[probe-runner.ready] answers a world a probe runs against as ready, before any probe is run",
+      () => {
+        const harness = make();
+        return Effect.gen(function* () {
+          const runner = yield* ProbeRunner;
+          const { namespace, worldBundle } = harness.prepared.pass;
+          expect(yield* runner.ready({ namespace, worldBundle })).toEqual({ _tag: "Ready" });
+          expect(yield* runner.run(harness.prepared.pass)).toMatchObject({ outcome: "pass" });
+        }).pipe(Effect.provide(harness.layer));
+      },
+    );
+    it.effect(
       "[probe-runner.harness-error] answers a broken probe as a harness error, never an outcome",
       () => {
         const harness = make();
