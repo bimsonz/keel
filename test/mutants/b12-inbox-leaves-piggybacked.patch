@@ -2,14 +2,14 @@
 # kills: b12.piggyback-after-inbox
 # why: an inbox read leaves `piggybacked` behind, so notices the agent already read ride its next tool result
 diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
-index c311e94..471ac9f 100644
+index 97df2626..56533f70 100644
 --- a/packages/core/src/application/identity/inbox.ts
 +++ b/packages/core/src/application/identity/inbox.ts
-@@ -103,7 +103,6 @@ export const readInbox: (
+@@ -245,7 +245,6 @@ export const readInbox: (
        notices: entries.map(({ entry, position: at }) => noticeOf(entry, at)),
        cursor: entries.at(-1)?.position ?? cursor ?? START,
      };
--    markRead(store, page.cursor);
+-    markRead(store, page.cursor, run);
      return page;
    });
  });

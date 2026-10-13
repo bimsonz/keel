@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.pool-inbox
+# why: through the real Worker an event arrives at the agent's object without its run, so everything the agent caused is dropped and a run is never told that another took its change
+diff --git a/apps/keel/src/rpc/events.ts b/apps/keel/src/rpc/events.ts
+index 7873fa4c..c0829e76 100644
+--- a/apps/keel/src/rpc/events.ts
++++ b/apps/keel/src/rpc/events.ts
+@@ -32,7 +32,6 @@ const ArrivingEnvelope = Schema.Struct({
+   dedupeKey: Schema.NonEmptyString,
+   causation: Schema.optional(Schema.String),
+   actor: Schema.optional(Schema.String),
+-  run: Schema.optional(Schema.Unknown),
+   project: Schema.optional(Schema.String),
+   affected: Schema.optional(Schema.Array(Schema.Unknown)),
+   notified: Schema.optional(Schema.Array(Schema.Unknown)),

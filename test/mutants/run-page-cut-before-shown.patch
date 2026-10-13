@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/session.test.ts
+# kills: run.piggyback
+# why: a page is cut to its limit before the run's entries are picked, so three notices of another lane's leave a tool result empty and the mark where it was
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index 97df2626..3a6f673c 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -209,8 +209,8 @@ export function entriesAfter(
+       position: row.id,
+       entry: Schema.decodeUnknownSync(InboxEntrySchema)(row.value),
+     }))
+-    .filter(({ entry }) => shownTo(entry, run))
+-    .slice(0, limit);
++    .slice(0, limit)
++    .filter(({ entry }) => shownTo(entry, run));
+ }
+ 
+ /**

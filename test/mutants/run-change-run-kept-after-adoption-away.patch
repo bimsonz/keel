@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/session.test.ts
+# kills: run.inbox-interleaved
+# why: the run that held a change keeps its row after another agent adopts the change, so later events about it are filed for a run that no longer holds it
+diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
+index abf32f99..27327fd2 100644
+--- a/packages/core/src/application/identity/session.ts
++++ b/packages/core/src/application/identity/session.ts
+@@ -233,7 +233,6 @@ function foldHeldLeases(store: Store, agentId: AgentId, event: EventEnvelope): v
+         heldBy(store, changeId, adopted.run);
+       } else if (adopted.previousAgentId === agentId) {
+         store.remove(HELD_LEASE, changeId);
+-        store.remove(CHANGE_RUN, changeId);
+       }
+       return;
+     }

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/sponsorship.test.ts
+# kills: run.namespace-read
+# why: the profile the end of a sponsor link answers is made from the object's answer alone, so it names no namespace where the directory holds one
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index c514ab46..5d8da714 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -548,7 +548,6 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+                   idempotencyKey: input["idempotency-key"],
+                 }),
+               ).pipe(
+-                Effect.flatMap(placed),
+                 Effect.match({
+                   onSuccess: linkOk,
+                   onFailure: (error) => endError(caller, error),

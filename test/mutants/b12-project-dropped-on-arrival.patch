@@ -2,13 +2,13 @@
 # kills: b12.envelope-project
 # why: the lenient arrival schema drops `project`, so the Projector sees every event as no project's and labels none
 diff --git a/apps/keel/src/rpc/events.ts b/apps/keel/src/rpc/events.ts
-index c0829e7..80d99c8 100644
+index 7873fa4c..7d67a9e3 100644
 --- a/apps/keel/src/rpc/events.ts
 +++ b/apps/keel/src/rpc/events.ts
-@@ -32,7 +32,6 @@ const ArrivingEnvelope = Schema.Struct({
-   dedupeKey: Schema.NonEmptyString,
+@@ -33,7 +33,6 @@ const ArrivingEnvelope = Schema.Struct({
    causation: Schema.optional(Schema.String),
    actor: Schema.optional(Schema.String),
+   run: Schema.optional(Schema.Unknown),
 -  project: Schema.optional(Schema.String),
    affected: Schema.optional(Schema.Array(Schema.Unknown)),
    notified: Schema.optional(Schema.Array(Schema.Unknown)),

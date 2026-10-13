@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/session.test.ts
+# kills: run.inbox-other-run
+# why: an entry is for whoever holds the change after the event, so a run that loses its change to another run is never told
+diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
+index abf32f99..7b6c7666 100644
+--- a/packages/core/src/application/identity/session.ts
++++ b/packages/core/src/application/identity/session.ts
+@@ -273,7 +273,7 @@ export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope):
+   foldHeldLeases(store, agentId, event);
+   if (!notifies(agentId, event)) return;
+   const holder =
+-    about === undefined ? soleHolder(store, event) : (before ?? runHolding(store, about));
++    about === undefined ? soleHolder(store, event) : runHolding(store, about);
+   if (holder !== undefined && event.run?.id === holder) return;
+   recordDelivery(store, event, holder);
+ }

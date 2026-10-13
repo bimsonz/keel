@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adapters.test.ts
+# kills: run.session
+# why: the object describes itself as the agent whatever run asks, so `whoami` answers one lane another's session
+diff --git a/apps/keel/src/adapters/driving/do/agent-session.ts b/apps/keel/src/adapters/driving/do/agent-session.ts
+index 0f0c8280..bf1808e0 100644
+--- a/apps/keel/src/adapters/driving/do/agent-session.ts
++++ b/apps/keel/src/adapters/driving/do/agent-session.ts
+@@ -77,7 +77,7 @@ export class AgentSessionDO
+     const agentId = agentIdOf(this.ctx.id.name);
+     const program = Schema.decodeUnknownEffect(DescribeSession)(request).pipe(
+       Effect.orDie,
+-      Effect.flatMap(({ run }) => viewSession(agentId, run)),
++      Effect.flatMap(() => viewSession(agentId)),
+       Effect.map((view) => ({ agentId, ...view, fidelity: null })),
+     );
+     return this.answer(AgentSessionCodecs.describe, program);

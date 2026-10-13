@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.pool-piggyback
+# why: a tool result takes notices as the agent, so a lane's own notices never ride its results
+diff --git a/apps/keel/src/adapters/driving/http/piggyback.ts b/apps/keel/src/adapters/driving/http/piggyback.ts
+index 1b72dafb..6cfdf23f 100644
+--- a/apps/keel/src/adapters/driving/http/piggyback.ts
++++ b/apps/keel/src/adapters/driving/http/piggyback.ts
+@@ -87,7 +87,7 @@ export function piggyback<H extends Operations<Caller>>(run: Runner, handlers: H
+         const taken = await run(
+           caller,
+           Notifier.use((notifier) =>
+-            notifier.take(principal.agentId, MAX_NOTICES, caller.token?.run?.id),
++            notifier.take(principal.agentId, MAX_NOTICES),
+           ).pipe(
+             Effect.catchCause((cause) =>
+               Effect.as(

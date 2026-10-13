@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: run.session
+# why: the in-memory Sessions opens a session that names no run, unlike the object it stands in for
+diff --git a/packages/testing/src/memory/sessions.ts b/packages/testing/src/memory/sessions.ts
+index 06d04da1..560e0e36 100644
+--- a/packages/testing/src/memory/sessions.ts
++++ b/packages/testing/src/memory/sessions.ts
+@@ -52,7 +52,6 @@ export function makeSessionsMemory() {
+                 ...(input.harness === undefined ? {} : { harness: input.harness }),
+                 ...(input.model === undefined ? {} : { model: input.model }),
+                 ...(agent.sponsor === undefined ? {} : { sponsor: agent.sponsor }),
+-                ...(principal.run === undefined ? {} : { run: principal.run }),
+                 openedAt: Instant(Date.now()),
+               };
+               byKey.set(key, { session, fingerprint });

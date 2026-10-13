@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/event-arrival.test.ts
+# kills: run.delivered
+# why: a receiver keeps a listed set of an arriving event's fields and the run is not among them, so no object learns which run caused an event and the feed names none
+diff --git a/apps/keel/src/rpc/events.ts b/apps/keel/src/rpc/events.ts
+index 7873fa4c..c0829e76 100644
+--- a/apps/keel/src/rpc/events.ts
++++ b/apps/keel/src/rpc/events.ts
+@@ -32,7 +32,6 @@ const ArrivingEnvelope = Schema.Struct({
+   dedupeKey: Schema.NonEmptyString,
+   causation: Schema.optional(Schema.String),
+   actor: Schema.optional(Schema.String),
+-  run: Schema.optional(Schema.Unknown),
+   project: Schema.optional(Schema.String),
+   affected: Schema.optional(Schema.Array(Schema.Unknown)),
+   notified: Schema.optional(Schema.Array(Schema.Unknown)),

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsorship.test.ts
+# kills: run.namespace-read
+# why: a replayed move on the sponsor link answers the row whole, though the first answer named no namespace
+diff --git a/packages/core/src/application/identity/sponsorship.ts b/packages/core/src/application/identity/sponsorship.ts
+index 49687ef7..0b5b83a0 100644
+--- a/packages/core/src/application/identity/sponsorship.ts
++++ b/packages/core/src/application/identity/sponsorship.ts
+@@ -171,7 +171,7 @@ const moveLink = Effect.fn("identity/moveLink")(function* (
+     const moved = standingOf(event);
+     if (moved !== undefined) yield* directory.standing(moved.agentId, moved.standing, moved.seq);
+   }
+-  if (committed.duplicate) return withoutNamespace(decodeAgent(store.get(AGENT, agentId)));
++  if (committed.duplicate) return decodeAgent(store.get(AGENT, agentId));
+   store.transaction(() => {
+     for (const event of committed.events) hearEvent(store, agentId, event);
+   });

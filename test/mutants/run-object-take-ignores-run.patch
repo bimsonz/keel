@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.pool-piggyback
+# why: the object hands out notices as the agent whatever run asks, under the one mark
+diff --git a/apps/keel/src/adapters/driving/do/agent-session.ts b/apps/keel/src/adapters/driving/do/agent-session.ts
+index 0f0c8280..c36a1ff8 100644
+--- a/apps/keel/src/adapters/driving/do/agent-session.ts
++++ b/apps/keel/src/adapters/driving/do/agent-session.ts
+@@ -199,7 +199,7 @@ export class AgentSessionDO
+   async takeNotices(request: typeof TakeNotices.Encoded) {
+     const program = Schema.decodeUnknownEffect(TakeNotices)(request).pipe(
+       Effect.orDie,
+-      Effect.flatMap(({ limit, run }) => takeNotices(limit, run)),
++      Effect.flatMap(({ limit }) => takeNotices(limit)),
+     );
+     return this.answer(AgentSessionCodecs.takeNotices, program);
+   }

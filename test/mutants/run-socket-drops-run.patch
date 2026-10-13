@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.pool-socket
+# why: the socket upgrade is forwarded with no run, so a lane's socket reads as an agent that names none
+diff --git a/apps/keel/src/adapters/driving/http/inbox-streams.ts b/apps/keel/src/adapters/driving/http/inbox-streams.ts
+index fe65c7b7..734dd203 100644
+--- a/apps/keel/src/adapters/driving/http/inbox-streams.ts
++++ b/apps/keel/src/adapters/driving/http/inbox-streams.ts
+@@ -107,7 +107,7 @@ export function registerInboxStreams(
+       });
+     const cursor = c.req.query("cursor");
+     if (cursor !== undefined && !isInboxCursor(cursor)) return badCursor(caller);
+-    const upgraded = await streams.socket(principal.agentId, c.req.raw, caller.token?.run?.id);
++    const upgraded = await streams.socket(principal.agentId, c.req.raw, undefined);
+     // The object's response has immutable headers, and the app's middleware adds its own afterwards.
+     return new Response(upgraded.body, {
+       status: upgraded.status,

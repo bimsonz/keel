@@ -2,7 +2,7 @@
 # kills: sdk.token
 # why: a 401 is thrown instead of exchanging the credentials once more
 diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
-index d2d9c292..34a5d624 100644
+index 7fc90509..7452e6a9 100644
 --- a/packages/sdk/src/client.ts
 +++ b/packages/sdk/src/client.ts
 @@ -255,8 +255,7 @@ export class KeelClient {

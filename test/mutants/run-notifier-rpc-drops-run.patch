@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.pool-piggyback
+# why: the adapter takes notices from the object with no run, so one lane's tool result takes what is for no lane in particular and never its own
+diff --git a/apps/keel/src/adapters/driven/do-rpc/notifier.ts b/apps/keel/src/adapters/driven/do-rpc/notifier.ts
+index 20c6dbed..af396021 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/notifier.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/notifier.ts
+@@ -18,7 +18,7 @@ export function NotifierRpc(
+     Notifier.of({
+       take: (agentId, limit, run) =>
+         callObject(AgentSessionCodecs.takeNotices, () =>
+-          agentSession(agentId).takeNotices({ limit, ...(run === undefined ? {} : { run }) }),
++          agentSession(agentId).takeNotices({ limit }),
+         ),
+     }),
+   );

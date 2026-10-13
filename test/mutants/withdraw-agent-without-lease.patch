@@ -2,7 +2,7 @@
 # kills: a11.abandon-authority
 # why: an agent that sent no lease withdraws as though it maintained the project, so any agent ends any change of its project
 diff --git a/packages/core/src/application/coordination/gateway.ts b/packages/core/src/application/coordination/gateway.ts
-index 8f605812..114b8b59 100644
+index 66d30b43..d6bc2ae7 100644
 --- a/packages/core/src/application/coordination/gateway.ts
 +++ b/packages/core/src/application/coordination/gateway.ts
 @@ -185,7 +185,7 @@ const withdrawal = (by: Withdrawer, lease: LeaseId | undefined): Withdrawal | un

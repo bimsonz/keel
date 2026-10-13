@@ -2,7 +2,7 @@
 # kills: sdk.public
 # why: a client with no credentials asks for a token before every call
 diff --git a/packages/sdk/src/client.ts b/packages/sdk/src/client.ts
-index d2d9c292..38c2c846 100644
+index 7fc90509..22814a3d 100644
 --- a/packages/sdk/src/client.ts
 +++ b/packages/sdk/src/client.ts
 @@ -252,7 +252,7 @@ export class KeelClient {

@@ -1,0 +1,25 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/session.test.ts
+# kills: run.session
+# why: the agent has one current session, so a lane that opens one replaces every other lane's
+diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
+index abf32f99..a1ac22b3 100644
+--- a/packages/core/src/application/identity/session.ts
++++ b/packages/core/src/application/identity/session.ts
+@@ -135,7 +135,7 @@ export const openSession: (
+       );
+       tx.store.put(
+         SESSION.current.kind,
+-        command.run?.id ?? SESSION.current.id,
++        SESSION.current.id,
+         asStored(encodeSession(session)),
+       );
+       const payload = SessionOpened.make({ sessionId, agentId, ...details });
+@@ -152,7 +152,7 @@ export const openSession: (
+ 
+ /** The current session of a run of the agent (of the agent itself, for no run), or null when it has opened none. */
+ export function currentSession(store: Store, run?: RunId): Session | null {
+-  const stored = store.get(SESSION.current.kind, run ?? SESSION.current.id);
++  const stored = store.get(SESSION.current.kind, SESSION.current.id);
+   return stored === undefined ? null : decodeSession(stored);
+ }
+ 

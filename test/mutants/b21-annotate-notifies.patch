@@ -2,15 +2,15 @@
 # kills: b21.conflict-noted
 # why: a conflict noted under annotate still reaches the agent's inbox
 diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
-index b22f33b..dd35805 100644
+index abf32f99..e179a5d4 100644
 --- a/packages/core/src/application/identity/session.ts
 +++ b/packages/core/src/application/identity/session.ts
-@@ -198,7 +198,7 @@ function foldHeldLeases(store: Store, agentId: AgentId, event: EventEnvelope): v
-  */
- export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope): void {
+@@ -271,7 +271,7 @@ export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope):
+   const about = changeOf(event);
+   const before = about === undefined ? undefined : runHolding(store, about);
    foldHeldLeases(store, agentId, event);
--  if (notifies(agentId, event)) recordDelivery(store, event);
-+  if (notifies(agentId, event) || event.type === "ConflictNoted") recordDelivery(store, event);
- }
- 
- /** What the AgentSession DO knows about its agent right now. Fidelity arrives with effect derivation. */
+-  if (!notifies(agentId, event)) return;
++  if (!notifies(agentId, event) && event.type !== "ConflictNoted") return;
+   const holder =
+     about === undefined ? soleHolder(store, event) : (before ?? runHolding(store, about));
+   if (holder !== undefined && event.run?.id === holder) return;

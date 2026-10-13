@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.pool-whoami
+# why: `whoami` asks for the agent's session whatever run its token names, so a lane is answered no session, or another's
+diff --git a/packages/core/src/application/identity/index.ts b/packages/core/src/application/identity/index.ts
+index 6623b3cd..0668cad6 100644
+--- a/packages/core/src/application/identity/index.ts
++++ b/packages/core/src/application/identity/index.ts
+@@ -40,7 +40,7 @@ export const whoami: (
+ ) => Effect.Effect<Identity, AgentNotKnown | AgentNotAdmitted, AgentDirectory | Sessions> =
+   Effect.fn("identity/whoami")(function* (principal: AgentClaims) {
+     const agent = yield* admit(principal);
+-    const current = yield* (yield* Sessions).current(agent.id, principal.run?.id);
++    const current = yield* (yield* Sessions).current(agent.id);
+     return { agent, session: current === null ? null : { id: current.id } };
+   });
+ 

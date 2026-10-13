@@ -1,0 +1,34 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/session.test.ts
+# kills: run.piggyback
+# why: every run shares the one `piggybacked` mark, so one lane's tool result marks another lane's notices carried and they never ride
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index 97df2626..7b650e2c 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -45,7 +45,7 @@ const headOf = (store: Store): number => {
+ };
+ 
+ const piggybackedOf = (store: Store, run: RunId | undefined): string => {
+-  const at = store.get(INBOX.piggybacked.kind, run ?? INBOX.piggybacked.id);
++  const at = store.get(INBOX.piggybacked.kind, INBOX.piggybacked.id);
+   return typeof at === "string" ? at : START;
+ };
+ 
+@@ -222,7 +222,7 @@ function markRead(store: Store, cursor: string, run: RunId | undefined): void {
+   const head = position(headOf(store));
+   const read = cursor > head ? head : cursor;
+   if (read > piggybackedOf(store, run))
+-    store.put(INBOX.piggybacked.kind, run ?? INBOX.piggybacked.id, read);
++    store.put(INBOX.piggybacked.kind, INBOX.piggybacked.id, read);
+ }
+ 
+ /**
+@@ -273,7 +273,7 @@ export const takeNotices: (
+       );
+       const last = entries.at(-1);
+       if (last !== undefined)
+-        store.put(INBOX.piggybacked.kind, run ?? INBOX.piggybacked.id, last.position);
++        store.put(INBOX.piggybacked.kind, INBOX.piggybacked.id, last.position);
+       return entries.map(({ entry, position: at }) => noticeOf(entry, at));
+     });
+   },

@@ -1,0 +1,17 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsorship.test.ts
+# kills: run.namespace-read
+# why: the object answers a move with the namespace its own row kept from enrolment, which the directory may have moved since
+diff --git a/packages/core/src/application/identity/standing.ts b/packages/core/src/application/identity/standing.ts
+index 4b61f978..42f32859 100644
+--- a/packages/core/src/application/identity/standing.ts
++++ b/packages/core/src/application/identity/standing.ts
+@@ -41,8 +41,7 @@ export type StandingMove = "suspend" | "reinstate" | "revoke";
+  * is the one place a namespace is read from.
+  */
+ export const withoutNamespace = (agent: Agent): Agent => {
+-  const { org: _kept, ...answered } = agent;
+-  return answered;
++  return agent;
+ };
+ 
+ /** A suspension, reinstatement or revocation, as the isolate sends it. */

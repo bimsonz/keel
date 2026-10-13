@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/session.test.ts
+# kills: run.inbox-own
+# why: a delivered entry never says which run caused it, so a run reads its own act back when the entry is for every run
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index 97df2626..9ac59b8b 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -186,7 +186,6 @@ export function recordDelivery(store: Store, event: EventEnvelope, holder?: RunI
+     ...(nextActions === undefined
+       ? {}
+       : { nextActions: nextActions.map((action) => Schema.encodeSync(NextAction)(action)) }),
+-    ...(event.run === undefined ? {} : { by: event.run.id }),
+     ...(holder === undefined ? {} : { for: holder }),
+   };
+   store.put(INBOX.kind, position(next), asStored(entry));

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adapters.test.ts
+# kills: run.session
+# why: the adapter asks the object for the agent's session whatever run asks, so a lane is answered a session it never opened
+diff --git a/apps/keel/src/adapters/driven/do-rpc/sessions.ts b/apps/keel/src/adapters/driven/do-rpc/sessions.ts
+index b13c0fb4..9db75cca 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/sessions.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/sessions.ts
+@@ -40,7 +40,7 @@ export function SessionsRpc(
+         }),
+       current: (agentId, run) =>
+         callObject(AgentSessionCodecs.describe, () =>
+-          agentSession(agentId).describe(run === undefined ? {} : { run }),
++          agentSession(agentId).describe({}),
+         ).pipe(
+           Effect.map((snapshot) => snapshot.session),
+           Effect.catchTag("AgentNotKnown", () => Effect.succeed(null)),

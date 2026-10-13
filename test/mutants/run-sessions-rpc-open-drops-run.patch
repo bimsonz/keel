@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/adapters.test.ts
+# kills: run.session
+# why: the adapter opens a session without the run the principal's token names, so every lane's session is the agent's one
+diff --git a/apps/keel/src/adapters/driven/do-rpc/sessions.ts b/apps/keel/src/adapters/driven/do-rpc/sessions.ts
+index b13c0fb4..c0a933f7 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/sessions.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/sessions.ts
+@@ -31,7 +31,6 @@ export function SessionsRpc(
+             agentSession(principal.agentId).openSession(
+               encodeOpen({
+                 ...body,
+-                ...(principal.run === undefined ? {} : { run: principal.run }),
+                 idempotencyKey: input.idempotencyKey,
+                 fingerprint,
+               }),

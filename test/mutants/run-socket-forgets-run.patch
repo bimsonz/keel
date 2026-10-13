@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.pool-socket
+# why: the socket's run is dropped when its cursor is kept after the first frame, so the snapshot is the lane's and every later notice is read as the agent
+diff --git a/apps/keel/src/adapters/driving/do/agent-session.ts b/apps/keel/src/adapters/driving/do/agent-session.ts
+index 0f0c8280..ef88737c 100644
+--- a/apps/keel/src/adapters/driving/do/agent-session.ts
++++ b/apps/keel/src/adapters/driving/do/agent-session.ts
+@@ -189,7 +189,7 @@ export class AgentSessionDO
+       const { cursor, run } = attachedOf(socket);
+       const page = this.runtime.runSync(readInbox(cursor, run));
+       if (type === "snapshot" || page.notices.length > 0) socket.send(socketFrame(type, page));
+-      socket.serializeAttachment({ cursor: page.cursor, run });
++      socket.serializeAttachment({ cursor: page.cursor });
+       if (page.notices.length < INBOX_PAGE) return;
+       type = "notices";
+     }

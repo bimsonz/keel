@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.pool-socket
+# why: a socket's frames are read as the agent whatever run the socket holds
+diff --git a/apps/keel/src/adapters/driving/do/agent-session.ts b/apps/keel/src/adapters/driving/do/agent-session.ts
+index 0f0c8280..50529916 100644
+--- a/apps/keel/src/adapters/driving/do/agent-session.ts
++++ b/apps/keel/src/adapters/driving/do/agent-session.ts
+@@ -187,7 +187,7 @@ export class AgentSessionDO
+     let type = first;
+     for (;;) {
+       const { cursor, run } = attachedOf(socket);
+-      const page = this.runtime.runSync(readInbox(cursor, run));
++      const page = this.runtime.runSync(readInbox(cursor));
+       if (type === "snapshot" || page.notices.length > 0) socket.send(socketFrame(type, page));
+       socket.serializeAttachment({ cursor: page.cursor, run });
+       if (page.notices.length < INBOX_PAGE) return;

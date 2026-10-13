@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.pool-header
+# why: the isolate sets the run's header only when the client sent none, so a client picks the run its socket reads as
+diff --git a/apps/keel/src/composition/isolate.ts b/apps/keel/src/composition/isolate.ts
+index 058f4b99..e112c91e 100644
+--- a/apps/keel/src/composition/isolate.ts
++++ b/apps/keel/src/composition/isolate.ts
+@@ -205,7 +205,7 @@ function inboxStreams(env: Env, runtime: IsolateRuntime): InboxStreams {
+     socket: (agentId, request, run) => {
+       const headers = new Headers(request.headers);
+       if (run === undefined) headers.delete(RUN_HEADER);
+-      else headers.set(RUN_HEADER, run);
++      else if (!headers.has(RUN_HEADER)) headers.set(RUN_HEADER, run);
+       return env.AGENT_SESSION.get(env.AGENT_SESSION.idFromName(`agent:${agentId}`)).fetch(
+         new Request(request, { headers }),
+       );

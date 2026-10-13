@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/session.test.ts
+# kills: run.inbox-for
+# why: a verdict names its change as `subject`, and only `changeId` is read, so a verdict on one lane's change goes to every lane
+diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
+index abf32f99..df4dc11f 100644
+--- a/packages/core/src/application/identity/session.ts
++++ b/packages/core/src/application/identity/session.ts
+@@ -179,7 +179,7 @@ function heldBy(store: Store, changeId: string, run: RunRef | undefined): void {
+ function changeOf(event: EventEnvelope): ChangeId | undefined {
+   const payload: object =
+     typeof event.payload === "object" && event.payload !== null ? event.payload : {};
+-  for (const field of ["changeId", "subject"]) {
++  for (const field of ["changeId"]) {
+     const named: unknown = Reflect.get(payload, field);
+     if (isChangeId(named)) return named;
+   }

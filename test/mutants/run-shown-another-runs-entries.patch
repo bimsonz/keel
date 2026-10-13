@@ -1,0 +1,13 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/inbox.test.ts
+# kills: run.inbox-for
+# why: the read never looks at who an entry is for, so every lane reads every other lane's notices
+diff --git a/packages/core/src/domain/identity/inbox.ts b/packages/core/src/domain/identity/inbox.ts
+index b11f01f6..69f9d1bf 100644
+--- a/packages/core/src/domain/identity/inbox.ts
++++ b/packages/core/src/domain/identity/inbox.ts
+@@ -97,4 +97,4 @@ export const notifies = (agentId: AgentId, event: EventEnvelope): boolean =>
+  * secret, a plain token) reads what is for every run.
+  */
+ export const shownTo = (entry: InboxEntry, run: RunId | undefined): boolean =>
+-  (entry.for === undefined || entry.for === run) && (entry.by === undefined || entry.by !== run);
++  entry.by === undefined || entry.by !== run;

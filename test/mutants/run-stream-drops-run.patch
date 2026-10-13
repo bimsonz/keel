@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.pool-stream
+# why: the stream reads as the agent whatever run its token names, so a lane's stream never carries its own notices
+diff --git a/apps/keel/src/adapters/driving/http/inbox-streams.ts b/apps/keel/src/adapters/driving/http/inbox-streams.ts
+index fe65c7b7..76fe33e4 100644
+--- a/apps/keel/src/adapters/driving/http/inbox-streams.ts
++++ b/apps/keel/src/adapters/driving/http/inbox-streams.ts
+@@ -73,7 +73,7 @@ export function registerInboxStreams(
+             cursor,
+             SSE_WAIT_SECONDS,
+             caller.signal,
+-            caller.token?.run?.id,
++            undefined,
+           );
+           const frames =
+             page.notices.length === 0 ? ": keep-alive\n\n" : page.notices.map(sseEvent).join("");

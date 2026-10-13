@@ -2,15 +2,14 @@
 # kills: b12.no-self-loop
 # why: the AgentSession records every event, its agent's own included, so an agent is woken by its own commands
 diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
-index b22f33b..5589f5a 100644
+index abf32f99..719d3377 100644
 --- a/packages/core/src/application/identity/session.ts
 +++ b/packages/core/src/application/identity/session.ts
-@@ -198,7 +198,7 @@ function foldHeldLeases(store: Store, agentId: AgentId, event: EventEnvelope): v
-  */
- export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope): void {
+@@ -271,7 +271,6 @@ export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope):
+   const about = changeOf(event);
+   const before = about === undefined ? undefined : runHolding(store, about);
    foldHeldLeases(store, agentId, event);
--  if (notifies(agentId, event)) recordDelivery(store, event);
-+  recordDelivery(store, event);
- }
- 
- /** What the AgentSession DO knows about its agent right now. Fidelity arrives with effect derivation. */
+-  if (!notifies(agentId, event)) return;
+   const holder =
+     about === undefined ? soleHolder(store, event) : (before ?? runHolding(store, about));
+   if (holder !== undefined && event.run?.id === holder) return;

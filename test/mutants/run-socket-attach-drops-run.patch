@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.pool-socket
+# why: the object accepts a socket without keeping the run it reads as, so its snapshot is the agent's
+diff --git a/apps/keel/src/adapters/driving/do/agent-session.ts b/apps/keel/src/adapters/driving/do/agent-session.ts
+index 0f0c8280..c3d819f0 100644
+--- a/apps/keel/src/adapters/driving/do/agent-session.ts
++++ b/apps/keel/src/adapters/driving/do/agent-session.ts
+@@ -145,7 +145,7 @@ export class AgentSessionDO
+       return new Response("run is not a run id.", { status: 400 });
+     const { 0: client, 1: socket } = new WebSocketPair();
+     this.ctx.acceptWebSocket(socket);
+-    socket.serializeAttachment({ cursor, run });
++    socket.serializeAttachment({ cursor });
+     this.project(socket, "snapshot");
+     return new Response(null, { status: 101, webSocket: client });
+   }

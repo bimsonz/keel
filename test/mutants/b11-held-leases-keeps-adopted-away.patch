@@ -2,14 +2,14 @@
 # kills: b11.held-leases
 # why: a change adopted away before its lapse was committed stays counted as the old holder's lease
 diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
-index b22f33b..c571365 100644
+index abf32f99..db699db6 100644
 --- a/packages/core/src/application/identity/session.ts
 +++ b/packages/core/src/application/identity/session.ts
-@@ -171,7 +171,6 @@ function foldHeldLeases(store: Store, agentId: AgentId, event: EventEnvelope): v
-     case "ChangeAdopted": {
-       const adopted = Schema.decodeUnknownSync(ChangeAdopted)(event.payload);
-       if (adopted.agentId === agentId) store.put(HELD_LEASE, changeId, adopted.leaseId);
--      else if (adopted.previousAgentId === agentId) store.remove(HELD_LEASE, changeId);
+@@ -232,7 +232,6 @@ function foldHeldLeases(store: Store, agentId: AgentId, event: EventEnvelope): v
+         store.put(HELD_LEASE, changeId, adopted.leaseId);
+         heldBy(store, changeId, adopted.run);
+       } else if (adopted.previousAgentId === agentId) {
+-        store.remove(HELD_LEASE, changeId);
+         store.remove(CHANGE_RUN, changeId);
+       }
        return;
-     }
-     case "ChangeParked": {

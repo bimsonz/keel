@@ -2,19 +2,16 @@
 # kills: b11.held-leases
 # why: the held leases fold only events the agent did not cause, so its own declare and adopt never count
 diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
-index b22f33b..6faab28 100644
+index abf32f99..cb7bfb0a 100644
 --- a/packages/core/src/application/identity/session.ts
 +++ b/packages/core/src/application/identity/session.ts
-@@ -197,8 +197,10 @@ function foldHeldLeases(store: Store, agentId: AgentId, event: EventEnvelope): v
-  * its own tool result already reported those.
-  */
+@@ -270,8 +270,8 @@ function foldHeldLeases(store: Store, agentId: AgentId, event: EventEnvelope): v
  export function hearEvent(store: Store, agentId: AgentId, event: EventEnvelope): void {
+   const about = changeOf(event);
+   const before = about === undefined ? undefined : runHolding(store, about);
 -  foldHeldLeases(store, agentId, event);
--  if (notifies(agentId, event)) recordDelivery(store, event);
-+  if (notifies(agentId, event)) {
-+    foldHeldLeases(store, agentId, event);
-+    recordDelivery(store, event);
-+  }
- }
- 
- /** What the AgentSession DO knows about its agent right now. Fidelity arrives with effect derivation. */
+   if (!notifies(agentId, event)) return;
++  foldHeldLeases(store, agentId, event);
+   const holder =
+     about === undefined ? soleHolder(store, event) : (before ?? runHolding(store, about));
+   if (holder !== undefined && event.run?.id === holder) return;

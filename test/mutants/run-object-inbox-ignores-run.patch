@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.pool-inbox
+# why: the object reads its inbox as the agent whatever run asks, so a lane never reads the notices that are for it alone
+diff --git a/apps/keel/src/adapters/driving/do/agent-session.ts b/apps/keel/src/adapters/driving/do/agent-session.ts
+index 0f0c8280..5b8682cf 100644
+--- a/apps/keel/src/adapters/driving/do/agent-session.ts
++++ b/apps/keel/src/adapters/driving/do/agent-session.ts
+@@ -119,7 +119,7 @@ export class AgentSessionDO
+     const program = Schema.decodeUnknownEffect(InboxRead)(request).pipe(
+       Effect.orDie,
+       Effect.flatMap(({ cursor, waitMs, run }) =>
+-        waiters.until(waitMs, readInbox(cursor, run), (page) => page.notices.length > 0),
++        waiters.until(waitMs, readInbox(cursor), (page) => page.notices.length > 0),
+       ),
+     );
+     return this.answer(AgentSessionCodecs.inbox, program);

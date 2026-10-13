@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/session.test.ts
+# kills: run.inbox-for
+# why: a delivered entry never says which run it is for, so a notice about one lane's change goes to all of them
+diff --git a/packages/core/src/application/identity/inbox.ts b/packages/core/src/application/identity/inbox.ts
+index 97df2626..ff18da7e 100644
+--- a/packages/core/src/application/identity/inbox.ts
++++ b/packages/core/src/application/identity/inbox.ts
+@@ -187,7 +187,6 @@ export function recordDelivery(store: Store, event: EventEnvelope, holder?: RunI
+       ? {}
+       : { nextActions: nextActions.map((action) => Schema.encodeSync(NextAction)(action)) }),
+     ...(event.run === undefined ? {} : { by: event.run.id }),
+-    ...(holder === undefined ? {} : { for: holder }),
+   };
+   store.put(INBOX.kind, position(next), asStored(entry));
+   store.put(INBOX.head.kind, INBOX.head.id, next);

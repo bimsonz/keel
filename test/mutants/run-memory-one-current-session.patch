@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/testing/test/ports.test.ts
+# kills: run.session
+# why: the in-memory Sessions keeps one current session an agent, so a suite that runs on it never sees two lanes' sessions apart
+diff --git a/packages/testing/src/memory/sessions.ts b/packages/testing/src/memory/sessions.ts
+index 06d04da1..443ba373 100644
+--- a/packages/testing/src/memory/sessions.ts
++++ b/packages/testing/src/memory/sessions.ts
+@@ -10,7 +10,7 @@ import { Effect, Layer, Option } from "effect";
+ import { ulidOf } from "./operator.ts";
+ 
+ /** Where a run of an agent keeps its current session: under the agent alone when it names no run. */
+-const slot = (agentId: AgentId, run: RunId | undefined) => `${agentId}\u0000${run ?? ""}`;
++const slot = (agentId: AgentId, run: RunId | undefined) => `${agentId}\u0000`;
+ 
+ /**
+  * Sessions over an AgentDirectory, with the AgentSession DO's rules: the agent

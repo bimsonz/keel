@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/session.test.ts
+# kills: run.session
+# why: a session never says which run opened it, so nothing read from a session tells one lane's from another's
+diff --git a/packages/core/src/application/identity/session.ts b/packages/core/src/application/identity/session.ts
+index abf32f99..f919db1b 100644
+--- a/packages/core/src/application/identity/session.ts
++++ b/packages/core/src/application/identity/session.ts
+@@ -125,7 +125,6 @@ export const openSession: (
+         id: sessionId,
+         agentId,
+         ...details,
+-        ...(command.run === undefined ? {} : { run: command.run }),
+         openedAt: tx.at,
+       };
+       tx.store.put(

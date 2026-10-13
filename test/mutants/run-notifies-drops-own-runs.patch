@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/inbox.test.ts
+# kills: run.inbox-other-run
+# why: every event the agent caused is dropped, as before runs, so one lane's act never reaches the lane whose change it touched
+diff --git a/packages/core/src/domain/identity/inbox.ts b/packages/core/src/domain/identity/inbox.ts
+index b11f01f6..5f4f0f79 100644
+--- a/packages/core/src/domain/identity/inbox.ts
++++ b/packages/core/src/domain/identity/inbox.ts
+@@ -89,7 +89,7 @@ const isAnnotation = Schema.is(
+  * caused under no run is dropped here.
+  */
+ export const notifies = (agentId: AgentId, event: EventEnvelope): boolean =>
+-  !(event.actor === agentActor(agentId) && event.run === undefined) && !isAnnotation(event.payload);
++  event.actor !== agentActor(agentId) && !isAnnotation(event.payload);
+ 
+ /**
+  * Whether a run of the agent reads an entry: the entry is for that run or for

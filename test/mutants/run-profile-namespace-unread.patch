@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/standing.test.ts
+# kills: run.namespace-read
+# why: a standing move's profile is made from the object's answer alone, so it names no namespace at all, where the directory holds one
+diff --git a/apps/keel/src/adapters/driving/http/handlers.ts b/apps/keel/src/adapters/driving/http/handlers.ts
+index c514ab46..62a2cc7a 100644
+--- a/apps/keel/src/adapters/driving/http/handlers.ts
++++ b/apps/keel/src/adapters/driving/http/handlers.ts
+@@ -422,7 +422,6 @@ export function makeHandlers(run: Runner, signIn: SignInMethods, doorway: Doorwa
+       caller,
+       actorOf(caller).pipe(
+         Effect.flatMap((actor) => move(actor, decoded.success)),
+-        Effect.flatMap(placed),
+         Effect.match({
+           onSuccess: standingOk,
+           onFailure: (error) => standingError(caller, operation, error),

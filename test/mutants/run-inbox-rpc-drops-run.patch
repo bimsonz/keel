@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/runs.test.ts
+# kills: run.pool-inbox
+# why: the adapter reads the object's inbox with no run, so a lane's read is the read of an agent that names none
+diff --git a/apps/keel/src/adapters/driven/do-rpc/inbox.ts b/apps/keel/src/adapters/driven/do-rpc/inbox.ts
+index 81eeaefb..16adf031 100644
+--- a/apps/keel/src/adapters/driven/do-rpc/inbox.ts
++++ b/apps/keel/src/adapters/driven/do-rpc/inbox.ts
+@@ -26,7 +26,6 @@ export function InboxRpc(
+           agentSession(agentId).inbox({
+             ...(cursor === undefined ? {} : { cursor }),
+             waitMs,
+-            ...(run === undefined ? {} : { run }),
+           }),
+         ).pipe(
+           Effect.catchTag("AgentNotKnown", (error) =>

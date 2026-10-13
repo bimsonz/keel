@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit apps/keel/test/unit/sponsorship.test.ts
+# kills: run.namespace-read
+# why: a move on the sponsor link answers the agent's row whole, the namespace it was enrolled into with it
+diff --git a/packages/core/src/application/identity/sponsorship.ts b/packages/core/src/application/identity/sponsorship.ts
+index 49687ef7..43ef163e 100644
+--- a/packages/core/src/application/identity/sponsorship.ts
++++ b/packages/core/src/application/identity/sponsorship.ts
+@@ -175,7 +175,7 @@ const moveLink = Effect.fn("identity/moveLink")(function* (
+   store.transaction(() => {
+     for (const event of committed.events) hearEvent(store, agentId, event);
+   });
+-  return withoutNamespace(committed.value);
++  return committed.value;
+ });
+ 
+ /**
