@@ -17,7 +17,7 @@ import {
 import { waitUntil } from "cloudflare:workers";
 import { Effect, Layer, ManagedRuntime, Option, Schema } from "effect";
 import { CodeHostArtifacts } from "../adapters/driven/artifacts/code-host.ts";
-import type { AgentAccess } from "../adapters/driven/better-auth/agents.ts";
+import { type AgentAccess, TOKEN_PATH } from "../adapters/driven/better-auth/agents.ts";
 import {
   authorizationServerDocument,
   protectedResourceDocument,
@@ -260,6 +260,8 @@ export function makeIsolate(
       basePath: AUTH_BASE_PATH,
       handler: (request) => auth().handler(request),
       admit: async (key) => (await env.AUTH_LIMIT.limit({ key })).success,
+      tokenPath: TOKEN_PATH,
+      admitToken: async (key) => (await env.TOKEN_LIMIT.limit({ key })).success,
     },
     tokens: { admit: async (key) => (await env.TOKEN_LIMIT.limit({ key })).success },
     wellKnown: {

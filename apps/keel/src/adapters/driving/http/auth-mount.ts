@@ -9,7 +9,17 @@ export interface AuthMount {
   readonly handler: (request: Request) => Promise<Response>;
   /** Whether this key may make another request now (the Workers Rate Limiting binding). */
   readonly admit: (key: string) => Promise<boolean>;
+  /**
+   * Where an agent asks for a token, under the base path. Those requests are
+   * counted with the token endpoint's limiter, not this one: an agent's runs ask
+   * every few minutes, and must not spend what a person's sign-in is allowed.
+   */
+  readonly tokenPath: string;
+  readonly admitToken: (key: string) => Promise<boolean>;
 }
+
+/** How long an address waits once the token limit refuses it: the limiter's own window. */
+export const TOKEN_WINDOW_SECONDS = 60;
 
 /**
  * The one answer that hands a session's token to its holder: the device grant's
@@ -76,14 +86,23 @@ export function oneCredential(request: Request): Request {
 export function registerAuth(app: Hono<AppEnv>, mount: AuthMount): void {
   app.all(`${mount.basePath}/*`, async (c) => {
     const request = c.req.raw;
+    const path = new URL(request.url).pathname.slice(mount.basePath.length);
     if (request.method !== "GET" && request.method !== "HEAD") {
       const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
-      if (!(await mount.admit(`auth:${ip}`)))
+      if (path === mount.tokenPath) {
+        // By address alone, as the token endpoint is limited: an agent's id is public.
+        if (!(await mount.admitToken(`token:${ip}`))) {
+          const refused = problemResponse(429, "rate.limited", c.get("requestId"), {
+            detail: "Too many token requests from this address; wait a minute.",
+          });
+          refused.headers.set("retry-after", String(TOKEN_WINDOW_SECONDS));
+          return refused;
+        }
+      } else if (!(await mount.admit(`auth:${ip}`)))
         return problemResponse(429, "rate.limited", c.get("requestId"), {
           detail: "Too many sign-in requests from this address; wait a minute.",
         });
     }
-    const path = new URL(request.url).pathname.slice(mount.basePath.length);
     return withoutSessionTokens(path, await mount.handler(oneCredential(request)));
   });
 }

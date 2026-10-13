@@ -9,8 +9,8 @@ import {
   ResponseContractError,
   UndeclaredStatusError,
 } from "../../../generated/http/runtime.gen.ts";
-import { type AuthMount, registerAuth } from "./auth-mount.ts";
-import type { Handlers } from "./handlers.ts";
+import { type AuthMount, registerAuth, TOKEN_WINDOW_SECONDS } from "./auth-mount.ts";
+import { type Handlers, REGISTER_PATH } from "./handlers.ts";
 import { type InboxStreams, registerInboxStreams } from "./inbox-streams.ts";
 import { problemResponse } from "./problems.ts";
 import { type BoundGate, routeDeps } from "./route-deps.ts";
@@ -43,7 +43,6 @@ export const DOCUMENT_PATH = "/v1/openapi.json";
 const TOKEN_PATH = "/v1/oauth/token";
 
 /** The limiter's window (`TOKEN_LIMIT`'s period in wrangler.jsonc): the longest a refused address waits. */
-const TOKEN_WINDOW_SECONDS = 60;
 
 /** The HTTP doorway: middleware, the generated routes, the agent's inbox streams, the MCP endpoint, Better Auth, the document and the signers file. */
 export function makeApp(options: AppOptions) {
@@ -71,6 +70,15 @@ export function makeApp(options: AppOptions) {
     });
     refused.headers.set("retry-after", String(TOKEN_WINDOW_SECONDS));
     return refused;
+  });
+
+  // An agent's sign-up is counted as a person's is: by address, under the sign-in limit.
+  app.use(REGISTER_PATH, async (c, next) => {
+    const ip = c.req.header("cf-connecting-ip") ?? "unknown";
+    if (await options.auth.admit(`auth:${ip}`)) return next();
+    return problemResponse(429, "rate.limited", c.get("requestId"), {
+      detail: "Too many sign-ups from this address; wait a minute.",
+    });
   });
 
   app.get("/healthz", (c) => c.json({ ok: true, service: "keel" }));
