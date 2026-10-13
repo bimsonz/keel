@@ -312,7 +312,7 @@ describe("a project's name that is taken", () => {
         expect.objectContaining({
           code: "project.name_taken",
           title: "The namespace already has a project by that name",
-          detail: `${handle} already has a project named "notes", in some case.`,
+          detail: `${handle} already has a project named "notes" (names ignore letter case).`,
           nextActions: [expect.objectContaining({ operationId: "Operator_createProject" })],
         }),
       ]);

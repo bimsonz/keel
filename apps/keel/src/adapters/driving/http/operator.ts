@@ -238,7 +238,7 @@ export function createProjectError(
       return {
         status: 409,
         body: problem(409, "project.name_taken", caller.requestId, {
-          detail: `${namespace} already has a project named "${error.name}", in some case.`,
+          detail: `${namespace} already has a project named "${error.name}" (names ignore letter case).`,
           nextActions: [again("Choose another name")],
         }),
       };
