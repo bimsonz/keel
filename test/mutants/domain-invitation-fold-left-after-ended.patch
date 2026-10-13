@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t invitation.fold-table
+# kills: invitation.fold-table
+# why: an end is folded into an invitation that has already ended, so a second end is no defect
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index f273fb45..a123f1ae 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -224,7 +224,7 @@ export const evolveInvitation = (
+         : illegal(state, event);
+     case "AgentLeftNamespace":
+     case "AgentLeftProject":
+-      return standing(state) ? { ...state, state: "ended" } : illegal(state, event);
++      return state !== undefined ? { ...state, state: "ended" } : illegal(state, event);
+     default: {
+       const unreachable: never = event;
+       return unreachable;

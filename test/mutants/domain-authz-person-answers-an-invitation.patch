@@ -1,0 +1,18 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.invitation-rows
+# kills: authz.invitation-rows
+# why: a person reads, accepts and leaves an invitation in the agent's place: only a handler would stop them
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index e161bdfa..78b09c8f 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -582,8 +582,9 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
+       return granted();
+     // Work is an agent's, and so is the answer to an invitation: no person gives it in the agent's place.
+     case "work":
+-    case "agent":
+       return refused("agents-only");
++    case "agent":
++      return granted();
+     // An agent's account is there only for the person who stands behind it.
+     case "sponsor":
+     case "sponsorOrSelf":

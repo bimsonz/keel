@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t invitation.scopes-refused
+# kills: invitation.scopes-refused
+# why: a read-only invitation reads as letting its agent work
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index f273fb45..a4702ab4 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -240,7 +240,7 @@ export const scopesUnder = (given: InvitationScopes, held: readonly Scope[]): re
+   held.filter((scope) => given.some((granted) => granted === scope));
+ 
+ /** Whether an invitation lets its agent work, or only read. */
+-export const givesWork = (given: InvitationScopes): boolean => given.includes("agent:work");
++export const givesWork = (given: InvitationScopes): boolean => given.length > 0;
+ 
+ /** Rebuilds an agent's place, in a namespace or on one project, from its events in `seq` order. */
+ export const replayInvitation = (

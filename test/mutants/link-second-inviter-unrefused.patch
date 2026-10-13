@@ -2,11 +2,11 @@
 # kills: link.invite-machine
 # why: another member's invitation of an agent already invited is answered as if nothing were in the way, so two members believe they answer for it
 diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
-index ddd9a8e4..cbd9921e 100644
+index f273fb45..282d271e 100644
 --- a/packages/core/src/domain/identity/invitation-machine.ts
 +++ b/packages/core/src/domain/identity/invitation-machine.ts
-@@ -139,9 +139,7 @@ export const decideInvitation = (
-     case "Invite":
+@@ -156,9 +156,7 @@ export const decideInvitation = (
+       if (!givesWhatAnInvitationGives(command.scopes)) return refuse("invalid-scopes");
        if (!standing(invitation))
          return Result.succeed([events.invited(command.by, command.scopes)]);
 -      return invitation.by === command.by && sameScopes(invitation.scopes, command.scopes)

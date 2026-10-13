@@ -2,13 +2,13 @@
 # kills: run.pool-settings
 # why: replacing a project's settings asks only for a read, so an agent replaces the settings of another agent's public project
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index ab00e909..9f39aad4 100644
+index e161bdfa..37a4144e 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -167,7 +167,7 @@ export const SPEC_ACTIONS = {
-   Agents_listProjects: rule("Self", "self"),
-   Agents_acceptProjectInvitation: rule("Self", "self"),
-   Agents_leaveProject: rule("Self", "self"),
+@@ -168,7 +168,7 @@ export const SPEC_ACTIONS = {
+   Agents_listProjects: rule("Self", "agent"),
+   Agents_acceptProjectInvitation: rule("Self", "agent"),
+   Agents_leaveProject: rule("Self", "agent"),
 -  Operator_putSettings: rule("Project", "maintain"),
 +  Operator_putSettings: rule("Project", "read"),
  } as const satisfies Record<string, ActionRule>;

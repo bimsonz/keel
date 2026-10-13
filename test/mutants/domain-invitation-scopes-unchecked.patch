@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t invitation.scopes-refused
+# kills: invitation.scopes-refused
+# why: an invitation asked for with no scopes, with work alone or with one twice is not refused by name: it throws where none stands and reads as already invited where one does
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index f273fb45..48373234 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -153,7 +153,6 @@ export const decideInvitation = (
+   switch (command._tag) {
+     case "Invite":
+       // Read, or read and work, each once: asked of the command, whatever stands.
+-      if (!givesWhatAnInvitationGives(command.scopes)) return refuse("invalid-scopes");
+       if (!standing(invitation))
+         return Result.succeed([events.invited(command.by, command.scopes)]);
+       return invitation.by === command.by && sameScopes(invitation.scopes, command.scopes)

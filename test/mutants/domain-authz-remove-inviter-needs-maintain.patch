@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.inviter-or-maintain
+# kills: authz.inviter-or-maintain
+# why: the member who invited an agent cannot take it out unless they also maintain the org
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index e161bdfa..9aae9c00 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -624,7 +624,7 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
+     // The member who invited an agent may take it out again; so may whoever maintains the org.
+     case "inviterOrMaintain":
+       return rights.has("maintain") ||
+-        (rights.has("member") &&
++        (rights.has("maintain") &&
+           resource._tag === "Namespace" &&
+           resource.inviter === principal.userId)
+         ? granted()

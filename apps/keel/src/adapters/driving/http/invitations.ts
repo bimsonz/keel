@@ -149,6 +149,14 @@ const notFound = (caller: Caller, detail?: string) => ({
   ),
 });
 
+/** An invitation asked for with scopes no invitation gives: 400, from the body's check or the machine's. */
+const scopesRefused = (caller: Caller) => ({
+  status: 400 as const,
+  body: problem(400, "request.invalid", caller.requestId, {
+    detail: "An invitation gives agent:read, or agent:read and agent:work, each named once.",
+  }),
+});
+
 const idempotencyConflict = (caller: Caller, error: IdempotencyConflict, operationId: string) => ({
   status: 409 as const,
   body: problem(409, "request.idempotency_conflict", caller.requestId, {
@@ -163,12 +171,13 @@ const idempotencyConflict = (caller: Caller, error: IdempotencyConflict, operati
  * The refusals of a move on an agent's place as it stands, in a namespace or
  * on one project: 409, saying what is in the way. It names no person: a member
  * reads who invited the agent from the org's list, and a project's owner made
- * every invitation to it.
+ * every invitation to it. Scopes no invitation gives are 400, as the body's
+ * own check answers them before the machine is asked.
  */
 function stateRefused(
   caller: Caller,
   error: InvitationRefused,
-): { readonly status: 409; readonly body: ProblemBody } {
+): { readonly status: 400 | 409; readonly body: ProblemBody } {
   switch (error.reason) {
     case "already-invited":
       return {
@@ -214,6 +223,8 @@ function stateRefused(
           detail: `The invitation of ${error.agentId} is not this caller's to end.`,
         }),
       };
+    case "invalid-scopes":
+      return scopesRefused(caller);
     default: {
       const unmapped: never = error.reason;
       return unmapped;
@@ -225,7 +236,7 @@ export function inviteError(
   caller: Caller,
   error: InvitationRefused | IdempotencyConflict,
   operationId = "Namespaces_inviteAgent",
-): { readonly status: 409; readonly body: ProblemBody } {
+): { readonly status: 400 | 409; readonly body: ProblemBody } {
   switch (error._tag) {
     case "InvitationRefused":
       return stateRefused(caller, error);
@@ -248,7 +259,7 @@ function moveError(
   caller: Caller,
   error: InvitationRefused | IdempotencyConflict,
   operationId: string,
-): { readonly status: 404 | 409; readonly body: ProblemBody } {
+): { readonly status: 400 | 404 | 409; readonly body: ProblemBody } {
   switch (error._tag) {
     case "InvitationRefused":
       return error.reason === "not-invited" ? notFound(caller) : stateRefused(caller, error);
@@ -311,13 +322,7 @@ const invitationAsked = (
     if (principal._tag !== "User")
       return yield* Effect.die(new Error("an invitation ran without a user"));
     const scopes = decodeScopes(input.scopes ?? INVITED_SCOPES);
-    if (Option.isNone(scopes))
-      return Result.fail({
-        status: 400 as const,
-        body: problem(400, "request.invalid", caller.requestId, {
-          detail: "An invitation gives agent:read, or agent:read and agent:work, each named once.",
-        }),
-      });
+    if (Option.isNone(scopes)) return Result.fail(scopesRefused(caller));
     // An agent's handle is its own namespace's, and that namespace's id is the agent's.
     const named = yield* Namespaces.use((namespaces) => namespaces.byHandle(input.agent));
     const agentId = Option.flatMap(named, (found) =>

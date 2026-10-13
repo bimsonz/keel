@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t invitation.scopes-refused
+# kills: invitation.scopes-refused
+# why: a token that asked for less holds everything the invitation gives
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index f273fb45..055f2615 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -237,7 +237,7 @@ export const evolveInvitation = (
+  * invitation gives. A token that asked for less holds no more for it.
+  */
+ export const scopesUnder = (given: InvitationScopes, held: readonly Scope[]): readonly Scope[] =>
+-  held.filter((scope) => given.some((granted) => granted === scope));
++  given.filter(() => held.length > 0);
+ 
+ /** Whether an invitation lets its agent work, or only read. */
+ export const givesWork = (given: InvitationScopes): boolean => given.includes("agent:work");

@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t invitation.row-is-its-own
+# kills: invitation.row-is-its-own
+# why: a command on a project's invitation is decided against the namespace's row, or another project's, and the other way
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index f273fb45..94668531 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -137,7 +137,6 @@ export const decideInvitation = (
+   const { namespace, agentId, projectId } = facts;
+   if (invitation !== undefined && invitation.agentId !== agentId) return notTheRow(invitation);
+   if (invitation !== undefined && invitation.namespace !== namespace) return notTheRow(invitation);
+-  if (invitation !== undefined && invitation.projectId !== projectId) return notTheRow(invitation);
+   const events = eventsOf(facts);
+   const refuse = (reason: InvitationRefused["reason"]): Decision =>
+     Result.fail(

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.invitation-rows
+# kills: authz.invitation-rows
+# why: nobody is refused accepting an invitation, a caller with no credential among them
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index e161bdfa..14c5f185 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -163,7 +163,7 @@ export const SPEC_ACTIONS = {
+   Operator_reinstateAgent: rule("Agent", "sponsor"),
+   Agents_endSponsorship: rule("Agent", "sponsorOrSelf"),
+   Agents_listNamespaces: rule("Self", "agent"),
+-  Agents_acceptInvitation: rule("Self", "agent"),
++  Agents_acceptInvitation: rule("Self", "anyone"),
+   Agents_leaveNamespace: rule("Self", "agent"),
+   Agents_listProjects: rule("Self", "agent"),
+   Agents_acceptProjectInvitation: rule("Self", "agent"),

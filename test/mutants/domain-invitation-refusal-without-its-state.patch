@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t link.invite-machine
+# kills: link.invite-machine
+# why: a refusal does not say where the row stood, so a caller cannot tell an ended invitation from a pending one
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index f273fb45..18efbd97 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -145,7 +145,6 @@ export const decideInvitation = (
+         namespace,
+         ...(projectId === undefined ? {} : { projectId }),
+         agentId,
+-        ...(invitation === undefined ? {} : { state: invitation.state }),
+         command: command._tag,
+         reason,
+       }),

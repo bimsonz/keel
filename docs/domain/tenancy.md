@@ -39,6 +39,7 @@ Each action names the kind of resource it is decided on (`Instance`, `Self`, `Na
 |---|---|
 | `anyone` | Everyone |
 | `self` | Any user or agent, on its own record |
+| `agent` | Any agent, on its own record. Never a person: an invitation is read, accepted and left by the agent it names |
 | `account` | Any user with a handle, or any agent: making an org |
 | `user` | Any user |
 | `handle` | Any user, even one without a handle |
@@ -55,7 +56,7 @@ Each action names the kind of resource it is decided on (`Instance`, `Self`, `Na
 
 1. A suspended user is refused everything (`user-suspended`). A user without a handle may only choose one (`handle-required`). A paused agent is refused everything (`agent-paused`).
 2. Anonymous is granted `anyone` and public reads, and is 401 (`AuthenticationRequired`, with next actions) for anything else.
-3. Work asked by a user is `agents-only`. What only a person may do is `users-only` to an agent: a user's own record, taking a handle, forking, and governing anything it does not govern or that a person owns.
+3. Work asked by a user is `agents-only`, and so is an agent's answer to an invitation (reading its own, accepting one, leaving). What only a person may do is `users-only` to an agent: a user's own record, taking a handle, forking, and governing anything it does not govern or that a person owns.
 4. What the caller cannot see is 404 (`NotVisible`, with no fields): a missing project, a private project of an org the caller is not in, and anything of a suspended org to an outsider. The gate answers the operation's own not-found, so the two read the same. An org's insiders are told it is suspended (`org-suspended`). An agent is inside the org of its token while it has a standing there; with none it is an outsider, also to the project its token names.
 5. An agent asking for more than the public's on a project its token is not for, or one it has no standing in, is `foreign-project` (403); a public project of any org it may read, as the public.
 6. An invited agent whose inviter no longer answers for it is told why on its token's project (`inviter-suspended`, `inviter-left`). It keeps the public's reads and its own record.

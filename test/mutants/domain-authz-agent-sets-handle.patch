@@ -2,12 +2,12 @@
 # kills: authz.any-account
 # why: an agent takes a handle as a person does
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 4a5aca00..c4311ac2 100644
+index e161bdfa..0fe317f4 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -507,9 +507,9 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
-     case "anyone":
+@@ -674,9 +674,9 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
      case "self":
+     case "agent":
      case "account":
 +    case "handle":
        return granted();

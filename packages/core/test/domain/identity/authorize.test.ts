@@ -267,7 +267,14 @@ const PEOPLE_ONLY: ReadonlySet<Need> = new Set(["invite", "inviterOrMaintain"]);
 /** A person's own namespace that no drawn user or agent is in: its id is that person's. */
 const SOMEONES: NamespaceId = makeId("usr", ulid(97));
 const PEOPLES: readonly Right[] = ["member", "maintain", "own"];
-const UNSCOPED: ReadonlySet<Need> = new Set(["anyone", "self", "account", "user", "handle"]);
+const UNSCOPED: ReadonlySet<Need> = new Set([
+  "anyone",
+  "self",
+  "agent",
+  "account",
+  "user",
+  "handle",
+]);
 
 const user = (over: Partial<UserPrincipal> = {}): UserPrincipal => ({
   _tag: "User",
@@ -602,6 +609,27 @@ describe("authorize", () => {
     expect(remove(as(ada), own)).toBe("404");
     const agentsOwn = makeId("agt", ulid(7));
     expect(invite(as(ada, "owner"), into(agentsOwn, { personOwned: false }))).toBe("404");
+  });
+
+  it("[authz.inviter-or-maintain] whatever role a person holds and whoever invited the agent, it is taken out by a maintainer, an owner or the member who invited it, and by nobody else", () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...USERS),
+        fc.option(roleArb, { nil: undefined }),
+        fc.option(fc.constantFrom(...USERS), { nil: undefined }),
+        (userId, role, inviter) => {
+          const person = user({
+            userId,
+            memberships: role === undefined ? [] : [{ org: ORG_1, role }],
+          });
+          const org = into(ORG_1, inviter === undefined ? {} : { inviter });
+          // Written apart from the policy: the role's rank, or a member's own invitation.
+          const may =
+            role !== undefined && (RANK[role] >= RANK.maintainer || inviter === person.userId);
+          expect(remove(person, org)).toBe(may ? "ok:" : "403:role");
+        },
+      ),
+    );
   });
 
   it("[authz.invite-people-only] no agent invites an agent or takes one out, even where it governs and no person owns: the invitation names the person who answers for it", () => {
@@ -1540,6 +1568,87 @@ describe("authorize: the rows a sponsor's link is made by", () => {
     expect(answers(agentOn(PRJ_1, { paused: true }))).toBe(
       "403:agent-paused 403:agent-paused 403:agent-paused",
     );
+  });
+});
+
+describe("authorize: the rows an invitation is made, read and answered by", () => {
+  // Typed apart from the table. A person who invites and an agent who answers are told apart here, in the policy.
+  const INVITATION_ROWS = [
+    "Namespaces_inviteAgent: Org invite",
+    "Namespaces_removeAgent: Org inviterOrMaintain",
+    "Namespaces_listAgents: Namespace read",
+    "Projects_inviteAgent: PersonalProject own",
+    "Projects_removeAgent: PersonalProject own",
+    "Projects_listAgents: Project read",
+    "Agents_listNamespaces: Self agent",
+    "Agents_acceptInvitation: Self agent",
+    "Agents_leaveNamespace: Self agent",
+    "Agents_listProjects: Self agent",
+    "Agents_acceptProjectInvitation: Self agent",
+    "Agents_leaveProject: Self agent",
+  ];
+  const rows = INVITATION_ROWS.map((row) => row.slice(0, row.indexOf(":"))).filter(isAction);
+  const itsOwn = rows.filter((a) => kindOf(a) === "Self");
+  const all = (answer: string): string => itsOwn.map(() => answer).join(" ");
+  const answers = (who: Principal): string =>
+    itsOwn.map((a) => outcome(decide(who, a, { _tag: "Self" }))).join(" ");
+
+  it("[authz.invitation-rows] an invitation is made and ended by people and read, accepted and left by the agent it names: a person is refused the agent's rows, and an agent the org's two", () => {
+    expect(rows.map((a) => `${a}: ${kindOf(a)} ${needOf(a)}`)).toEqual(INVITATION_ROWS);
+    expect(itsOwn).toHaveLength(6);
+    // These six are every row that asks for an agent, and what a person reads of themselves still asks `self`.
+    expect(ACTION_NAMES.filter((a) => needOf(a) === "agent").toSorted()).toEqual(itsOwn.toSorted());
+    expect(ACTION_NAMES.filter((a) => needOf(a) === "self").toSorted()).toEqual([
+      "askSponsor",
+      "inbox",
+      "whoami",
+    ]);
+
+    // The agent's own six: any agent that is not paused, and no person, whoever they are.
+    fc.assert(
+      fc.property(agentArb, (agent) => answers({ ...agent, paused: false }) === all("ok:")),
+    );
+    fc.assert(
+      fc.property(
+        userArb,
+        (person) =>
+          answers({ ...person, suspended: false, handle: "ada" }) === all("403:agents-only"),
+      ),
+    );
+    fc.assert(fc.property(userArb, (person) => !answers(person).includes("ok:")));
+    expect(answers(user())).toBe(all("403:agents-only"));
+    expect(answers(user({ memberships: [{ org: ORG_1, role: "owner" }] }))).toBe(
+      all("403:agents-only"),
+    );
+    expect(answers(ANON)).toBe(all("401"));
+    expect(answers(agentOn(PRJ_1, { paused: true }))).toBe(all("403:agent-paused"));
+
+    // The org's two: no agent is granted either, whatever its standing and whoever invited the one it names.
+    fc.assert(
+      fc.property(
+        agentArb,
+        orgResArb,
+        fc.option(fc.constantFrom(...USERS), { nil: undefined }),
+        (agent, org, inviter) => {
+          const asked = { ...org, ...(inviter === undefined ? {} : { inviter }) };
+          const said = [
+            decide({ ...agent, paused: false }, "Namespaces_inviteAgent", asked),
+            decide({ ...agent, paused: false }, "Namespaces_removeAgent", asked),
+          ].map(outcome);
+          expect(said.filter((answer) => answer.startsWith("ok:"))).toEqual([]);
+        },
+      ),
+    );
+    const governor = agentIn(ORG_1, { standing: GOVERNS });
+    const unowned = into(ORG_1, { personOwned: false, inviter: INVITER });
+    expect(
+      [
+        decide(governor, "Namespaces_inviteAgent", unowned),
+        decide(governor, "Namespaces_removeAgent", unowned),
+        decide(ANON, "Namespaces_inviteAgent", unowned),
+        decide(ANON, "Namespaces_removeAgent", unowned),
+      ].map(outcome),
+    ).toEqual(["403:users-only", "403:users-only", "401", "401"]);
   });
 });
 

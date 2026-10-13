@@ -1,0 +1,21 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t invitation.fold-table
+# kills: invitation.fold-table
+# why: the fold compares the namespace for an acceptance alone, so another namespace's invitation or end is folded into the row
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index f273fb45..beef8087 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -201,7 +201,12 @@ export const evolveInvitation = (
+ ): Invitation => {
+   const event = committed.payload;
+   if (state !== undefined && event.agentId !== state.agentId) return illegal(state, event);
+-  if (state !== undefined && event.namespace !== state.namespace) return illegal(state, event);
++  if (
++    state !== undefined &&
++    (event._tag === "AgentJoinedNamespace" || event._tag === "AgentJoinedProject") &&
++    event.namespace !== state.namespace
++  )
++    return illegal(state, event);
+   if (state !== undefined && projectOf(event) !== state.projectId) return illegal(state, event);
+   switch (event._tag) {
+     case "AgentInvited":

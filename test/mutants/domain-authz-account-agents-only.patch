@@ -2,14 +2,14 @@
 # kills: authz.any-account
 # why: a person cannot make an org: making one is kept to agents
 diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
-index 3f965345..223bae29 100644
+index e161bdfa..fa9e26b0 100644
 --- a/packages/core/src/domain/identity/authorize.ts
 +++ b/packages/core/src/domain/identity/authorize.ts
-@@ -407,7 +407,6 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
+@@ -577,7 +577,6 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
    switch (need) {
      case "anyone":
      case "self":
 -    case "account":
      case "user":
        return granted();
-     case "work":
+     // Work is an agent's, and so is the answer to an invitation: no person gives it in the agent's place.

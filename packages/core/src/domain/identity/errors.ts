@@ -70,8 +70,9 @@ export class AgentStateRefused extends Schema.TaggedError<AgentStateRefused>()(
 /**
  * The command is not valid for the agent's place in the namespace, or on the
  * one project of it that `projectId` names: an invitation already stands
- * there (`already-invited`), none does (`not-invited`), or another agent asked
- * to end it (`not-a-party`).
+ * there (`already-invited`), none does (`not-invited`), another agent asked
+ * to end it (`not-a-party`), or the invitation asked for would give something
+ * no invitation gives (`invalid-scopes`).
  */
 export class InvitationRefused extends Schema.TaggedError<InvitationRefused>()(
   "InvitationRefused",
@@ -81,7 +82,7 @@ export class InvitationRefused extends Schema.TaggedError<InvitationRefused>()(
     agentId: AgentId,
     state: Schema.optional(Schema.Literals(["invited", "joined", "ended"])),
     command: Schema.String,
-    reason: Schema.Literals(["already-invited", "not-invited", "not-a-party"]),
+    reason: Schema.Literals(["already-invited", "not-invited", "not-a-party", "invalid-scopes"]),
   },
 ) {}
 

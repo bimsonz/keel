@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t invitation.fold-table
+# kills: invitation.fold-table
+# why: an agent invited again holds what its first invitation gave, not what the new one does
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index f273fb45..99329b5a 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -213,7 +213,7 @@ export const evolveInvitation = (
+             ...(event._tag === "AgentInvitedToProject" ? { projectId: event.projectId } : {}),
+             agentId: event.agentId,
+             by: event.by,
+-            scopes: event.scopes,
++            scopes: state?.scopes ?? event.scopes,
+             state: "invited",
+             invitedAt: committed.at,
+           };

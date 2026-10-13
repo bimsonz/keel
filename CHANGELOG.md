@@ -48,6 +48,11 @@ From `contracts-v0` on, every contract change gets a line here. Contract changes
 
 ### Added
 
+- **An invitation is answered by its agent alone, in the policy, and its scopes are the machine's to refuse**.
+  - Core, the policy: `Need` gains `agent` (any agent, on its own record, and no person). `Agents_listNamespaces`, `Agents_acceptInvitation`, `Agents_leaveNamespace`, `Agents_listProjects`, `Agents_acceptProjectInvitation` and `Agents_leaveProject` ask it where they asked `self`, so a person is refused `agents-only` by the policy, where only the handler had stopped them. `whoami`, `inbox` and `askSponsor` still ask `self`. A person who calls one of the six is answered the same 403 `Refused: agents-only.`, now with the policy's next action for it.
+  - Core, the machine: `InvitationRefused.reason` gains `invalid-scopes`. An `Invite` whose scopes are not read, or read and work, each once, is refused by name wherever the row stands, where `decideInvitation` threw a plain error. A row that is not the one its facts name (another agent's, another namespace's, another place's in it) throws `IllegalTransition`, as the fold does, and decides nothing.
+  - HTTP: `invalid-scopes` is answered 400 `request.invalid`, as a body whose scopes the schema refuses is; that check still answers first, so no request reaches the machine's.
+
 - **The API says its version, and the front door's pages name the catalogue in a header** (agent identity; additive, no route and no migration).
   - Spec: `@info(#{ version: "0.2.0" })` on the service in `main.tsp`. The published document's `info.version` is `0.2.0` where it was `0.0.0`, the number a document is given when it declares none. The walk at `/start`, the MCP server's card and the MCP server's own `serverInfo` already read that field, so all three now say `0.2.0`. The packages' own versions do not change.
   - `GET /start`, in each of its three forms, and `GET /llms.txt` answer with `Link: <https://<host>/.well-known/api-catalog>; rel="api-catalog"` (RFC 9727), so a reader is told where the catalogue is without reading the page.

@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t invitation.fold-table
+# kills: invitation.fold-table
+# why: an acceptance is folded into an accepted or an ended invitation, so an agent taken out stands there again
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index f273fb45..10f37892 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -219,7 +219,7 @@ export const evolveInvitation = (
+           };
+     case "AgentJoinedNamespace":
+     case "AgentJoinedProject":
+-      return state?.state === "invited"
++      return state !== undefined
+         ? { ...state, state: "joined", joinedAt: committed.at }
+         : illegal(state, event);
+     case "AgentLeftNamespace":

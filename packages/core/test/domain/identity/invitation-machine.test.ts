@@ -10,16 +10,21 @@ import {
   type InvitationEvent,
   type InvitationFacts,
   type InvitationScopes,
+  givesWork,
   INVITED_SCOPES,
   replayInvitation,
+  type Scope,
+  scopesUnder,
 } from "../../../src/domain/identity/index.ts";
 import {
   agentActor,
   type AgentId,
+  canonicalJson,
   type CommandActor,
   type Committed,
   IllegalTransition,
   Instant,
+  type Json,
   makeId,
   type NamespaceId,
   type ProjectId,
@@ -29,6 +34,7 @@ import {
 import { invitationChart } from "../../charts/charts.ts";
 import { ABSENT, foldsOf, offChart, uncovered, type View } from "../../charts/conformance.ts";
 import { fc } from "../../support/fast-check.ts";
+import { foldCases, foldLines, foldShape } from "../../support/fold-table.ts";
 import { type Machine, tour } from "../../support/machine.ts";
 
 const ulid = (n: number): string => String(n).padStart(26, "0");
@@ -44,14 +50,26 @@ const ON_PROJECT: InvitationFacts = { namespace: ANN, agentId: BOT, projectId: P
 const BOTH: InvitationScopes = ["agent:read", "agent:work"];
 const READ: InvitationScopes = ["agent:read"];
 
-/** Plays commands through decide and evolve, a millisecond apart, keeping what each committed or why it was refused. */
+/**
+ * Plays commands through decide and evolve, a millisecond apart, keeping what
+ * each committed or why it was refused; and, beside them, who each end named
+ * against who asked for it, and the state each refusal carried against the
+ * row's.
+ */
 function play(commands: readonly InvitationCommand[], facts: InvitationFacts = FACTS) {
   let state: Invitation | undefined;
   const log: Committed<InvitationEvent>[] = [];
+  const ends: { readonly asked: string; readonly named: string }[] = [];
+  const refusals: { readonly row: string; readonly carried: string }[] = [];
   const results = commands.map((command, index) => {
     const decided = decideInvitation(state, command, facts);
-    if (Result.isFailure(decided)) return decided.failure.reason;
+    if (Result.isFailure(decided)) {
+      refusals.push({ row: state?.state ?? "none", carried: decided.failure.state ?? "none" });
+      return decided.failure.reason;
+    }
     for (const payload of decided.success) {
+      if (command._tag === "End" && "reason" in payload)
+        ends.push({ asked: command.by, named: payload.by });
       const committed = { at: Instant(1_760_000_000_000 + index), payload };
       state = evolveInvitation(state, committed);
       log.push(committed);
@@ -60,7 +78,7 @@ function play(commands: readonly InvitationCommand[], facts: InvitationFacts = F
       "reason" in event ? `${event._tag}:${event.reason}` : event._tag,
     );
   });
-  return { state, log, results };
+  return { state, log, results, ends, refusals };
 }
 
 const invite = (by: UserId, scopes: InvitationScopes = BOTH): InvitationCommand => ({
@@ -86,6 +104,19 @@ const machine: Machine<Invitation, InvitationCommand, InvitationEvent, Invitatio
   decide: decideInvitation,
   evolve: evolveInvitation,
 };
+
+/** Every command from every state, with no seed, in one place: the agent's own end and a person's. */
+const walkedIn = (facts: InvitationFacts) =>
+  tour(machine, {
+    start: Instant(START),
+    facts: () => facts,
+    moves: () =>
+      [invite(ANN), accept, end(agentActor(BOT)), end(userActor(ANN))].map((command) => ({
+        command,
+        dt: 1,
+      })),
+    signature: (invitation) => invitation?.state ?? ABSENT,
+  });
 
 // The chart checks the machine; it never drives it.
 const invitationView: View<Invitation, InvitationEvent> = {
@@ -361,7 +392,10 @@ describe("the invitation machine", () => {
   it("[link.invite-machine] any sequence of commands does what the rules say, in a namespace and on one project alike, somebody answers only for an accepted invitation, and the log replays to the state", () => {
     fc.assert(
       fc.property(runArb, ([facts, commands]) => {
-        const { state, log, results } = play(commands, facts);
+        const { state, log, results, ends, refusals } = play(commands, facts);
+        // An end's event names whoever ended it, and a refusal says where the row stood.
+        expect(ends.map((e) => e.named)).toEqual(ends.map((e) => e.asked));
+        expect(refusals.map((r) => r.carried)).toEqual(refusals.map((r) => r.row));
         let model: Model = { state: "none" };
         const expected = commands.map((command) => {
           const { next, says } = step(model, command);
@@ -392,19 +426,7 @@ describe("the invitation machine", () => {
         }
       }),
     );
-    // Every command from every state, with no seed, in each place: the agent's own end and a person's.
-    const walked = [FACTS, ON_PROJECT].flatMap((facts) =>
-      tour(machine, {
-        start: Instant(START),
-        facts: () => facts,
-        moves: () =>
-          [invite(ANN), accept, end(agentActor(BOT)), end(userActor(ANN))].map((command) => ({
-            command,
-            dt: 1,
-          })),
-        signature: (invitation) => invitation?.state ?? ABSENT,
-      }),
-    );
+    const walked = [FACTS, ON_PROJECT].flatMap(walkedIn);
     expect(offChart(invitationChart, walked, invitationView)).toEqual([]);
     expect(uncovered(invitationChart, walked, invitationView)).toEqual([]);
     // The two places share the chart's edges and no event: a namespace's run takes none of a project's.
@@ -418,5 +440,251 @@ describe("the invitation machine", () => {
       "AgentLeftNamespace",
       "AgentLeftNamespace",
     ]);
+  });
+});
+
+/** What the fold's table is about: the whole row, its two instants among it. */
+interface FoldedInvitation {
+  readonly namespace: NamespaceId;
+  readonly projectId?: ProjectId;
+  readonly agentId: AgentId;
+  readonly by: UserId;
+  readonly scopes: InvitationScopes;
+  readonly state: Invitation["state"];
+  readonly invitedAt: Instant;
+  readonly joinedAt?: Instant;
+}
+
+/** The fold's from-table (state-machines.md § Invitation), typed apart from `evolveInvitation`. */
+const invitationFolds = (
+  from: FoldedInvitation | undefined,
+  event: InvitationEvent,
+  at: Instant,
+): FoldedInvitation | "illegal" => {
+  const project = "projectId" in event ? event.projectId : undefined;
+  // A row takes only its own agent's events, in its own namespace and its own place there.
+  const itsOwn =
+    from === undefined ||
+    (event.agentId === from.agentId &&
+      event.namespace === from.namespace &&
+      project === from.projectId);
+  if (!itsOwn) return "illegal";
+  switch (event._tag) {
+    case "AgentInvited":
+    case "AgentInvitedToProject":
+      // A new invitation, from nothing or from an ended one: who, on what and when are the
+      // event's, and nobody has accepted it.
+      return from === undefined || from.state === "ended"
+        ? {
+            namespace: event.namespace,
+            ...(project === undefined ? {} : { projectId: project }),
+            agentId: event.agentId,
+            by: event.by,
+            scopes: event.scopes,
+            state: "invited",
+            invitedAt: at,
+          }
+        : "illegal";
+    case "AgentJoinedNamespace":
+    case "AgentJoinedProject":
+      return from?.state === "invited" ? { ...from, state: "joined", joinedAt: at } : "illegal";
+    case "AgentLeftNamespace":
+    case "AgentLeftProject":
+      // Whatever its reason: the fold reads who ended it and why from nothing but the event's kind.
+      return from !== undefined && from.state !== "ended" ? { ...from, state: "ended" } : "illegal";
+    default: {
+      const unreachable: never = event;
+      return unreachable;
+    }
+  }
+};
+
+const OTHER_PRJ: ProjectId = makeId("prj", ulid(7));
+const REASONS = ["declined", "left", "withdrawn", "removed"] as const;
+const shownInvitation = (f: FoldedInvitation): string =>
+  [
+    `${f.agentId} in ${f.namespace}`,
+    ...(f.projectId === undefined ? [] : [`on ${f.projectId}`]),
+    `${f.state} by ${f.by} for ${f.scopes.join("+")}, invited ${f.invitedAt}`,
+    ...(f.joinedAt === undefined ? [] : [`joined ${f.joinedAt}`]),
+  ].join(" ");
+
+describe("the Invitation fold", () => {
+  it("[invitation.fold-table] the fold takes an event exactly where its table says, lands where it says, and refuses every other as illegal", () => {
+    const cases = foldCases<Invitation, InvitationEvent, FoldedInvitation>({
+      evolve: evolveInvitation,
+      walked: [FACTS, ON_PROJECT].flatMap(walkedIn),
+      summary: (i) => ({
+        namespace: i.namespace,
+        ...(i.projectId === undefined ? {} : { projectId: i.projectId }),
+        agentId: i.agentId,
+        by: i.by,
+        scopes: i.scopes,
+        state: i.state,
+        invitedAt: i.invitedAt,
+        ...(i.joinedAt === undefined ? {} : { joinedAt: i.joinedAt }),
+      }),
+      shown: shownInvitation,
+      // Each event as committed, as another agent's and in the other namespace (so a
+      // namespace's event meets a project's row of that namespace, and a project's a
+      // namespace's row); a project's for another project too; an invitation by each of two
+      // members on read and on read and work; an end under each of its four reasons.
+      forms: (event) => [
+        event,
+        { ...event, agentId: OTHER_BOT },
+        { ...event, namespace: event.namespace === ORG ? ANN : ORG },
+        ...("projectId" in event ? [{ ...event, projectId: OTHER_PRJ }] : []),
+        ...("scopes" in event
+          ? [ANN, BEN].flatMap((by) => [BOTH, READ].map((scopes) => ({ ...event, by, scopes })))
+          : []),
+        ...("reason" in event ? REASONS.map((reason) => ({ ...event, reason })) : []),
+      ],
+      // Two instants, neither one the tour stood at: what the fold dates, it dates by its own.
+      times: [Instant(START + 100), Instant(START + 200)],
+      table: invitationFolds,
+    });
+    const { folded, table } = foldLines(cases);
+    expect(folded).toEqual(table);
+    // Eleven rows: nothing, and in each place an invitation pending, accepted, ended before it
+    // was accepted, ended after, and made again. Fifty-six forms at two instants, 162 taken.
+    const row = (place: InvitationFacts, state: Invitation["state"], ...at: readonly number[]) =>
+      shownInvitation({
+        namespace: place.namespace,
+        ...(place.projectId === undefined ? {} : { projectId: place.projectId }),
+        agentId: BOT,
+        by: ANN,
+        scopes: BOTH,
+        state,
+        invitedAt: Instant(START + (at[0] ?? 0)),
+        ...(at[1] === undefined ? {} : { joinedAt: Instant(START + at[1]) }),
+      });
+    expect(foldShape(cases)).toEqual({
+      folds: 1232,
+      refused: 1070,
+      rows: [
+        "none",
+        ...[FACTS, ON_PROJECT].flatMap((place) => [
+          row(place, "invited", 1),
+          row(place, "joined", 1, 2),
+          row(place, "ended", 1),
+          row(place, "ended", 1, 2),
+          row(place, "invited", 3),
+        ]),
+      ],
+    });
+  });
+});
+
+const asJson = (value: unknown): Json => JSON.parse(JSON.stringify(value));
+
+/** Every row a tour reaches in a place, nothing among them, each once. */
+const rowsIn = (facts: InvitationFacts): readonly (Invitation | undefined)[] => [
+  undefined,
+  ...new Map(
+    walkedIn(facts).map((fold) => [canonicalJson(asJson(fold.after)), fold.after]),
+  ).values(),
+];
+
+/** A place's facts, wrong in one thing at a time: the agent, the namespace, the place in it. */
+const wrong = (facts: InvitationFacts): readonly InvitationFacts[] => [
+  { ...facts, agentId: OTHER_BOT },
+  { ...facts, namespace: facts.namespace === ORG ? ANN : ORG },
+  facts.projectId === undefined
+    ? { ...facts, projectId: PRJ }
+    : { namespace: facts.namespace, agentId: facts.agentId },
+  ...(facts.projectId === undefined ? [] : [{ ...facts, projectId: OTHER_PRJ }]),
+];
+
+/** What a decision came to: its events' names, its refusal's reason, or the error it threw. */
+const decided = (
+  row: Invitation | undefined,
+  command: InvitationCommand,
+  facts: InvitationFacts,
+): string => {
+  try {
+    const result = decideInvitation(row, command, facts);
+    return Result.isFailure(result)
+      ? `refused ${result.failure.reason} ${result.failure.state ?? "none"}`
+      : `took ${result.success.map((event) => event._tag).join(",")}`;
+  } catch (error) {
+    return error instanceof IllegalTransition ? "IllegalTransition" : `threw ${String(error)}`;
+  }
+};
+
+describe("the invitation machine's own row and its scopes", () => {
+  const COMMANDS: readonly InvitationCommand[] = [
+    invite(ANN),
+    invite(BEN, READ),
+    accept,
+    end(agentActor(BOT)),
+    end(agentActor(OTHER_BOT)),
+    end(userActor(ANN)),
+    end(userActor(BEN)),
+  ];
+
+  it("[invitation.row-is-its-own] a command decided against a row its facts do not name, another agent's, another namespace's or another place's, is a defect and decides nothing", () => {
+    const tried = [FACTS, ON_PROJECT].flatMap((facts) =>
+      rowsIn(facts).flatMap((row) =>
+        COMMANDS.flatMap((command) => [
+          { row, own: true, said: decided(row, command, facts) },
+          ...wrong(facts).map((other) => ({ row, own: false, said: decided(row, command, other) })),
+        ]),
+      ),
+    );
+    // Nothing is anyone's row, so only a row that stands for something can be the wrong one.
+    const defects = tried.filter((t) => t.said === "IllegalTransition");
+    expect(defects).toEqual(tried.filter((t) => !t.own && t.row !== undefined));
+    // Two places by five rows by seven commands, under three wrong facts and four.
+    expect(defects).toHaveLength(245);
+    expect(tried.filter((t) => t.said.startsWith("threw"))).toEqual([]);
+  });
+
+  it("[invitation.scopes-refused] an invitation that would give anything but read, or read and work, each once, is refused by name wherever the row stands, and what an invitation gives is cut to it", () => {
+    const WORK_ALONE: InvitationScopes = ["agent:work"];
+    const TWICE: InvitationScopes = ["agent:read", "agent:read"];
+    const AND_AGAIN: InvitationScopes = ["agent:read", "agent:work", "agent:read"];
+    const refusedScopes: readonly InvitationScopes[] = [[], WORK_ALONE, TWICE, AND_AGAIN];
+    const said = [FACTS, ON_PROJECT].flatMap((facts) =>
+      rowsIn(facts).flatMap((row) =>
+        [ANN, BEN].flatMap((by) =>
+          refusedScopes.map((scopes) => decided(row, invite(by, scopes), facts)),
+        ),
+      ),
+    );
+    const expected = [FACTS, ON_PROJECT].flatMap((facts) =>
+      rowsIn(facts).flatMap((row) =>
+        [ANN, BEN].flatMap(() =>
+          refusedScopes.map(() => `refused invalid-scopes ${row?.state ?? "none"}`),
+        ),
+      ),
+    );
+    expect(said).toEqual(expected);
+    expect(said).toHaveLength(96);
+    // What the schema takes is still taken where no invitation stands.
+    expect(decided(undefined, invite(ANN, ["agent:work", "agent:read"]), FACTS)).toBe(
+      "took AgentInvited",
+    );
+
+    expect([READ, BOTH, WORK_ALONE, ["agent:work", "agent:read"] as const].map(givesWork)).toEqual([
+      false,
+      true,
+      true,
+      true,
+    ]);
+
+    const SCOPES: readonly Scope[] = ["agent:work", "agent:read", "operator", "observer"];
+    fc.assert(
+      fc.property(
+        fc.constantFrom<InvitationScopes>(READ, BOTH, ["agent:work", "agent:read"]),
+        fc.subarray([...SCOPES, ...SCOPES]),
+        (given, held) => {
+          const under = scopesUnder(given, held);
+          // Never more than the token holds nor than the invitation gives, and all of what both do.
+          const both = new Set<Scope>(given);
+          expect(under).toEqual(held.filter((scope) => both.has(scope)));
+          expect(under.filter((scope) => !held.includes(scope) || !both.has(scope))).toEqual([]);
+        },
+      ),
+    );
   });
 });

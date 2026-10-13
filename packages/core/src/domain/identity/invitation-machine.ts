@@ -95,6 +95,8 @@ const eventsOf = ({ namespace, agentId, projectId }: InvitationFacts) =>
 const projectOf = (event: InvitationEvent): ProjectId | undefined =>
   "projectId" in event ? event.projectId : undefined;
 
+const givesWhatAnInvitationGives = Schema.is(InvitationScopes);
+
 const sameScopes = (a: readonly Scope[], b: readonly Scope[]): boolean =>
   a.length === b.length && a.every((scope) => b.includes(scope));
 
@@ -102,6 +104,12 @@ const standing = (
   invitation: Invitation | undefined,
 ): invitation is Invitation & { readonly state: "invited" | "joined" } =>
   invitation !== undefined && invitation.state !== "ended";
+
+const notTheRow = (invitation: Invitation): never => {
+  throw new IllegalTransition(
+    `a command on an agent's place was decided against the row of ${invitation.agentId} in ${invitation.namespace}${invitation.projectId === undefined ? "" : ` on ${invitation.projectId}`}, which its facts do not name`,
+  );
+};
 
 /**
  * Decides a command on an agent's place in a namespace, or on one project of
@@ -116,6 +124,10 @@ const standing = (
  * An end says why by who ends it and when: the agent declines an invitation
  * it has not accepted and leaves one it has; the member who made a pending
  * invitation withdraws it; any other end by a person removes the agent.
+ *
+ * The row is the one its facts name: a row of another agent, another namespace
+ * or another place in it is the caller's mistake and throws
+ * `IllegalTransition`, as the fold does, and nothing is decided.
  */
 export const decideInvitation = (
   invitation: Invitation | undefined,
@@ -123,6 +135,9 @@ export const decideInvitation = (
   facts: InvitationFacts,
 ): Decision => {
   const { namespace, agentId, projectId } = facts;
+  if (invitation !== undefined && invitation.agentId !== agentId) return notTheRow(invitation);
+  if (invitation !== undefined && invitation.namespace !== namespace) return notTheRow(invitation);
+  if (invitation !== undefined && invitation.projectId !== projectId) return notTheRow(invitation);
   const events = eventsOf(facts);
   const refuse = (reason: InvitationRefused["reason"]): Decision =>
     Result.fail(
@@ -137,6 +152,8 @@ export const decideInvitation = (
     );
   switch (command._tag) {
     case "Invite":
+      // Read, or read and work, each once: asked of the command, whatever stands.
+      if (!givesWhatAnInvitationGives(command.scopes)) return refuse("invalid-scopes");
       if (!standing(invitation))
         return Result.succeed([events.invited(command.by, command.scopes)]);
       return invitation.by === command.by && sameScopes(invitation.scopes, command.scopes)

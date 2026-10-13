@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/authorize.test.ts -t authz.invitation-rows
+# kills: authz.invitation-rows
+# why: any member takes out an agent another member invited, and so does an agent where it governs
+diff --git a/packages/core/src/domain/identity/authorize.ts b/packages/core/src/domain/identity/authorize.ts
+index e161bdfa..7daf2cb8 100644
+--- a/packages/core/src/domain/identity/authorize.ts
++++ b/packages/core/src/domain/identity/authorize.ts
+@@ -113,7 +113,7 @@ export const SPEC_ACTIONS = {
+   Namespaces_listAgents: rule("Namespace", "read"),
+   // An agent is invited into an org, never into a person's own namespace, and by a person.
+   Namespaces_inviteAgent: rule("Org", "invite"),
+-  Namespaces_removeAgent: rule("Org", "inviterOrMaintain"),
++  Namespaces_removeAgent: rule("Org", "member"),
+   // In a person's own namespace an agent is invited to one project, never to the whole of it.
+   Projects_inviteAgent: rule("PersonalProject", "own"),
+   Projects_listAgents: rule("Project", "read"),

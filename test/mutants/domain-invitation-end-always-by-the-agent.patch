@@ -1,0 +1,16 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t link.invite-machine
+# kills: link.invite-machine
+# why: an end's event names the agent as whoever ended it, also when a person took it out
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index f273fb45..7927bf5f 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -174,7 +174,7 @@ export const decideInvitation = (
+         : pending && command.by === userActor(invitation.by)
+           ? "withdrawn"
+           : "removed";
+-      return Result.succeed([events.left(command.by, reason)]);
++      return Result.succeed([events.left(agentActor(agentId), reason)]);
+     }
+     default: {
+       const unreachable: never = command;

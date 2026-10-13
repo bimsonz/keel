@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project unit packages/core/test/domain/identity/invitation-machine.test.ts -t invitation.fold-table
+# kills: invitation.fold-table
+# why: an agent invited again still reads as having joined, at the old instant, before it has accepted
+diff --git a/packages/core/src/domain/identity/invitation-machine.ts b/packages/core/src/domain/identity/invitation-machine.ts
+index f273fb45..0166ce7f 100644
+--- a/packages/core/src/domain/identity/invitation-machine.ts
++++ b/packages/core/src/domain/identity/invitation-machine.ts
+@@ -216,6 +216,7 @@ export const evolveInvitation = (
+             scopes: event.scopes,
+             state: "invited",
+             invitedAt: committed.at,
++            ...(state?.joinedAt === undefined ? {} : { joinedAt: state.joinedAt }),
+           };
+     case "AgentJoinedNamespace":
+     case "AgentJoinedProject":

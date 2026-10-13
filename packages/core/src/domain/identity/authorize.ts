@@ -28,6 +28,8 @@ import type {
 /**
  * What an action asks of its caller:
  * - `anyone`: no one is refused; `self`: any user or agent, on its own record;
+ *   `agent`: any agent, on its own record, and no person: an invitation is the
+ *   agent's to read, accept and leave, and nobody answers it in its place;
  *   `account`: any user or agent; `user`: any user; `handle`: any user, even
  *   one without a handle yet;
  * - `read`: reads the resource (public projects to anyone, private ones to their
@@ -49,6 +51,7 @@ import type {
 export type Need =
   | "anyone"
   | "self"
+  | "agent"
   | "account"
   | "user"
   | "handle"
@@ -159,12 +162,12 @@ export const SPEC_ACTIONS = {
   Operator_suspendAgent: rule("Agent", "sponsor"),
   Operator_reinstateAgent: rule("Agent", "sponsor"),
   Agents_endSponsorship: rule("Agent", "sponsorOrSelf"),
-  Agents_listNamespaces: rule("Self", "self"),
-  Agents_acceptInvitation: rule("Self", "self"),
-  Agents_leaveNamespace: rule("Self", "self"),
-  Agents_listProjects: rule("Self", "self"),
-  Agents_acceptProjectInvitation: rule("Self", "self"),
-  Agents_leaveProject: rule("Self", "self"),
+  Agents_listNamespaces: rule("Self", "agent"),
+  Agents_acceptInvitation: rule("Self", "agent"),
+  Agents_leaveNamespace: rule("Self", "agent"),
+  Agents_listProjects: rule("Self", "agent"),
+  Agents_acceptProjectInvitation: rule("Self", "agent"),
+  Agents_leaveProject: rule("Self", "agent"),
   Operator_putSettings: rule("Project", "maintain"),
 } as const satisfies Record<string, ActionRule>;
 
@@ -577,7 +580,9 @@ const user = (principal: UserPrincipal, need: Need, resource: Resource): Decisio
     case "account":
     case "user":
       return granted();
+    // Work is an agent's, and so is the answer to an invitation: no person gives it in the agent's place.
     case "work":
+    case "agent":
       return refused("agents-only");
     // An agent's account is there only for the person who stands behind it.
     case "sponsor":
@@ -667,6 +672,7 @@ const agent = (principal: AgentPrincipal, need: Need, resource: Resource): Decis
   switch (need) {
     case "anyone":
     case "self":
+    case "agent":
     case "account":
       return granted();
     case "user":
