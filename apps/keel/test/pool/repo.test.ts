@@ -120,6 +120,8 @@ describe("the repo read API's doorway", () => {
   it("[views.trunk.wired] the trunk's route answers through the real doorway: anyone reads a public project's trunk, a private one's is read by its own agent, and a stranger is told the project is missing", async () => {
     const { via, heads } = await repoApp();
     const own = await tokenFor(await seedAgent({ projectId: PRIVATE }));
+    // Seeding an agent of a project is what places it in its org: without one the public project reads as missing.
+    await seedAgent({ projectId: PUBLIC });
     const other = await tokenFor(await seedForeignAgent());
     const open = await trunkOf(via, PUBLIC);
     expect(open).toMatchObject({
@@ -147,6 +149,8 @@ describe("the repo read API's doorway", () => {
   it("[views.lanes.wired] the lanes' route answers through the real doorway, decided on the project its path names: anyone reads a public project's lanes, a private one's are read by its own agent, and a stranger is told the project is missing", async () => {
     const { via } = await repoApp();
     const own = await tokenFor(await seedAgent({ projectId: PRIVATE }));
+    // Seeding an agent of a project is what places it in its org: without one the public project reads as missing.
+    await seedAgent({ projectId: PUBLIC });
     const other = await tokenFor(await seedForeignAgent());
     expect(await lanesOf(via, PUBLIC)).toEqual(page(PUBLIC));
     expect(await lanesOf(via, PRIVATE, `Bearer ${own}`)).toEqual(page(PRIVATE));
