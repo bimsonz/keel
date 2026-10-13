@@ -656,7 +656,7 @@ export function createFakeKeel(
             409,
             "project.name_taken",
             [again("Choose another name")],
-            `The org already has a project named "${name.toLowerCase()}", in some case.`,
+            `${handle.toLowerCase()} already has a project named "${name.toLowerCase()}", in some case.`,
           );
         // One public repository answers here. Any other address is to Keel as a private one is: nothing there.
         if (typeof address === "string" && address !== PUBLIC_REPOSITORY)
