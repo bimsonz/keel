@@ -43,10 +43,17 @@ export const HOLDER_AGENT = "holder-agent";
 
 /**
  * What a change's agent hears from a subject, on its subscription scoped to
- * that change: its premise suspected, and a conflict it is a party to put to
- * a person or resolved, whether or not that parked the change.
+ * that change: its premise suspected, and a conflict it is a party to opened,
+ * put to a person or resolved, whether or not that parked the change. It is
+ * told a conflict is suspected when it is, not minutes later at its proof:
+ * nothing is asked of it then, but it knows Keel is proving one.
  */
-export const HOLDER_HEARS = ["PremiseSuspected", "ConflictEscalated", "ConflictResolved"] as const;
+export const HOLDER_HEARS = [
+  "PremiseSuspected",
+  "ConflictSuspected",
+  "ConflictEscalated",
+  "ConflictResolved",
+] as const;
 
 const Held = Schema.Struct({
   premises: Schema.Array(Proposition),

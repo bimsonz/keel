@@ -96,9 +96,23 @@ const decodeEscalation = Schema.decodeUnknownOption(
   }),
 );
 
+const decodeSuspected = Schema.decodeUnknownOption(
+  Schema.Struct({
+    conflictId: Schema.String,
+    parties: Schema.Array(Schema.String),
+    subjectKey: Schema.optional(Schema.String),
+  }),
+);
+
 /** More than the notice's title says, chosen for the event when it is delivered. */
 export function detailOf(event: EventEnvelope): string | undefined {
   switch (event.type) {
+    case "ConflictSuspected":
+      return Option.match(decodeSuspected(event.payload), {
+        onNone: () => undefined,
+        onSome: (p) =>
+          `Keel suspects a conflict between ${p.parties.join(" and ")}${p.subjectKey === undefined ? "" : ` on ${p.subjectKey}`} and is proving it: nothing is asked of you until it has`,
+      });
     case "ConflictNoted":
       return Option.getOrUndefined(decodeNoted(event.payload))?.evidenceRef;
     case "AlternativeDeclared":

@@ -120,6 +120,57 @@ describe("[b21.fallout-race] a premise and an effect that breaks it, in either o
     });
 });
 
+describe("[b21.conflict-suspected-told] a must premise an effect contradicts", () => {
+  it("[b21.conflict-suspected-told] both parties' agents are told at once that Keel suspects a conflict and is proving it, with nothing asked of them; a should premise's holder is told its premise is suspected and no conflict", async () => {
+    await using probes = await inertProbe();
+    const { projectId, change } = await project();
+    const [a, b] = [await change(), await change()];
+    await declared(a, { premises: [premiseOf()] });
+    await declared(b, { declaredEffects: [cachedPerSession] });
+    await drainOutbox(subjectStub(projectId, LEAF));
+    // The conflict's Probe is started and held inert: nothing is proven while the agents read.
+    await vi.waitFor(async () => expect(await probes.get()).toHaveLength(1), {
+      timeout: 10_000,
+      interval: 50,
+    });
+    const conflictId = conflictIdOf(projectId, {
+      premise: { holder: a.changeId, proposition: premiseOf() },
+      effect: { changeId: b.changeId, proposition: cachedPerSession },
+    });
+    const told = async (agentId: ChangeUnderTest["agentId"]) => {
+      const token = await tokenFor(await seedAgent({ id: agentId, projectId }));
+      const response = await exports.default.fetch(`${BASE}/v1/inbox`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = await response.json<{
+        result: {
+          notices: { kind: string; ref?: string; detail?: string; nextActions?: unknown[] }[];
+        };
+      }>();
+      return body.result.notices.filter((n) => n.kind.startsWith("Conflict"));
+    };
+    const detail = `Keel suspects a conflict between ${a.changeId} and ${b.changeId} on ${LEAF} and is proving it: nothing is asked of you until it has`;
+    // The premise's holder, who until now heard nothing before the proof.
+    const holders = await told(a.agentId);
+    expect(holders.map((n) => [n.kind, n.detail])).toEqual([["ConflictSuspected", detail]]);
+    expect(holders[0]?.nextActions ?? []).toEqual([]);
+    expect(JSON.stringify(holders[0])).toContain(conflictId);
+    // And the change whose effect is against it.
+    expect((await told(b.agentId)).map((n) => [n.kind, n.detail])).toEqual([
+      ["ConflictSuspected", detail],
+    ]);
+
+    // A should premise is suspected, and no conflict is: its holder is told of the premise alone.
+    const other = await project();
+    const [c, d] = [await other.change(), await other.change()];
+    await declared(c, { premises: [premiseOf("should")] });
+    await declared(d, { declaredEffects: [cachedPerSession] });
+    await drainOutbox(subjectStub(other.projectId, LEAF));
+    const soft = await tokenFor(await seedAgent({ id: c.agentId, projectId: other.projectId }));
+    expect((await inbox(soft)).map((n) => n.kind)).toEqual(["PremiseSuspected"]);
+  });
+});
+
 describe("[b21.premise-suspected] a should premise an effect contradicts", () => {
   it("[b21.premise-suspected] its holder's agent is told, and after an adopt the adopter is told instead", async () => {
     const { projectId, change } = await project();

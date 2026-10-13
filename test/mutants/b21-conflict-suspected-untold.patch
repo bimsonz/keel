@@ -1,0 +1,15 @@
+# expect-red: pnpm exec vitest run --project pool:keel apps/keel/test/pool/fallout.test.ts -t b21.conflict-suspected-told
+# kills: b21.conflict-suspected-told
+# why: the parties to a suspected conflict hear nothing of it until it is proven
+diff --git a/packages/core/src/application/coordination/subject.ts b/packages/core/src/application/coordination/subject.ts
+index fb8195e1..e70a55c8 100644
+--- a/packages/core/src/application/coordination/subject.ts
++++ b/packages/core/src/application/coordination/subject.ts
+@@ -50,7 +50,6 @@ export const HOLDER_AGENT = "holder-agent";
+  */
+ export const HOLDER_HEARS = [
+   "PremiseSuspected",
+-  "ConflictSuspected",
+   "ConflictEscalated",
+   "ConflictResolved",
+ ] as const;
